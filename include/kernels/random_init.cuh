@@ -40,7 +40,7 @@ namespace quda {
     __device__ constexpr init_random(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int id, int parity)
+    __device__ inline void operator()(int id, int parity) const
     {
       // Each thread gets same seed, a different sequence number, no offset
       int x[4];

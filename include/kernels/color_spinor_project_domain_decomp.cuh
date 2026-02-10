@@ -40,7 +40,7 @@ namespace quda
     constexpr ProjectDD_(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       Coord<4> coord;
       coord.X = getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);

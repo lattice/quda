@@ -175,7 +175,7 @@ namespace quda
     }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int dir) const
     {
       using Link = Matrix<complex<real>, Arg::nColor>;
       complex<real> im(0.0, -1.0);

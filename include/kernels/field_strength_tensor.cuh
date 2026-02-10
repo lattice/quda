@@ -182,7 +182,7 @@ namespace quda
     }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu) const
     {
       int mu, nu;
       switch (mu_nu) { // F[1,0], F[2,0], F[2,1], F[3,0], F[3,1], F[3,2]

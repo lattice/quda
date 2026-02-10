@@ -154,7 +154,7 @@ namespace quda
     constexpr ProlongatorMma(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()()
+    __device__ inline void operator()() const
     {
       int n_offset = target::block_idx().z * Arg::bN;
       int m_offset = target::block_idx().y * Arg::bM;

@@ -318,7 +318,7 @@ namespace quda
     constexpr RestrictorMma(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()()
+    __device__ inline void operator()() const
     {
       int coarse_spin = target::block_idx().x % Arg::coarseSpin;
       int x_coarse = target::block_idx().x / Arg::coarseSpin;

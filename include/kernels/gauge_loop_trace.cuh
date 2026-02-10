@@ -60,7 +60,7 @@ namespace quda {
     constexpr GaugeLoop(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity, int path_id)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity, int path_id) const
     {
       using Link = typename Arg::Link;
 

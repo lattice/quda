@@ -51,7 +51,7 @@ namespace quda {
     /**
      * @brief Measure gauge fixing quality
      */
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity) const
     {
       reduce_t data{0, 0};
       using Link = Matrix<complex<typename Arg::real>, 3>;
@@ -147,7 +147,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-    __device__ inline void operator()(int idx, int mu, bool alive = true)
+    __device__ inline void operator()(int idx, int mu, bool alive = true) const
     {
       using real = typename Arg::real;
       using Link = Matrix<complex<real>, 3>;
@@ -273,7 +273,7 @@ namespace quda {
     constexpr Packer(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int idx)
+    __device__ __host__ inline void operator()(int idx) const
     {
       int X[4];
       for (int dr = 0; dr < 4; dr++) X[dr] = arg.X[dr];
@@ -373,7 +373,7 @@ namespace quda {
     constexpr BorderPointsCompute(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int idd, int parity, int dir)
+    __device__ __host__ void operator()(int idd, int parity, int dir) const
     {
       int dim = 0;
       for (int d = 0; d < 4; d++) if (idd >= arg.offset[d] && idd < arg.offset[d+1]) { dim = d; break; }

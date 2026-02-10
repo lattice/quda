@@ -39,7 +39,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the determinant or trace at site (x_cb, parity)
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity) const
     {
       int X[4];
 #pragma unroll
@@ -50,7 +50,7 @@ namespace quda {
 #pragma unroll
       for(int dr=0; dr<4; ++dr) {
         x[dr] += arg.border[dr];
-        X[dr] += 2*arg.border[dr];
+        X[dr] += 2 * arg.border[dr];
       }
 #pragma unroll
       for (int mu = 0; mu < 4; mu++) {

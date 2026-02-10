@@ -48,7 +48,7 @@ namespace quda
     constexpr APE(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int dir) const
     {
       using real = typename Arg::real;
       typedef Matrix<complex<real>, Arg::nColor> Link;

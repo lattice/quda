@@ -208,7 +208,7 @@ namespace quda {
     constexpr Unitarize(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int mu)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int mu) const
     {
       // result is always in double precision
       Matrix<complex<double>,Arg::nColor> v, result;
@@ -248,7 +248,7 @@ namespace quda {
     constexpr Projector(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int mu)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int mu) const
     {
       Matrix<complex<typename Arg::real>, Arg::nColor> u = arg.u(mu, x_cb, parity);
 

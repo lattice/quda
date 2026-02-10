@@ -63,7 +63,7 @@ namespace quda {
     constexpr CloverCompute(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       constexpr int N = Arg::nColor*Arg::nSpin / 2;
       using real = typename Arg::real;

@@ -48,7 +48,7 @@ namespace quda {
     constexpr InsertTimeslice(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       int x[4];
       getCoords(x, x_cb, arg.X_slice, parity);
@@ -146,7 +146,7 @@ namespace quda {
     constexpr PolyakovLoopProduct(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -207,7 +207,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the (temporal) Polyakov Loop at 3-d site (x_cb, parity)
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity) const
     {
       using HighPrecLink = typename Arg::HighPrecLink;
 

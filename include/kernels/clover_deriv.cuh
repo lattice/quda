@@ -199,7 +199,7 @@ namespace quda
     constexpr CloverDerivative(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __host__ __device__ void operator()(int x_cb, int parity, int mu)
+    __host__ __device__ void operator()(int x_cb, int parity, int mu) const
     {
       using real = typename Arg::real;
       using Complex = complex<real>;

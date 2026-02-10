@@ -29,7 +29,7 @@ namespace quda {
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in
     // order to increase stability
-    __device__ __host__ inline reduce_t operator()(reduce_t &action, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &action, int x_cb, int parity) const
     {
       using matrix = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
@@ -93,7 +93,7 @@ namespace quda {
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in
     // order to increase stability
-    __device__ __host__ inline reduce_t operator()(reduce_t &norm, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &norm, int x_cb, int parity) const
     {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -146,7 +146,7 @@ namespace quda {
     constexpr ApplyU(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       using mat = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 

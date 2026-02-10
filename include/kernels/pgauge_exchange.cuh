@@ -34,7 +34,7 @@ namespace quda {
     constexpr unpacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int idx)
+    __device__ __host__ void operator()(int idx) const
     {
       auto &X = arg.X;
       auto &Xh = arg.Xh;

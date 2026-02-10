@@ -279,7 +279,7 @@ namespace quda
     constexpr CopyColorSpinor_(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       ColorSpinor<typename Arg::realIn, Arg::nColor, Arg::nSpin> in = arg.in(x_cb, (parity + arg.inParity) & 1);
       ColorSpinor<typename Arg::realOut, Arg::nColor, Arg::nSpin> out;

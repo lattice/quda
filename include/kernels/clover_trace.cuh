@@ -163,7 +163,7 @@ namespace quda {
     constexpr CloverSigmaTr(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb) { cloverSigmaTraceCompute<Arg>(arg, x_cb); }
+    __device__ __host__ inline void operator()(int x_cb) const { cloverSigmaTraceCompute<Arg>(arg, x_cb); }
   };
 
 }

@@ -68,7 +68,7 @@ namespace quda {
     constexpr GhostExtractor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int X, int, int parity_dim)
+    __device__ __host__ inline void operator()(int X, int, int parity_dim) const
     {
       using real = typename Arg::real;
       constexpr int nColor = Arg::nColor;
@@ -118,7 +118,7 @@ namespace quda {
     constexpr GhostExtractorFineGrained(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int X, int i, int parity_dim)
+    __device__ __host__ inline void operator()(int X, int i, int parity_dim) const
     {
       constexpr int nColor = Arg::nColor;
 

@@ -47,7 +47,7 @@ namespace quda
     /**
        Use a Cholesky decomposition and invert the clover matrix
     */
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity) const
     {
       using real = typename Arg::real;
       constexpr int N = Arg::nColor * Arg::nSpin / 2;

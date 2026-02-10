@@ -65,7 +65,7 @@ namespace quda
     constexpr SigmaOprod(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu) const
     {
       switch (mu_nu) {
       case 0: sigmaOprod<1, 0>(arg, x_cb, parity); break;

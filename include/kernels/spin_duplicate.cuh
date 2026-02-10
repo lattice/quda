@@ -35,7 +35,7 @@ namespace quda {
     constexpr DuplicateSpinor(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       using vector = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
       vector src = arg.src(x_cb, parity);

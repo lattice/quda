@@ -66,7 +66,7 @@ namespace quda {
     constexpr ComputeStaggeredVUV(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int c, int parity)
+    __device__ __host__ void operator()(int x_cb, int c, int parity) const
     {
       using real = typename Arg::real;
       using complex = complex<real>;

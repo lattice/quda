@@ -123,7 +123,7 @@ namespace quda {
     constexpr StaggeredProlongRestrict(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int c)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int c) const
     {
       parity = arg.nParity == 2 ? parity : arg.parity;
 

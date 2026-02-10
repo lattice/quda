@@ -60,7 +60,7 @@ namespace quda {
     constexpr NoiseGauge(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

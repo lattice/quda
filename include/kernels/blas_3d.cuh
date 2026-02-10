@@ -46,7 +46,7 @@ namespace quda
     constexpr copyTo3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       // Isolate the slice of the 4D array
       int idx[4];
@@ -71,7 +71,7 @@ namespace quda
     constexpr copyFrom3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       int idx[4] = {};
       getCoords(idx, x_cb, arg.X, parity);
@@ -93,7 +93,7 @@ namespace quda
     constexpr swap3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       int idx[4] = {};
       getCoords(idx, x_cb, arg.X, parity);
@@ -140,7 +140,7 @@ namespace quda
     constexpr axpby3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
@@ -195,7 +195,7 @@ namespace quda
     constexpr caxpby3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
@@ -253,7 +253,7 @@ namespace quda
     constexpr reDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t) const
     {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
@@ -309,7 +309,7 @@ namespace quda
     constexpr cDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t) const
     {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;

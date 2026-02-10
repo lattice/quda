@@ -246,7 +246,7 @@ namespace quda
     constexpr pack_wilson(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int, int src_s, int parity)
+    __device__ inline void operator()(int, int src_s, int parity) const
     {
       int local_tid = target::thread_idx().x;
       int tid = arg.sites_per_block * target::block_idx().x + local_tid;
@@ -316,7 +316,7 @@ namespace quda
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
     template <int twist, int n_src_tile>
-    __device__ __forceinline__ void operator()(const Arg &arg, int src_s, int parity)
+    __device__ __forceinline__ void operator()(const Arg &arg, int src_s, int parity) const
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
@@ -387,7 +387,7 @@ namespace quda
     }
 
     template <int n_src_tile = Arg::n_src_tile>
-    __device__ __forceinline__ void operator()(const Arg &arg, int src_s_block_, int parity, int twist_pack)
+    __device__ __forceinline__ void operator()(const Arg &arg, int src_s_block_, int parity, int twist_pack) const
     {
       int src_s_block = MAX_MULTI_RHS == 1 ? 0 : src_s_block_;
       int src_s_idx = src_s_block * Arg::n_src_tile;
@@ -408,7 +408,7 @@ namespace quda
     constexpr pack_wilson_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int, int s, int parity)
+    __device__ inline void operator()(int, int s, int parity) const
     {
       if (arg.nParity == 1) parity = arg.parity;
       packShmem<Arg::dagger, Arg::pc_type, Arg> pack;
@@ -421,7 +421,7 @@ namespace quda
     constexpr pack_staggered(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int, int src_idx, int parity)
+    __device__ inline void operator()(int, int src_idx, int parity) const
     {
       int local_tid = target::thread_idx().x;
       int tid = arg.sites_per_block * target::block_idx().x + local_tid;
@@ -457,7 +457,7 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
-    template <int n_src_tile> __device__ __forceinline__ void apply(const Arg &arg, int src_idx, int parity)
+    template <int n_src_tile> __device__ __forceinline__ void apply(const Arg &arg, int src_idx, int parity) const
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
@@ -525,7 +525,7 @@ namespace quda
     }
 
     template <int n_src_tile = Arg::n_src_tile>
-    __device__ __forceinline__ void operator()(const Arg &arg, int src_idx_block_, int parity, int = 0)
+    __device__ __forceinline__ void operator()(const Arg &arg, int src_idx_block_, int parity, int = 0) const
     {
       int src_idx_block = MAX_MULTI_RHS == 1 ? 0 : src_idx_block_;
       int src_idx = src_idx_block * Arg::n_src_tile;
@@ -542,7 +542,7 @@ namespace quda
     constexpr pack_staggered_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int, int s, int parity)
+    __device__ inline void operator()(int, int s, int parity) const
     {
       if (arg.nParity == 1) parity = arg.parity;
       packStaggeredShmem<0, QUDA_4D_PC, Arg> pack;

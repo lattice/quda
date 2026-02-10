@@ -44,7 +44,7 @@ namespace quda {
     constexpr FFTrotate(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int id)
+    __device__ __host__ inline void operator()(int id) const
     {
       if (arg.dir == 0) {
         int x3 = id / (arg.X[0] * arg.X[1] * arg.X[2]);
@@ -113,7 +113,7 @@ namespace quda {
     constexpr set_invpsq(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       using Float = typename Arg::Float;
       int id = parity * arg.threads.x + x_cb;
@@ -139,7 +139,7 @@ namespace quda {
     const Arg &arg;
     constexpr mult_norm_2d(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       int id = parity * arg.threads.x + x_cb;
       arg.gx[id] = arg.gx[id] * arg.invpsq[id];
@@ -187,7 +187,7 @@ namespace quda {
     /**
      * @brief Measure gauge fixing quality
      */
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity) const
     {
       reduce_t data{0, 0};
       using matrix = Matrix<complex<typename Arg::real>, 3>;
@@ -275,7 +275,7 @@ namespace quda {
     constexpr U_EO_NEW(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       using Float = typename Arg::Float;
       using complex = complex<Float>;
@@ -341,7 +341,7 @@ namespace quda {
     constexpr GX(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       using complex = complex<typename Arg::Float>;
       using matrix = Matrix<complex, 3>;
@@ -384,7 +384,7 @@ namespace quda {
     constexpr U_EO(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       using complex = complex<typename Arg::Float>;
       using matrix = Matrix<complex, 3>;

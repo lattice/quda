@@ -88,7 +88,7 @@ namespace quda {
     constexpr Interior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    template <int mu> __device__ __host__ inline void operator()(int x_cb, int parity)
+    template <int mu> __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       using Complex = complex<typename Arg::real>;
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
@@ -124,7 +124,7 @@ namespace quda {
       }
     }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int mu)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int mu) const
     {
       switch (mu) {
       case 0: this->operator()<0>(x_cb, parity); break;
@@ -140,7 +140,7 @@ namespace quda {
     constexpr Exterior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity, int)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int) const
     {
       using Complex = complex<typename Arg::real>;
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;

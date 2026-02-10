@@ -163,7 +163,7 @@ namespace quda {
   };
 
   template <bool is_device> struct site_max {
-    template <typename Ftor> inline auto operator()(typename Ftor::Arg::real thread_max, Ftor &)
+    template <typename Ftor> inline auto operator()(typename Ftor::Arg::real thread_max, Ftor &) const
     {
       using Arg = typename Ftor::Arg;
       // on the host we require that both spin and color are fully thread local
@@ -191,7 +191,8 @@ namespace quda {
     template <typename Arg> using Cache = SharedMemoryCache<typename Arg::real, CacheDims<Arg>>;
     template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
 
-    template <typename Ftor> __device__ inline auto operator()(typename Ftor::Arg::real thread_max, const Ftor &ftor)
+    template <typename Ftor>
+    __device__ inline auto operator()(typename Ftor::Arg::real thread_max, const Ftor &ftor) const
     {
       using Arg = typename Ftor::Arg;
       using real = typename Arg::real;
@@ -309,7 +310,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-    __device__ __host__ void operator()(int tid, int spin_color_block, int parity, bool alive = true)
+    __device__ __host__ void operator()(int tid, int spin_color_block, int parity, bool alive = true) const
     {
       const int Ms = spins_per_thread(Arg::nSpin);
       const int Mc = colors_per_thread(Arg::nColor);

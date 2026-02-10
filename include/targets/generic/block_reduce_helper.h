@@ -31,7 +31,8 @@ namespace quda
      @brief Dummy generic implementation of warp_reduce
   */
   template <bool is_device> struct warp_reduce {
-    template <typename T, typename reducer_t, typename param_t> T operator()(const T &value, bool, reducer_t, param_t)
+    template <typename T, typename reducer_t, typename param_t>
+    T operator()(const T &value, bool, reducer_t, param_t) const
     {
       return value;
     }
@@ -55,7 +56,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in logical thread 0 only)
      */
-    __device__ __host__ inline T Sum(const T &value)
+    __device__ __host__ inline T Sum(const T &value) const
     {
       return target::dispatch<warp_reduce>(value, false, quda::plus<T>(), param_t());
     }
@@ -65,7 +66,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in all threads within the logical warp)
      */
-    __device__ __host__ inline T AllSum(const T &value)
+    __device__ __host__ inline T AllSum(const T &value) const
     {
       return target::dispatch<warp_reduce>(value, true, quda::plus<T>(), param_t());
     }
@@ -75,7 +76,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in logical thread 0 only)
      */
-    __device__ __host__ inline T Max(const T &value)
+    __device__ __host__ inline T Max(const T &value) const
     {
       return target::dispatch<warp_reduce>(value, false, quda::maximum<T>(), param_t());
     }
@@ -85,7 +86,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in all threads within the logical warp)
      */
-    __device__ __host__ inline T AllMax(const T &value)
+    __device__ __host__ inline T AllMax(const T &value) const
     {
       return target::dispatch<warp_reduce>(value, true, quda::maximum<T>(), param_t());
     }
@@ -95,7 +96,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in logical thread 0 only)
      */
-    __device__ __host__ inline T Min(const T &value)
+    __device__ __host__ inline T Min(const T &value) const
     {
       return target::dispatch<warp_reduce>(value, false, quda::minimum<T>(), param_t());
     }
@@ -105,7 +106,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in all threads within the logical warp)
      */
-    __device__ __host__ inline T AllMin(const T &value)
+    __device__ __host__ inline T AllMin(const T &value) const
     {
       return target::dispatch<warp_reduce>(value, true, quda::minimum<T>(), param_t());
     }
@@ -129,7 +130,8 @@ namespace quda
 
   public:
     template <typename... U>
-    __device__ __host__ constexpr BlockReduce(KernelOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch)
+    __device__ __host__ constexpr BlockReduce(const KernelOps<U...> &ops, int batch = 0) :
+      block_reduce_t(ops), batch(batch)
     {
       checkKernelOps<BlockReduce_t>(ops);
     }
@@ -141,7 +143,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in logical thread 0 only)
      */
-    template <bool async = true> __device__ __host__ inline T Sum(const T &value)
+    template <bool async = true> __device__ __host__ inline T Sum(const T &value) const
     {
       return this->apply(value, async, batch, false, quda::plus<T>());
     }
@@ -151,7 +153,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in all threads in the block)
      */
-    template <bool async = true> __device__ __host__ inline T AllSum(const T &value)
+    template <bool async = true> __device__ __host__ inline T AllSum(const T &value) const
     {
       static_assert(batch_size == 1, "Cannot do AllSum with batch_size > 1");
       return this->apply(value, async, batch, true, quda::plus<T>());
@@ -162,7 +164,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in logical thread 0 only)
      */
-    template <bool async = true> __device__ __host__ inline T Max(const T &value)
+    template <bool async = true> __device__ __host__ inline T Max(const T &value) const
     {
       return this->apply(value, async, batch, false, quda::maximum<T>());
     }
@@ -172,7 +174,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in all threads in the block)
      */
-    template <bool async = true> __device__ __host__ inline T AllMax(const T &value)
+    template <bool async = true> __device__ __host__ inline T AllMax(const T &value) const
     {
       static_assert(batch_size == 1, "Cannot do AllMax with batch_size > 1");
       return this->apply(value, async, batch, true, quda::maximum<T>());
@@ -183,7 +185,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in logical thread 0 only)
      */
-    template <bool async = true> __device__ __host__ inline T Min(const T &value)
+    template <bool async = true> __device__ __host__ inline T Min(const T &value) const
     {
       return this->apply(value, async, batch, false, quda::minimum<T>());
     }
@@ -193,7 +195,7 @@ namespace quda
        @param[in] value Thread-local value to be reduced
        @return Reduced value (defined in all threads in the block)
      */
-    template <bool async = true> __device__ __host__ inline T AllMin(const T &value)
+    template <bool async = true> __device__ __host__ inline T AllMin(const T &value) const
     {
       static_assert(batch_size == 1, "Cannot do AllMin with batch_size > 1");
       return this->apply(value, async, batch, true, quda::minimum<T>());
@@ -206,7 +208,7 @@ namespace quda
        @return Reduced value (defined in logical thread 0 only)
      */
     template <bool async = true, typename reducer_t>
-    __device__ __host__ inline T Reduce(const T &value, const reducer_t &r)
+    __device__ __host__ inline T Reduce(const T &value, const reducer_t &r) const
     {
       return this->apply(value, async, batch, false, r);
     }
@@ -218,7 +220,7 @@ namespace quda
        @return Reduced value (defined in all threads in the block)
      */
     template <bool async = true, typename reducer_t>
-    __device__ __host__ inline T AllReduce(const T &value, const reducer_t &r)
+    __device__ __host__ inline T AllReduce(const T &value, const reducer_t &r) const
     {
       static_assert(batch_size == 1, "Cannot do AllReduce with batch_size > 1");
       return this->apply(value, async, batch, true, r);

@@ -605,7 +605,7 @@ namespace quda
     constexpr HB(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb)
+    __device__ __host__ void operator()(int x_cb) const
     {
       using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
       auto mu = arg.mu;

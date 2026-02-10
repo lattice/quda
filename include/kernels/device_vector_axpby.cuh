@@ -24,7 +24,7 @@ namespace quda
     constexpr Axpby(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int thread_idx)
+    __device__ __host__ inline void operator()(int thread_idx) const
     {
       arg.out[thread_idx] += arg.a * arg.x[thread_idx] + arg.b * arg.y[thread_idx];
     }

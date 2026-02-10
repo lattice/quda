@@ -60,7 +60,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the plaquette at site (x_cb, parity)
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity) const
     {
       reduce_t plaq{0, 0};
 

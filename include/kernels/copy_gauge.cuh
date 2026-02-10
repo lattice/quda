@@ -77,19 +77,21 @@ namespace quda {
     constexpr CopyGauge_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    template <bool fine_grain> __device__ __host__ inline std::enable_if_t<!fine_grain, void> copy(int d, int parity, int x, int)
+    template <bool fine_grain>
+    __device__ __host__ inline std::enable_if_t<!fine_grain, void> copy(int d, int parity, int x, int) const
     {
       Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in(d, x, parity);
       Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
       arg.out(d, x, parity) = out;
     }
 
-    template <bool fine_grain> __device__ __host__ inline std::enable_if_t<fine_grain, void> copy(int d, int parity, int x, int i)
+    template <bool fine_grain>
+    __device__ __host__ inline std::enable_if_t<fine_grain, void> copy(int d, int parity, int x, int i) const
     {
       for (int j = 0; j < Arg::nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
     }
 
-    __device__ __host__ inline void operator()(int x, int i, int parity_d)
+    __device__ __host__ inline void operator()(int x, int i, int parity_d) const
     {
       int parity = parity_d / arg.geometry;
       int d = parity_d % arg.geometry;
@@ -106,21 +108,23 @@ namespace quda {
     constexpr CopyGhost_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    template <bool fine_grain> __device__ __host__ inline std::enable_if_t<!fine_grain, void> copy(int d, int parity, int x, int)
+    template <bool fine_grain>
+    __device__ __host__ inline std::enable_if_t<!fine_grain, void> copy(int d, int parity, int x, int) const
     {
       Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in.Ghost(d + arg.in_offset, x, parity);
       Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
       arg.out.Ghost(d + arg.out_offset, x, parity) = out;
     }
 
-    template <bool fine_grain> __device__ __host__ inline std::enable_if_t<fine_grain, void> copy(int d, int parity, int x, int i)
+    template <bool fine_grain>
+    __device__ __host__ inline std::enable_if_t<fine_grain, void> copy(int d, int parity, int x, int i) const
     {
       for (int j = 0; j < Arg::nColor; j++) {
         arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
       }
     }
 
-    __device__ __host__ inline void operator()(int x, int i, int parity_d)
+    __device__ __host__ inline void operator()(int x, int i, int parity_d) const
     {
       int parity = parity_d / arg.nDim;
       int d = parity_d % arg.nDim;

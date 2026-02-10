@@ -86,7 +86,7 @@ namespace quda {
     constexpr Gamma(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int src_idx, int parity)
+    __device__ __host__ void operator()(int x_cb, int src_idx, int parity) const
     {
       for (int i = 0; i < arg.n_flavor; i++) {
         ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in[src_idx](x_cb + i * arg.volumeCB, parity);
@@ -109,7 +109,7 @@ namespace quda {
     constexpr ChiralProject(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int src_idx, int parity)
+    __device__ __host__ void operator()(int x_cb, int src_idx, int parity) const
     {
       ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in[src_idx](x_cb, parity);
       ColorSpinor<typename Arg::real, Arg::nColor, 2> chi;
@@ -142,7 +142,7 @@ namespace quda {
     constexpr TwistGamma(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int src_idx, int parity)
+    __device__ __host__ void operator()(int x_cb, int src_idx, int parity) const
     {
       constexpr int d = 4;
       if (!arg.doublet) {
@@ -200,7 +200,7 @@ namespace quda {
     constexpr Tau(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int src_idx, int parity)
+    __device__ __host__ void operator()(int x_cb, int src_idx, int parity) const
     {
       fermion_t in_1 = arg.in[src_idx](x_cb + 0 * arg.volumeCB, parity);
       fermion_t in_2 = arg.in[src_idx](x_cb + 1 * arg.volumeCB, parity);

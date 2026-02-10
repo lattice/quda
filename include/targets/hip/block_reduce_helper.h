@@ -38,7 +38,7 @@ namespace quda
        @return The warp-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
-    __device__ inline T operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
+    __device__ inline T operator()(const T &value_, bool all, const reducer_t &r, const param_t &) const
     {
       using warp_reduce_t = hipcub::WarpReduce<T, param_t::width>;
       typename warp_reduce_t::TempStorage dummy_storage;
@@ -84,7 +84,7 @@ namespace quda
   */
   template <bool is_device> struct block_reduce_impl {
     template <typename T, typename reducer_t, typename param_t>
-    T operator()(const T &value, bool, int, bool, reducer_t, param_t)
+    T operator()(const T &value, bool, int, bool, reducer_t, param_t) const
     {
       return value;
     }
@@ -112,7 +112,8 @@ namespace quda
        @return The block-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
-    __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r, const param_t &)
+    __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
+                                   const param_t &) const
     {
       constexpr auto max_items = device::max_block_size() / device::warp_size();
       const auto thread_idx = target::thread_idx_linear<param_t::block_dim>();
@@ -169,7 +170,7 @@ namespace quda
       return 0; // only counts dynamic shared memory (not __shared__)
     }
     template <typename reducer_t>
-    __device__ __host__ inline T apply(const T &value, bool async, int batch, bool all, const reducer_t &r)
+    __device__ __host__ inline T apply(const T &value, bool async, int batch, bool all, const reducer_t &r) const
     {
       return target::dispatch<block_reduce_impl>(value, async, batch, all, r,
                                                  block_reduce_param<block_dim, batch_size>());

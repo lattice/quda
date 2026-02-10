@@ -53,7 +53,7 @@ namespace quda {
     constexpr Interior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb)
+    __device__ __host__ inline void operator()(int x_cb) const
     {
       using matrix = Matrix<complex<typename Arg::real>, Arg::nColor>;
       using vector = ColorSpinor<typename Arg::real, Arg::nColor, 1>;
@@ -94,7 +94,7 @@ namespace quda {
     constexpr Exterior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb)
+    __device__ __host__ inline void operator()(int x_cb) const
     {
       using matrix = Matrix<complex<typename Arg::real>, Arg::nColor>;
       using vector = ColorSpinor<typename Arg::real, Arg::nColor, 1>;

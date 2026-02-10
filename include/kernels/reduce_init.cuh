@@ -17,7 +17,7 @@ namespace quda {
       const Arg &arg;
       static constexpr const char *filename() { return KERNEL_FILE; }
       constexpr init_count(const Arg &arg) : arg(arg) {}
-      __device__ void operator()(int i) { new (arg.count + i) typename Arg::T {0}; }
+      __device__ void operator()(int i) const { new (arg.count + i) typename Arg::T {0}; }
     };
 
   }

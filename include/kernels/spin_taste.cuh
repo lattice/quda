@@ -36,7 +36,7 @@ namespace quda
     constexpr SpinTastePhase(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, 1>;

@@ -130,7 +130,7 @@ namespace quda
     constexpr copy_field_offset(const Arg &arg) : arg(arg) { }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int s, int parity)
+    __device__ __host__ void operator()(int x_cb, int s, int parity) const
     {
       // XXX: This code assumes parity if NOT changed when offset is added.
       static_assert(Arg::pc_type == QUDA_4D_PC || Arg::pc_type == QUDA_5D_PC,

@@ -37,7 +37,7 @@ namespace quda
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int x4, int src_s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int x4, int src_s, int parity) const
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;

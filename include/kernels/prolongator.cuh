@@ -138,7 +138,7 @@ namespace quda {
     constexpr Prolongator(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int src_parity, int fine_color_thread)
+    __device__ __host__ inline void operator()(int x_cb, int src_parity, int fine_color_thread) const
     {
       int src_idx = src_parity % arg.n_src;
       int parity = (arg.nParity == 2) ? (src_parity / arg.n_src) : arg.parity;

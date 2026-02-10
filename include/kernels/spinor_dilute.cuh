@@ -88,7 +88,7 @@ namespace quda {
        @param[in] s Spin index
        @param[in] c Color index
     */
-    constexpr bool write_source(int i, int s, int c, int parity)
+    constexpr bool write_source(int i, int s, int c, int parity) const
     {
       switch (Arg::type) {
       case QUDA_DILUTION_SPIN: return s == i;
@@ -99,7 +99,7 @@ namespace quda {
       }
     }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       using vector = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
       vector src = arg.src(x_cb, parity);

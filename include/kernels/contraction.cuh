@@ -92,8 +92,7 @@ namespace quda
     template <typename U> static inline void comm_reduce(U &) { }
 
     // Final param is unused in the MultiReduce functor in this use case.
-    template <int s1>
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
+    template <int s1> __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t) const
     {
       constexpr int nSpin = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
@@ -150,7 +149,7 @@ namespace quda
       return operator()(result_all_channels, result);
     }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int dummy, int t)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int dummy, int t) const
     {
       switch (arg.s1) {
       case 0: return operator()<0>(result, xyz, dummy, t);
@@ -177,7 +176,7 @@ namespace quda
     template <typename U> static inline void comm_reduce(U &) { }
 
     // y index param is unused in the MultiReduce functor in this use case.
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t) const
     {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
@@ -253,7 +252,7 @@ namespace quda
     constexpr ColorContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       constexpr int nSpin = Arg::nSpin;
       using real = typename Arg::real;
@@ -282,7 +281,7 @@ namespace quda
     constexpr DegrandRossiContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       constexpr int nSpin = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
@@ -455,7 +454,7 @@ namespace quda
     constexpr StaggeredContract(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity) const
     {
       constexpr int nSpin = Arg::nSpin;
       using real = typename Arg::real;

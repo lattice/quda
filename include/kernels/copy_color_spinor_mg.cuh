@@ -25,7 +25,7 @@ namespace quda {
     constexpr CopySpinor_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int s, int c)
+    __device__ __host__ inline void operator()(int x_cb, int s, int c) const
     {
       arg.out(0, x_cb, s, c) = arg.in(0, x_cb, s, c);
     }

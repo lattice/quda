@@ -48,7 +48,7 @@ namespace quda
       // Flops count, in two-number pair (matrix_mult, matrix_add)
       // 				   (4, 4)
       // 198 Flops per direction
-      __device__ __host__ void operator()(int x_cb, int parity, int mu)
+      __device__ __host__ void operator()(int x_cb, int parity, int mu) const
       {
         int x[4];
         int dx[4] = {0, 0, 0, 0};

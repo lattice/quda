@@ -101,7 +101,7 @@ namespace quda {
     constexpr CloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int src_idx, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_idx, int parity) const
     {
       using namespace linalg; // for Cholesky
       int clover_parity = arg.nParity == 2 ? parity : arg.parity;
@@ -144,7 +144,7 @@ namespace quda {
     constexpr TwistCloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int src_idx, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_idx, int parity) const
     {
       using namespace linalg; // for Cholesky
       int clover_parity = arg.nParity == 2 ? parity : arg.parity;
@@ -203,7 +203,7 @@ namespace quda {
     }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int src_flavor, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_flavor, int parity) const
     {
       using namespace linalg; // for Cholesky
       const int clover_parity = arg.nParity == 2 ? parity : arg.parity;

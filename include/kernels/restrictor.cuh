@@ -140,7 +140,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool alive = true)
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool alive = true) const
     {
       int x_fine_offset = thread.x;
       const int x_coarse = block.x;

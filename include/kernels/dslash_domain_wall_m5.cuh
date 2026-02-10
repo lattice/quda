@@ -346,7 +346,7 @@ namespace quda
        @param[in] x_b Checkerboarded 4-d space-time index
        @param[in] s Ls dimension coordinate
     */
-    __device__ __host__ inline void operator()(int x_cb, int src_s, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_s, int parity) const
     {
       using real = typename Arg::real;
       coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
@@ -618,7 +618,7 @@ namespace quda
        @param[in] x_b Checkerboarded 4-d space-time index
        @param[in] s Ls dimension coordinate
     */
-    __device__ __host__ inline void operator()(int x_cb, int src_s, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_s, int parity) const
     {
       constexpr int nSpin = 4;
       using real = typename Arg::real;

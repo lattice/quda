@@ -71,7 +71,7 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-      __device__ __host__ inline void operator()(int i, int k, int parity, bool alive = true)
+      __device__ __host__ inline void operator()(int i, int k, int parity, bool alive = true) const
       {
         using vec = array<complex<typename Arg::real>, Arg::n/2>;
 

@@ -72,7 +72,7 @@ namespace quda {
     constexpr ComputeStaggeredGeometryReorder(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int g_f, int parity)
+    __device__ __host__ void operator()(int x_cb, int g_f, int parity) const
     {
       constexpr int nDim = 4;
       int coord[nDim];

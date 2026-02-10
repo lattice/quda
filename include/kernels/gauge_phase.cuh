@@ -103,7 +103,7 @@ namespace quda {
     constexpr GaugePhase(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       gaugePhase<0>(x_cb, parity, arg);
       gaugePhase<1>(x_cb, parity, arg);

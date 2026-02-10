@@ -34,7 +34,7 @@ namespace quda {
     constexpr ColdStart(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity)
+    __device__ __host__ void operator()(int x_cb, int parity) const
     {
       Matrix<complex<typename Arg::real>, Arg::nColor> U;
       setIdentity(&U);
@@ -203,7 +203,7 @@ namespace quda {
     constexpr HotStart(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb)
+    __device__ __host__ void operator()(int x_cb) const
     {
       int X[4], x[4];
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];

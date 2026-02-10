@@ -35,7 +35,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the qcharge and field strength at site (x_cb, parity)
-    __device__ __host__ inline reduce_t operator()(reduce_t &E, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &E, int x_cb, int parity) const
     {
       using real = typename Arg::Float;
       using Link = Matrix<complex<real>, Arg::nColor>;

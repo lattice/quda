@@ -235,7 +235,7 @@ namespace quda {
       constexpr OneLinkTerm(const Arg &arg) : arg(arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void operator()(int x_cb, int parity, int sig)
+      __device__ __host__ void operator()(int x_cb, int parity, int sig) const
       {
         int x[4];
         getCoords(x, x_cb, arg.X, parity);
@@ -342,7 +342,8 @@ namespace quda {
           Flops:
             3 Multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ inline void lepage_p3(int x[4], int point_a, int parity_a, Link &force_mu) {
+      __device__ __host__ inline void lepage_p3(int x[4], int point_a, int parity_a, Link &force_mu) const
+      {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -396,7 +397,7 @@ namespace quda {
       */
       template <typename LinkCache>
       __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu,
-                                                   LinkCache &Uab_cache)
+                                                   LinkCache &Uab_cache) const
       {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
@@ -466,7 +467,7 @@ namespace quda {
             2 multiplies, 1 add, 1 rescale
       */
       template <typename LinkCache>
-      __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, LinkCache &Uab_cache)
+      __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, LinkCache &Uab_cache) const
       {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
@@ -538,9 +539,8 @@ namespace quda {
           If we're calculating the 3-link middle-link contribution (mu_next_positive != DIR_IGNORED),
           there's no extra work in this routine.
       */
-      __device__ __host__ void operator()(int x_cb, int parity)
+      __device__ __host__ void operator()(int x_cb, int parity) const
       {
-
         int x[4];
         getCoords(x, x_cb, arg.D, parity);
 
@@ -726,7 +726,7 @@ namespace quda {
             4 multiplies, 2 adds, 2 rescales
       */
       template <typename LinkCache>
-      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache) const
       {
         auto mycoeff_seven = parity_sign<typename Arg::real>(parity_a) * coeff_sign<sig_positive, typename Arg::real>(parity_a) * arg.coeff_seven;
 
@@ -839,7 +839,7 @@ namespace quda {
             2 multiplies, 2 adds, 2 rescales
       */
       template <typename LinkCache>
-      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache) const
       {
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(nu_positive)>(y, arg.nu, arg);
@@ -893,7 +893,7 @@ namespace quda {
             1 multiply, 1 add, 1 rescale
       */
       template <typename LinkCache>
-      __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache) const
       {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
@@ -968,7 +968,7 @@ namespace quda {
             READ: force_sig_at_a
             WRITE: force_sig_at_a
       */
-      __device__ __host__ void operator()(int x_cb, int parity)
+      __device__ __host__ void operator()(int x_cb, int parity) const
       {
         int x[4];
         getCoords(x, x_cb, arg.D, parity);
@@ -1043,7 +1043,7 @@ namespace quda {
       constexpr CompleteForce(const Arg &arg) : arg(arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void operator()(int x_cb, int parity)
+      __device__ __host__ void operator()(int x_cb, int parity) const
       {
         int x[4];
         getCoords(x, x_cb, arg.X, parity);
@@ -1093,7 +1093,7 @@ namespace quda {
 
       // Flops count, in two-number pair (matrix_mult, matrix_add)
       //           (24, 12)
-      __device__ __host__ void operator()(int x_cb, int parity)
+      __device__ __host__ void operator()(int x_cb, int parity) const
       {
         int x[4];
         getCoords(x, x_cb, arg.X, parity);

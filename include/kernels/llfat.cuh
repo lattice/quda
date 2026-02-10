@@ -73,7 +73,7 @@ namespace quda {
     constexpr ComputeLongLink(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity, int dir)
+    __device__ __host__ void operator()(int x_cb, int parity, int dir) const
     {
       switch(dir) {
       case 0: longLinkDir<0>(arg, x_cb, parity); break;
@@ -90,7 +90,7 @@ namespace quda {
     constexpr ComputeOneLink(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity, int dir)
+    __device__ __host__ void operator()(int x_cb, int parity, int dir) const
     {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -223,7 +223,7 @@ namespace quda {
     constexpr ComputeStaple(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity, int mu_idx)
+    __device__ __host__ void operator()(int x_cb, int parity, int mu_idx) const
     {
       int mu;
       switch(mu_idx) {

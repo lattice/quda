@@ -140,7 +140,7 @@ namespace quda {
     constexpr GhostExtractorEx(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int X, int parity, int dir)
+    __device__ __host__ inline void operator()(int X, int parity, int dir) const
     {
       // this will have two-warp divergence since we only do work on
       // one parity but parity alternates between threads
