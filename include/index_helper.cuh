@@ -15,7 +15,7 @@ namespace quda {
   __device__ __host__ inline int linkIndexShift(const I &x, const J &dx, const K &X) {
     int y[4];
 #pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
+    for (int i = 0; i < 4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
   }
@@ -32,7 +32,7 @@ namespace quda {
   template <typename I, typename J, typename K, typename L>
   __device__ __host__ inline int linkIndexShift(I &y, const J &x, const K &dx, const L &X) {
 #pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
+    for (int i = 0; i < 4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
   }
@@ -79,7 +79,7 @@ namespace quda {
   {
     int y[4];
 #pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    for (int i = 0; i < 4; i++) y[i] = x[i];
     y[mu] = (y[mu] + n + X[mu]) % X[mu];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
@@ -99,7 +99,7 @@ namespace quda {
   {
     int y[4];
 #pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    for (int i = 0; i < 4; i++) y[i] = x[i];
     switch (mu) {
     case 0: y[0] = (y[0] + nFace + X[0]) % X[0]; break;
     case 1: y[1] = (y[1] + nFace + X[1]) % X[1]; break;
@@ -182,10 +182,9 @@ namespace quda {
   __device__ __host__ inline int linkNormalIndexP1(const int x[], const I X[4], const int mu) {
     int y[4];
 #pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    for (int i = 0; i < 4; i++) y[i] = x[i];
     y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
-    int idx = ((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0];
-    return idx;
+    return ((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0];
   }
 
   /**
@@ -311,7 +310,7 @@ namespace quda {
     int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
     x[0] = (2 * cb_index + x1odd  - za * X[0]);
 #pragma unroll
-    for (int d=0; d<4; d++) x[d] += R[d];
+    for (int d = 0; d < 4; d++) x[d] += R[d];
     return;
   }
 
@@ -822,20 +821,38 @@ namespace quda {
     int s = face_idx_in / arg.dc.face_XYZT[dim];
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
 
-    std::remove_const_t<std::remove_reference_t<decltype(arg.dc.X[0])>> dims[3] = {};
-    int d1 = 0;
-#pragma unroll 4
-    for (int d2 = 0; d2 < 4; d2++) { // this will evaluate at compile time
-      if (d2 == dim) continue;
-      dims[d1++] = arg.dc.X[d2];
+    // Three dimensions other than dim (avoid array to reduce stack/register pressure)
+    using dim_type = std::remove_const_t<std::remove_reference_t<decltype(arg.dc.X[0])>>;
+    dim_type d0, d1, d2;
+    switch (dim) {
+    case 0:
+      d0 = X[1];
+      d1 = X[2];
+      d2 = X[3];
+      break;
+    case 1:
+      d0 = X[0];
+      d1 = X[2];
+      d2 = X[3];
+      break;
+    case 2:
+      d0 = X[0];
+      d1 = X[1];
+      d2 = X[3];
+      break;
+    default:
+      d0 = X[0];
+      d1 = X[1];
+      d2 = X[2];
+      break; // dim == 3
     }
 
     /*y,z,t here are face indexes in new order*/
-    int aux1 = face_idx / dims[0];
-    int aux2 = aux1 / dims[1];
-    int y = aux1 - aux2 * dims[1];
-    int t = aux2 / dims[2];
-    int z = aux2 - t * dims[2];
+    int aux1 = face_idx / d0;
+    int aux2 = aux1 / d1;
+    int y = aux1 - aux2 * d1;
+    int t = aux2 / d2;
+    int z = aux2 - t * d2;
     face_idx += (face_parity + t + z + y) & 1;
 
     // compute index into the full local volume
@@ -1074,11 +1091,13 @@ namespace quda {
 
     coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
 
-    for(int dim = 0; dim<4; ++dim){
+#pragma unroll
+    for (int dim = 0; dim < 4; ++dim) {
       if( partitioned[dim] )
 	if( (x[dim]+shift[dim])<0 || (x[dim]+shift[dim])>=X[dim]) return -1;
     }
 
+#pragma unroll
     for(int dim=0; dim<4; ++dim){
       x[dim] = shift[dim] ? (x[dim]+shift[dim] + X[dim]) % X[dim] : x[dim];
     }

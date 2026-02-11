@@ -304,6 +304,7 @@ namespace quda {
       reunit_link<Float>(g);
       //130
 
+#pragma unroll
       for ( int mu = 0; mu < 4; mu++ ) {
         matrix U = arg.data(mu, x_cb, parity);
 
