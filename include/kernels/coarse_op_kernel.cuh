@@ -1404,7 +1404,7 @@ namespace quda {
 
     template <bool allthreads, typename VUV, typename Pack, typename Ftor>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0,
-                                      int parity, const Pack &pack, const Ftor &ftor, bool active)
+                                      int parity, const Pack &pack, const Ftor &ftor, bool alive)
     {
       using Arg = typename Ftor::Arg;
       const Arg &arg = ftor.arg;
@@ -1468,7 +1468,7 @@ namespace quda {
 
       if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
 
-        if (!allthreads || active) {
+        if (!allthreads || alive) {
 #pragma unroll
           for (int i = 0; i < TileType::M; i++) {
 #pragma unroll
@@ -1507,22 +1507,22 @@ namespace quda {
 
   template <bool allthreads, typename VUV, typename Ftor>
   __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity,
-                                                   int i0, int j0, int parity, const Ftor &ftor, bool active)
+                                                   int i0, int j0, int parity, const Ftor &ftor, bool alive)
   {
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
     switch (arg.dir) {
     case QUDA_BACKWARDS:
       target::dispatch<storeCoarseSharedAtomic_impl, allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0,
-                                                                 parity, Pack<QUDA_BACKWARDS>(), ftor, active);
+                                                                 parity, Pack<QUDA_BACKWARDS>(), ftor, alive);
       break;
     case QUDA_FORWARDS:
       target::dispatch<storeCoarseSharedAtomic_impl, allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0,
-                                                                 parity, Pack<QUDA_FORWARDS>(), ftor, active);
+                                                                 parity, Pack<QUDA_FORWARDS>(), ftor, alive);
       break;
     case QUDA_IN_PLACE:
       target::dispatch<storeCoarseSharedAtomic_impl, allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0,
-                                                                 parity, Pack<QUDA_IN_PLACE>(), ftor, active);
+                                                                 parity, Pack<QUDA_IN_PLACE>(), ftor, alive);
       break;
     default:
       break;// do nothing
@@ -1611,7 +1611,7 @@ namespace quda {
 
   template <int nFace, bool allthreads, typename Ftor>
   __device__ __host__ void computeVUV(const Ftor &ftor, int parity, int x_cb, int i0, int j0, int parity_coarse_,
-                                      int coarse_x_cb_, bool active)
+                                      int coarse_x_cb_, bool alive)
   {
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
@@ -1638,7 +1638,7 @@ namespace quda {
 
     using Ctype = decltype(make_tile_C<complex<real>, false>(arg.vuvTile));
     Ctype vuv[Arg::coarseSpin * Arg::coarseSpin];
-    if (!allthreads || active) multiplyVUV(vuv, arg, parity, x_cb, i0, j0);
+    if (!allthreads || alive) multiplyVUV(vuv, arg, parity, x_cb, i0, j0);
 
     if (isDiagonal && !isFromCoarseClover) {
 #pragma unroll
@@ -1646,8 +1646,8 @@ namespace quda {
     }
 
     if (arg.shared_atomic)
-      storeCoarseSharedAtomic<allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, ftor, active);
-    else if (!allthreads || active)
+      storeCoarseSharedAtomic<allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, ftor, alive);
+    else if (!allthreads || alive)
       storeCoarseGlobalAtomic(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, arg);
   }
 
@@ -1726,23 +1726,23 @@ namespace quda {
        @param[in] c_col output coarse color column
     */
     template <bool allthreads = false>
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool alive = true)
     {
       int parity = 0, parity_coarse = 0, x_coarse_cb = 0, c_row = 0;
-      if (!allthreads || active)
+      if (!allthreads || alive)
         target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 
       // if (parity > 1) return;
       // if (c_row >= arg.vuvTile.M_tiles) return;
       // if (c_col >= arg.vuvTile.N_tiles) return;
       // if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
-      if (parity > 1) active = false;
-      if (c_row >= arg.vuvTile.M_tiles) active = false;
-      if (c_col >= arg.vuvTile.N_tiles) active = false;
-      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) active = false;
+      if (parity > 1) alive = false;
+      if (c_row >= arg.vuvTile.M_tiles) alive = false;
+      if (c_col >= arg.vuvTile.N_tiles) alive = false;
+      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) alive = false;
 
       computeVUV<nFace, allthreads>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse,
-                                    x_coarse_cb, active);
+                                    x_coarse_cb, alive);
     }
   };
 
@@ -1763,23 +1763,23 @@ namespace quda {
        @param[in] c_col output coarse color column
     */
     template <bool allthreads = false>
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool alive = true)
     {
       int parity = 0, parity_coarse = 0, x_coarse_cb = 0, c_row = 0;
-      if (!allthreads || active)
+      if (!allthreads || alive)
         target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 
       // if (parity > 1) return;
       // if (c_row >= arg.vuvTile.M_tiles) return;
       // if (c_col >= arg.vuvTile.N_tiles) return;
       // if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
-      if (parity > 1) active = false;
-      if (c_row >= arg.vuvTile.M_tiles) active = false;
-      if (c_col >= arg.vuvTile.N_tiles) active = false;
-      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) active = false;
+      if (parity > 1) alive = false;
+      if (c_row >= arg.vuvTile.M_tiles) alive = false;
+      if (c_col >= arg.vuvTile.N_tiles) alive = false;
+      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) alive = false;
 
       computeVUV<nFace, allthreads>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse,
-                                    x_coarse_cb, active);
+                                    x_coarse_cb, alive);
     }
   };
 
