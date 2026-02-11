@@ -17,7 +17,9 @@ namespace quda
   template <typename T> inline T max(const T a, const T b) { return a > b ? a : b; }
   template <typename T> inline T min(const T a, const T b) { return a < b ? a : b; }
   template <typename T> inline void sincos(const T a, T *s, T *c) { ::sincos(a, s, c); }
+  inline void sincos(float a, float *s, float *c) { *s = std::sin(a); *c = std::cos(a); }
   template <typename T> inline void sincospi(const T a, T *s, T *c) { ::sincos(a * static_cast<T>(M_PI), s, c); }
+  inline void sincospi(float a, float *s, float *c) { sincos(a * static_cast<float>(M_PI), s, c); }
   template <typename T> inline T sinpi(const T a) { return ::sin(a * static_cast<float>(M_PI)); }
   template <typename T> inline T cospi(const T a) { return ::cos(a * static_cast<float>(M_PI)); }
   template <typename T> inline T rsqrt(const T a) { return static_cast<T>(1.0) / ::sqrt(a); }
