@@ -7,8 +7,8 @@ namespace quda {
 
   namespace blas {
 
-    template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
-    class MultiBlas : public TunableGridStrideKernel3D
+    template <template <typename...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
+    class MultiBlas : public TunableKernel3D_base<!QUDA_WORK_STEAL>
     {
       using real = typename mapper<y_store_t>::type;
       const int NXZ;
@@ -25,11 +25,26 @@ namespace quda {
       // for these streaming kernels, there is no need to tune the grid size, just use max
       unsigned int minGridSize() const override { return maxGridSize(); }
 
+      unsigned int minThreads() const
+      {
+        if constexpr (QUDA_WORK_STEAL) {
+          using device_store_t = typename device_type_mapper<store_t>::type;
+          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+          constexpr bool site_unroll
+            = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
+          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
+          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          return warp_split * x[0].Length() / (nParity * M);
+        } else {
+          return Tunable::minThreads();
+        }
+      }
+
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw>
-      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0,
-                Vx &x, Vy &y, Vz &z, Vw &w) :
-        TunableGridStrideKernel3D(x0, y.size(), x0.SiteSubset()),
+      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0, Vx &x,
+                Vy &y, Vz &z, Vw &w) :
+        TunableKernel3D_base<!QUDA_WORK_STEAL>(x0, y.size(), x0.SiteSubset()),
         NXZ(x.size()),
         NYW(y.size()),
         f(NXZ, NYW),
@@ -38,10 +53,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(reinterpret_cast<cvector_ref<ColorSpinorField>&>(x)),
-        y(reinterpret_cast<cvector_ref<ColorSpinorField>&>(y)),
-        z(reinterpret_cast<cvector_ref<ColorSpinorField>&>(z)),
-        w(reinterpret_cast<cvector_ref<ColorSpinorField>&>(w))
+        x(reinterpret_cast<cvector_ref<ColorSpinorField> &>(x)),
+        y(reinterpret_cast<cvector_ref<ColorSpinorField> &>(y)),
+        z(reinterpret_cast<cvector_ref<ColorSpinorField> &>(z)),
+        w(reinterpret_cast<cvector_ref<ColorSpinorField> &>(w))
       {
         checkLocation(x[0], y[0], z[0], w[0]);
         checkLength(x[0], y[0], z[0], w[0]);
@@ -233,13 +248,13 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const override
       {
-        TunableGridStrideKernel3D::initTuneParam(param);
+        TunableKernel3D_base<!QUDA_WORK_STEAL>::initTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
       void defaultTuneParam(TuneParam &param) const override
       {
-        TunableGridStrideKernel3D::defaultTuneParam(param);
+        TunableKernel3D_base<!QUDA_WORK_STEAL>::defaultTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 

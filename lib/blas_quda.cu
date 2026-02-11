@@ -8,7 +8,7 @@ namespace quda {
   namespace blas {
 
     template <template <typename real> class Functor, typename store_t, typename y_store_t, int nSpin, typename coeff_t>
-    class Blas : public TunableGridStrideKernel3D
+    class Blas : public TunableKernel3D_base<!QUDA_WORK_STEAL>
     {
       using real = typename mapper<y_store_t>::type;
       Functor<real> f;
@@ -21,10 +21,28 @@ namespace quda {
       // for these streaming kernels, there is no need to tune the grid size, just use max
       unsigned int minGridSize() const override { return maxGridSize(); }
 
+      unsigned int minThreads() const
+      {
+        if constexpr (QUDA_WORK_STEAL) {
+          using device_store_t = typename device_type_mapper<store_t>::type;
+          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+
+          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
+          constexpr bool site_unroll
+            = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
+          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
+          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          return x.Length() / (nParity * M);
+        } else {
+          return Tunable::minThreads();
+        }
+      }
+
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw, typename Vv>
       Blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, Vx &x, Vy &y, Vz &z, Vw &w, Vv &v) :
-        TunableGridStrideKernel3D(x[0], x.size(), (x[0].IsComposite() ? x[0].CompositeDim() : 1) * x.SiteSubset()),
+        TunableKernel3D_base<!QUDA_WORK_STEAL>(x[0], x.size(),
+                                               (x[0].IsComposite() ? x[0].CompositeDim() : 1) * x.SiteSubset()),
         f(a, b, c),
         nParity(vector_length_z),
         a(a),

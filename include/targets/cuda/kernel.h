@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cuda/work_stealing>
 #include <target_device.h>
 #include <constant_kernel_arg.h>
 #include <kernel_helper.h>
@@ -27,18 +28,31 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
-    auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    if constexpr (Arg::work_steal) {
+      static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
-    if constexpr (Arg::check_bounds) {
-      while (i < arg.threads.x) {
+      cuda::device::for_each_canceled_block<1>([&](dim3 block_idx) {
+        auto i = threadIdx.x + block_idx.x * blockDim.x;
+        if constexpr (Arg::check_bounds)
+          if (i >= arg.threads.x) return;
         f(i);
-        if (grid_stride)
-          i += gridDim.x * blockDim.x;
-        else
-          break;
-      }
+      });
+
     } else {
-      f(i);
+
+      auto i = threadIdx.x + blockIdx.x * blockDim.x;
+
+      if constexpr (Arg::check_bounds) {
+        while (i < arg.threads.x) {
+          f(i);
+          if constexpr (grid_stride)
+            i += gridDim.x * blockDim.x;
+          else
+            break;
+        }
+      } else {
+        f(i);
+      }
     }
   }
 
@@ -141,21 +155,39 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
-    auto i = threadIdx.x + blockIdx.x * blockDim.x;
-    auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    if constexpr (Arg::work_steal) {
+      static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
-    if constexpr (Arg::check_bounds) {
-      if (j >= arg.threads.y) return;
+      cuda::device::for_each_canceled_block<2>([&](dim3 block_idx) {
+        auto i = threadIdx.x + block_idx.x * blockDim.x;
+        auto j = threadIdx.y + block_idx.y * blockDim.y;
 
-      while (i < arg.threads.x) {
+        if constexpr (Arg::check_bounds) {
+          if (i >= arg.threads.x) return;
+          if (j >= arg.threads.y) return;
+        }
+
         f(i, j);
-        if (grid_stride)
-          i += gridDim.x * blockDim.x;
-        else
-          break;
-      }
+      });
+
     } else {
-      f(i, j);
+
+      auto i = threadIdx.x + blockIdx.x * blockDim.x;
+      auto j = threadIdx.y + blockIdx.y * blockDim.y;
+
+      if constexpr (Arg::check_bounds) {
+        if (j >= arg.threads.y) return;
+
+        while (i < arg.threads.x) {
+          f(i, j);
+          if constexpr (grid_stride)
+            i += gridDim.x * blockDim.x;
+          else
+            break;
+        }
+      } else {
+        f(i, j);
+      }
     }
   }
 
@@ -258,23 +290,43 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
-    auto i = threadIdx.x + blockIdx.x * blockDim.x;
-    auto j = threadIdx.y + blockIdx.y * blockDim.y;
-    auto k = threadIdx.z + blockIdx.z * blockDim.z;
+    if constexpr (Arg::work_steal) {
+      static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
-    if constexpr (Arg::check_bounds) {
-      if (j >= arg.threads.y) return;
-      if (k >= arg.threads.z) return;
+      cuda::device::for_each_canceled_block<3>([&](dim3 block_idx) {
+        auto i = threadIdx.x + block_idx.x * blockDim.x;
+        auto j = threadIdx.y + block_idx.y * blockDim.y;
+        auto k = threadIdx.z + block_idx.z * blockDim.z;
 
-      while (i < arg.threads.x) {
+        if constexpr (Arg::check_bounds) {
+          if (i >= arg.threads.x) return;
+          if (j >= arg.threads.y) return;
+          if (k >= arg.threads.z) return;
+        }
+
         f(i, j, k);
-        if (grid_stride)
-          i += gridDim.x * blockDim.x;
-        else
-          break;
-      }
+      });
+
     } else {
-      f(i, j, k);
+
+      auto i = threadIdx.x + blockIdx.x * blockDim.x;
+      auto j = threadIdx.y + blockIdx.y * blockDim.y;
+      auto k = threadIdx.z + blockIdx.z * blockDim.z;
+
+      if constexpr (Arg::check_bounds) {
+        if (j >= arg.threads.y) return;
+        if (k >= arg.threads.z) return;
+
+        while (i < arg.threads.x) {
+          f(i, j, k);
+          if constexpr (grid_stride)
+            i += gridDim.x * blockDim.x;
+          else
+            break;
+        }
+      } else {
+        f(i, j, k);
+      }
     }
   }
 
