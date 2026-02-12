@@ -19,9 +19,9 @@ namespace quda
     __device__ __forceinline__ void request()
     {
       __syncthreads();
-      if (target::thread_idx_linear<dim>() == 0) { // Cancellation request
+      if (target::is_thread_zero<dim>()) { // One thread per block does request + arrive (same thread for both)
         ptx::fence_proxy_async_generic_sync_restrict(ptx::sem_acquire, ptx::space_cluster, ptx::scope_cluster);
-        if (target::is_thread_zero()) { ptx::clusterlaunchcontrol_try_cancel(result, bar); }
+        ptx::clusterlaunchcontrol_try_cancel(result, bar);
         ptx::mbarrier_arrive_expect_tx(ptx::sem_relaxed, ptx::scope_cta, ptx::space_shared, bar, sizeof(uint4));
       }
     }
