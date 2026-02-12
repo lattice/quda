@@ -54,7 +54,8 @@ namespace quda
     const Arg &arg;
     using typename nDegTwistedCloverPreconditionedParams<Arg>::Ops::KernelOpsT;
     template <typename Ftor>
-    constexpr nDegTwistedCloverPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg)
+    constexpr nDegTwistedCloverPreconditioned(const Ftor &ftor) :
+      dslash_default {ftor.block_idx}, KernelOpsT(ftor), arg(ftor.arg)
     {
     }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
@@ -79,7 +80,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim, block_idx.x);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;

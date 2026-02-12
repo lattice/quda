@@ -37,7 +37,10 @@ namespace quda
   struct wilsonCloverPreconditioned : dslash_default {
 
     const Arg &arg;
-    template <typename Ftor> constexpr wilsonCloverPreconditioned(const Ftor &ftor) : arg(ftor.arg) { }
+    template <typename Ftor>
+    constexpr wilsonCloverPreconditioned(const Ftor &ftor) : dslash_default {ftor.block_idx}, arg(ftor.arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -56,7 +59,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim, block_idx.x);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
 

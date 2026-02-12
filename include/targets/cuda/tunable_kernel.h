@@ -6,6 +6,7 @@
 #include <kernel_helper.h>
 #include <kernel.h>
 #include <kernel_ops_target.h>
+#include <type_traits>
 
 #ifdef JITIFY
 #include <jitify_helper.h>
@@ -13,6 +14,13 @@
 
 namespace quda
 {
+  /** True if Arg has a member .arg (e.g. dslash_functor_arg). */
+  template <typename Arg, typename = void> struct has_nested_arg : std::false_type {
+  };
+  template <typename Arg>
+  struct has_nested_arg<Arg, std::void_t<decltype(std::declval<Arg &>().arg)>> : std::true_type {
+  };
+  template <typename Arg> inline constexpr bool has_nested_arg_v = has_nested_arg<Arg>::value;
 
   /**
      @brief Wrapper around cudaLaunchKernel
@@ -58,7 +66,7 @@ namespace quda
     {
       checkSharedBytes<Functor>(tp, arg);
       const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
-      if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
+      if constexpr (Arg::is_dslash && has_nested_arg_v<Arg>) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
@@ -79,7 +87,7 @@ namespace quda
     {
       checkSharedBytes<Functor>(tp, arg);
       const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
-      if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
+      if constexpr (Arg::is_dslash && has_nested_arg_v<Arg>) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
 #ifdef JITIFY
       // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
@@ -104,7 +112,7 @@ namespace quda
     {
       checkSharedBytes<Functor>(tp, arg);
       const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
-      if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
+      if constexpr (Arg::is_dslash && has_nested_arg_v<Arg>) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
       constexpr bool grid_stride = false;
       const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }

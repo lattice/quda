@@ -304,11 +304,13 @@ namespace quda
           if (k >= arg.threads.z) return;
         }
 
+        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
         f(i, j, k);
       });
 
     } else {
 
+      if constexpr (Arg::is_dslash) f.block_idx = dim3(blockIdx.x, blockIdx.y, blockIdx.z);
       auto i = threadIdx.x + blockIdx.x * blockDim.x;
       auto j = threadIdx.y + blockIdx.y * blockDim.y;
       auto k = threadIdx.z + blockIdx.z * blockDim.z;

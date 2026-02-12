@@ -16,6 +16,7 @@ namespace quda
 
     using DomainWall4DArg = DomainWall4DArg<Float, nColor, nDim, DDArg, reconstruct_>;
     using DomainWall4DArg::a_5;
+    using DomainWall4DArg::block_size;
     using DomainWall4DArg::dagger;
     using DomainWall4DArg::in;
     using DomainWall4DArg::max_regs;
@@ -23,9 +24,9 @@ namespace quda
     using DomainWall4DArg::out;
     using DomainWall4DArg::spill_shared;
     using DomainWall4DArg::threads;
+    using DomainWall4DArg::work_steal;
     using DomainWall4DArg::x;
     using DomainWall4DArg::xpay;
-    using DomainWall4DArg::block_size;
 
     using F = typename DomainWall4DArg::F;
 
@@ -71,7 +72,10 @@ namespace quda
 
     const Arg &arg;
     using typename d5Params<Arg_, shared>::Ops::KernelOpsT;
-    template <typename Ftor> constexpr domainWall4DFusedM5(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) { }
+    template <typename Ftor>
+    constexpr domainWall4DFusedM5(const Ftor &ftor) : dslash_default {ftor.block_idx}, KernelOpsT(ftor), arg(ftor.arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
@@ -86,7 +90,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim; // which dimension is thread working on (fused kernel only)
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim, block_idx.x);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector stencil_out;

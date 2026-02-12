@@ -133,7 +133,8 @@ namespace quda
      @return checkerboard space-time index
   */
   template <QudaPCType pc_type, KernelType kernel_type, typename Arg>
-  __host__ __device__ __forceinline__ auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
+  __host__ __device__ __forceinline__ auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim,
+                                                     int block_x = 0)
   {
     constexpr auto nDim = Arg::nDim;
     Coord<nDim> coord;
@@ -145,7 +146,11 @@ namespace quda
 
     if (kernel_type == INTERIOR_KERNEL) {
       coord.x_cb = idx;
-      coord.x_cb_0 = (target::block_idx<Arg>().x - arg.pack_blocks) * target::block_dim().x;
+      if constexpr (Arg::work_steal) {
+        coord.x_cb_0 = (block_x - arg.pack_blocks) * target::block_dim().x;
+      } else {
+        coord.x_cb_0 = (target::block_idx<Arg>().x - arg.pack_blocks) * target::block_dim().x;
+      }
       if (nDim == 5)
         coord.X = getCoords5CB(coord, idx, arg.dc.X, arg.X0h, parity, pc_type);
       else
@@ -559,6 +564,7 @@ namespace quda
      classed.
    */
   struct dslash_default {
+    dim3 block_idx; /**< logical block index (set from dslash_functor when launched via Kernel3D) */
 
     // By default the dslash types do not have __syncthreads() in their operator();
     constexpr static bool use_syncthreads = false;
@@ -616,15 +622,14 @@ namespace quda
   }
 
   template <KernelType kernel_type, class D, typename Arg>
-  void __device__ __forceinline__ shmem_exterior(D &dslash, const Arg &arg, int s)
+  void __device__ __forceinline__ shmem_exterior(D &dslash, const Arg &arg, int s, dim3 block_idx)
   {
     // shmem exterior kernel with grid-strided loop
     if (kernel_type == UBER_KERNEL || kernel_type == EXTERIOR_KERNEL_ALL) {
       // figure out some details on blocks
       const bool shmem_interiordone = (arg.shmem & 64);
-      const int myblockidx = arg.exterior_blocks > 0 ?
-        target::block_idx<Arg>().x - (target::grid_dim().x - arg.exterior_blocks) :
-        target::block_idx<Arg>().x;
+      const int myblockidx
+        = arg.exterior_blocks > 0 ? block_idx.x - (target::grid_dim().x - arg.exterior_blocks) : block_idx.x;
       const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
       const int blocks_per_dim = (arg.exterior_blocks > 0 ? arg.exterior_blocks : target::grid_dim().x) / (nComm);
       const int blocks_per_dir = blocks_per_dim / 2;
@@ -723,8 +728,7 @@ namespace quda
 
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
-        int parity
-          = arg.nParity == 2 ? target::block_dim().z * target::block_idx<Arg>().z + target::thread_idx().z : arg.parity;
+        int parity = arg.nParity == 2 ? target::block_dim().z * block_idx.z + target::thread_idx().z : arg.parity;
         apply_dslash<EXTERIOR_KERNEL_ALL>(dslash, tid, s, parity);
         local_tid += target::block_dim().x * blocks_per_dir;
         tid += target::block_dim().x * blocks_per_dir;
@@ -772,6 +776,7 @@ namespace quda
    */
   template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
     const typename Arg::Arg &arg;
+    dim3 block_idx; /**< logical block index (set by kernel launch, valid when Arg::is_dslash) */
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
@@ -790,17 +795,18 @@ namespace quda
         // FIXME need warp uniform parity which is not composable with
         // NVSHMEM since the latter requires blockDim.y and blockDim.z to
         // cover the entire extent
-        parity = target::block_idx<Arg>().z; // ensure parity is warp uniform
+        parity = block_idx.z; // ensure parity is warp uniform
       }
 
       // for full fields set parity from z thread index else use arg setting
       if (arg.nParity == 1) parity = arg.parity;
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL)
-          && target::block_idx<Arg>().x < static_cast<unsigned int>(arg.pack_blocks)) {
+          && block_idx.x < static_cast<unsigned int>(arg.pack_blocks)) {
         if (!allthreads || alive) {
           // first few blocks do packing kernel
           typename Arg::template P<dslash.pc_type()> packer;
+          packer.block_idx = block_idx;
           packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
         }
         // we use that when running the exterior -- this is either
@@ -810,13 +816,13 @@ namespace quda
       } else if (arg.shmem > 0
                  && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
                      || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
-                         && target::block_idx<Arg>().x >= (target::grid_dim().x - arg.exterior_blocks)))) {
-        shmem_exterior<kernel_type>(dslash, arg, s);
+                         && block_idx.x >= (target::grid_dim().x - arg.exterior_blocks)))) {
+        shmem_exterior<kernel_type>(dslash, arg, s, block_idx);
 #endif
       } else {
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
-        int x_cb = (target::block_idx<Arg>().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
+        int x_cb = (block_idx.x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
 
 #ifdef NVSHMEM_COMMS
         constexpr bool use_nvshmem_comms = true;

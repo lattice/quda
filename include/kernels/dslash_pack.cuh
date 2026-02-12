@@ -16,6 +16,7 @@ namespace quda
   template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true, bool dagger_ = false, int twist_ = 0,
             QudaPCType pc_type_ = QUDA_4D_PC, int n_src_tile_ = pack_tile_size>
   struct PackArg : kernel_param<use_kernel_arg_p::TRUE, true, QUDA_WORK_STEAL_DSLASH> {
+    static constexpr bool is_dslash = true; // pack kernels get block_idx set by kernel launch like dslash_functor
 
     typedef Float_ Float;
     typedef typename mapper<Float>::type real;
@@ -243,13 +244,14 @@ namespace quda
 
   template <typename Arg> struct pack_wilson {
     const Arg &arg;
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
     constexpr pack_wilson(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int, int src_s, int parity) const
     {
       int local_tid = target::thread_idx().x;
-      int tid = arg.sites_per_block * target::block_idx<Arg>().x + local_tid;
+      int tid = arg.sites_per_block * block_idx.x + local_tid;
 
       int src_idx = src_s / arg.Ls;
       int s = src_s % arg.Ls;
@@ -314,13 +316,14 @@ namespace quda
   // 32 - use packstream -- not used
   // 64 - use uber kernel (merge exterior)
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
+    dim3 block_idx; /**< logical block index (set by caller, e.g. dslash_functor or pack_wilson_shmem) */
 
     template <int twist, int n_src_tile>
     __device__ __forceinline__ void operator()(const Arg &arg, int src_s, int parity) const
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
-      int local_block_idx = target::block_idx<Arg>().x % arg.blocks_per_dir;
-      int dim_dir = target::block_idx<Arg>().x / arg.blocks_per_dir;
+      int local_block_idx = block_idx.x % arg.blocks_per_dir;
+      int dim_dir = block_idx.x / arg.blocks_per_dir;
       int dir = dim_dir % 2;
       int dim;
       switch (dim_dir / 2) {
@@ -382,7 +385,7 @@ namespace quda
         }
 #ifdef NVSHMEM_COMMS
       }
-      if (arg.shmem) shmem_signal(dim, dir, arg);
+      if (arg.shmem) shmem_signal(dim, dir, arg, block_idx.x);
 #endif
     }
 
@@ -405,6 +408,7 @@ namespace quda
 
   template <typename Arg> struct pack_wilson_shmem {
     const Arg &arg;
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
     constexpr pack_wilson_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -412,19 +416,21 @@ namespace quda
     {
       if (arg.nParity == 1) parity = arg.parity;
       packShmem<Arg::dagger, Arg::pc_type, Arg> pack;
+      pack.block_idx = block_idx;
       pack.operator()(arg, s, parity, Arg::twist);
     }
   };
 
   template <typename Arg> struct pack_staggered {
     const Arg &arg;
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
     constexpr pack_staggered(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int, int src_idx, int parity) const
     {
       int local_tid = target::thread_idx().x;
-      int tid = arg.sites_per_block * target::block_idx<Arg>().x + local_tid;
+      int tid = arg.sites_per_block * block_idx.x + local_tid;
       // this is the parity used for load/store, but we use arg.parity for index mapping
       if (arg.nParity == 1) parity = arg.parity;
 
@@ -456,12 +462,13 @@ namespace quda
   };
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
+    dim3 block_idx; /**< logical block index (set by caller, e.g. pack_staggered_shmem) */
 
     template <int n_src_tile> __device__ __forceinline__ void apply(const Arg &arg, int src_idx, int parity) const
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
-      int local_block_idx = target::block_idx<Arg>().x % arg.blocks_per_dir;
-      int dim_dir = target::block_idx<Arg>().x / arg.blocks_per_dir;
+      int local_block_idx = block_idx.x % arg.blocks_per_dir;
+      int dim_dir = block_idx.x / arg.blocks_per_dir;
       int dir = dim_dir % 2;
       int dim;
       switch (dim_dir / 2) {
@@ -520,7 +527,7 @@ namespace quda
         }
 #ifdef NVSHMEM_COMMS
       }
-      if (arg.shmem) shmem_signal(dim, dir, arg);
+      if (arg.shmem) shmem_signal(dim, dir, arg, block_idx.x);
 #endif
     }
 
@@ -539,6 +546,7 @@ namespace quda
 
   template <typename Arg> struct pack_staggered_shmem {
     const Arg &arg;
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
     constexpr pack_staggered_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -546,6 +554,7 @@ namespace quda
     {
       if (arg.nParity == 1) parity = arg.parity;
       packStaggeredShmem<0, QUDA_4D_PC, Arg> pack;
+      pack.block_idx = block_idx;
       pack.operator()(arg, s, parity);
     }
   };

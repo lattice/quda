@@ -32,7 +32,9 @@ namespace quda
   template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall5D : dslash_default {
 
     const Arg &arg;
-    template <typename Ftor> constexpr domainWall5D(const Ftor &ftor) : arg(ftor.arg) { }
+    template <typename Ftor> constexpr domainWall5D(const Ftor &ftor) : dslash_default {ftor.block_idx}, arg(ftor.arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
@@ -51,7 +53,7 @@ namespace quda
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trivial for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       // we pass s=0, since idx is a 5-d index that includes s
-      auto coord = getCoords<QUDA_5D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
+      auto coord = getCoords<QUDA_5D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim, block_idx.x);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;

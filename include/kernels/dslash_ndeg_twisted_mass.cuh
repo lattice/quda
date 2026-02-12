@@ -26,7 +26,10 @@ namespace quda
   template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct nDegTwistedMass : dslash_default {
 
     const Arg &arg;
-    template <typename Ftor> constexpr nDegTwistedMass(const Ftor &ftor) : arg(ftor.arg) { }
+    template <typename Ftor>
+    constexpr nDegTwistedMass(const Ftor &ftor) : dslash_default {ftor.block_idx}, arg(ftor.arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -46,7 +49,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim, block_idx.x);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;

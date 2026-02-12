@@ -157,7 +157,10 @@ namespace quda
   template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct staggered_qsmear : dslash_default {
 
     const Arg &arg;
-    template <typename Ftor> constexpr staggered_qsmear(const Ftor &ftor) : arg(ftor.arg) { }
+    template <typename Ftor>
+    constexpr staggered_qsmear(const Ftor &ftor) : dslash_default {ftor.block_idx}, arg(ftor.arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
@@ -195,7 +198,7 @@ namespace quda
         }
       }
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim, block_idx.x);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
