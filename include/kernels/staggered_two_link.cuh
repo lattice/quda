@@ -51,8 +51,13 @@ namespace quda
       __device__ __host__ void operator()(int x_cb, int parity, int mu) const
       {
         int x[4];
-        int dx[4] = {0, 0, 0, 0};
-        dx[mu] = 1;
+        int dx[4] = {};
+        switch (mu) {
+        case 0: dx[0] = 1; break;
+        case 1: dx[1] = 1; break;
+        case 2: dx[2] = 1; break;
+        case 3: dx[3] = 1; break;
+        }
         getCoords(x, x_cb, arg.X, parity);
 
         for (int i = 0; i < 4; i++) x[i] += arg.border[i];
