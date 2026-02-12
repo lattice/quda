@@ -3,10 +3,13 @@
 #include <cuda/work_stealing>
 #include <target_device.h>
 #include <constant_kernel_arg.h>
+#include <work_steal.h>
 #include <kernel_helper.h>
 
 namespace quda
 {
+
+#define LOW_LEVEL
 
   /**
      @brief Kernel1D_impl is the implementation of the generic 1-d
@@ -28,15 +31,42 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
+#ifdef LOW_LEVEL
+    __shared__ uint4 work_steal_result;
+    __shared__ uint64_t work_steal_bar;
+    work_steal<1> robber(&work_steal_result, &work_steal_bar);
+#endif
+
     if constexpr (Arg::work_steal) {
       static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
+#ifdef LOW_LEVEL
+      dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
+      while (true) {
+        robber.request();
+
+        auto i = threadIdx.x + block_idx.x * blockDim.x;
+        if constexpr (Arg::check_bounds)
+          if (i >= arg.threads.x) return;
+
+        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
+        f(i);
+
+        bool success = robber.complete();
+        if (!success) break;
+
+        block_idx = robber.get_block_idx();
+
+        robber.release();
+      }
+#else
       cuda::device::for_each_canceled_block<1>([&](dim3 block_idx) {
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         if constexpr (Arg::check_bounds)
           if (i >= arg.threads.x) return;
         f(i);
       });
+#endif
 
     } else {
 
@@ -155,9 +185,39 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
+#ifdef LOW_LEVEL
+    __shared__ uint4 work_steal_result;
+    __shared__ uint64_t work_steal_bar;
+    work_steal<2> robber(&work_steal_result, &work_steal_bar);
+#endif
+
     if constexpr (Arg::work_steal) {
       static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
+#ifdef LOW_LEVEL
+      dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
+      while (true) {
+        robber.request();
+
+        auto i = threadIdx.x + block_idx.x * blockDim.x;
+        auto j = threadIdx.y + block_idx.y * blockDim.y;
+
+        if constexpr (Arg::check_bounds) {
+          if (i >= arg.threads.x) return;
+          if (j >= arg.threads.y) return;
+        }
+
+        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
+        f(i, j);
+
+        bool success = robber.complete();
+        if (!success) break;
+
+        block_idx = robber.get_block_idx();
+
+        robber.release();
+      }
+#else
       cuda::device::for_each_canceled_block<2>([&](dim3 block_idx) {
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         auto j = threadIdx.y + block_idx.y * blockDim.y;
@@ -169,6 +229,7 @@ namespace quda
 
         f(i, j);
       });
+#endif
 
     } else {
 
@@ -290,9 +351,41 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
+#ifdef LOW_LEVEL
+    __shared__ uint4 work_steal_result;
+    __shared__ uint64_t work_steal_bar;
+    work_steal<3> robber(&work_steal_result, &work_steal_bar);
+#endif
+
     if constexpr (Arg::work_steal) {
       static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
+#ifdef LOW_LEVEL
+      dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
+      while (true) {
+        robber.request();
+
+        auto i = threadIdx.x + block_idx.x * blockDim.x;
+        auto j = threadIdx.y + block_idx.y * blockDim.y;
+        auto k = threadIdx.z + block_idx.z * blockDim.z;
+
+        if constexpr (Arg::check_bounds) {
+          if (i >= arg.threads.x) return;
+          if (j >= arg.threads.y) return;
+          if (k >= arg.threads.z) return;
+        }
+
+        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
+        f(i, j, k);
+
+        bool success = robber.complete();
+        if (!success) break;
+
+        block_idx = robber.get_block_idx();
+
+        robber.release();
+      }
+#else
       cuda::device::for_each_canceled_block<3>([&](dim3 block_idx) {
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         auto j = threadIdx.y + block_idx.y * blockDim.y;
@@ -307,6 +400,7 @@ namespace quda
         if constexpr (Arg::is_dslash) f.block_idx = block_idx;
         f(i, j, k);
       });
+#endif
 
     } else {
 
