@@ -156,10 +156,10 @@ namespace quda
 
     __device__ inline void operator()() const
     {
-      int n_offset = target::block_idx().z * Arg::bN;
-      int m_offset = target::block_idx().y * Arg::bM;
+      int n_offset = target::block_idx<Arg>().z * Arg::bN;
+      int m_offset = target::block_idx<Arg>().y * Arg::bM;
 
-      int parity_x_cb_spin = target::block_idx().x;
+      int parity_x_cb_spin = target::block_idx<Arg>().x;
       int spin = parity_x_cb_spin % (Arg::fineSpin / Arg::spin_block_factor);
       int parity_x_cb = parity_x_cb_spin / (Arg::fineSpin / Arg::spin_block_factor);
       int parity = (arg.nParity == 2) ? parity_x_cb % 2 : arg.parity;

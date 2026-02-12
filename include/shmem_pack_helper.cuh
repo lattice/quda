@@ -158,7 +158,7 @@ namespace quda
     // potential hangs in the tune process of the fully fused kernel
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
       if (quda::target::thread_idx().x == 0 && quda::target::thread_idx().y == 0 && quda::target::thread_idx().z == 0
-          && quda::target::block_idx().x % arg.blocks_per_dir == 0) {
+          && quda::target::block_idx<Arg>().x % arg.blocks_per_dir == 0) {
         if (!(getNeighborRank(2 * dim + dir, arg) < 0))
           nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
                              getNeighborRank(2 * dim + dir, arg));

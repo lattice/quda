@@ -14,12 +14,21 @@ namespace quda
 
   enum class use_kernel_arg_p { FALSE, TRUE, ALWAYS };
 
-#define QUDA_WORK_STEAL false
+#ifndef QUDA_WORK_STEAL
+#define QUDA_WORK_STEAL true
+#endif
+#ifndef QUDA_WORK_STEAL_DSLASH
+#define QUDA_WORK_STEAL_DSLASH false
+#endif
+#ifndef QUDA_WORK_STEAL_REDUCTION
+#define QUDA_WORK_STEAL_REDUCTION false
+#endif
 
-  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE, bool check_bounds_ = true> struct kernel_param {
+  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE, bool check_bounds_ = true, bool work_steal_ = QUDA_WORK_STEAL>
+  struct kernel_param {
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
     static constexpr bool check_bounds = check_bounds_;
-    static constexpr bool work_steal = QUDA_WORK_STEAL;
+    static constexpr bool work_steal = work_steal_;
     static constexpr int max_regs = 0;          // by default we don't limit register count
     static constexpr bool spill_shared = false; // whether a given kernel should use shared memory spilling
     static constexpr bool is_dslash = false;    // whether the arg is for a dslash (with its nested arg struct)

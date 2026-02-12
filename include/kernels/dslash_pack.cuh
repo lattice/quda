@@ -15,7 +15,7 @@ namespace quda
 
   template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true, bool dagger_ = false, int twist_ = 0,
             QudaPCType pc_type_ = QUDA_4D_PC, int n_src_tile_ = pack_tile_size>
-  struct PackArg : kernel_param<> {
+  struct PackArg : kernel_param<use_kernel_arg_p::TRUE, true, QUDA_WORK_STEAL_DSLASH> {
 
     typedef Float_ Float;
     typedef typename mapper<Float>::type real;
@@ -86,7 +86,7 @@ namespace quda
 #else
             int) :
 #endif
-      kernel_param(dim3(block * grid, halo.X(4), in.SiteSubset())),
+      kernel_param<use_kernel_arg_p::TRUE, true, QUDA_WORK_STEAL_DSLASH>(dim3(block * grid, halo.X(4), in.SiteSubset())),
       halo_pack(halo, nFace, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       parity(parity),
@@ -249,7 +249,7 @@ namespace quda
     __device__ inline void operator()(int, int src_s, int parity) const
     {
       int local_tid = target::thread_idx().x;
-      int tid = arg.sites_per_block * target::block_idx().x + local_tid;
+      int tid = arg.sites_per_block * target::block_idx<Arg>().x + local_tid;
 
       int src_idx = src_s / arg.Ls;
       int s = src_s % arg.Ls;
@@ -319,8 +319,8 @@ namespace quda
     __device__ __forceinline__ void operator()(const Arg &arg, int src_s, int parity) const
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
-      int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
-      int dim_dir = target::block_idx().x / arg.blocks_per_dir;
+      int local_block_idx = target::block_idx<Arg>().x % arg.blocks_per_dir;
+      int dim_dir = target::block_idx<Arg>().x / arg.blocks_per_dir;
       int dir = dim_dir % 2;
       int dim;
       switch (dim_dir / 2) {
@@ -424,7 +424,7 @@ namespace quda
     __device__ inline void operator()(int, int src_idx, int parity) const
     {
       int local_tid = target::thread_idx().x;
-      int tid = arg.sites_per_block * target::block_idx().x + local_tid;
+      int tid = arg.sites_per_block * target::block_idx<Arg>().x + local_tid;
       // this is the parity used for load/store, but we use arg.parity for index mapping
       if (arg.nParity == 1) parity = arg.parity;
 
@@ -460,8 +460,8 @@ namespace quda
     template <int n_src_tile> __device__ __forceinline__ void apply(const Arg &arg, int src_idx, int parity) const
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
-      int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
-      int dim_dir = target::block_idx().x / arg.blocks_per_dir;
+      int local_block_idx = target::block_idx<Arg>().x % arg.blocks_per_dir;
+      int dim_dir = target::block_idx<Arg>().x / arg.blocks_per_dir;
       int dir = dim_dir % 2;
       int dim;
       switch (dim_dir / 2) {

@@ -320,11 +320,11 @@ namespace quda
 
     __device__ inline void operator()() const
     {
-      int coarse_spin = target::block_idx().x % Arg::coarseSpin;
-      int x_coarse = target::block_idx().x / Arg::coarseSpin;
+      int coarse_spin = target::block_idx<Arg>().x % Arg::coarseSpin;
+      int x_coarse = target::block_idx<Arg>().x / Arg::coarseSpin;
 
-      int m_offset = Arg::bM * target::block_idx().y;
-      int n_offset = Arg::bN * target::block_idx().z;
+      int m_offset = Arg::bM * target::block_idx<Arg>().y;
+      int n_offset = Arg::bN * target::block_idx<Arg>().z;
 
       restrict_mma(x_coarse, coarse_spin, m_offset, n_offset, arg);
     }

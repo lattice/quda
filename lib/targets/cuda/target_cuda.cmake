@@ -106,8 +106,21 @@ cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic su
 cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT "use infinity as the sentinel for heterogeneous atomic support?" ON
                        "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
+# Work stealing is supported on CUDA only (requires CUDA block work-stealing API)
+set(QUDA_WORK_STEAL_SUPPORT ON)
+message(STATUS "Work stealing support: ${QUDA_WORK_STEAL_SUPPORT}")
+cmake_dependent_option(QUDA_WORK_STEAL "enable work stealing for generic kernels (kernel_param default)" OFF
+                       "QUDA_WORK_STEAL_SUPPORT" OFF)
+cmake_dependent_option(QUDA_WORK_STEAL_DSLASH "enable work stealing for dslash and dslash pack kernels" OFF
+                       "QUDA_WORK_STEAL_SUPPORT" OFF)
+cmake_dependent_option(QUDA_WORK_STEAL_REDUCTION "enable work stealing for reduction kernels" OFF
+                       "QUDA_WORK_STEAL_SUPPORT" OFF)
+
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT)
+mark_as_advanced(QUDA_WORK_STEAL)
+mark_as_advanced(QUDA_WORK_STEAL_DSLASH)
+mark_as_advanced(QUDA_WORK_STEAL_REDUCTION)
 mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)

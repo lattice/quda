@@ -23,7 +23,7 @@ namespace quda
      memory
    */
   template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE>
-  struct ReduceArg : kernel_param<use_kernel_arg> {
+  struct ReduceArg : kernel_param<use_kernel_arg, true, QUDA_WORK_STEAL_REDUCTION> {
     using reduce_t = T;
 
     template <typename Reducer, typename Arg, typename I>
@@ -47,7 +47,9 @@ namespace quda
        @param[in] n_reduce The number of reductions
     */
     ReduceArg(dim3 threads, int n_reduce = 1, bool = false) :
-      kernel_param<use_kernel_arg>(threads), launch_error(QUDA_ERROR_UNINITIALIZED), n_reduce(n_reduce)
+      kernel_param<use_kernel_arg, true, QUDA_WORK_STEAL_REDUCTION>(threads),
+      launch_error(QUDA_ERROR_UNINITIALIZED),
+      n_reduce(n_reduce)
     {
       reducer::init(n_reduce, sizeof(*partial));
       // these buffers may be allocated in init, so we can't set the local copies until now
@@ -129,7 +131,7 @@ namespace quda
     T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 
     if (target::thread_idx_linear<2>() == 0) {
-      arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
+      arg.partial[idx * target::grid_dim().x + target::block_idx<Arg>().x] = aggregate;
       __threadfence(); // flush result
 
       // increment global block counter

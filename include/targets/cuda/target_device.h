@@ -144,10 +144,19 @@ namespace quda
 
     /**
        @brief Helper function that returns the thread indices within a
-       thread block.  On CUDA this returns the intrinsic
-       blockIdx, whereas on the host this just returns (0, 0, 0).
+       thread block.  On CUDA this returns the intrinsic blockIdx,
+       whereas on the host this just returns (0, 0, 0).
+       @tparam Arg Kernel argument type (must have Arg::work_steal).
+       When Arg::work_steal is true, this triggers a static_assert so
+       that call sites are fixed to use the logical block index instead.
     */
-    __device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
+    template <typename Arg> __device__ __host__ inline dim3 block_idx()
+    {
+      static_assert(!Arg::work_steal,
+                    "target::block_idx() must not be used when work stealing is enabled; "
+                    "use the logical block index from the functor or pass it explicitly.");
+      return dispatch<block_idx_impl>();
+    }
 
     template <bool is_device> struct thread_idx_impl {
       dim3 operator()() { return dim3(0, 0, 0); }

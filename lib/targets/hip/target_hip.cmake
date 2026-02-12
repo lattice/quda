@@ -85,11 +85,18 @@ set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision
 set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 
 # ######################################################################################################################
-# CUDA specific QUDA options
+# CUDA specific QUDA options (not supported on HIP)
 set(QUDA_HETEROGENEOUS_ATOMIC OFF)
 set(QUDA_LARGE_KERNEL_ARG OFF)
+# Work stealing is not supported on HIP
+set(QUDA_WORK_STEAL OFF)
+set(QUDA_WORK_STEAL_DSLASH OFF)
+set(QUDA_WORK_STEAL_REDUCTION OFF)
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
 mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+mark_as_advanced(QUDA_WORK_STEAL)
+mark_as_advanced(QUDA_WORK_STEAL_DSLASH)
+mark_as_advanced(QUDA_WORK_STEAL_REDUCTION)
 
 # ######################################################################################################################
 # HIP specific variables

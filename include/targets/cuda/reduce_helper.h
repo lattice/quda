@@ -70,7 +70,8 @@ namespace quda
      parameter struct as an explicit kernel argument or from constant
      memory
    */
-  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE> struct ReduceArg : kernel_param<use_kernel_arg> {
+  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE>
+  struct ReduceArg : kernel_param<use_kernel_arg, true, QUDA_WORK_STEAL_REDUCTION> {
     using reduce_t = T;
 
     template <typename Arg, typename I> friend __device__ void write_result(Arg &, const I &, const int);
@@ -103,7 +104,7 @@ namespace quda
        instance will be used for multiple reductions.
     */
     ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
-      kernel_param<use_kernel_arg>(threads),
+      kernel_param<use_kernel_arg, true, QUDA_WORK_STEAL_REDUCTION>(threads),
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       reset(reset),
@@ -298,7 +299,7 @@ namespace quda
 
 #pragma unroll
         for (int k = 0; k < n; k++) {
-          new (arg.partial + (idx * target::grid_dim().x + target::block_idx().x) * n + k)
+          new (arg.partial + (idx * target::grid_dim().x + target::block_idx<Arg>().x) * n + k)
             cuda::atomic<atomic_t, cuda::thread_scope_device> {aggregate_tmp[k]};
         }
 

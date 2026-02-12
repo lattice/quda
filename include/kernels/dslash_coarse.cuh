@@ -349,7 +349,8 @@ namespace quda {
         const int warp_id = target::thread_idx().x / device::warp_size();
         const int vector_site_width = device::warp_size() / Arg::color_stride; // number of sites per warp
 
-        x_cb = target::block_idx().x * (target::block_dim().x / Arg::color_stride) + warp_id * (device::warp_size() / Arg::color_stride) + lane_id % vector_site_width;
+        x_cb = target::block_idx<Arg>().x * (target::block_dim().x / Arg::color_stride)
+          + warp_id * (device::warp_size() / Arg::color_stride) + lane_id % vector_site_width;
         color_offset = lane_id / vector_site_width;
       }
 

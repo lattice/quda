@@ -76,15 +76,15 @@ namespace quda
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
     __device__ __host__ inline void operator()(int x_cb, int, bool = true)
     {
-      int parity_color = target::block_idx().z;
+      int parity_color = target::block_idx<Arg>().z;
       int color = parity_color % Arg::nColor;
       int parity = parity_color / Arg::nColor;
       using color_spinor_t = typename BlockTransposeKernelOps<Arg>::color_spinor_t;
 
       typename BlockTransposeKernelOps<Arg>::CacheT cache {*this};
 
-      int x_offset = target::block_dim().x * target::block_idx().x;
-      int v_offset = target::block_dim().y * target::block_idx().y;
+      int x_offset = target::block_dim().x * target::block_idx<Arg>().x;
+      int v_offset = target::block_dim().y * target::block_idx<Arg>().y;
 
       if constexpr (std::is_const_v<typename Arg::v_t>) {
         int thread_idx = target::thread_idx().x + target::block_dim().x * target::thread_idx().y;
