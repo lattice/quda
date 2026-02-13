@@ -41,8 +41,8 @@ namespace quda
     {
       dim3 block_idx;
       block_idx.x = ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_x<int>(*result);
-      block_idx.y = ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_y<int>(*result);
-      block_idx.z = ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_z<int>(*result);
+      block_idx.y = dim >= 2 ? ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_y<int>(*result) : 0;
+      block_idx.z = dim >= 3 ? ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_z<int>(*result) : 0;
       return block_idx;
     }
 
