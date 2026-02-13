@@ -10,6 +10,9 @@ namespace quda
     uint4 *result; // Request result (points to block __shared__).
     uint64_t *bar; // Synchronization barrier (points to block __shared__).
     int phase = 0; // Synchronization barrier phase.
+    bool last_success_ = false; // result of last complete() (true => we got a next block to work on)
+    dim3 next_block_idx_ {0, 0,
+                          0}; // next block to work on (set by get_block_idx(), read by kernel after functor returns)
 
     __device__ __forceinline__ work_steal(uint4 *result_, uint64_t *bar_) : result(result_), bar(bar_)
     {
@@ -33,8 +36,8 @@ namespace quda
       phase ^= 1;
 
       // Cancellation request decoding:
-      bool success = ptx::clusterlaunchcontrol_query_cancel_is_canceled(*result);
-      return success;
+      last_success_ = ptx::clusterlaunchcontrol_query_cancel_is_canceled(*result);
+      return last_success_;
     }
 
     __device__ __forceinline__ dim3 get_block_idx()
@@ -43,8 +46,12 @@ namespace quda
       block_idx.x = ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_x<int>(*result);
       block_idx.y = dim >= 2 ? ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_y<int>(*result) : 0;
       block_idx.z = dim >= 3 ? ptx::clusterlaunchcontrol_query_cancel_get_first_ctaid_z<int>(*result) : 0;
+      next_block_idx_ = block_idx;
       return block_idx;
     }
+
+    constexpr bool last_success() const { return last_success_; }
+    constexpr dim3 next_block_idx() const { return next_block_idx_; }
 
     __device__ __forceinline__ void release()
     {

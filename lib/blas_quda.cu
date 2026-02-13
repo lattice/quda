@@ -8,7 +8,7 @@ namespace quda {
   namespace blas {
 
     template <template <typename real> class Functor, typename store_t, typename y_store_t, int nSpin, typename coeff_t>
-    class Blas : public TunableKernel3D_base<!QUDA_WORK_STEAL>
+    class Blas : public TunableKernel3D_base<!QUDA_WORK_STEAL_DEFAULT>
     {
       using real = typename mapper<y_store_t>::type;
       Functor<real> f;
@@ -41,8 +41,8 @@ namespace quda {
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw, typename Vv>
       Blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, Vx &x, Vy &y, Vz &z, Vw &w, Vv &v) :
-        TunableKernel3D_base<!QUDA_WORK_STEAL>(x[0], x.size(),
-                                               (x[0].IsComposite() ? x[0].CompositeDim() : 1) * x.SiteSubset()),
+        TunableKernel3D_base<!QUDA_WORK_STEAL_DEFAULT>(x[0], x.size(),
+                                                       (x[0].IsComposite() ? x[0].CompositeDim() : 1) * x.SiteSubset()),
         f(a, b, c),
         nParity(vector_length_z),
         a(a),

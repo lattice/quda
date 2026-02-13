@@ -17,6 +17,9 @@ namespace quda
 #ifndef QUDA_WORK_STEAL
 #define QUDA_WORK_STEAL true
 #endif
+#ifndef QUDA_WORK_STEAL_DEFAULT
+#define QUDA_WORK_STEAL_DEFAULT false
+#endif
 #ifndef QUDA_WORK_STEAL_DSLASH
 #define QUDA_WORK_STEAL_DSLASH false
 #endif
@@ -24,7 +27,8 @@ namespace quda
 #define QUDA_WORK_STEAL_REDUCTION false
 #endif
 
-  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE, bool check_bounds_ = true, bool work_steal_ = QUDA_WORK_STEAL>
+  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE, bool check_bounds_ = true,
+            bool work_steal_ = QUDA_WORK_STEAL_DEFAULT>
   struct kernel_param {
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
     static constexpr bool check_bounds = check_bounds_;
@@ -33,6 +37,7 @@ namespace quda
     static constexpr bool spill_shared = false;  // whether a given kernel should use shared memory spilling
     static constexpr bool is_dslash = false;     // whether the arg is for a dslash (with its nested arg struct)
     static constexpr bool set_block_idx = false; // whether the kernel should set f.block_idx (e.g. dslash, pack)
+    static constexpr bool work_steal_functor = false; // when true, functor drives request() and next-block prefetch
     dim3 threads;                                /** number of active threads required */
     int block_size;                              /** product of thread block dimensions */
     int comms_rank;                              /** per process value of comm_rank() */

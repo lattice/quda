@@ -8,7 +8,7 @@ namespace quda {
   namespace blas {
 
     template <template <typename...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
-    class MultiBlas : public TunableKernel3D_base<!QUDA_WORK_STEAL>
+    class MultiBlas : public TunableKernel3D_base<!QUDA_WORK_STEAL_DEFAULT>
     {
       using real = typename mapper<y_store_t>::type;
       const int NXZ;
@@ -44,7 +44,7 @@ namespace quda {
       template <typename Vx, typename Vy, typename Vz, typename Vw>
       MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0, Vx &x,
                 Vy &y, Vz &z, Vw &w) :
-        TunableKernel3D_base<!QUDA_WORK_STEAL>(x0, y.size(), x0.SiteSubset()),
+        TunableKernel3D_base<!QUDA_WORK_STEAL_DEFAULT>(x0, y.size(), x0.SiteSubset()),
         NXZ(x.size()),
         NYW(y.size()),
         f(NXZ, NYW),
@@ -248,13 +248,13 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const override
       {
-        TunableKernel3D_base<!QUDA_WORK_STEAL>::initTuneParam(param);
+        TunableKernel3D_base<!QUDA_WORK_STEAL_DEFAULT>::initTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
       void defaultTuneParam(TuneParam &param) const override
       {
-        TunableKernel3D_base<!QUDA_WORK_STEAL>::defaultTuneParam(param);
+        TunableKernel3D_base<!QUDA_WORK_STEAL_DEFAULT>::defaultTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 

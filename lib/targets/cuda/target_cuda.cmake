@@ -109,18 +109,25 @@ cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT "use infinity as the s
 # Work stealing is supported on CUDA only (requires CUDA block work-stealing API)
 set(QUDA_WORK_STEAL_SUPPORT ON)
 message(STATUS "Work stealing support: ${QUDA_WORK_STEAL_SUPPORT}")
-cmake_dependent_option(QUDA_WORK_STEAL "enable work stealing for generic kernels (kernel_param default)" OFF
+cmake_dependent_option(QUDA_WORK_STEAL "enable work stealing" OFF
                        "QUDA_WORK_STEAL_SUPPORT" OFF)
+cmake_dependent_option(QUDA_WORK_STEAL_DEFAULT "use work stealing by default in kernel_param (generic kernels)" OFF
+                       "QUDA_WORK_STEAL_SUPPORT;QUDA_WORK_STEAL" OFF)
 cmake_dependent_option(QUDA_WORK_STEAL_DSLASH "enable work stealing for dslash and dslash pack kernels" OFF
                        "QUDA_WORK_STEAL_SUPPORT" OFF)
 cmake_dependent_option(QUDA_WORK_STEAL_REDUCTION "enable work stealing for reduction kernels" OFF
                        "QUDA_WORK_STEAL_SUPPORT" OFF)
+cmake_dependent_option(QUDA_WORK_STEAL_COOPERATIVE
+                       "use in-kernel cooperative work stealing when work_steal_functor=true and QUDA_WORK_STEAL=ON"
+                       ON "QUDA_WORK_STEAL_SUPPORT" OFF)
 
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT)
 mark_as_advanced(QUDA_WORK_STEAL)
+mark_as_advanced(QUDA_WORK_STEAL_DEFAULT)
 mark_as_advanced(QUDA_WORK_STEAL_DSLASH)
 mark_as_advanced(QUDA_WORK_STEAL_REDUCTION)
+mark_as_advanced(QUDA_WORK_STEAL_COOPERATIVE)
 mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
@@ -143,6 +150,13 @@ endif()
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
 message(STATUS "QUDA_GPU_ARCH: ${QUDA_GPU_ARCH}")
+
+if(QUDA_WORK_STEAL_COOPERATIVE AND QUDA_COMPUTE_CAPABILITY LESS 100)
+  message(FATAL_ERROR "QUDA_WORK_STEAL_COOPERATIVE requires QUDA_GPU_ARCH=sm_100 or newer (current: ${QUDA_GPU_ARCH})")
+endif()
+if(QUDA_WORK_STEAL_COOPERATIVE AND NOT QUDA_WORK_STEAL)
+  message(FATAL_ERROR "QUDA_WORK_STEAL_COOPERATIVE requires QUDA_WORK_STEAL to be ON")
+endif()
 
 # ######################################################################################################################
 # data order variables

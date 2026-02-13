@@ -343,6 +343,7 @@ namespace quda
     static constexpr bool work_steal = QUDA_WORK_STEAL_DSLASH;
     static constexpr int prefetch_distance = 0; // whether we are using prefetching in the dslash
     static constexpr PrefetchType prefetch_type = dslash_prefetch_type();
+    static constexpr bool work_steal_functor = false; // set true only for stencils that drive request() from prefetch
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
     const QudaReconstructType reconstruct;
@@ -762,9 +763,10 @@ namespace quda
     static constexpr bool spill_shared = Arg::spill_shared;
     static constexpr bool is_dslash = true;
     static constexpr bool set_block_idx = true;
+    static constexpr bool work_steal_functor = Arg_::work_steal_functor;
     Arg arg;
 
-    dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
+    constexpr dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
       kernel_param<use_kernel_arg, true, Arg_::work_steal>(
         dim3(threads_x, (arg.dc.Ls + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity)),
       arg(arg)
@@ -781,7 +783,9 @@ namespace quda
    */
   template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
     const typename Arg::Arg &arg;
-    dim3 block_idx; /**< logical block index (set by kernel launch, valid when Arg::set_block_idx) */
+    dim3 block_idx;                   /**< logical block index (set by kernel launch, valid when Arg::set_block_idx) */
+    dim3 next_block_idx;              /**< next block index (when Arg::work_steal_functor, for next-block prefetch) */
+    work_steal<3> *robber_ = nullptr; /**< when Arg::work_steal_functor, kernel sets via set_robber() */
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
@@ -790,6 +794,8 @@ namespace quda
     constexpr dslash_functor(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg.arg)
     {
     }
+    constexpr void set_robber(work_steal<3> &r) { robber_ = &r; }
+    constexpr work_steal<3> *robber_ptr() const { return robber_; }
 
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
     __forceinline__ __device__ void operator()(int, int s, int parity, bool alive = true) const

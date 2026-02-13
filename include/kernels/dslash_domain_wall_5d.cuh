@@ -9,6 +9,7 @@ namespace quda
 
   template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
   struct DomainWall5DArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    static constexpr bool work_steal_functor = false;
     typedef typename mapper<Float>::type real;
     int_fastdiv Ls; /** fifth dimension length */
     real a;   /** xpay scale factor */

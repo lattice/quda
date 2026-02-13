@@ -9,8 +9,6 @@
 namespace quda
 {
 
-#define LOW_LEVEL
-
   /**
      @brief Kernel1D_impl is the implementation of the generic 1-d
      kernel.  Functors that utilize this kernel have a
@@ -31,7 +29,7 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
-#ifdef LOW_LEVEL
+#ifdef QUDA_WORK_STEAL_COOPERATIVE
     __shared__ uint4 work_steal_result;
     __shared__ uint64_t work_steal_bar;
     work_steal<1> robber(&work_steal_result, &work_steal_bar);
@@ -40,25 +38,42 @@ namespace quda
     if constexpr (Arg::work_steal) {
       static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
-#ifdef LOW_LEVEL
+#ifdef QUDA_WORK_STEAL_COOPERATIVE
       dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
-      while (true) {
-        robber.request();
+      if constexpr (Arg::work_steal_functor) {
+        while (true) {
+          if constexpr (Arg::set_block_idx) {
+            f.block_idx = block_idx;
+            f.set_robber(robber);
+          }
+          auto i = threadIdx.x + block_idx.x * blockDim.x;
+          auto in_bounds = !Arg::check_bounds ? true : i < arg.threads.x;
+          if (in_bounds) f(i);
+          bool success = robber.last_success();
+          block_idx = robber.next_block_idx();
+          if (!success) break;
+          robber.release();
+        }
+      } else {
+        while (true) {
+          robber.request();
 
-        auto i = threadIdx.x + block_idx.x * blockDim.x;
-        if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
+          auto i = threadIdx.x + block_idx.x * blockDim.x;
+          if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
 
-        auto in_bounds = !Arg::check_bounds ? true : i < arg.threads.x;
-        if (in_bounds) f(i);
+          auto in_bounds = !Arg::check_bounds ? true : i < arg.threads.x;
+          if (in_bounds) f(i);
 
-        bool success = robber.complete();
-        if (!success) break;
+          bool success = robber.complete();
+          if (!success) break;
 
-        block_idx = robber.get_block_idx();
+          block_idx = robber.get_block_idx();
 
-        robber.release();
+          robber.release();
+        }
       }
 #else
+      // When QUDA_WORK_STEAL_COOPERATIVE is not defined, use runtime work stealing; work_steal_functor has no effect
       cuda::device::for_each_canceled_block<1>([&](dim3 block_idx) {
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         if constexpr (Arg::check_bounds)
@@ -184,7 +199,7 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
-#ifdef LOW_LEVEL
+#ifdef QUDA_WORK_STEAL_COOPERATIVE
     __shared__ uint4 work_steal_result;
     __shared__ uint64_t work_steal_bar;
     work_steal<2> robber(&work_steal_result, &work_steal_bar);
@@ -193,26 +208,44 @@ namespace quda
     if constexpr (Arg::work_steal) {
       static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
-#ifdef LOW_LEVEL
+#ifdef QUDA_WORK_STEAL_COOPERATIVE
       dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
-      while (true) {
-        robber.request();
+      if constexpr (Arg::work_steal_functor) {
+        while (true) {
+          if constexpr (Arg::set_block_idx) {
+            f.block_idx = block_idx;
+            f.set_robber(robber);
+          }
+          auto i = threadIdx.x + block_idx.x * blockDim.x;
+          auto j = threadIdx.y + block_idx.y * blockDim.y;
+          auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y);
+          if (in_bounds) f(i, j);
+          bool success = robber.last_success();
+          block_idx = robber.next_block_idx();
+          if (!success) break;
+          robber.release();
+        }
+      } else {
+        while (true) {
+          robber.request();
 
-        auto i = threadIdx.x + block_idx.x * blockDim.x;
-        auto j = threadIdx.y + block_idx.y * blockDim.y;
-        if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
+          auto i = threadIdx.x + block_idx.x * blockDim.x;
+          auto j = threadIdx.y + block_idx.y * blockDim.y;
+          if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
 
-        auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y);
-        if (in_bounds) f(i, j);
+          auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y);
+          if (in_bounds) f(i, j);
 
-        bool success = robber.complete();
-        if (!success) break;
+          bool success = robber.complete();
+          if (!success) break;
 
-        block_idx = robber.get_block_idx();
+          block_idx = robber.get_block_idx();
 
-        robber.release();
+          robber.release();
+        }
       }
 #else
+      // When QUDA_WORK_STEAL_COOPERATIVE is not defined, use runtime work stealing; work_steal_functor has no effect
       cuda::device::for_each_canceled_block<2>([&](dim3 block_idx) {
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         auto j = threadIdx.y + block_idx.y * blockDim.y;
@@ -346,7 +379,7 @@ namespace quda
 #endif
     Functor<Arg> f(arg);
 
-#ifdef LOW_LEVEL
+#ifdef QUDA_WORK_STEAL_COOPERATIVE
     __shared__ uint4 work_steal_result;
     __shared__ uint64_t work_steal_bar;
     work_steal<3> robber(&work_steal_result, &work_steal_bar);
@@ -355,27 +388,46 @@ namespace quda
     if constexpr (Arg::work_steal) {
       static_assert(!grid_stride, "grid stride cannot be used with work stealing");
 
-#ifdef LOW_LEVEL
+#ifdef QUDA_WORK_STEAL_COOPERATIVE
       dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
-      while (true) {
-        robber.request();
+      if constexpr (Arg::work_steal_functor) {
+        while (true) {
+          if constexpr (Arg::set_block_idx) {
+            f.block_idx = block_idx;
+            f.set_robber(robber);
+          }
+          auto i = threadIdx.x + block_idx.x * blockDim.x;
+          auto j = threadIdx.y + block_idx.y * blockDim.y;
+          auto k = threadIdx.z + block_idx.z * blockDim.z;
+          auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
+          if (in_bounds) f(i, j, k);
+          bool success = robber.last_success();
+          block_idx = robber.next_block_idx();
+          if (!success) break;
+          robber.release();
+        }
+      } else {
+        while (true) {
+          robber.request();
 
-        auto i = threadIdx.x + block_idx.x * blockDim.x;
-        auto j = threadIdx.y + block_idx.y * blockDim.y;
-        auto k = threadIdx.z + block_idx.z * blockDim.z;
-        if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
+          auto i = threadIdx.x + block_idx.x * blockDim.x;
+          auto j = threadIdx.y + block_idx.y * blockDim.y;
+          auto k = threadIdx.z + block_idx.z * blockDim.z;
+          if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
 
-        auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
-        if (in_bounds) f(i, j, k);
+          auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
+          if (in_bounds) f(i, j, k);
 
-        bool success = robber.complete();
-        if (!success) break;
+          bool success = robber.complete();
+          if (!success) break;
 
-        block_idx = robber.get_block_idx();
+          block_idx = robber.get_block_idx();
 
-        robber.release();
+          robber.release();
+        }
       }
 #else
+      // When QUDA_WORK_STEAL_COOPERATIVE is not defined, use runtime work stealing; work_steal_functor has no effect
       cuda::device::for_each_canceled_block<3>([&](dim3 block_idx) {
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         auto j = threadIdx.y + block_idx.y * blockDim.y;

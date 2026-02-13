@@ -10,6 +10,7 @@ namespace quda
   template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool twist_ = false,
             bool distance_pc_ = false>
   struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_> {
+    static constexpr bool work_steal_functor = false;
     using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool twist = twist_;

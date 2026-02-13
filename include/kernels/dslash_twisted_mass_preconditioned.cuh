@@ -7,6 +7,7 @@ namespace quda
 
   template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool asymmetric_>
   struct TwistedMassArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    static constexpr bool work_steal_functor = false;
     typedef typename mapper<Float>::type real;
     static constexpr bool asymmetric = asymmetric_; /** whether we are applying the asymmetric operator or not */
     real a;          /** this is the scaling factor */

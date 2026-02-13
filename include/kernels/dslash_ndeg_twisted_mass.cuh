@@ -7,6 +7,7 @@ namespace quda
 
   template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
   struct NdegTwistedMassArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    static constexpr bool work_steal_functor = false;
     typedef typename mapper<Float>::type real;
     real a; /** this is the Wilson-dslash scale factor */
     real b; /** this is the chiral twist factor */
