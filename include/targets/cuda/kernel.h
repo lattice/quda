@@ -42,17 +42,22 @@ namespace quda
       dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
       if constexpr (Arg::work_steal_functor) {
         while (true) {
-          if constexpr (Arg::set_block_idx) {
-            f.block_idx = block_idx;
-            f.set_robber(robber);
-          }
           auto i = threadIdx.x + block_idx.x * blockDim.x;
           auto in_bounds = !Arg::check_bounds ? true : i < arg.threads.x;
-          if (in_bounds) f(i);
-          bool success = robber.last_success();
-          block_idx = robber.next_block_idx();
+
+          bool success = false;
+          // Only in_bounds threads run the functor (and thus request/complete); keep barrier scope consistent.
+          if (in_bounds) {
+            if constexpr (Arg::set_block_idx) {
+              f.block_idx = block_idx;
+              f.set_robber(robber);
+            }
+            f(i);
+            success = robber.last_success();
+            block_idx = robber.next_block_idx();
+            if (success) robber.release();
+          }
           if (!success) break;
-          robber.release();
         }
       } else {
         while (true) {
@@ -212,18 +217,23 @@ namespace quda
       dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
       if constexpr (Arg::work_steal_functor) {
         while (true) {
-          if constexpr (Arg::set_block_idx) {
-            f.block_idx = block_idx;
-            f.set_robber(robber);
-          }
           auto i = threadIdx.x + block_idx.x * blockDim.x;
           auto j = threadIdx.y + block_idx.y * blockDim.y;
           auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y);
-          if (in_bounds) f(i, j);
-          bool success = robber.last_success();
-          block_idx = robber.next_block_idx();
+
+          bool success = false;
+          // Only in_bounds threads run the functor (and thus request/complete); keep barrier scope consistent.
+          if (in_bounds) {
+            if constexpr (Arg::set_block_idx) {
+              f.block_idx = block_idx;
+              f.set_robber(robber);
+            }
+            f(i, j);
+            success = robber.last_success();
+            block_idx = robber.next_block_idx();
+            if (success) robber.release();
+          }
           if (!success) break;
-          robber.release();
         }
       } else {
         while (true) {
@@ -392,19 +402,24 @@ namespace quda
       dim3 block_idx = {blockIdx.x, blockIdx.y, blockIdx.z};
       if constexpr (Arg::work_steal_functor) {
         while (true) {
-          if constexpr (Arg::set_block_idx) {
-            f.block_idx = block_idx;
-            f.set_robber(robber);
-          }
           auto i = threadIdx.x + block_idx.x * blockDim.x;
           auto j = threadIdx.y + block_idx.y * blockDim.y;
           auto k = threadIdx.z + block_idx.z * blockDim.z;
           auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
-          if (in_bounds) f(i, j, k);
-          bool success = robber.last_success();
-          block_idx = robber.next_block_idx();
+
+          bool success = false;
+          // Only in_bounds threads run the functor (and thus request/complete); keep barrier scope consistent.
+          if (in_bounds) {
+            if constexpr (Arg::set_block_idx) {
+              f.block_idx = block_idx;
+              f.set_robber(robber);
+            }
+            f(i, j, k);
+            success = robber.last_success();
+            block_idx = robber.next_block_idx();
+            if (success) robber.release();
+          }
           if (!success) break;
-          robber.release();
         }
       } else {
         while (true) {
