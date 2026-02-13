@@ -16,7 +16,8 @@ namespace quda
   template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true, bool dagger_ = false, int twist_ = 0,
             QudaPCType pc_type_ = QUDA_4D_PC, int n_src_tile_ = pack_tile_size>
   struct PackArg : kernel_param<use_kernel_arg_p::TRUE, true, QUDA_WORK_STEAL_DSLASH> {
-    static constexpr bool is_dslash = true; // pack kernels get block_idx set by kernel launch like dslash_functor
+    static constexpr bool is_dslash = false;    // pack does not use nested arg.block_size
+    static constexpr bool set_block_idx = true; // pack kernels get block_idx set by kernel launch
 
     typedef Float_ Float;
     typedef typename mapper<Float>::type real;
@@ -25,7 +26,8 @@ namespace quda
     static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = (nSpin == 4 && spin_project_ ? true : false);
     static constexpr bool dagger = dagger_;
-    static constexpr int twist = twist_; // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 - doublet)
+    static constexpr int twist
+      = twist_; // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 - doublet)
     static constexpr QudaPCType pc_type = pc_type_; // preconditioning type (4-d or 5-d)
     static constexpr int n_src_tile = n_src_tile_;
 
@@ -39,8 +41,8 @@ namespace quda
     Ghost halo_pack;
 
     const int nFace;
-    const int parity;         // only use this for single parity fields
-    const int nParity;        // number of parities we are working on
+    const int parity;  // only use this for single parity fields
+    const int nParity; // number of parities we are working on
 
     DslashConstant dc; // pre-computed dslash constants for optimized indexing
 
@@ -244,7 +246,7 @@ namespace quda
 
   template <typename Arg> struct pack_wilson {
     const Arg &arg;
-    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::set_block_idx) */
     constexpr pack_wilson(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -408,7 +410,7 @@ namespace quda
 
   template <typename Arg> struct pack_wilson_shmem {
     const Arg &arg;
-    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::set_block_idx) */
     constexpr pack_wilson_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -423,7 +425,7 @@ namespace quda
 
   template <typename Arg> struct pack_staggered {
     const Arg &arg;
-    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::set_block_idx) */
     constexpr pack_staggered(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -546,7 +548,7 @@ namespace quda
 
   template <typename Arg> struct pack_staggered_shmem {
     const Arg &arg;
-    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::is_dslash) */
+    dim3 block_idx; /**< logical block index (set by kernel launch when Arg::set_block_idx) */
     constexpr pack_staggered_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 

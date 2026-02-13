@@ -341,16 +341,16 @@ namespace quda
     static constexpr int max_regs = 0;             // by default we don't limit register count
     static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
     static constexpr bool work_steal = QUDA_WORK_STEAL_DSLASH;
-    static constexpr int prefetch_distance = 0;    // whether we are using prefetching in the dslash
+    static constexpr int prefetch_distance = 0; // whether we are using prefetching in the dslash
     static constexpr PrefetchType prefetch_type = dslash_prefetch_type();
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
     const QudaReconstructType reconstruct;
 
     const int_fastdiv X0h;
-    const int dim[5];         // full lattice dimensions
-    const int gDim[5];        // global full lattice dimensions
-    int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
+    const int dim[5];  // full lattice dimensions
+    const int gDim[5]; // global full lattice dimensions
+    int commDim[4];    // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
 
     const int commCoord[5];
     const int globalDim3;
@@ -362,7 +362,7 @@ namespace quda
     KernelType kernel_type; // interior, exterior_t, etc.
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
 
-    int_fastdiv threads; // number of threads in x-thread dimension
+    int_fastdiv threads;              // number of threads in x-thread dimension
     int_fastdiv exterior_threads = 0; // number of threads in x-thread dimension for fused exterior dslash
     int threadDimMapLower[4] = {};
     int threadDimMapUpper[4] = {};
@@ -449,9 +449,9 @@ namespace quda
         errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
       for (auto i = 0u; i < in.size(); i++)
         if (in[i].data() == out[i].data()) errorQuda("Aliasing pointers");
-      checkOrder(out, in, x);        // check all orders match
-      checkLocation(out, in, x, U);  // check all locations match
-      checkDD(out, in, x);           // check all DD match
+      checkOrder(out, in, x);       // check all orders match
+      checkLocation(out, in, x, U); // check all locations match
+      checkDD(out, in, x);          // check all DD match
       checkNative(in, U);
 
       for (int d = 0; d < 4; d++) {
@@ -671,7 +671,8 @@ namespace quda
 
       if (shmembarrier) {
 
-        if (shmem_interiordone && target::thread_idx().x == target::block_dim().x - 1 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
+        if (shmem_interiordone && target::thread_idx().x == target::block_dim().x - 1 && target::thread_idx().y == 0
+            && target::thread_idx().z == 0) {
           auto tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
           while (tst_val < arg.counter - 1) {
             arg.interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
@@ -714,7 +715,9 @@ namespace quda
           }
 
           if (getNeighborRank(target::thread_idx().x, arg) >= 0) {
-            if (spin) { nvshmem_signal_wait_until((arg.sync_arr + target::thread_idx().x), NVSHMEM_CMP_GE, arg.counter); }
+            if (spin) {
+              nvshmem_signal_wait_until((arg.sync_arr + target::thread_idx().x), NVSHMEM_CMP_GE, arg.counter);
+            }
           }
         }
 
@@ -723,7 +726,8 @@ namespace quda
         // do exterior
       }
 
-      int local_tid = target::thread_idx().x + target::block_dim().x * (myblockidx % (blocks_per_dir)); // index within the block
+      int local_tid
+        = target::thread_idx().x + target::block_dim().x * (myblockidx % (blocks_per_dir)); // index within the block
       int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponding to local_tid
 
       while (local_tid < threads_my_dir) {
@@ -757,6 +761,7 @@ namespace quda
     static constexpr int max_regs = Arg::max_regs;
     static constexpr bool spill_shared = Arg::spill_shared;
     static constexpr bool is_dslash = true;
+    static constexpr bool set_block_idx = true;
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
@@ -776,7 +781,7 @@ namespace quda
    */
   template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
     const typename Arg::Arg &arg;
-    dim3 block_idx; /**< logical block index (set by kernel launch, valid when Arg::is_dslash) */
+    dim3 block_idx; /**< logical block index (set by kernel launch, valid when Arg::set_block_idx) */
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }

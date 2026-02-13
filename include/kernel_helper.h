@@ -29,15 +29,16 @@ namespace quda
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
     static constexpr bool check_bounds = check_bounds_;
     static constexpr bool work_steal = work_steal_;
-    static constexpr int max_regs = 0;          // by default we don't limit register count
-    static constexpr bool spill_shared = false; // whether a given kernel should use shared memory spilling
-    static constexpr bool is_dslash = false;    // whether the arg is for a dslash (with its nested arg struct)
-    dim3 threads;          /** number of active threads required */
-    int block_size;        /** product of thread block dimensions */
-    int comms_rank;        /** per process value of comm_rank() */
-    int comms_rank_global; /** per process value comm_rank_global() */
-    int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */
-    int comms_dim[4];      /** array storing {comm_dim(0), ..., comm_dim(3)} */
+    static constexpr int max_regs = 0;           // by default we don't limit register count
+    static constexpr bool spill_shared = false;  // whether a given kernel should use shared memory spilling
+    static constexpr bool is_dslash = false;     // whether the arg is for a dslash (with its nested arg struct)
+    static constexpr bool set_block_idx = false; // whether the kernel should set f.block_idx (e.g. dslash, pack)
+    dim3 threads;                                /** number of active threads required */
+    int block_size;                              /** product of thread block dimensions */
+    int comms_rank;                              /** per process value of comm_rank() */
+    int comms_rank_global;                       /** per process value comm_rank_global() */
+    int comms_coord[4];                          /** array storing {comm_coord(0), ..., comm_coord(3)} */
+    int comms_dim[4];                            /** array storing {comm_dim(0), ..., comm_dim(3)} */
     int comms_dim_partitioned[4]; /** array storing {comm_dim_partitioned(0), ..., comm_dim_partiitoned(3)} */
 
     constexpr kernel_param() = default;
@@ -57,19 +58,13 @@ namespace quda
       @brief This helper member function may be used when templated kernel argument
       needs to check the value of use_kernel_arg without including this header file.
     */
-    static constexpr bool default_use_kernel_arg()
-    {
-      return use_kernel_arg != use_kernel_arg_p::FALSE;
-    }
+    static constexpr bool default_use_kernel_arg() { return use_kernel_arg != use_kernel_arg_p::FALSE; }
 
     /**
       @brief This helper member function may be used when templated kernel argument
       needs to check the value of use_kernel_arg without including this header file.
     */
-    static constexpr bool always_use_kernel_arg()
-    {
-      return use_kernel_arg == use_kernel_arg_p::ALWAYS;
-    }
+    static constexpr bool always_use_kernel_arg() { return use_kernel_arg == use_kernel_arg_p::ALWAYS; }
   };
 
 #ifdef JITIFY

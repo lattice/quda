@@ -46,7 +46,7 @@ namespace quda
         robber.request();
 
         auto i = threadIdx.x + block_idx.x * blockDim.x;
-        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
+        if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
 
         auto in_bounds = !Arg::check_bounds ? true : i < arg.threads.x;
         if (in_bounds) f(i);
@@ -200,7 +200,7 @@ namespace quda
 
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         auto j = threadIdx.y + block_idx.y * blockDim.y;
-        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
+        if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
 
         auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y);
         if (in_bounds) f(i, j);
@@ -363,7 +363,7 @@ namespace quda
         auto i = threadIdx.x + block_idx.x * blockDim.x;
         auto j = threadIdx.y + block_idx.y * blockDim.y;
         auto k = threadIdx.z + block_idx.z * blockDim.z;
-        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
+        if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
 
         auto in_bounds = !Arg::check_bounds ? true : (i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
         if (in_bounds) f(i, j, k);
@@ -387,14 +387,14 @@ namespace quda
           if (k >= arg.threads.z) return;
         }
 
-        if constexpr (Arg::is_dslash) f.block_idx = block_idx;
+        if constexpr (Arg::set_block_idx) f.block_idx = block_idx;
         f(i, j, k);
       });
 #endif
 
     } else {
 
-      if constexpr (Arg::is_dslash) f.block_idx = dim3(blockIdx.x, blockIdx.y, blockIdx.z);
+      if constexpr (Arg::set_block_idx) f.block_idx = dim3(blockIdx.x, blockIdx.y, blockIdx.z);
       auto i = threadIdx.x + blockIdx.x * blockDim.x;
       auto j = threadIdx.y + blockIdx.y * blockDim.y;
       auto k = threadIdx.z + blockIdx.z * blockDim.z;
