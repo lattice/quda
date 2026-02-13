@@ -78,11 +78,11 @@ namespace quda
      @param[in] parity Partiry that we are working on
      @param[in] arg Paramter struct
   */
-  template <class coord_t, class Arg>
-  __device__ __host__ void prefetch(int dim, int dir, const coord_t &coord, int parity, const Arg &arg,
-                                    work_steal<3> *robber = nullptr, const coord_t *next_coord_ptr = nullptr,
-                                    bool next_is_interior = false, int next_parity_val = 0,
-                                    bool *p_next_steal_valid = nullptr, coord_t *p_next_steal_coord = nullptr)
+  template <class coord_t, class Arg, KernelType kernel_type = INTERIOR_KERNEL>
+  __device__ __host__ void
+  prefetch(int dim, int dir, const coord_t &coord, int parity, const Arg &arg, work_steal<3> *robber = nullptr,
+           const coord_t *next_coord_ptr = nullptr, bool next_is_interior = false, int next_parity_val = 0,
+           bool *p_next_steal_valid = nullptr, coord_t *p_next_steal_coord = nullptr, unsigned int block_idx_x = 0)
   {
     if constexpr (Arg::prefetch_distance == 0) return;
 
@@ -90,8 +90,11 @@ namespace quda
       = 8; // 4 dims * 2 directions; request at pipeline_length-1, complete at pipeline_length
     int step = 2 * dim + dir + Arg::prefetch_distance;
     if constexpr (Arg::work_steal_functor) {
-      if (step == pipeline_length - 1 && robber) robber->request();
-      if (step == pipeline_length && robber && p_next_steal_coord) {
+      // Last interior block never participates in request/complete to avoid mbarrier hang when block is ragged
+      const bool skip_work_steal = (kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL)
+        && (block_idx_x == target::grid_dim().x - 1 - arg.exterior_blocks);
+      if (step == pipeline_length - 1 && robber && !skip_work_steal) robber->request();
+      if (step == pipeline_length && robber && p_next_steal_coord && !skip_work_steal) {
         bool success = robber->complete();
         if (success) {
           dim3 nb = robber->get_block_idx();
@@ -148,9 +151,9 @@ namespace quda
   */
   template <bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
-                                              int thread_dim, bool &active, int src_idx,
-                                              work_steal<3> *robber = nullptr, const Coord *next_coord_ptr = nullptr,
-                                              bool next_is_interior = false, int next_parity_val = 0)
+                                              int thread_dim, bool &active, int src_idx, work_steal<3> *robber = nullptr,
+                                              const Coord *next_coord_ptr = nullptr, bool next_is_interior = false,
+                                              int next_parity_val = 0, unsigned int block_idx_x = 0)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -200,8 +203,9 @@ namespace quda
             out += fwd_coeff * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
 
-          prefetch(d, 0, coord, parity, arg, robber, next_coord_ptr, next_is_interior, next_parity_val,
-                   &next_steal_valid, &next_steal_coord); // prefetch the gauge link Arg::prefetch_distance ahead
+          prefetch<Coord, Arg, kernel_type>(d, 0, coord, parity, arg, robber, next_coord_ptr, next_is_interior,
+                                            next_parity_val, &next_steal_valid, &next_steal_coord,
+                                            block_idx_x); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
@@ -238,8 +242,9 @@ namespace quda
             out += bwd_coeff * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
 
-          prefetch(d, 1, coord, parity, arg, robber, next_coord_ptr, next_is_interior, next_parity_val,
-                   &next_steal_valid, &next_steal_coord); // prefetch the gauge link Arg::prefetch_distance ahead
+          prefetch<Coord, Arg, kernel_type>(d, 1, coord, parity, arg, robber, next_coord_ptr, next_is_interior,
+                                            next_parity_val, &next_steal_valid, &next_steal_coord,
+                                            block_idx_x); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
     } // nDim
@@ -282,7 +287,7 @@ namespace quda
       bool next_is_interior = false;
       int next_parity_val = 0;
       applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx, robber_ptr_,
-                                         next_coord_ptr, next_is_interior, next_parity_val);
+                                         next_coord_ptr, next_is_interior, next_parity_val, block_idx.x);
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
         out = arg.a * out;
