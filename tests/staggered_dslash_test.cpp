@@ -57,11 +57,8 @@ TEST_F(StaggeredDslashTest, verify)
   double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
 
-  // give it a tiny bump for fixed precision, recon 8
-  if (dslash_test_wrapper.inv_param.cuda_prec <= QUDA_HALF_PRECISION
-      && dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9)
-    tol *= 1.1;
-
+  ASSERT_FALSE(std::isnan(deviation)) << "Nan has propagated into the result";
+  checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec, dslash_test_wrapper.gauge_param.reconstruct);
   ASSERT_LE(deviation, tol) << "reference and QUDA implementations do not agree";
 }
 
