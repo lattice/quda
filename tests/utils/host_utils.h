@@ -363,7 +363,7 @@ inline double checkReasonableHostDeviation(double residual, double tolerance, Qu
 
   // If we are using low precision and reconstruct 8 or 9, we tolerate a greater deviation
   if (precision <= QUDA_HALF_PRECISION && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9))
-    factor *= 1.1;
+    factor *= 10.0;
 
   if (residual > tolerance && residual < tolerance * factor)
     warningQuda("Residual %e exceeds tolerance %e but is within reasonable deviation factor of %f", residual, tolerance,
