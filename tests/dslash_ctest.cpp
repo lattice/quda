@@ -127,7 +127,7 @@ TEST_P(DslashTest, verify)
     tol *= 10;
 
   ASSERT_FALSE(std::isnan(deviation)) << "Nan has propagated into the result";
-  checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec, dslash_test_wrapper.gauge_param.reconstruct);
+  tol = checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec, dslash_test_wrapper.gauge_param.reconstruct);
   ASSERT_LE(deviation, tol) << "Reference and QUDA implementations do not agree";
 }
 
