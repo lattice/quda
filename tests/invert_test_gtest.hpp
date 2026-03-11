@@ -39,7 +39,7 @@ bool skip_test(test_t param)
   if (is_normal_solve(inverter_type, solve_type) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ) {
 #ifdef QUDA_MMA_AVAILABLE
     warningQuda("Temporarily disabling MdagMLocal test until feature/prefetch2 is merged");
-    //if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
+    // if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
     return true;
 #else
     return true;
@@ -141,8 +141,8 @@ TEST_P(InvertTest, verify)
 
   // account for distance preconditioning error since cosh * 1//cosh != 1.0 (assume 1 ulp error per dof)
   if (distance_pc_alpha0 != 0.0 && distance_pc_t0 >= 0) {
-    auto epsilon = prec == QUDA_DOUBLE_PRECISION ?
-      std::numeric_limits<double>::epsilon() : std::numeric_limits<float>::epsilon();
+    auto epsilon
+      = prec == QUDA_DOUBLE_PRECISION ? std::numeric_limits<double>::epsilon() : std::numeric_limits<float>::epsilon();
     tol = epsilon * dof * quda::comm_size();
     tol_hq = epsilon * dof * quda::comm_size();
   }

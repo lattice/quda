@@ -225,7 +225,7 @@ static void llfat_test()
 
   if (verify_results) {
     double tol = 1e-3;
-    
+
     printfQuda("Checking fat links...\n");
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {

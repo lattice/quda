@@ -542,8 +542,7 @@ int main(int argc, char **argv)
     };
 
     double expected_tol = getStaggeredInvertTolerance(prec);
-    if (expected_tol == 0.0)
-      errorQuda("Unexpected precision %d", prec);
+    if (expected_tol == 0.0) errorQuda("Unexpected precision %d", prec);
 
     if (tol != expected_tol) {
       tol = expected_tol;
@@ -561,8 +560,10 @@ int main(int argc, char **argv)
     if (changes) {
       printfQuda("For gtest, various defaults are changed:\n");
       printfQuda("  --compute-fat-long true\n");
-      printfQuda("  --tol (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION), getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
-      printfQuda("  --tol-hq (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION), getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
+      printfQuda("  --tol (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
+      printfQuda("  --tol-hq (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
       printfQuda("  --niter 1000\n");
     }
   }

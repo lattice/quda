@@ -348,7 +348,9 @@ inline double getTolerance(QudaPrecision prec) { return pow(10, -getNegLog10Tole
   @param[in] reconstruct Reconstruction type
   @return Tolerance adjusted for reasonable deviation factor
 */
-inline double checkReasonableHostDeviation(double residual, double tolerance, QudaPrecision precision, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO) {
+inline double checkReasonableHostDeviation(double residual, double tolerance, QudaPrecision precision,
+                                           QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO)
+{
   double factor = [precision]() {
     switch (precision) {
     case QUDA_QUARTER_PRECISION: return 1.03;
@@ -364,7 +366,8 @@ inline double checkReasonableHostDeviation(double residual, double tolerance, Qu
     factor *= 1.1;
 
   if (residual > tolerance && residual < tolerance * factor)
-    warningQuda("Residual %e exceeds tolerance %e but is within reasonable deviation factor of %f", residual, tolerance, factor);
+    warningQuda("Residual %e exceeds tolerance %e but is within reasonable deviation factor of %f", residual, tolerance,
+                factor);
 
   return tolerance * factor;
 }
