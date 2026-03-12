@@ -319,7 +319,7 @@ inline int getReconstructNibble(QudaReconstructType recon)
   @param[in] prec Precision
   @return Exponent of the base-10 reasonably expected tolerance
 */
-inline int getNegLog10Tolerance(QudaPrecision prec)
+constexpr int getNegLog10Tolerance(QudaPrecision prec)
 {
   switch (prec) {
   case QUDA_QUARTER_PRECISION: return 1;
@@ -338,6 +338,39 @@ inline int getNegLog10Tolerance(QudaPrecision prec)
   @return Reasonable expected tolerance
 */
 inline double getTolerance(QudaPrecision prec) { return pow(10, -getNegLog10Tolerance(prec)); }
+
+/**
+  @brief If the residual exceeds the tolerance but is within a reasonable deviation factor
+  for reasons such as host/device accumulation differences, warn the user and return the reasonable tolerance.
+  @param[in] residual Residual
+  @param[in] tolerance Tolerance
+  @param[in] precision Precision
+  @param[in] reconstruct Reconstruction type
+  @return Tolerance adjusted for reasonable deviation factor
+*/
+inline double checkReasonableHostDeviation(double residual, double tolerance, QudaPrecision precision,
+                                           QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO)
+{
+  double factor = [precision]() {
+    switch (precision) {
+    case QUDA_QUARTER_PRECISION: return 1.03;
+    case QUDA_HALF_PRECISION: return 1.03;
+    case QUDA_SINGLE_PRECISION: return 1.03;
+    case QUDA_DOUBLE_PRECISION: return 1.0;
+    default: return 1.0;
+    }
+  }();
+
+  // If we are using low precision and reconstruct 8 or 9, we tolerate a greater deviation
+  if (precision <= QUDA_HALF_PRECISION && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9))
+    factor *= 10.0;
+
+  if (residual > tolerance && residual < tolerance * factor)
+    warningQuda("Residual %e exceeds tolerance %e but is within reasonable deviation factor of %f", residual, tolerance,
+                factor);
+
+  return tolerance * factor;
+}
 
 /**
   @brief Check if the std::string has a size smaller than the limit: if yes, copy it to a C-string;
