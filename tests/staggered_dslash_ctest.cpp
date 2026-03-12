@@ -80,6 +80,7 @@ public:
   {
     if (skip()) GTEST_SKIP();
     dslash_test_wrapper.end();
+    commDimPartitionedReset();
   }
 
   static void SetUpTestCase() { initQuda(device_ordinal); }
@@ -102,10 +103,9 @@ TEST_P(StaggeredDslashTest, verify)
   double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
 
-  if (dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9
-      && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
-    tol *= 10; // if recon 9, we tolerate a greater deviation
-
+  ASSERT_FALSE(std::isnan(deviation)) << "Nan has propagated into the result";
+  tol = checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec,
+                                     dslash_test_wrapper.gauge_param.reconstruct);
   ASSERT_LE(deviation, tol) << "Reference CPU and QUDA implementations do not agree";
 }
 
