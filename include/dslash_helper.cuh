@@ -503,12 +503,6 @@ namespace quda
       dslash.template operator()<kernel_type>(x_cb, s, parity);
   }
 
-  template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool alive)
-  {
-    dslash.template operator()<kernel_type, true>(x_cb, s, parity, alive);
-  }
-
 #ifdef NVSHMEM_COMMS
   /**
    * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed.

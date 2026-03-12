@@ -204,7 +204,7 @@ namespace quda {
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
-    __device__ __host__ inline void operator()(int x_cb, int src_flavor, int parity, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int src_flavor, int parity, bool alive = true)
     {
       using namespace linalg; // for Cholesky
       const int clover_parity = arg.nParity == 2 ? parity : arg.parity;
@@ -218,7 +218,7 @@ namespace quda {
       fermion in;
       int chirality = flavor; // relabel flavor as chirality
       Mat A;
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
         in = arg.in[src_idx](my_flavor_idx, spinor_parity);
         in.toRel(); // change to chiral basis here
         A = arg.clover(x_cb, clover_parity, chirality);
@@ -258,7 +258,7 @@ namespace quda {
         out_chi[flavor] += arg.b * in_chi[1 - flavor];
       }
 
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
         if (arg.inverse) {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
@@ -278,7 +278,7 @@ namespace quda {
 
       swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
 
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
         fermion out = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
         out.toNonRel(); // change basis back
 
