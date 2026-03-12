@@ -282,6 +282,8 @@ namespace quda {
     anisotropy = std::exchange(src.anisotropy, 0.0);
     tadpole = std::exchange(src.tadpole, 0.0);
     fat_link_max = std::exchange(src.fat_link_max, 0.0);
+    shifted = std::exchange(src.shifted, nullptr);
+    is_shifted = std::exchange(src.is_shifted, false);
     for (auto i = 0; i < ghost.size(); i++) ghost[i].exchange(src.ghost[i], {});
     ghostFace = std::exchange(src.ghostFace, {});
     staggeredPhaseType = std::exchange(src.staggeredPhaseType, QUDA_STAGGERED_PHASE_INVALID);
@@ -1444,9 +1446,16 @@ namespace quda {
   GaugeField& GaugeField::shift(int shift_offset) const
   {
     if (shift_offset == -1) shift_offset = nFace;
+    if (shift_offset != 1 && shift_offset != 3) errorQuda("Invalid shift_offset = %d", shift_offset);
+    if (is_shifted) errorQuda("Cannot shift a shifted field");
     // If we don't yet have a cached shifted copy or the shift value changed
     if (!shifted) shifted = std::make_unique<GaugeField>(::quda::shift(*this, shift_offset));
     return *shifted;
+  }
+
+  void GaugeField::shift_reset() const
+  {
+    if (shifted) shifted.reset(nullptr);
   }
 
   void GaugeField::PrintMatrix(int dim, int parity, unsigned int x_cb, int rank) const

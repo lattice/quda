@@ -90,7 +90,6 @@ namespace quda
 
           if (doHalo<kernel_type>(d) && ghost) {
 
-            // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -115,7 +114,6 @@ namespace quda
 
           if (doHalo<kernel_type>(d) && ghost) {
 
-            // const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dc.X, d, arg.nFace);
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);

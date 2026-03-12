@@ -42,9 +42,8 @@ namespace quda
 
       if constexpr (!Arg::verify) {
         typename Arg::RawLink link;
-        if (x[dir] < arg.shift
-            && arg.comms_dim_partitioned[dir]) { // on the boundary so we need to fetch from the ghost zone
-          const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, arg.shift);
+        if (x[dir] < arg.shift && arg.comms_dim_partitioned[dir]) { // on boundary so we fetch from ghost
+          const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, 1);
           arg.in.raw_load(link, arg.volume_cb + ghost_idx, dir, 1 - parity);
           arg.out.raw_save(link, x_cb, dir, parity);
         } else { // simple shift
@@ -64,7 +63,7 @@ namespace quda
         // verify the shifting has worked
         using Link = typename Arg::Link;
         if (x[dir] < arg.shift && arg.comms_dim_partitioned[dir]) {
-          const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, arg.shift);
+          const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, 1);
           Link in = arg.in(dir, arg.volume_cb + ghost_idx, 1 - parity);
           Link out = arg.out(dir, x_cb, parity);
           assert(in.L1() == out.L1());

@@ -147,6 +147,7 @@ namespace quda {
   class GaugeField : public LatticeField {
 
     friend std::ostream &operator<<(std::ostream &output, const GaugeField &param);
+    friend GaugeField shift(const GaugeField &in, int shift);
 
   private:
     /**
@@ -193,7 +194,9 @@ namespace quda {
     double tadpole = 0.0;
     double fat_link_max = 0.0;
 
-    mutable std::unique_ptr<GaugeField> shifted; // shifted copy of the gauge field, used for double-store enabled dslash
+    mutable std::unique_ptr<GaugeField> shifted
+      = nullptr;             // shifted copy of the gauge field, used for double-store enabled dslash
+    bool is_shifted = false; // whether this instance is a shifted one
 
     mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost
       = {}; // stores the ghost zone of the gauge field (non-native fields only)
@@ -657,6 +660,11 @@ namespace quda {
        @return Reference to shifted field
     */
     GaugeField &shift(int shift = -1) const;
+
+    /**
+       @brief Resets the shifted field (if it exists).
+    */
+    void shift_reset() const;
 
     /**
      * @brief Print the site data
