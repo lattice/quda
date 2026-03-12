@@ -189,8 +189,8 @@ set(_dslash_prefetch_dist_s_default 0)
 
 # These are expected Blackwell+ defaults
 if(QUDA_COMPUTE_CAPABILITY GREATER_EQUAL 100)
-  set(_dslash_double_store_default OFF)
-  set(_dslash_prefetch_type_default THREAD)
+  set(_dslash_double_store_default ON)
+  set(_dslash_prefetch_type_default BULK)
   set(_dslash_prefetch_dist_w_default 2)
   set(_dslash_prefetch_dist_s_default 2)
 endif()
