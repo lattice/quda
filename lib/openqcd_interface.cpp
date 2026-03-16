@@ -1305,7 +1305,7 @@ static void *openQCD_qudaSolverReadIn(int id)
       *invert_param_mg = *param;
 
       /* these have to be fixed, and cannot be overwritten by the input file */
-      invert_param_mg->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+      invert_param_mg->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // UNCLEAR: Gamma basis of the B fields in MG
       invert_param_mg->dirac_order = QUDA_DIRAC_ORDER;
 
       multigrid_param->n_level = kv.get<int>(mg_section, "n_level", multigrid_param->n_level, true);
@@ -2028,7 +2028,7 @@ double openQCD_qudaMG(int id, double mu, void* source, void* solution, int *stat
  * @param      openQCD_field  The openQCD field (always in double)
  * @param[in]  precision      The precision of the constructed field
  *
- * @return     The color spinor field.
+ * @return     The device field.
  */
 static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
 {
@@ -2067,6 +2067,7 @@ static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
   return ColorSpinorField();
 }
 
+
 static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, QudaInvertParam *param, int *status, double *residual)
 {
   static TimeProfile profileMG("MG");
@@ -2082,6 +2083,7 @@ static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSp
   cparam->use_init_guess = param->use_init_guess;
   cparam->iter = 0; // reset the solver
 
+  // FIXME: explain this!
   massRescale(b, *param, false);
 
   (*mg)(x, b);
@@ -2091,6 +2093,58 @@ static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSp
     residual[i] = cparam->true_res[i];
     status[i] = residual[i] <= cparam->tol ? cparam->iter : -1;
   }
+}
+
+
+void openQCD_qudaMGProjector(int id, void* in_h, void* out_h)
+{
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
+
+  if (!openQCD_qudaInvertParamCheck(param)) {
+    WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
+  }
+
+  if (param->inv_type_precondition != QUDA_MG_INVERTER) {
+    WITH_COMM(errorQuda("No MG preconditioner defined."));
+  }
+
+  ColorSpinorField *in = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2D(in_h));
+  ColorSpinorField *out = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2D(out_h));
+
+  WITH_COMM(reinterpret_cast<multigrid_solver*>(param->preconditioner)->mg->projector(*out, *in));
+
+  openQCD_qudaD2H(out, out_h);
+  openQCD_qudaSpinorFree((void*) in);
+  openQCD_qudaSpinorFree((void*) out);
+}
+
+
+void openQCD_qudaMGTAR(int id, void* in_h, void* out_h)
+{
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
+
+  if (!openQCD_qudaInvertParamCheck(param)) {
+    WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
+  }
+
+  if (param->inv_type_precondition != QUDA_MG_INVERTER) {
+    WITH_COMM(errorQuda("No MG preconditioner defined."));
+  }
+
+  ColorSpinorField *in = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2D(in_h));
+  ColorSpinorField *out = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2D(out_h));
+
+  WITH_COMM(reinterpret_cast<multigrid_solver*>(param->preconditioner)->mg->coarse_operator(*out, *in));
+
+  // mass rescaling
+  if (param->mass_normalization == QUDA_MASS_NORMALIZATION ||
+      param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+    WITH_COMM(blas::ax(0.5/param->kappa, *out));
+  }
+
+  openQCD_qudaD2H(out, out_h);
+  openQCD_qudaSpinorFree((void*) in);
+  openQCD_qudaSpinorFree((void*) out);
 }
 
 
@@ -2146,6 +2200,14 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
 }
 
 
+/**
+ * @brief      Factory to wrap host spinor fields
+ *
+ * @param[in]  openQCD_field  The openQCD field (always in double)
+ * @param[in]  idx            Buffer field index
+ *
+ * @return     The host field wrapped.
+ */
 ColorSpinorField HostCSFactory(void *openQCD_field, int idx = 0)
 {
   void* in = qudaState.init.buffer_field(qudaState.layout.world_comm, idx, openQCD_field);
@@ -2179,7 +2241,8 @@ QudaMultigridParam* openQCD_qudaMGSetInOutVecs(const int id, void** in_vecs, voi
   if (in_vecs != nullptr) {
     auto *d_vecs = new std::vector<ColorSpinorField>();
     for (i = 0; i < n_vec; ++i) {
-      d_vecs->push_back(std::move(HostCSFactory(in_vecs[i], i+2)));
+      //d_vecs->push_back(std::move(CSFactory(in_vecs[i], QUDA_DOUBLE_PRECISION)));
+      d_vecs->push_back(std::move(HostCSFactory(in_vecs[i], i+2))); //FIXME: buffer field index
       WITH_COMM(printfQuda("in_vecs[%d] = %p\n", i, in_vecs[i]));
     }
     mg_param->vec_copy_in[level] = static_cast<void*>(d_vecs);
@@ -2189,7 +2252,8 @@ QudaMultigridParam* openQCD_qudaMGSetInOutVecs(const int id, void** in_vecs, voi
   if (out_vecs != nullptr) {
     auto *d_vecs = new std::vector<ColorSpinorField>();
     for (j = 0; j < n_vec; ++j) {
-      d_vecs->push_back(std::move(HostCSFactory(out_vecs[i], i+j+2)));
+      //d_vecs->push_back(std::move(CSFactory(out_vecs[i], QUDA_DOUBLE_PRECISION)));
+      d_vecs->push_back(std::move(HostCSFactory(out_vecs[i], i+j+2))); //FIXME: buffer field index
     }
     mg_param->vec_copy_out[level] = static_cast<void*>(d_vecs);
   }

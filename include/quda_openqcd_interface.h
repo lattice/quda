@@ -413,6 +413,24 @@ double openQCD_qudaMG(int id, double mu, void* source, void* solution, int *stat
 void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions, int *status, double *residual);
 
 /**
+ * @brief      Apply the MG projector.
+ *
+ * @param[in]  id     The solver identifier
+ * @param[in]  in_h   The input spinor
+ * @param[out] out_h  The output spinor
+ */
+void openQCD_qudaMGProjector(int id, void* in_h, void* out_h);
+
+/**
+ * @brief      Apply the MG coarse operator.
+ *
+ * @param[in]  id     The solver identifier
+ * @param[in]  in_h   The input spinor
+ * @param[out] out_h  The output spinor
+ */
+void openQCD_qudaMGTAR(int id, void* in_h, void* out_h);
+
+/**
  * @brief      Setup eigenvector fields from the host from an MG instance
  *
  * @param[in]  id        The solver identifier in the input file, i.e.
