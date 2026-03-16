@@ -1255,6 +1255,50 @@ namespace quda
     popOutputPrefix();
   }
 
+  void MG::prepare()
+  {
+    if (!transfer)
+      errorQuda("Coarse levels need to be created");
+
+    if (param.level >= param.Nlevel - 1)
+      errorQuda("Can only be apply operators on non-terminative MG levels");
+
+    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+    QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ?
+      QUDA_EVEN_PARITY :
+      QUDA_ODD_PARITY;
+
+    QudaSiteSubset site_subset
+      = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
+    transfer->setSiteSubset(site_subset, parity); // use this to force location of transfer
+  }
+
+  void MG::projector(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in)
+  {
+    pushOutputPrefix(prefix);
+
+    prepare();
+    resize(r_coarse, in.size(), QUDA_NULL_FIELD_CREATE);
+    transfer->R(r_coarse, in);
+    transfer->P(out, r_coarse);
+
+    popOutputPrefix();
+  }
+
+  void MG::coarse_operator(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in)
+  {
+    pushOutputPrefix(prefix);
+
+    prepare();
+    resize(r_coarse, in.size(), QUDA_NULL_FIELD_CREATE);
+    resize(x_coarse, in.size(), QUDA_NULL_FIELD_CREATE);
+    transfer->R(r_coarse, in);
+    (*matCoarseResidual)(x_coarse, r_coarse);
+    transfer->P(out, x_coarse);
+
+    popOutputPrefix();
+  }
+
   // supports separate reading or single file read
   void MG::loadVectors(cvector_ref<ColorSpinorField> &B)
   {

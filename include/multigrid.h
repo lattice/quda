@@ -455,6 +455,24 @@ namespace quda {
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
 
     /**
+     * @brief      Apply the projection operator, i.e. prolongator after
+     *             restrictor (P R)
+     *
+     * @param[out] out   The output vector
+     * @param[in]  in    The input vector
+     */
+    void projector(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
+
+    /**
+     * @brief      Apply the coarse operator sandwiched by restrictor and
+     *             prolongator (P \hat{D} R)
+     *
+     * @param[out] out   The output vector
+     * @param[in]  in    The input vector
+     */
+    void coarse_operator(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
+
+    /**
        @brief Load the null space vectors in from file
        @param B Loaded null-space vectors (pre-allocated)
     */
@@ -509,6 +527,12 @@ namespace quda {
 
       return (param.level == 0 || kd_nearnull_gen);
     }
+
+  private:
+    /**
+     * @brief      Prepare for operator application on coarse levels
+     */
+    void prepare();
   };
 
   /**
