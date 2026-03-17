@@ -39,16 +39,7 @@ jobs:
             -DQUDA_GPU_ARCH=gfx90a \
             -DROCM_PATH=/opt/rocm \
             -DCMAKE_PREFIX_PATH=/opt/rocm \
-            -DQUDA_DIRAC_CLOVER=ON \
-            -DQUDA_DIRAC_CLOVER_HASENBUSCH=ON \
-            -DQUDA_DIRAC_DOMAIN_WALL=ON \
-            -DQUDA_DIRAC_STAGGERED=ON \
-            -DQUDA_DIRAC_TWISTED_MASS=ON \
-            -DQUDA_DIRAC_TWISTED_CLOVER=ON \
-            -DQUDA_DIRAC_NDEG_TWISTED_CLOVER=ON \
-            -DQUDA_DIRAC_WILSON=ON \
-            -DQUDA_DIRAC_LAPLACE=ON \
-            -DQUDA_DIRAC_COVDEV=ON \
+            -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=ON \
             -DQUDA_CLOVER_DYNAMIC=ON \
             -DQUDA_FAST_COMPILE_REDUCE=ON \
             -DQUDA_FAST_COMPILE_DSLASH=ON \
