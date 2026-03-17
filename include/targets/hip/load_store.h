@@ -25,14 +25,14 @@ namespace quda
     {
       float4 tmp;
       operator()(tmp, ptr, idx);
-      memcpy(&value, &tmp, sizeof(float4));
+      value = __builtin_bit_cast(short8, tmp);
     }
 
     __device__ inline void operator()(char8 &value, const void *ptr, int idx)
     {
       float2 tmp;
       operator()(tmp, ptr, idx);
-      memcpy(&value, &tmp, sizeof(float2));
+      value = __builtin_bit_cast(char8, tmp);
     }
   };
 
