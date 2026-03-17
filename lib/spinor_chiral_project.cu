@@ -18,9 +18,7 @@ namespace quda
     SpinorChiralReconstruct(ColorSpinorField &out, const ColorSpinorField &in_left, const ColorSpinorField &in_right,
                             QudaChirality chirality) :
       TunableKernel2D(out, out.SiteSubset()), out(out), in_left(in_left), in_right(in_right), chirality(chirality)
-    {
-      apply(device::get_default_stream());
-    }
+    { apply(device::get_default_stream()); }
 
     void apply(const qudaStream_t &stream)
     {
@@ -67,6 +65,18 @@ namespace quda
         SpinorChiralReconstruct<double, 3>(dst, src_left, src_right, chirality);
       } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
         SpinorChiralReconstruct<float, 3>(dst, src_left, src_right, chirality);
+      } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+        if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+          SpinorChiralReconstruct<short, 3>(dst, src_left, src_right, chirality);
+        } else {
+          errorQuda("Half precision support not enabled");
+        }
+      } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+        if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) {
+          SpinorChiralReconstruct<char, 3>(dst, src_left, src_right, chirality);
+        } else {
+          errorQuda("Quarter precision support not enabled");
+        }
       } else {
         errorQuda("Precision %d not implemented", dst.Precision());
       }
@@ -76,14 +86,10 @@ namespace quda
   }
 
   void spinorChiralReconstruct(ColorSpinorField &dst, const ColorSpinorField &src, QudaChirality chirality)
-  {
-    spinorChiralReconstruct(dst, src, src, chirality);
-  }
+  { spinorChiralReconstruct(dst, src, src, chirality); }
 
   void spinorChiralReconstruct(ColorSpinorField &dst, const ColorSpinorField &src_left, const ColorSpinorField &src_right)
-  {
-    spinorChiralReconstruct(dst, src_left, src_right, QUDA_INVALID_CHIRALITY);
-  }
+  { spinorChiralReconstruct(dst, src_left, src_right, QUDA_INVALID_CHIRALITY); }
 
   template <typename Float, int Nc> class SpinorChiralProject : TunableKernel2D
   {
@@ -97,9 +103,7 @@ namespace quda
     SpinorChiralProject(ColorSpinorField &out_left, ColorSpinorField &out_right, const ColorSpinorField &in,
                         QudaChirality chirality) :
       TunableKernel2D(in, in.SiteSubset()), out_left(out_left), out_right(out_right), in(in), chirality(chirality)
-    {
-      apply(device::get_default_stream());
-    }
+    { apply(device::get_default_stream()); }
 
     void apply(const qudaStream_t &stream)
     {
@@ -146,6 +150,18 @@ namespace quda
         SpinorChiralProject<double, 3>(dst_left, dst_right, src, chirality);
       } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
         SpinorChiralProject<float, 3>(dst_left, dst_right, src, chirality);
+      } else if (src.Precision() == QUDA_HALF_PRECISION) {
+        if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+          SpinorChiralProject<short, 3>(dst_left, dst_right, src, chirality);
+        } else {
+          errorQuda("Half precision support not enabled");
+        }
+      } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
+        if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) {
+          SpinorChiralProject<char, 3>(dst_left, dst_right, src, chirality);
+        } else {
+          errorQuda("Quarter precision support not enabled");
+        }
       } else {
         errorQuda("Precision %d not implemented", src.Precision());
       }
@@ -155,13 +171,9 @@ namespace quda
   }
 
   void spinorChiralProject(ColorSpinorField &dst, const ColorSpinorField &src, QudaChirality chirality)
-  {
-    spinorChiralProject(dst, dst, src, chirality);
-  }
+  { spinorChiralProject(dst, dst, src, chirality); }
 
   void spinorChiralProject(ColorSpinorField &dst_left, ColorSpinorField &dst_right, const ColorSpinorField &src)
-  {
-    spinorChiralProject(dst_left, dst_right, src, QUDA_INVALID_CHIRALITY);
-  }
+  { spinorChiralProject(dst_left, dst_right, src, QUDA_INVALID_CHIRALITY); }
 
 } // namespace quda
