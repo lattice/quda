@@ -304,6 +304,31 @@ TEST_P(HisqEndToEndTest, link_fat_long)
                     gauge_param.cpu_prec);
 }
 
+TEST_P(HisqEndToEndTest, link_naik)
+{
+  if (!has_naik) GTEST_SKIP() << "Naik correction not applicable without eps_naik";
+
+  double max_dev = 10.0 * getTolerance(test_prec);
+
+  for (int dir = 0; dir < 4; dir++) {
+    double dev = compare_floats_v2(fat_reflink_eps[dir], qdp_fatlink_eps[dir], V * gauge_site_size, max_dev,
+                                   gauge_param.cpu_prec);
+    EXPECT_LE(dev, max_dev) << "Naik fat link mismatch in dir " << dir;
+  }
+
+  strong_check_link(qdp_fatlink_eps, "Naik fat GPU results:", fat_reflink_eps, "CPU reference results:", V,
+                    gauge_param.cpu_prec);
+
+  for (int dir = 0; dir < 4; dir++) {
+    double dev = compare_floats_v2(long_reflink_eps[dir], qdp_longlink_eps[dir], V * gauge_site_size, max_dev,
+                                   gauge_param.cpu_prec);
+    EXPECT_LE(dev, max_dev) << "Naik long link mismatch in dir " << dir;
+  }
+
+  strong_check_link(qdp_longlink_eps, "Naik long GPU results:", long_reflink_eps, "CPU reference results:", V,
+                    gauge_param.cpu_prec);
+}
+
 std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
 {
   const QudaPrecision prec = ::testing::get<0>(param.param);
