@@ -270,6 +270,18 @@ TEST_P(HisqEndToEndTest, link_fat7)
   strong_check_link(qdp_vlink, "V link GPU results:", v_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
 }
 
+TEST_P(HisqEndToEndTest, link_unitarize)
+{
+  double max_dev = 10.0 * getTolerance(test_prec);
+
+  for (int dir = 0; dir < 4; dir++) {
+    double dev = compare_floats_v2(w_reflink[dir], qdp_wlink[dir], V * gauge_site_size, max_dev, gauge_param.cpu_prec);
+    EXPECT_LE(dev, max_dev) << "W link (unitarized) mismatch in dir " << dir;
+  }
+
+  strong_check_link(qdp_wlink, "W link GPU results:", w_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
+}
+
 std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
 {
   const QudaPrecision prec = ::testing::get<0>(param.param);
