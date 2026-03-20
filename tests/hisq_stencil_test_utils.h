@@ -196,8 +196,8 @@ struct HisqStencilTestWrapper {
       }
     }
 
-    computeHISQLinksCPU(fat_reflink, long_reflink, fat_reflink_eps, long_reflink_eps, qdp_sitelink, &gauge_param,
-                        act_paths, eps_naik);
+    computeHISQLinksCPU(fat_reflink, long_reflink, fat_reflink_eps, long_reflink_eps, nullptr, nullptr, qdp_sitelink,
+                        &gauge_param, act_paths, eps_naik);
 
     /////////////////////////////////////////////////////////////////////
     // Allocate CPU-precision host storage for fields built on the GPU //

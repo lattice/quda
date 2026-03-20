@@ -83,8 +83,9 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
                                             int argc, char **argv);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
-void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
+void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **vlink,
+                         void **wlink, void **sitelink, void *qudaGaugeParamPtr,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
 void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_param);
 void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
                                    quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param,

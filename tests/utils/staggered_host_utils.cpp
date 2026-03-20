@@ -337,8 +337,9 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, const quda
 // Compute the full HISQ stencil on the CPU.
 // If "eps_naik" is 0, there's no naik correction,
 // and this routine skips building the paths in "act_path_coeffs[2]"
-void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik)
+void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **vlink,
+                         void **wlink, void **sitelink, void *qudaGaugeParamPtr,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik)
 {
   // Prepare various things
   QudaGaugeParam &qudaGaugeParam = *((QudaGaugeParam *)qudaGaugeParamPtr);
@@ -646,6 +647,17 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
       cpu_xpy(prec, fatlink[i], fatlink_eps[i], V * gauge_site_size);
       cpu_xpy(prec, longlink[i], longlink_eps[i], V * gauge_site_size);
     }
+  }
+
+  //////////////////////////////////////////////////////////////
+  // Optionally copy out intermediate V and W links (QDP order)
+  //////////////////////////////////////////////////////////////
+
+  if (vlink) {
+    for (int i = 0; i < 4; i++) memcpy(vlink[i], v_reflink[i], V * gauge_site_size * gSize);
+  }
+  if (wlink) {
+    for (int i = 0; i < 4; i++) memcpy(wlink[i], w_reflink[i], V * gauge_site_size * gSize);
   }
 
   //////////////

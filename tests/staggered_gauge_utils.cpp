@@ -230,7 +230,8 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
 
   // defined in "llfat_reference.cpp"
   computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
-                      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, qdp_inlink, &gauge_param, act_paths, eps_naik);
+                      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, nullptr, nullptr, qdp_inlink, &gauge_param,
+                      act_paths, eps_naik);
 
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
