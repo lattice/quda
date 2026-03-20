@@ -245,6 +245,11 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(hisq_endtoend_test hisq_endtoend_test.cpp)
+  target_link_libraries(hisq_endtoend_test ${TEST_LIBS})
+  quda_checkbuildtest(hisq_endtoend_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_endtoend_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
   add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
   target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
