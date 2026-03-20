@@ -4,7 +4,11 @@
 
 #include <quda.h>
 #include <gauge_field.h>
+#include <color_spinor_field.h>
 #include <unitarization_links.h>
+#include <ks_improved_force.h>
+#include <staggered_oprod.h>
+#include <momentum.h>
 
 #include <gtest/gtest.h>
 
@@ -12,6 +16,8 @@
 #include "command_line_params.h"
 #include "misc.h"
 #include "test.h"
+#include "hisq_force_reference.h"
+#include "momentum_utils.h"
 
 using namespace quda;
 
@@ -212,8 +218,10 @@ static void setup_links(QudaPrecision test_prec, QudaReconstructType /*recon*/, 
   links_valid = true;
 }
 
+static void teardown_force(); // forward declaration
 static void destroy_host()
 {
+  teardown_force();
   teardown_links();
 
   for (int i = 0; i < 4; i++) {
@@ -227,6 +235,238 @@ static void destroy_host()
   }
 
   host_initialized = false;
+}
+
+// ============================================================
+// Force infrastructure
+// ============================================================
+
+#ifdef MULTI_GPU
+static lat_dim_t force_R = {2, 2, 2, 2};
+#else
+static lat_dim_t force_R = {0, 0, 0, 0};
+#endif
+
+// CPU outer products (host precision)
+static GaugeField *cpuOprod = nullptr;
+static GaugeField *cpuLongLinkOprod = nullptr;
+
+// CPU extended gauge/force fields for reference computation
+static GaugeField *cpuGauge_ex = nullptr;
+static GaugeField *cpuOprod_ex = nullptr;
+static GaugeField *cpuLongLinkOprod_ex = nullptr;
+static GaugeField *cpuForce_ex = nullptr;
+static GaugeField *cpuForce = nullptr;
+static GaugeField *cpuMom = nullptr;
+static GaugeField *refMom = nullptr;
+
+// GPU extended gauge fields
+static GaugeField *cudaGauge_ex = nullptr;
+static GaugeField *cudaForce_ex = nullptr;
+static GaugeField *cudaOprod_ex = nullptr;
+static GaugeField *cudaLongLinkOprod_ex = nullptr;
+
+// GPU force/momentum fields (non-extended)
+static GaugeField *cudaForce = nullptr;
+static GaugeField *cudaMom = nullptr;
+
+// Raw spinor for outer product
+static void *stag_for_oprod = nullptr;
+
+static bool force_valid = false;
+static QudaPrecision force_cur_prec = QUDA_INVALID_PRECISION;
+static bool force_cur_has_naik = false;
+
+static void teardown_force()
+{
+  if (!force_valid) return;
+
+  delete cpuOprod; cpuOprod = nullptr;
+  delete cpuLongLinkOprod; cpuLongLinkOprod = nullptr;
+  delete cpuGauge_ex; cpuGauge_ex = nullptr;
+  delete cpuOprod_ex; cpuOprod_ex = nullptr;
+  delete cpuLongLinkOprod_ex; cpuLongLinkOprod_ex = nullptr;
+  delete cpuForce_ex; cpuForce_ex = nullptr;
+  delete cpuForce; cpuForce = nullptr;
+  delete cpuMom; cpuMom = nullptr;
+  delete refMom; refMom = nullptr;
+
+  delete cudaGauge_ex; cudaGauge_ex = nullptr;
+  delete cudaForce_ex; cudaForce_ex = nullptr;
+  delete cudaOprod_ex; cudaOprod_ex = nullptr;
+  delete cudaLongLinkOprod_ex; cudaLongLinkOprod_ex = nullptr;
+  delete cudaForce; cudaForce = nullptr;
+  delete cudaMom; cudaMom = nullptr;
+
+  if (stag_for_oprod) { host_free(stag_for_oprod); stag_for_oprod = nullptr; }
+
+  force_valid = false;
+}
+
+static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool has_naik)
+{
+  if (force_valid && force_cur_prec == test_prec && force_cur_has_naik == has_naik) return;
+
+  teardown_force();
+  force_cur_prec = test_prec;
+  force_cur_has_naik = has_naik;
+
+  QudaReconstructType cuda_link_recon = recon;
+  if (cuda_link_recon != QUDA_RECONSTRUCT_NO && cuda_link_recon != QUDA_RECONSTRUCT_13)
+    cuda_link_recon = QUDA_RECONSTRUCT_NO;
+
+  fermion_force::setUnitarizeForceConstants(1e-14, 5e-5, 1e-10, true, false, 1e-8, 1e-8);
+
+  QudaGaugeParam forceGaugeParam = newQudaGaugeParam();
+  for (int d = 0; d < 4; d++) forceGaugeParam.X[d] = gauge_param.X[d];
+  forceGaugeParam.cpu_prec = gauge_param.cpu_prec;
+  forceGaugeParam.cuda_prec = test_prec;
+  forceGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  forceGaugeParam.type = QUDA_GENERAL_LINKS;
+  forceGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  forceGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+  forceGaugeParam.staggered_phase_applied = true;
+  forceGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  forceGaugeParam.anisotropy = 1.0;
+  forceGaugeParam.tadpole_coeff = 1.0;
+
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = forceGaugeParam.X[1] * forceGaugeParam.X[2] * forceGaugeParam.X[3] / 2;
+  int y_face_size = forceGaugeParam.X[0] * forceGaugeParam.X[2] * forceGaugeParam.X[3] / 2;
+  int z_face_size = forceGaugeParam.X[0] * forceGaugeParam.X[1] * forceGaugeParam.X[3] / 2;
+  int t_face_size = forceGaugeParam.X[0] * forceGaugeParam.X[1] * forceGaugeParam.X[2] / 2;
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
+#endif
+
+  GaugeFieldParam gParam(forceGaugeParam);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.order = QUDA_QDP_GAUGE_ORDER;
+
+  GaugeFieldParam gParam_ex(forceGaugeParam);
+  gParam_ex.location = QUDA_CPU_FIELD_LOCATION;
+  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  gParam_ex.link_type = QUDA_GENERAL_LINKS;
+  gParam_ex.order = QUDA_QDP_GAUGE_ORDER;
+  for (int d = 0; d < 4; d++) {
+    gParam_ex.r[d] = force_R[d];
+    gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
+  }
+
+  // CPU gauge field (using sitelinks, for createSiteLinkCPU)
+  GaugeFieldParam cpuGaugeParam(gParam);
+  cpuGaugeParam.create = QUDA_NULL_FIELD_CREATE;
+  auto *cpuGauge = new GaugeField(cpuGaugeParam);
+  createSiteLinkCPU(*cpuGauge, forceGaugeParam.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+
+  cpuGauge_ex = new GaugeField(gParam_ex);
+  copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
+
+  // CPU outer product fields
+  cpuOprod = new GaugeField(gParam);
+  cpuLongLinkOprod = new GaugeField(gParam);
+
+  cpuOprod_ex = new GaugeField(gParam_ex);
+  cpuLongLinkOprod_ex = new GaugeField(gParam_ex);
+
+  // RNG and random spinors
+  {
+    ColorSpinorParam qParam;
+    qParam.v = nullptr;
+    qParam.nColor = 3;
+    qParam.nSpin = 1;
+    qParam.setPrecision(forceGaugeParam.cpu_prec);
+    qParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    qParam.nDim = 4;
+    qParam.pc_type = QUDA_4D_PC;
+    qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    qParam.location = QUDA_CPU_FIELD_LOCATION;
+    for (int d = 0; d < 4; d++) qParam.x[d] = forceGaugeParam.X[d];
+    ColorSpinorField spinor_in(qParam);
+    RNG rng(spinor_in, 1234);
+
+    stag_for_oprod = safe_malloc(4 * V * stag_spinor_site_size * forceGaugeParam.cpu_prec);
+    createStagForOprodCPU(stag_for_oprod, forceGaugeParam.cpu_prec, forceGaugeParam.X, rng);
+  }
+
+  // CPU outer products from spinors
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuOprod, forceGaugeParam.cpu_prec, 1);
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuLongLinkOprod, forceGaugeParam.cpu_prec, 3);
+
+  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
+
+  // CPU force and momentum fields
+  cpuForce = new GaugeField(gParam);
+  cpuForce_ex = new GaugeField(gParam_ex);
+
+  GaugeFieldParam momParam(gParam);
+  momParam.reconstruct = QUDA_RECONSTRUCT_10;
+  momParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  momParam.order = QUDA_MILC_GAUGE_ORDER;
+  cpuMom = new GaugeField(momParam);
+  refMom = new GaugeField(momParam);
+
+  // GPU extended gauge field (loaded with U links from cpuGauge)
+  GaugeFieldParam cudaGaugeParam_ex(forceGaugeParam);
+  cudaGaugeParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaGaugeParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  cudaGaugeParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  cudaGaugeParam_ex.reconstruct = cuda_link_recon;
+  cudaGaugeParam_ex.setPrecision(test_prec, true);
+  cudaGaugeParam_ex.pad = 3 * pad_size;
+  for (int d = 0; d < 4; d++) {
+    cudaGaugeParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
+    cudaGaugeParam_ex.x[d] = forceGaugeParam.X[d] + 2 * cudaGaugeParam_ex.r[d];
+  }
+  cudaGauge_ex = new GaugeField(cudaGaugeParam_ex);
+
+  // GPU extended force/oprod fields (always recon NO)
+  GaugeFieldParam cudaForceParam_ex(cudaGaugeParam_ex);
+  cudaForceParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
+  cudaForce_ex = new GaugeField(cudaForceParam_ex);
+  cudaOprod_ex = new GaugeField(cudaForceParam_ex);
+  cudaLongLinkOprod_ex = new GaugeField(cudaForceParam_ex);
+
+  // GPU non-extended force field (for verify)
+  GaugeFieldParam cudaForceParam(forceGaugeParam);
+  cudaForceParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaForceParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaForceParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  cudaForceParam.link_type = QUDA_GENERAL_LINKS;
+  cudaForceParam.setPrecision(test_prec, true);
+  cudaForce = new GaugeField(cudaForceParam);
+
+  // GPU momentum field
+  GaugeFieldParam cudaMomParam(cudaForceParam);
+  cudaMomParam.reconstruct = QUDA_RECONSTRUCT_10;
+  cudaMomParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  cudaMom = new GaugeField(cudaMomParam);
+
+  // Exchange CPU extended fields
+  cpuGauge_ex->exchangeExtendedGhost(force_R, true);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
+  cpuLongLinkOprod_ex->exchangeExtendedGhost(force_R, true);
+
+  // Copy gauge and oprods to GPU
+  cudaGauge_ex->copy(*cpuGauge);
+  cudaGauge_ex->exchangeExtendedGhost(cudaGauge_ex->R());
+
+  cudaOprod_ex->copy(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+
+  cudaLongLinkOprod_ex->copy(*cpuLongLinkOprod);
+  cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
+
+  delete cpuGauge;
+
+  force_valid = true;
 }
 
 using test_t = ::testing::tuple<QudaPrecision, QudaReconstructType, bool>;
@@ -327,6 +567,12 @@ TEST_P(HisqEndToEndTest, link_naik)
 
   strong_check_link(qdp_longlink_eps, "Naik long GPU results:", long_reflink_eps, "CPU reference results:", V,
                     gauge_param.cpu_prec);
+}
+
+TEST_P(HisqEndToEndTest, force_setup)
+{
+  setup_force(test_prec, test_recon, has_naik);
+  SUCCEED() << "Force setup completed without crash";
 }
 
 std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
