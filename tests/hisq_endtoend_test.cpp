@@ -282,6 +282,28 @@ TEST_P(HisqEndToEndTest, link_unitarize)
   strong_check_link(qdp_wlink, "W link GPU results:", w_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
 }
 
+TEST_P(HisqEndToEndTest, link_fat_long)
+{
+  double max_dev = 10.0 * getTolerance(test_prec);
+
+  for (int dir = 0; dir < 4; dir++) {
+    double dev
+      = compare_floats_v2(fat_reflink[dir], qdp_fatlink[dir], V * gauge_site_size, max_dev, gauge_param.cpu_prec);
+    EXPECT_LE(dev, max_dev) << "X link (fat) mismatch in dir " << dir;
+  }
+
+  strong_check_link(qdp_fatlink, "X link GPU results:", fat_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
+
+  for (int dir = 0; dir < 4; dir++) {
+    double dev
+      = compare_floats_v2(long_reflink[dir], qdp_longlink[dir], V * gauge_site_size, max_dev, gauge_param.cpu_prec);
+    EXPECT_LE(dev, max_dev) << "Long link mismatch in dir " << dir;
+  }
+
+  strong_check_link(qdp_longlink, "Long link GPU results:", long_reflink, "CPU reference results:", V,
+                    gauge_param.cpu_prec);
+}
+
 std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
 {
   const QudaPrecision prec = ::testing::get<0>(param.param);
