@@ -610,6 +610,46 @@ TEST_P(HisqEndToEndTest, force_staples_level2)
   ASSERT_GE(level, tolerance) << "Level-2 staples force mismatch";
 }
 
+TEST_P(HisqEndToEndTest, force_long_link)
+{
+  setup_force(test_prec, test_recon, has_naik);
+
+  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
+
+  cpuForce->zero();
+  cpuForce_ex->zero();
+  cudaForce->zero();
+  cudaForce_ex->zero();
+
+  // Re-run staples force (prerequisite — accumulates into force fields)
+  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
+  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+
+  // Long link force (accumulates into same force fields)
+  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
+  qudaDeviceSynchronize();
+
+  hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+
+  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
+  copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
+
+  GaugeFieldParam hfParam(*cpuForce);
+  hfParam.create = QUDA_NULL_FIELD_CREATE;
+  GaugeField hostVerify(hfParam);
+  hostVerify.copy(*cudaForce);
+
+  int res = 1;
+  for (int dir = 0; dir < 4; dir++) {
+    res &= compare_floats(cpuForce->data<void *>(dir), hostVerify.data<void *>(dir), V * gauge_site_size,
+                           getTolerance(test_prec), gauge_param.cpu_prec);
+  }
+
+  int level = strong_check_link(hostVerify, "GPU result:", *cpuForce, "CPU reference:");
+  int tolerance = getNegLog10Tolerance(test_prec);
+  ASSERT_GE(level, tolerance) << "Long link force mismatch (accumulated staples + long)";
+}
+
 TEST_P(HisqEndToEndTest, force_naik_oprod)
 {
   if (!has_naik) GTEST_SKIP() << "Naik accumulation not applicable without eps_naik";
