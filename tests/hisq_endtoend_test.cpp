@@ -59,6 +59,7 @@ static bool cur_has_naik = false;
 static bool host_initialized = false;
 static bool links_valid = false;
 static int cur_n_naiks = 1;
+static int cur_partition = -1;
 
 static void init_host()
 {
@@ -138,7 +139,10 @@ static void teardown_links()
 
 static void setup_links(QudaPrecision test_prec, QudaReconstructType /*recon*/, bool has_naik)
 {
-  if (links_valid && cur_prec == test_prec && cur_has_naik == has_naik) return;
+  int part = 0;
+  for (int d = 0; d < 4; d++) part |= (comm_dim_partitioned(d) << d);
+  if (links_valid && cur_prec == test_prec && cur_has_naik == has_naik && cur_partition == part) return;
+  cur_partition = part;
 
   teardown_links();
 
@@ -308,7 +312,9 @@ static void teardown_force()
 
 static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool has_naik)
 {
-  if (force_valid && force_cur_prec == test_prec && force_cur_has_naik == has_naik) return;
+  int part = 0;
+  for (int d = 0; d < 4; d++) part |= (comm_dim_partitioned(d) << d);
+  if (force_valid && force_cur_prec == test_prec && force_cur_has_naik == has_naik && cur_partition == part) return;
 
   teardown_force();
   force_cur_prec = test_prec;
@@ -470,7 +476,9 @@ static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool
   force_valid = true;
 }
 
-using test_t = ::testing::tuple<QudaPrecision, QudaReconstructType, bool>;
+static bool ctest_all_partitions = false;
+
+using test_t = ::testing::tuple<QudaPrecision, QudaReconstructType, bool, int>;
 
 class HisqEndToEndTest : public ::testing::TestWithParam<test_t>
 {
@@ -478,10 +486,14 @@ protected:
   QudaPrecision test_prec;
   QudaReconstructType test_recon;
   bool has_naik;
+  int partition;
 
   bool skip()
   {
     if ((QUDA_PRECISION & test_prec) == 0 || (QUDA_RECONSTRUCT & getReconstructNibble(test_recon)) == 0) return true;
+    const std::array<bool, 16> partition_enabled {true, true,  true,  false, true, false, false, false,
+                                                  true, false, false, false, true, false, true,  true};
+    if (!ctest_all_partitions && !partition_enabled[partition]) return true;
     return false;
   }
 
@@ -491,7 +503,14 @@ public:
     test_prec = ::testing::get<0>(GetParam());
     test_recon = ::testing::get<1>(GetParam());
     has_naik = ::testing::get<2>(GetParam());
+    partition = ::testing::get<3>(GetParam());
     if (skip()) GTEST_SKIP();
+
+    for (int j = 0; j < 4; j++) {
+      if (partition & (1 << j)) { commDimPartitionedSet(j); }
+    }
+    updateR();
+
     init_host();
     setup_links(test_prec, test_recon, has_naik);
   }
@@ -1069,24 +1088,35 @@ std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
   const QudaPrecision prec = ::testing::get<0>(param.param);
   const QudaReconstructType recon = ::testing::get<1>(param.param);
   const bool has_naik = ::testing::get<2>(param.param);
+  const int part = ::testing::get<3>(param.param);
   std::stringstream ss;
   ss << get_prec_str(prec);
   ss << "_r" << recon;
   if (has_naik) ss << "_naik";
+  ss << "_partition" << part;
   return ss.str();
 }
 
+#ifdef MULTI_GPU
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
                          ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
                                             ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool()),
+                                            ::testing::Bool(), ::testing::Range(0, 16)),
                          getHisqEndToEndTestName);
+#else
+INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
+                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                            ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
+                                            ::testing::Bool(), ::testing::Values(0)),
+                         getHisqEndToEndTestName);
+#endif
 
 int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
 
   auto app = make_app();
+  app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
