@@ -794,6 +794,77 @@ TEST_P(HisqEndToEndTest, force_staples_fat7)
   ASSERT_GE(level, tolerance) << "Chained fat7 staples force mismatch";
 }
 
+TEST_P(HisqEndToEndTest, force_complete)
+{
+  setup_force(test_prec, test_recon, has_naik);
+
+  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
+  double fat7_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, 0.0};
+
+  // Re-run full chain: staples -> long -> unitarize -> fat7
+  cpuForce->zero();
+  cpuForce_ex->zero();
+  cudaForce->zero();
+  cudaForce_ex->zero();
+  cpuMom->zero();
+  refMom->zero();
+  cudaMom->zero();
+
+  // Staples + long
+  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
+  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
+  hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cudaForce_ex->exchangeExtendedGhost(cudaForce_ex->R());
+
+  // Unitarize
+  GaugeField *unitGauge = cudaGauge_ex;
+  GaugeField unitGaugeLocal;
+  if (cudaGauge_ex->Reconstruct() != QUDA_RECONSTRUCT_NO) {
+    GaugeFieldParam ugParam(*cudaGauge_ex);
+    ugParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    ugParam.create = QUDA_NULL_FIELD_CREATE;
+    unitGaugeLocal = GaugeField(ugParam);
+    unitGaugeLocal.copy(*cudaGauge_ex);
+    unitGaugeLocal.exchangeExtendedGhost(unitGaugeLocal.R());
+    unitGauge = &unitGaugeLocal;
+  }
+  int *num_failures_dev = static_cast<int *>(device_malloc(sizeof(int)));
+  qudaMemset(num_failures_dev, 0, sizeof(int));
+  fermion_force::unitarizeForce(*cudaOprod_ex, *cudaForce_ex, *unitGauge, num_failures_dev);
+  device_free(num_failures_dev);
+
+  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
+  GaugeFieldParam cpuResultParam(*cpuForce);
+  cpuResultParam.create = QUDA_NULL_FIELD_CREATE;
+  GaugeField cpuUnitResult(cpuResultParam);
+  fermion_force::unitarizeForceCPU(cpuUnitResult, *cpuForce, *cpuGauge);
+
+  // Fat7 staples (chained)
+  cudaForce_ex->zero();
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, fat7_coeff);
+
+  cpuForce_ex->zero();
+  copyExtendedGauge(*cpuOprod_ex, cpuUnitResult, QUDA_CPU_FIELD_LOCATION);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
+  hisqStaplesForceCPU(fat7_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+
+  // Complete force + momentum
+  fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
+  updateMomentum(*cudaMom, 1.0, *cudaForce_ex, __func__);
+  qudaDeviceSynchronize();
+
+  hisqCompleteForceCPU(*cpuForce_ex, *cpuGauge_ex, refMom);
+  cpuMom->copy(*cudaMom);
+
+  compare_floats(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume() * mom_site_size, getTolerance(test_prec),
+                 gauge_param.cpu_prec);
+  int accuracy_level = strong_check_mom(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume(), gauge_param.cpu_prec);
+  int tolerance = getNegLog10Tolerance(test_prec);
+  ASSERT_GE(accuracy_level, tolerance) << "Complete force + momentum mismatch";
+}
+
 TEST_P(HisqEndToEndTest, force_naik_oprod)
 {
   if (!has_naik) GTEST_SKIP() << "Naik accumulation not applicable without eps_naik";
