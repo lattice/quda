@@ -60,29 +60,7 @@ namespace quda
                 src_left.GammaBasis(), src_right.GammaBasis());
     }
 
-    if (dst.Ncolor() == 3) {
-      if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
-        SpinorChiralReconstruct<double, 3>(dst, src_left, src_right, chirality);
-      } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
-        SpinorChiralReconstruct<float, 3>(dst, src_left, src_right, chirality);
-      } else if (dst.Precision() == QUDA_HALF_PRECISION) {
-        if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-          SpinorChiralReconstruct<short, 3>(dst, src_left, src_right, chirality);
-        } else {
-          errorQuda("Half precision support not enabled");
-        }
-      } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
-        if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) {
-          SpinorChiralReconstruct<char, 3>(dst, src_left, src_right, chirality);
-        } else {
-          errorQuda("Quarter precision support not enabled");
-        }
-      } else {
-        errorQuda("Precision %d not implemented", dst.Precision());
-      }
-    } else {
-      errorQuda("nColor=%d not implemented", dst.Ncolor());
-    }
+    instantiate<SpinorChiralProject>(dst, src_left, src_right, chirality);
   }
 
   void spinorChiralReconstruct(ColorSpinorField &dst, const ColorSpinorField &src, QudaChirality chirality)
@@ -145,29 +123,7 @@ namespace quda
                 dst_right.GammaBasis(), src.GammaBasis());
     }
 
-    if (src.Ncolor() == 3) {
-      if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-        SpinorChiralProject<double, 3>(dst_left, dst_right, src, chirality);
-      } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-        SpinorChiralProject<float, 3>(dst_left, dst_right, src, chirality);
-      } else if (src.Precision() == QUDA_HALF_PRECISION) {
-        if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-          SpinorChiralProject<short, 3>(dst_left, dst_right, src, chirality);
-        } else {
-          errorQuda("Half precision support not enabled");
-        }
-      } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-        if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) {
-          SpinorChiralProject<char, 3>(dst_left, dst_right, src, chirality);
-        } else {
-          errorQuda("Quarter precision support not enabled");
-        }
-      } else {
-        errorQuda("Precision %d not implemented", src.Precision());
-      }
-    } else {
-      errorQuda("nColor=%d not implemented", src.Ncolor());
-    }
+    instantiate<SpinorChiralProject>(dst_left, dst_right, src, chirality);
   }
 
   void spinorChiralProject(ColorSpinorField &dst, const ColorSpinorField &src, QudaChirality chirality)
