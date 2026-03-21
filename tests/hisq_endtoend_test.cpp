@@ -575,6 +575,85 @@ TEST_P(HisqEndToEndTest, force_setup)
   SUCCEED() << "Force setup completed without crash";
 }
 
+TEST_P(HisqEndToEndTest, force_oprod)
+{
+  setup_force(test_prec, test_recon, has_naik);
+
+  QudaPrecision host_prec = gauge_param.cpu_prec;
+
+  // GPU outer product fields (zero-initialized, non-extended, host precision on device)
+  GaugeFieldParam oParam(gauge_param);
+  oParam.location = QUDA_CUDA_FIELD_LOCATION;
+  oParam.nFace = 0;
+  oParam.create = QUDA_ZERO_FIELD_CREATE;
+  oParam.link_type = QUDA_GENERAL_LINKS;
+  oParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  oParam.setPrecision(host_prec, true);
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  GaugeField gpuStapleOprod(oParam);
+  GaugeField gpuNaikOprod(oParam);
+  GaugeField *oprod[2] = {&gpuStapleOprod, &gpuNaikOprod};
+
+  // GPU quark field
+  ColorSpinorParam qParam;
+  qParam.nColor = 3;
+  qParam.nSpin = 1;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.nDim = 4;
+  qParam.pc_type = QUDA_4D_PC;
+  qParam.setPrecision(host_prec, host_prec, true);
+  qParam.pad = 0;
+  for (int d = 0; d < 4; d++) qParam.x[d] = gauge_param.X[d];
+
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.location = QUDA_CUDA_FIELD_LOCATION;
+  ColorSpinorField cudaQuark(qParam);
+
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
+  qParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+  qParam.v = stag_for_oprod;
+  ColorSpinorField cpuQuark(qParam);
+
+  cudaQuark = cpuQuark;
+
+  // Run GPU outer product: coeff = {1.0, 1.0} so output matches raw CPU oprod
+  double coeff[2] = {1.0, 1.0};
+  computeStaggeredOprod(oprod, cudaQuark, coeff, 3);
+
+  // Copy GPU results to host for comparison
+  GaugeFieldParam hParam(oParam);
+  hParam.location = QUDA_CPU_FIELD_LOCATION;
+  hParam.create = QUDA_NULL_FIELD_CREATE;
+  hParam.order = QUDA_QDP_GAUGE_ORDER;
+  GaugeField hostStapleOprod(hParam);
+  GaugeField hostNaikOprod(hParam);
+
+  hostStapleOprod.copy(gpuStapleOprod);
+  hostNaikOprod.copy(gpuNaikOprod);
+
+  // Compare 1-hop (staple) outer product
+  double tol = getTolerance(host_prec);
+  int res = 1;
+  for (int dir = 0; dir < 4; dir++) {
+    res &= compare_floats(cpuOprod->data<void *>(dir), hostStapleOprod.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
+  }
+  EXPECT_EQ(res, 1) << "Staple outer product (1-hop) mismatch";
+  strong_check_link(hostStapleOprod, "GPU staple oprod:", *cpuOprod, "CPU reference:");
+
+  // Compare 3-hop (Naik) outer product
+  res = 1;
+  for (int dir = 0; dir < 4; dir++) {
+    res &= compare_floats(cpuLongLinkOprod->data<void *>(dir), hostNaikOprod.data<void *>(dir), V * gauge_site_size,
+                           tol, host_prec);
+  }
+  EXPECT_EQ(res, 1) << "Naik outer product (3-hop) mismatch";
+  strong_check_link(hostNaikOprod, "GPU Naik oprod:", *cpuLongLinkOprod, "CPU reference:");
+}
+
 std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
 {
   const QudaPrecision prec = ::testing::get<0>(param.param);
