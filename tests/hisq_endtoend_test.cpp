@@ -610,6 +610,7 @@ TEST_P(HisqEndToEndTest, force_staples_level2)
   qudaDeviceSynchronize();
 
   hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
   copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
@@ -625,9 +626,12 @@ TEST_P(HisqEndToEndTest, force_staples_level2)
                            getTolerance(test_prec), gauge_param.cpu_prec);
   }
 
-  int level = strong_check_link(hostVerify, "GPU result:", *cpuForce, "CPU reference:");
+  void *hPtrs[4], *cPtrs[4];
+  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
+  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
   int tolerance = getNegLog10Tolerance(test_prec);
-  ASSERT_GE(level, tolerance) << "Level-2 staples force mismatch";
+  EXPECT_EQ(res, 1) << "Level-2 staples force compare_floats mismatch";
+  ASSERT_GE(level, tolerance) << "Level-2 staples force strong_check mismatch";
 }
 
 TEST_P(HisqEndToEndTest, force_long_link)
@@ -644,12 +648,14 @@ TEST_P(HisqEndToEndTest, force_long_link)
   // Re-run staples force (prerequisite — accumulates into force fields)
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
   // Long link force (accumulates into same force fields)
   fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
   qudaDeviceSynchronize();
 
   hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
   copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
@@ -665,9 +671,12 @@ TEST_P(HisqEndToEndTest, force_long_link)
                            getTolerance(test_prec), gauge_param.cpu_prec);
   }
 
-  int level = strong_check_link(hostVerify, "GPU result:", *cpuForce, "CPU reference:");
+  void *hPtrs[4], *cPtrs[4];
+  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
+  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
   int tolerance = getNegLog10Tolerance(test_prec);
-  ASSERT_GE(level, tolerance) << "Long link force mismatch (accumulated staples + long)";
+  EXPECT_EQ(res, 1) << "Long link force compare_floats mismatch";
+  ASSERT_GE(level, tolerance) << "Long link force strong_check mismatch";
 }
 
 TEST_P(HisqEndToEndTest, force_unitarize)
@@ -684,9 +693,11 @@ TEST_P(HisqEndToEndTest, force_unitarize)
   // Re-run staples + long link force (prerequisites)
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
   fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
   hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
   cudaForce_ex->exchangeExtendedGhost(cudaForce_ex->R());
 
@@ -729,9 +740,12 @@ TEST_P(HisqEndToEndTest, force_unitarize)
                            getTolerance(test_prec), gauge_param.cpu_prec);
   }
 
-  int level = strong_check_link(hostVerify, "GPU result:", cpuUnitResult, "CPU reference:");
+  void *hPtrs[4], *cPtrs[4];
+  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuUnitResult.data<void *>(d); }
+  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
   int tolerance = getNegLog10Tolerance(test_prec);
-  ASSERT_GE(level, tolerance) << "Unitarize force mismatch";
+  EXPECT_EQ(res, 1) << "Unitarize force compare_floats mismatch";
+  ASSERT_GE(level, tolerance) << "Unitarize force strong_check mismatch";
 }
 
 TEST_P(HisqEndToEndTest, force_staples_fat7)
@@ -793,6 +807,7 @@ TEST_P(HisqEndToEndTest, force_staples_fat7)
   copyExtendedGauge(*cpuOprod_ex, cpuUnitResult, QUDA_CPU_FIELD_LOCATION);
   cpuOprod_ex->exchangeExtendedGhost(force_R, true);
   hisqStaplesForceCPU(fat7_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
   copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
@@ -808,9 +823,12 @@ TEST_P(HisqEndToEndTest, force_staples_fat7)
                            getTolerance(test_prec), gauge_param.cpu_prec);
   }
 
-  int level = strong_check_link(hostVerify, "GPU result:", *cpuForce, "CPU reference:");
+  void *hPtrs[4], *cPtrs[4];
+  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
+  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
   int tolerance = getNegLog10Tolerance(test_prec);
-  ASSERT_GE(level, tolerance) << "Chained fat7 staples force mismatch";
+  EXPECT_EQ(res, 1) << "Chained fat7 staples force compare_floats mismatch";
+  ASSERT_GE(level, tolerance) << "Chained fat7 staples force strong_check mismatch";
 }
 
 TEST_P(HisqEndToEndTest, force_complete)
@@ -829,11 +847,14 @@ TEST_P(HisqEndToEndTest, force_complete)
   refMom->zero();
   cudaMom->zero();
 
-  // Staples + long
+  // Staples + long (with CPU ghost exchanges)
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
+
   fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
   hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
   cudaForce_ex->exchangeExtendedGhost(cudaForce_ex->R());
 
   // Unitarize
@@ -868,6 +889,7 @@ TEST_P(HisqEndToEndTest, force_complete)
   copyExtendedGauge(*cpuOprod_ex, cpuUnitResult, QUDA_CPU_FIELD_LOCATION);
   cpuOprod_ex->exchangeExtendedGhost(force_R, true);
   hisqStaplesForceCPU(fat7_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
   // Complete force + momentum
   fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
