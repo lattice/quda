@@ -575,13 +575,129 @@ TEST_P(HisqEndToEndTest, force_setup)
   SUCCEED() << "Force setup completed without crash";
 }
 
+TEST_P(HisqEndToEndTest, force_naik_oprod)
+{
+  if (!has_naik) GTEST_SKIP() << "Naik accumulation not applicable without eps_naik";
+  setup_force(test_prec, test_recon, has_naik);
+
+  QudaPrecision host_prec = gauge_param.cpu_prec;
+  double level2_coeff_0 = act_paths[0][0];
+
+  // Create GPU outer product fields: nFace=0 required by computeStaggeredOprod
+  GaugeFieldParam oParam(gauge_param);
+  oParam.location = QUDA_CUDA_FIELD_LOCATION;
+  oParam.nFace = 0;
+  oParam.create = QUDA_ZERO_FIELD_CREATE;
+  oParam.link_type = QUDA_GENERAL_LINKS;
+  oParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  oParam.setPrecision(host_prec, true);
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  GaugeField stapleOprod(oParam);
+  GaugeField oneLinkOprod(oParam);
+  GaugeField naikOprod(oParam);
+
+  // Create GPU quark
+  ColorSpinorParam qParam;
+  qParam.nColor = 3;
+  qParam.nSpin = 1;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.nDim = 4;
+  qParam.pc_type = QUDA_4D_PC;
+  qParam.setPrecision(host_prec, host_prec, true);
+  qParam.pad = 0;
+  for (int d = 0; d < 4; d++) qParam.x[d] = gauge_param.X[d];
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.location = QUDA_CUDA_FIELD_LOCATION;
+  ColorSpinorField cudaQuark(qParam);
+
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
+  qParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+  qParam.v = stag_for_oprod;
+  ColorSpinorField cpuQuark(qParam);
+  cudaQuark = cpuQuark;
+
+  // Non-trivial coefficients: regular term
+  double coeff_reg[2] = {0.625, -0.058479};
+  // Non-trivial coefficients: Naik term
+  double coeff_naik[2] = {0.3125, -0.029240};
+
+  // Step 1: regular term
+  {
+    GaugeField *oprod[2] = {&stapleOprod, &naikOprod};
+    computeStaggeredOprod(oprod, cudaQuark, coeff_reg, 3);
+  }
+
+  // Step 2: Naik accumulation pattern (lines 4532-4547 of interface_quda.cpp)
+  oneLinkOprod.copy(stapleOprod);
+  ax(level2_coeff_0, oneLinkOprod);
+  {
+    GaugeField *oprod[2] = {&oneLinkOprod, &naikOprod};
+    computeStaggeredOprod(oprod, cudaQuark, coeff_naik, 3);
+  }
+
+  // Host fields for GPU results (nFace=0 to match GPU oprods)
+  oParam.location = QUDA_CPU_FIELD_LOCATION;
+  oParam.create = QUDA_NULL_FIELD_CREATE;
+  oParam.order = QUDA_QDP_GAUGE_ORDER;
+  GaugeField hostStaple(oParam);
+  GaugeField hostOneLink(oParam);
+  GaugeField hostNaik(oParam);
+  hostStaple.copy(stapleOprod);
+  hostOneLink.copy(oneLinkOprod);
+  hostNaik.copy(naikOprod);
+
+  // Expected values (copy raw data from cpuOprod, scale with cpu_axy)
+  //   staple   = coeff_reg[0] * cpuOprod                     (unchanged by Naik step)
+  //   onelink  = cpuOprod * (coeff_reg[0] * L + coeff_naik[0])
+  //   naik     = cpuLongLinkOprod * (coeff_reg[1] + coeff_naik[1])
+  GaugeField expectedStaple(oParam);
+  GaugeField expectedOneLink(oParam);
+  GaugeField expectedNaik(oParam);
+  for (int dir = 0; dir < 4; dir++) {
+    cpu_axy(host_prec, coeff_reg[0], cpuOprod->data<void *>(dir), expectedStaple.data<void *>(dir),
+            V * gauge_site_size);
+    cpu_axy(host_prec, coeff_reg[0] * level2_coeff_0 + coeff_naik[0], cpuOprod->data<void *>(dir),
+            expectedOneLink.data<void *>(dir), V * gauge_site_size);
+    cpu_axy(host_prec, coeff_reg[1] + coeff_naik[1], cpuLongLinkOprod->data<void *>(dir),
+            expectedNaik.data<void *>(dir), V * gauge_site_size);
+  }
+
+  double tol = getTolerance(host_prec);
+
+  // Verify stapleOprod (should be coeff_reg[0] * cpuOprod, unchanged by Naik step)
+  int res = 1;
+  for (int dir = 0; dir < 4; dir++)
+    res &= compare_floats(expectedStaple.data<void *>(dir), hostStaple.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
+  EXPECT_EQ(res, 1) << "stapleOprod mismatch";
+
+  // Verify oneLinkOprod
+  res = 1;
+  for (int dir = 0; dir < 4; dir++)
+    res &= compare_floats(expectedOneLink.data<void *>(dir), hostOneLink.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
+  EXPECT_EQ(res, 1) << "oneLinkOprod mismatch after copy+ax+Naik accumulation";
+  strong_check_link(hostOneLink, "GPU oneLinkOprod:", expectedOneLink, "CPU expected:");
+
+  // Verify naikOprod
+  res = 1;
+  for (int dir = 0; dir < 4; dir++)
+    res &= compare_floats(expectedNaik.data<void *>(dir), hostNaik.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
+  EXPECT_EQ(res, 1) << "naikOprod mismatch after Naik accumulation";
+  strong_check_link(hostNaik, "GPU naikOprod:", expectedNaik, "CPU expected:");
+}
+
 TEST_P(HisqEndToEndTest, force_oprod)
 {
   setup_force(test_prec, test_recon, has_naik);
 
   QudaPrecision host_prec = gauge_param.cpu_prec;
 
-  // GPU outer product fields (zero-initialized, non-extended, host precision on device)
+  // GPU outer product fields: nFace=0 required by computeStaggeredOprod
   GaugeFieldParam oParam(gauge_param);
   oParam.location = QUDA_CUDA_FIELD_LOCATION;
   oParam.nFace = 0;
@@ -619,39 +735,43 @@ TEST_P(HisqEndToEndTest, force_oprod)
 
   cudaQuark = cpuQuark;
 
-  // Run GPU outer product: coeff = {1.0, 1.0} so output matches raw CPU oprod
-  double coeff[2] = {1.0, 1.0};
+  double coeff[2] = {0.625, -0.058479};
   computeStaggeredOprod(oprod, cudaQuark, coeff, 3);
 
-  // Copy GPU results to host for comparison
-  GaugeFieldParam hParam(oParam);
-  hParam.location = QUDA_CPU_FIELD_LOCATION;
-  hParam.create = QUDA_NULL_FIELD_CREATE;
-  hParam.order = QUDA_QDP_GAUGE_ORDER;
-  GaugeField hostStapleOprod(hParam);
-  GaugeField hostNaikOprod(hParam);
-
+  // Host fields for GPU results (nFace=0 to match GPU oprods)
+  oParam.location = QUDA_CPU_FIELD_LOCATION;
+  oParam.create = QUDA_NULL_FIELD_CREATE;
+  oParam.order = QUDA_QDP_GAUGE_ORDER;
+  GaugeField hostStapleOprod(oParam);
+  GaugeField hostNaikOprod(oParam);
   hostStapleOprod.copy(gpuStapleOprod);
   hostNaikOprod.copy(gpuNaikOprod);
 
-  // Compare 1-hop (staple) outer product
+  // CPU expected = coeff * raw_oprod (copy raw data from cpuOprod, scale with cpu_axy)
+  GaugeField expectedStaple(oParam);
+  GaugeField expectedNaik(oParam);
+  for (int dir = 0; dir < 4; dir++) {
+    cpu_axy(host_prec, coeff[0], cpuOprod->data<void *>(dir), expectedStaple.data<void *>(dir), V * gauge_site_size);
+    cpu_axy(host_prec, coeff[1], cpuLongLinkOprod->data<void *>(dir), expectedNaik.data<void *>(dir),
+            V * gauge_site_size);
+  }
+
   double tol = getTolerance(host_prec);
   int res = 1;
   for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(cpuOprod->data<void *>(dir), hostStapleOprod.data<void *>(dir), V * gauge_site_size, tol,
+    res &= compare_floats(expectedStaple.data<void *>(dir), hostStapleOprod.data<void *>(dir), V * gauge_site_size, tol,
                            host_prec);
   }
   EXPECT_EQ(res, 1) << "Staple outer product (1-hop) mismatch";
-  strong_check_link(hostStapleOprod, "GPU staple oprod:", *cpuOprod, "CPU reference:");
+  strong_check_link(hostStapleOprod, "GPU staple oprod:", expectedStaple, "CPU expected:");
 
-  // Compare 3-hop (Naik) outer product
   res = 1;
   for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(cpuLongLinkOprod->data<void *>(dir), hostNaikOprod.data<void *>(dir), V * gauge_site_size,
-                           tol, host_prec);
+    res &= compare_floats(expectedNaik.data<void *>(dir), hostNaikOprod.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
   }
   EXPECT_EQ(res, 1) << "Naik outer product (3-hop) mismatch";
-  strong_check_link(hostNaikOprod, "GPU Naik oprod:", *cpuLongLinkOprod, "CPU reference:");
+  strong_check_link(hostNaikOprod, "GPU Naik oprod:", expectedNaik, "CPU expected:");
 }
 
 std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
