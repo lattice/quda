@@ -1605,6 +1605,11 @@ if(QUDA_DIRAC_STAGGERED)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
                    --dim 8 8 8 8
                    --gtest_output=xml:hisq_stencil_test.xml)
+
+  add_test(NAME hisq_endtoend
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_endtoend_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_endtoend_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
