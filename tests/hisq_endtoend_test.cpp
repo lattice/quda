@@ -500,6 +500,18 @@ protected:
     return false;
   }
 
+  void verify_link_fat7();
+  void verify_link_unitarize();
+  void verify_link_fat_long();
+  void verify_link_naik();
+  void verify_force_oprod();
+  void verify_force_naik_oprod();
+  void verify_force_staples_level2();
+  void verify_force_long_link();
+  void verify_force_unitarize();
+  void verify_force_staples_fat7();
+  void verify_force_complete();
+
 public:
   void SetUp() override
   {
@@ -522,7 +534,11 @@ public:
   void TearDown() override { }
 };
 
-TEST_P(HisqEndToEndTest, link_fat7)
+// ============================================================
+// Verification helpers (extracted from TEST_P bodies)
+// ============================================================
+
+void HisqEndToEndTest::verify_link_fat7()
 {
   double max_dev = 10.0 * getTolerance(test_prec);
 
@@ -534,7 +550,7 @@ TEST_P(HisqEndToEndTest, link_fat7)
   strong_check_link(qdp_vlink, "V link GPU results:", v_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
 }
 
-TEST_P(HisqEndToEndTest, link_unitarize)
+void HisqEndToEndTest::verify_link_unitarize()
 {
   double max_dev = 10.0 * getTolerance(test_prec);
 
@@ -546,7 +562,7 @@ TEST_P(HisqEndToEndTest, link_unitarize)
   strong_check_link(qdp_wlink, "W link GPU results:", w_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
 }
 
-TEST_P(HisqEndToEndTest, link_fat_long)
+void HisqEndToEndTest::verify_link_fat_long()
 {
   double max_dev = 10.0 * getTolerance(test_prec);
 
@@ -568,10 +584,8 @@ TEST_P(HisqEndToEndTest, link_fat_long)
                     gauge_param.cpu_prec);
 }
 
-TEST_P(HisqEndToEndTest, link_naik)
+void HisqEndToEndTest::verify_link_naik()
 {
-  if (!has_naik) GTEST_SKIP() << "Naik correction not applicable without eps_naik";
-
   double max_dev = 10.0 * getTolerance(test_prec);
 
   for (int dir = 0; dir < 4; dir++) {
@@ -593,13 +607,7 @@ TEST_P(HisqEndToEndTest, link_naik)
                     gauge_param.cpu_prec);
 }
 
-TEST_P(HisqEndToEndTest, force_setup)
-{
-  setup_force(test_prec, test_recon, has_naik);
-  SUCCEED() << "Force setup completed without crash";
-}
-
-TEST_P(HisqEndToEndTest, force_staples_level2)
+void HisqEndToEndTest::verify_force_staples_level2()
 {
   setup_force(test_prec, test_recon, has_naik);
 
@@ -638,7 +646,7 @@ TEST_P(HisqEndToEndTest, force_staples_level2)
   ASSERT_GE(level, tolerance) << "Level-2 staples force strong_check mismatch";
 }
 
-TEST_P(HisqEndToEndTest, force_long_link)
+void HisqEndToEndTest::verify_force_long_link()
 {
   setup_force(test_prec, test_recon, has_naik);
 
@@ -655,7 +663,7 @@ TEST_P(HisqEndToEndTest, force_long_link)
   cudaForce->zero();
   cudaForce_ex->zero();
 
-  // Re-run staples force (prerequisite — accumulates into force fields)
+  // Re-run staples force (prerequisite -- accumulates into force fields)
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
   cpuForce_ex->exchangeExtendedGhost(force_R, true);
@@ -689,7 +697,7 @@ TEST_P(HisqEndToEndTest, force_long_link)
   ASSERT_GE(level, tolerance) << "Long link force strong_check mismatch";
 }
 
-TEST_P(HisqEndToEndTest, force_unitarize)
+void HisqEndToEndTest::verify_force_unitarize()
 {
   setup_force(test_prec, test_recon, has_naik);
 
@@ -764,7 +772,7 @@ TEST_P(HisqEndToEndTest, force_unitarize)
   ASSERT_GE(level, tolerance) << "Unitarize force strong_check mismatch";
 }
 
-TEST_P(HisqEndToEndTest, force_staples_fat7)
+void HisqEndToEndTest::verify_force_staples_fat7()
 {
   setup_force(test_prec, test_recon, has_naik);
 
@@ -856,7 +864,7 @@ TEST_P(HisqEndToEndTest, force_staples_fat7)
   ASSERT_GE(level, tolerance) << "Chained fat7 staples force strong_check mismatch";
 }
 
-TEST_P(HisqEndToEndTest, force_complete)
+void HisqEndToEndTest::verify_force_complete()
 {
   setup_force(test_prec, test_recon, has_naik);
 
@@ -924,7 +932,7 @@ TEST_P(HisqEndToEndTest, force_complete)
 
   // Complete force + momentum
   fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
-  updateMomentum(*cudaMom, 1.0, *cudaForce_ex, __func__);
+  updateMomentum(*cudaMom, 1.0, *cudaForce_ex, "verify_force_complete");
   qudaDeviceSynchronize();
 
   hisqCompleteForceCPU(*cpuForce_ex, *cpuGauge_ex, refMom);
@@ -937,9 +945,8 @@ TEST_P(HisqEndToEndTest, force_complete)
   ASSERT_GE(accuracy_level, tolerance) << "Complete force + momentum mismatch";
 }
 
-TEST_P(HisqEndToEndTest, force_naik_oprod)
+void HisqEndToEndTest::verify_force_naik_oprod()
 {
-  if (!has_naik) GTEST_SKIP() << "Naik accumulation not applicable without eps_naik";
   setup_force(test_prec, test_recon, has_naik);
 
   QudaPrecision host_prec = gauge_param.cpu_prec;
@@ -1053,7 +1060,7 @@ TEST_P(HisqEndToEndTest, force_naik_oprod)
   strong_check_link(hostNaik, "GPU naikOprod:", expectedNaik, "CPU expected:");
 }
 
-TEST_P(HisqEndToEndTest, force_oprod)
+void HisqEndToEndTest::verify_force_oprod()
 {
   setup_force(test_prec, test_recon, has_naik);
 
@@ -1135,6 +1142,41 @@ TEST_P(HisqEndToEndTest, force_oprod)
   EXPECT_EQ(res, 1) << "Naik outer product (3-hop) mismatch";
   strong_check_link(hostNaikOprod, "GPU Naik oprod:", expectedNaik, "CPU expected:");
 }
+
+// ============================================================
+// TEST_P wrappers (each delegates to the corresponding helper)
+// ============================================================
+
+TEST_P(HisqEndToEndTest, link_fat7) { verify_link_fat7(); }
+TEST_P(HisqEndToEndTest, link_unitarize) { verify_link_unitarize(); }
+TEST_P(HisqEndToEndTest, link_fat_long) { verify_link_fat_long(); }
+TEST_P(HisqEndToEndTest, link_naik)
+{
+  if (!has_naik) GTEST_SKIP() << "Naik correction not applicable without eps_naik";
+  verify_link_naik();
+}
+
+TEST_P(HisqEndToEndTest, force_setup)
+{
+  setup_force(test_prec, test_recon, has_naik);
+  SUCCEED() << "Force setup completed without crash";
+}
+
+TEST_P(HisqEndToEndTest, force_staples_level2) { verify_force_staples_level2(); }
+TEST_P(HisqEndToEndTest, force_long_link) { verify_force_long_link(); }
+TEST_P(HisqEndToEndTest, force_unitarize) { verify_force_unitarize(); }
+TEST_P(HisqEndToEndTest, force_staples_fat7) { verify_force_staples_fat7(); }
+TEST_P(HisqEndToEndTest, force_complete) { verify_force_complete(); }
+TEST_P(HisqEndToEndTest, force_naik_oprod)
+{
+  if (!has_naik) GTEST_SKIP() << "Naik accumulation not applicable without eps_naik";
+  verify_force_naik_oprod();
+}
+TEST_P(HisqEndToEndTest, force_oprod) { verify_force_oprod(); }
+
+// ============================================================
+// Test instantiation
+// ============================================================
 
 std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
 {
