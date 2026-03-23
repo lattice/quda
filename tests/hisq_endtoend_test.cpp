@@ -506,11 +506,7 @@ protected:
   void verify_link_naik();
   void verify_force_oprod();
   void verify_force_naik_oprod();
-  void verify_force_staples_level2();
-  void verify_force_long_link();
-  void verify_force_unitarize();
-  void verify_force_staples_fat7();
-  void verify_force_complete();
+  void verify_force_result(const char *label);
 
 public:
   void SetUp() override
@@ -535,7 +531,7 @@ public:
 };
 
 // ============================================================
-// Verification helpers (extracted from TEST_P bodies)
+// Verification helpers
 // ============================================================
 
 void HisqEndToEndTest::verify_link_fat7()
@@ -607,23 +603,8 @@ void HisqEndToEndTest::verify_link_naik()
                     gauge_param.cpu_prec);
 }
 
-void HisqEndToEndTest::verify_force_staples_level2()
+void HisqEndToEndTest::verify_force_result(const char *label)
 {
-  setup_force(test_prec, test_recon, has_naik);
-
-  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
-
-  cpuForce->zero();
-  cpuForce_ex->zero();
-  cudaForce->zero();
-  cudaForce_ex->zero();
-
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
-  qudaDeviceSynchronize();
-
-  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
   copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
 
@@ -642,422 +623,8 @@ void HisqEndToEndTest::verify_force_staples_level2()
   for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
   int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
   int tolerance = getNegLog10Tolerance(test_prec);
-  EXPECT_EQ(res, 1) << "Level-2 staples force compare_floats mismatch";
-  ASSERT_GE(level, tolerance) << "Level-2 staples force strong_check mismatch";
-}
-
-void HisqEndToEndTest::verify_force_long_link()
-{
-  setup_force(test_prec, test_recon, has_naik);
-
-  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
-
-  // Restore original outer products (may have been overwritten by previous tests)
-  cudaOprod_ex->copy(*cpuOprod);
-  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
-  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
-  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
-
-  cpuForce->zero();
-  cpuForce_ex->zero();
-  cudaForce->zero();
-  cudaForce_ex->zero();
-
-  // Re-run staples force (prerequisite -- accumulates into force fields)
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
-  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
-  // Long link force (accumulates into same force fields)
-  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
-  qudaDeviceSynchronize();
-
-  hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
-  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
-  copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
-
-  GaugeFieldParam hfParam(*cpuForce);
-  hfParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField hostVerify(hfParam);
-  hostVerify.copy(*cudaForce);
-
-  int res = 1;
-  for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(cpuForce->data<void *>(dir), hostVerify.data<void *>(dir), V * gauge_site_size,
-                           getTolerance(test_prec), gauge_param.cpu_prec);
-  }
-
-  void *hPtrs[4], *cPtrs[4];
-  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
-  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
-  int tolerance = getNegLog10Tolerance(test_prec);
-  EXPECT_EQ(res, 1) << "Long link force compare_floats mismatch";
-  ASSERT_GE(level, tolerance) << "Long link force strong_check mismatch";
-}
-
-void HisqEndToEndTest::verify_force_unitarize()
-{
-  setup_force(test_prec, test_recon, has_naik);
-
-  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
-
-  // Restore original outer products (may have been overwritten by previous tests)
-  cudaOprod_ex->copy(*cpuOprod);
-  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
-  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
-  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
-
-  cpuForce->zero();
-  cpuForce_ex->zero();
-  cudaForce->zero();
-  cudaForce_ex->zero();
-
-  // Re-run staples + long link force (prerequisites)
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
-  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
-  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
-  hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
-  cudaForce_ex->exchangeExtendedGhost(cudaForce_ex->R());
-
-  // GPU unitarize force requires recon-NO gauge (V links are general, not SU3)
-  GaugeField *unitGauge = cudaGauge_ex;
-  GaugeField unitGaugeLocal;
-  if (cudaGauge_ex->Reconstruct() != QUDA_RECONSTRUCT_NO) {
-    GaugeFieldParam ugParam(*cudaGauge_ex);
-    ugParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    ugParam.create = QUDA_NULL_FIELD_CREATE;
-    unitGaugeLocal = GaugeField(ugParam);
-    unitGaugeLocal.copy(*cudaGauge_ex);
-    unitGaugeLocal.exchangeExtendedGhost(unitGaugeLocal.R());
-    unitGauge = &unitGaugeLocal;
-  }
-
-  int *num_failures_dev = static_cast<int *>(device_malloc(sizeof(int)));
-  qudaMemset(num_failures_dev, 0, sizeof(int));
-  fermion_force::unitarizeForce(*cudaOprod_ex, *cudaForce_ex, *unitGauge, num_failures_dev);
-  qudaDeviceSynchronize();
-  device_free(num_failures_dev);
-
-  // CPU unitarize force (on non-extended fields)
-  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
-  GaugeFieldParam cpuResultParam(*cpuForce);
-  cpuResultParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField cpuUnitResult(cpuResultParam);
-  fermion_force::unitarizeForceCPU(cpuUnitResult, *cpuForce, *cpuGauge);
-
-  // Extract GPU result and compare
-  copyExtendedGauge(*cudaForce, *cudaOprod_ex, QUDA_CUDA_FIELD_LOCATION);
-  GaugeFieldParam hfParam(*cpuForce);
-  hfParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField hostVerify(hfParam);
-  hostVerify.copy(*cudaForce);
-
-  int res = 1;
-  for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(cpuUnitResult.data<void *>(dir), hostVerify.data<void *>(dir), V * gauge_site_size,
-                           getTolerance(test_prec), gauge_param.cpu_prec);
-  }
-
-  void *hPtrs[4], *cPtrs[4];
-  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuUnitResult.data<void *>(d); }
-  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
-  int tolerance = getNegLog10Tolerance(test_prec);
-  EXPECT_EQ(res, 1) << "Unitarize force compare_floats mismatch";
-  ASSERT_GE(level, tolerance) << "Unitarize force strong_check mismatch";
-}
-
-void HisqEndToEndTest::verify_force_staples_fat7()
-{
-  setup_force(test_prec, test_recon, has_naik);
-
-  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
-  double fat7_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, 0.0};
-
-  // Restore original outer products (may have been overwritten by previous tests)
-  cudaOprod_ex->copy(*cpuOprod);
-  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
-  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
-  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
-
-  // Re-run full chain: staples -> long -> unitarize
-  cpuForce->zero();
-  cpuForce_ex->zero();
-  cudaForce->zero();
-  cudaForce_ex->zero();
-
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
-  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-
-  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
-  hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
-
-  cudaForce_ex->exchangeExtendedGhost(cudaForce_ex->R());
-
-  // Unitarize (recon-NO gauge for V links)
-  GaugeField *unitGauge = cudaGauge_ex;
-  GaugeField unitGaugeLocal;
-  if (cudaGauge_ex->Reconstruct() != QUDA_RECONSTRUCT_NO) {
-    GaugeFieldParam ugParam(*cudaGauge_ex);
-    ugParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    ugParam.create = QUDA_NULL_FIELD_CREATE;
-    unitGaugeLocal = GaugeField(ugParam);
-    unitGaugeLocal.copy(*cudaGauge_ex);
-    unitGaugeLocal.exchangeExtendedGhost(unitGaugeLocal.R());
-    unitGauge = &unitGaugeLocal;
-  }
-
-  // GPU: unitarize output -> cudaOprod_ex (reuse as input force for fat7)
-  int *num_failures_dev = static_cast<int *>(device_malloc(sizeof(int)));
-  qudaMemset(num_failures_dev, 0, sizeof(int));
-  fermion_force::unitarizeForce(*cudaOprod_ex, *cudaForce_ex, *unitGauge, num_failures_dev);
-  device_free(num_failures_dev);
-
-  // CPU: unitarize
-  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
-  GaugeFieldParam cpuResultParam(*cpuForce);
-  cpuResultParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField cpuUnitResult(cpuResultParam);
-  fermion_force::unitarizeForceCPU(cpuUnitResult, *cpuForce, *cpuGauge);
-
-  // Fat7 staples: input is unitarize output, zero the output force, use U links (= same gauge)
-
-  // CPU: load unitarized force into oprod_ex and exchange ghosts
-  cpuForce_ex->zero();
-  copyExtendedGauge(*cpuOprod_ex, cpuUnitResult, QUDA_CPU_FIELD_LOCATION);
-  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
-
-  // GPU: exchange unitarized force ghosts
-  cudaForce_ex->zero();
-  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
-
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, fat7_coeff);
-  qudaDeviceSynchronize();
-
-  hisqStaplesForceCPU(fat7_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
-  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
-  copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
-
-  GaugeFieldParam hfParam(*cpuForce);
-  hfParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField hostVerify(hfParam);
-  hostVerify.copy(*cudaForce);
-
-  int res = 1;
-  for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(cpuForce->data<void *>(dir), hostVerify.data<void *>(dir), V * gauge_site_size,
-                           getTolerance(test_prec), gauge_param.cpu_prec);
-  }
-
-  void *hPtrs[4], *cPtrs[4];
-  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
-  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
-  int tolerance = getNegLog10Tolerance(test_prec);
-  EXPECT_EQ(res, 1) << "Chained fat7 staples force compare_floats mismatch";
-  ASSERT_GE(level, tolerance) << "Chained fat7 staples force strong_check mismatch";
-}
-
-void HisqEndToEndTest::verify_force_complete()
-{
-  setup_force(test_prec, test_recon, has_naik);
-
-  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
-  double fat7_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, 0.0};
-
-  // Restore original outer products (may have been overwritten by previous tests)
-  cudaOprod_ex->copy(*cpuOprod);
-  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
-  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
-  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
-
-  // Re-run full chain: staples -> long -> unitarize -> fat7
-  cpuForce->zero();
-  cpuForce_ex->zero();
-  cudaForce->zero();
-  cudaForce_ex->zero();
-  cpuMom->zero();
-  refMom->zero();
-  cudaMom->zero();
-
-  // Staples + long (with CPU ghost exchanges)
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
-  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
-  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
-  hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-  cudaForce_ex->exchangeExtendedGhost(cudaForce_ex->R());
-
-  // Unitarize
-  GaugeField *unitGauge = cudaGauge_ex;
-  GaugeField unitGaugeLocal;
-  if (cudaGauge_ex->Reconstruct() != QUDA_RECONSTRUCT_NO) {
-    GaugeFieldParam ugParam(*cudaGauge_ex);
-    ugParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    ugParam.create = QUDA_NULL_FIELD_CREATE;
-    unitGaugeLocal = GaugeField(ugParam);
-    unitGaugeLocal.copy(*cudaGauge_ex);
-    unitGaugeLocal.exchangeExtendedGhost(unitGaugeLocal.R());
-    unitGauge = &unitGaugeLocal;
-  }
-  int *num_failures_dev = static_cast<int *>(device_malloc(sizeof(int)));
-  qudaMemset(num_failures_dev, 0, sizeof(int));
-  fermion_force::unitarizeForce(*cudaOprod_ex, *cudaForce_ex, *unitGauge, num_failures_dev);
-  device_free(num_failures_dev);
-
-  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
-  GaugeFieldParam cpuResultParam(*cpuForce);
-  cpuResultParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField cpuUnitResult(cpuResultParam);
-  fermion_force::unitarizeForceCPU(cpuUnitResult, *cpuForce, *cpuGauge);
-
-  // Fat7 staples (chained)
-  cudaForce_ex->zero();
-  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, fat7_coeff);
-
-  cpuForce_ex->zero();
-  copyExtendedGauge(*cpuOprod_ex, cpuUnitResult, QUDA_CPU_FIELD_LOCATION);
-  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
-  hisqStaplesForceCPU(fat7_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-  cpuForce_ex->exchangeExtendedGhost(force_R, true);
-
-  // Complete force + momentum
-  fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
-  updateMomentum(*cudaMom, 1.0, *cudaForce_ex, "verify_force_complete");
-  qudaDeviceSynchronize();
-
-  hisqCompleteForceCPU(*cpuForce_ex, *cpuGauge_ex, refMom);
-  cpuMom->copy(*cudaMom);
-
-  compare_floats(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume() * mom_site_size, getTolerance(test_prec),
-                 gauge_param.cpu_prec);
-  int accuracy_level = strong_check_mom(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume(), gauge_param.cpu_prec);
-  int tolerance = getNegLog10Tolerance(test_prec);
-  ASSERT_GE(accuracy_level, tolerance) << "Complete force + momentum mismatch";
-}
-
-void HisqEndToEndTest::verify_force_naik_oprod()
-{
-  setup_force(test_prec, test_recon, has_naik);
-
-  QudaPrecision host_prec = gauge_param.cpu_prec;
-  double level2_coeff_0 = act_paths[0][0];
-
-  // Create GPU outer product fields: nFace=0 required by computeStaggeredOprod
-  GaugeFieldParam oParam(gauge_param);
-  oParam.location = QUDA_CUDA_FIELD_LOCATION;
-  oParam.nFace = 0;
-  oParam.create = QUDA_ZERO_FIELD_CREATE;
-  oParam.link_type = QUDA_GENERAL_LINKS;
-  oParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  oParam.setPrecision(host_prec, true);
-  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-
-  GaugeField stapleOprod(oParam);
-  GaugeField oneLinkOprod(oParam);
-  GaugeField naikOprod(oParam);
-
-  // Create GPU quark
-  ColorSpinorParam qParam;
-  qParam.nColor = 3;
-  qParam.nSpin = 1;
-  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  qParam.nDim = 4;
-  qParam.pc_type = QUDA_4D_PC;
-  qParam.setPrecision(host_prec, host_prec, true);
-  qParam.pad = 0;
-  for (int d = 0; d < 4; d++) qParam.x[d] = gauge_param.X[d];
-  qParam.create = QUDA_NULL_FIELD_CREATE;
-  qParam.location = QUDA_CUDA_FIELD_LOCATION;
-  ColorSpinorField cudaQuark(qParam);
-
-  qParam.location = QUDA_CPU_FIELD_LOCATION;
-  qParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
-  qParam.v = stag_for_oprod;
-  ColorSpinorField cpuQuark(qParam);
-  cudaQuark = cpuQuark;
-
-  // Non-trivial coefficients: regular term
-  double coeff_reg[2] = {0.625, -0.058479};
-  // Non-trivial coefficients: Naik term
-  double coeff_naik[2] = {0.3125, -0.029240};
-
-  // Step 1: regular term
-  {
-    GaugeField *oprod[2] = {&stapleOprod, &naikOprod};
-    computeStaggeredOprod(oprod, cudaQuark, coeff_reg, 3);
-  }
-
-  // Step 2: Naik accumulation pattern (lines 4532-4547 of interface_quda.cpp)
-  oneLinkOprod.copy(stapleOprod);
-  ax(level2_coeff_0, oneLinkOprod);
-  {
-    GaugeField *oprod[2] = {&oneLinkOprod, &naikOprod};
-    computeStaggeredOprod(oprod, cudaQuark, coeff_naik, 3);
-  }
-
-  // Host fields for GPU results (nFace=0 to match GPU oprods)
-  oParam.location = QUDA_CPU_FIELD_LOCATION;
-  oParam.create = QUDA_NULL_FIELD_CREATE;
-  oParam.order = QUDA_QDP_GAUGE_ORDER;
-  GaugeField hostStaple(oParam);
-  GaugeField hostOneLink(oParam);
-  GaugeField hostNaik(oParam);
-  hostStaple.copy(stapleOprod);
-  hostOneLink.copy(oneLinkOprod);
-  hostNaik.copy(naikOprod);
-
-  // Expected values (copy raw data from cpuOprod, scale with cpu_axy)
-  //   staple   = coeff_reg[0] * cpuOprod                     (unchanged by Naik step)
-  //   onelink  = cpuOprod * (coeff_reg[0] * L + coeff_naik[0])
-  //   naik     = cpuLongLinkOprod * (coeff_reg[1] + coeff_naik[1])
-  GaugeField expectedStaple(oParam);
-  GaugeField expectedOneLink(oParam);
-  GaugeField expectedNaik(oParam);
-  for (int dir = 0; dir < 4; dir++) {
-    cpu_axy(host_prec, coeff_reg[0], cpuOprod->data<void *>(dir), expectedStaple.data<void *>(dir),
-            V * gauge_site_size);
-    cpu_axy(host_prec, coeff_reg[0] * level2_coeff_0 + coeff_naik[0], cpuOprod->data<void *>(dir),
-            expectedOneLink.data<void *>(dir), V * gauge_site_size);
-    cpu_axy(host_prec, coeff_reg[1] + coeff_naik[1], cpuLongLinkOprod->data<void *>(dir),
-            expectedNaik.data<void *>(dir), V * gauge_site_size);
-  }
-
-  double tol = getTolerance(host_prec);
-
-  // Verify stapleOprod (should be coeff_reg[0] * cpuOprod, unchanged by Naik step)
-  int res = 1;
-  for (int dir = 0; dir < 4; dir++)
-    res &= compare_floats(expectedStaple.data<void *>(dir), hostStaple.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
-  EXPECT_EQ(res, 1) << "stapleOprod mismatch";
-
-  // Verify oneLinkOprod
-  res = 1;
-  for (int dir = 0; dir < 4; dir++)
-    res &= compare_floats(expectedOneLink.data<void *>(dir), hostOneLink.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
-  EXPECT_EQ(res, 1) << "oneLinkOprod mismatch after copy+ax+Naik accumulation";
-  strong_check_link(hostOneLink, "GPU oneLinkOprod:", expectedOneLink, "CPU expected:");
-
-  // Verify naikOprod
-  res = 1;
-  for (int dir = 0; dir < 4; dir++)
-    res &= compare_floats(expectedNaik.data<void *>(dir), hostNaik.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
-  EXPECT_EQ(res, 1) << "naikOprod mismatch after Naik accumulation";
-  strong_check_link(hostNaik, "GPU naikOprod:", expectedNaik, "CPU expected:");
+  EXPECT_EQ(res, 1) << label << " compare_floats mismatch";
+  ASSERT_GE(level, tolerance) << label << " strong_check mismatch";
 }
 
 void HisqEndToEndTest::verify_force_oprod()
@@ -1066,7 +633,6 @@ void HisqEndToEndTest::verify_force_oprod()
 
   QudaPrecision host_prec = gauge_param.cpu_prec;
 
-  // GPU outer product fields: nFace=0 required by computeStaggeredOprod
   GaugeFieldParam oParam(gauge_param);
   oParam.location = QUDA_CUDA_FIELD_LOCATION;
   oParam.nFace = 0;
@@ -1080,7 +646,6 @@ void HisqEndToEndTest::verify_force_oprod()
   GaugeField gpuNaikOprod(oParam);
   GaugeField *oprod[2] = {&gpuStapleOprod, &gpuNaikOprod};
 
-  // GPU quark field
   ColorSpinorParam qParam;
   qParam.nColor = 3;
   qParam.nSpin = 1;
@@ -1107,7 +672,6 @@ void HisqEndToEndTest::verify_force_oprod()
   double coeff[2] = {0.625, -0.058479};
   computeStaggeredOprod(oprod, cudaQuark, coeff, 3);
 
-  // Host fields for GPU results (nFace=0 to match GPU oprods)
   oParam.location = QUDA_CPU_FIELD_LOCATION;
   oParam.create = QUDA_NULL_FIELD_CREATE;
   oParam.order = QUDA_QDP_GAUGE_ORDER;
@@ -1116,7 +680,6 @@ void HisqEndToEndTest::verify_force_oprod()
   hostStapleOprod.copy(gpuStapleOprod);
   hostNaikOprod.copy(gpuNaikOprod);
 
-  // CPU expected = coeff * raw_oprod (copy raw data from cpuOprod, scale with cpu_axy)
   GaugeField expectedStaple(oParam);
   GaugeField expectedNaik(oParam);
   for (int dir = 0; dir < 4; dir++) {
@@ -1143,36 +706,237 @@ void HisqEndToEndTest::verify_force_oprod()
   strong_check_link(hostNaikOprod, "GPU Naik oprod:", expectedNaik, "CPU expected:");
 }
 
-// ============================================================
-// TEST_P wrappers (each delegates to the corresponding helper)
-// ============================================================
-
-TEST_P(HisqEndToEndTest, link_fat7) { verify_link_fat7(); }
-TEST_P(HisqEndToEndTest, link_unitarize) { verify_link_unitarize(); }
-TEST_P(HisqEndToEndTest, link_fat_long) { verify_link_fat_long(); }
-TEST_P(HisqEndToEndTest, link_naik)
-{
-  if (!has_naik) GTEST_SKIP() << "Naik correction not applicable without eps_naik";
-  verify_link_naik();
-}
-
-TEST_P(HisqEndToEndTest, force_setup)
+void HisqEndToEndTest::verify_force_naik_oprod()
 {
   setup_force(test_prec, test_recon, has_naik);
-  SUCCEED() << "Force setup completed without crash";
+
+  QudaPrecision host_prec = gauge_param.cpu_prec;
+  double level2_coeff_0 = act_paths[0][0];
+
+  GaugeFieldParam oParam(gauge_param);
+  oParam.location = QUDA_CUDA_FIELD_LOCATION;
+  oParam.nFace = 0;
+  oParam.create = QUDA_ZERO_FIELD_CREATE;
+  oParam.link_type = QUDA_GENERAL_LINKS;
+  oParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  oParam.setPrecision(host_prec, true);
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  GaugeField stapleOprod(oParam);
+  GaugeField oneLinkOprod(oParam);
+  GaugeField naikOprod(oParam);
+
+  ColorSpinorParam qParam;
+  qParam.nColor = 3;
+  qParam.nSpin = 1;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.nDim = 4;
+  qParam.pc_type = QUDA_4D_PC;
+  qParam.setPrecision(host_prec, host_prec, true);
+  qParam.pad = 0;
+  for (int d = 0; d < 4; d++) qParam.x[d] = gauge_param.X[d];
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.location = QUDA_CUDA_FIELD_LOCATION;
+  ColorSpinorField cudaQuark(qParam);
+
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
+  qParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+  qParam.v = stag_for_oprod;
+  ColorSpinorField cpuQuark(qParam);
+  cudaQuark = cpuQuark;
+
+  double coeff_reg[2] = {0.625, -0.058479};
+  double coeff_naik[2] = {0.3125, -0.029240};
+
+  {
+    GaugeField *oprod[2] = {&stapleOprod, &naikOprod};
+    computeStaggeredOprod(oprod, cudaQuark, coeff_reg, 3);
+  }
+
+  oneLinkOprod.copy(stapleOprod);
+  ax(level2_coeff_0, oneLinkOprod);
+  {
+    GaugeField *oprod[2] = {&oneLinkOprod, &naikOprod};
+    computeStaggeredOprod(oprod, cudaQuark, coeff_naik, 3);
+  }
+
+  oParam.location = QUDA_CPU_FIELD_LOCATION;
+  oParam.create = QUDA_NULL_FIELD_CREATE;
+  oParam.order = QUDA_QDP_GAUGE_ORDER;
+  GaugeField hostStaple(oParam);
+  GaugeField hostOneLink(oParam);
+  GaugeField hostNaik(oParam);
+  hostStaple.copy(stapleOprod);
+  hostOneLink.copy(oneLinkOprod);
+  hostNaik.copy(naikOprod);
+
+  GaugeField expectedStaple(oParam);
+  GaugeField expectedOneLink(oParam);
+  GaugeField expectedNaik(oParam);
+  for (int dir = 0; dir < 4; dir++) {
+    cpu_axy(host_prec, coeff_reg[0], cpuOprod->data<void *>(dir), expectedStaple.data<void *>(dir),
+            V * gauge_site_size);
+    cpu_axy(host_prec, coeff_reg[0] * level2_coeff_0 + coeff_naik[0], cpuOprod->data<void *>(dir),
+            expectedOneLink.data<void *>(dir), V * gauge_site_size);
+    cpu_axy(host_prec, coeff_reg[1] + coeff_naik[1], cpuLongLinkOprod->data<void *>(dir),
+            expectedNaik.data<void *>(dir), V * gauge_site_size);
+  }
+
+  double tol = getTolerance(host_prec);
+
+  int res = 1;
+  for (int dir = 0; dir < 4; dir++)
+    res &= compare_floats(expectedStaple.data<void *>(dir), hostStaple.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
+  EXPECT_EQ(res, 1) << "stapleOprod mismatch";
+
+  res = 1;
+  for (int dir = 0; dir < 4; dir++)
+    res &= compare_floats(expectedOneLink.data<void *>(dir), hostOneLink.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
+  EXPECT_EQ(res, 1) << "oneLinkOprod mismatch after copy+ax+Naik accumulation";
+  strong_check_link(hostOneLink, "GPU oneLinkOprod:", expectedOneLink, "CPU expected:");
+
+  res = 1;
+  for (int dir = 0; dir < 4; dir++)
+    res &= compare_floats(expectedNaik.data<void *>(dir), hostNaik.data<void *>(dir), V * gauge_site_size, tol,
+                           host_prec);
+  EXPECT_EQ(res, 1) << "naikOprod mismatch after Naik accumulation";
+  strong_check_link(hostNaik, "GPU naikOprod:", expectedNaik, "CPU expected:");
 }
 
-TEST_P(HisqEndToEndTest, force_staples_level2) { verify_force_staples_level2(); }
-TEST_P(HisqEndToEndTest, force_long_link) { verify_force_long_link(); }
-TEST_P(HisqEndToEndTest, force_unitarize) { verify_force_unitarize(); }
-TEST_P(HisqEndToEndTest, force_staples_fat7) { verify_force_staples_fat7(); }
-TEST_P(HisqEndToEndTest, force_complete) { verify_force_complete(); }
-TEST_P(HisqEndToEndTest, force_naik_oprod)
+// ============================================================
+// Single TEST_P that runs the full verification chain
+// ============================================================
+
+TEST_P(HisqEndToEndTest, full_chain)
 {
-  if (!has_naik) GTEST_SKIP() << "Naik accumulation not applicable without eps_naik";
-  verify_force_naik_oprod();
+  // --- Link checks ---
+  { SCOPED_TRACE("link_fat7"); verify_link_fat7(); }
+  { SCOPED_TRACE("link_unitarize"); verify_link_unitarize(); }
+  { SCOPED_TRACE("link_fat_long"); verify_link_fat_long(); }
+  if (has_naik) { SCOPED_TRACE("link_naik"); verify_link_naik(); }
+
+  // --- Outer product checks ---
+  { SCOPED_TRACE("force_oprod"); verify_force_oprod(); }
+  if (has_naik) { SCOPED_TRACE("force_naik_oprod"); verify_force_naik_oprod(); }
+
+  // --- Force chain (sequential, no recomputation) ---
+  setup_force(test_prec, test_recon, has_naik);
+
+  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
+  double fat7_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, 0.0};
+
+  // Restore outer products once
+  cudaOprod_ex->copy(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
+
+  cpuForce->zero();
+  cpuForce_ex->zero();
+  cudaForce->zero();
+  cudaForce_ex->zero();
+  cpuMom->zero();
+  refMom->zero();
+  cudaMom->zero();
+
+  // Step 1: Level-2 staples
+  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
+  qudaDeviceSynchronize();
+  hisqStaplesForceCPU(d_act_path_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
+  { SCOPED_TRACE("force_staples_level2"); verify_force_result("Level-2 staples force"); }
+
+  // Step 2: Long link (accumulates into existing force fields)
+  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
+  qudaDeviceSynchronize();
+  hisqLongLinkForceCPU(d_act_path_coeff[1], *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
+  { SCOPED_TRACE("force_long_link"); verify_force_result("Long link force"); }
+
+  // Step 3: Unitarize
+  cudaForce_ex->exchangeExtendedGhost(cudaForce_ex->R());
+
+  GaugeField *unitGauge = cudaGauge_ex;
+  GaugeField unitGaugeLocal;
+  if (cudaGauge_ex->Reconstruct() != QUDA_RECONSTRUCT_NO) {
+    GaugeFieldParam ugParam(*cudaGauge_ex);
+    ugParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    ugParam.create = QUDA_NULL_FIELD_CREATE;
+    unitGaugeLocal = GaugeField(ugParam);
+    unitGaugeLocal.copy(*cudaGauge_ex);
+    unitGaugeLocal.exchangeExtendedGhost(unitGaugeLocal.R());
+    unitGauge = &unitGaugeLocal;
+  }
+
+  int *num_failures_dev = static_cast<int *>(device_malloc(sizeof(int)));
+  qudaMemset(num_failures_dev, 0, sizeof(int));
+  fermion_force::unitarizeForce(*cudaOprod_ex, *cudaForce_ex, *unitGauge, num_failures_dev);
+  qudaDeviceSynchronize();
+  device_free(num_failures_dev);
+
+  copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
+  GaugeFieldParam cpuResultParam(*cpuForce);
+  cpuResultParam.create = QUDA_NULL_FIELD_CREATE;
+  GaugeField cpuUnitResult(cpuResultParam);
+  fermion_force::unitarizeForceCPU(cpuUnitResult, *cpuForce, *cpuGauge);
+
+  {
+    SCOPED_TRACE("force_unitarize");
+    copyExtendedGauge(*cudaForce, *cudaOprod_ex, QUDA_CUDA_FIELD_LOCATION);
+    GaugeFieldParam hfParam(*cpuForce);
+    hfParam.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField hostVerify(hfParam);
+    hostVerify.copy(*cudaForce);
+
+    int res = 1;
+    for (int dir = 0; dir < 4; dir++) {
+      res &= compare_floats(cpuUnitResult.data<void *>(dir), hostVerify.data<void *>(dir), V * gauge_site_size,
+                             getTolerance(test_prec), gauge_param.cpu_prec);
+    }
+
+    void *hPtrs[4], *cPtrs[4];
+    for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuUnitResult.data<void *>(d); }
+    int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
+    int tolerance = getNegLog10Tolerance(test_prec);
+    EXPECT_EQ(res, 1) << "Unitarize force compare_floats mismatch";
+    ASSERT_GE(level, tolerance) << "Unitarize force strong_check mismatch";
+  }
+
+  // Step 4: Fat7 staples (chained from unitarize output)
+  cpuForce_ex->zero();
+  copyExtendedGauge(*cpuOprod_ex, cpuUnitResult, QUDA_CPU_FIELD_LOCATION);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
+
+  cudaForce_ex->zero();
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+
+  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, fat7_coeff);
+  qudaDeviceSynchronize();
+  hisqStaplesForceCPU(fat7_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
+  cpuForce_ex->exchangeExtendedGhost(force_R, true);
+  { SCOPED_TRACE("force_staples_fat7"); verify_force_result("Chained fat7 staples force"); }
+
+  // Step 5: Complete force + momentum
+  fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
+  updateMomentum(*cudaMom, 1.0, *cudaForce_ex, "full_chain");
+  qudaDeviceSynchronize();
+
+  hisqCompleteForceCPU(*cpuForce_ex, *cpuGauge_ex, refMom);
+  cpuMom->copy(*cudaMom);
+
+  {
+    SCOPED_TRACE("force_complete");
+    compare_floats(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume() * mom_site_size, getTolerance(test_prec),
+                   gauge_param.cpu_prec);
+    int accuracy_level = strong_check_mom(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume(), gauge_param.cpu_prec);
+    int tolerance = getNegLog10Tolerance(test_prec);
+    ASSERT_GE(accuracy_level, tolerance) << "Complete force + momentum mismatch";
+  }
 }
-TEST_P(HisqEndToEndTest, force_oprod) { verify_force_oprod(); }
 
 // ============================================================
 // Test instantiation
