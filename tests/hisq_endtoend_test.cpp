@@ -282,6 +282,7 @@ static void *stag_for_oprod = nullptr;
 static bool force_valid = false;
 static QudaPrecision force_cur_prec = QUDA_INVALID_PRECISION;
 static bool force_cur_has_naik = false;
+static int force_cur_partition = -1;
 
 static void teardown_force()
 {
@@ -314,11 +315,13 @@ static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool
 {
   int part = 0;
   for (int d = 0; d < 4; d++) part |= (comm_dim_partitioned(d) << d);
-  if (force_valid && force_cur_prec == test_prec && force_cur_has_naik == has_naik && cur_partition == part) return;
+  if (force_valid && force_cur_prec == test_prec && force_cur_has_naik == has_naik && force_cur_partition == part)
+    return;
 
   teardown_force();
   force_cur_prec = test_prec;
   force_cur_has_naik = has_naik;
+  force_cur_partition = part;
 
   QudaReconstructType cuda_link_recon = recon;
   if (cuda_link_recon != QUDA_RECONSTRUCT_NO && cuda_link_recon != QUDA_RECONSTRUCT_13)
@@ -506,6 +509,7 @@ public:
     partition = ::testing::get<3>(GetParam());
     if (skip()) GTEST_SKIP();
 
+    commDimPartitionedReset();
     for (int j = 0; j < 4; j++) {
       if (partition & (1 << j)) { commDimPartitionedSet(j); }
     }
@@ -640,6 +644,12 @@ TEST_P(HisqEndToEndTest, force_long_link)
 
   double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
 
+  // Restore original outer products (may have been overwritten by previous tests)
+  cudaOprod_ex->copy(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
+
   cpuForce->zero();
   cpuForce_ex->zero();
   cudaForce->zero();
@@ -684,6 +694,12 @@ TEST_P(HisqEndToEndTest, force_unitarize)
   setup_force(test_prec, test_recon, has_naik);
 
   double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
+
+  // Restore original outer products (may have been overwritten by previous tests)
+  cudaOprod_ex->copy(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
 
   cpuForce->zero();
   cpuForce_ex->zero();
@@ -755,6 +771,12 @@ TEST_P(HisqEndToEndTest, force_staples_fat7)
   double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
   double fat7_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, 0.0};
 
+  // Restore original outer products (may have been overwritten by previous tests)
+  cudaOprod_ex->copy(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
+
   // Re-run full chain: staples -> long -> unitarize
   cpuForce->zero();
   cpuForce_ex->zero();
@@ -796,16 +818,19 @@ TEST_P(HisqEndToEndTest, force_staples_fat7)
   fermion_force::unitarizeForceCPU(cpuUnitResult, *cpuForce, *cpuGauge);
 
   // Fat7 staples: input is unitarize output, zero the output force, use U links (= same gauge)
-  // GPU
-  cudaForce_ex->zero();
-  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
-  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, fat7_coeff);
-  qudaDeviceSynchronize();
 
-  // CPU
+  // CPU: load unitarized force into oprod_ex and exchange ghosts
   cpuForce_ex->zero();
   copyExtendedGauge(*cpuOprod_ex, cpuUnitResult, QUDA_CPU_FIELD_LOCATION);
   cpuOprod_ex->exchangeExtendedGhost(force_R, true);
+
+  // GPU: exchange unitarized force ghosts
+  cudaForce_ex->zero();
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+
+  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, fat7_coeff);
+  qudaDeviceSynchronize();
+
   hisqStaplesForceCPU(fat7_coeff, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
   cpuForce_ex->exchangeExtendedGhost(force_R, true);
 
@@ -837,6 +862,12 @@ TEST_P(HisqEndToEndTest, force_complete)
 
   double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, -0.123113};
   double fat7_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, 0.0};
+
+  // Restore original outer products (may have been overwritten by previous tests)
+  cudaOprod_ex->copy(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
+  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cpuOprod_ex->exchangeExtendedGhost(force_R, true);
 
   // Re-run full chain: staples -> long -> unitarize -> fat7
   cpuForce->zero();
