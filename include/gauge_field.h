@@ -533,8 +533,9 @@ namespace quda {
     /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
+     * @param[in] scale Arbitrary scale factor we want to apply
      */
-    void copy(const GaugeField &src);
+    void copy(const GaugeField &src, double scale = 1.0);
 
     /**
        @brief Compute the L1 norm of the field
@@ -728,14 +729,15 @@ namespace quda {
      @param out The output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
      @param ghostOut The output ghost buffer (optional)
      @param ghostIn The input ghost buffer (optional)
      @param type The type of copy we doing (0 body and ghost else ghost only)
   */
-  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
-                        void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                        void *Out = 0, void *In = 0, void **ghostOut = 0, void **ghostIn = 0, int type = 0);
 
   /**
     @brief This function is used for copying from a source gauge field to a destination gauge field
@@ -753,11 +755,12 @@ namespace quda {
      @param out The extended output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
   */
-  void copyExtendedGauge(GaugeField &out, const GaugeField &in,
-			 QudaFieldLocation location, void *Out=0, void *In=0);
+  void copyExtendedGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                         void *Out = 0, void *In = 0);
 
   /**
      This function is used for creating an exteneded gauge field from the input,

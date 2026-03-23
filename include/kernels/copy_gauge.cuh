@@ -11,30 +11,32 @@ namespace quda {
    */
   template <typename store_out_t, typename store_in_t, int length_, bool fine_grain_, typename OutOrder, typename InOrder>
   struct CopyGaugeArg : kernel_param<> {
-    using real_out_t  = typename mapper<store_out_t>::type;
-    using real_in_t  = typename mapper<store_in_t>::type;
+    using real_out_t = typename mapper<store_out_t>::type;
+    using real_in_t = typename mapper<store_in_t>::type;
     static constexpr int length = length_;
     static constexpr int nColor = Ncolor(length);
     static constexpr bool fine_grain = fine_grain_;
     OutOrder out;
     const InOrder in;
+    real_in_t scale;
     int volume;
     int faceVolumeCB[QUDA_MAX_DIM];
     int_fastdiv nDim;
     int_fastdiv geometry;
     int out_offset;
     int in_offset;
-    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta) :
+    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta, double scale_) :
       kernel_param(dim3(1, 1, meta.Geometry() * 2)), // FIXME - need to set .x and .y components
       out(out),
       in(in),
+      scale(static_cast<real_in_t>(scale_)),
       volume(meta.Volume()),
       nDim(meta.Ndim()),
       geometry(meta.Geometry()),
       out_offset(0),
       in_offset(0)
     {
-      for (int d=0; d<nDim; d++) faceVolumeCB[d] = meta.SurfaceCB(d) * meta.Nface();
+      for (int d = 0; d < nDim; d++) faceVolumeCB[d] = meta.SurfaceCB(d) * meta.Nface();
     }
   };
 
@@ -80,13 +82,13 @@ namespace quda {
     template <bool fine_grain> __device__ __host__ inline std::enable_if_t<!fine_grain, void> copy(int d, int parity, int x, int)
     {
       Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in(d, x, parity);
-      Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
+      Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in * arg.scale;
       arg.out(d, x, parity) = out;
     }
 
     template <bool fine_grain> __device__ __host__ inline std::enable_if_t<fine_grain, void> copy(int d, int parity, int x, int i)
     {
-      for (int j = 0; j < Arg::nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+      for (int j = 0; j < Arg::nColor; j++) arg.out(d, parity, x, i, j) = arg.scale * arg.in(d, parity, x, i, j);
     }
 
     __device__ __host__ inline void operator()(int x, int i, int parity_d)
@@ -109,14 +111,14 @@ namespace quda {
     template <bool fine_grain> __device__ __host__ inline std::enable_if_t<!fine_grain, void> copy(int d, int parity, int x, int)
     {
       Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in.Ghost(d + arg.in_offset, x, parity);
-      Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
+      Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in * arg.scale;
       arg.out.Ghost(d + arg.out_offset, x, parity) = out;
     }
 
     template <bool fine_grain> __device__ __host__ inline std::enable_if_t<fine_grain, void> copy(int d, int parity, int x, int i)
     {
       for (int j = 0; j < Arg::nColor; j++) {
-        arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
+        arg.out.Ghost(d + arg.out_offset, parity, x, i, j) = arg.scale * arg.in.Ghost(d + arg.in_offset, parity, x, i, j);
       }
     }
 

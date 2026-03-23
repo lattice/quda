@@ -581,7 +581,7 @@ namespace quda {
         }
 
         if (isNative()) {
-          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, recv_d, 1 + 2 * link_dir); // 1, 3
+          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 1.0, 0, 0, 0, recv_d, 1 + 2 * link_dir); // 1, 3
         } else {
           // copy from receive buffer into ghost array
           for (int dim = 0; dim < nDim; dim++)
@@ -658,7 +658,7 @@ namespace quda {
         }
 
         if (isNative()) { // copy from padded region in gauge field into send buffer
-          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, send_d, 0, 1 + 2 * link_dir);
+          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 1.0, 0, 0, send_d, 0, 1 + 2 * link_dir);
         } else { // copy from receive buffer into ghost array
           for (int dim = 0; dim < nDim; dim++)
             qudaMemcpy(send_d[dim], ghost[dim + link_dir * nDim].data(), ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
@@ -997,7 +997,7 @@ namespace quda {
     }
   }
 
-  void GaugeField::copy(const GaugeField &src)
+  void GaugeField::copy(const GaugeField &src, double scale)
   {
     if (this == &src) return;
 
@@ -1016,17 +1016,20 @@ namespace quda {
       fat_link_max = 1.0;
     }
 
+    if (link_type != QUDA_GENERAL_LINKS && scale != 1.0)
+      errorQuda("Can only apply a scale factor to a general link field");
+
     if (src.Location() == QUDA_CUDA_FIELD_LOCATION) {
 
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
           // copy field and ghost zone into this field
-          copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION);
+          copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale);
 
           if (geometry == QUDA_COARSE_GEOMETRY)
-            copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, nullptr, nullptr, nullptr, nullptr, 3);
+            copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, nullptr, nullptr, nullptr, nullptr, 3);
         } else {
-          copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, nullptr, nullptr);
+          copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, nullptr, nullptr);
           if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
         }
       } else { // CPU location
@@ -1037,9 +1040,9 @@ namespace quda {
           qudaMemcpy(buffer, src.data(), src.Bytes(), qudaMemcpyDeviceToHost);
 
           if (GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
-            copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, nullptr, buffer);
+            copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale, nullptr, buffer);
           } else {
-            copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, nullptr, buffer);
+            copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale, nullptr, buffer);
           }
           pool_pinned_free(buffer);
 
@@ -1050,7 +1053,7 @@ namespace quda {
             // special case where we use zero-copy memory to read/write directly from application's array
             void *data_d = get_mapped_device_pointer(data());
             if (GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
-              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, data_d, nullptr);
+              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, data_d, nullptr);
             } else {
               errorQuda("Ghost copy not supported here");
             }
@@ -1063,12 +1066,12 @@ namespace quda {
             void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, order, geometry) : nullptr;
 
             if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED) {
-              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, nullptr, ghost_buffer, nullptr);
+              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, buffer, nullptr, ghost_buffer, nullptr);
               if (geometry == QUDA_COARSE_GEOMETRY)
-                copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, nullptr, ghost_buffer, nullptr,
+                copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, buffer, nullptr, ghost_buffer, nullptr,
                                  3); // forwards links if bi-directional
             } else {
-              copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0);
+              copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, buffer, 0);
             }
 
             if (order == QUDA_QDP_GAUGE_ORDER) {
@@ -1094,19 +1097,19 @@ namespace quda {
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
         // copy field and ghost zone directly
-        copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION);
+        copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale);
       } else {
         if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
           void *buffer = pool_pinned_malloc(bytes);
 
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
             // copy field and ghost zone into buffer
-            copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, nullptr);
+            copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale, buffer, nullptr);
 
             if (geometry == QUDA_COARSE_GEOMETRY)
-              copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, nullptr, 0, 0, 3);
+              copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale, buffer, nullptr, 0, 0, 3);
           } else {
-            copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, nullptr);
+            copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale, buffer, nullptr);
             if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
           }
 
@@ -1120,7 +1123,7 @@ namespace quda {
             void *src_d = get_mapped_device_pointer(src.data());
 
             if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
-              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, data(), src_d);
+              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, data(), src_d);
             } else {
               errorQuda("Ghost copy not supported here");
             }
@@ -1146,11 +1149,11 @@ namespace quda {
                 qudaMemcpy(ghost_buffer[d], src.Ghost()[d].data(), ghost_bytes[d], qudaMemcpyDefault);
 
             if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
-              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, nullptr, buffer, nullptr, ghost_buffer);
+              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, nullptr, buffer, nullptr, ghost_buffer);
               if (geometry == QUDA_COARSE_GEOMETRY)
-                copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, nullptr, buffer, nullptr, ghost_buffer, 3);
+                copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, nullptr, buffer, nullptr, ghost_buffer, 3);
             } else {
-              copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, nullptr, buffer);
+              copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, scale, nullptr, buffer);
               if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
             }
             free_gauge_buffer(buffer, src.Order(), src.Geometry());
@@ -1241,9 +1244,10 @@ namespace quda {
     }
   }
 
-  ColorSpinorParam colorSpinorParam(const GaugeField &a) {
-   if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
-     errorQuda("Not implemented for this order %d", a.FieldOrder());
+  ColorSpinorParam colorSpinorParam(const GaugeField &a)
+  {
+    if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
+      errorQuda("Not implemented for this order %d", a.FieldOrder());
 
     if (a.LinkType() == QUDA_COARSE_LINKS) errorQuda("Not implemented for coarse-link type");
     if (a.Ncolor() != 3) errorQuda("Not implemented for Ncolor = %d", a.Ncolor());
