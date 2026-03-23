@@ -60,7 +60,7 @@ namespace quda
                 src_left.GammaBasis(), src_right.GammaBasis());
     }
 
-    instantiate<SpinorChiralProject>(dst, src_left, src_right, chirality);
+    instantiate<SpinorChiralReconstruct>(dst, src_left, src_right, chirality);
   }
 
   void spinorChiralReconstruct(ColorSpinorField &dst, const ColorSpinorField &src, QudaChirality chirality)
