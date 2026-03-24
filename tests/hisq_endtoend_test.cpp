@@ -818,9 +818,10 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   fermion_force::setUnitarizeForceConstants(1e-14, 5e-5, 1e-10, true, false, 1e-8, 1e-8);
 
   // ---- 1. Fresh U links (QDP order, host precision) ----
+  auto link_type = (test_recon == QUDA_RECONSTRUCT_13) ? SiteLinkType::SITELINK_PHASE_U1 : SiteLinkType::SITELINK_PHASE_NO;
   void *qdp_u[4];
   for (int i = 0; i < 4; i++) qdp_u[i] = safe_malloc(gsize);
-  createSiteLinkCPU(qdp_u, host_prec, SiteLinkType::SITELINK_PHASE_NO);
+  createSiteLinkCPU(qdp_u, host_prec, link_type);
 
   // ---- 2. Build V, W on GPU via computeKSLinkQuda ----
   QudaGaugeParam linkParam = newQudaGaugeParam();
