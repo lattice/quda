@@ -4640,7 +4640,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // Compute level two term
   hisqStaplesForce(cudaOutForce, cudaInForce, cudaWLink, act_path_coeff);
-  logQuda(QUDA_VERBOSE, "DIAG computeHISQForceQuda: after staples, OutForce norm2 = %e\n", cudaOutForce.norm2());
 
   // Load naik outer product
   copyExtendedGauge(cudaInForce, naikOprod, QUDA_CUDA_FIELD_LOCATION);
@@ -4649,7 +4648,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // Compute Naik three-link term contribution
   hisqLongLinkForce(cudaOutForce, cudaInForce, cudaWLink, act_path_coeff[1]);
-  logQuda(QUDA_VERBOSE, "DIAG computeHISQForceQuda: after long link, OutForce norm2 = %e\n", cudaOutForce.norm2());
 
   cudaOutForce.exchangeExtendedGhost(R, profileHISQForce);
 
@@ -4674,7 +4672,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   *num_failures_h = 0;
   unitarizeForce(cudaInForce, cudaOutForce, cudaVLink, num_failures_d);
-  logQuda(QUDA_VERBOSE, "DIAG computeHISQForceQuda: after unitarize, InForce norm2 = %e\n", cudaInForce.norm2());
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
@@ -4701,18 +4698,14 @@ void computeHISQForceQuda(void* const milc_momentum,
   // Compute Fat7-staple term
   cudaOutForce.zero();
   hisqStaplesForce(cudaOutForce, cudaInForce, cudaULink, fat7_coeff);
-  logQuda(QUDA_VERBOSE, "DIAG computeHISQForceQuda: after fat7, OutForce norm2 = %.15e\n", cudaOutForce.norm2());
 
   cudaInForce = GaugeField();
 
   hisqCompleteForce(cudaOutForce, cudaULink);
-  logQuda(QUDA_VERBOSE, "DIAG computeHISQForceQuda: after complete, OutForce norm2 = %.15e\n", cudaOutForce.norm2());
 
   if (gParam->use_resident_mom && !momResident.Length()) errorQuda("No resident momentum field to use");
   GaugeField mom = gParam->use_resident_mom ? momResident.create_alias() : GaugeField(momParam);
   updateMomentum(mom, dt, cudaOutForce, "hisq");
-
-  logQuda(QUDA_VERBOSE, "DIAG computeHISQForceQuda: after updateMomentum, mom norm2 = %e\n", mom.norm2());
 
   // Close the paths, make anti-hermitian, and store in compressed format
   if (gParam->return_result_mom) cpuMom.copy(mom);
