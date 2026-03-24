@@ -2,6 +2,10 @@
 
 #include <register_traits.h>
 
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
 namespace quda
 {
 
@@ -25,14 +29,22 @@ namespace quda
     {
       float4 tmp;
       operator()(tmp, ptr, idx);
-      memcpy(&value, &tmp, sizeof(float4));
+#if __has_builtin(__builtin_bit_cast)
+      value = __builtin_bit_cast(short8, tmp);
+#else
+      __builtin_memcpy(&value, &tmp, sizeof(float4));
+#endif
     }
 
     __device__ inline void operator()(char8 &value, const void *ptr, int idx)
     {
       float2 tmp;
       operator()(tmp, ptr, idx);
-      memcpy(&value, &tmp, sizeof(float2));
+#if __has_builtin(__builtin_bit_cast)
+      value = __builtin_bit_cast(char8, tmp);
+#else
+      __builtin_memcpy(&value, &tmp, sizeof(float2));
+#endif
     }
   };
 
