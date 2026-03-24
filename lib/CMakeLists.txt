@@ -45,7 +45,7 @@ set (QUDA_OBJS
   dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
-  dirac_twisted_mass.cpp 
+  dirac_twisted_mass.cpp dirac_overlap.cpp overlap_kernel.cpp
   llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
@@ -81,6 +81,7 @@ set (QUDA_OBJS
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
   spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
+  spinor_chiral_project.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu

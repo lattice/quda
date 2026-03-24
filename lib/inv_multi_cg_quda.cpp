@@ -71,7 +71,7 @@ namespace quda {
   public:
     ShiftUpdate(ColorSpinorField &r, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &x,
                 std::vector<double> &alpha, std::vector<double> &beta, std::vector<double> &zeta,
-                std::vector<double> &zeta_old, int j_low, int n_shift) :
+                std::vector<double> &zeta_old, int j_low, int n_shift, int n_update) :
       r(r),
       p(p),
       x(x),
@@ -81,7 +81,7 @@ namespace quda {
       zeta_old(zeta_old),
       j_low(j_low),
       n_shift(n_shift),
-      n_update((r.Nspin() == 4) ? 4 : 2)
+      n_update(n_update)
     {
     }
 
@@ -265,7 +265,8 @@ namespace quda {
 
     // now create the worker class for updating the shifted solutions and gradient vectors
     bool aux_update = false;
-    ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
+    ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now,
+                             matSloppy.getStencilSteps());
 
     getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
@@ -284,7 +285,7 @@ namespace quda {
       shift_update.updateNshift(num_offset_now);
 
       // at some point we should curry these into the Dirac operator
-      if (r.Nspin() == 4)
+      if (r.Nspin() != 1)
         pAp = blas::axpyReDot(offset[0], p[0], Ap);
       else
         pAp = blas::reDotProduct(p[0], Ap);
@@ -343,7 +344,7 @@ namespace quda {
         }
 
         mat(r, x[0]);
-        if (r.Nspin() == 4) blas::axpy(offset[0], x[0], r);
+        if (r.Nspin() != 1) blas::axpy(offset[0], x[0], r);
 
         r2[0] = blas::xmyNorm(b, r);
         for (int j = 1; j < num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
@@ -451,7 +452,7 @@ namespace quda {
         // 2.) For shift 0 if we did not exit early  (we went to the full solution)
         if ( (i > 0 and not mixed) or (i == 0 and not exit_early) ) {
           mat(r, x[i]);
-          if (r.Nspin() == 4) {
+          if (r.Nspin() != 1) {
             blas::axpy(offset[i], x[i], r); // Offset it.
           } else if (i != 0) {
             blas::axpy(offset[i] - offset[0], x[i], r); // Offset it.
