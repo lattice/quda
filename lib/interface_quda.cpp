@@ -4530,8 +4530,7 @@ void computeHISQForceQuda(void* const milc_momentum,
     }
 
     { // naik terms
-      oneLinkOprod.copy(stapleOprod);
-      ax(level2_coeff[0], oneLinkOprod);
+      oneLinkOprod.copy(stapleOprod, level2_coeff[0]);
       GaugeField *oprod[2] = {&oneLinkOprod, &naikOprod};
 
       // loop over different quark fields
