@@ -13,8 +13,8 @@ namespace quda {
     FloatIn *In;
     double scale;
 
-    bool tuneSharedBytes() const { return false; }
-    unsigned int minThreads() const { return in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(); }
+    bool tuneSharedBytes() const override { return false; }
+    unsigned int minThreads() const override { return in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(); }
 
   public:
     CopyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, FloatIn *In,
@@ -35,8 +35,7 @@ namespace quda {
         launch<CopyGaugeEx_, enable_host>(tp, stream, Arg<false>(out, in, Out, In, scale));
     }
 
-    long long flops() const { return 0; }
-    long long bytes() const
+    long long bytes() const override
     { // only count interior sites
       return (out.LocalVolume() * out.Bytes()) / out.Volume() +  (in.LocalVolume() * in.Bytes()) / in.Volume();
     }
