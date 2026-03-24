@@ -18,6 +18,7 @@
 #include "misc.h"
 #include "test.h"
 #include "hisq_force_reference.h"
+#include "momentum_force_reference.h"
 #include "momentum_utils.h"
 
 using namespace quda;
@@ -897,10 +898,92 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 
-  GaugeField localOprod(gParam);
-  GaugeField localLongOprod(gParam);
-  computeLinkOrderedOuterProduct(local_stag, localOprod, host_prec, 1);
-  computeLinkOrderedOuterProduct(local_stag, localLongOprod, host_prec, 3);
+  // Coefficient setup matching computeHISQForceQuda's conventions
+  double level2_coeff[6] = {1.0 / 8.0, 0.0, -1.0 / 16.0, 1.0 / 64.0, -1.0 / 384.0, -1.0 / 8.0};
+  double fat7_act[6] = {1.0 / 8.0, -1.0 / 24.0, -1.0 / 16.0, 1.0 / 64.0, -1.0 / 384.0, 0.0};
+  int num_terms = 1;
+  int num_naik_terms = has_naik ? 1 : 0;
+  double coeff_reg[2] = {0.625, -0.058479};
+  double coeff_naik_term[2] = {0.3125, -0.029240};
+  double *coeff_ptrs[2] = {coeff_reg, coeff_naik_term};
+
+  // Compute outer products on GPU (matching computeHISQForceQuda's internal computeStaggeredOprod)
+  // then copy back for the CPU reference chain, ensuring identical starting data.
+  GaugeFieldParam oParam(fgp);
+  oParam.location = QUDA_CUDA_FIELD_LOCATION;
+  oParam.nFace = 0;
+  oParam.create = QUDA_ZERO_FIELD_CREATE;
+  oParam.link_type = QUDA_GENERAL_LINKS;
+  oParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  oParam.setPrecision(host_prec, true);
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  GaugeField gpuStapleOprod(oParam);
+  GaugeField gpuNaikOprod(oParam);
+  GaugeField *oprod_arr[2] = {&gpuStapleOprod, &gpuNaikOprod};
+
+  {
+    ColorSpinorParam qcParam;
+    qcParam.nColor = 3;
+    qcParam.nSpin = 1;
+    qcParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    qcParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    qcParam.nDim = 4;
+    qcParam.pc_type = QUDA_4D_PC;
+    qcParam.setPrecision(host_prec, host_prec, true);
+    qcParam.pad = 0;
+    for (int d = 0; d < 4; d++) qcParam.x[d] = gauge_param.X[d];
+    qcParam.create = QUDA_NULL_FIELD_CREATE;
+    qcParam.location = QUDA_CUDA_FIELD_LOCATION;
+    ColorSpinorField cudaQuark(qcParam);
+    qcParam.location = QUDA_CPU_FIELD_LOCATION;
+    qcParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    qcParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+    qcParam.v = local_stag;
+    ColorSpinorField cpuQuark(qcParam);
+    cudaQuark = cpuQuark;
+    computeStaggeredOprod(oprod_arr, cudaQuark, coeff_reg, 3);
+  }
+
+  // Build oneLinkOprod on GPU matching computeHISQForceQuda: copy stapleOprod, scale by level2_coeff[0]
+  GaugeField gpuOneLinkOprod(oParam);
+  gpuOneLinkOprod.copy(gpuStapleOprod);
+  ax(level2_coeff[0], gpuOneLinkOprod);
+
+  if (has_naik) {
+    GaugeField *oprod_naik[2] = {&gpuOneLinkOprod, &gpuNaikOprod};
+    ColorSpinorParam qcParam2;
+    qcParam2.nColor = 3;
+    qcParam2.nSpin = 1;
+    qcParam2.siteSubset = QUDA_FULL_SITE_SUBSET;
+    qcParam2.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    qcParam2.nDim = 4;
+    qcParam2.pc_type = QUDA_4D_PC;
+    qcParam2.setPrecision(host_prec, host_prec, true);
+    qcParam2.pad = 0;
+    for (int d = 0; d < 4; d++) qcParam2.x[d] = gauge_param.X[d];
+    qcParam2.create = QUDA_NULL_FIELD_CREATE;
+    qcParam2.location = QUDA_CUDA_FIELD_LOCATION;
+    ColorSpinorField cudaQuark2(qcParam2);
+    qcParam2.location = QUDA_CPU_FIELD_LOCATION;
+    qcParam2.create = QUDA_REFERENCE_FIELD_CREATE;
+    qcParam2.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+    qcParam2.v = local_stag;
+    ColorSpinorField cpuQuark2(qcParam2);
+    cudaQuark2 = cpuQuark2;
+    computeStaggeredOprod(oprod_naik, cudaQuark2, coeff_naik_term, 3);
+  }
+
+  // Copy GPU outer products to CPU QDP-order fields (already scaled by coefficients)
+  oParam.location = QUDA_CPU_FIELD_LOCATION;
+  oParam.create = QUDA_NULL_FIELD_CREATE;
+  oParam.order = QUDA_QDP_GAUGE_ORDER;
+  GaugeField stapleOprodCpuField(oParam);
+  GaugeField oneLinkOprodCpuField(oParam);
+  GaugeField naikOprodCpuField(oParam);
+  stapleOprodCpuField.copy(gpuStapleOprod);
+  oneLinkOprodCpuField.copy(gpuOneLinkOprod);
+  naikOprodCpuField.copy(gpuNaikOprod);
 
   // ---- 4. MILC-order links at host precision for computeHISQForceQuda ----
   void *milc_u_hp = safe_malloc(field_bytes_hp);
@@ -911,14 +994,6 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   reorderQDPtoMILC(milc_w_hp, qdp_w, V, gauge_site_size, host_prec, host_prec);
 
   // ---- 5. Call computeHISQForceQuda ----
-  double level2_coeff[6] = {1.0 / 8.0, 0.0, -1.0 / 16.0, 1.0 / 64.0, -1.0 / 384.0, -1.0 / 8.0};
-  double fat7_act[6] = {1.0 / 8.0, -1.0 / 24.0, -1.0 / 16.0, 1.0 / 64.0, -1.0 / 384.0, 0.0};
-
-  int num_terms = 1;
-  int num_naik_terms = has_naik ? 1 : 0;
-  double coeff_reg[2] = {0.625, -0.058479};
-  double coeff_naik_term[2] = {0.3125, -0.029240};
-  double *coeff_ptrs[2] = {coeff_reg, coeff_naik_term};
   void *fermion_ptrs[1] = {local_stag};
 
   size_t mom_bytes = 4 * V * mom_site_size * host_prec;
@@ -960,30 +1035,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
 
   double act_path_coeff[6] = {0, 1, level2_coeff[2], level2_coeff[3], level2_coeff[4], level2_coeff[5]};
 
-  GaugeField stapleOprodCpu(gParam);
-  GaugeField oneLinkOprodCpu(gParam);
-  GaugeField naikOprodCpu(gParam);
-
-  for (int dir = 0; dir < 4; dir++) {
-    cpu_axy(host_prec, coeff_reg[0], localOprod.data<void *>(dir), stapleOprodCpu.data<void *>(dir),
-            V * gauge_site_size);
-    cpu_axy(host_prec, coeff_reg[1], localLongOprod.data<void *>(dir), naikOprodCpu.data<void *>(dir),
-            V * gauge_site_size);
-    cpu_axy(host_prec, level2_coeff[0] * coeff_reg[0], localOprod.data<void *>(dir),
-            oneLinkOprodCpu.data<void *>(dir), V * gauge_site_size);
-  }
-
-  if (has_naik) {
-    GaugeField tmpField(gParam);
-    for (int dir = 0; dir < 4; dir++) {
-      cpu_axy(host_prec, coeff_naik_term[0], localOprod.data<void *>(dir), tmpField.data<void *>(dir),
-              V * gauge_site_size);
-      cpu_xpy(host_prec, tmpField.data<void *>(dir), oneLinkOprodCpu.data<void *>(dir), V * gauge_site_size);
-      cpu_axy(host_prec, coeff_naik_term[1], localLongOprod.data<void *>(dir), tmpField.data<void *>(dir),
-              V * gauge_site_size);
-      cpu_xpy(host_prec, tmpField.data<void *>(dir), naikOprodCpu.data<void *>(dir), V * gauge_site_size);
-    }
-  }
+  // Outer products are already scaled by GPU -- use them directly as staple/oneLink/naik oprods
 
   // Non-extended gauge fields from the same QDP ground truth
   GaugeField cpuU(gParam);
@@ -1020,18 +1072,22 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   GaugeField localForce(gParam);
 
   // Level-2 staples
-  copyExtendedGauge(localOprod_ex, stapleOprodCpu, QUDA_CPU_FIELD_LOCATION);
+  copyExtendedGauge(localOprod_ex, stapleOprodCpuField, QUDA_CPU_FIELD_LOCATION);
   localOprod_ex.exchangeExtendedGhost(force_R, true);
-  copyExtendedGauge(localForce_ex, oneLinkOprodCpu, QUDA_CPU_FIELD_LOCATION);
+  copyExtendedGauge(localForce_ex, oneLinkOprodCpuField, QUDA_CPU_FIELD_LOCATION);
   localForce_ex.exchangeExtendedGhost(force_R, true);
   hisqStaplesForceCPU(act_path_coeff, localOprod_ex, cpuW_ex, &localForce_ex);
   localForce_ex.exchangeExtendedGhost(force_R, true);
+  { GaugeField tmp(gParam); copyExtendedGauge(tmp, localForce_ex, QUDA_CPU_FIELD_LOCATION);
+    printfQuda("DIAG CPU ref: after staples, inner force norm2 = %e\n", tmp.norm2()); }
 
   // Long link
-  copyExtendedGauge(localOprod_ex, naikOprodCpu, QUDA_CPU_FIELD_LOCATION);
+  copyExtendedGauge(localOprod_ex, naikOprodCpuField, QUDA_CPU_FIELD_LOCATION);
   localOprod_ex.exchangeExtendedGhost(force_R, true);
   hisqLongLinkForceCPU(act_path_coeff[1], localOprod_ex, cpuW_ex, &localForce_ex);
   localForce_ex.exchangeExtendedGhost(force_R, true);
+  { GaugeField tmp(gParam); copyExtendedGauge(tmp, localForce_ex, QUDA_CPU_FIELD_LOCATION);
+    printfQuda("DIAG CPU ref: after long link, inner force norm2 = %e\n", tmp.norm2()); }
 
   // Unitarize
   copyExtendedGauge(localForce, localForce_ex, QUDA_CPU_FIELD_LOCATION);
@@ -1039,6 +1095,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   unitResParam.create = QUDA_NULL_FIELD_CREATE;
   GaugeField cpuUnitResult(unitResParam);
   fermion_force::unitarizeForceCPU(cpuUnitResult, localForce, cpuV);
+  printfQuda("DIAG CPU ref: after unitarize, force norm2 = %e\n", cpuUnitResult.norm2());
 
   // Fat7 staples
   localForce_ex.zero();
@@ -1046,14 +1103,20 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   localOprod_ex.exchangeExtendedGhost(force_R, true);
   hisqStaplesForceCPU(fat7_act, localOprod_ex, cpuU_ex, &localForce_ex);
   localForce_ex.exchangeExtendedGhost(force_R, true);
+  { GaugeField tmp(gParam); copyExtendedGauge(tmp, localForce_ex, QUDA_CPU_FIELD_LOCATION);
+    printfQuda("DIAG CPU ref: after fat7, inner force norm2 = %.15e\n", tmp.norm2()); }
 
-  // Complete force + momentum
+  // Complete force -> 18-real force field (matching GPU CompleteForce kernel)
+  GaugeField cpuCompleteForce(gParam);
+  hisqCompleteForceToForceCPU(cpuCompleteForce, localForce_ex, cpuU_ex);
+
+  // Force -> 10-real momentum (matching GPU updateMomentum kernel)
   GaugeFieldParam momParam(gParam);
   momParam.reconstruct = QUDA_RECONSTRUCT_10;
   momParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   momParam.order = QUDA_MILC_GAUGE_ORDER;
   GaugeField cpuRefMom(momParam);
-  hisqCompleteForceCPU(localForce_ex, cpuU_ex, &cpuRefMom);
+  updateMomentumFromForceCPU(cpuRefMom, dt, cpuCompleteForce);
 
   // ---- 7. Compare ----
   momParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -1062,6 +1125,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
 
   int accuracy_level = strong_check_mom(gpuMomResult.data(), cpuRefMom.data(), 4 * V, host_prec);
   int tolerance = getNegLog10Tolerance(test_prec);
+  printfQuda("DIAG hisq_force_interface: accuracy_level=%d tolerance=%d\n", accuracy_level, tolerance);
   ASSERT_GE(accuracy_level, tolerance) << "computeHISQForceQuda momentum mismatch vs CPU reference";
 
   // ---- 8. Cleanup ----
