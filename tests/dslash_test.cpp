@@ -77,10 +77,10 @@ TEST_F(DslashTest, verify)
   // If we are using tensor core we tolerate a greater deviation
   if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dslash_test_wrapper.dtest_type == dslash_test_type::MatPCDagMatPCLocal)
     tol *= 10;
-  if (dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_8
-      && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
-    tol *= 10; // if recon 8, we tolerate a greater deviation
 
+  ASSERT_FALSE(std::isnan(deviation)) << "Nan has propagated into the result";
+  tol = checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec,
+                                     dslash_test_wrapper.gauge_param.reconstruct);
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 

@@ -77,8 +77,9 @@ TEST_P(BLASTest, verify)
     case QUDA_BLAS_DATATYPE_C: tol_gemm = 10 * std::numeric_limits<float>::epsilon(); break;
     case QUDA_BLAS_DATATYPE_D:
     case QUDA_BLAS_DATATYPE_Z: tol_gemm = 10 * std::numeric_limits<double>::epsilon(); break;
-    default: errorQuda("Unexpected BLAS data type %d", data_type);
+    default: ASSERT_TRUE(false) << "Unexpected BLAS data type " << data_type;
     }
+    ASSERT_FALSE(std::isnan(deviation_gemm)) << "Nan has propagated into the result";
     EXPECT_LE(deviation_gemm, tol_gemm) << "CPU and CUDA GEMM implementations do not agree";
     break;
   }
@@ -93,12 +94,13 @@ TEST_P(BLASTest, verify)
     case QUDA_BLAS_DATATYPE_Z: tol_lu_inv = 5000 * std::numeric_limits<double>::epsilon(); break;
     case QUDA_BLAS_DATATYPE_S:
     case QUDA_BLAS_DATATYPE_D:
-    default: errorQuda("Unexpected BLAS data type %d", data_type);
+    default: ASSERT_TRUE(false) << "Unexpected BLAS data type " << data_type;
     }
+    ASSERT_FALSE(std::isnan(deviation_lu_inv)) << "Nan has propagated into the result";
     EXPECT_LE(deviation_lu_inv, tol_lu_inv) << "CPU and CUDA LU Inversion implementations do not agree";
     break;
   }
-  default: errorQuda("Unexpected BLAS test type %d", test_type);
+  default: ASSERT_TRUE(false) << "Unexpected BLAS test type " << test_type;
   }
 }
 

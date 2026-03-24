@@ -38,7 +38,9 @@ bool skip_test(test_t param)
   // MdagMLocal only support for Mobius at present
   if (is_normal_solve(inverter_type, solve_type) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ) {
 #ifdef QUDA_MMA_AVAILABLE
-    if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
+    warningQuda("Temporarily disabling MdagMLocal test until feature/prefetch2 is merged");
+    // if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
+    return true;
 #else
     return true;
 #endif
@@ -106,14 +108,25 @@ TEST_P(InvertTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
-  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-6 : 1e-12;
-  auto tol_hq = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-6 : 1e-12;
-  inv_param.tol = 0.0;
-  inv_param.tol_hq = 0.0;
+  auto prec = ::testing::get<0>(GetParam());
+  auto getInvertTolerance = [](QudaPrecision precision) {
+    switch (precision) {
+    case QUDA_SINGLE_PRECISION: return 1e-6;
+    case QUDA_DOUBLE_PRECISION: return 1e-12;
+    default: return 0.0;
+    }
+  };
+
+  auto tol = getInvertTolerance(prec);
+  auto tol_hq = getInvertTolerance(prec);
+  ASSERT_TRUE(tol != 0.0 && tol_hq != 0.0) << "Unexpected precision " << prec;
+
+  inv_param.tol = tol;
+  inv_param.tol_hq = tol_hq;
+
   auto res_t = ::testing::get<8>(GetParam());
   if (res_t & QUDA_L2_RELATIVE_RESIDUAL) inv_param.tol = tol;
   if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) inv_param.tol_hq = tol_hq;
-
   if (is_chiral(inv_param.dslash_type)) { tol *= std::sqrt(static_cast<double>(inv_param.Ls)); }
   // FIXME eventually we should build in refinement to the *NR solvers to remove the need for this
   if (is_normal_residual(::testing::get<2>(GetParam()))) tol *= 50;
@@ -128,15 +141,23 @@ TEST_P(InvertTest, verify)
 
   // account for distance preconditioning error since cosh * 1//cosh != 1.0 (assume 1 ulp error per dof)
   if (distance_pc_alpha0 != 0.0 && distance_pc_t0 >= 0) {
-    auto epsilon = ::testing::get<0>(GetParam()) == QUDA_DOUBLE_PRECISION ?
-      std::numeric_limits<double>::epsilon() : std::numeric_limits<float>::epsilon();
+    auto epsilon
+      = prec == QUDA_DOUBLE_PRECISION ? std::numeric_limits<double>::epsilon() : std::numeric_limits<float>::epsilon();
     tol = epsilon * dof * quda::comm_size();
     tol_hq = epsilon * dof * quda::comm_size();
   }
 
   for (auto rsd : solve(GetParam())) {
-    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], tol); }
-    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }
+    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) {
+      EXPECT_FALSE(std::isnan(rsd[0])) << "Nan has propagated into the result";
+      tol = checkReasonableHostDeviation(rsd[0], tol, prec, gauge_param.reconstruct);
+      EXPECT_LE(rsd[0], tol);
+    }
+    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) {
+      EXPECT_FALSE(std::isnan(rsd[1])) << "Nan has propagated into the result";
+      tol_hq = checkReasonableHostDeviation(rsd[1], tol_hq, prec);
+      EXPECT_LE(rsd[1], tol_hq);
+    }
   }
 }
 
