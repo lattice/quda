@@ -1,3 +1,8 @@
+#include <quda_arch.h>
+#ifdef QUDA_MMA_AVAILABLE
+#include <cub/block/block_reduce.cuh>
+#endif
+
 #include <color_spinor_field.h>
 #include <multigrid.h>
 #include <power_of_two_array.h>
@@ -26,7 +31,7 @@ namespace quda
     const int parity;
     int aggregate_size;
 
-    using mma_t = typename mma::mg_mma_restrictor_t<out_t>::type;
+    using mma_t = typename mma::mg_mma_restrictor_t<v_t>::type;
 
     static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
     // The number of fine grid aggregate to be inlucded in an thread block per iteration: this number
@@ -49,7 +54,7 @@ namespace quda
     using this_t = RestrictMmaLaunch<out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec>;
     expand_aux_t<this_t, block_limit, block_atom_size, n, n_atom_size, m, m_atom_size, k, k_atom_size> expand;
 
-    bool checkParam(const TuneParam &param) const { return true; }
+    bool checkParam(const TuneParam &) const { return true; }
 
     unsigned int sharedBytesPerThread() const { return 0; }
 

@@ -14,16 +14,15 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariant derivative operator
   */
-  template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct StaggeredQSmearArg : DslashArg<Float, nDim> {
+  template <typename Float, int nSpin_, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct StaggeredQSmearArg : DslashArg<Float, nDim, DDArg, 3> {
     static constexpr int nColor = 3;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
-                                                    spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
@@ -50,7 +49,7 @@ namespace quda
     StaggeredQSmearArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                        const ColorSpinorField &halo, const GaugeField &U, int t0, bool is_t0_kernel, int parity,
                        int dir, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, halo, U, in, parity, dagger, false, 3, false, comm_override),
+      DslashArg<Float, nDim, DDArg, 3>(out, in, halo, U, in, parity, dagger, false, false, comm_override),
       halo_pack(halo, 3),
       halo(halo, 3),
       U(U),
@@ -95,7 +94,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
+  template <KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyStaggeredQSmear(Vector &out, Arg &arg, Coord &coord, int parity, int,
                                                        int thread_dim, bool &active, int src_idx)
   {
@@ -106,29 +105,28 @@ namespace quda
 #pragma unroll
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
       if (d != dir) {
-        {
+        if (arg.dd_in.doHopping(coord, d, +2)) {
           // Forward gather - compute fwd offset for vector fetch
           const bool ghost
-            = (coord[d] + 2 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg); // 1=>2
+            = (coord[d] + 2 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg); // 1=>2
 
-          if (doHalo<kernel_type>(d) && ghost) { //?
+          if (doHalo<kernel_type>(d) && ghost) {
 
             const int ghost_idx
-              = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 2); // check nFace=2, requires improved staggered fields
+              = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 2); // check nFace=2, requires improved staggered fields
             const Link U = arg.U(d, coord.x_cb, parity);
-            const Vector in
-              = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity); //?
+            const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
             out = mv_add(U, in, out);
 
           } else if (doBulk<kernel_type>() && !ghost) { // doBulk
-            const int _2hop_fwd_idx = linkIndexP2(coord, arg.dim, d);
+            const int _2hop_fwd_idx = linkIndexP2(coord, arg.dc.X, d);
             const Vector in_2hop = arg.in[src_idx](_2hop_fwd_idx, their_spinor_parity);
             const Link U_2link = arg.U(d, coord.x_cb, parity);
             out = mv_add(U_2link, in_2hop, out);
           }
         }
-        {
+        if (arg.dd_in.doHopping(coord, d, -2)) {
           // Backward gather - compute back offset for spinor and gauge fetch
           const bool ghost = (coord[d] - 2 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg); // 1=>2
 
@@ -136,16 +134,15 @@ namespace quda
 
             // when updating replace arg.nFace with 1 here
             const int ghost_idx
-              = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 2); // check nFace=2, requires improved staggered field
+              = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 2); // check nFace=2, requires improved staggered field
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
-            const Vector in
-              = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
             out = mv_add(conj(U), in, out);
 
-          } else if (doBulk<kernel_type>() && !ghost) { //?
+          } else if (doBulk<kernel_type>() && !ghost) {
 
-            const int _2hop_back_idx = linkIndexM2(coord, arg.dim, d);
+            const int _2hop_back_idx = linkIndexM2(coord, arg.dc.X, d);
             const int _2hop_gauge_idx = _2hop_back_idx;
 
             const Link U_2link = arg.U(d, _2hop_gauge_idx, parity);
@@ -157,11 +154,10 @@ namespace quda
     }
   }
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct staggered_qsmear : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct staggered_qsmear : dslash_default {
 
     const Arg &arg;
-    constexpr staggered_qsmear(const Arg &arg) : arg(arg) { }
+    template <typename Ftor> constexpr staggered_qsmear(const Ftor &ftor) : arg(ftor.arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
@@ -199,20 +195,23 @@ namespace quda
         }
       }
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, 0, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
+
       // We instantiate two kernel types:
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3:
-        applyStaggeredQSmear<nParity, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
+      case 3: applyStaggeredQSmear<mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       case 4:
       default:
-        applyStaggeredQSmear<nParity, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        applyStaggeredQSmear<mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
         break;
       }
 

@@ -10,12 +10,21 @@ namespace quda
   {
 
     // hip-clang: compile-time dispatch
-    template <template <bool, typename...> class f, typename... Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
 #ifdef __HIP_DEVICE_COMPILE__
-      return f<true>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<true>()(args...);
+      } else {
+        return f<true>().template operator()<Params...>(args...);
+      }
 #else
-      return f<false>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<false>()(args...);
+      } else {
+        return f<false>().template operator()<Params...>(args...);
+      }
 #endif
     }
 
@@ -144,7 +153,10 @@ namespace quda
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
-    constexpr int warp_size() { return warpSize; }
+    constexpr int warp_size() {
+      // FIXME: Need to handle devices with different wavefront sizes
+      return 64;
+    }
 
     /**
        @brief Return the thread mask for a converged warp.
@@ -172,7 +184,7 @@ namespace quda
        the kernel arguments passed to a kernel on the target
        architecture.
     */
-    constexpr size_t max_kernel_arg_size() { return 4096; }
+    constexpr size_t max_kernel_arg_size() { return MAX_KERNEL_ARG_SIZE; }
 
     /**
        @brief Helper function that returns true if we are to pass the

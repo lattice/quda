@@ -3,7 +3,8 @@
 #include <instantiate.h>
 #include <kernels/gauge_stout.cuh>
 
-namespace quda {
+namespace quda
+{
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeSTOUT : TunableKernel3D
   {
@@ -13,6 +14,7 @@ namespace quda {
     const Float rho;
     const Float epsilon;
     const int dir_ignore;
+    const Float anisotropy;
     const int stoutDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
@@ -20,13 +22,13 @@ namespace quda {
     unsigned int sharedBytesPerThread() const
     {
       // use ThreadLocalCache if using over improvement for two link fields
-      return (improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0)
-        + 4 * sizeof(int); // for thread_array
+      return improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0;
     }
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon, int dir_ignore) :
+    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon, int dir_ignore,
+               double anisotropy) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       in(in),
@@ -34,6 +36,7 @@ namespace quda {
       rho(static_cast<Float>(rho)),
       epsilon(static_cast<Float>(epsilon)),
       dir_ignore(dir_ignore),
+      anisotropy(anisotropy),
       stoutDim((dir_ignore == 4) ? 4 : 3)
     {
       if (improved) strcat(aux, ",improved");
@@ -48,16 +51,18 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (!improved) {
         if (stoutDim == 3) {
-          launch<STOUT>(tp, stream, STOUTArg<Float, nColor, recon, 3>(out, in, rho, 0.0, dir_ignore));
+          launch<STOUT>(tp, stream, STOUTArg<Float, nColor, recon, 3>(out, in, rho, 0.0, dir_ignore, anisotropy));
         } else if (stoutDim == 4) {
-          launch<STOUT>(tp, stream, STOUTArg<Float, nColor, recon, 4>(out, in, rho, 0.0, dir_ignore));
+          launch<STOUT>(tp, stream, STOUTArg<Float, nColor, recon, 4>(out, in, rho, 0.0, dir_ignore, anisotropy));
         }
       } else if (improved) {
         tp.set_max_shared_bytes = true;
         if (stoutDim == 3) {
-          launch<OvrImpSTOUT>(tp, stream, STOUTArg<Float, nColor, recon, 3>(out, in, rho, epsilon, dir_ignore));
+          launch<OvrImpSTOUT>(tp, stream,
+                              STOUTArg<Float, nColor, recon, 3>(out, in, rho, epsilon, dir_ignore, anisotropy));
         } else if (stoutDim == 4) {
-          launch<OvrImpSTOUT>(tp, stream, STOUTArg<Float, nColor, recon, 4>(out, in, rho, epsilon, dir_ignore));
+          launch<OvrImpSTOUT>(tp, stream,
+                              STOUTArg<Float, nColor, recon, 4>(out, in, rho, epsilon, dir_ignore, anisotropy));
         }
       }
     }
@@ -79,11 +84,13 @@ namespace quda {
 
     long long bytes() const // 6 links per dim, 1 in, 1 out.
     {
-      return ((1 + (stoutDim - 1) * (improved ? 24 : 6)) * in.Reconstruct() * in.Precision() +
-              out.Reconstruct() * out.Precision()) * stoutDim * in.LocalVolume();    }
+      return ((1 + (stoutDim - 1) * (improved ? 24 : 6)) * in.Reconstruct() * in.Precision()
+              + out.Reconstruct() * out.Precision())
+        * stoutDim * in.LocalVolume();
+    }
   };
 
-  void STOUTStep(GaugeField &out, GaugeField &in, double rho, int dir_ignore)
+  void STOUTStep(GaugeField &out, GaugeField &in, double rho, int dir_ignore, double smear_anisotropy)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
@@ -94,12 +101,13 @@ namespace quda {
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugeSTOUT>(out, in, false, rho, 0.0, dir_ignore);
+    instantiate<GaugeSTOUT>(out, in, false, rho, 0.0, dir_ignore, smear_anisotropy);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 
-  void OvrImpSTOUTStep(GaugeField &out, GaugeField &in, double rho, double epsilon, int dir_ignore)
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField &in, double rho, double epsilon, int dir_ignore,
+                       double smear_anisotropy)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
@@ -110,9 +118,9 @@ namespace quda {
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugeSTOUT>(out, in, true, rho, epsilon, dir_ignore);
+    instantiate<GaugeSTOUT>(out, in, true, rho, epsilon, dir_ignore, smear_anisotropy);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 
-}
+} // namespace quda

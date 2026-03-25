@@ -132,12 +132,12 @@ namespace quda {
     gParam.location = gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.order = gpu ? QUDA_NATIVE_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     // use null-space precision for coarse links on gpu
-    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
+    gParam.setPrecision(transfer->NullPrecision());
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -184,12 +184,12 @@ namespace quda {
     gParam.location = gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.order = gpu ? QUDA_NATIVE_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     // use null-space precision for preconditioned links on gpu
-    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
+    gParam.setPrecision(transfer->NullPrecision());
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;

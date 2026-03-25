@@ -66,7 +66,6 @@ namespace quda {
   void GaugeField::create(const GaugeFieldParam &param)
   {
     if (param.siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", param.siteSubset);
-    if (param.order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", param.order);
     if (param.GhostPrecision() != param.Precision())
       errorQuda("Ghost precision %d doesn't match field precision %d", param.GhostPrecision(), param.Precision());
     if (param.link_type != QUDA_COARSE_LINKS && param.nColor != 3)
@@ -81,6 +80,8 @@ namespace quda {
       errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
     if (param.reconstruct == QUDA_RECONSTRUCT_10 && param.link_type != QUDA_ASQTAD_MOM_LINKS)
       errorQuda("10-reconstruction only supported with momentum links");
+    if (param.nFace > x[0] || param.nFace > x[1] || param.nFace > x[2] || param.nFace > x[3])
+      errorQuda("Halo depth %d is greater than local lattice x = {%d %d %d %d}", param.nFace, x[0], x[1], x[2], x[3]);
 
     nColor = param.nColor;
     nFace = param.nFace;
@@ -318,7 +319,8 @@ namespace quda {
     LatticeField::setTuningString();
     std::stringstream aux_ss;
     aux_ss << "vol=" << volume << ",stride=" << stride << ",precision=" << precision << ",geometry=" << geometry
-           << ",Nc=" << nColor;
+           << ",Nc=" << nColor << ",order=" << order;
+    if (isNative()) aux_ss << ",N=" << gauge::get_vector_order(precision, 128);
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << ",r=" << r[0] << r[1] << r[2] << r[3];
     aux_string = aux_ss.str();
     if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
@@ -327,14 +329,42 @@ namespace quda {
   void GaugeField::zeroPad()
   {
     if (!isNative()) return;
-    size_t pad_bytes = (stride - volumeCB) * precision * order;
-    int Npad = (geometry * (reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2)) / order;
 
-    size_t pitch = stride * order * precision;
-    if (pad_bytes) {
-      for (int parity = 0; parity < 2; parity++) {
-        qudaMemset2DAsync(gauge, parity * (bytes / 2) + volumeCB * order * precision, pitch, 0, pad_bytes, Npad,
-                          device::get_default_stream());
+    if (stride - volumeCB > 0) {
+      int length = nColor == 3 ? reconstruct : nColor * nColor * 2;
+      // we deal with phase separately
+      if (reconstruct == QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9) length--;
+      int N = gauge::get_vector_order(precision, length);
+      int M = length / N;
+      int Nrem = length - M * N;
+
+      {
+        size_t pitch = stride * N * precision;
+        size_t pad_bytes = (stride - volumeCB) * precision * N;
+        for (int parity = 0; parity < 2; parity++) {
+          for (int g = 0; g < geometry; g++) {
+            qudaMemset2DAsync(gauge, parity * (bytes / 2) + g * length * stride * precision + volumeCB * N * precision,
+                              pitch, 0, pad_bytes, M, device::get_default_stream());
+          }
+        }
+      }
+
+      if (Nrem) {                                   // take care of any remainder
+        size_t pitch = length * stride * precision; // unused since we have a height of one
+        size_t pad_bytes = (stride - volumeCB) * precision * Nrem;
+        for (int parity = 0; parity < 2; parity++) {
+          qudaMemset2DAsync(gauge, parity * (bytes / 2) + M * N * stride * precision + volumeCB * Nrem * precision,
+                            pitch, 0, pad_bytes, geometry, device::get_default_stream());
+        }
+      }
+
+      if (phase_bytes) {
+        size_t pitch = stride * precision;
+        size_t pad_bytes = (stride - volumeCB) * precision;
+        for (int parity = 0; parity < 2; parity++) {
+          qudaMemset2DAsync(gauge, parity * (bytes / 2) + phase_offset + volumeCB, pitch, 0, pad_bytes, geometry,
+                            device::get_default_stream());
+        }
       }
     }
   }
@@ -351,7 +381,7 @@ namespace quda {
     // calculate size of ghost zone required
     ghost_bytes_old = ghost_bytes; // save for subsequent resize checking
     ghost_bytes = 0;
-    for (int i=0; i<nDim; i++) {
+    for (int i = 0; i < nDim; i++) {
       ghost_face_bytes[i] = 0;
       if ( !(comm_dim_partitioned(i) || (no_comms_fill && R[i])) ) ghostFace[i] = 0;
       else ghostFace[i] = surface[i] * R[i]; // includes the radius (unlike ColorSpinorField)
@@ -1223,7 +1253,7 @@ namespace quda {
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     spinor_param.pc_type = QUDA_4D_PC;
-    for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
+    for (int d = 0; d < a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;

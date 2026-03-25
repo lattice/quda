@@ -230,12 +230,16 @@ namespace quda {
 
   template <int nDim>
   struct Coord {
-    int x[nDim]; // nDim lattice coordinates
+    array<int, nDim> x = {};    // nDim lattice coordinates
+    array<int, nDim> gx = {};   // nDim global lattice coordinates
+    array<int, nDim> gDim = {}; // global lattice dimensions
     int x_cb;    // checkerboard lattice site index
     int s;       // fifth dimension coord
     int X;       // full lattice site index
     constexpr const int& operator[](int i) const { return x[i]; }
     constexpr int& operator[](int i) { return x[i]; }
+    array_2d<bool, 2, nDim> in_boundary = {};
+    constexpr int size() const { return nDim; }
   };
 
   /**
@@ -253,19 +257,19 @@ namespace quda {
     switch (dir) {
     case +1: // positive direction
       switch (mu) {
-      case 0: return (x[0] == arg.X[0] - 1 ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
-      case 1: return (x[1] == arg.X[1] - 1 ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
-      case 2: return (x[2] == arg.X[2] - 1 ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
-      case 3: return (x[3] == arg.X[3] - 1 ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
-      case 4: return (x[4] == arg.X[4] - 1 ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
+      case 0: return (x.in_boundary[1][0] ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
+      case 1: return (x.in_boundary[1][1] ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
+      case 2: return (x.in_boundary[1][2] ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
+      case 3: return (x.in_boundary[1][3] ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
+      case 4: return (x.in_boundary[1][4] ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
       }
     case -1:
       switch (mu) {
-      case 0: return (x[0] == 0 ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
-      case 1: return (x[1] == 0 ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
-      case 2: return (x[2] == 0 ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
-      case 3: return (x[3] == 0 ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
-      case 4: return (x[4] == 0 ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
+      case 0: return (x.in_boundary[0][0] ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
+      case 1: return (x.in_boundary[0][1] ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
+      case 2: return (x.in_boundary[0][2] ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
+      case 3: return (x.in_boundary[0][3] ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
+      case 4: return (x.in_boundary[0][4] ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
       }
     }
     return 0; // should never reach here
@@ -838,7 +842,6 @@ namespace quda {
   constexpr int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
-    const auto *dims = arg.dc.dims[dim]; // dimensions of the face
     const auto &V4 = arg.dc.volume_4d;   // 4-d volume
 
     // intrinsic parity of the face depends on offset of first element
@@ -850,6 +853,14 @@ namespace quda {
     // first compute src index, then find 4-d index from remainder
     int s = face_idx_in / arg.dc.face_XYZT[dim];
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
+
+    int dims[3] = {};
+    int d1 = 0;
+#pragma unroll 4
+    for (int d2 = 0; d2 < 4; d2++) { // this will evaluate at compile time
+      if (d2 == dim) continue;
+      dims[d1++] = arg.dc.X[d2];
+    }
 
     /*y,z,t here are face indexes in new order*/
     int aux1 = face_idx / dims[0];
@@ -953,7 +964,7 @@ namespace quda {
         phase == QUDA_STAGGERED_PHASE_MILC || phase == QUDA_STAGGERED_PHASE_TIFR, "Unsupported staggered phase");
     real sign;
 
-    const auto *X = arg.dim;
+    const auto *X = arg.dc.X;
     if (phase == QUDA_STAGGERED_PHASE_MILC) {
       switch (dim) {
       case 0: sign = (coords[3]) % 2 == 0 ? static_cast<real>(1.0) : static_cast<real>(-1.0); break;
@@ -1115,7 +1126,7 @@ namespace quda {
    *
    * The main helper functions are ipt() and iup(), giving pure function
    * implementations of the ipt[] and iup[][] arrays (see
-   * openqcd:include/global.h) that are needed to calculate the correct offsets
+   * https://doi.org/10.22323/1.466.0280) that are needed to calculate the correct offsets
    * of the fields base pointers.
    */
   namespace openqcd
@@ -1129,7 +1140,7 @@ namespace quda {
      *
      * @return     Surface
      */
-    __device__ __host__ inline int surface(const int *X, const int mu)
+    __device__ __host__ inline int surface(const int X[4], const int mu)
     {
       if (mu == 0) {
         return X[1] * X[2] * X[3];
@@ -1149,7 +1160,7 @@ namespace quda {
      *
      * @return     BNDRY
      */
-    __device__ __host__ inline int bndry(const int *L, const int *nproc)
+    __device__ __host__ inline int bndry(const int L[4], const int nproc[4])
     {
       return 2
         * (((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
@@ -1165,7 +1176,7 @@ namespace quda {
      *
      * @return     The offset
      */
-    __device__ __host__ inline int ifc(const int *L, const int *nproc, const int mu)
+    __device__ __host__ inline int ifc(const int L[4], const int nproc[4], const int mu)
     {
       if (mu == 0) {
         return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2;
@@ -1188,7 +1199,7 @@ namespace quda {
      *
      * @return     The offset
      */
-    __device__ __host__ inline int face_offset(const int *L, const int *nproc, const int mu)
+    __device__ __host__ inline int face_offset(const int L[4], const int nproc[4], const int mu)
     {
       if (mu == 0) {
         return 0;
@@ -1209,7 +1220,7 @@ namespace quda {
      * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
      *                        convention (txyz)
      */
-    __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD)
+    __device__ __host__ inline void rotate_coords(const int x_quda[4], int x_openQCD[4])
     {
       x_openQCD[1] = x_quda[0];
       x_openQCD[2] = x_quda[1];
@@ -1244,7 +1255,7 @@ namespace quda {
      *
      * @return     Volume
      */
-    __device__ __host__ inline int vol(const int *X) { return X[0] * X[1] * X[2] * X[3]; }
+    __device__ __host__ inline int vol(const int X[4]) { return X[0] * X[1] * X[2] * X[3]; }
 
     /**
      * @brief      Return cbs[]. This is the cache block size in openQCD, which
@@ -1255,7 +1266,7 @@ namespace quda {
      *
      * @return     cbs
      */
-    __device__ __host__ inline int setup_cbs(const int mu, const int *X)
+    __device__ __host__ inline int setup_cbs(const int mu, const int X[4])
     {
       if (mu == 0) {
         return X[0];
@@ -1283,7 +1294,7 @@ namespace quda {
      * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
      *             openQCD
      */
-    __device__ __host__ inline int ipt(const int *x, const int *L)
+    __device__ __host__ inline int ipt(const int x[4], const int L[4])
     {
       int xb[4], xn[4];
 
@@ -1318,7 +1329,7 @@ namespace quda {
      *
      * @return     Number of prior boundary points
      */
-    __device__ __host__ inline int boundary_pts(const int mu, const int *x, const int *X)
+    __device__ __host__ inline int boundary_pts(const int mu, const int x[4], const int X[4])
     {
       int ret = 0;
 
@@ -1358,7 +1369,7 @@ namespace quda {
      *
      * @return     iup[ix][mu]
      */
-    __device__ __host__ inline int iup(const int *x, const int mu, const int *L, const int *nproc)
+    __device__ __host__ inline int iup(const int x[4], const int mu, const int L[4], const int nproc[4])
     {
       int i, ret, xb[4], xn[4];
 

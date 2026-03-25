@@ -81,7 +81,7 @@ void initFields(QudaPrecision prec)
   gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 1;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.order = QUDA_NATIVE_GAUGE_ORDER;
   gParam.geometry = QUDA_COARSE_GEOMETRY;
   gParam.nFace = 1;
 

@@ -171,9 +171,6 @@ namespace quda
     if (r_sloppy[0].Precision() != r[0].Precision()) blas::copy(r_sloppy, r);
 
     auto csParam(r_sloppy[0]);
-    std::vector<XUpdateBatch> x_update_batch(b.size());
-    for (auto i = 0u; i < b.size(); i++)
-      x_update_batch[i] = XUpdateBatch(Np, K ? minvr_sloppy[i] : r_sloppy[i], csParam);
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -184,6 +181,10 @@ namespace quda
       popVerbosity();
       blas::copy(minvr_sloppy, minvr_pre);
     }
+
+    std::vector<XUpdateBatch> x_update_batch(b.size());
+    for (auto i = 0u; i < b.size(); i++)
+      x_update_batch[i] = XUpdateBatch(Np, K ? minvr_sloppy[i] : r_sloppy[i], csParam);
 
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);

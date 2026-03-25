@@ -46,11 +46,8 @@ namespace quda {
     /** Precision to use for the GPU null-space components */
     const QudaPrecision null_precision;
 
-    /** CPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField V_h;
-
-    /** GPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField V_d;
+    /** Block-normalized null-space components that define the prolongator */
+    mutable ColorSpinorField V;
 
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
     mutable ColorSpinorField fine_tmp_h;
@@ -98,16 +95,6 @@ namespace quda {
     /** The parity of any single-parity fine-grid fields that are passed into the transfer operator */
     QudaParity parity;
 
-    /** Whether the GPU transfer operator has been constructed */
-    mutable bool enable_gpu = false;
-
-    /** Whether the CPU transfer operator has been constructed */
-    mutable bool enable_cpu = false;
-
-    /** Whether to apply the transfer operation the GPU (requires
-        enable_gpu=true in the constructor) */
-    mutable bool use_gpu;
-
     /** Whether to apply the transfer operation with MMA */
     mutable bool _use_mma;
 
@@ -119,22 +106,7 @@ namespace quda {
      * @brief Allocate V field
      * @param[in] location Where to allocate the V field
      */
-    void createV(QudaFieldLocation location) const;
-
-    /**
-     * @brief Allocate host temporaries used when applying transfer operators
-     * @param[in] location Where to allocate the temporaries
-     */
-    void createTmp() const;
-
-    /**
-     * @brief Allocate temporaries needed for prolongator / restrictor
-     * application (if changing location)
-     * @param[in,out] tmp Storaage for temporaries
-     * @param[in] location Location for new temporaries
-     * @param[in] a Field whose metadata we are cloning (aside from location and ordering)
-     */
-    void createTmp(std::vector<ColorSpinorField> &tmp, QudaFieldLocation new_location, ColorSpinorField &a) const;
+    void createV() const;
 
     /**
      * @brief Creates the map between fine and coarse grids
@@ -148,12 +120,6 @@ namespace quda {
      */
     void createSpinMap(int spin_bs);
 
-    /**
-     * @brief Lazy allocation of the transfer operator in a given location
-     * @param[in] location Where to allocate the temporaries
-     */
-    void initializeLazy(QudaFieldLocation location) const;
-
   public:
     /**
      * The constructor for Transfer
@@ -166,7 +132,6 @@ namespace quda {
      * @param spin_bs The spin block sizes to use
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param null_precision The precision to store the null-space basis vectors in
-     * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
     Transfer(const std::vector<ColorSpinorField> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
              int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type);
@@ -198,24 +163,14 @@ namespace quda {
     /**
      * @brief The precision of the packed null-space vectors
      */
-    QudaPrecision NullPrecision(QudaFieldLocation location) const
-    {
-      return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0].Precision(), QUDA_SINGLE_PRECISION);
-    }
+    QudaPrecision NullPrecision() const { return null_precision; }
 
     /**
      * Returns a const reference to the V field
      * @param location Which memory space are we requesting
      * @return The V field const reference
      */
-    const ColorSpinorField& Vectors(QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION) const {
-      if (location == QUDA_INVALID_FIELD_LOCATION) {
-        // if not set then we return the memory space where the input vectors are stored
-        return B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? V_d : V_h;
-      } else {
-        return location == QUDA_CUDA_FIELD_LOCATION ? V_d : V_h;
-      }
-    }
+    const ColorSpinorField &Vectors() const { return V; }
 
     /**
      * Returns the number of near nullvectors
@@ -252,12 +207,6 @@ namespace quda {
     */
     const int* coarseToFine(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const
     { return location == QUDA_CPU_FIELD_LOCATION ? coarse_to_fine_h : coarse_to_fine_d; }
-
-    /**
-     * Sets where the prolongator / restrictor should take place
-     * @param location Location where the transfer operator should be computed
-     */
-    void setTransferGPU(bool use_gpu) const { this->use_gpu = use_gpu; }
 
     /**
      * @brief Sets whether the transfer operator is to act on full

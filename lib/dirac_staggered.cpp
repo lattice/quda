@@ -69,6 +69,7 @@ namespace quda {
 
   void DiracStaggered::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out.Even());
 
     //even
@@ -174,6 +175,7 @@ namespace quda {
 
   void DiracStaggeredPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
 
     QudaParity parity = QUDA_INVALID_PARITY;

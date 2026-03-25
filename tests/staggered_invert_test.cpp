@@ -140,6 +140,7 @@ void init()
 {
   // Set QUDA internal parameters
   gauge_param = newQudaGaugeParam();
+  gauge_param.use_split_gauge_bkup = use_split_gauge_bkup == 1;
   setStaggeredGaugeParam(gauge_param);
   QudaGaugeSmearParam smear_param;
   if (gauge_smear) {
@@ -203,7 +204,7 @@ void init()
   cpuFatMILC = GaugeField(cpuParam);
 
   cpuParam.link_type = QUDA_ASQTAD_LONG_LINKS;
-  cpuParam.nFace = 3;
+  cpuParam.nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuLongQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
@@ -216,7 +217,7 @@ void init()
 
   // Reorder gauge fields to MILC order
   cpuFatMILC = cpuFatQDP;
-  cpuLongMILC = cpuLongQDP;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) cpuLongMILC = cpuLongQDP;
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
@@ -237,10 +238,11 @@ void init()
 
   // now copy back to QDP aliases, since these are used for the reference dslash
   cpuFatQDP = cpuFatMILC;
-  cpuLongQDP = cpuLongMILC;
-  // ensure QDP alias has exchanged ghosts
   cpuFatQDP.exchangeGhost();
-  cpuLongQDP.exchangeGhost();
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    cpuLongQDP = cpuLongMILC;
+    cpuLongQDP.exchangeGhost();
+  }
 
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
@@ -531,7 +533,17 @@ int main(int argc, char **argv)
       changes = true;
     }
 
-    double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-5 : 1e-6;
+    auto getStaggeredInvertTolerance = [](QudaPrecision prec) {
+      switch (prec) {
+      case QUDA_SINGLE_PRECISION: return 1e-5;
+      case QUDA_DOUBLE_PRECISION: return 1e-6;
+      default: return 0.0;
+      }
+    };
+
+    double expected_tol = getStaggeredInvertTolerance(prec);
+    if (expected_tol == 0.0) errorQuda("Unexpected precision %d", prec);
+
     if (tol != expected_tol) {
       tol = expected_tol;
       changes = true;
@@ -548,8 +560,10 @@ int main(int argc, char **argv)
     if (changes) {
       printfQuda("For gtest, various defaults are changed:\n");
       printfQuda("  --compute-fat-long true\n");
-      printfQuda("  --tol (1e-6 for double, 1e-5 for single)\n");
-      printfQuda("  --tol-hq (1e-6 for double, 1e-5 for single)\n");
+      printfQuda("  --tol (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
+      printfQuda("  --tol-hq (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
       printfQuda("  --niter 1000\n");
     }
   }

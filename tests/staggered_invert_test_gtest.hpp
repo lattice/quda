@@ -107,12 +107,22 @@ TEST_P(StaggeredInvertTest, verify)
   auto ca_basis_tmp = inv_param.ca_basis;
   if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER) inv_param.ca_basis = QUDA_POWER_BASIS;
 
-  // Single precision needs a tiny bump due to small host/device precision deviations
-  if (prec == QUDA_SINGLE_PRECISION) verify_tol *= 1.01;
+  // account for summation error scaling with number of processors
+  auto dof = 6lu * dim[0] * dim[1] * dim[2] * dim[3];
+  verify_tol *= (1 + log(quda::comm_size()) / log(dof));
+  tol_hq *= (1 + log(quda::comm_size()) / log(dof));
 
   for (auto rsd : solve(GetParam())) {
-    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], verify_tol); }
-    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }
+    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) {
+      EXPECT_FALSE(std::isnan(rsd[0])) << "Nan has propagated into the result";
+      verify_tol = checkReasonableHostDeviation(rsd[0], verify_tol, prec, gauge_param.reconstruct);
+      EXPECT_LE(rsd[0], verify_tol);
+    }
+    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) {
+      EXPECT_FALSE(std::isnan(rsd[1])) << "Nan has propagated into the result";
+      tol_hq = checkReasonableHostDeviation(rsd[1], tol_hq, prec, gauge_param.reconstruct);
+      EXPECT_LE(rsd[1], tol_hq);
+    }
   }
 
   inv_param.ca_basis = ca_basis_tmp;

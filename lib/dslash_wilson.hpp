@@ -34,10 +34,7 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonApply {
 
     template <bool distance_pc>
     WilsonApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -46,10 +43,10 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      WilsonArg<Float, nColor, nDim, recon, distance_pc> arg(out, in, halo, U, a, x, parity, dagger, comm_override,
-                                                             alpha0, t0);
+      WilsonArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, halo, U, a, x, parity, dagger,
+                                                                    comm_override, alpha0, t0);
       Wilson<decltype(arg)> wilson(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

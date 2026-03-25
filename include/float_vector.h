@@ -15,25 +15,19 @@
 
 namespace quda {
 
-  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y)
-  {
-    return make_double2(x.x + y.x, x.y + y.y);
-  }
+  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y) { return {x.x + y.x, x.y + y.y}; }
 
   __host__ __device__ inline double3 operator+(const double3 &x, const double3 &y)
   {
-    return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
+    return {x.x + y.x, x.y + y.y, x.z + y.z};
   }
 
   __host__ __device__ inline double4 operator+(const double4 &x, const double4 &y)
   {
-    return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
+    return {x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w};
   }
 
-  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y)
-  {
-    return make_float2(x.x + y.x, x.y + y.y);
-  }
+  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y) { return {x.x + y.x, x.y + y.y}; }
 
   template <typename T, int n>
   __device__ __host__ inline array<T, n> operator+(const array<T, n> &a, const array<T, n> &b)

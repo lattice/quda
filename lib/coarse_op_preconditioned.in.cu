@@ -10,11 +10,12 @@
 namespace quda
 {
 
-  template <QudaFieldLocation location_template, typename Float_, typename PreconditionedGauge,
+  template <QudaFieldLocation location_template, typename Float_, typename store_t_, typename PreconditionedGauge,
             typename Gauge, typename GaugeInv, int n, int M, int N, bool compute_max, bool use_mma>
   class CalculateYhat : public TunableKernel3D {
     using Float = Float_;
-    using Arg = CalculateYhatArg<Float, PreconditionedGauge, Gauge, GaugeInv, n, M, N, compute_max>;
+    using store_t = store_t_;
+    using Arg = CalculateYhatArg<Float, store_t, PreconditionedGauge, Gauge, GaugeInv, n, M, N, compute_max>;
     Arg arg;
     GaugeField &Yhat;
     const GaugeField &Y;
@@ -51,7 +52,7 @@ namespace quda
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           strcat(aux, ",mma");
 #ifdef QUDA_MMA_AVAILABLE
-          strcat(aux, mma::mg_mma_setup_t<Float>::type::get_type_name().c_str());
+          strcat(aux, mma::mg_mma_setup_t<store_t>::type::get_type_name().c_str());
 #endif
         }
       }
@@ -94,7 +95,7 @@ namespace quda
       }
     }
 
-    bool advanceSharedBytes(TuneParam &) const { return false; }
+    bool tuneSharedBytes() const { return false; }
 
     bool advanceAux(TuneParam &param) const
     {
@@ -231,10 +232,10 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_aos->norm2(0));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
-          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true, true>
+          CalculateYhat<location, Float, storeFloat, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true, true>
             (*Yhat_aos, *Y_aos, *Xinv_aos);
         }
-        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, false, true>
+        CalculateYhat<location, Float, storeFloat, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, false, true>
           (*Yhat_aos, *Y_aos, *Xinv_aos);
 
         if (&Y != Y_aos) { delete Y_aos; }
@@ -254,10 +255,10 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
-          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true, false>
+          CalculateYhat<location, Float, storeFloat, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true, false>
             (Yhat, Y, Xinv);
         }
-        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, false, false>
+        CalculateYhat<location, Float, storeFloat, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, false, false>
           (Yhat, Y, Xinv);
       }
 
@@ -288,7 +289,7 @@ namespace quda
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
       calculateYhat<QUDA_CPU_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     } else {
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_NATIVE_GAUGE_ORDER;
       // if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
       calculateYhat<QUDA_CUDA_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     }

@@ -5,8 +5,8 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-  struct NdegTwistedMassArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct NdegTwistedMassArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
     typedef typename mapper<Float>::type real;
     real a; /** this is the Wilson-dslash scale factor */
     real b; /** this is the chiral twist factor */
@@ -15,7 +15,7 @@ namespace quda
     NdegTwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                        const ColorSpinorField &halo, const GaugeField &U, double a, double b, double c,
                        cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the chiral twist
       c(c)
@@ -23,11 +23,10 @@ namespace quda
     }
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedMass : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct nDegTwistedMass : dslash_default {
 
     const Arg &arg;
-    constexpr nDegTwistedMass(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr nDegTwistedMass(const Ftor &ftor) : arg(ftor.arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -49,15 +48,20 @@ namespace quda
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
+      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+        return;
+      }
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
-
-      if (mykernel_type == INTERIOR_KERNEL) {
+      if (mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (mykernel_type == INTERIOR_KERNEL) {
         // apply the chiral and flavor twists
         // use consistent load order across s to ensure better cache locality
         Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);

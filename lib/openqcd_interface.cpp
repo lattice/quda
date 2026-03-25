@@ -27,9 +27,13 @@
 #define WITH_COMM(expr) do { if (in_comm()) { expr; } } while (0)
 
 typedef struct {
+  bool ready;
   bool created;
   pthread_t thread;
-  MPI_Comm comm;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+  MPI_Comm main_comm;   /** MPI communicator holding the main threads */
+  MPI_Comm worker_comm; /** MPI communicator holding the worker threads */
 } openQCD_QudaThread_t;
 
 typedef struct {
@@ -77,7 +81,7 @@ typedef struct openQCD_QudaSolver_s {
   int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
 } openQCD_QudaSolver;
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1, MPI_COMM_NULL }, {}, {}, nullptr, {}, {}, ""};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, false, 1, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, MPI_COMM_NULL, MPI_COMM_NULL }, {}, {}, nullptr, {}, {}, ""};
 
 using namespace quda;
 
@@ -87,32 +91,26 @@ using namespace quda;
  */
 
 #ifdef INTERFACE_NVTX
-
-#if QUDA_NVTX_VERSION == 3
 #include "nvtx3/nvToolsExt.h"
-#else
-#include "nvToolsExt.h"
-#endif
 
-static const uint32_t colors[] = {0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff};
-static const int num_colors = sizeof(colors) / sizeof(uint32_t);
+static const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 
-#define PUSH_RANGE(name, cid)                                                                                          \
-  {                                                                                                                    \
-    int color_id = cid;                                                                                                \
-    color_id = color_id % num_colors;                                                                                  \
-    nvtxEventAttributes_t eventAttrib = {0};                                                                           \
-    eventAttrib.version = NVTX_VERSION;                                                                                \
-    eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;                                                                  \
-    eventAttrib.colorType = NVTX_COLOR_ARGB;                                                                           \
-    eventAttrib.color = colors[color_id];                                                                              \
-    eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;                                                                 \
-    eventAttrib.message.ascii = name;                                                                                  \
-    nvtxRangePushEx(&eventAttrib);                                                                                     \
-  }
+#define PUSH_RANGE(name,cid) { \
+  int color_id = cid; \
+  color_id = color_id%num_colors;\
+  nvtxEventAttributes_t eventAttrib = {}; \
+  eventAttrib.version = NVTX_VERSION; \
+  eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = colors[color_id]; \
+  eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+  eventAttrib.message.ascii = name; \
+  nvtxRangePushEx(&eventAttrib); \
+}
 #define POP_RANGE nvtxRangePop();
 #else
-#define PUSH_RANGE(name, cid)
+#define PUSH_RANGE(name,cid)
 #define POP_RANGE
 #endif
 
@@ -494,12 +492,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
   setMPICommHandleQuda(&layout.quda_comm);
 
 #ifdef MULTI_GPU
-/* TODO: would we ever want to run with QMP COMMS? */
-#ifdef QMP_COMMS
-  initCommsGridQuda(4, layout.nproc, nullptr, nullptr);
-#else
   initCommsGridQuda(4, layout.nproc, rankFromCoords, (void *)(layout.data));
-#endif
   static int device = -1; /* enable a default allocation of devices to processes */
 #else
   static int device = layout.device;
@@ -518,7 +511,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
   }
 
   MPI_Bcast((void *)&qudaState.init.verbosity, sizeof(qudaState.init.verbosity), MPI_INT, 0, layout.quda_comm);
-  setVerbosityQuda(qudaState.init.verbosity, prefix, qudaState.init.logfile);
+  setVerbosityQuda(qudaState.init.verbosity, prefix, my_rank == 0 ? qudaState.init.logfile : stdout);
   initQuda(device);
 }
 
@@ -648,7 +641,7 @@ double openQCD_qudaPlaquette(void)
 
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
-  void *buf = qudaState.init.buffer_field(0, gauge);
+  void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, gauge);
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_GAUGE, gauge, buf)) {
     QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
     loadGaugeQuda(buf, &param);
@@ -657,7 +650,7 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType 
 
 void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
-  void *buf = qudaState.init.buffer_field(0, gauge);
+  void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, gauge);
   if (in_comm()) {
     QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
     saveGaugeQuda(buf, &param);
@@ -687,7 +680,7 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu)
   param.clover_csw = csw;
   param.clover_coeff = 0.0;
 
-  void *buf = qudaState.init.buffer_field(0, clover);
+  void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, clover);
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_CLOVER, clover, buf)) {
     param.mu = mu;
     
@@ -732,7 +725,7 @@ inline void set_su3csw(QudaInvertParam *param, double su3csw)
     param->dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 
     if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
-      param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
+      param->clover_order = QUDA_NATIVE_CLOVER_ORDER; /* what implication has this? */
       param->compute_clover = true;
     } else {
       param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
@@ -791,7 +784,7 @@ static ColorSpinorField *openQCD_qudaSpinorAlloc(void)
 
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 {
-  void *out = qudaState.init.buffer_field(0, openQCD_field);
+  void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, openQCD_field);
 
   if (in_comm()) {
     /* sets up the necessary parameters */
@@ -813,7 +806,7 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 
 void *openQCD_qudaH2D(void *openQCD_field)
 {
-  void *in = qudaState.init.buffer_field(0, openQCD_field);
+  void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, openQCD_field);
 
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in)) {
 
@@ -907,22 +900,22 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
   /* gamma_i run within QUDA using QUDA fields */
   if (in_comm()) {
     switch (dir) {
-    case 0: /* t direction */ gamma3(*out, *in); break;
-    case 1: /* x direction */ gamma0(*out, *in); break;
-    case 2: /* y direction */ gamma1(*out, *in); break;
-    case 3: /* z direction */ gamma2(*out, *in); break;
-    case 4:
-    case 5:
-      gamma5(*out, *in);
-      /* UKQCD uses a different convention for Gamma matrices:
-       * gamma5_ukqcd = gammax gammay gammaz gammat,
-       * gamma5_openqcd = gammat gammax gammay gammaz,
-       * and thus
-       * gamma5_openqcd = -1 * U gamma5_ukqcd U^dagger,
-       * with U the transformation matrix from OpenQCD to UKQCD. */
-      blas::ax(-1.0, *out);
-      break;
-    default: errorQuda("Unknown gamma: %d\n", dir);
+      case 0: ApplyGamma(*out, *in, QUDA_GAMMA_T); break;
+      case 1: ApplyGamma(*out, *in, QUDA_GAMMA_X); break;
+      case 2: ApplyGamma(*out, *in, QUDA_GAMMA_Y); break;
+      case 3: ApplyGamma(*out, *in, QUDA_GAMMA_Z); break;
+      case 4:
+      case 5:
+        ApplyGamma(*out, *in, QUDA_GAMMA_5);
+        /* UKQCD uses a different convention for Gamma matrices:
+         * gamma5_ukqcd = gammax gammay gammaz gammat,
+         * gamma5_openqcd = gammat gammax gammay gammaz,
+         * and thus
+         * gamma5_openqcd = -1 * U gamma5_ukqcd U^dagger,
+         * with U the transformation matrix from OpenQCD to UKQCD. */
+        blas::ax(-1.0, *out);
+        break;
+      default: errorQuda("Unknown gamma: %d\n", dir);
     }
   }
 
@@ -973,7 +966,7 @@ inline bool gauge_field_get_unset(void)
  */
 inline bool clover_field_get_up2date(void)
 {
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   bool test = gauge_field_get_up2date();
   return (test && qudaState.swd_ud_rev == qudaState.ud_rev && qudaState.swd_ad_rev == qudaState.ad_rev
           && qudaState.swd_kappa == 1.0 / (2.0 * (dp.m0 + 4.0)) && qudaState.swd_su3csw == dp.su3csw
@@ -992,7 +985,7 @@ inline bool clover_field_get_up2date(void)
 inline bool mg_get_up2date(QudaInvertParam *param)
 {
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   int test = param->preconditioner != nullptr;
 
   MPI_Bcast(&test, 1, MPI_INT, 0, qudaState.layout.world_comm);
@@ -1011,7 +1004,7 @@ inline bool mg_get_up2date(QudaInvertParam *param)
 inline void mg_set_revision(QudaInvertParam *param)
 {
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   additional_prop->mg_ud_rev = qudaState.ud_rev;
   additional_prop->mg_ad_rev = qudaState.ad_rev;
   additional_prop->mg_kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
@@ -1025,7 +1018,7 @@ inline void mg_set_revision(QudaInvertParam *param)
  */
 inline void clover_field_set_revision(void)
 {
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   qudaState.swd_ud_rev = qudaState.ud_rev;
   qudaState.swd_ad_rev = qudaState.ad_rev;
   qudaState.swd_kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
@@ -1053,7 +1046,7 @@ static int openQCD_qudaInvertParamCheck(void *param_)
   QudaInvertParam *param = static_cast<QudaInvertParam *>(param_);
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   bool ret = true;
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
 
   if (param->kappa != (1.0 / (2.0 * (dp.m0 + 4.0)))) {
     WITH_COMM(logQuda(
@@ -1134,7 +1127,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(param_);
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
 
   bool do_param_update = !openQCD_qudaInvertParamCheck(param_);
   bool do_gauge_transfer = (!gauge_field_get_up2date() && !gauge_field_get_unset())
@@ -1151,8 +1144,18 @@ static void openQCD_qudaSolverUpdate(void *param_)
     WITH_COMM(logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n"));
     void *h_gauge = qudaState.layout.h_gauge();
     PUSH_RANGE("openQCD_qudaGaugeLoad", 3);
-    QudaReconstructType rec
-      = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
+
+#ifdef BUILD_QCD_PLUS_QED
+    QudaReconstructType rec = QUDA_RECONSTRUCT_9;
+    if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
+      WITH_COMM(warningQuda("QUDA was built with QCD+QED support, but gauge group does not require it (set QUDA_QCD_PLUS_QED=OFF)"));
+    }
+#else
+    QudaReconstructType rec = QUDA_RECONSTRUCT_8;
+    if (qudaState.layout.flds_parms().gauge != OPENQCD_GAUGE_SU3) {
+      WITH_COMM(errorQuda("QUDA was not built with QCD+QED support, but gauge group requires it (set QUDA_QCD_PLUS_QED=ON)"));
+    }
+#endif
 
     /**
      * We set t_boundary = QUDA_ANTI_PERIODIC_T. This setting is a label that
@@ -1278,7 +1281,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
 static void *openQCD_qudaSolverReadIn(int id)
 {
   int my_rank;
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
 
   MPI_Comm_rank(qudaState.layout.world_comm, &my_rank);
 
@@ -1644,21 +1647,30 @@ static void *openQCD_qudaSolverReadIn(int id)
 void *openQCD_qudaSolverGetHandle(int id)
 {
   check_solver_id(id);
-  if (qudaState.inv_handles[id] == nullptr) {
+
+  void *ptr = id == -1 ? qudaState.dirac_handle : qudaState.inv_handles[id];
+
+  if (ptr == nullptr) {
     if (id != -1) {
       WITH_COMM(logQuda(QUDA_VERBOSE, "Read in solver parameters from file %s for solver (id=%d)\n", qudaState.infile, id));
     }
-    qudaState.inv_handles[id] = openQCD_qudaSolverReadIn(id);
+    ptr = openQCD_qudaSolverReadIn(id);
   }
 
-  openQCD_qudaSolverUpdate(qudaState.inv_handles[id]);
-  return qudaState.inv_handles[id];
+  if (id == -1) {
+    qudaState.dirac_handle = ptr;
+  } else {
+    qudaState.inv_handles[id] = ptr;
+  }
+
+  openQCD_qudaSolverUpdate(ptr);
+  return ptr;
 }
 
 void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
 {
-  void *in = qudaState.init.buffer_field(0, src);
-  void *out = qudaState.init.buffer_field(1, dst);
+  void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, src);
+  void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 1, dst);
   qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, src, in);
 
   if (in_comm()) {
@@ -1695,8 +1707,8 @@ void openQCD_qudaDw(void *src, void *dst)
   param->input_location = QUDA_CPU_FIELD_LOCATION;
   param->output_location = QUDA_CPU_FIELD_LOCATION;
 
-  void *in = qudaState.init.buffer_field(0, src);
-  void *out = qudaState.init.buffer_field(1, dst);
+  void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, src);
+  void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 1, dst);
 
   qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, src, in);
   WITH_COMM(MatQuda(static_cast<char *>(out), static_cast<char *>(in), param));
@@ -1834,14 +1846,14 @@ void openQCD_qudaSolverPrintSetup(int id)
   }
 }
 
-double openQCD_qudaInvert(int id, spinor_dble* source, spinor_dble* solution, int *status)
+double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status)
 {
   double residual;
   openQCD_qudaInvertMultiSrc(id, &source, &solution, status, &residual);
   return residual;
 }
 
-void openQCD_qudaInvertMultiSrc(int id, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual)
+void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual)
 {
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
@@ -1866,8 +1878,8 @@ void openQCD_qudaInvertMultiSrc(int id, spinor_dble** sources, spinor_dble** sol
   void **h_solutions = (void**) malloc(param->num_src*sizeof(void*));
 
   for (int i = 0; i < param->num_src; ++i) {
-    h_sources[i] = qudaState.init.buffer_field(i, sources[i]);
-    h_solutions[i] = qudaState.init.buffer_field(i+param->num_src, solutions[i]);
+    h_sources[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i, sources[i]);
+    h_solutions[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i+param->num_src, solutions[i]);
     qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, sources[i], h_sources[i]);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solutions[i], h_solutions[i]);
@@ -1909,6 +1921,13 @@ static void *openQCD_qudaInvertAsyncWrapper(void*)
   /* enable the thread to use QUDA */
   WITH_COMM(device::init_thread());
 
+  /* split the world_comm communicator, then signal the main threads to continue */
+  pthread_mutex_lock(&qudaState.thread.mutex);
+  MPI_Comm_split(qudaState.layout.world_comm, 0, 0, &qudaState.thread.worker_comm);
+  qudaState.thread.ready = true;
+  pthread_cond_signal(&qudaState.thread.cond);
+  pthread_mutex_unlock(&qudaState.thread.mutex);
+
   int Ns = qudaState.async_params.num_src;  /* num sources */
   int Nd = qudaState.inv_args.size();       /* num dispatched */
   int Nc = Nd > Ns ? ((Ns+Nd-1)/Ns) : 1;    /* num calls */
@@ -1921,8 +1940,8 @@ static void *openQCD_qudaInvertAsyncWrapper(void*)
 
     for (int s = 0; s < qudaState.async_params.num_src; ++s) {
       int i = c*Ns + s;
-      h_sources[s] = qudaState.init.buffer_field(s, qudaState.inv_args[i].source);
-      h_solutions[s] = qudaState.init.buffer_field(s+qudaState.async_params.num_src, qudaState.inv_args[i].solution);
+      h_sources[s] = qudaState.init.buffer_field(qudaState.thread.worker_comm, s, qudaState.inv_args[i].source);
+      h_solutions[s] = qudaState.init.buffer_field(qudaState.thread.worker_comm, s+qudaState.async_params.num_src, qudaState.inv_args[i].solution);
       qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, qudaState.inv_args[i].source, h_sources[s]);
       if (qudaState.async_params.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, qudaState.inv_args[i].solution, h_solutions[s]);
@@ -1954,12 +1973,14 @@ static void *openQCD_qudaInvertAsyncWrapper(void*)
       WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_hq[%d] = %.2e\n", s, qudaState.async_params.true_res_hq[s]));
       WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]      = %d\n", s, *(qudaState.inv_args[i].status)));
 
-      MPI_Bcast(qudaState.inv_args[i].status, 1, MPI_INT, 0, qudaState.layout.world_comm);
-      MPI_Bcast((void *)&qudaState.inv_args[i].retval, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+      MPI_Bcast(qudaState.inv_args[i].status, 1, MPI_INT, 0, qudaState.thread.worker_comm);
+      MPI_Bcast((void *)&qudaState.inv_args[i].retval, 1, MPI_DOUBLE, 0, qudaState.thread.worker_comm);
     }
   }
   free(h_sources);
   free(h_solutions);
+  MPI_Comm_free(&qudaState.thread.worker_comm);
+
   return nullptr;
 }
 
@@ -2010,15 +2031,23 @@ MPI_Comm openQCD_qudaInvertAsyncStart(void)
   if (qudaState.thread.created == true)
     WITH_COMM(errorQuda("Thread already created"));
 
+  MPI_Comm_split(qudaState.layout.world_comm, 1, 0, &qudaState.thread.main_comm);
+
   int rc = pthread_create(&qudaState.thread.thread, nullptr, openQCD_qudaInvertAsyncWrapper, nullptr);
   if (rc != 0) {
     perror("Error in openQCD_qudaInvertStart");
     WITH_COMM(errorQuda("pthread_create failed"));
   }
 
+  /* wait for the worker threads to split the world_comm communicator properly */
+  pthread_mutex_lock(&qudaState.thread.mutex);
+  while (!qudaState.thread.ready) {
+    pthread_cond_wait(&qudaState.thread.cond, &qudaState.thread.mutex);
+  }
+  pthread_mutex_unlock(&qudaState.thread.mutex);
+
   qudaState.thread.created = true;
-  MPI_Comm_dup(qudaState.layout.world_comm, &qudaState.thread.comm);
-  return qudaState.thread.comm;
+  return qudaState.thread.main_comm;
 }
 
 void openQCD_qudaInvertAsyncWait(double *residual)
@@ -2033,7 +2062,15 @@ void openQCD_qudaInvertAsyncWait(double *residual)
     perror("Error in openQCD_qudaInvertWait");
     WITH_COMM(errorQuda("pthread_join failed"));
   }
+
+  /* reset the thread state properly */
+  MPI_Comm_free(&qudaState.thread.main_comm);
   qudaState.thread.created = false;
+  qudaState.thread.ready = false;
+  qudaState.thread.cond = PTHREAD_COND_INITIALIZER;
+  qudaState.thread.mutex = PTHREAD_MUTEX_INITIALIZER;
+  qudaState.thread.worker_comm = MPI_COMM_NULL;
+  qudaState.thread.main_comm = MPI_COMM_NULL;
 
   if (residual != nullptr) {
     int i = 0;
@@ -2043,7 +2080,6 @@ void openQCD_qudaInvertAsyncWait(double *residual)
     }
   }
 
-  MPI_Comm_free(&qudaState.thread.comm);
   qudaState.inv_args.clear();
 }
 
@@ -2207,7 +2243,7 @@ void openQCD_qudaEigensolve(int id, int solver_id, void **h_evecs, void *h_evals
   int N = eig_param->n_conv*(eig_param->compute_svd ? 2 : 1);
   void **evecs = (void**) malloc(N*sizeof(void*));
   for (int i = 0; i < N; ++i) {
-    evecs[i] = qudaState.init.buffer_field(i, h_evecs[i]);
+    evecs[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i, h_evecs[i]);
     qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, h_evecs[i], evecs[i]);
   }
 
@@ -2242,3 +2278,13 @@ void openQCD_qudaEigensolverDestroy(int id)
     qudaState.eig_handles[id] = nullptr;
   }
 }
+
+bool openQCD_qudaQCDPlusQEDEnabled(void) {
+#ifdef BUILD_QCD_PLUS_QED
+  return true;
+#else
+  return false;
+#endif
+}
+
+#undef WITH_COMM

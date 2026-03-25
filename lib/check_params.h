@@ -111,11 +111,13 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(staggered_phase_applied, 0);
   P(i_mu, 0.0);
   P(overlap, 0);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_TRUE);
 #else
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
   P(staggered_phase_applied, INVALID_INT);
   P(i_mu, INVALID_DOUBLE);
   P(overlap, INVALID_INT);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_FALSE);
 #endif
 
 #if defined INIT_PARAM
@@ -761,11 +763,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-#ifdef NVSHMEM_COMMS
-  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
-#else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
-#endif
 #else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
 #endif
@@ -1112,6 +1110,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #ifdef INIT_PARAM
   P(su_project, QUDA_BOOLEAN_FALSE);
   P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_rectangle, QUDA_BOOLEAN_FALSE);
   P(compute_polyakov_loop, QUDA_BOOLEAN_FALSE);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_FALSE);
   P(traces, nullptr);
@@ -1128,6 +1127,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #else
   P(su_project, QUDA_BOOLEAN_INVALID);
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_rectangle, QUDA_BOOLEAN_INVALID);
   P(compute_polyakov_loop, QUDA_BOOLEAN_INVALID);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_INVALID);
   if (param->compute_gauge_loop_trace == QUDA_BOOLEAN_TRUE) {
@@ -1161,6 +1161,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
 #if defined CHECK_PARAM
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
     errorQuda("Unexpected QudaGaugeSmearParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+
 #else
   P(struct_size, (size_t)INVALID_INT);
 #endif
@@ -1173,7 +1174,11 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, 0.0);
   P(rho, 0.0);
   P(epsilon, 0.0);
+  P(smear_anisotropy, 1.0);
+  P(rk_order, 3);
   P(restart, QUDA_BOOLEAN_FALSE);
+  P(adj_n_save, 5);
+  P(hier_threshold, 6);
   P(t0, 0.0);
   P(alpha1, 0.0);
   P(alpha2, 0.0);
@@ -1185,7 +1190,11 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, INVALID_DOUBLE);
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
+  P(smear_anisotropy, INVALID_DOUBLE);
+  P(rk_order, (unsigned int)INVALID_INT);
   P(restart, QUDA_BOOLEAN_INVALID);
+  P(adj_n_save, (unsigned int)INVALID_INT);
+  P(hier_threshold, (unsigned int)INVALID_INT);
   P(t0, INVALID_DOUBLE);
   P(alpha1, INVALID_DOUBLE);
   P(alpha2, INVALID_DOUBLE);

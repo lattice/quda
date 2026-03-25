@@ -11,7 +11,6 @@ namespace quda
     GaugeField &f;
     const GaugeField &u;
     unsigned int minThreads() const { return f.VolumeCB(); }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     Fmunu(const GaugeField &u, GaugeField &f) :

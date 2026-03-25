@@ -10,6 +10,7 @@
 
 #include "clover_force_reference.h"
 #include "host_utils.h"
+#include "momentum_utils.h"
 #include "index_utils.hpp"
 #include "misc.h"
 #include "dslash_reference.h"
@@ -789,7 +790,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
 
   quda::GaugeFieldParam gparam(gauge_param, oprod, QUDA_GENERAL_LINKS);
   gparam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gparam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gparam.order = QUDA_NATIVE_GAUGE_ORDER;
   gparam.geometry = QUDA_TENSOR_GEOMETRY;
   auto oprod_ex = quda::createExtendedGauge(quda::GaugeField(gparam), R);
 

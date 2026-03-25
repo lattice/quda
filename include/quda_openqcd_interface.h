@@ -1,7 +1,7 @@
 #pragma once
 
-#include "mpi.h"
-#include "pthread.h"
+#include <mpi.h>
+#include <pthread.h>
 
 #define OPENQCD_MAX_INVERTERS 32
 #define OPENQCD_MAX_EIGENSOLVERS 32
@@ -60,37 +60,29 @@ extern "C" {
 #endif
 
 /**
- * OpenQCD inmitations of structs.
- * Copied from flags.h, su3.h
- * #############################################
+ * #############################################################################
+ * OpenQCD immitations of structs as documented in main/README.global (see
+ * openQCD or openQxD official repositories). These structs have the same
+ * members as the ones from openQCD and are (mostly) alignment compatible, but
+ * they don't *have* to be.
+ * #############################################################################
  */
-#ifndef FLAGS_H
 typedef struct {
-  int type;
-  int cstar;
-  double phi3[2][3];
-  double phi1[2];
-} bc_parms_t;
+  int type, cstar;
+  double phi3[2][3], phi1[2];
+} openQCD_bc_parms_t;
 
 typedef struct {
   int qhat;
   double m0, su3csw, u1csw, cF[2], theta[3];
   double mu;     /* mu: twisted mass */
-} dirac_parms_t;
+} openQCD_dirac_parms_t;
 
 typedef struct {
-  int gauge;
-  int nfl;
-} flds_parms_t;
-#endif
-
-#ifndef SU3_H
-typedef struct {
-  double x[24];
-} spinor_dble;
-#endif
+  int gauge, nfl;
+} openQCD_flds_parms_t;
 /**
- * #############################################
+ * #############################################################################
  */
 
 typedef enum OpenQCDGaugeGroup_s {
@@ -128,9 +120,9 @@ typedef struct {
                                                 data[5+lex(ix,iy,iz,it)] returns rank number in
                                                 openQCD, where lex stands for lexicographical
                                                 indexing (in QUDA order (xyzt)) */
-  bc_parms_t (*bc_parms)(void);             /** @see bc_parms() */
-  flds_parms_t (*flds_parms)(void);         /** @see flds_parms() */
-  dirac_parms_t (*dirac_parms)(void);       /** @see dirac_parms() */
+  openQCD_bc_parms_t (*bc_parms)(void);       /** @see bc_parms() */
+  openQCD_flds_parms_t (*flds_parms)(void);   /** @see flds_parms() */
+  openQCD_dirac_parms_t (*dirac_parms)(void); /** @see dirac_parms() */
   void *(*h_gauge)(void);                   /** function to return a pointer to the gauge field */
   void *(*h_sw)(void);                      /** function to return a pointer to the updated Clover field */
   int (*openqcd2quda)(OpenQCDFieldType type, void *in, void *out);        /** spinor gather function */
@@ -148,7 +140,7 @@ typedef struct {
   int volume;              /** VOLUME */
   int bndry;               /** BNDRY */
   int two_grids_equal;     /** Whether the QUDA and the openqxd process grids are equal or not */
-  void *(*buffer_field)(int idx, void *field);        /** obtain buffer field */
+  void *(*buffer_field)(MPI_Comm comm, int idx, void *field);        /** obtain buffer field */
 } openQCD_QudaInitArgs_t;
 
 
@@ -354,7 +346,7 @@ void openQCD_qudaSolverPrintSetup(int id);
  *
  * @return     Residual
  */
-double openQCD_qudaInvert(int id, spinor_dble* source, spinor_dble* solution, int *status);
+double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status);
 
 
 /**
@@ -375,7 +367,7 @@ double openQCD_qudaInvert(int id, spinor_dble* source, spinor_dble* solution, in
  *                        that the inversion failed.
  * @param      residual   The num_src residuals
  */
-void openQCD_qudaInvertMultiSrc(int id, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual);
+void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual);
 
 /**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
@@ -463,6 +455,11 @@ void openQCD_qudaEigensolve(int id, int solver_id, void **h_evecs, void *h_evals
  * @param[in]  id    The section id of the eigensolver
  */
 void openQCD_qudaEigensolverDestroy(int id);
+
+/**
+ * @brief      Whether QUDA was built with QCD+QED or not.
+ */
+bool openQCD_qudaQCDPlusQEDEnabled(void);
 
 /**
  * @brief      Wrapper for the plaquette. We could call plaqQuda() directly in

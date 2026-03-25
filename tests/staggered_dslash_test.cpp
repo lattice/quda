@@ -16,6 +16,12 @@ protected:
     printfQuda("Grid partition info:     X  Y  Z  T\n");
     printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
                dimPartitioned(3));
+
+    if (dslash_test_wrapper.test_domain_decomposition) {
+      if (dd_red_black)
+        printfQuda("Testing DD Red Black with block: %d  %d  %d  %d\n", dd_block_size[0], dd_block_size[1],
+                   dd_block_size[2], dd_block_size[3]);
+    }
   }
 
 public:
@@ -45,17 +51,15 @@ TEST_F(StaggeredDslashTest, verify)
 {
   if (!verify_results) GTEST_SKIP();
 
-  dslash_test_wrapper.staggeredDslashRef();
+  if (!dslash_test_wrapper.test_domain_decomposition) dslash_test_wrapper.staggeredDslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
 
-  // give it a tiny bump for fixed precision, recon 8
-  if (dslash_test_wrapper.inv_param.cuda_prec <= QUDA_HALF_PRECISION
-      && dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9)
-    tol *= 1.1;
-
+  ASSERT_FALSE(std::isnan(deviation)) << "Nan has propagated into the result";
+  tol = checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec,
+                                     dslash_test_wrapper.gauge_param.reconstruct);
   ASSERT_LE(deviation, tol) << "reference and QUDA implementations do not agree";
 }
 
@@ -70,6 +74,7 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  add_dd_option_group(app);
   add_comms_option_group(app);
 
   try {

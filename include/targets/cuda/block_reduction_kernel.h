@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <constant_kernel_arg.h>
 #include <kernel_helper.h>
 #include <block_reduce_helper.h>
 
@@ -81,6 +82,9 @@ namespace quda
   template <template <typename> class Functor, typename Arg>
   __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
+#ifdef QUDA_SHARED_MEMORY_SPILL
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
+#endif
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, blockIdx.z);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
     auto j = blockDim.y * blockIdx.y + threadIdx.y;

@@ -2,17 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <quda.h>
+#include <instantiate.h>
+#include <color_spinor_field.h> // convenient quark field container
+#include <clover_field.h>
+#include <gauge_field.h>
+#include <gtest/gtest.h>
+
+#include "command_line_params.h"
+#include "gauge_utils.h"
+#include "host_utils.h"
+#include "momentum_utils.h"
 #include "clover_force_reference.h"
 #include "misc.h"
 #include "test.h"
-#include <color_spinor_field.h> // convenient quark field container
-#include <clover_field.h>
-#include <command_line_params.h>
-#include <gauge_field.h>
-#include <host_utils.h>
-#include <quda.h>
-#include <instantiate.h>
-#include <gtest/gtest.h>
 
 static int force_check;
 static double force_deviation;
@@ -156,7 +159,7 @@ std::tuple<int, double> clover_force_test(test_t param)
   logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
   auto action_quda = momActionQuda(mom.data(), &gauge_param);
-  auto action_ref = mom_action(mom_ref.data(), gauge_param.cpu_prec, 4 * V);
+  auto action_ref = momentumActionCPU(mom_ref.data(), 4 * V, gauge_param.cpu_prec);
   force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
   logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
           force_deviation);

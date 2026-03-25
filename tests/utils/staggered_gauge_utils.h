@@ -1,14 +1,15 @@
 #pragma once
 #include <quda_internal.h>
-#include "color_spinor_field.h"
+#include <color_spinor_field.h>
 
 extern int Z[4];
 extern int Vh;
 extern int V;
 
-using namespace quda;
-
 void setDims(int *);
+
+void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu);
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,

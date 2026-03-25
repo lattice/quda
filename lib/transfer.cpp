@@ -31,7 +31,6 @@ namespace quda {
     nspin_fine(B[0].Nspin()),
     site_subset(QUDA_FULL_SITE_SUBSET),
     parity(QUDA_INVALID_PARITY),
-    use_gpu(true),
     transfer_type(transfer_type)
   {
     postTrace();
@@ -95,17 +94,14 @@ namespace quda {
       if (Nvec != 24) errorQuda("Invalid number of coarse vectors %d for staggered KD multigrid, must be 24", Nvec);
     }
 
-    createV(B[0].Location());              // allocate V field
-    createTmp();                           // allocate temporaries (needed for geomap creation)
+    createV(); // allocate V field
 
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
     fine_to_coarse_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
     coarse_to_fine_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
 
-    if (enable_gpu) {
-      fine_to_coarse_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
-      coarse_to_fine_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
-    }
+    fine_to_coarse_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
+    coarse_to_fine_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
 
     createGeoMap(geo_bs);
 
@@ -118,7 +114,7 @@ namespace quda {
     postTrace();
   }
 
-  void Transfer::createV(QudaFieldLocation location) const
+  void Transfer::createV() const
   {
     postTrace();
 
@@ -138,10 +134,9 @@ namespace quda {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
-    param.location = location;
-    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? colorspinor::getNative(null_precision, param.nSpin) :
-                                                              QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision());
+    param.fieldOrder
+      = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.setPrecision(B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
         || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
@@ -150,60 +145,8 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
     }
 
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      V_d = ColorSpinorField(param);
-      enable_gpu = true;
-    } else {
-      V_h = ColorSpinorField(param);
-      enable_cpu = true;
-    }
+    V = ColorSpinorField(param);
     postTrace();
-  }
-
-  void Transfer::createTmp() const
-  {
-    // The CPU temporaries are needed for creating geometry mappings.
-    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) return;
-
-    if (!fine_tmp_h.empty()) return;
-
-    postTrace();
-    ColorSpinorParam param(B[0]);
-    param.create = QUDA_NULL_FIELD_CREATE;
-    param.location = QUDA_CPU_FIELD_LOCATION;
-    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
-
-    fine_tmp_h = ColorSpinorParam(param);
-    coarse_tmp_h = fine_tmp_h.create_coarse(geo_bs, spin_bs, Nvec);
-
-    postTrace();
-  }
-
-  void Transfer::initializeLazy(QudaFieldLocation location) const
-  {
-    if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
-
-    createTmp();
-
-    switch (location) {
-    case QUDA_CUDA_FIELD_LOCATION:
-      if (enable_gpu) return;
-      createV(location);
-      if (transfer_type == QUDA_TRANSFER_AGGREGATE) V_d = V_h;
-      fine_to_coarse_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
-      coarse_to_fine_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0].Volume() * sizeof(int), qudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0].Volume() * sizeof(int), qudaMemcpyHostToDevice);
-      break;
-    case QUDA_CPU_FIELD_LOCATION:
-      if (enable_cpu) return;
-      createV(location);
-      if (transfer_type == QUDA_TRANSFER_AGGREGATE) V_h = V_d;
-      break;
-    default:
-      errorQuda("Unknown location %d", location);
-    }
   }
 
   void Transfer::reset()
@@ -216,22 +159,7 @@ namespace quda {
     }
     logQuda(QUDA_VERBOSE, "Transfer: block orthogonalizing\n");
 
-    if (B[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("enable_gpu = %d so cannot reset", enable_gpu);
-      BlockOrthogonalize(V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
-      if (enable_cpu) {
-        V_h = V_d;
-        logQuda(QUDA_VERBOSE, "Transferred prolongator back to CPU\n");
-      }
-    } else {
-      if (!enable_cpu) errorQuda("enable_cpu = %d so cannot reset", enable_cpu);
-      BlockOrthogonalize(V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
-      if (enable_gpu) { // if the GPU fields has been initialized then we need to update
-        V_d = V_h;
-        logQuda(QUDA_VERBOSE, "Transferred prolongator to GPU\n");
-      }
-    }
-
+    BlockOrthogonalize(V, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
     postTrace();
   }
 
@@ -270,12 +198,18 @@ namespace quda {
   };
 
   // compute the fine-to-coarse site map
-  void Transfer::createGeoMap(int *geo_bs) {
-
+  void Transfer::createGeoMap(int *geo_bs)
+  {
     int x[QUDA_MAX_DIM];
 
-    ColorSpinorField &fine(fine_tmp_h);
-    ColorSpinorField &coarse(coarse_tmp_h);
+    ColorSpinorParam param(B[0]);
+    param.create = QUDA_NULL_FIELD_CREATE;
+    param.location = QUDA_CPU_FIELD_LOCATION;
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
+
+    ColorSpinorField fine = ColorSpinorParam(param);
+    ColorSpinorField coarse = fine.create_coarse(geo_bs, spin_bs, Nvec);
 
     // compute the coarse grid point for every site (assuming parity ordering currently)
     for (size_t i = 0; i < fine.Volume(); i++) {
@@ -302,11 +236,8 @@ namespace quda {
     std::sort(geo_sort.begin(), geo_sort.end());
     for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine_h[i] = geo_sort[i].y;
 
-    if (enable_gpu) {
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0].Volume() * sizeof(int), qudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0].Volume() * sizeof(int), qudaMemcpyHostToDevice);
-    }
-
+    qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0].Volume() * sizeof(int), qudaMemcpyHostToDevice);
+    qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0].Volume() * sizeof(int), qudaMemcpyHostToDevice);
   }
 
   // compute the fine spin and checkerboard to coarse spin map
@@ -325,27 +256,13 @@ namespace quda {
     }
   }
 
-  void Transfer::createTmp(std::vector<ColorSpinorField> &tmp, QudaFieldLocation new_location, ColorSpinorField &a) const
-  {
-    ColorSpinorParam param(a);
-    param.location = QUDA_CUDA_FIELD_LOCATION;
-    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER; // set to CPU order and override below if needed
-    param.setPrecision(param.Precision(), param.Precision(), new_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
-    // ideally we'd want to be able to have tmp[0] on the temp stack as well
-    tmp[0] = ColorSpinorParam(param);
-    for (auto i = 1u; i < tmp.size(); i++) tmp[i] = getFieldTmp(tmp[0]);
-  }
-
   // apply the prolongator
   void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
 
-    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
-    const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
-
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
-      StaggeredProlongate(out, in, fine_to_coarse, spin_map, parity);
+      StaggeredProlongate(out, in, fine_to_coarse_d, spin_map, parity);
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
       if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
@@ -360,49 +277,10 @@ namespace quda {
 
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
-      std::vector<ColorSpinorField> input(in.size());
-      std::vector<ColorSpinorField> output(out.size());
-      const ColorSpinorField &V = use_gpu ? V_d : V_h;
-
-      if (use_gpu) {
-
-        // set input fields
-        if (in[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          createTmp(input, QUDA_CUDA_FIELD_LOCATION, coarse_tmp_h);
-        } else {
-          for (auto i = 0u; i < in.size(); i++) input[i] = const_cast<ColorSpinorField&>(in[i]).create_alias();
-        }
-
-        // set output fields
-        if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          createTmp(output, QUDA_CUDA_FIELD_LOCATION, fine_tmp_h);
-        } else {
-          for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
-        }
-        if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
-
-      } else {
-
-        // set input fields
-        for (auto i = 0u; i < in.size(); i++) input[i] = const_cast<ColorSpinorField&>(in[i]).create_alias();
-
-        // set output fields
-        if (out[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
-          createTmp(output, QUDA_CPU_FIELD_LOCATION, fine_tmp_h);
-        } else {
-          for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
-        }
-
-      }
-
-      for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically)
-
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      Prolongate(output, input, V, fine_to_coarse, spin_map, _use_mma, parity);
-
-      for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
+      Prolongate(out, in, V, fine_to_coarse_d, spin_map, _use_mma, parity);
     } else {
       errorQuda("Invalid transfer type in prolongate");
     }
@@ -416,12 +294,8 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
 
-    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
-    const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
-    const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
-
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
-      StaggeredRestrict(out, in, fine_to_coarse, spin_map, parity);
+      StaggeredRestrict(out, in, fine_to_coarse_d, spin_map, parity);
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
       if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
@@ -437,47 +311,10 @@ namespace quda {
 
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
-      std::vector<ColorSpinorField> input(in.size());
-      std::vector<ColorSpinorField> output(out.size());
-      const ColorSpinorField &V = use_gpu ? V_d : V_h;
-
-      if (use_gpu) {
-
-        // set input fields
-        if (in[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          createTmp(input, QUDA_CUDA_FIELD_LOCATION, fine_tmp_h);
-        } else {
-          for (auto i = 0u; i < out.size(); i++) input[i] = const_cast<ColorSpinorField &>(in[i]).create_alias();
-        }
-
-        // set output fields
-        if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          createTmp(output, QUDA_CUDA_FIELD_LOCATION, coarse_tmp_h);
-        } else {
-          for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
-        }
-        if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
-      } else {
-
-        // set input fields
-        if (in[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
-          createTmp(input, QUDA_CPU_FIELD_LOCATION, coarse_tmp_h);
-        } else {
-          for (auto i = 0u; i < in.size(); i++) input[i] = const_cast<ColorSpinorField &>(in[i]).create_alias();
-        }
-
-        // set output fields
-        for (auto i = 0u; i < out.size(); i++) output[i] = const_cast<ColorSpinorField&>(out[i]).create_alias();
-      }
-
-      for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically) FIXME - maybe not?
-
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      Restrict(output, input, V, fine_to_coarse, coarse_to_fine, spin_map, _use_mma, parity);
-
-      for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
+      Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
 
     } else {
       errorQuda("Invalid transfer type in restrict");

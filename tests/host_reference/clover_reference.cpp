@@ -3,54 +3,61 @@
 #include <math.h>
 #include <complex>
 
-#include <util_quda.h>
-#include <host_utils.h>
-#include <wilson_dslash_reference.h>
+#include "util_quda.h"
+#include "host_utils.h"
+#include "wilson_dslash_reference.h"
+#include "instantiate_host.hpp"
 
 /**
- * @brief Apply the clover matrix field
- * @tparam real_t The floating-point type used for the vectors
+ * @brief Apply the clover matrix field to a spinor field
+ * @tparam real_t The floating-point type used for the computation
  * @param[out] out Result field (single parity)
  * @param[in] clover Clover-matrix field (full field)
  * @param[in] in Input field (single parity)
  * @param[in] parity Parity to which we are applying the clover field
  */
-template <typename real_t> void cloverReference(real_t *out, const real_t *clover, const real_t *in, int parity)
-{
-  using complex = std::complex<real_t>;
-  int nSpin = 4;
-  int nColor = 3;
-  int N = nColor * nSpin / 2;
-  int chiralBlock = N + 2 * (N - 1) * N / 2;
+template <typename real_t> struct CloverReference {
+  void operator()(void *out_, const void *clover_, const void *in_, int parity)
+  {
+    using complex = std::complex<real_t>;
+    auto out = reinterpret_cast<complex *>(out_);
+    auto clover = reinterpret_cast<const real_t *>(clover_);
+    auto in = reinterpret_cast<const complex *>(in_);
+
+    int nSpin = 4;
+    int nColor = 3;
+    int N = nColor * nSpin / 2;
+    int chiralBlock = N + 2 * (N - 1) * N / 2;
 
 #pragma omp parallel for
-  for (int i = 0; i < Vh; i++) {
-    const complex *In = reinterpret_cast<const complex *>(&in[i * nSpin * nColor * 2]);
-    complex *Out = reinterpret_cast<complex *>(&out[i * nSpin * nColor * 2]);
+    for (int i = 0; i < Vh; i++) {
+      auto In = reinterpret_cast<const complex *>(&in[i * nSpin * nColor]);
+      auto Out = reinterpret_cast<complex *>(&out[i * nSpin * nColor]);
 
-    for (int chi = 0; chi < nSpin / 2; chi++) {
-      const real_t *D = &clover[((parity * Vh + i) * 2 + chi) * chiralBlock];
-      const complex *L = reinterpret_cast<const complex *>(&D[N]);
+      for (int chi = 0; chi < nSpin / 2; chi++) {
+        auto D = &clover[((parity * Vh + i) * 2 + chi) * chiralBlock];
+        auto L = reinterpret_cast<const complex *>(&D[N]);
 
-      for (int s_col = 0; s_col < nSpin / 2; s_col++) { // 2 spins per chiral block
-        for (int c_col = 0; c_col < nColor; c_col++) {
-          const int col = s_col * nColor + c_col;
-          const int Col = chi * N + col;
-          Out[Col] = 0.0;
+        for (int s_col = 0; s_col < nSpin / 2; s_col++) { // 2 spins per chiral block
+          for (int c_col = 0; c_col < nColor; c_col++) {
+            const int col = s_col * nColor + c_col;
+            const int Col = chi * N + col;
+            Out[Col] = 0.0;
 
-          for (int s_row = 0; s_row < nSpin / 2; s_row++) { // 2 spins per chiral block
-            for (int c_row = 0; c_row < nColor; c_row++) {
-              const int row = s_row * nColor + c_row;
-              const int Row = chi * N + row;
+            for (int s_row = 0; s_row < nSpin / 2; s_row++) { // 2 spins per chiral block
+              for (int c_row = 0; c_row < nColor; c_row++) {
+                const int row = s_row * nColor + c_row;
+                const int Row = chi * N + row;
 
-              if (row == col) {
-                Out[Col] += D[row] * In[Row];
-              } else if (col < row) {
-                int k = N * (N - 1) / 2 - (N - col) * (N - col - 1) / 2 + row - col - 1;
-                Out[Col] += conj(L[k]) * In[Row];
-              } else if (row < col) {
-                int k = N * (N - 1) / 2 - (N - row) * (N - row - 1) / 2 + col - row - 1;
-                Out[Col] += L[k] * In[Row];
+                if (row == col) {
+                  Out[Col] += D[row] * In[Row];
+                } else if (col < row) {
+                  int k = N * (N - 1) / 2 - (N - col) * (N - col - 1) / 2 + row - col - 1;
+                  Out[Col] += conj(L[k]) * In[Row];
+                } else if (row < col) {
+                  int k = N * (N - 1) / 2 - (N - row) * (N - row - 1) / 2 + col - row - 1;
+                  Out[Col] += L[k] * In[Row];
+                }
               }
             }
           }
@@ -58,22 +65,11 @@ template <typename real_t> void cloverReference(real_t *out, const real_t *clove
       }
     }
   }
-}
+};
 
 void apply_clover(void *out, const void *clover, const void *in, int parity, QudaPrecision precision)
 {
-
-  switch (precision) {
-  case QUDA_DOUBLE_PRECISION:
-    cloverReference(static_cast<double *>(out), static_cast<const double *>(clover), static_cast<const double *>(in),
-                    parity);
-    break;
-  case QUDA_SINGLE_PRECISION:
-    cloverReference(static_cast<float *>(out), static_cast<const float *>(clover), static_cast<const float *>(in),
-                    parity);
-    break;
-  default: errorQuda("Unsupported precision %d", precision);
-  }
+  instantiate_host<CloverReference>(precision, out, clover, in, parity);
 }
 
 void clover_dslash(void *out, const void *const *gauge, const void *clover, const void *in, int parity, int dagger,
