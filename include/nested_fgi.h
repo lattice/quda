@@ -1,0 +1,216 @@
+#pragma once
+
+#include <vector>
+#include <color_spinor_field.h>
+#include <gauge_field.h>
+#include <eigensolve_quda.h>
+#include <multigrid.h>
+#include <transfer.h>
+#include <dirac_quda.h>
+#include <quda.h>
+
+namespace quda
+{
+
+  /**
+   * @brief Manages coarse-grid eigenvectors for deflation-based force splitting.
+   *
+   * Supports three refresh tiers:
+   *   Tier 1 (rayleighRitzUpdate): Re-diagonalize in the current eigenvector subspace.
+   *     Cost: n_defl coarse matvecs (~free).
+   *   Tier 2 (maybeRefresh): Periodic Galerkin rebuild + RR evolution within a trajectory.
+   *     Cost: k fine matvecs per refresh (k = number of MG null vectors).
+   *   Tier 3 (solve): Full TRLM re-eigensolve on the coarse operator.
+   */
+  class CoarseDeflationManager {
+  private:
+    std::vector<ColorSpinorField> coarseEvecs;
+    std::vector<Complex> coarseEvals;
+
+    const DiracMatrix *matCoarse;
+    const Transfer *transfer;
+
+    int nDefl;
+    int refreshInterval;
+    int stepCounter;
+
+    QudaEigParam eigParam;
+
+    /** Workspace for RR update */
+    std::vector<ColorSpinorField> workVecs;
+
+  public:
+    /**
+     * @brief Construct the deflation manager.
+     * @param transfer   Transfer operator (restrict/prolong) from MG level
+     * @param matCoarse  Coarse Dirac matrix wrapper from MG
+     * @param nDefl      Number of deflation eigenvectors
+     * @param eigTol     TRLM convergence tolerance
+     * @param nKr        Krylov space size (default 3*nDefl)
+     * @param maxRestarts TRLM max restarts
+     * @param refreshInterval Inner steps between Tier 2 refresh (0 = frozen)
+     */
+    CoarseDeflationManager(const Transfer &transfer, const DiracMatrix &matCoarse, int nDefl, double eigTol,
+                           int nKr = 0, int maxRestarts = 100, int refreshInterval = 0);
+
+    ~CoarseDeflationManager() = default;
+
+    /** @brief Tier 3: Run full TRLM eigensolver on the coarse operator */
+    void solve();
+
+    /** @brief Tier 1: Rayleigh-Ritz re-diagonalization (cheap, between trajectories) */
+    void rayleighRitzUpdate();
+
+    /** @brief Tier 2: Check step counter and refresh if due */
+    void maybeRefresh();
+
+    /** @brief Increment the inner-step counter */
+    void step() { stepCounter++; }
+
+    /** @brief Reset the step counter (e.g., at start of trajectory) */
+    void resetCounter() { stepCounter = 0; }
+
+    const std::vector<ColorSpinorField> &getEvecs() const { return coarseEvecs; }
+    const std::vector<Complex> &getEvals() const { return coarseEvals; }
+    const Transfer &getTransfer() const { return *transfer; }
+    int getNDefl() const { return nDefl; }
+  };
+
+  /**
+   * @brief Computes the cheap "inner" fermion force using coarse-grid deflation
+   *        projection plus optional MR smoothing.
+   *
+   * Algorithm: restrict -> project onto coarse eigenvectors -> prolong -> [MR smooth] -> fermion force
+   */
+  class LowModeForce {
+  private:
+    CoarseDeflationManager &deflManager;
+
+    int nMRSmooth;
+    double mrOmega;
+
+    const DiracMatrix *matFine;
+
+    /** Workspace fields (allocated once, reused) */
+    ColorSpinorField coarseTmp;
+    ColorSpinorField coarseSol;
+    ColorSpinorField fineSol;
+
+  public:
+    /**
+     * @brief Construct the low-mode force calculator.
+     * @param deflManager  Coarse deflation manager (provides eigenvectors and transfer)
+     * @param matFine      Fine-grid normal operator (for MR smoothing)
+     * @param nMRSmooth    Number of MR smoothing iterations (0 = no smoothing)
+     * @param mrOmega      MR relaxation parameter
+     */
+    LowModeForce(CoarseDeflationManager &deflManager, const DiracMatrix &matFine, int nMRSmooth = 0,
+                 double mrOmega = 1.0);
+
+    ~LowModeForce() = default;
+
+    /**
+     * @brief Project source onto low modes and return the approximate solution.
+     * @param xLow  Output: low-mode approximate solution (fine-grid)
+     * @param src   Input: source vector (fine-grid, e.g. pseudofermion)
+     */
+    void projectLowModes(ColorSpinorField &xLow, const ColorSpinorField &src);
+
+    /**
+     * @brief Compute low-mode fermion force and accumulate into momentum.
+     *
+     * Calls projectLowModes, then the existing fermion force kernel
+     * (e.g. computeCloverForce) with the projected solution.
+     *
+     * @param mom        Momentum field (accumulated into)
+     * @param src        Source pseudofermion vector
+     * @param coeff      Step-size coefficient (dt)
+     * @param gauge      Current gauge field
+     * @param clover     Clover field (if Wilson-clover)
+     * @param gaugeParam Gauge metadata
+     * @param invParam   Inverter metadata
+     */
+    void computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &gauge,
+                      const CloverField *clover, QudaGaugeParam &gaugeParam, QudaInvertParam &invParam);
+  };
+
+  /**
+   * @brief Nested force-gradient integrator with coarse-grid deflation.
+   *
+   * Outer integrator: PQPQP_FGI (4th order), coefficients lambda=1/6, xi=1/72.
+   * Inner integrator: Leapfrog on cheap force (low-mode deflation + gauge force).
+   * Force-gradient step: Hessian-free via gauge save/restore using GaugeBundleBackup.
+   */
+  class NestedFGIIntegrator {
+  private:
+    CoarseDeflationManager deflManager;
+    LowModeForce lowModeForce;
+
+    double lambda;
+    double xi;
+    int nInnerSteps;
+
+    /** External references for gauge/momentum management */
+    GaugeField *&gaugePrecise;
+    GaugeField *&gaugeSloppy;
+    GaugeField *&gaugePrecondition;
+    GaugeField *&gaugeRefinement;
+    GaugeField *&gaugeEigensolver;
+    GaugeField *&gaugeExtended;
+    GaugeField &momResident;
+
+    /** MG preconditioner for outer (expensive) force */
+    void *mgPreconditioner;
+
+    /** Parameter structs */
+    QudaGaugeParam &gaugeParam;
+    QudaInvertParam &invParam;
+
+    /** @brief Compute the expensive outer force: full MG-prec solve minus low-mode */
+    void computeOuterForce(GaugeField &mom, double coeff, const ColorSpinorField &phi);
+
+    /** @brief Compute the cheap inner force: low-mode + gauge */
+    void computeInnerForce(GaugeField &mom, double coeff, const ColorSpinorField &phi);
+
+    /** @brief Perform inner leapfrog sub-integration for duration dt */
+    void innerLeapfrog(double dt, const ColorSpinorField &phi);
+
+    /** @brief Hessian-free force-gradient sub-step */
+    void forceGradientStep(double h, const ColorSpinorField &phi);
+
+  public:
+    /**
+     * @brief Construct the nested FGI integrator.
+     * @param hmcParam       HMC parameters (integrator config, deflation config, etc.)
+     * @param mg             MG hierarchy (provides Transfer + coarse operator)
+     * @param mgPrec         MG preconditioner instance (for outer force CG solves)
+     * @param gaugeParam     Gauge metadata
+     * @param invParam       Inverter parameters
+     * @param gaugePrecise   Reference to global precise gauge pointer
+     * @param gaugeSloppy    Reference to global sloppy gauge pointer
+     * @param gaugePrecondition Reference to global precondition gauge pointer
+     * @param gaugeRefinement   Reference to global refinement gauge pointer
+     * @param gaugeEigensolver  Reference to global eigensolver gauge pointer
+     * @param gaugeExtended     Reference to global extended gauge pointer
+     * @param momResident       Reference to global resident momentum
+     */
+    NestedFGIIntegrator(const QudaHMCParam &hmcParam, MG &mg, void *mgPrec, QudaGaugeParam &gaugeParam,
+                        QudaInvertParam &invParam, GaugeField *&gaugePrecise, GaugeField *&gaugeSloppy,
+                        GaugeField *&gaugePrecondition, GaugeField *&gaugeRefinement, GaugeField *&gaugeEigensolver,
+                        GaugeField *&gaugeExtended, GaugeField &momResident);
+
+    ~NestedFGIIntegrator() = default;
+
+    /**
+     * @brief Execute one full MD trajectory with the nested FGI scheme.
+     * @param tau     Trajectory length
+     * @param nSteps  Number of outer integration steps
+     * @param phi     Pseudofermion field
+     */
+    void trajectory(double tau, int nSteps, const ColorSpinorField &phi);
+
+    /** @brief Access the deflation manager (e.g. for inter-trajectory RR update) */
+    CoarseDeflationManager &getDeflationManager() { return deflManager; }
+  };
+
+} // namespace quda
