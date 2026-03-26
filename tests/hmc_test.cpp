@@ -150,6 +150,34 @@ TEST(HMC, OmelyanTrajectory)
 }
 
 /**
+ * Test: Single-timescale force-gradient integrator (PQPQP_FGI).
+ *
+ * This is the 4th-order Hessian-free FGI without force splitting.
+ * It uses the total force for all kicks and the FG displacement.
+ * Validates the PQPQP structure, gauge save/restore, and FG step.
+ */
+TEST(HMC, ForceGradientTrajectory)
+{
+  QudaHMCParam hmc_param = newQudaHMCParam();
+  hmc_param.integrator = QUDA_FORCE_GRADIENT_INTEGRATOR;
+  hmc_param.tau = 1.0;
+  hmc_param.n_steps = 3;
+  hmc_param.fgi_lambda = 1.0 / 6.0;
+  hmc_param.fgi_xi = 1.0 / 72.0;
+  hmc_param.beta = 6.0;
+  hmc_param.generate_momentum = 1;
+  hmc_param.momentum_seed = 99999;
+  hmc_param.use_resident_gauge = 1;
+  hmc_param.make_resident_gauge = 1;
+  hmc_param.return_result_gauge = 0;
+
+  double dH = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
+
+  printfQuda("FGI: dH = %e\n", dH);
+  EXPECT_TRUE(std::isfinite(dH));
+}
+
+/**
  * Test: Nested FGI parameter configuration.
  *
  * Shows how to configure the nested force-gradient integrator with

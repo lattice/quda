@@ -856,7 +856,9 @@ extern "C" {
     double fgi_xi;                    /**< PQPQP xi (default 1/72) */
 
     /** Inner integrator (nested FGI only) */
-    int n_inner_steps;                /**< Leapfrog sub-steps per inner half-step */
+    int n_inner_steps;                /**< Sub-steps per inner half-step */
+    QudaIntegratorType inner_integrator; /**< Inner sub-integrator type (leapfrog or Omelyan) */
+    double inner_omelyan_lambda;      /**< Omelyan lambda for inner integrator (default 0.1932) */
 
     /** Coarse deflation (nested FGI only) */
     int n_defl;                       /**< Number of coarse-grid deflation eigenvectors */

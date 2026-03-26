@@ -6,6 +6,7 @@
 #include <eigensolve_quda.h>
 #include <multigrid.h>
 #include <transfer.h>
+#include <clover_field.h>
 #include <dirac_quda.h>
 #include <quda.h>
 
@@ -150,9 +151,12 @@ namespace quda
 
     double lambda;
     double xi;
+    double beta;
     int nInnerSteps;
+    QudaIntegratorType innerIntegrator;
+    double innerOmelyanLambda;
 
-    /** External references for gauge/momentum management */
+    /** External references for gauge/momentum/clover management */
     GaugeField *&gaugePrecise;
     GaugeField *&gaugeSloppy;
     GaugeField *&gaugePrecondition;
@@ -160,6 +164,8 @@ namespace quda
     GaugeField *&gaugeEigensolver;
     GaugeField *&gaugeExtended;
     GaugeField &momResident;
+    CloverField *&cloverPrecise;
+    GaugeField *&extendedGaugeResident;
 
     /** MG preconditioner for outer (expensive) force */
     void *mgPreconditioner;
@@ -168,14 +174,31 @@ namespace quda
     QudaGaugeParam &gaugeParam;
     QudaInvertParam &invParam;
 
+    /** Wilson plaquette gauge force paths */
+    int **gaugePaths[4];
+    int gaugePathLength[6];
+    double gaugePathCoeff[6];
+
+    /** @brief Set up Wilson plaquette gauge force paths */
+    void setupGaugePaths();
+
+    /** @brief Free gauge force paths */
+    void freeGaugePaths();
+
+    /** @brief Perform gauge drift + clover rebuild */
+    void gaugeStep(double dt);
+
     /** @brief Compute the expensive outer force: full MG-prec solve minus low-mode */
-    void computeOuterForce(GaugeField &mom, double coeff, const ColorSpinorField &phi);
+    void computeOuterForce(double coeff, const ColorSpinorField &phi);
 
     /** @brief Compute the cheap inner force: low-mode + gauge */
-    void computeInnerForce(GaugeField &mom, double coeff, const ColorSpinorField &phi);
+    void computeInnerForce(double coeff, const ColorSpinorField &phi);
 
     /** @brief Perform inner leapfrog sub-integration for duration dt */
     void innerLeapfrog(double dt, const ColorSpinorField &phi);
+
+    /** @brief Perform inner Omelyan (PQPQP) sub-integration for duration dt */
+    void innerOmelyan(double dt, const ColorSpinorField &phi);
 
     /** @brief Hessian-free force-gradient sub-step */
     void forceGradientStep(double h, const ColorSpinorField &phi);
@@ -200,9 +223,10 @@ namespace quda
     NestedFGIIntegrator(const QudaHMCParam &hmcParam, MG &mg, const DiracMatrix &matFine, void *mgPrec,
                         QudaGaugeParam &gaugeParam, QudaInvertParam &invParam, GaugeField *&gaugePrecise,
                         GaugeField *&gaugeSloppy, GaugeField *&gaugePrecondition, GaugeField *&gaugeRefinement,
-                        GaugeField *&gaugeEigensolver, GaugeField *&gaugeExtended, GaugeField &momResident);
+                        GaugeField *&gaugeEigensolver, GaugeField *&gaugeExtended, GaugeField &momResident,
+                        CloverField *&cloverPrecise, GaugeField *&extendedGaugeResident);
 
-    ~NestedFGIIntegrator() = default;
+    ~NestedFGIIntegrator();
 
     /**
      * @brief Execute one full MD trajectory with the nested FGI scheme.

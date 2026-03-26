@@ -5019,6 +5019,8 @@ QudaHMCParam newQudaHMCParam(void)
 
   // Inner integrator
   param.n_inner_steps = 3;
+  param.inner_integrator = QUDA_LEAPFROG_INTEGRATOR;
+  param.inner_omelyan_lambda = 0.1932;
 
   // Coarse deflation
   param.n_defl = 32;
@@ -5375,9 +5377,65 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
     omelyanTrajectory(h, hmc_param->n_steps, hmc_param->omelyan_lambda, phi, hmc_param->beta, gauge_param, inv_param);
     break;
 
-  case QUDA_FORCE_GRADIENT_INTEGRATOR:
-    errorQuda("Single-timescale FGI not yet implemented -- use QUDA_NESTED_FGI_INTEGRATOR");
+  case QUDA_FORCE_GRADIENT_INTEGRATOR: {
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Force-gradient (PQPQP), tau=%e, n_steps=%d\n", hmc_param->tau,
+            hmc_param->n_steps);
+    double lam = hmc_param->fgi_lambda;
+    double xi_fgi = hmc_param->fgi_xi;
+
+    // Initial P(lambda*h)
+    computeTotalForceAndKick(lam * h, phi, hmc_param->beta, gauge_param, inv_param);
+
+    for (int step = 0; step < hmc_param->n_steps; step++) {
+      logQuda(QUDA_VERBOSE, "FGI step %d/%d\n", step + 1, hmc_param->n_steps);
+
+      // Q(h/2)
+      gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+
+      // Force-gradient sub-step: FG((1-2*lambda)*h, xi*h^3)
+      {
+        double one_m_2lam = 1.0 - 2.0 * lam;
+        double xi_h3 = xi_fgi * h * h * h;
+        double fgCoeff = xi_h3 / (one_m_2lam * h);
+
+        // Save gauge + momentum
+        GaugeField gaugeSaved(*gaugePrecise);
+        GaugeField momSaved(momResident);
+
+        // Zero momentum, compute force, kick with FG coefficient
+        momResident.zero();
+        computeTotalForceAndKick(fgCoeff, phi, hmc_param->beta, gauge_param, inv_param);
+
+        // Displace gauge: U' = exp(1.0 * mom) * U
+        GaugeFieldParam gfParam(*gaugePrecise);
+        gfParam.create = QUDA_NULL_FIELD_CREATE;
+        GaugeField u_out(gfParam);
+        updateGaugeField(u_out, 1.0, *gaugePrecise, momResident, false, true);
+        gaugePrecise->copy(u_out);
+        if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+        if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+          gaugePrecondition->copy(*gaugePrecise);
+
+        // Restore momentum, compute force at displaced gauge
+        momResident.copy(momSaved);
+        computeTotalForceAndKick(one_m_2lam * h, phi, hmc_param->beta, gauge_param, inv_param);
+
+        // Restore gauge
+        gaugePrecise->copy(gaugeSaved);
+        if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+        if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+          gaugePrecondition->copy(*gaugePrecise);
+      }
+
+      // Q(h/2)
+      gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+
+      // P(2*lambda*h) merged, or P(lambda*h) final
+      double kickDt = (step < hmc_param->n_steps - 1) ? 2.0 * lam * h : lam * h;
+      computeTotalForceAndKick(kickDt, phi, hmc_param->beta, gauge_param, inv_param);
+    }
     break;
+  }
 
   case QUDA_NESTED_FGI_INTEGRATOR: {
     if (!mg_instance) errorQuda("Nested FGI requires a multigrid preconditioner (mg_instance != nullptr)");
@@ -5389,7 +5447,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
       nestedFGIInstance
         = new NestedFGIIntegrator(*hmc_param, *mg, *mg_solver->m, mg_instance, *gauge_param, *inv_param, gaugePrecise,
                                   gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver, gaugeExtended,
-                                  momResident);
+                                  momResident, cloverPrecise, extendedGaugeResident);
     }
 
     nestedFGIInstance->getDeflationManager().rayleighRitzUpdate();
