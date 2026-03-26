@@ -5034,6 +5034,17 @@ QudaHMCParam newQudaHMCParam(void)
   param.n_mr_smooth = 0;
   param.mr_omega = 1.0;
 
+  // Multi-trajectory
+  param.n_trajectories = 10;
+  param.n_thermalization = 5;
+
+  // Checkpointing
+  param.checkpoint_interval = 0;
+  memset(param.checkpoint_prefix, 0, sizeof(param.checkpoint_prefix));
+  strncpy(param.checkpoint_prefix, "ckpt_", sizeof(param.checkpoint_prefix) - 1);
+  memset(param.gauge_infile, 0, sizeof(param.gauge_infile));
+  memset(param.gauge_outfile, 0, sizeof(param.gauge_outfile));
+
   // Field management
   param.use_resident_gauge = 0;
   param.make_resident_gauge = 0;
@@ -5490,6 +5501,121 @@ void destroyHMCQuda(void)
     nestedFGIInstance = nullptr;
   }
   freeWilsonGaugePaths();
+}
+
+void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
+                void *mg_instance)
+{
+  using namespace quda;
+  auto profile = pushProfile(profileHMC);
+
+  checkGaugeParam(gauge_param);
+  checkInvertParam(inv_param);
+
+  int n_traj = hmc_param->n_trajectories;
+  int n_therm = hmc_param->n_thermalization;
+
+  logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Starting HMC run: %d trajectories (%d thermalisation)\n", n_traj, n_therm);
+
+  // --- 1. Load initial gauge configuration ---
+  if (hmc_param->gauge_infile[0] != '\0') {
+    // Load from file via QIO
+    logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Loading gauge from file: %s\n", hmc_param->gauge_infile);
+    GaugeFieldParam gParam(*gauge_param);
+    gParam.location = QUDA_CPU_FIELD_LOCATION;
+    gParam.order = QUDA_QDP_GAUGE_ORDER;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField cpuGauge(gParam);
+    read_gauge_field(hmc_param->gauge_infile, reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param->cpu_prec,
+                     gauge_param->X, 0, nullptr);
+    loadGaugeQuda(cpuGauge.raw_pointer(), gauge_param);
+  } else if (h_gauge) {
+    loadGaugeQuda(h_gauge, gauge_param);
+  }
+  if (!gaugePrecise) errorQuda("hmcRunQuda: No gauge field available");
+
+  // Load clover
+  loadCloverQuda(nullptr, nullptr, inv_param);
+
+  // --- 2. Configure trajectory params for internal use ---
+  // hmcTrajectoryQuda operates on resident fields
+  hmc_param->use_resident_gauge = 1;
+  hmc_param->make_resident_gauge = 1;
+  hmc_param->return_result_gauge = 0;
+  hmc_param->generate_momentum = 1;
+
+  // Seed for momentum RNG — increment each trajectory for reproducibility
+  unsigned long long base_seed = hmc_param->momentum_seed;
+  if (base_seed == 0) base_seed = static_cast<unsigned long long>(std::time(nullptr));
+
+  int n_accepted = 0;
+  int n_total = 0;
+
+  // --- 3. HMC trajectory loop ---
+  for (int traj = 0; traj < n_traj; traj++) {
+    n_total++;
+    hmc_param->momentum_seed = base_seed + traj;
+
+    // Compute plaquette before trajectory
+    double plaq[3];
+    plaqQuda(plaq);
+
+    bool is_therm = (traj < n_therm);
+    logQuda(QUDA_SUMMARIZE, "hmcRunQuda: === Trajectory %d/%d %s=== plaquette = %e\n", traj + 1, n_traj,
+            is_therm ? "(thermalisation) " : "", plaq[0]);
+
+    // Backup gauge for accept/reject
+    GaugeField gaugeBkup(*gaugePrecise);
+
+    // Run MD trajectory
+    double dH = hmcTrajectoryQuda(nullptr, nullptr, hmc_param, gauge_param, inv_param, mg_instance);
+
+    // Metropolis accept/reject
+    double rand_val = drand48();
+    double prob = std::exp(-dH);
+    bool accepted = (rand_val < prob);
+
+    if (accepted) {
+      n_accepted++;
+      logQuda(QUDA_SUMMARIZE, "hmcRunQuda: ACCEPTED  dH = %+.6e  exp(-dH) = %.6e  rand = %.6e  rate = %.1f%%\n", dH,
+              prob, rand_val, 100.0 * n_accepted / n_total);
+    } else {
+      // Reject: restore gauge from backup
+      gaugePrecise->copy(gaugeBkup);
+      if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+      if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+        gaugePrecondition->copy(*gaugePrecise);
+
+      // Rebuild clover after restoring gauge
+      if (cloverPrecise) createCloverQuda(inv_param);
+
+      logQuda(QUDA_SUMMARIZE, "hmcRunQuda: REJECTED  dH = %+.6e  exp(-dH) = %.6e  rand = %.6e  rate = %.1f%%\n", dH,
+              prob, rand_val, 100.0 * n_accepted / n_total);
+    }
+
+    // Checkpoint: save gauge to disk periodically
+    if (hmc_param->checkpoint_interval > 0 && accepted && (n_accepted % hmc_param->checkpoint_interval == 0)) {
+      char filename[512];
+      snprintf(filename, sizeof(filename), "%s%05d", hmc_param->checkpoint_prefix, traj + 1);
+      logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Checkpointing gauge to %s\n", filename);
+      writeGaugeQuda(filename, gauge_param);
+    }
+  }
+
+  // --- 4. Final plaquette and summary ---
+  double plaq_final[3];
+  plaqQuda(plaq_final);
+  logQuda(QUDA_SUMMARIZE, "hmcRunQuda: === Run complete === acceptance = %d/%d (%.1f%%)  plaquette = %e\n", n_accepted,
+          n_total, 100.0 * n_accepted / n_total, plaq_final[0]);
+
+  // --- 5. Save final gauge ---
+  if (hmc_param->gauge_outfile[0] != '\0') {
+    logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Saving final gauge to %s\n", hmc_param->gauge_outfile);
+    writeGaugeQuda(hmc_param->gauge_outfile, gauge_param);
+  }
+
+  // Copy back to host if requested
+  if (h_gauge) { saveGaugeQuda(h_gauge, gauge_param); }
 }
 
 void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)

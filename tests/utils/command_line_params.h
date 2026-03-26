@@ -256,6 +256,7 @@ void add_dd_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
@@ -542,6 +543,17 @@ extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
 extern bool heatbath_initialize_on_host;
+
+extern double hmc_beta;
+extern double hmc_tau;
+extern int hmc_n_steps;
+extern int hmc_integrator;
+extern int hmc_n_trajectories;
+extern int hmc_n_thermalization;
+extern int hmc_checkpoint_interval;
+extern std::string hmc_checkpoint_prefix;
+extern std::string hmc_gauge_infile;
+extern std::string hmc_gauge_outfile;
 
 extern int gf_gauge_dir;
 extern int gf_maxiter;

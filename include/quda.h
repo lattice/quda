@@ -872,6 +872,18 @@ extern "C" {
     int n_mr_smooth;                  /**< MR smoothing iterations (0=off) */
     double mr_omega;                  /**< MR relaxation parameter */
 
+    /** Multi-trajectory control (used by hmcRunQuda) */
+    int n_trajectories;               /**< Total number of MD trajectories to run */
+    int n_thermalization;             /**< Number of thermalisation trajectories (no measurements) */
+
+    /** Checkpointing */
+    int checkpoint_interval;          /**< Save gauge every N accepted trajectories (0=disabled) */
+    char checkpoint_prefix[256];      /**< Filename prefix for checkpoints (e.g. "ckpt_") */
+
+    /** Gauge I/O */
+    char gauge_infile[256];           /**< Load initial gauge from file (empty = use host pointer) */
+    char gauge_outfile[256];          /**< Save final gauge to file (empty = no save) */
+
     /** Field management flags (standard QUDA pattern) */
     int use_resident_gauge;           /**< Use existing resident gauge as input */
     int make_resident_gauge;          /**< Store result gauge as resident */
@@ -1360,6 +1372,23 @@ extern "C" {
    */
   double hmcTrajectoryQuda(void *gauge, void *momentum, QudaHMCParam *hmc_param,
                            QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, void *mg_instance);
+
+  /**
+   * @brief Run a complete HMC simulation with Metropolis accept/reject.
+   *
+   * Runs n_trajectories MD trajectories with accept/reject, thermalisation,
+   * plaquette logging, and periodic gauge checkpointing to disk.
+   * The gauge field is loaded from gauge_infile (if set) or from the host
+   * pointer, and saved to gauge_outfile (if set) at the end.
+   *
+   * @param[in,out] gauge       Host gauge field pointer (or nullptr if loading from file)
+   * @param[in]     hmc_param   HMC parameters including trajectory count and checkpointing
+   * @param[in]     gauge_param Gauge field metadata
+   * @param[in]     inv_param   Inverter parameters
+   * @param[in]     mg_instance MG preconditioner (or nullptr)
+   */
+  void hmcRunQuda(void *gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
+                  void *mg_instance);
 
   /**
    * @brief Destroy any persistent HMC-internal state (coarse deflation manager, etc.)

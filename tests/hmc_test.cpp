@@ -226,53 +226,39 @@ TEST(HMC, NestedFGIParameterSetup)
 }
 
 /**
- * Example: Full nested FGI trajectory with MG (commented out -- requires MG setup).
+ * Test: Multi-trajectory HMC run with accept/reject.
  *
- * This shows the complete workflow an external library would use:
- *
- *   // 1. Setup MG preconditioner (one-time)
- *   QudaMultigridParam mg_param = newQudaMultigridParam();
- *   // ... configure mg_param levels, null vectors, smoothers ...
- *   void *mg = newMultigridQuda(&mg_param);
- *
- *   // 2. Configure HMC
- *   QudaHMCParam hmc_param = newQudaHMCParam();
- *   hmc_param.integrator = QUDA_NESTED_FGI_INTEGRATOR;
- *   hmc_param.tau = 1.0;
- *   hmc_param.n_steps = 5;
- *   hmc_param.n_inner_steps = 3;
- *   hmc_param.n_defl = 32;
- *   hmc_param.eig_tol = 1e-6;
- *   hmc_param.n_mr_smooth = 3;
- *
- *   // 3. HMC loop
- *   for (int traj = 0; traj < n_trajectories; traj++) {
- *     // Generate random momentum from Gaussian distribution
- *     gaussianMomentum(momentum, gauge_param);
- *
- *     // Run MD trajectory -- returns dH for Metropolis test
- *     double dH = hmcTrajectoryQuda(gauge, momentum, &hmc_param,
- *                                    &gauge_param, &inv_param, mg);
- *
- *     // Metropolis accept/reject
- *     double r = drand48();
- *     if (r < exp(-dH)) {
- *       // Accept: gauge is already updated
- *       printfQuda("Trajectory %d: ACCEPTED (dH = %e)\n", traj, dH);
- *     } else {
- *       // Reject: restore gauge from backup
- *       printfQuda("Trajectory %d: REJECTED (dH = %e)\n", traj, dH);
- *       // ... restore gauge ...
- *     }
- *
- *     // Update MG for new gauge field
- *     updateMultigridQuda(mg, &mg_param);
- *   }
- *
- *   // 4. Cleanup
- *   destroyHMCQuda();
- *   destroyMultigridQuda(mg);
+ * Uses hmcRunQuda to run multiple trajectories with Metropolis
+ * accept/reject, thermalisation, and plaquette logging.
+ * Demonstrates the self-contained HMC workflow using CLI options.
  */
+TEST(HMC, MultiTrajectoryRun)
+{
+  QudaHMCParam hmc_param = newQudaHMCParam();
+
+  // Use CLI options if set, otherwise defaults
+  hmc_param.integrator = static_cast<QudaIntegratorType>(hmc_integrator);
+  hmc_param.beta = hmc_beta;
+  hmc_param.tau = hmc_tau;
+  hmc_param.n_steps = hmc_n_steps;
+  hmc_param.n_trajectories = hmc_n_trajectories;
+  hmc_param.n_thermalization = hmc_n_thermalization;
+  hmc_param.checkpoint_interval = hmc_checkpoint_interval;
+  hmc_param.generate_momentum = 1;
+  hmc_param.momentum_seed = 42;
+
+  strncpy(hmc_param.checkpoint_prefix, hmc_checkpoint_prefix.c_str(), sizeof(hmc_param.checkpoint_prefix) - 1);
+  strncpy(hmc_param.gauge_infile, hmc_gauge_infile.c_str(), sizeof(hmc_param.gauge_infile) - 1);
+  strncpy(hmc_param.gauge_outfile, hmc_gauge_outfile.c_str(), sizeof(hmc_param.gauge_outfile) - 1);
+
+  // Load gauge from host (already loaded in initHMCTest)
+  hmc_param.use_resident_gauge = 1;
+
+  hmcRunQuda(nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
+
+  // If we get here without crashing, the run succeeded
+  SUCCEED();
+}
 
 int main(int argc, char **argv)
 {
@@ -281,8 +267,8 @@ int main(int argc, char **argv)
 
   // Process remaining command line options
   auto app = make_app();
+  add_hmc_option_group(app);
   add_multigrid_option_group(app);
-  add_eigen_option_group(app);
   app->allow_extras();
   try {
     app->parse(argc, argv);

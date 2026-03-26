@@ -287,6 +287,17 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 bool heatbath_initialize_on_host = true;
+
+double hmc_beta = 6.0;
+double hmc_tau = 1.0;
+int hmc_n_steps = 10;
+int hmc_integrator = 0; // 0=leapfrog, 1=omelyan, 2=FGI, 3=nested FGI
+int hmc_n_trajectories = 10;
+int hmc_n_thermalization = 5;
+int hmc_checkpoint_interval = 0;
+std::string hmc_checkpoint_prefix = "ckpt_";
+std::string hmc_gauge_infile = "";
+std::string hmc_gauge_outfile = "";
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -1225,6 +1236,30 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   // DMH
   // opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
   //"Number of measurement steps in heatbath before checkpointing (default 5)");
+}
+
+void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("HMC", "Options controlling HMC simulation");
+
+  opgroup->add_option("--hmc-beta", hmc_beta, "Gauge coupling beta (default 6.0)");
+  opgroup->add_option("--hmc-tau", hmc_tau, "MD trajectory length (default 1.0)");
+  opgroup->add_option("--hmc-n-steps", hmc_n_steps, "Number of outer integration steps (default 10)");
+  opgroup->add_option("--hmc-integrator", hmc_integrator,
+                      "Integrator type: 0=leapfrog, 1=Omelyan, 2=FGI, 3=nested FGI (default 0)");
+  opgroup->add_option("--hmc-n-trajectories", hmc_n_trajectories,
+                      "Total number of HMC trajectories to run (default 10)");
+  opgroup->add_option("--hmc-thermalization", hmc_n_thermalization,
+                      "Number of thermalisation trajectories before measurements (default 5)");
+  opgroup->add_option("--hmc-checkpoint", hmc_checkpoint_interval,
+                      "Save gauge every N accepted trajectories, 0=disabled (default 0)");
+  opgroup->add_option("--hmc-checkpoint-prefix", hmc_checkpoint_prefix,
+                      "Filename prefix for gauge checkpoints (default \"ckpt_\")");
+
+  opgroup->add_option("--hmc-gauge-infile", hmc_gauge_infile,
+                      "Load initial gauge configuration from file (requires QIO)");
+  opgroup->add_option("--hmc-gauge-outfile", hmc_gauge_outfile,
+                      "Save final gauge configuration to file (requires QIO)");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
