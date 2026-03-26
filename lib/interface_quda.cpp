@@ -42,6 +42,8 @@
 
 #include <gauge_path_quda.h>
 #include <gauge_update_quda.h>
+#include <nested_fgi.h>
+#include <momentum.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
@@ -4972,6 +4974,251 @@ void updateGaugeFieldQuda(void *gauge, void *momentum, double dt, int conj_mom, 
     std::exchange(momResident, cudaMom);
   else if (!param->make_resident_mom)
     momResident = GaugeField();
+}
+
+// ============================================================
+// HMC Trajectory API
+// ============================================================
+
+// Persistent HMC state (survives across trajectories for deflation reuse)
+static quda::NestedFGIIntegrator *nestedFGIInstance = nullptr;
+
+QudaHMCParam newQudaHMCParam(void)
+{
+  QudaHMCParam param;
+  memset(&param, 0, sizeof(QudaHMCParam));
+  param.struct_size = sizeof(QudaHMCParam);
+
+  // Trajectory defaults
+  param.tau = 1.0;
+  param.n_steps = 10;
+  param.integrator = QUDA_LEAPFROG_INTEGRATOR;
+
+  // Omelyan default
+  param.omelyan_lambda = 0.1932;
+
+  // FGI defaults (from report: lambda=1/6, xi=1/72)
+  param.fgi_lambda = 1.0 / 6.0;
+  param.fgi_xi = 1.0 / 72.0;
+
+  // Inner integrator
+  param.n_inner_steps = 3;
+
+  // Coarse deflation
+  param.n_defl = 32;
+  param.eig_tol = 1e-6;
+  param.eig_n_kr = 0; // 0 means auto = 3*n_defl
+  param.eig_max_restarts = 100;
+  param.defl_refresh_interval = 0; // frozen by default
+  param.coarse_level = 1;
+
+  // MR smoothing
+  param.n_mr_smooth = 0;
+  param.mr_omega = 1.0;
+
+  // Field management
+  param.use_resident_gauge = 0;
+  param.make_resident_gauge = 0;
+  param.return_result_gauge = 1;
+  param.use_resident_mom = 0;
+  param.make_resident_mom = 0;
+  param.return_result_mom = 1;
+
+  return param;
+}
+
+/**
+ * @brief Simple leapfrog MD trajectory.
+ *
+ * Uses existing QUDA force and update primitives.
+ * Pseudofermion generation, Hamiltonian evaluation, and accept/reject
+ * are left to the caller or to the top-level hmcTrajectoryQuda.
+ */
+static void leapfrogTrajectory(double h, int nSteps, quda::GaugeField &mom, QudaGaugeParam *gauge_param,
+                                QudaInvertParam *inv_param)
+{
+  using namespace quda;
+
+  for (int step = 0; step < nSteps; step++) {
+    // Half-step momentum kick at first step, full otherwise
+    double kickDt = (step == 0) ? h / 2.0 : h;
+
+    // Compute total force (gauge + fermion) and kick momentum
+    // Force computation: this calls the existing QUDA force API
+    // The fermion force requires a CG solve per step
+    // TODO: Wire to fermion force computation via invertQuda + computeCloverForceQuda
+    logQuda(QUDA_VERBOSE, "Leapfrog step %d/%d: kick dt=%e\n", step + 1, nSteps, kickDt);
+
+    // Full gauge drift
+    updateGaugeField(*gaugePrecise, h, *gaugePrecise, mom, false, true);
+  }
+
+  // Final half-step momentum kick
+  logQuda(QUDA_VERBOSE, "Leapfrog: final half-kick dt=%e\n", h / 2.0);
+}
+
+/**
+ * @brief Omelyan (2nd-order) MD trajectory.
+ *
+ * Implements the TSTSSTS... pattern with lambda parameter.
+ */
+static void omelyanTrajectory(double h, int nSteps, double omelyanLambda, quda::GaugeField &mom,
+                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+{
+  using namespace quda;
+
+  for (int step = 0; step < nSteps; step++) {
+    double kickLambda = (step == 0) ? omelyanLambda * h : 2.0 * omelyanLambda * h;
+
+    logQuda(QUDA_VERBOSE, "Omelyan step %d/%d: lambda_kick=%e\n", step + 1, nSteps, kickLambda);
+
+    // P(lambda*h) -- momentum kick with lambda fraction
+    // TODO: Compute force and kick
+
+    // Q((1-2*lambda)*h/2) -- gauge drift
+    updateGaugeField(*gaugePrecise, (1.0 - 2.0 * omelyanLambda) * h / 2.0, *gaugePrecise, mom, false, true);
+
+    // P((1-2*lambda)*h) -- momentum kick with (1-2*lambda) fraction
+    // TODO: Compute force and kick
+
+    // Q((1-2*lambda)*h/2) -- gauge drift
+    updateGaugeField(*gaugePrecise, (1.0 - 2.0 * omelyanLambda) * h / 2.0, *gaugePrecise, mom, false, true);
+  }
+
+  // Final P(lambda*h)
+  logQuda(QUDA_VERBOSE, "Omelyan: final lambda kick\n");
+}
+
+double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param,
+                         QudaInvertParam *inv_param, void *mg_instance)
+{
+  using namespace quda;
+
+  // --- 1. Load gauge field to device if not resident ---
+  if (!hmc_param->use_resident_gauge) {
+    loadGaugeQuda(h_gauge, gauge_param);
+  }
+  if (!gaugePrecise) errorQuda("No gauge field available for HMC trajectory");
+
+  // --- 2. Load momentum to device if not resident ---
+  if (!hmc_param->use_resident_mom) {
+    GaugeFieldParam mParam(*gauge_param, h_momentum, QUDA_ASQTAD_MOM_LINKS);
+    GaugeField cpuMom(mParam);
+
+    mParam.location = QUDA_CUDA_FIELD_LOCATION;
+    mParam.create = QUDA_COPY_FIELD_CREATE;
+    mParam.field = &cpuMom;
+    mParam.reconstruct = QUDA_RECONSTRUCT_10;
+    mParam.setPrecision(gauge_param->cuda_prec, true);
+    momResident = GaugeField(mParam);
+  }
+  if (momResident.empty()) errorQuda("No momentum field available for HMC trajectory");
+
+  // --- 3. Compute H_initial ---
+  // Kinetic energy: 1/2 * mom^2
+  double kinetic_init = computeMomAction(momResident);
+
+  // Gauge action: plaquette-based
+  // TODO: Compute full gauge + fermion action for H_init
+  // For now, placeholder
+  double H_init = kinetic_init;
+
+  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: H_init = %e (kinetic = %e)\n", H_init, kinetic_init);
+
+  // --- 4. MD evolution ---
+  double h = hmc_param->tau / hmc_param->n_steps;
+
+  switch (hmc_param->integrator) {
+  case QUDA_LEAPFROG_INTEGRATOR:
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Leapfrog, tau=%e, n_steps=%d\n", hmc_param->tau, hmc_param->n_steps);
+    leapfrogTrajectory(h, hmc_param->n_steps, momResident, gauge_param, inv_param);
+    break;
+
+  case QUDA_OMELYAN_INTEGRATOR:
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Omelyan, tau=%e, n_steps=%d, lambda=%e\n", hmc_param->tau,
+            hmc_param->n_steps, hmc_param->omelyan_lambda);
+    omelyanTrajectory(h, hmc_param->n_steps, hmc_param->omelyan_lambda, momResident, gauge_param, inv_param);
+    break;
+
+  case QUDA_FORCE_GRADIENT_INTEGRATOR:
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Force-gradient (single-timescale), tau=%e, n_steps=%d\n",
+            hmc_param->tau, hmc_param->n_steps);
+    // Single-timescale FGI is a special case of nested FGI with no inner force splitting
+    // TODO: Implement single-timescale FGI
+    errorQuda("Single-timescale FGI not yet implemented -- use QUDA_NESTED_FGI_INTEGRATOR");
+    break;
+
+  case QUDA_NESTED_FGI_INTEGRATOR: {
+    logQuda(QUDA_SUMMARIZE,
+            "hmcTrajectoryQuda: Nested FGI, tau=%e, n_outer=%d, n_inner=%d, n_defl=%d, refresh=%d\n", hmc_param->tau,
+            hmc_param->n_steps, hmc_param->n_inner_steps, hmc_param->n_defl, hmc_param->defl_refresh_interval);
+
+    if (!mg_instance) errorQuda("Nested FGI requires a multigrid preconditioner (mg_instance != nullptr)");
+
+    auto *mg_solver = static_cast<multigrid_solver *>(mg_instance);
+    MG *mg = mg_solver->mg;
+
+    // Create or reuse the nested FGI integrator
+    // The deflation manager persists across trajectories for RR evolution
+    if (!nestedFGIInstance) {
+      nestedFGIInstance = new NestedFGIIntegrator(*hmc_param, *mg, mg_instance, *gauge_param, *inv_param, gaugePrecise,
+                                                  gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
+                                                  gaugeExtended, momResident);
+    }
+
+    // TODO: Generate pseudofermion field phi = D * eta (eta ~ N(0,1))
+    // For now, create a placeholder -- the actual pseudofermion generation
+    // should be done by the caller or added here
+    // ColorSpinorField phi = generatePseudofermion(...);
+
+    // Perform RR evolution of coarse eigenvectors on the updated gauge
+    nestedFGIInstance->getDeflationManager().rayleighRitzUpdate();
+
+    // Run the trajectory
+    // nestedFGIInstance->trajectory(hmc_param->tau, hmc_param->n_steps, phi);
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Nested FGI trajectory framework ready\n");
+    break;
+  }
+
+  default: errorQuda("Unknown integrator type %d", hmc_param->integrator);
+  }
+
+  // --- 5. Compute H_final ---
+  double kinetic_final = computeMomAction(momResident);
+  double H_final = kinetic_final;
+  // TODO: Add gauge + fermion action to H_final
+
+  double dH = H_final - H_init;
+  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: H_final = %e, dH = %e\n", H_final, dH);
+
+  // --- 6. Copy results back to host ---
+  if (hmc_param->return_result_gauge) { saveGaugeQuda(h_gauge, gauge_param); }
+
+  if (hmc_param->return_result_mom) {
+    GaugeFieldParam mParam(*gauge_param, h_momentum, QUDA_ASQTAD_MOM_LINKS);
+    GaugeField cpuMom(mParam);
+    cpuMom.copy(momResident);
+  }
+
+  // Manage resident fields
+  if (hmc_param->make_resident_gauge) {
+    // gauge is already resident from loadGaugeQuda or was already resident
+  } else if (!hmc_param->use_resident_gauge) {
+    // Free the gauge we loaded
+    freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+  }
+
+  if (!hmc_param->make_resident_mom) { momResident = GaugeField(); }
+
+  return dH;
+}
+
+void destroyHMCQuda(void)
+{
+  if (nestedFGIInstance) {
+    delete nestedFGIInstance;
+    nestedFGIInstance = nullptr;
+  }
 }
 
 void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)

@@ -77,6 +77,7 @@ set (QUDA_OBJS
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
+  coarse_deflation_manager.cpp low_mode_force.cpp nested_fgi_integrator.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
