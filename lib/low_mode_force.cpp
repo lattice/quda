@@ -54,29 +54,32 @@ namespace quda
       // Use xLow as initial guess, apply a few MR iterations of A x = src
       blas::copy(fineSol, xLow);
 
-      // Simple MR relaxation: x_{k+1} = x_k + omega * r * <Ar, r> / <Ar, Ar>
-      ColorSpinorParam tmpParam{xLow};
-      tmpParam.create = QUDA_ZERO_FIELD_CREATE;
-      ColorSpinorField r{tmpParam};
-      ColorSpinorField Ar{tmpParam};
+      // Lazily allocate MR workspace
+      if (mrResid.empty()) {
+        ColorSpinorParam tmpParam{xLow};
+        tmpParam.create = QUDA_ZERO_FIELD_CREATE;
+        mrResid = ColorSpinorField(tmpParam);
+        mrAr = ColorSpinorField(tmpParam);
+      }
 
+      // Simple MR relaxation: x_{k+1} = x_k + omega * r * <Ar, r> / <Ar, Ar>
       for (int iter = 0; iter < nMRSmooth; iter++) {
         // r = src - A * x
-        (*matFine)(Ar, fineSol);
-        blas::copy(r, src);
-        blas::axpy(-1.0, Ar, r);
+        (*matFine)(mrAr, fineSol);
+        blas::copy(mrResid, src);
+        blas::axpy(-1.0, mrAr, mrResid);
 
         // Ar = A * r
-        (*matFine)(Ar, r);
+        (*matFine)(mrAr, mrResid);
 
         // alpha = <Ar, r> / <Ar, Ar>
-        Complex ArDotR = blas::cDotProduct(Ar, r);
-        double ArNorm = blas::norm2(Ar);
+        Complex ArDotR = blas::cDotProduct(mrAr, mrResid);
+        double ArNorm = blas::norm2(mrAr);
         if (ArNorm == 0.0) break;
         double alpha = mrOmega * ArDotR.real() / ArNorm;
 
         // x = x + alpha * r
-        blas::axpy(alpha, r, fineSol);
+        blas::axpy(alpha, mrResid, fineSol);
       }
 
       blas::copy(xLow, fineSol);

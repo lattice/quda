@@ -95,6 +95,8 @@ namespace quda
     ColorSpinorField coarseTmp;
     ColorSpinorField coarseSol;
     ColorSpinorField fineSol;
+    ColorSpinorField mrResid;
+    ColorSpinorField mrAr;
 
   public:
     /**
@@ -183,6 +185,7 @@ namespace quda
      * @brief Construct the nested FGI integrator.
      * @param hmcParam       HMC parameters (integrator config, deflation config, etc.)
      * @param mg             MG hierarchy (provides Transfer + coarse operator)
+     * @param matFine        Fine-grid normal operator for MR smoothing in LowModeForce
      * @param mgPrec         MG preconditioner instance (for outer force CG solves)
      * @param gaugeParam     Gauge metadata
      * @param invParam       Inverter parameters
@@ -194,10 +197,10 @@ namespace quda
      * @param gaugeExtended     Reference to global extended gauge pointer
      * @param momResident       Reference to global resident momentum
      */
-    NestedFGIIntegrator(const QudaHMCParam &hmcParam, MG &mg, void *mgPrec, QudaGaugeParam &gaugeParam,
-                        QudaInvertParam &invParam, GaugeField *&gaugePrecise, GaugeField *&gaugeSloppy,
-                        GaugeField *&gaugePrecondition, GaugeField *&gaugeRefinement, GaugeField *&gaugeEigensolver,
-                        GaugeField *&gaugeExtended, GaugeField &momResident);
+    NestedFGIIntegrator(const QudaHMCParam &hmcParam, MG &mg, const DiracMatrix &matFine, void *mgPrec,
+                        QudaGaugeParam &gaugeParam, QudaInvertParam &invParam, GaugeField *&gaugePrecise,
+                        GaugeField *&gaugeSloppy, GaugeField *&gaugePrecondition, GaugeField *&gaugeRefinement,
+                        GaugeField *&gaugeEigensolver, GaugeField *&gaugeExtended, GaugeField &momResident);
 
     ~NestedFGIIntegrator() = default;
 

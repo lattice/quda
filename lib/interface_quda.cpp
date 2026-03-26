@@ -205,6 +205,9 @@ static TimeProfile profileHISQForce("computeHISQForceQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
+//!<Profiler for hmcTrajectoryQuda
+static TimeProfile profileHMC("hmcTrajectoryQuda");
+
 //!< Profiler for wuppertalQuda
 static TimeProfile profileWuppertal("wuppertalQuda");
 
@@ -1584,6 +1587,7 @@ void endQuda(void)
     profileGaugeObs.Print();
     profileGaussianSmear.Print();
     profileGaugeSmear.Print();
+    profileHMC.Print();
     profileWFlow.Print();
     profileGFlow.Print();
     profileProject.Print();
@@ -5056,19 +5060,18 @@ static void setupWilsonGaugePaths()
   }
 
   for (int dir = 0; dir < 4; dir++) {
-    hmc_gauge_paths[dir] = new int *[6];
+    hmc_gauge_paths[dir] = static_cast<int **>(safe_malloc(6 * sizeof(int *)));
     int idx = 0;
     for (int i = 0; i < 4; i++) {
       if (i == dir) continue;
       int opp_dir = 7 - dir;
       int opp_i = 7 - i;
-      // Two staples for this plane
-      hmc_gauge_paths[dir][idx] = new int[3];
+      hmc_gauge_paths[dir][idx] = static_cast<int *>(safe_malloc(3 * sizeof(int)));
       hmc_gauge_paths[dir][idx][0] = i;
       hmc_gauge_paths[dir][idx][1] = opp_dir;
       hmc_gauge_paths[dir][idx][2] = opp_i;
       idx++;
-      hmc_gauge_paths[dir][idx] = new int[3];
+      hmc_gauge_paths[dir][idx] = static_cast<int *>(safe_malloc(3 * sizeof(int)));
       hmc_gauge_paths[dir][idx][0] = opp_i;
       hmc_gauge_paths[dir][idx][1] = opp_dir;
       hmc_gauge_paths[dir][idx][2] = i;
@@ -5083,8 +5086,8 @@ static void freeWilsonGaugePaths()
   if (!hmc_gauge_paths_initialized) return;
   for (int dir = 0; dir < 4; dir++) {
     if (hmc_gauge_paths[dir]) {
-      for (int i = 0; i < 6; i++) delete[] hmc_gauge_paths[dir][i];
-      delete[] hmc_gauge_paths[dir];
+      for (int i = 0; i < 6; i++) host_free(hmc_gauge_paths[dir][i]);
+      host_free(hmc_gauge_paths[dir]);
       hmc_gauge_paths[dir] = nullptr;
     }
   }
@@ -5111,39 +5114,26 @@ static double computeFermionAction(quda::ColorSpinorField &phi, QudaInvertParam 
 {
   using namespace quda;
 
-  // Solve x = (D^dag D)^{-1} phi
-  // Set use_resident_solution=1 so that solve() aliases x into solutionResident
-  // (keeping it in native GPU field order for the dot product)
-  int save_make = inv_param->make_resident_solution;
-  int save_use = inv_param->use_resident_solution;
-  inv_param->make_resident_solution = 1;
-  inv_param->use_resident_solution = 1;
+  // Solve x = (D†D)^{-1} phi using solutionResident for on-device storage.
+  // use_resident_solution=1 causes solve() to alias x into solutionResident.
+  QudaInvertParam ip = *inv_param;
+  ip.make_resident_solution = 1;
+  ip.use_resident_solution = 1;
 
-  // Pre-allocate solutionResident with correct geometry if empty
-  if (solutionResident.empty()) {
-    ColorSpinorParam csParam(nullptr, *inv_param, gaugePrecise->X(), true, QUDA_CUDA_FIELD_LOCATION);
-    csParam.create = QUDA_NULL_FIELD_CREATE;
-    csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
-    solutionResident = std::vector<ColorSpinorField>(1, csParam);
-  }
+  // Create proper host-side buffers for the invertQuda C-API interface.
+  // phi is already a single-parity device field.
+  ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
+  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+  ColorSpinorField h_x(cpuParam);
+  ColorSpinorField h_b(cpuParam);
+  h_b = phi; // device → host copy
 
-  // Dummy host pointers — invertQuda detects device pointers and adapts
-  ColorSpinorParam csParam{phi};
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField xDummy{csParam};
-  invertQuda(xDummy.data(), phi.data(), inv_param);
+  invertQuda(h_x.data(), h_b.data(), &ip);
 
-  inv_param->make_resident_solution = save_make;
-  inv_param->use_resident_solution = save_use;
+  // S_f = real(phi† x) using the resident solution (native GPU field order)
+  Complex dot = blas::cDotProduct(phi, solutionResident[0]);
 
-  // S_f = real(phi^dag x) using the resident solution (native field order, single parity)
-  QudaParity parity
-    = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
-  Complex dot = blas::cDotProduct(phi[parity], solutionResident[0]);
-
-  // Clear resident solution
   solutionResident.clear();
-
   return dot.real();
 }
 
@@ -5161,53 +5151,45 @@ static void computeTotalForceAndKick(double dt, quda::ColorSpinorField &phi, dou
   setupWilsonGaugePaths();
 
   // --- Gauge force ---
-  // Set up gauge_param flags for resident operation
-  int save_use_resident_gauge = gauge_param->use_resident_gauge;
-  int save_use_resident_mom = gauge_param->use_resident_mom;
-  int save_make_resident_gauge = gauge_param->make_resident_gauge;
-  int save_make_resident_mom = gauge_param->make_resident_mom;
-  int save_return_result_mom = gauge_param->return_result_mom;
-  int save_overwrite_mom = gauge_param->overwrite_mom;
-
-  gauge_param->use_resident_gauge = 1;
-  gauge_param->use_resident_mom = 1;
-  gauge_param->make_resident_gauge = 1;
-  gauge_param->make_resident_mom = 1;
-  gauge_param->return_result_mom = 0;
-  gauge_param->overwrite_mom = 0; // accumulate
+  // Use local copy of gauge_param with resident-field flags for internal calls.
+  // IMPORTANT: use_resident_mom=1 with make_resident_mom=0 avoids the
+  // std::exchange in computeCloverForceQuda that would corrupt momResident.
+  QudaGaugeParam gp = *gauge_param;
+  gp.use_resident_gauge = 1;
+  gp.use_resident_mom = 1;
+  gp.make_resident_gauge = 1;
+  gp.make_resident_mom = 1;
+  gp.return_result_mom = 0;
+  gp.overwrite_mom = 0; // accumulate into existing momentum
 
   double eb3 = dt * beta / 3.0;
   computeGaugeForceQuda(nullptr, nullptr, hmc_gauge_paths, hmc_gauge_path_length, hmc_gauge_path_coeff, 6, 4, eb3,
-                        gauge_param);
+                        &gp);
 
   // --- Fermion force ---
-  // CG solve: x = (D^dag D)^{-1} phi, store as resident solution
-  inv_param->use_resident_solution = 0;
-  inv_param->make_resident_solution = 1;
-  // invertQuda detects device pointers and adjusts automatically
-  ColorSpinorParam csParam{phi};
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField x{csParam};
-  invertQuda(x.data(), phi.data(), inv_param);
+  // CG solve with use_resident_solution=1 so solve() aliases x into solutionResident.
+  QudaInvertParam ip = *inv_param;
+  ip.use_resident_solution = 1;
+  ip.make_resident_solution = 1;
 
-  // Clover force from the resident solution
+  // Create proper host-side buffers for the invertQuda C-API.
+  // phi is already a single-parity device field.
+  ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
+  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+  ColorSpinorField h_x(cpuParam);
+  ColorSpinorField h_b(cpuParam);
+  h_b = phi; // device → host copy
+
+  invertQuda(h_x.data(), h_b.data(), &ip);
+
+  // Clover force reads from solutionResident (populated by the solve above)
   double coeff = 1.0;
-  double kappa2 = inv_param->kappa * inv_param->kappa;
-  double ck = inv_param->clover_csw * inv_param->kappa;
+  double kappa2 = ip.kappa * ip.kappa;
+  double ck = ip.clover_csw * ip.kappa;
+  computeCloverForceQuda(nullptr, dt, nullptr, nullptr, &coeff, kappa2, ck, 1, 1.0, nullptr, &gp, &ip);
 
-  inv_param->use_resident_solution = 1;
-  // h_x is ignored when use_resident_solution=1, pass nullptr
-  computeCloverForceQuda(nullptr, dt, nullptr, nullptr, &coeff, kappa2, ck, 1, 1.0, nullptr, gauge_param, inv_param);
-
-  // Restore flags
-  gauge_param->use_resident_gauge = save_use_resident_gauge;
-  gauge_param->use_resident_mom = save_use_resident_mom;
-  gauge_param->make_resident_gauge = save_make_resident_gauge;
-  gauge_param->make_resident_mom = save_make_resident_mom;
-  gauge_param->return_result_mom = save_return_result_mom;
-  gauge_param->overwrite_mom = save_overwrite_mom;
-  inv_param->use_resident_solution = 0;
-  inv_param->make_resident_solution = 0;
+  // Clear resident solution after force computation
+  solutionResident.clear();
 }
 
 /**
@@ -5217,11 +5199,23 @@ static void gaugeUpdateAndCloverRebuild(double dt, QudaInvertParam *inv_param)
 {
   using namespace quda;
 
-  // Gauge update: U = exp(dt * P) * U
-  updateGaugeField(*gaugePrecise, dt, *gaugePrecise, momResident, false, true);
-  if (gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-  if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+  // Gauge update: U_out = exp(dt * P) * U_in
+  // Must use separate in/out fields — in-place update is a race condition.
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  GaugeField u_out(gParam);
+  updateGaugeField(u_out, dt, *gaugePrecise, momResident, false, true);
+
+  // Copy the updated field back into gaugePrecise (in-place content update)
+  gaugePrecise->copy(u_out);
+
+  // Rebuild sloppy/precondition copies from the updated precise field
+  if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+  if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
     gaugePrecondition->copy(*gaugePrecise);
+
+  // Rebuild extended gauge (handles ghost exchange internally)
+  updateExtendedGaugeResident(true, R, getProfile());
 
   // Rebuild clover field from updated gauge
   if (cloverPrecise) { createCloverQuda(inv_param); }
@@ -5230,16 +5224,18 @@ static void gaugeUpdateAndCloverRebuild(double dt, QudaInvertParam *inv_param)
 /**
  * @brief Generate pseudofermion: phi = D * eta where eta ~ N(0,1)
  */
-static quda::ColorSpinorField generatePseudofermion(QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
+static quda::ColorSpinorField generatePseudofermion(QudaGaugeParam *, QudaInvertParam *inv_param,
                                                     unsigned long long seed)
 {
   using namespace quda;
 
-  // Create spinor field using QudaInvertParam-based constructor (sets pc_type, etc.)
-  ColorSpinorParam csParam(nullptr, *inv_param, gaugePrecise->X(), false, QUDA_CUDA_FIELD_LOCATION);
+  // Create a single-parity spinor on the GPU in native field order.
+  // pc_solution=true gives us the parity field the solver expects.
+  ColorSpinorParam csParam(nullptr, *inv_param, gaugePrecise->X(), true, QUDA_CUDA_FIELD_LOCATION);
   csParam.create = QUDA_ZERO_FIELD_CREATE;
   csParam.setPrecision(gaugePrecise->Precision());
   csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
+  csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   ColorSpinorField eta{csParam};
   ColorSpinorField phi{csParam};
@@ -5248,9 +5244,9 @@ static quda::ColorSpinorField generatePseudofermion(QudaGaugeParam *gauge_param,
   if (seed == 0) seed = static_cast<unsigned long long>(std::time(nullptr));
   spinorNoise(eta, seed, QUDA_NOISE_GAUSS);
 
-  // Apply Dirac operator: phi = D * eta
+  // Apply even-odd preconditioned Dirac operator: phi = D_pc * eta
   DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, false);
+  setDiracParam(diracParam, inv_param, true);
   Dirac *dirac = Dirac::create(diracParam);
   dirac->M(phi, eta);
   delete dirac;
@@ -5311,6 +5307,10 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
                          QudaInvertParam *inv_param, void *mg_instance)
 {
   using namespace quda;
+  auto profile = pushProfile(profileHMC);
+
+  checkGaugeParam(gauge_param);
+  checkInvertParam(inv_param);
 
   // --- 1. Load gauge field to device ---
   if (!hmc_param->use_resident_gauge) { loadGaugeQuda(h_gauge, gauge_param); }
@@ -5386,9 +5386,10 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
     MG *mg = mg_solver->mg;
 
     if (!nestedFGIInstance) {
-      nestedFGIInstance = new NestedFGIIntegrator(*hmc_param, *mg, mg_instance, *gauge_param, *inv_param, gaugePrecise,
-                                                  gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
-                                                  gaugeExtended, momResident);
+      nestedFGIInstance
+        = new NestedFGIIntegrator(*hmc_param, *mg, *mg_solver->m, mg_instance, *gauge_param, *inv_param, gaugePrecise,
+                                  gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver, gaugeExtended,
+                                  momResident);
     }
 
     nestedFGIInstance->getDeflationManager().rayleighRitzUpdate();
@@ -5412,7 +5413,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
   // --- 8. Copy results back to host ---
   if (hmc_param->return_result_gauge) { saveGaugeQuda(h_gauge, gauge_param); }
 
-  if (hmc_param->return_result_mom) {
+  if (hmc_param->return_result_mom && h_momentum) {
     GaugeFieldParam mParam(*gauge_param, h_momentum, QUDA_ASQTAD_MOM_LINKS);
     GaugeField cpuMom(mParam);
     cpuMom.copy(momResident);

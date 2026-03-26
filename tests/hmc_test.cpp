@@ -272,8 +272,10 @@ int main(int argc, char **argv)
   // Run tests
   int result = RUN_ALL_TESTS();
 
-  // Cleanup
+  // Cleanup: free resident fields before endQuda to avoid destruction-order issues
   destroyHMCQuda();
+  freeGaugeQuda();
+  freeCloverQuda();
   endQuda();
   finalizeComms();
 

@@ -7,8 +7,8 @@
 namespace quda
 {
 
-  NestedFGIIntegrator::NestedFGIIntegrator(const QudaHMCParam &hmcParam, MG &mg, void *mgPrec,
-                                           QudaGaugeParam &gaugeParam_, QudaInvertParam &invParam_,
+  NestedFGIIntegrator::NestedFGIIntegrator(const QudaHMCParam &hmcParam, MG &mg, const DiracMatrix &matFine,
+                                           void *mgPrec, QudaGaugeParam &gaugeParam_, QudaInvertParam &invParam_,
                                            GaugeField *&gaugePrecise_, GaugeField *&gaugeSloppy_,
                                            GaugeField *&gaugePrecondition_, GaugeField *&gaugeRefinement_,
                                            GaugeField *&gaugeEigensolver_, GaugeField *&gaugeExtended_,
@@ -16,7 +16,7 @@ namespace quda
     deflManager(*mg.getTransfer(), *mg.getMatCoarseResidual(), hmcParam.n_defl, hmcParam.eig_tol,
                 hmcParam.eig_n_kr > 0 ? hmcParam.eig_n_kr : 3 * hmcParam.n_defl, hmcParam.eig_max_restarts,
                 hmcParam.defl_refresh_interval),
-    lowModeForce(deflManager, *mg.getMatCoarseResidual(), hmcParam.n_mr_smooth, hmcParam.mr_omega),
+    lowModeForce(deflManager, matFine, hmcParam.n_mr_smooth, hmcParam.mr_omega),
     lambda(hmcParam.fgi_lambda),
     xi(hmcParam.fgi_xi),
     nInnerSteps(hmcParam.n_inner_steps),
@@ -94,12 +94,16 @@ namespace quda
     computeInnerForce(momResident, dti / 2.0, phi);
 
     for (int i = 0; i < nInnerSteps; i++) {
-      // Full drift: U = exp(dti * P) * U
-      updateGaugeField(*gaugePrecise, dti, *gaugePrecise, momResident, false, true);
+      // Full drift: U_out = exp(dti * P) * U_in (separate in/out to avoid race)
+      GaugeFieldParam gParam(*gaugePrecise);
+      gParam.create = QUDA_NULL_FIELD_CREATE;
+      GaugeField u_out(gParam);
+      updateGaugeField(u_out, dti, *gaugePrecise, momResident, false, true);
+      gaugePrecise->copy(u_out);
 
-      // Rebuild sloppy/precondition gauge copies if they alias
-      if (gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-      if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+      // Rebuild sloppy/precondition gauge copies
+      if (gaugeSloppy != gaugePrecise && gaugeSloppy) gaugeSloppy->copy(*gaugePrecise);
+      if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy && gaugePrecondition)
         gaugePrecondition->copy(*gaugePrecise);
 
       // Full or half kick
@@ -126,13 +130,18 @@ namespace quda
     double fgCoeff = xi_h3 / (one_m_2lam * h); // = h^2/24 for lambda=1/6, xi=1/72
     computeOuterForce(momResident, fgCoeff, phi);
 
-    // 4. Displace gauge: U' = exp(1.0 * mom) * U
-    //    The momentum now contains only the FG displacement
-    updateGaugeField(*gaugePrecise, 1.0, *gaugePrecise, momResident, false, true);
+    // 4. Displace gauge: U' = exp(1.0 * mom) * U (separate in/out)
+    {
+      GaugeFieldParam gfParam(*gaugePrecise);
+      gfParam.create = QUDA_NULL_FIELD_CREATE;
+      GaugeField u_out(gfParam);
+      updateGaugeField(u_out, 1.0, *gaugePrecise, momResident, false, true);
+      gaugePrecise->copy(u_out);
+    }
 
     // Rebuild sloppy/precondition copies for force evaluation at displaced gauge
-    if (gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-    if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+    if (gaugeSloppy != gaugePrecise && gaugeSloppy) gaugeSloppy->copy(*gaugePrecise);
+    if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy && gaugePrecondition)
       gaugePrecondition->copy(*gaugePrecise);
 
     // 5. Restore momentum from saved copy
