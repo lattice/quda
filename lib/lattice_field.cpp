@@ -158,7 +158,7 @@ namespace quda {
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
-    if (is_native_gauge) { // if a native gauge field we need to ensure padded volume is aligned
+    if (0 && is_native_gauge) {     // if a native gauge field we need to ensure padded volume is aligned
       stride = (stride + 31) & ~31; // round up to be a multiple of 32 to guarantee alignment
       pad = stride - volumeCB;
     }

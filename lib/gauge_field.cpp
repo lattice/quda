@@ -89,6 +89,7 @@ namespace quda {
     reconstruct = param.reconstruct;
     nInternal = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2;
     order = param.order;
+
     fixed = param.fixed;
     link_type = param.link_type;
     t_boundary = param.t_boundary;
@@ -178,17 +179,6 @@ namespace quda {
 
     total_bytes = bytes;
 
-    if (isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
-      bool pad_check = true;
-      for (int i = 0; i < nDim; i++) {
-        // when we have coarse links we need to double the pad since we're storing forwards and backwards links
-        int minimum_pad = comm_dim_partitioned(i) ? nFace * surfaceCB[i] * (geometry == QUDA_COARSE_GEOMETRY ? 2 : 1) : 0;
-        if (pad < minimum_pad) pad_check = false;
-        if (!pad_check)
-          errorQuda("GaugeField being constructed with insufficient padding in dim %d (%d < %d)", i, pad, minimum_pad);
-      }
-    }
-
     if (isNative()) {
       if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
         gauge = quda_ptr(mem_type, bytes);
@@ -230,18 +220,15 @@ namespace quda {
     }
 
     if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
-      if (!isNative()) {
-        for (int i = 0; i < nDim; i++) {
-          size_t nbytes = nFace * surface[i] * nInternal * precision;
-          ghost[i] = quda_ptr(mem_type, nbytes);
-          if (geometry == QUDA_COARSE_GEOMETRY) ghost[i + 4] = quda_ptr(mem_type, nbytes);
+      for (int i = 0; i < nDim; i++) {
+        size_t nbytes = nFace * surface[i] * nInternal * precision;
+        ghost[i] = quda_ptr(mem_type, nbytes);
+        if (geometry == QUDA_COARSE_GEOMETRY) ghost[i + 4] = quda_ptr(mem_type, nbytes);
 
-          qudaMemset(ghost[i], 0, nbytes);
-          if (geometry == QUDA_COARSE_GEOMETRY) qudaMemset(ghost[i + 4], 0, nbytes);
-        }
-      } else {
-        if (param.create != QUDA_ZERO_FIELD_CREATE) zeroPad();
+        qudaMemset(ghost[i], 0, nbytes);
+        if (geometry == QUDA_COARSE_GEOMETRY) qudaMemset(ghost[i + 4], 0, nbytes);
       }
+      if (isNative() && param.create != QUDA_ZERO_FIELD_CREATE) zeroPad();
     }
 
     init = true;
@@ -580,13 +567,8 @@ namespace quda {
           }
         }
 
-        if (isNative()) {
-          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 1.0, 0, 0, 0, recv_d, 1 + 2 * link_dir); // 1, 3
-        } else {
-          // copy from receive buffer into ghost array
-          for (int dim = 0; dim < nDim; dim++)
-            qudaMemcpy(ghost[dim + link_dir * nDim].data(), recv_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
-        }
+        for (int dim = 0; dim < nDim; dim++)
+          qudaMemcpy(ghost[dim + link_dir * nDim].data(), recv_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
 
         bufferIndex = 1 - bufferIndex;
       } // link_dir
@@ -657,12 +639,8 @@ namespace quda {
           offset += ghost_face_bytes_aligned[d];
         }
 
-        if (isNative()) { // copy from padded region in gauge field into send buffer
-          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 1.0, 0, 0, send_d, 0, 1 + 2 * link_dir);
-        } else { // copy from receive buffer into ghost array
-          for (int dim = 0; dim < nDim; dim++)
-            qudaMemcpy(send_d[dim], ghost[dim + link_dir * nDim].data(), ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
-        }
+        for (int dim = 0; dim < nDim; dim++)
+          qudaMemcpy(send_d[dim], ghost[dim + link_dir * nDim].data(), ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
         qudaDeviceSynchronize(); // need to synchronize before issueing copies in different streams - could replace with event post and wait
 
         // issue receive preposts and host-to-device copies if needed
@@ -1082,8 +1060,8 @@ namespace quda {
               qudaMemcpy(gauge.data(), buffer, bytes, qudaMemcpyDeviceToHost);
             }
 
-            if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
-                && nFace)
+            if ((isNative() || order > 4) && ghostExchange == QUDA_GHOST_EXCHANGE_PAD
+                && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
               for (int d = 0; d < geometry; d++)
                 qudaMemcpy(Ghost()[d].data(), ghost_buffer[d], ghost_bytes[d], qudaMemcpyDeviceToHost);
 
@@ -1143,7 +1121,7 @@ namespace quda {
               qudaMemcpy(buffer, src.data(), src.Bytes(), qudaMemcpyDefault);
             }
 
-            if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
+            if ((src.isNative() || src.Order() > 4) && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
                 && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
               for (int d = 0; d < geometry; d++)
                 qudaMemcpy(ghost_buffer[d], src.Ghost()[d].data(), ghost_bytes[d], qudaMemcpyDefault);
@@ -1362,7 +1340,7 @@ namespace quda {
   {
     if (location == QUDA_CUDA_FIELD_LOCATION && is_prefetch_enabled() && mem_type == QUDA_MEMORY_DEVICE) {
       if (gauge.data()) qudaMemPrefetchAsync(gauge.data(), bytes, mem_space, stream);
-      if (!isNative()) {
+      if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD && nFace > 0) {
         for (int i = 0; i < nDim; i++) {
           size_t nbytes = nFace * surface[i] * nInternal * precision;
           if (ghost[i].data() && nbytes) qudaMemPrefetchAsync(ghost[i].data(), nbytes, mem_space, stream);

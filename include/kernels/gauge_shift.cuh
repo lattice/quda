@@ -44,7 +44,7 @@ namespace quda
         typename Arg::RawLink link;
         if (x[dir] < arg.shift && arg.comms_dim_partitioned[dir]) { // on boundary so we fetch from ghost
           const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, 1);
-          arg.in.raw_load(link, arg.volume_cb + ghost_idx, dir, 1 - parity);
+          arg.in.raw_load_ghost(link, ghost_idx, dir, 1 - parity);
           arg.out.raw_save(link, x_cb, dir, parity);
         } else { // simple shift
           byte_array<int8_t, 4> dx = {};
@@ -56,7 +56,7 @@ namespace quda
           if (x[dir] >= arg.X[dir] - arg.shift && arg.comms_dim_partitioned[dir]) { // write the ghost
             const int ghost_idx = ghostFaceIndexStaggered<1>(x, arg.X, dir, arg.shift);
             arg.in.raw_load(link, x_cb, dir, parity);
-            arg.out.raw_save(link, arg.volume_cb + ghost_idx, dir, 1 - parity);
+            arg.out.raw_save_ghost(link, ghost_idx, dir, 1 - parity);
           }
         }
       } else {

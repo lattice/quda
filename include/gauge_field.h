@@ -198,8 +198,7 @@ namespace quda {
       = nullptr;             // shifted copy of the gauge field, used for double-store enabled dslash
     bool is_shifted = false; // whether this instance is a shifted one
 
-    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost
-      = {}; // stores the ghost zone of the gauge field (non-native fields only)
+    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost = {}; // ghost zone (separate allocation when QUDA_GHOST_EXCHANGE_PAD)
 
     mutable array<int, QUDA_MAX_DIM> ghostFace = {}; // the size of each face
 
@@ -507,11 +506,7 @@ namespace quda {
 
     virtual int full_dim(int d) const { return x[d]; }
 
-    auto &Ghost() const
-    {
-      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return ghost;
-    }
+    auto &Ghost() const { return ghost; }
 
     /**
        @return The offset into the struct to the start of the gauge

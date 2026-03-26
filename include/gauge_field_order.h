@@ -727,13 +727,17 @@ namespace quda {
         volumeCB(U.VolumeCB()),
         accessor(U, gauge_, ghost_)
       {
-        if constexpr (!native_ghost) assert(ghost_ != nullptr);
         for (int d = 0; d < 4; d++) {
-          ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat> *>(ghost_[d]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+                              static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d].data())) :
+                              nullptr;
           ghostVolumeCB[d] = U.Nface() * U.SurfaceCB(d);
-          ghost[d + 4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY ?
-            static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
-            nullptr;
+          ghost[d + 4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+            ghost_                                              ? static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+                     static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d + 4].data())) :
+                     nullptr;
           ghostVolumeCB[d + 4] = U.Nface() * U.SurfaceCB(d);
         }
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
@@ -765,8 +769,6 @@ namespace quda {
 
       __device__ __host__ inline wrapper operator()(int d, int parity, int x_cb, int row, int col) const
       {
-        if constexpr (native_ghost)
-          return accessor(d % 4, parity, x_cb + (d / 4) * ghostVolumeCB[d] + volumeCB, row, col);
         return wrapper(ghost[d], indexNative(d, parity, x_cb, row, col), scale, scale_inv);
       }
     };
@@ -780,8 +782,7 @@ namespace quda {
        @tparam nColor Number of colors for the field
        @tparam nSpinCoarse Number of "spin degrees of freedom" (for coarse-link fields only)
        @tparam order Storage order of the field
-       @tparam native_ghost Whether to use native ghosts (inlined into
-               the padded area for internal-order fields or use a separate array if false)
+       @tparam native_ghost Legacy template parameter (native PAD uses disjoint ghost[] like other orders)
        @tparam storeFloat_ Underlying storage type for the field
      */
     template <typename Float_, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
@@ -1620,7 +1621,10 @@ namespace quda {
           for (int i = 0; i < 4; i++) {
             X[i] = u.X()[i];
             R[i] = u.R()[i];
-            ghost[i] = ghost_ ? ghost_[i] : 0;
+            ghost[i] = ghost_ ? ghost_[i] :
+              (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && u.Order() == QUDA_NATIVE_GAUGE_ORDER) ?
+                                static_cast<Float *>(const_cast<void *>(u.Ghost()[i].data())) :
+                                0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
         }
@@ -1774,6 +1778,63 @@ namespace quda {
 
         if constexpr (hasPhase)
           memcpy(&gauge[parity * offset + phaseOffset + dir * stride + x], &v[M * N + Nrem], sizeof(store_t));
+      }
+
+      /**
+         @brief Raw load from the ghost buffer for direction `dir` at face index `ghost_idx` (same layout as loadGhost).
+         When ghosts are inlined in the bulk allocation, delegates to raw_load at volumeCB + ghost_idx.
+       */
+      __device__ __host__ inline void raw_load_ghost(array<store_t, reconLen> &v, int ghost_idx, int dir, int parity) const
+      {
+        if (!ghost[dir]) {
+          raw_load(v, volumeCB + ghost_idx, dir, parity);
+        } else {
+#pragma unroll
+          for (int i = 0; i < M; i++) {
+            auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx);
+            memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
+          }
+
+          if constexpr (Nrem > 0) {
+            auto vecTmp = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
+                                                   parity * faceVolumeCB[dir] + ghost_idx);
+            memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
+          }
+
+          if constexpr (loadPhase)
+            memcpy(&v[M * N + Nrem],
+                   &ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
+                   sizeof(store_t));
+        }
+      }
+
+      /**
+         @brief Raw save to the ghost buffer for direction `dir` at face index `ghost_idx` (same layout as saveGhost).
+         When ghosts are inlined in the bulk allocation, delegates to raw_save at volumeCB + ghost_idx.
+       */
+      __device__ __host__ inline void raw_save_ghost(const array<store_t, reconLen> &v, int ghost_idx, int dir,
+                                                     int parity) const
+      {
+        if (!ghost[dir]) {
+          raw_save(v, volumeCB + ghost_idx, dir, parity);
+        } else {
+#pragma unroll
+          for (int i = 0; i < M; i++) {
+            array<Float, N> vecTmp;
+            memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
+            vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx, vecTmp);
+          }
+
+          if constexpr (Nrem > 0) {
+            array<Float, Nrem> vecTmp;
+            memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
+            vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + ghost_idx, vecTmp);
+          }
+
+          if constexpr (hasPhase)
+            memcpy(&ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
+                   &v[M * N + Nrem], sizeof(store_t));
+        }
       }
 
       /**
