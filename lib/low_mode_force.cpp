@@ -20,8 +20,10 @@ namespace quda
 
     // Lazily allocate coarse workspace fields from the first eigenvector's metadata
     if (coarseTmp.empty()) {
-      coarseTmp = ColorSpinorField(ColorSpinorParam(evecs[0]));
-      coarseSol = ColorSpinorField(ColorSpinorParam(evecs[0]));
+      ColorSpinorParam csParam{evecs[0]};
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      coarseTmp = ColorSpinorField(csParam);
+      coarseSol = ColorSpinorField(csParam);
     }
 
     // 1. Restrict source to coarse grid: phi_c = R * src
@@ -43,14 +45,20 @@ namespace quda
     // 4. Optional MR smoothing to improve the approximation
     if (nMRSmooth > 0) {
       // Lazily allocate fine workspace
-      if (fineSol.empty()) { fineSol = ColorSpinorField(ColorSpinorParam(xLow)); }
+      if (fineSol.empty()) {
+        ColorSpinorParam fineParam{xLow};
+        fineParam.create = QUDA_ZERO_FIELD_CREATE;
+        fineSol = ColorSpinorField(fineParam);
+      }
 
       // Use xLow as initial guess, apply a few MR iterations of A x = src
       blas::copy(fineSol, xLow);
 
-      // Simple MR relaxation: x_{k+1} = x_k + omega * (src - A*x_k) / ||A*r_k||
-      ColorSpinorField r(ColorSpinorParam(xLow));
-      ColorSpinorField Ar(ColorSpinorParam(xLow));
+      // Simple MR relaxation: x_{k+1} = x_k + omega * r * <Ar, r> / <Ar, Ar>
+      ColorSpinorParam tmpParam{xLow};
+      tmpParam.create = QUDA_ZERO_FIELD_CREATE;
+      ColorSpinorField r{tmpParam};
+      ColorSpinorField Ar{tmpParam};
 
       for (int iter = 0; iter < nMRSmooth; iter++) {
         // r = src - A * x
@@ -62,7 +70,7 @@ namespace quda
         (*matFine)(Ar, r);
 
         // alpha = <Ar, r> / <Ar, Ar>
-        auto ArDotR = blas::cDotProduct(Ar, r);
+        Complex ArDotR = blas::cDotProduct(Ar, r);
         double ArNorm = blas::norm2(Ar);
         if (ArNorm == 0.0) break;
         double alpha = mrOmega * ArDotR.real() / ArNorm;
@@ -76,10 +84,14 @@ namespace quda
   }
 
   void LowModeForce::computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &gauge,
-                                   const CloverField *clover, QudaGaugeParam &gaugeParam, QudaInvertParam &invParam)
+                                   const CloverField *clover, QudaGaugeParam &, QudaInvertParam &invParam)
   {
     // Lazily allocate fine solution workspace
-    if (fineSol.empty()) { fineSol = ColorSpinorField(ColorSpinorParam(src)); }
+    if (fineSol.empty()) {
+      ColorSpinorParam fineParam{src};
+      fineParam.create = QUDA_ZERO_FIELD_CREATE;
+      fineSol = ColorSpinorField(fineParam);
+    }
 
     // Project source onto low modes
     projectLowModes(fineSol, src);
@@ -87,17 +99,9 @@ namespace quda
     // Compute fermion force using the projected solution via existing QUDA force infrastructure.
     // The solution vector fineSol is the low-mode approximation to (D†D)^{-1} phi.
     // The force kernel computes dS/dU using this solution.
-
-    // For now, we store the solution as resident and call the force computation.
-    // The caller is responsible for managing the full force computation pipeline.
-    // This method accumulates the low-mode force contribution into mom.
-
-    // Use the internal computeCloverForce with our projected solution
     std::vector<ColorSpinorField> xVec = {fineSol};
     std::vector<ColorSpinorField> x0Vec(1);
     std::vector<double> forceCoeff = {coeff};
-
-    double kappa2 = invParam.kappa * invParam.kappa;
     std::vector<array<double, 2>> fermEpsilon = {{0.0, 0.0}};
 
     // Build extended gauge if needed

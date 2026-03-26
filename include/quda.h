@@ -1340,7 +1340,7 @@ extern "C" {
    * handles the Metropolis test using the returned dH).
    *
    * Host/device field management follows the standard QUDA resident-field
-   * pattern controlled by the use_resident_*/make_resident_*/return_result_*
+   * pattern controlled by the use_resident, make_resident, and return_result
    * flags in hmc_param.
    *
    * @param[in,out] gauge       Host gauge field pointer (or nullptr if use_resident_gauge)

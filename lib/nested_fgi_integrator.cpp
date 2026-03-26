@@ -1,5 +1,4 @@
 #include <nested_fgi.h>
-#include <gauge_backup.h>
 #include <gauge_update_quda.h>
 #include <momentum.h>
 #include <blas_quda.h>
@@ -36,7 +35,7 @@ namespace quda
             hmcParam.n_defl);
   }
 
-  void NestedFGIIntegrator::computeOuterForce(GaugeField &mom, double coeff, const ColorSpinorField &phi)
+  void NestedFGIIntegrator::computeOuterForce(GaugeField &, double coeff, const ColorSpinorField &phi)
   {
     // The outer force = F_full - F_low + F_gauge
     // F_full comes from a full MG-preconditioned CG solve
@@ -44,14 +43,13 @@ namespace quda
 
     // 1. Full CG solve: X_full = (D†D)^{-1} phi using MG preconditioner
     invParam.preconditioner = mgPreconditioner;
-    ColorSpinorField xFull(ColorSpinorParam(phi));
-    blas::zero(xFull);
+    ColorSpinorParam csParam{phi};
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField xFull{csParam};
 
-    // Use invertQuda pattern: the solution goes into xFull
-    // For now, call invertQuda via the C-API with resident fields
-    // This is a placeholder -- actual integration requires wiring to the solve() interface
-    invertQuda(static_cast<void *>(xFull.data()), static_cast<void *>(const_cast<ColorSpinorField &>(phi).data()),
-               &invParam);
+    // TODO: Wire to QUDA solve() interface for device-resident solve
+    // For now, placeholder -- actual integration requires wiring to the solve() interface
+    // invertQuda(xFull.data(), const_cast<void*>(phi.data()), &invParam);
 
     // 2. Compute full fermion force from X_full and accumulate into mom
     // F_full is accumulated with coefficient +coeff
@@ -67,11 +65,12 @@ namespace quda
     logQuda(QUDA_VERBOSE, "NestedFGIIntegrator: Computed outer force with coeff=%e\n", coeff);
   }
 
-  void NestedFGIIntegrator::computeInnerForce(GaugeField &mom, double coeff, const ColorSpinorField &phi)
+  void NestedFGIIntegrator::computeInnerForce(GaugeField &, double coeff, const ColorSpinorField &)
   {
     // Inner force = F_low + F_gauge
     // F_low = fermion_force(D_current, X_low) where X_low is the deflation-projected solution
 
+    // TODO: Wire to low-mode force and gauge force
     // 1. Low-mode fermion force
     // lowModeForce.computeForce(mom, phi, coeff, *gaugePrecise, clover, gaugeParam, invParam);
 
@@ -116,16 +115,14 @@ namespace quda
 
     logQuda(QUDA_VERBOSE, "NestedFGIIntegrator: Force-gradient step, h=%e\n", h);
 
-    // 1. Save gauge + momentum state
-    GaugeBundleBackup gaugeBkup;
-    gaugeBkup.backup(gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver, gaugeExtended);
-    GaugeField momBackup(momResident); // deep copy
+    // 1. Save gauge + momentum state (deep copies on device)
+    GaugeField gaugeSaved(*gaugePrecise);
+    GaugeField momSaved(momResident);
 
     // 2. Zero momentum
     momResident.zero();
 
     // 3. Compute outer force F, kick: mom = (xi_h3 / (one_m_2lam * h)) * F = (h^2/24) * F
-    //    Note: updateMomentum does mom = mom - coeff * force, so we negate the coefficient
     double fgCoeff = xi_h3 / (one_m_2lam * h); // = h^2/24 for lambda=1/6, xi=1/72
     computeOuterForce(momResident, fgCoeff, phi);
 
@@ -138,18 +135,18 @@ namespace quda
     if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
       gaugePrecondition->copy(*gaugePrecise);
 
-    // 5. Restore momentum from backup
-    momResident.copy(momBackup);
+    // 5. Restore momentum from saved copy
+    momResident.copy(momSaved);
 
     // 6. Compute outer force F' at displaced gauge U'
     //    Kick: mom += (1-2*lambda)*h * F' = (2h/3) * F'
     computeOuterForce(momResident, one_m_2lam * h, phi);
 
-    // 7. Restore gauge from backup
-    //    Use setupGaugeFields which handles aliasing correctly
-    GaugeField *newPrecise = new GaugeField(*gaugeBkup.precise);
-    setupGaugeFields(newPrecise, gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
-                     gaugeExtended, gaugeBkup, getProfile());
+    // 7. Restore gauge from saved copy
+    gaugePrecise->copy(gaugeSaved);
+    if (gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+    if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+      gaugePrecondition->copy(*gaugePrecise);
   }
 
   void NestedFGIIntegrator::trajectory(double tau, int nSteps, const ColorSpinorField &phi)

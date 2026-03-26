@@ -276,10 +276,14 @@ TEST(HMC, NestedFGIParameterSetup)
 
 int main(int argc, char **argv)
 {
-  // Process command line options
+  // Let gtest strip its args first
+  ::testing::InitGoogleTest(&argc, argv);
+
+  // Process remaining command line options
   auto app = make_app();
   add_multigrid_option_group(app);
   add_eigen_option_group(app);
+  app->allow_extras();
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -294,7 +298,6 @@ int main(int argc, char **argv)
   initHMCTest(argc, argv);
 
   // Run tests
-  ::testing::InitGoogleTest(&argc, argv);
   int result = RUN_ALL_TESTS();
 
   // Cleanup
