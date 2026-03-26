@@ -1846,14 +1846,14 @@ void openQCD_qudaSolverPrintSetup(int id)
   }
 }
 
-double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status)
+double openQCD_qudaInvert(int id, void* source, void* solution, int *status)
 {
   double residual;
   openQCD_qudaInvertMultiSrc(id, &source, &solution, status, &residual);
   return residual;
 }
 
-void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual)
+void openQCD_qudaInvertMultiSrc(int id, void** sources, void** solutions, int *status, double *residual)
 {
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 

@@ -346,8 +346,7 @@ void openQCD_qudaSolverPrintSetup(int id);
  *
  * @return     Residual
  */
-double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status);
-
+double openQCD_qudaInvert(int id, void* source, void* solution, int *status);
 
 /**
  * @brief      Solve Ax=b for an Clover Wilson operator with a QUDA solver. All
@@ -367,7 +366,7 @@ double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* s
  *                        that the inversion failed.
  * @param      residual   The num_src residuals
  */
-void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual);
+void openQCD_qudaInvertMultiSrc(int id, void** sources, void** solutions, int *status, double *residual);
 
 /**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
