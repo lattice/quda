@@ -835,6 +835,45 @@ extern "C" {
     QudaBoolean thin_update_only;
   } QudaMultigridParam;
 
+  typedef struct QudaHMCParam_s {
+    size_t struct_size; /**< Size of this struct in bytes. Used to ensure that the host application and QUDA see the same struct */
+
+    /** Trajectory control */
+    double tau;                       /**< Trajectory length */
+    int n_steps;                      /**< Outer integration steps (n_outer for nested) */
+    QudaIntegratorType integrator;    /**< Which integrator to use */
+
+    /** Omelyan parameter */
+    double omelyan_lambda;            /**< Omelyan-Mryglod-Folk lambda (default 0.1932) */
+
+    /** Force-gradient parameters (FGI and nested FGI) */
+    double fgi_lambda;                /**< PQPQP lambda (default 1/6) */
+    double fgi_xi;                    /**< PQPQP xi (default 1/72) */
+
+    /** Inner integrator (nested FGI only) */
+    int n_inner_steps;                /**< Leapfrog sub-steps per inner half-step */
+
+    /** Coarse deflation (nested FGI only) */
+    int n_defl;                       /**< Number of coarse-grid deflation eigenvectors */
+    double eig_tol;                   /**< TRLM convergence tolerance */
+    int eig_n_kr;                     /**< Krylov space size (default 3*n_defl) */
+    int eig_max_restarts;             /**< TRLM max restarts (default 100) */
+    int defl_refresh_interval;        /**< Inner steps between eigenspace refresh (0=frozen) */
+    int coarse_level;                 /**< Which MG level provides coarse grid (default 1) */
+
+    /** MR smoothing (nested FGI only) */
+    int n_mr_smooth;                  /**< MR smoothing iterations (0=off) */
+    double mr_omega;                  /**< MR relaxation parameter */
+
+    /** Field management flags (standard QUDA pattern) */
+    int use_resident_gauge;           /**< Use existing resident gauge as input */
+    int make_resident_gauge;          /**< Store result gauge as resident */
+    int return_result_gauge;          /**< Copy result gauge back to host */
+    int use_resident_mom;             /**< Use existing resident momentum */
+    int make_resident_mom;            /**< Store result momentum as resident */
+    int return_result_mom;            /**< Copy result momentum back to host */
+  } QudaHMCParam;
+
   typedef struct QudaGaugeObservableParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
@@ -1287,6 +1326,38 @@ extern "C" {
    * sets the output filename prefix).
    */
   void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
+
+  /**
+   * @brief Initialize a QudaHMCParam with sensible defaults
+   * @return Default-initialized QudaHMCParam
+   */
+  QudaHMCParam newQudaHMCParam(void);
+
+  /**
+   * @brief Run one HMC molecular dynamics trajectory.
+   *
+   * Performs the MD evolution only (no accept/reject step -- the caller
+   * handles the Metropolis test using the returned dH).
+   *
+   * Host/device field management follows the standard QUDA resident-field
+   * pattern controlled by the use_resident_*/make_resident_*/return_result_*
+   * flags in hmc_param.
+   *
+   * @param[in,out] gauge       Host gauge field pointer (or nullptr if use_resident_gauge)
+   * @param[in,out] momentum    Host momentum pointer (or nullptr if use_resident_mom)
+   * @param[in]     hmc_param   HMC/integrator parameters
+   * @param[in]     gauge_param Gauge field metadata
+   * @param[in]     inv_param   Inverter parameters (for fermion force solves)
+   * @param[in]     mg_instance MG preconditioner (from newMultigridQuda, or nullptr)
+   * @return dH = H_final - H_initial for the Metropolis accept/reject test
+   */
+  double hmcTrajectoryQuda(void *gauge, void *momentum, QudaHMCParam *hmc_param,
+                           QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, void *mg_instance);
+
+  /**
+   * @brief Destroy any persistent HMC-internal state (coarse deflation manager, etc.)
+   */
+  void destroyHMCQuda(void);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).

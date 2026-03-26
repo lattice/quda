@@ -664,6 +664,14 @@ typedef enum QudaUpdateSplitGauge_s {
   = 0, // the input gauge fields will not be split and the buffered (split) gauges will be used for split grid solves
 } QudaUpdateSplitGauge;
 
+typedef enum QudaIntegratorType_s {
+  QUDA_LEAPFROG_INTEGRATOR,
+  QUDA_OMELYAN_INTEGRATOR,
+  QUDA_FORCE_GRADIENT_INTEGRATOR,
+  QUDA_NESTED_FGI_INTEGRATOR,
+  QUDA_INVALID_INTEGRATOR = QUDA_INVALID_ENUM
+} QudaIntegratorType;
+
 #ifdef __cplusplus
 }
 #endif
