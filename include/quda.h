@@ -842,6 +842,11 @@ extern "C" {
     double tau;                       /**< Trajectory length */
     int n_steps;                      /**< Outer integration steps (n_outer for nested) */
     QudaIntegratorType integrator;    /**< Which integrator to use */
+    double beta;                      /**< Gauge coupling constant */
+
+    /** Momentum generation */
+    int generate_momentum;            /**< If 1, generate Gaussian momentum internally; if 0, use caller-supplied */
+    unsigned long long momentum_seed; /**< RNG seed for momentum generation (ignored if generate_momentum=0) */
 
     /** Omelyan parameter */
     double omelyan_lambda;            /**< Omelyan-Mryglod-Folk lambda (default 0.1932) */

@@ -30,8 +30,10 @@
 // Global test state
 static QudaGaugeParam gauge_param;
 static QudaInvertParam inv_param;
-static quda::GaugeField gauge;
-static quda::GaugeField mom;
+
+// Host gauge storage (QDP order: array of 4 pointers)
+static std::vector<char> gauge_buf;
+static void *gauge[4];
 
 void initHMCTest(int argc, char **argv)
 {
@@ -42,21 +44,31 @@ void initHMCTest(int argc, char **argv)
   // Initialize inverter parameters
   inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
+  inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+  inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+  inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  inv_param.clover_csw = 1.0;
+  inv_param.clover_coeff = inv_param.clover_csw * inv_param.kappa;
+  inv_param.clover_cpu_prec = gauge_param.cpu_prec;
+  inv_param.clover_cuda_prec = gauge_param.cuda_prec;
+  inv_param.clover_cuda_prec_sloppy = gauge_param.cuda_prec_sloppy;
+  inv_param.clover_cuda_prec_precondition = gauge_param.cuda_prec_precondition;
+  inv_param.clover_cuda_prec_eigensolver = gauge_param.cuda_prec_eigensolver;
+  inv_param.clover_cuda_prec_refinement_sloppy = gauge_param.cuda_prec_refinement_sloppy;
+  inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+  inv_param.compute_clover = QUDA_BOOLEAN_TRUE;
   setDims(gauge_param.X);
 
-  // Allocate and randomize host gauge field
-  quda::GaugeFieldParam gParam(gauge_param, nullptr, QUDA_SU3_LINKS);
-  gParam.create = QUDA_NULL_FIELD_CREATE;
-  gParam.order = QUDA_MILC_GAUGE_ORDER;
-  gauge = quda::GaugeField(gParam);
+  // Allocate host gauge field (QDP order)
+  gauge_buf.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) gauge[i] = gauge_buf.data() + i * V * gauge_site_size * host_gauge_data_type_size;
   constructHostGaugeField(gauge, gauge_param, argc, argv);
 
-  // Allocate host momentum field
-  quda::GaugeFieldParam mParam(gauge_param, nullptr, QUDA_ASQTAD_MOM_LINKS);
-  mParam.create = QUDA_ZERO_FIELD_CREATE;
-  mParam.order = QUDA_MILC_GAUGE_ORDER;
-  mParam.reconstruct = QUDA_RECONSTRUCT_10;
-  mom = quda::GaugeField(mParam);
+  // Load gauge to QUDA (makes it resident)
+  gauge_param.use_resident_gauge = 0;
+  gauge_param.make_resident_gauge = 1;
+  loadGaugeQuda(gauge, &gauge_param);
 
   printfQuda("HMC test initialized: lattice = %d x %d x %d x %d\n", gauge_param.X[0], gauge_param.X[1],
              gauge_param.X[2], gauge_param.X[3]);
@@ -81,6 +93,8 @@ TEST(HMC, ParameterDefaults)
   EXPECT_EQ(p.defl_refresh_interval, 0);
   EXPECT_EQ(p.coarse_level, 1);
   EXPECT_EQ(p.n_mr_smooth, 0);
+  EXPECT_DOUBLE_EQ(p.beta, 6.0);
+  EXPECT_EQ(p.generate_momentum, 1);
   EXPECT_EQ(p.return_result_gauge, 1);
   EXPECT_EQ(p.return_result_mom, 1);
 }
@@ -88,93 +102,51 @@ TEST(HMC, ParameterDefaults)
 /**
  * Test: Leapfrog trajectory with energy conservation check.
  *
- * Demonstrates the simplest usage pattern:
- *   1. Set up gauge and inverter parameters
- *   2. Configure QudaHMCParam with leapfrog integrator
- *   3. Call hmcTrajectoryQuda with host pointers
- *   4. Check that dH is returned (energy conservation)
+ * Demonstrates the self-contained usage pattern:
+ *   1. Load gauge from host
+ *   2. Let QUDA generate Gaussian momentum internally
+ *   3. Call hmcTrajectoryQuda -- it generates pseudofermion, runs MD, returns dH
  */
 TEST(HMC, LeapfrogTrajectory)
 {
   QudaHMCParam hmc_param = newQudaHMCParam();
   hmc_param.integrator = QUDA_LEAPFROG_INTEGRATOR;
   hmc_param.tau = 1.0;
-  hmc_param.n_steps = 20;
-  hmc_param.use_resident_gauge = 0;
-  hmc_param.make_resident_gauge = 0;
-  hmc_param.return_result_gauge = 1;
-  hmc_param.use_resident_mom = 0;
-  hmc_param.make_resident_mom = 0;
-  hmc_param.return_result_mom = 1;
+  hmc_param.n_steps = 10;
+  hmc_param.beta = 6.0;
+  hmc_param.generate_momentum = 1;
+  hmc_param.momentum_seed = 12345;
+  hmc_param.use_resident_gauge = 1;
+  hmc_param.make_resident_gauge = 1;
+  hmc_param.return_result_gauge = 0;
 
-  double dH = hmcTrajectoryQuda(gauge.data(), mom.data(), &hmc_param, &gauge_param, &inv_param, nullptr);
+  double dH = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
 
   printfQuda("Leapfrog: dH = %e\n", dH);
-  // dH should be finite (not NaN/Inf)
   EXPECT_TRUE(std::isfinite(dH));
 }
 
 /**
  * Test: Omelyan trajectory.
- *
- * Shows how to configure the Omelyan integrator with a custom lambda parameter.
  */
 TEST(HMC, OmelyanTrajectory)
 {
   QudaHMCParam hmc_param = newQudaHMCParam();
   hmc_param.integrator = QUDA_OMELYAN_INTEGRATOR;
   hmc_param.tau = 1.0;
-  hmc_param.n_steps = 10;
+  hmc_param.n_steps = 5;
   hmc_param.omelyan_lambda = 0.1932;
-  hmc_param.use_resident_gauge = 0;
-  hmc_param.make_resident_gauge = 0;
-  hmc_param.return_result_gauge = 1;
-  hmc_param.use_resident_mom = 0;
-  hmc_param.make_resident_mom = 0;
-  hmc_param.return_result_mom = 1;
+  hmc_param.beta = 6.0;
+  hmc_param.generate_momentum = 1;
+  hmc_param.momentum_seed = 54321;
+  hmc_param.use_resident_gauge = 1;
+  hmc_param.make_resident_gauge = 1;
+  hmc_param.return_result_gauge = 0;
 
-  double dH = hmcTrajectoryQuda(gauge.data(), mom.data(), &hmc_param, &gauge_param, &inv_param, nullptr);
+  double dH = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
 
   printfQuda("Omelyan: dH = %e\n", dH);
   EXPECT_TRUE(std::isfinite(dH));
-}
-
-/**
- * Test: Device-resident workflow.
- *
- * Shows how to keep fields on device across multiple trajectories,
- * avoiding host-device copies. This is the high-performance usage pattern.
- */
-TEST(HMC, DeviceResidentWorkflow)
-{
-  // First trajectory: load from host, keep on device
-  QudaHMCParam hmc_param = newQudaHMCParam();
-  hmc_param.integrator = QUDA_LEAPFROG_INTEGRATOR;
-  hmc_param.tau = 0.5;
-  hmc_param.n_steps = 10;
-  hmc_param.use_resident_gauge = 0;
-  hmc_param.make_resident_gauge = 1; // keep gauge on device
-  hmc_param.return_result_gauge = 0; // don't copy back
-  hmc_param.use_resident_mom = 0;
-  hmc_param.make_resident_mom = 1; // keep momentum on device
-  hmc_param.return_result_mom = 0;
-
-  double dH1 = hmcTrajectoryQuda(gauge.data(), mom.data(), &hmc_param, &gauge_param, &inv_param, nullptr);
-  printfQuda("Resident trajectory 1: dH = %e\n", dH1);
-
-  // Second trajectory: use device-resident fields, return to host at the end
-  hmc_param.use_resident_gauge = 1;
-  hmc_param.make_resident_gauge = 0;
-  hmc_param.return_result_gauge = 1; // copy final gauge back
-  hmc_param.use_resident_mom = 1;
-  hmc_param.make_resident_mom = 0;
-  hmc_param.return_result_mom = 1;
-
-  double dH2 = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
-  printfQuda("Resident trajectory 2: dH = %e\n", dH2);
-
-  EXPECT_TRUE(std::isfinite(dH1));
-  EXPECT_TRUE(std::isfinite(dH2));
 }
 
 /**

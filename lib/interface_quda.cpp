@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <functional>
 #include <sys/time.h>
@@ -4983,6 +4984,12 @@ void updateGaugeFieldQuda(void *gauge, void *momentum, double dt, int conj_mom, 
 // Persistent HMC state (survives across trajectories for deflation reuse)
 static quda::NestedFGIIntegrator *nestedFGIInstance = nullptr;
 
+// Wilson plaquette gauge force paths (allocated once, reused)
+static int **hmc_gauge_paths[4] = {nullptr, nullptr, nullptr, nullptr};
+static int hmc_gauge_path_length[6];
+static double hmc_gauge_path_coeff[6];
+static bool hmc_gauge_paths_initialized = false;
+
 QudaHMCParam newQudaHMCParam(void)
 {
   QudaHMCParam param;
@@ -4993,6 +5000,11 @@ QudaHMCParam newQudaHMCParam(void)
   param.tau = 1.0;
   param.n_steps = 10;
   param.integrator = QUDA_LEAPFROG_INTEGRATOR;
+  param.beta = 6.0;
+
+  // Momentum generation
+  param.generate_momentum = 1;
+  param.momentum_seed = 0;
 
   // Omelyan default
   param.omelyan_lambda = 0.1932;
@@ -5007,9 +5019,9 @@ QudaHMCParam newQudaHMCParam(void)
   // Coarse deflation
   param.n_defl = 32;
   param.eig_tol = 1e-6;
-  param.eig_n_kr = 0; // 0 means auto = 3*n_defl
+  param.eig_n_kr = 0;
   param.eig_max_restarts = 100;
-  param.defl_refresh_interval = 0; // frozen by default
+  param.defl_refresh_interval = 0;
   param.coarse_level = 1;
 
   // MR smoothing
@@ -5028,65 +5040,271 @@ QudaHMCParam newQudaHMCParam(void)
 }
 
 /**
- * @brief Simple leapfrog MD trajectory.
+ * @brief Set up Wilson plaquette gauge force paths.
  *
- * Uses existing QUDA force and update primitives.
- * Pseudofermion generation, Hamiltonian evaluation, and accept/reject
- * are left to the caller or to the top-level hmcTrajectoryQuda.
+ * Creates 6 staple paths per direction (length 3 each) following
+ * the MILC createGaugeForcePaths pattern.
+ * Direction encoding: XUP=0, YUP=1, ZUP=2, TUP=3, TDOWN=4..XDOWN=7.
  */
-static void leapfrogTrajectory(double h, int nSteps, quda::GaugeField &mom, QudaGaugeParam *gauge_param,
-                                QudaInvertParam *inv_param)
+static void setupWilsonGaugePaths()
 {
-  using namespace quda;
+  if (hmc_gauge_paths_initialized) return;
 
-  for (int step = 0; step < nSteps; step++) {
-    // Half-step momentum kick at first step, full otherwise
-    double kickDt = (step == 0) ? h / 2.0 : h;
-
-    // Compute total force (gauge + fermion) and kick momentum
-    // Force computation: this calls the existing QUDA force API
-    // The fermion force requires a CG solve per step
-    // TODO: Wire to fermion force computation via invertQuda + computeCloverForceQuda
-    logQuda(QUDA_VERBOSE, "Leapfrog step %d/%d: kick dt=%e\n", step + 1, nSteps, kickDt);
-
-    // Full gauge drift
-    updateGaugeField(*gaugePrecise, h, *gaugePrecise, mom, false, true);
+  for (int i = 0; i < 6; i++) {
+    hmc_gauge_path_length[i] = 3;
+    hmc_gauge_path_coeff[i] = 1.0;
   }
 
-  // Final half-step momentum kick
-  logQuda(QUDA_VERBOSE, "Leapfrog: final half-kick dt=%e\n", h / 2.0);
+  for (int dir = 0; dir < 4; dir++) {
+    hmc_gauge_paths[dir] = new int *[6];
+    int idx = 0;
+    for (int i = 0; i < 4; i++) {
+      if (i == dir) continue;
+      int opp_dir = 7 - dir;
+      int opp_i = 7 - i;
+      // Two staples for this plane
+      hmc_gauge_paths[dir][idx] = new int[3];
+      hmc_gauge_paths[dir][idx][0] = i;
+      hmc_gauge_paths[dir][idx][1] = opp_dir;
+      hmc_gauge_paths[dir][idx][2] = opp_i;
+      idx++;
+      hmc_gauge_paths[dir][idx] = new int[3];
+      hmc_gauge_paths[dir][idx][0] = opp_i;
+      hmc_gauge_paths[dir][idx][1] = opp_dir;
+      hmc_gauge_paths[dir][idx][2] = i;
+      idx++;
+    }
+  }
+  hmc_gauge_paths_initialized = true;
+}
+
+static void freeWilsonGaugePaths()
+{
+  if (!hmc_gauge_paths_initialized) return;
+  for (int dir = 0; dir < 4; dir++) {
+    if (hmc_gauge_paths[dir]) {
+      for (int i = 0; i < 6; i++) delete[] hmc_gauge_paths[dir][i];
+      delete[] hmc_gauge_paths[dir];
+      hmc_gauge_paths[dir] = nullptr;
+    }
+  }
+  hmc_gauge_paths_initialized = false;
 }
 
 /**
- * @brief Omelyan (2nd-order) MD trajectory.
- *
- * Implements the TSTSSTS... pattern with lambda parameter.
+ * @brief Compute gauge action from plaquette: S_g = beta * (1 - plaq) * V * 6
  */
-static void omelyanTrajectory(double h, int nSteps, double omelyanLambda, quda::GaugeField &mom,
-                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+static double computeGaugeAction(double beta)
+{
+  using namespace quda;
+  updateExtendedGaugeResident(false, R, getProfile());
+  double3 plaq3 = plaquette(*extendedGaugeResident);
+  int V = 1;
+  for (int d = 0; d < 4; d++) V *= gaugePrecise->X()[d];
+  return beta * (1.0 - plaq3.x) * V * 6;
+}
+
+/**
+ * @brief Compute fermion action: S_f = phi^dag x where x = (D^dag D)^{-1} phi
+ */
+static double computeFermionAction(quda::ColorSpinorField &phi, QudaInvertParam *inv_param)
 {
   using namespace quda;
 
-  for (int step = 0; step < nSteps; step++) {
-    double kickLambda = (step == 0) ? omelyanLambda * h : 2.0 * omelyanLambda * h;
+  // Solve x = (D^dag D)^{-1} phi
+  // Set use_resident_solution=1 so that solve() aliases x into solutionResident
+  // (keeping it in native GPU field order for the dot product)
+  int save_make = inv_param->make_resident_solution;
+  int save_use = inv_param->use_resident_solution;
+  inv_param->make_resident_solution = 1;
+  inv_param->use_resident_solution = 1;
 
-    logQuda(QUDA_VERBOSE, "Omelyan step %d/%d: lambda_kick=%e\n", step + 1, nSteps, kickLambda);
-
-    // P(lambda*h) -- momentum kick with lambda fraction
-    // TODO: Compute force and kick
-
-    // Q((1-2*lambda)*h/2) -- gauge drift
-    updateGaugeField(*gaugePrecise, (1.0 - 2.0 * omelyanLambda) * h / 2.0, *gaugePrecise, mom, false, true);
-
-    // P((1-2*lambda)*h) -- momentum kick with (1-2*lambda) fraction
-    // TODO: Compute force and kick
-
-    // Q((1-2*lambda)*h/2) -- gauge drift
-    updateGaugeField(*gaugePrecise, (1.0 - 2.0 * omelyanLambda) * h / 2.0, *gaugePrecise, mom, false, true);
+  // Pre-allocate solutionResident with correct geometry if empty
+  if (solutionResident.empty()) {
+    ColorSpinorParam csParam(nullptr, *inv_param, gaugePrecise->X(), true, QUDA_CUDA_FIELD_LOCATION);
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+    csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
+    solutionResident = std::vector<ColorSpinorField>(1, csParam);
   }
 
-  // Final P(lambda*h)
-  logQuda(QUDA_VERBOSE, "Omelyan: final lambda kick\n");
+  // Dummy host pointers — invertQuda detects device pointers and adapts
+  ColorSpinorParam csParam{phi};
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  ColorSpinorField xDummy{csParam};
+  invertQuda(xDummy.data(), phi.data(), inv_param);
+
+  inv_param->make_resident_solution = save_make;
+  inv_param->use_resident_solution = save_use;
+
+  // S_f = real(phi^dag x) using the resident solution (native field order, single parity)
+  QudaParity parity
+    = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+  Complex dot = blas::cDotProduct(phi[parity], solutionResident[0]);
+
+  // Clear resident solution
+  solutionResident.clear();
+
+  return dot.real();
+}
+
+/**
+ * @brief Compute total force (gauge + fermion) and kick momentum.
+ *
+ * Gauge force: Wilson plaquette via computeGaugeForceQuda (uses resident fields)
+ * Fermion force: CG solve + computeCloverForceQuda (uses resident fields)
+ */
+static void computeTotalForceAndKick(double dt, quda::ColorSpinorField &phi, double beta, QudaGaugeParam *gauge_param,
+                                     QudaInvertParam *inv_param)
+{
+  using namespace quda;
+
+  setupWilsonGaugePaths();
+
+  // --- Gauge force ---
+  // Set up gauge_param flags for resident operation
+  int save_use_resident_gauge = gauge_param->use_resident_gauge;
+  int save_use_resident_mom = gauge_param->use_resident_mom;
+  int save_make_resident_gauge = gauge_param->make_resident_gauge;
+  int save_make_resident_mom = gauge_param->make_resident_mom;
+  int save_return_result_mom = gauge_param->return_result_mom;
+  int save_overwrite_mom = gauge_param->overwrite_mom;
+
+  gauge_param->use_resident_gauge = 1;
+  gauge_param->use_resident_mom = 1;
+  gauge_param->make_resident_gauge = 1;
+  gauge_param->make_resident_mom = 1;
+  gauge_param->return_result_mom = 0;
+  gauge_param->overwrite_mom = 0; // accumulate
+
+  double eb3 = dt * beta / 3.0;
+  computeGaugeForceQuda(nullptr, nullptr, hmc_gauge_paths, hmc_gauge_path_length, hmc_gauge_path_coeff, 6, 4, eb3,
+                        gauge_param);
+
+  // --- Fermion force ---
+  // CG solve: x = (D^dag D)^{-1} phi, store as resident solution
+  inv_param->use_resident_solution = 0;
+  inv_param->make_resident_solution = 1;
+  // invertQuda detects device pointers and adjusts automatically
+  ColorSpinorParam csParam{phi};
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  ColorSpinorField x{csParam};
+  invertQuda(x.data(), phi.data(), inv_param);
+
+  // Clover force from the resident solution
+  double coeff = 1.0;
+  double kappa2 = inv_param->kappa * inv_param->kappa;
+  double ck = inv_param->clover_csw * inv_param->kappa;
+
+  inv_param->use_resident_solution = 1;
+  // h_x is ignored when use_resident_solution=1, pass nullptr
+  computeCloverForceQuda(nullptr, dt, nullptr, nullptr, &coeff, kappa2, ck, 1, 1.0, nullptr, gauge_param, inv_param);
+
+  // Restore flags
+  gauge_param->use_resident_gauge = save_use_resident_gauge;
+  gauge_param->use_resident_mom = save_use_resident_mom;
+  gauge_param->make_resident_gauge = save_make_resident_gauge;
+  gauge_param->make_resident_mom = save_make_resident_mom;
+  gauge_param->return_result_mom = save_return_result_mom;
+  gauge_param->overwrite_mom = save_overwrite_mom;
+  inv_param->use_resident_solution = 0;
+  inv_param->make_resident_solution = 0;
+}
+
+/**
+ * @brief Update gauge field and rebuild clover term.
+ */
+static void gaugeUpdateAndCloverRebuild(double dt, QudaInvertParam *inv_param)
+{
+  using namespace quda;
+
+  // Gauge update: U = exp(dt * P) * U
+  updateGaugeField(*gaugePrecise, dt, *gaugePrecise, momResident, false, true);
+  if (gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+  if (gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+    gaugePrecondition->copy(*gaugePrecise);
+
+  // Rebuild clover field from updated gauge
+  if (cloverPrecise) { createCloverQuda(inv_param); }
+}
+
+/**
+ * @brief Generate pseudofermion: phi = D * eta where eta ~ N(0,1)
+ */
+static quda::ColorSpinorField generatePseudofermion(QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
+                                                    unsigned long long seed)
+{
+  using namespace quda;
+
+  // Create spinor field using QudaInvertParam-based constructor (sets pc_type, etc.)
+  ColorSpinorParam csParam(nullptr, *inv_param, gaugePrecise->X(), false, QUDA_CUDA_FIELD_LOCATION);
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  csParam.setPrecision(gaugePrecise->Precision());
+  csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
+
+  ColorSpinorField eta{csParam};
+  ColorSpinorField phi{csParam};
+
+  // Generate Gaussian noise
+  if (seed == 0) seed = static_cast<unsigned long long>(std::time(nullptr));
+  spinorNoise(eta, seed, QUDA_NOISE_GAUSS);
+
+  // Apply Dirac operator: phi = D * eta
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, false);
+  Dirac *dirac = Dirac::create(diracParam);
+  dirac->M(phi, eta);
+  delete dirac;
+
+  return phi;
+}
+
+/**
+ * @brief Leapfrog MD trajectory with Wilson-clover action.
+ */
+static void leapfrogTrajectory(double h, int nSteps, quda::ColorSpinorField &phi, double beta,
+                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+{
+  // Initial half-kick
+  logQuda(QUDA_VERBOSE, "Leapfrog: initial half-kick dt=%e\n", h / 2.0);
+  computeTotalForceAndKick(h / 2.0, phi, beta, gauge_param, inv_param);
+
+  for (int step = 0; step < nSteps; step++) {
+    // Full drift
+    logQuda(QUDA_VERBOSE, "Leapfrog step %d/%d: drift dt=%e\n", step + 1, nSteps, h);
+    gaugeUpdateAndCloverRebuild(h, inv_param);
+
+    // Full kick (or final half-kick)
+    double kickDt = (step < nSteps - 1) ? h : h / 2.0;
+    logQuda(QUDA_VERBOSE, "Leapfrog step %d/%d: kick dt=%e\n", step + 1, nSteps, kickDt);
+    computeTotalForceAndKick(kickDt, phi, beta, gauge_param, inv_param);
+  }
+}
+
+/**
+ * @brief Omelyan (2MN) MD trajectory: PQPQP pattern.
+ */
+static void omelyanTrajectory(double h, int nSteps, double lam, quda::ColorSpinorField &phi, double beta,
+                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+{
+  // Initial P(lambda*h)
+  computeTotalForceAndKick(lam * h, phi, beta, gauge_param, inv_param);
+
+  for (int step = 0; step < nSteps; step++) {
+    logQuda(QUDA_VERBOSE, "Omelyan step %d/%d\n", step + 1, nSteps);
+
+    // Q(h/2)
+    gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+
+    // P((1-2*lambda)*h)
+    computeTotalForceAndKick((1.0 - 2.0 * lam) * h, phi, beta, gauge_param, inv_param);
+
+    // Q(h/2)
+    gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+
+    // P(2*lambda*h) for merged steps, P(lambda*h) for final
+    double kickDt = (step < nSteps - 1) ? 2.0 * lam * h : lam * h;
+    computeTotalForceAndKick(kickDt, phi, beta, gauge_param, inv_param);
+  }
 }
 
 double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param,
@@ -5094,17 +5312,31 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
 {
   using namespace quda;
 
-  // --- 1. Load gauge field to device if not resident ---
-  if (!hmc_param->use_resident_gauge) {
-    loadGaugeQuda(h_gauge, gauge_param);
-  }
+  // --- 1. Load gauge field to device ---
+  if (!hmc_param->use_resident_gauge) { loadGaugeQuda(h_gauge, gauge_param); }
   if (!gaugePrecise) errorQuda("No gauge field available for HMC trajectory");
 
-  // --- 2. Load momentum to device if not resident ---
-  if (!hmc_param->use_resident_mom) {
+  // --- 2. Load or create clover field ---
+  loadCloverQuda(nullptr, nullptr, inv_param);
+
+  // --- 3. Momentum: load from host, use resident, or generate ---
+  if (hmc_param->generate_momentum) {
+    // Ensure a resident momentum field exists
+    if (momResident.empty()) {
+      GaugeFieldParam mParam(*gauge_param, nullptr, QUDA_ASQTAD_MOM_LINKS);
+      mParam.location = QUDA_CUDA_FIELD_LOCATION;
+      mParam.create = QUDA_ZERO_FIELD_CREATE;
+      mParam.reconstruct = QUDA_RECONSTRUCT_10;
+      mParam.setPrecision(gauge_param->cuda_prec, true);
+      momResident = GaugeField(mParam);
+    }
+    unsigned long long seed = hmc_param->momentum_seed;
+    if (seed == 0) seed = static_cast<unsigned long long>(std::time(nullptr));
+    gaugeGauss(momResident, seed, 1.0);
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Generated Gaussian momentum (seed=%llu)\n", seed);
+  } else if (!hmc_param->use_resident_mom) {
     GaugeFieldParam mParam(*gauge_param, h_momentum, QUDA_ASQTAD_MOM_LINKS);
     GaugeField cpuMom(mParam);
-
     mParam.location = QUDA_CUDA_FIELD_LOCATION;
     mParam.create = QUDA_COPY_FIELD_CREATE;
     mParam.field = &cpuMom;
@@ -5114,84 +5346,70 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
   }
   if (momResident.empty()) errorQuda("No momentum field available for HMC trajectory");
 
-  // --- 3. Compute H_initial ---
-  // Kinetic energy: 1/2 * mom^2
+  // --- 4. Generate pseudofermion ---
+  unsigned long long phi_seed = hmc_param->momentum_seed ? hmc_param->momentum_seed + 1 : std::time(nullptr) + 1;
+  ColorSpinorField phi = generatePseudofermion(gauge_param, inv_param, phi_seed);
+  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Generated pseudofermion\n");
+
+  // --- 5. Compute H_initial ---
   double kinetic_init = computeMomAction(momResident);
+  double gauge_action_init = computeGaugeAction(hmc_param->beta);
+  double fermion_action_init = computeFermionAction(phi, inv_param);
+  double H_init = kinetic_init + gauge_action_init + fermion_action_init;
 
-  // Gauge action: plaquette-based
-  // TODO: Compute full gauge + fermion action for H_init
-  // For now, placeholder
-  double H_init = kinetic_init;
+  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: H_init = %e (kinetic=%e, gauge=%e, fermion=%e)\n", H_init, kinetic_init,
+          gauge_action_init, fermion_action_init);
 
-  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: H_init = %e (kinetic = %e)\n", H_init, kinetic_init);
-
-  // --- 4. MD evolution ---
+  // --- 6. MD evolution ---
   double h = hmc_param->tau / hmc_param->n_steps;
 
   switch (hmc_param->integrator) {
   case QUDA_LEAPFROG_INTEGRATOR:
     logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Leapfrog, tau=%e, n_steps=%d\n", hmc_param->tau, hmc_param->n_steps);
-    leapfrogTrajectory(h, hmc_param->n_steps, momResident, gauge_param, inv_param);
+    leapfrogTrajectory(h, hmc_param->n_steps, phi, hmc_param->beta, gauge_param, inv_param);
     break;
 
   case QUDA_OMELYAN_INTEGRATOR:
     logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Omelyan, tau=%e, n_steps=%d, lambda=%e\n", hmc_param->tau,
             hmc_param->n_steps, hmc_param->omelyan_lambda);
-    omelyanTrajectory(h, hmc_param->n_steps, hmc_param->omelyan_lambda, momResident, gauge_param, inv_param);
+    omelyanTrajectory(h, hmc_param->n_steps, hmc_param->omelyan_lambda, phi, hmc_param->beta, gauge_param, inv_param);
     break;
 
   case QUDA_FORCE_GRADIENT_INTEGRATOR:
-    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Force-gradient (single-timescale), tau=%e, n_steps=%d\n",
-            hmc_param->tau, hmc_param->n_steps);
-    // Single-timescale FGI is a special case of nested FGI with no inner force splitting
-    // TODO: Implement single-timescale FGI
     errorQuda("Single-timescale FGI not yet implemented -- use QUDA_NESTED_FGI_INTEGRATOR");
     break;
 
   case QUDA_NESTED_FGI_INTEGRATOR: {
-    logQuda(QUDA_SUMMARIZE,
-            "hmcTrajectoryQuda: Nested FGI, tau=%e, n_outer=%d, n_inner=%d, n_defl=%d, refresh=%d\n", hmc_param->tau,
-            hmc_param->n_steps, hmc_param->n_inner_steps, hmc_param->n_defl, hmc_param->defl_refresh_interval);
-
     if (!mg_instance) errorQuda("Nested FGI requires a multigrid preconditioner (mg_instance != nullptr)");
 
     auto *mg_solver = static_cast<multigrid_solver *>(mg_instance);
     MG *mg = mg_solver->mg;
 
-    // Create or reuse the nested FGI integrator
-    // The deflation manager persists across trajectories for RR evolution
     if (!nestedFGIInstance) {
       nestedFGIInstance = new NestedFGIIntegrator(*hmc_param, *mg, mg_instance, *gauge_param, *inv_param, gaugePrecise,
                                                   gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
                                                   gaugeExtended, momResident);
     }
 
-    // TODO: Generate pseudofermion field phi = D * eta (eta ~ N(0,1))
-    // For now, create a placeholder -- the actual pseudofermion generation
-    // should be done by the caller or added here
-    // ColorSpinorField phi = generatePseudofermion(...);
-
-    // Perform RR evolution of coarse eigenvectors on the updated gauge
     nestedFGIInstance->getDeflationManager().rayleighRitzUpdate();
-
-    // Run the trajectory
-    // nestedFGIInstance->trajectory(hmc_param->tau, hmc_param->n_steps, phi);
-    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Nested FGI trajectory framework ready\n");
+    nestedFGIInstance->trajectory(hmc_param->tau, hmc_param->n_steps, phi);
     break;
   }
 
   default: errorQuda("Unknown integrator type %d", hmc_param->integrator);
   }
 
-  // --- 5. Compute H_final ---
+  // --- 7. Compute H_final ---
   double kinetic_final = computeMomAction(momResident);
-  double H_final = kinetic_final;
-  // TODO: Add gauge + fermion action to H_final
+  double gauge_action_final = computeGaugeAction(hmc_param->beta);
+  double fermion_action_final = computeFermionAction(phi, inv_param);
+  double H_final = kinetic_final + gauge_action_final + fermion_action_final;
 
   double dH = H_final - H_init;
-  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: H_final = %e, dH = %e\n", H_final, dH);
+  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: H_final = %e (kinetic=%e, gauge=%e, fermion=%e), dH = %e\n", H_final,
+          kinetic_final, gauge_action_final, fermion_action_final, dH);
 
-  // --- 6. Copy results back to host ---
+  // --- 8. Copy results back to host ---
   if (hmc_param->return_result_gauge) { saveGaugeQuda(h_gauge, gauge_param); }
 
   if (hmc_param->return_result_mom) {
@@ -5200,14 +5418,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
     cpuMom.copy(momResident);
   }
 
-  // Manage resident fields
-  if (hmc_param->make_resident_gauge) {
-    // gauge is already resident from loadGaugeQuda or was already resident
-  } else if (!hmc_param->use_resident_gauge) {
-    // Free the gauge we loaded
-    freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
-  }
-
+  if (!hmc_param->make_resident_gauge && !hmc_param->use_resident_gauge) { freeUniqueGaugeQuda(QUDA_WILSON_LINKS); }
   if (!hmc_param->make_resident_mom) { momResident = GaugeField(); }
 
   return dH;
@@ -5219,6 +5430,7 @@ void destroyHMCQuda(void)
     delete nestedFGIInstance;
     nestedFGIInstance = nullptr;
   }
+  freeWilsonGaugePaths();
 }
 
 void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)
