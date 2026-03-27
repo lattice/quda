@@ -1210,7 +1210,8 @@ static void openQCD_qudaSolverUpdate(void *param_)
          * field.
          */
         WITH_COMM(logQuda(QUDA_VERBOSE, "Generating Clover field in QUDA ...\n"));
-        PUSH_RANGE("loadCloverQuda", 3);
+        PUSH_RANGE("loadCloverQuda", 3); 
+        printfQuda("DEBUG before loadCloverQuda: param->mu=%f, param->dslash_type=%d\n", param->mu, param->dslash_type);
         WITH_COMM(loadCloverQuda(NULL, NULL, param));
         POP_RANGE;
         clover_field_set_revision();
@@ -1282,6 +1283,7 @@ static void *openQCD_qudaSolverReadIn(int id)
 {
   int my_rank;
   openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
+  printfQuda("DEBUG dp.mu = %f, id = %d\n", dp.mu, id);
 
   MPI_Comm_rank(qudaState.layout.world_comm, &my_rank);
 
@@ -1640,6 +1642,8 @@ static void *openQCD_qudaSolverReadIn(int id)
   additional_prop->u1csw = 0.0;
   additional_prop->qhat = 0.0;
   param->additional_prop = reinterpret_cast<void *>(additional_prop);
+  
+  printfQuda("DEBUG SolverReadIn return: id=%d, param->mu=%f, param->dslash_type=%d\n", id, param->mu, param->dslash_type);
 
   return (void *)param;
 }
@@ -1706,6 +1710,11 @@ void openQCD_qudaDw(void *src, void *dst)
   /* both fields reside on the CPU */
   param->input_location = QUDA_CPU_FIELD_LOCATION;
   param->output_location = QUDA_CPU_FIELD_LOCATION;
+ 
+  printfQuda("==== QUDA InvertParam Debug ====\n");
+  printfQuda("dslash_type: %d\n", param->dslash_type);
+  printfQuda("mu: %f\n", param->mu);
+  printfQuda("================================\n");
 
   void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, src);
   void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 1, dst);
