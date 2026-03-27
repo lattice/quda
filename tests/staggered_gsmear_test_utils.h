@@ -11,13 +11,13 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <dirac_quda.h>
+#include <instantiate.h>
 
-#include <gtest/gtest.h>
-
-#include <misc.h>
-#include <host_utils.h>
+#include "misc.h"
+#include "host_utils.h"
 #include "gauge_utils.h"
 #include "command_line_params.h"
+#include "test.h"
 
 using namespace quda;
 
@@ -152,7 +152,7 @@ struct StaggeredGSmearTestWrapper { //
   void init_ctest_once()
   {
     static bool has_been_called = false;
-    if (has_been_called) { errorQuda("This function is not supposed to be called twice.\n"); }
+    if (has_been_called) { errorQuda("This function is not supposed to be called twice"); }
     is_ctest = true; // Is being used in dslash_ctest.
     has_been_called = true;
   }
@@ -160,7 +160,7 @@ struct StaggeredGSmearTestWrapper { //
   void end_ctest_once()
   {
     static bool has_been_called = false;
-    if (has_been_called) { errorQuda("This function is not supposed to be called twice.\n"); }
+    if (has_been_called) { errorQuda("This function is not supposed to be called twice"); }
     has_been_called = true;
   }
 
@@ -209,7 +209,6 @@ struct StaggeredGSmearTestWrapper { //
 
   void init(int argc, char **argv)
   {
-    setVerbosity(verbosity);
     inv_param.split_grid[0] = grid_partition[0];
     inv_param.split_grid[1] = grid_partition[1];
     inv_param.split_grid[2] = grid_partition[2];

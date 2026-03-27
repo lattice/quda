@@ -35,9 +35,9 @@ template <typename real_t> struct ComputeLinkOrderedOuterProduct {
   }
 };
 
-void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
+void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, size_t nhops)
 {
-  instantiate_host<ComputeLinkOrderedOuterProduct>(precision, src, dst, nhops);
+  instantiate_host<ComputeLinkOrderedOuterProduct>(dst.Precision(), src, dst, nhops);
 }
 
 #define RETURN_IF_ERR                                                                                                  \
@@ -814,9 +814,9 @@ template <typename real_t> struct HisqStaplesForce {
 void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda::GaugeField &link,
                          quda::GaugeField *newOprod)
 {
+  auto precision = quda::checkPrecision(oprod, link, *newOprod);
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
-  QudaPrecision precision = oprod.Precision();
 
   uint64_t len = is_multi_gpu() ? (2 * Vh_ex) : (X_[0] * X_[1] * X_[2] * X_[3]);
 
@@ -913,9 +913,9 @@ template <class real_t> struct ComputeLongLinkField {
 
 void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *newOprod)
 {
+  auto precision = quda::checkPrecision(oprod, link, *newOprod);
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
-  QudaPrecision precision = oprod.Precision();
 
   for (int sig = 0; sig < 4; ++sig) {
     instantiate_host<ComputeLongLinkField>(precision, X_, oprod.data_array().data, link.data_array().data, sig, coeff,
@@ -964,9 +964,9 @@ template <class real_t> struct CompleteForceField {
 
 void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *mom)
 {
+  auto precision = quda::checkPrecision(oprod, link, *mom);
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
-  QudaPrecision precision = oprod.Precision();
 
   for (int sig = 0; sig < 4; ++sig) {
     instantiate_host<CompleteForceField>(precision, X_, oprod.data_array().data, link.data_array().data, sig,

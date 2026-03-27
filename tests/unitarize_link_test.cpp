@@ -3,24 +3,19 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "quda.h"
-#include "timer.h"
-#include "gauge_field.h"
+#include <quda.h>
+#include <timer.h>
+#include <gauge_field.h>
+#include <instantiate.h>
+#include "util_quda.h"
+#include <unitarization_links.h>
+
 #include "host_utils.h"
-#include <command_line_params.h>
+#include "command_line_params.h"
 #include "misc.h"
 #include "test.h"
-#include "util_quda.h"
-#include "llfat_quda.h"
-#include <unitarization_links.h>
 #include "ks_improved_force.h"
-
-#ifdef MULTI_GPU
 #include "comm_quda.h"
-#endif
-
-// google test frame work
-#include <gtest/gtest.h>
 
 #define TDIFF(a, b) (b.tv_sec - a.tv_sec + 0.000001 * (b.tv_usec - a.tv_usec))
 
@@ -33,33 +28,22 @@ static double max_allowed_error = 1e-11;
 
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
-quda::GaugeField *cpuFatLink, *cpuULink, *cudaResult;
-quda::GaugeField *cudaFatLink, *cudaULink;
-
 const double unittol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 
-TEST(unitarization, verify)
+using test_t = ::testing::tuple<QudaPrecision>;
+
+class UnitarizeTest : public ::testing::TestWithParam<test_t>
 {
-  unitarizeLinksCPU(*cpuULink, *cpuFatLink);
-  cudaResult->copy(*cudaULink);
+protected:
+  QudaPrecision precision;
 
-  int res = compare_floats(cudaResult->data(), cpuULink->data(), 4 * cudaResult->Volume() * gauge_site_size, unittol,
-                           cpu_prec);
+public:
+  UnitarizeTest() : precision(::testing::get<0>(GetParam())) { }
+};
 
-#ifdef MULTI_GPU
-  quda::comm_allreduce_int(res);
-  res /= quda::comm_size();
-#endif
-
-  ASSERT_EQ(res, 1) << "CPU and CUDA implementations do not agree";
-}
-
-static int unitarize_link_test(int &test_rc)
+void unitarize(QudaPrecision prec)
 {
-  setVerbosity(verbosity);
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
-
-  qudaGaugeParam.anisotropy = 1.0;
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -69,6 +53,8 @@ static int unitarize_link_test(int &test_rc)
   setDims(qudaGaugeParam.X);
 
   qudaGaugeParam.type = QUDA_WILSON_LINKS;
+
+  qudaGaugeParam.anisotropy = 1.0;
 
   qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
   qudaGaugeParam.anisotropy = 1.0;
@@ -125,21 +111,21 @@ static int unitarize_link_test(int &test_rc)
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge = fatlink;
   gParam.location = QUDA_CPU_FIELD_LOCATION;
-  cpuFatLink = new quda::GaugeField(gParam);
+  auto cpuFatLink = quda::GaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuULink = new quda::GaugeField(gParam);
+  auto cpuULink = quda::GaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaResult = new quda::GaugeField(gParam);
+  auto cudaResult = quda::GaugeField(gParam);
 
   gParam.pad = 0;
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec, true);
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaFatLink = new quda::GaugeField(gParam);
-  cudaULink = new quda::GaugeField(gParam);
+  auto cudaFatLink = quda::GaugeField(gParam);
+  auto cudaULink = quda::GaugeField(gParam);
 
   { // create fat links
     double act_path_coeff[6];
@@ -152,7 +138,7 @@ static int unitarize_link_test(int &test_rc)
 
     computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam);
 
-    cudaFatLink->copy(*cpuFatLink);
+    cudaFatLink.copy(cpuFatLink);
   }
 
   quda::setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
@@ -165,19 +151,22 @@ static int unitarize_link_test(int &test_rc)
   struct timeval t0, t1;
 
   gettimeofday(&t0, NULL);
-  unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
+  unitarizeLinks(cudaULink, cudaFatLink, num_failures_d);
   gettimeofday(&t1, NULL);
 
   if (verify_results) {
-    test_rc = RUN_ALL_TESTS();
-    if (test_rc != 0) warningQuda("Tests failed");
+    unitarizeLinksCPU(cpuULink, cpuFatLink);
+    cudaResult.copy(cudaULink);
+
+    int test_rc
+      = compare_floats(cudaResult.data(), cpuULink.data(), 4 * cudaResult.Volume() * gauge_site_size, unittol, cpu_prec);
+
+    quda::comm_allreduce_int(test_rc);
+    test_rc /= quda::comm_size();
+
+    ASSERT_EQ(test_rc, 1) << "CPU and CUDA implementations do not agree";
   }
 
-  delete cudaResult;
-  delete cpuULink;
-  delete cpuFatLink;
-  delete cudaFatLink;
-  delete cudaULink;
   for (int dir = 0; dir < 4; ++dir) host_free(sitelink[dir]);
 
   host_free(fatlink);
@@ -191,69 +180,61 @@ static int unitarize_link_test(int &test_rc)
 #endif
 
   printfQuda("Unitarization time: %g ms\n", TDIFF(t0, t1) * 1000);
-  return num_failures;
+
+  quda::comm_allreduce_int(num_failures);
+  printfQuda("Number of failures = %d\n", num_failures);
+  ASSERT_EQ(num_failures, 0);
+  if (num_failures > 0) {
+    printfQuda("Failure rate = %lf\n", num_failures / (4.0 * V * quda::comm_size()));
+    printfQuda("You may want to increase the error tolerance or vary the unitarization parameters\n");
+  } else {
+    printfQuda("Unitarization successfull!\n");
+  }
 }
 
-static void display_test_info()
+TEST_P(UnitarizeTest, verify)
 {
-  printfQuda("running the following test:\n");
-
-  printfQuda("link_precision      link_reconstruct           space_dimension        T_dimension    algorithm           "
-             "max allowed error  deviation tolerance\n");
-  printfQuda("%8s              %s                         %d/%d/%d/                 %d            %s         %g        "
-             "     %g\n",
-             get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim,
-             get_unitarization_str(reunit_svd_only), max_allowed_error, unittol);
-
-#ifdef MULTI_GPU
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-#endif
+  prec = ::testing::get<0>(GetParam());
+  if (!quda::is_enabled(prec)) GTEST_SKIP();
+  unitarize(prec);
 }
+
+auto test_str
+  = [](testing::TestParamInfo<test_t> param) { return std::string(get_prec_str(::testing::get<0>(param.param))); };
+
+INSTANTIATE_TEST_SUITE_P(, UnitarizeTest, ::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), test_str);
+
+struct unitarize_test : public quda_test {
+  void display_info() const override
+  {
+    printfQuda(
+      "link_precision      link_reconstruct           space_dimension        T_dimension    algorithm           "
+      "max allowed error  deviation tolerance\n");
+    printfQuda(
+      "%8s              %s                         %d/%d/%d/                 %d            %s         %g        "
+      "     %g\n",
+      get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_unitarization_str(reunit_svd_only),
+      max_allowed_error, unittol);
+  }
+
+  unitarize_test(int argc, char **argv) : quda_test("unitarize_test", argc, argv) { }
+};
 
 int main(int argc, char **argv)
 {
-  // initalize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
-  int test_rc = 0;
+  unitarize_test test(argc, argv);
 
   // default to 18 reconstruct, 8^3 x 8
   link_recon = QUDA_RECONSTRUCT_NO;
   xdim = ydim = zdim = tdim = 8;
 
-  auto app = make_app();
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
+  test.init();
 
-  initComms(argc, argv, gridsize_from_cmdline);
-  initQuda(device_ordinal);
-
-  // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-
-  display_test_info();
-  int num_failures = unitarize_link_test(test_rc);
-  int num_procs = 1;
-#ifdef MULTI_GPU
-  quda::comm_allreduce_int(num_failures);
-  num_procs = quda::comm_size();
-#endif
-
-  printfQuda("Number of failures = %d\n", num_failures);
-  if (num_failures > 0) {
-    printfQuda("Failure rate = %lf\n", num_failures / (4.0 * V * num_procs));
-    printfQuda("You may want to increase the error tolerance or vary the unitarization parameters\n");
+  int test_rc = 0;
+  if (!enable_testing) {
+    unitarize(prec);
   } else {
-    printfQuda("Unitarization successfull!\n");
+    test_rc = test.execute();
   }
-
-  endQuda();
-  finalizeComms();
-
   return test_rc;
 }

@@ -1124,20 +1124,6 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
 endforeach(pol)
 
-# enable the precisions that are compiled
-math(EXPR double_prec  "${QUDA_PRECISION} & 8")
-math(EXPR single_prec  "${QUDA_PRECISION} & 4")
-math(EXPR half_prec    "${QUDA_PRECISION} & 2")
-math(EXPR quarter_prec "${QUDA_PRECISION} & 1")
-
-if(double_prec AND single_prec)
-  set(TEST_PRECS single double)
-elseif(double_prec)
-  set(TEST_PRECS double)
-elseif(single_prec)
-  set(TEST_PRECS single)
-endif()
-
 # Wilson-type Inversions
 if(QUDA_DIRAC_WILSON)
   add_test(NAME invert_test_wilson
@@ -1301,60 +1287,44 @@ if(QUDA_DIRAC_DOMAIN_WALL)
 endif()
 
 # Staggered-type Inversions
-foreach(prec IN LISTS TEST_PRECS)
+if(QUDA_DIRAC_STAGGERED)
+  # --compute-fat-long true is necessary to get well-behaved fields
 
-  # These require looser tolerances to keep iterations to solution in check
-  if(${prec} STREQUAL "double")
-    set(tol 1e-6)
-  elseif(${prec} STREQUAL "single")
-    set(tol 1e-5)
+  add_test(NAME invert_test_staggered
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+    --dim 2 4 6 8 --niter 1000 --enable-testing true
+    --gtest_output=xml:invert_test_staggered.xml)
+
+  add_test(NAME invert_test_splitgrid_staggered
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+    --dim 2 4 6 8 --niter 1000 --nsrc ${QUDA_TEST_NUM_PROCS} --nsrc-tile ${QUDA_TEST_NUM_PROCS}
+    --enable-testing true
+    --gtest_output=xml:invert_test_splitgrid_staggered.xml)
+
+  set_tests_properties(invert_test_splitgrid_staggered PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+
+  add_test(NAME invert_test_asqtad
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+    --dim 6 6 6 8 --niter 1000 --enable-testing true --nsrc 4 --nsrc-tile 4
+    --gtest_output=xml:invert_test_asqtad.xml)
+
+  add_test(NAME invert_test_splitgrid_asqtad
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+    --dim 6 6 6 8 --niter 1000 --nsrc ${QUDA_TEST_NUM_PROCS} --enable-testing true
+    --gtest_output=xml:invert_test_splitgrid_asqtad)
+
+  if (QUDA_DIRAC_LAPLACE)
+    add_test(NAME invert_test_laplace
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type laplace --ngcrkrylov 8 --compute-fat-long true
+      --dim 2 4 6 8 --niter 1000 --enable-testing true
+      --gtest_output=xml:invert_test_laplace.xml)
   endif()
-
-  if(QUDA_DIRAC_STAGGERED)
-    # --compute-fat-long true is necessary to get well-behaved fields
-
-    add_test(NAME invert_test_staggered_${prec}
-      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
-      --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-      --enable-testing true
-      --gtest_output=xml:invert_test_staggered_${prec}.xml)
-
-    add_test(NAME invert_test_splitgrid_staggered_${prec}
-      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
-      --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-      --nsrc ${QUDA_TEST_NUM_PROCS} --nsrc-tile ${QUDA_TEST_NUM_PROCS}
-      --enable-testing true
-      --gtest_output=xml:invert_test_splitgrid_staggered_${prec}.xml)
-
-    set_tests_properties(invert_test_splitgrid_staggered_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
-
-    add_test(NAME invert_test_asqtad_${prec}
-      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
-      --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
-      --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-      --enable-testing true --nsrc 4 --nsrc-tile 4
-      --gtest_output=xml:invert_test_asqtad_${prec}.xml)
-
-    add_test(NAME invert_test_splitgrid_asqtad_${prec}
-      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
-      --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
-      --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-      --nsrc ${QUDA_TEST_NUM_PROCS}
-      --enable-testing true
-      --gtest_output=xml:invert_test_splitgrid_asqtad_${prec}.xml)
-
-    if (QUDA_DIRAC_LAPLACE)
-      add_test(NAME invert_test_laplace_${prec}
-        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
-        --dslash-type laplace --ngcrkrylov 8 --compute-fat-long true
-        --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-        --enable-testing true
-        --gtest_output=xml:invert_test_laplace_${prec}.xml)
-    endif()
-  endif()
-endforeach(prec)
+endif()
 
 # Distance preconditioning for Wilson/clover
 if (QUDA_DIRAC_DISTANCE_PRECONDITIONING)
@@ -1618,44 +1588,27 @@ add_test(NAME gauge_path
   --dim 2 4 6 8 --enable-testing true --niter 1
   --gtest_output=xml:gauge_path_test.xml)
 
-foreach(prec IN LISTS TEST_PRECS)
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME unitarize_link
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
+           --dim 2 4 6 8 --enable-testing true
+           --gtest_output=xml:unitarize_link_test.xml)
 
-  if(QUDA_DIRAC_STAGGERED)
-    add_test(NAME unitarize_link_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:unitarize_link_test_${prec}.xml)
+  add_test(NAME hisq_unitarize_force
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_unitarize_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --enable-testing true
+                   --gtest_output=xml:hisq_unitarize_force_test.xml)
 
-    add_test(NAME hisq_paths_force_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:hisq_paths_force_test_${prec}.xml)
+  add_test(NAME hisq_paths_force
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --enable-testing true
+                   --gtest_output=xml:hisq_paths_force_test}.xml)
 
-    add_test(NAME hisq_unitarize_force_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_unitarize_force_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
-
-    set(KERNEL_TYPE TwoLink GaussianSmear)
-    foreach(kerneltp IN LISTS KERNEL_TYPE)
-      if(${kerneltp} STREQUAL "TwoLink")
-	set(laplace3D 4)
-	set(smear_t0 -1)
-      elseif(${kerneltp} STREQUAL "GaussianSmear")
-	set(laplace3D 3)
-	set(smear_t0 1)
-      endif()	    
-      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
-        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
-        --dim 6 8 10 12 --prec ${prec}
-        --test ${kerneltp}
-	--laplace3D ${laplace3D}
-	--smear-t0 ${smear_t0}
-        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
-    endforeach(kerneltp)
-  endif()
-
-endforeach(prec)
+  add_test(NAME staggered_gsmear
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+           --dim 6 8 10 12 --enable-testing true
+           --gtest_output=xml:staggered_gsmear_test.xml)
+endif()
 
 add_test(NAME gauge_alg
   COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
