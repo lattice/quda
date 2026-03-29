@@ -546,8 +546,8 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   out_flowed = {};
   // tmp = {};
   // delete *rng;
-  if (quda::comm_rank() == 0)
-  write_files(ferm_meas);
+  if ((quda::comm_rank() == 0) && (latfile.size() > 0 )){
+  write_files(ferm_meas);}
   
   
   cleanup();

@@ -5780,22 +5780,37 @@ typedef struct FermMeasObj {
     int meas_interval;
     QudaBoolean take_meas;
     QudaBoolean take_fwd_gflow;
+    QudaBoolean take_pion_meas;
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas, QudaBoolean _take_fwd_gflow) 
-        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas), take_fwd_gflow(_take_fwd_gflow) {}
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas, QudaBoolean _take_fwd_gflow, QudaBoolean _take_pion_meas) 
+        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas), take_fwd_gflow(_take_fwd_gflow), take_pion_meas(_take_pion_meas) {}
 
 } FermMeasObj;
     
 void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile, FermMeasObj *ferm_m)
 {
   const GaugeField gin = *gaugeSmeared;
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+  GaugeField gaugeTemp(gParam);
+  GaugeField precise;
+  GaugeFieldParam gParam_helper(*gaugePrecise);
+  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+  precise = GaugeField(gParam_helper);
+  // else if (tgl.size() == 3) {
+  //     printfQuda("almost at t_2\n");
+  //     gin = tgl[0].get();
+  //     gaugeTemp = tgl[1].get();
+  //     precise = tgl[2].get();
+  // }
+  // else errorQuda("list of gauge fields not equatl to 2 or 3"); 
+  printfQuda("almost at t_2\n");
   GaugeField g_W0 = gin;
   GaugeField g_W1 = gin;
   GaugeField g_W2 = gin;
   GaugeField g_VT = gin;
-  GaugeField gaugeTemp = tgl[0].get();
-  GaugeField precise = tgl[1].get();
+  
   //dont want to create references!!
   std::vector<ColorSpinorField> f_temp0 = f_temp3_p.get();  
   std::vector<ColorSpinorField> f_temp1 = f_temp3_p.get();
@@ -5812,7 +5827,7 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
   int comm_dim[4] = {};
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
-  
+  printfQuda("almost at t_3\n");
   for (unsigned int i = 0; i < ns_safe; i++) {
       
     if (i == 0) g_W0 = gin;
@@ -5860,6 +5875,10 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     blas::axpy(smear_param->epsilon * 3. / 4., f_temp2, f_temp3);
     // apply step W3 (Vt) of gauge field flow part
     GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
+
+    // ferm_m->i_glob++;
+    // if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) DO MEASUREMENTS;
+      
   }
     
 }
@@ -6245,7 +6264,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
   std::vector<std::vector<std::vector<Complex>>> ppb_t;
-  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas, ferm_meas->take_fwd_gflow);
+  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas, ferm_meas->take_fwd_gflow,QUDA_BOOLEAN_FALSE);
 
   std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
@@ -6267,6 +6286,9 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     printfQuda("meas list found\n");
     meas_int_vec = *meas_list_pt;
   }
+
+  std::vector<unsigned int> meas_diff_vec(meas_int_vec.size());
+  std::adjacent_difference(meas_int_vec.begin(), meas_int_vec.end(), meas_diff_vec.begin());
     
   if (!ferm_meas->take_meas)
     algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
@@ -6297,9 +6319,33 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, m, gaugeTemp, precise);
     }
 
-    printfQuda("begin pion correlator measurement\n");
+    if (true){
+        printfQuda("begin pion correlator measurement\n");
+        gin = *gaugeSmeared;
+        std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
 
-    
+        //light quark invert parameter
+        QudaInvertParam *lq_inv_param = inv_param;
+
+        double lq_mass = 0.0102;
+        int dimension = inv_param->laplace3D < 4 ? 3 : 4;
+        double kappa = 1.0 / (2 * dimension + lq_mass);
+
+        lq_inv_param->mass = lq_mass;
+        lq_inv_param->kappa = kappa;
+        // gaugeTemp = gin;
+        // precise = gin;
+
+        
+        for (const auto& m : meas_diff_vec){
+            // t_gf_list = {gin,gaugeTemp,precise};
+            t_gf_list = {gaugeTemp,precise};
+            printfQuda("almost at t_gh\n");
+            gfEvolve(f_temp4,t_gf_list, smear_param, lq_inv_param, m, profileAdjGFlowHier, &ferm_m);
+        }
+
+        
+    }
 
   }
   
