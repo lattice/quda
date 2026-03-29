@@ -5793,18 +5793,26 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
   const GaugeField gin = *gaugeSmeared;
   GaugeFieldParam gParam(*gaugePrecise);
   gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+  
+    
   GaugeField gaugeTemp(gParam);
   GaugeField precise;
+  GaugeField gout;
   GaugeFieldParam gParam_helper(*gaugePrecise);
   gParam_helper.create = QUDA_NULL_FIELD_CREATE;
   precise = GaugeField(gParam_helper);
-  // else if (tgl.size() == 3) {
-  //     printfQuda("almost at t_2\n");
-  //     gin = tgl[0].get();
-  //     gaugeTemp = tgl[1].get();
-  //     precise = tgl[2].get();
-  // }
-  // else errorQuda("list of gauge fields not equatl to 2 or 3"); 
+  if (tgl.size() == 2) {
+      printfQuda("almost at t_2\n");
+      gaugeTemp = tgl[1].get();
+      precise = tgl[2].get();
+  }
+  else if (tgl.size() == 3) {
+      printfQuda("almost at t_2\n");
+      gout = tgl[0].get();
+      gaugeTemp = tgl[1].get();
+      precise = tgl[2].get();
+  }
+  else errorQuda("list of gauge fields not equatl to 2 or 3"); 
   printfQuda("almost at t_2\n");
   GaugeField g_W0 = gin;
   GaugeField g_W1 = gin;
