@@ -5787,7 +5787,7 @@ typedef struct FermMeasObj {
 
 } FermMeasObj;
     
-void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile)
+void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile, FermMeasObj *ferm_m)
 {
   const GaugeField gin = *gaugeSmeared;
   GaugeField g_W0 = gin;
@@ -6032,7 +6032,7 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
       if (ferm_m->take_fwd_gflow && (m != 0)){
         smear_param->n_steps = m;
         t_gf_list = {gaugeTemp,precise};
-        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier);
+        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier, ferm_m);
         printfQuda("checking again\n");
         f_temp4[0].PrintVector(0,0,0);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
@@ -6296,6 +6296,11 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
       perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, m, gaugeTemp, precise);
     }
+
+    printfQuda("begin pion correlator measurement\n");
+
+    
+
   }
   
  

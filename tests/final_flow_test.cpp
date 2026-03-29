@@ -527,6 +527,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   // printfQuda("dot product just out : %f\n",PsiPsibarTest);
   // PsiPsibarTest = quda::blas::cDotProduct(in_raw[0], out[0]);
   // printfQuda("dot product in out : %f\n",PsiPsibarTest);
+
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
 
   printfQuda("At end ppb has %li elements\n",ppb.size());
