@@ -1664,13 +1664,13 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
+          auto vecTmp = vector_load<store_t, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
           memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
+          auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
           memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
         }
 
@@ -1734,7 +1734,7 @@ namespace quda {
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          array<Float, N> vecTmp;
+          array<store_t, N> vecTmp;
           // first do copy converting into storage type
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
@@ -1744,7 +1744,7 @@ namespace quda {
 
         // now save any remainder
         if constexpr (Nrem > 0) {
-          array<Float, Nrem> vecTmp;
+          array<store_t, Nrem> vecTmp;
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
@@ -1761,7 +1761,7 @@ namespace quda {
       {
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          array<Float, N> vecTmp;
+          array<store_t, N> vecTmp;
           // first do copy converting into storage type
           memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
           // second do vectorized copy into memory
@@ -1770,7 +1770,7 @@ namespace quda {
 
         // now save any remainder
         if constexpr (Nrem > 0) {
-          array<Float, Nrem> vecTmp;
+          array<store_t, Nrem> vecTmp;
           memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
           // second do vectorized copy into memory
           vector_store(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
@@ -1786,26 +1786,22 @@ namespace quda {
        */
       __device__ __host__ inline void raw_load_ghost(array<store_t, reconLen> &v, int ghost_idx, int dir, int parity) const
       {
-        if (!ghost[dir]) {
-          raw_load(v, volumeCB + ghost_idx, dir, parity);
-        } else {
 #pragma unroll
-          for (int i = 0; i < M; i++) {
-            auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx);
-            memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
-          }
-
-          if constexpr (Nrem > 0) {
-            auto vecTmp = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
-                                                   parity * faceVolumeCB[dir] + ghost_idx);
-            memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
-          }
-
-          if constexpr (loadPhase)
-            memcpy(&v[M * N + Nrem],
-                   &ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
-                   sizeof(store_t));
+        for (int i = 0; i < M; i++) {
+          auto vecTmp = vector_load<store_t, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx);
+          memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
         }
+
+        if constexpr (Nrem > 0) {
+          auto vecTmp = vector_load<store_t, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
+                                                   parity * faceVolumeCB[dir] + ghost_idx);
+          memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
+        }
+
+        if constexpr (loadPhase)
+          memcpy(&v[M * N + Nrem],
+                 &ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
+                 sizeof(store_t));
       }
 
       /**
@@ -1815,26 +1811,22 @@ namespace quda {
       __device__ __host__ inline void raw_save_ghost(const array<store_t, reconLen> &v, int ghost_idx, int dir,
                                                      int parity) const
       {
-        if (!ghost[dir]) {
-          raw_save(v, volumeCB + ghost_idx, dir, parity);
-        } else {
 #pragma unroll
-          for (int i = 0; i < M; i++) {
-            array<Float, N> vecTmp;
-            memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
-            vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx, vecTmp);
-          }
-
-          if constexpr (Nrem > 0) {
-            array<Float, Nrem> vecTmp;
-            memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
-            vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + ghost_idx, vecTmp);
-          }
-
-          if constexpr (hasPhase)
-            memcpy(&ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
-                   &v[M * N + Nrem], sizeof(store_t));
+        for (int i = 0; i < M; i++) {
+          array<store_t, N> vecTmp;
+          memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
+          vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx, vecTmp);
         }
+
+        if constexpr (Nrem > 0) {
+          array<store_t, Nrem> vecTmp;
+          memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
+          vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + ghost_idx, vecTmp);
+        }
+
+        if constexpr (hasPhase)
+          memcpy(&ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
+                 &v[M * N + Nrem], sizeof(store_t));
       }
 
       /**
@@ -1852,81 +1844,65 @@ namespace quda {
         return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
       }
 
-      __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
       {
-        if (!ghost[dir]) { // load from main field not separate array
-          load(v, volumeCB + x, dir, parity, inphase); // an offset of size volumeCB puts us at the padded region
-          // This also works perfectly when phases are stored. No need to change this.
-        } else {
-          real tmp[reconLen];
+        real tmp[reconLen];
 
 #pragma unroll
-          for (int i = 0; i < M; i++) {
-            // first do vectorized copy from memory into registers
-            auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
-
-            // second do copy converting into register type with combined scaling
-            copy_and_scale(tmp + i * N, vecTmp, combined_scale);
-          }
-
-          // now load any remainder
-          if constexpr (Nrem > 0) {
-            auto vecTmp
-              = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
-            copy_and_scale(tmp + M * N, vecTmp, combined_scale);
-          }
-
-          real phase = 0.;
-
-          if constexpr (hasPhase) {
-            // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
-            //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
-            // } else {
-            if constexpr (isFixed<Float>::value) {
-              copy_and_scale(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
-                             phase_scale);
-            } else {
-              copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x]);
-              phase *= static_cast<real>(2.0);
-            }
-            // }
-          }
-          reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
+        for (int i = 0; i < M; i++) {
+          // first do vectorized copy from memory into registers
+          auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
+          // second do copy converting into register type with combined scaling
+          copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
+
+        // now load any remainder
+        if constexpr (Nrem > 0) {
+          auto vecTmp
+            = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
+          copy_and_scale(tmp + M * N, vecTmp, combined_scale);
+        }
+
+        if constexpr (loadPhase) {
+          if constexpr (isFixed<Float>::value) {
+            copy_and_scale(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
+                           phase_scale);
+          } else {
+            copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x]);
+            phase *= static_cast<real>(2.0);
+          }
+        }
+        reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
       }
 
       __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity) const
       {
-        if (!ghost[dir]) { // store in main field not separate array
-          save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
-        } else {
-          real tmp[reconLen];
-          reconstruct.Pack(tmp, v);
+        real tmp[reconLen];
+        reconstruct.Pack(tmp, v);
 
 #pragma unroll
-          for (int i = 0; i < M; i++) {
-            array<Float, N> vecTmp;
-            // first do copy converting into storage type
+        for (int i = 0; i < M; i++) {
+          array<Float, N> vecTmp;
+          // first do copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
-            // second do vectorized copy into memory
-            vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x, vecTmp);
-          }
+          for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
+          // second do vectorized copy into memory
+          vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x, vecTmp);
+        }
 
-          // now save any remainder
-          if constexpr (Nrem > 0) {
-            array<Float, Nrem> vecTmp;
+        // now save any remainder
+        if constexpr (Nrem > 0) {
+          array<Float, Nrem> vecTmp;
 #pragma unroll
-            for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
-            // second do vectorized copy into memory
-            vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x, vecTmp);
-          }
+          for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
+          // second do vectorized copy into memory
+          vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x, vecTmp);
+        }
 
-          if constexpr (hasPhase) {
-            real phase = reconstruct.getPhase(v);
-            copy(ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
-                 static_cast<real>(0.5) * phase);
-          }
+        if constexpr (hasPhase) {
+          real phase = reconstruct.getPhase(v);
+          copy(ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
+               static_cast<real>(0.5) * phase);
         }
       }
 
