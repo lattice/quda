@@ -3465,11 +3465,11 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
-void invertMultiSrcQudaEG(void **_hp_x, void **_hp_b, QudaInvertParam *param, GaugeField *&gauge)
+void invertMultiSrcQudaEG(void **_hp_x, void **_hp_b, QudaInvertParam *param, GaugeField &gauge)
 {
   auto op = [&](const std::vector<void *> &_x, const std::vector<void *> &_b, QudaInvertParam &param) {
     // check the gauge fields have been created
-    solve(_x, _b, param, *gauge);
+    solve(_x, _b, param, gauge);
   };
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
@@ -5774,8 +5774,10 @@ typedef struct FermMeasObj {
     std::vector<ColorSpinorField> vec_ref;
     int i_glob;
     std::vector<int> meas_list;
+    std::vector<unsigned int> meas_diff_vec;
     // outer vector: flow_time, inner vector: stochastic noise source
     std::vector<std::vector<Complex>> ppb;
+    // outer vector: flow_time, middle vector: stochastic noise source, inner vector: time coordinate
     std::vector<std::vector<std::vector<Complex>>> ppb_t;
     std::vector<std::vector<std::vector<Complex>>> pion_corr;
     int meas_interval;
@@ -5795,33 +5797,6 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
   GaugeField &gin = tgl[0].get();
   GaugeField &gaugeTemp = tgl[1].get();
   GaugeField &precise = tgl[2].get();
-
-    
-  // const GaugeField gin = *gaugeSmeared;
-  // GaugeFieldParam gParam(*gaugePrecise);
-  // gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
-  // GaugeField gaugeTemp(gParam);
-  // GaugeField precise;
-  // GaugeField gout;
-  // GaugeField *gout_pt = nullptr;
-  // gout_pt = createExtendedGauge(*gaugeSmeared, R, profileAdjGFlowHier);
-  // GaugeFieldParam gParam_helper(*gaugePrecise);
-  // gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-  // precise = GaugeField(gParam_helper);
-  // // if (tgl.size() == 2) {
-  // //     printfQuda("almost at t_2\n");
-  // //     gaugeTemp = tgl[1].get();
-  // //     precise = tgl[2].get();
-  // // }
-  // if (tgl.size() == 3) {
-  //     printfQuda("almost at t_2\n");
-  //     *gout_pt = tgl[0].get();
-  //     // gaugeTemp = tgl[1].get();
-  //     // precise = tgl[2].get();
-  // }
-  // else errorQuda("list of gauge fields not equatl to 2 or 3"); 
-  // printfQuda("almost at t_2\n");
-
     
   GaugeField g_W0 = gin;
   GaugeField g_W1 = gin;
@@ -6104,49 +6079,54 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
     
 }
 
-void perform_pion_corr_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3,  QudaInvertParam *inv_param, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param, int m, GaugeField &gaugeTemp,GaugeField &precise)
-    {
+void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3, std::vector<std::reference_wrapper<GaugeField>> t_gf_list, QudaInvertParam *inv_param, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param)
+    { 
       int Nsrc = (int) f_temp4.size();
-      int Nsrc_tile = 1;
-      printfQuda("pion We are here now, m = %i\n",m);
-      std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
-      printfQuda("pion starting another meas\n");
-      // ferm_m->meas_list.push_back(ferm_m->i_glob);
-      f_temp3[0].PrintVector(0,0,0);
-      for (int j = 0; j < Nsrc; j += Nsrc_tile) {
-        for (int i = 0; i < Nsrc_tile; i++) {
-          data_f_temp3_tiled[i] = f_temp3[j + i].data();
-          data_f_temp4_tiled[i] = f_temp4[j + i].data();
-        }
-
-          invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+      int Nsrc_tile = inv_param->num_src;
+      printfQuda("pion We are here now, \n");
+      
+      if (Nsrc > 1){
+          printfQuda("doing multisrc\n");
+          f_temp3[0].PrintVector(0,0,0);
+          std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
+          
+          for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+                for (int i = 0; i < Nsrc_tile; i++) {
+                  data_f_temp3_tiled[i] = f_temp3[j + i].data();
+                  data_f_temp4_tiled[i] = f_temp4[j + i].data();
+                }
+                // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
+                invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
       }
+      }
+      else{
+          printfQuda("doing single source\n");
+invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
+        printfQuda("Now printing f4, \n");}
+        
       f_temp4[0].PrintVector(0,0,0);
 
-      std::vector<std::vector<Complex>> pion_corr_t_el = {};
-    
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
       printfQuda("here?\n");
       std::array<int, 4> mom_modes = {0,0,0,0};
       std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
       std::array<int, 4> source_position = {0,0,0,0};
-      //Why not this?
-      // int source_position = 0;
-      // QudaFFTSymmType fft_modes = eo;
-      // int mom_modes = 0;
-
       QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
-      std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
-
-      for (size_t nn = 0; nn < f_temp4.size(); nn++){
-        std::fill(result_global.begin(), result_global.end(), 0.0);
-        contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
-        //necessary?
-        comm_allreduce_sum(result_global);
-        pion_corr_t_el.push_back(result_global);
-        }
-        ferm_m->pion_corr.push_back(pion_corr_t_el);    
+        
+      for (const auto& m : ferm_m->meas_diff_vec){
+          printQuda("flow a distance of %i\n",m);
+          gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileAdjGFlowHier, ferm_m);
+          std::vector<std::vector<Complex>> pion_corr_t_el = {};
+          std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
     
+          for (size_t nn = 0; nn < f_temp4.size(); nn++){
+            std::fill(result_global.begin(), result_global.end(), 0.0);
+            contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
+            comm_allreduce_sum(result_global);
+            pion_corr_t_el.push_back(result_global);
+            }
+            ferm_m->pion_corr.push_back(pion_corr_t_el);    
+      }
 }
 
 void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list, std::vector<GaugeField> &gauge_stages,
@@ -6320,7 +6300,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     f_temp4.push_back(ColorSpinorField(deviceParam));
     // set [3] = input spinor
     f_temp3[i] = fin[i];
-    if (i == 0) hostParam = cpuParam;
+    if (i == 0) {hostParam = cpuParam; hostParam.create = QUDA_ZERO_FIELD_CREATE;}
   }
   // The following is crucial when inverting matrices on the GPU
   inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
@@ -6332,9 +6312,19 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<std::vector<std::vector<Complex>>> ppb_t;
   FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas, ferm_meas->take_fwd_gflow,QUDA_BOOLEAN_FALSE);
 
-  ColorSpinorField pion_source(hostParam);
-  genericSource(pion_source,QUDA_POINT_SOURCE,0,0,0);
-  ferm_m.pion_source_pt = &pion_source;
+  ColorSpinorParam deviceParam(hostParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  deviceParam.create = QUDA_NULL_FIELD_CREATE;
+
+  std::vector<ColorSpinorField> pion_source_host, pion_source, pion_out;
+
+    for(int j = 0; j < 5; j++){
+        pion_source_host.push_back(ColorSpinorField(hostParam));
+        pion_source.push_back(ColorSpinorField(deviceParam));
+        pion_out.push_back(ColorSpinorField(deviceParam));
+        genericSource(pion_source_host[j],QUDA_POINT_SOURCE,0,0,0);
+        pion_source[j] = pion_source_host[j];
+    }
+      
   std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> sub_gf_list;
@@ -6358,6 +6348,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   std::vector<unsigned int> meas_diff_vec(meas_int_vec.size());
   std::adjacent_difference(meas_int_vec.begin(), meas_int_vec.end(), meas_diff_vec.begin());
+  ferm_m.meas_diff_vec = meas_diff_vec;
     
   if (!ferm_meas->take_meas)
     algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
@@ -6401,13 +6392,11 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
         lq_inv_param->mass = lq_mass;
         lq_inv_param->kappa = kappa;
         t_gf_list = {gcurr,gaugeTemp,precise};
+        auto num_sub_partition = lq_inv_param->num_src/lq_inv_param->num_src_per_sub_partition;
+        lq_inv_param->num_src = pion_source.size();
+        lq_inv_param->num_src_per_sub_partition = lq_inv_param->num_src/num_sub_partition;
         
-        for (const auto& m : meas_diff_vec){
-            
-            printfQuda("almost at t_gh\n");
-            gfEvolve(f_temp4,t_gf_list, smear_param, lq_inv_param, m, profileAdjGFlowHier, &ferm_m);
-            t_gf_list[0].get().PrintMatrix(0,0,0,0);
-        }
+        perform_flow_pion_corr(pion_out,pion_source,t_gf_list,lq_inv_param,&ferm_m,smear_param);
 
         
     }
