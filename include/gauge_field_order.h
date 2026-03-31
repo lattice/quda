@@ -1636,14 +1636,14 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
+          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
+          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -1664,13 +1664,13 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<store_t, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
+          auto vecTmp = vector_load<store_t, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
           memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
+          auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x);
           memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
         }
 
@@ -1683,11 +1683,11 @@ namespace quda {
         if constexpr (type == PrefetchType::THREAD) { // use per-thread prefetching
 #pragma unroll
           for (int i = 0; i < M; i++)
-            prefetch_cache_line(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N));
+            prefetch_cache_line(gauge + (parity * offset + dir * (M * N) * stride + (i * stride + x) * N));
 
           // now load any remainder
           if constexpr (Nrem > 0)
-            prefetch_cache_line(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
+            prefetch_cache_line(gauge + (parity * offset + (geometry * M * N + dir * Nrem) * stride + x * Nrem));
 
           if constexpr (loadPhase) prefetch_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
         } else if constexpr (type == PrefetchType::BULK) { // bulk prefetch
@@ -1695,12 +1695,12 @@ namespace quda {
           if (target::is_thread_zero()) {
 #pragma unroll
             for (int i = 0; i < M; i++)
-              prefetch_cache_bulk(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N),
+              prefetch_cache_bulk(gauge + (parity * offset + dir * (M * N) * stride + (i * stride + x) * N),
                                   block_size * N * sizeof(Float));
 
             // now load any remainder
             if constexpr (Nrem > 0)
-              prefetch_cache_bulk(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem),
+              prefetch_cache_bulk(gauge + (parity * offset + (geometry * M * N + dir * Nrem) * stride + x * Nrem),
                                   block_size * Nrem * sizeof(Float));
 
             if constexpr (loadPhase)
@@ -1716,11 +1716,11 @@ namespace quda {
         } else { // L1 prefetching
 #pragma unroll
           for (int i = 0; i < M; i++)
-            prefetch_L1_cache_line(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N));
+            prefetch_L1_cache_line(gauge + (parity * offset + dir * (M * N) * stride + (i * stride + x) * N));
 
           // now load any remainder
           if constexpr (Nrem > 0)
-            prefetch_L1_cache_line(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
+            prefetch_L1_cache_line(gauge + (parity * offset + (geometry * M * N + dir * Nrem) * stride + x * Nrem));
 
           if constexpr (loadPhase) prefetch_L1_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
 #endif
@@ -1739,7 +1739,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
           // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
+          vector_store(gauge, parity * offset + dir * (M * N) * stride, x + i * stride, vecTmp);
         }
 
         // now save any remainder
@@ -1748,7 +1748,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
+          vector_store(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x, vecTmp);
         }
 
         if constexpr (hasPhase) {
@@ -1765,7 +1765,7 @@ namespace quda {
           // first do copy converting into storage type
           memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
           // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
+          vector_store(gauge, parity * offset + dir * (M * N) * stride, x + i * stride, vecTmp);
         }
 
         // now save any remainder
@@ -1773,7 +1773,7 @@ namespace quda {
           array<store_t, Nrem> vecTmp;
           memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
           // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
+          vector_store(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x, vecTmp);
         }
 
         if constexpr (hasPhase)
