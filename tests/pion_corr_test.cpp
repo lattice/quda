@@ -170,78 +170,43 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   if (!std::filesystem::is_directory(output_dir)){
       std::filesystem::create_directories(output_dir);
   } 
-  std::string quark_str = n_naiks > 1 ? "_cbarc" : "_sbars";
   std::string output_filestr;
   output_filestr = "_mq" + std::to_string(mass);
-  output_filestr += "_naik" + std::to_string(eps_naik);
-  output_filestr += "_start" + std::to_string(start_seed) + "_Nsrc" + std::to_string(Nsrc);
 
-  std::string filename_allcon = output_dir.string()+"/allcon"+output_filestr;
-  std::string filename_tslice = output_dir.string()+"/tslice"+output_filestr;
+  std::string filename_picorr = output_dir.string()+"/picorr"+output_filestr;
 
   auto* flow_int_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas.meas_int_vec);
-  auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
+  auto* pion_corr_data =reinterpret_cast<std::vector<std::vector<std::vector<std::complex<double>>>>*>(ferm_meas.pion_corr);
+                        
   printfQuda("flow vec size %i \n",(*flow_int_pt).size());
-  printfQuda("ppb data size %i \n",(*ppb_data).size());
 
-  std::ofstream out_ppb(filename_allcon);
-  std::vector<std::ofstream> out_ppb_vec, out_ppb_t_vec, out_pion_corr_vec;
-  out_ppb_t_vec.reserve(ppb_data->size());
-  for (int i = 0; i < ppb_data->size(); i++){
+  std::vector<std::ofstream> out_pion_corr_vec;
+  out_pion_corr_vec.reserve(pion_corr_data->size());
+  for (int i = 0; i < pion_corr_data->size(); i++){
     std::string flowN_s = (i == 0) ? std::to_string(0) : std::to_string(flow_int_pt->at(i-1));
     std::string epsF_s =  (i == 0) ? "" : "_epsF" + std::to_string(gauge_smear_epsilon);
-    std::string flow_file_name(filename_tslice+"_FT"+flowN_s+epsF_s);
-    out_ppb_t_vec.emplace_back(flow_file_name);
-    // out_pion_corr_vec.emplace_back(flow_file_name);
-    if (!out_ppb_t_vec.back().is_open()) {
-        printfQuda("Error: failed to open ppb_t flow file #%i\n",i);
+    std::string flow_file_name(filename_picorr+"_FT"+flowN_s+epsF_s);
+    out_pion_corr_vec.emplace_back(flow_file_name);
+    if (!out_pion_corr_vec.back().is_open()) {
+        printfQuda("Error: failed to open pion_corr flow file #%i\n",i);
     } else {
         printfQuda("Successfully opened flow file #%i\n",i);
     }
-    // if (!out_pion_corr_vec.back().is_open()) {
-    //     printfQuda("Error: failed to open pion_corr flow file #%i\n",i);
-    // } else {
-    //     printfQuda("Successfully opened flow file #%i\n",i);
-    // }
   }
-  
-    //stuff works above
-  if (!out_ppb.is_open()) {
-      std::cerr << "Failed to open file: " << filename_allcon << std::endl;
-  }
-    
-  for (const auto& row : *ppb_data) {
-      for (const auto& elem : row) {
-          out_ppb << elem.real()/(V*comm_size()) << " ";
-      }
-      out_ppb << "\n"; // Newline after each row
-  }
-  out_ppb.close();
-
-  std::ofstream out_ppb_t(filename_tslice);
-  if (!out_ppb_t.is_open()) {
-      std::cerr << "Failed to open file: " << filename_tslice << std::endl;
-  }
-  auto* ppb_t_data = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas.ppb_t);
 
   unsigned int flow_idx = 0;
-  for (const auto& flow_t: *ppb_t_data) {
-      assert(out_ppb_t_vec[flow_idx].good());
+  for (const auto& flow_t: *pion_corr_data) {
+      assert(out_pion_corr_vec[flow_idx].good());
       printfQuda("begin writing flow time #%i\n",flow_idx);
       for (const auto& s_src : flow_t) {
-        // out_ppb_t << "next source\n";
         for (const auto& elem : s_src) {
-          out_ppb_t << elem.real()/(V*comm_size()) << " ";
-          out_ppb_t_vec[flow_idx] << elem.real()/(V*comm_size()) << " ";
+          out_pion_corr_vec[flow_idx] << elem.real()/(V*comm_size()) << " ";
         }
-        out_ppb_t << "\n";
-        out_ppb_t_vec[flow_idx] << "\n";
+        out_pion_corr_vec[flow_idx] << "\n";
       }
-    out_ppb_t << "\n";
     // out_ppb_t_vec[flow_idx].close();
     flow_idx += 1;
   }
-  out_ppb_t.close();
 }
 
 void init()
@@ -454,16 +419,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
     
-  std::vector<quda::ColorSpinorField> in_raw(Nsrc,cs_param);
-  std::vector<quda::ColorSpinorField> in(Nsrc,cs_param);
-  std::vector<quda::ColorSpinorField> out(Nsrc,cs_param);
-  std::vector<quda::ColorSpinorField> out_flowed(Nsrc,cs_param);
 
-
-  std::vector<void *> in_raw_ptr(Nsrc);
-  std::vector<void *> in_ptr(Nsrc);
-  std::vector<void *> out_ptr(Nsrc);
-  std::vector<void *> out_flowed_ptr(Nsrc);
 
     auto meas_int_vec = read_meas_int_vec();
     QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
@@ -471,21 +427,12 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     ferm_meas.take_fwd_gflow = (QudaBoolean) take_fwd_gflow;
     ferm_meas.meas_int = measurement_interval;
     ferm_meas.meas_int_vec = (void *) &meas_int_vec;
-    std::vector<std::vector<std::complex<double>>> ppb;
-    std::vector<std::vector<std::vector<std::complex<double>>>> ppb_t;
     std::vector<std::vector<std::vector<std::complex<double>>>> pion_corr;
-    void* ptr_ppb = &ppb;
-    void** data_ppb = &ptr_ppb;
-    ferm_meas.ppb = data_ppb;
-    void* data_ppb_t = &ppb_t;
-    ferm_meas.ppb_t = data_ppb_t;
     void* data_pion_corr = &pion_corr;
     ferm_meas.pion_corr = data_pion_corr;
     std::vector<int> meas_list;
     ferm_meas.meas_list = (void *) &meas_list;
-
-    printfQuda("At start ppb has %li elements\n",ppb.size());
-    printfQuda("At start ppb_t has %li elements\n",ppb_t.size());
+    printfQuda("At start pion_corr has %li elements\n",pion_corr.size());
     //simulates what user might do from external library
 
 // Prepare rng, fill host spinors with random numbers
@@ -494,55 +441,33 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   std::vector<double> time(Nsrc);
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
+  assert(Nsrc == 1);
+  
+  std::vector<quda::ColorSpinorField> pion_source(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> out(Nsrc,cs_param);
 
-  // Create a temporary spinor just to seed the rng
-  // quda::ColorSpinorField tmp(cs_param);
-  // quda::RNG rng(tmp, 1234);
-  // tmp = quda::ColorSpinorField();
+  quda::ColorSpinorField one_field(cs_param);
+  genericSource(one_field,QUDA_CONSTANT_SOURCE,1,0,0);
 
+
+  std::vector<void *> pion_source_ptr(Nsrc);
+  std::vector<void *> out_ptr(Nsrc);
+    
   for (int n = 0; n < Nsrc; n++) {
-    // Populate the host spinor with random numbers.
-    quda::spinorNoise(in_raw[n], n + start_seed, QUDA_NOISE_GAUSS);
-    in_raw_ptr[n] = in_raw[n].data();
-    in_ptr[n] = in[n].data();
+    // Populate the host spinor with source points.
+    genericSource(pion_source[n],QUDA_POINT_SOURCE,0,0,0);
+    pion_source_ptr[n] = pion_source[n].data();
     out_ptr[n] = out[n].data();
-    out_flowed_ptr[n] = out_flowed[n].data();
+    if (false){
+        std::complex<double> dott = quda::blas::cDotProduct(pion_source[n],one_field);
+        double dot_real = dott.real();
+        printfQuda("dott %f\n",dot_real);
+        printfQuda("comm_dim first %d\n",comm_dim(3));
+        genericPrintVector(pion_source[n],0,0);
+    }
   }
 
-  quda::ColorSpinorField pion_source(cs_param);
-  quda::ColorSpinorField one_field(cs_param);
-  // genericSource(pion_source,QUDA_CONSTANT_SOURCE,0,0,0);
-  genericSource(pion_source,QUDA_POINT_SOURCE,0,0,0);
-  genericSource(one_field,QUDA_CONSTANT_SOURCE,1,0,0);
-  std::complex<double> dott = quda::blas::cDotProduct(pion_source,one_field);
-  double dot_real = dott.real();
-  printfQuda("dott %f\n",dot_real);
-  printfQuda("comm_dim first %d\n",comm_dim(3));
-  // pion_source.PrintVector(0,0,0);
-  // pion_source.PrintVector(1,0,0);
-  genericPrintVector(pion_source,0,0);
-    //BAD
-  // genericPrintVector(pion_source,0,0,1);
-  
-  int origin[4] = {0, 0, 0, 0};
-  auto x_cb_true = linkIndex(origin, pion_source.X() );
-  auto which_rank = lex_rank_from_coords_t(origin, (void*)pion_source.X());
-  
-  // Topology *topo = quda::comm_default_topology();
-  // auto which_rank = quda::comm_rank_from_coords(topo,origin);
-  // auto which_rank = comm_coords(origin);
-  // invertQuda(out[0].data(), in_raw[0].data(), &inv_param);
-  // in_raw[0].PrintVector(0,0,0);
-  // out[0].PrintVector(0,0,0);
-  // auto PsiPsibarTest = quda::blas::cDotProduct(out[0], out[0]);
-  // printfQuda("dot product just out : %f\n",PsiPsibarTest);
-  // PsiPsibarTest = quda::blas::cDotProduct(in_raw[0], out[0]);
-  // printfQuda("dot product in out : %f\n",PsiPsibarTest);
-
-  performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
-
-  printfQuda("At end ppb has %li elements\n",ppb.size());
-  printfQuda("At end ppb_t has %li elements\n",ppb_t.size());
+  computeFlowedPionCorrelator(out_ptr.data(),pion_source_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
 
   printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
                  inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
@@ -551,12 +476,9 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
                    inv_param.energy, inv_param.energy / Nsrc_tile, inv_param.power, inv_param.temp, inv_param.clock);
       }
 
-  in_raw = {};
-  in = {};
+  pion_source = {};
   out = {};
-  out_flowed = {};
-  // tmp = {};
-  // delete *rng;
+
   if ((quda::comm_rank() == 0) && (latfile.size() > 0 )){
   write_files(ferm_meas);}
   

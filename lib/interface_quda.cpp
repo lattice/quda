@@ -205,6 +205,9 @@ static TimeProfile profileAdjGFlowSafe("AdjgFlowSafeQuda");
 //!< Profiler for AdjgFlowHierQuda
 static TimeProfile profileAdjGFlowHier("AdjgFlowHierQuda");
 
+//!< Profiler for AdjgFlowHierQuda
+static TimeProfile profileFlowedPionCorrelator("FlowedPionCorrelator");
+
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
 
@@ -5771,9 +5774,12 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 }
 
 typedef struct FermMeasObj {
+    //reference *copy* of initial source vector(s)
     std::vector<ColorSpinorField> vec_ref;
-    int i_glob;
-    std::vector<int> meas_list;
+    int i_glob = 0;
+    //meas_list aims to be a list that accrues measurement points s calculations proceed, to check that all is working as is intended 
+    std::vector<int> meas_list = {};
+    std::vector<unsigned int> meas_int_vec;
     std::vector<unsigned int> meas_diff_vec;
     // outer vector: flow_time, inner vector: stochastic noise source
     std::vector<std::vector<Complex>> ppb;
@@ -5787,8 +5793,8 @@ typedef struct FermMeasObj {
     ColorSpinorField *pion_source_pt=nullptr;
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas, QudaBoolean _take_fwd_gflow, QudaBoolean _take_pion_meas) 
-        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas), take_fwd_gflow(_take_fwd_gflow), take_pion_meas(_take_pion_meas) {}
+    // FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas, QudaBoolean _take_fwd_gflow, QudaBoolean _take_pion_meas) 
+    //     : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas), take_fwd_gflow(_take_fwd_gflow), take_pion_meas(_take_pion_meas) {}
 
 } FermMeasObj;
     
@@ -6102,7 +6108,7 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
       else{
           printfQuda("doing single source\n");
 invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
-        printfQuda("Now printing f4, \n");}
+}
         
       f_temp4[0].PrintVector(0,0,0);
 
@@ -6114,8 +6120,8 @@ invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
       QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
         
       for (const auto& m : ferm_m->meas_diff_vec){
-          printQuda("flow a distance of %i\n",m);
-          gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileAdjGFlowHier, ferm_m);
+          printfQuda("flow a distance of %i\n",m);
+          gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedPionCorrelator, ferm_m);
           std::vector<std::vector<Complex>> pion_corr_t_el = {};
           std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
     
@@ -6281,7 +6287,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   precise = GaugeField(gParam_helper);
 
   // spinor fields, fout_h not needed
-  std::vector<ColorSpinorField> fin_h, fin, fout, fout_h;
+  std::vector<ColorSpinorField> fin_h, fin, fout;
   // auxilliary fermion fields [0], [1], [2] and [3]
   std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
     ColorSpinorParam hostParam;
@@ -6310,8 +6316,14 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
   std::vector<std::vector<std::vector<Complex>>> ppb_t;
-  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas, ferm_meas->take_fwd_gflow,QUDA_BOOLEAN_FALSE);
-
+  // FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas, ferm_meas->take_fwd_gflow,QUDA_BOOLEAN_FALSE);
+  FermMeasObj ferm_m;
+  ferm_m.vec_ref = fin;
+  ferm_m.ppb = ppb;
+  ferm_m.meas_interval = ferm_meas->meas_int;
+  ferm_m.take_meas = ferm_meas->take_meas;
+  ferm_m.take_fwd_gflow = ferm_meas->take_fwd_gflow;
+  
   ColorSpinorParam deviceParam(hostParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
   deviceParam.create = QUDA_NULL_FIELD_CREATE;
 
@@ -6348,6 +6360,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   std::vector<unsigned int> meas_diff_vec(meas_int_vec.size());
   std::adjacent_difference(meas_int_vec.begin(), meas_int_vec.end(), meas_diff_vec.begin());
+  ferm_m.meas_int_vec = meas_int_vec;
   ferm_m.meas_diff_vec = meas_diff_vec;
     
   if (!ferm_meas->take_meas)
@@ -6423,16 +6436,118 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
           ppb_ptr->push_back(ferm_m.ppb[i]);
       }
 
-
       auto* ppb_t_ptr = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas->ppb_t);
       size_t nft_ppb = ferm_m.ppb_t.size();
       for (size_t i = 0; i < nft_ppb; i++){
           ppb_t_ptr->push_back(ferm_m.ppb_t[i]);
       }
+
+      auto* pion_corr_ptr = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas->pion_corr);
+      size_t nft_pion_corr = ferm_m.pion_corr.size();
+      for (size_t i = 0; i < nft_pion_corr; i++){
+          pion_corr_ptr->push_back(ferm_m.pion_corr[i]);
+      }
         
       auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
       size_t len_meas_list = ferm_m.meas_list.size();  
       printfQuda("size of meas list recon %li\n",len_ppb);
+      for (size_t i = 0; i < len_meas_list; i++){
+          meas_list_ptr->push_back(ferm_m.meas_list[i]);
+      }
+
+      
+  }
+  logQuda(QUDA_DEBUG_VERBOSE, "Spinor written to cpu \n");
+  popOutputPrefix();
+}
+
+void computeFlowedPionCorrelator(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
+                         size_t nSpinors)
+{
+
+  auto profile = pushProfile(profileFlowedPionCorrelator);
+  pushOutputPrefix("performFlowedPionCorrelator: ");
+  checkGaugeSmearParam(smear_param);
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  if (smear_param->restart) {
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared must be loaded");
+  } else {
+    if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+    freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
+    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAdjGFlowHier);
+  }
+
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+  GaugeField gaugeTemp(gParam);
+  GaugeField gin = *gaugeSmeared;
+
+  // helper gauge field for Laplace operator
+  GaugeField precise;
+  GaugeFieldParam gParam_helper(*gaugePrecise);
+  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+  precise = GaugeField(gParam_helper);
+
+  // spinor fields, fout_h not needed
+  std::vector<ColorSpinorField> fin_h, fin, fout;
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+    fin_h.push_back(ColorSpinorField(cpuParam));
+    ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+    fin.push_back(ColorSpinorField(deviceParam));
+    fin[i] = fin_h[i];
+    deviceParam.create = QUDA_NULL_FIELD_CREATE;
+    fout.push_back(ColorSpinorField(deviceParam));
+  }
+  // The following is crucial when inverting matrices on the GPU
+  inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
+  inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
+  inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
+
+  std::vector<std::reference_wrapper<GaugeField>> t_gf_list = {gin,gaugeTemp,precise};
+
+  std::vector<unsigned int> meas_int_vec = {};
+  auto* meas_list_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas->meas_int_vec);
+  if (meas_list_pt == nullptr){
+    printfQuda("meas list not populated yet, populating now\n");
+    for (int m=ferm_meas->meas_int; m <= smear_param->n_steps; m = m + ferm_meas->meas_int){
+        meas_int_vec.push_back(m);
+    }
+  }
+  else{
+    printfQuda("meas list found\n");
+    meas_int_vec = *meas_list_pt;
+  }
+
+  std::vector<unsigned int> meas_diff_vec(meas_int_vec.size());
+  std::adjacent_difference(meas_int_vec.begin(), meas_int_vec.end(), meas_diff_vec.begin());
+  FermMeasObj ferm_m;
+  ferm_m.meas_diff_vec = meas_diff_vec;
+  perform_flow_pion_corr(fout,fin,t_gf_list,inv_param,&ferm_m,smear_param);
+
+      //get back on cpu
+  inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
+  inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
+  inv_param->dirac_order=QUDA_DIRAC_ORDER;
+
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
+    ColorSpinorField fout_h(cpuParam);
+    fout_h = fout[i];
+  }
+    if ( ferm_meas->take_meas){
+      auto* pion_corr_ptr = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas->pion_corr);
+      size_t nft_pion_corr = ferm_m.pion_corr.size();
+      for (size_t i = 0; i < nft_pion_corr; i++){
+          pion_corr_ptr->push_back(ferm_m.pion_corr[i]);
+      }
+        
+      auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
+      size_t len_meas_list = ferm_m.meas_list.size();  
+      printfQuda("size of meas list recon %li\n",len_meas_list);
       for (size_t i = 0; i < len_meas_list; i++){
           meas_list_ptr->push_back(ferm_m.meas_list[i]);
       }
