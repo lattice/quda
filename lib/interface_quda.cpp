@@ -6111,7 +6111,7 @@ invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
 }
         
       f_temp4[0].PrintVector(0,0,0);
-
+      f_temp4[0].PrintVector(1,0,0);
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
       printfQuda("here?\n");
       std::array<int, 4> mom_modes = {0,0,0,0};
@@ -6120,18 +6120,20 @@ invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
       QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
         
       for (const auto& m : ferm_m->meas_diff_vec){
-          printfQuda("flow a distance of %i\n",m);
-          gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedPionCorrelator, ferm_m);
+          
           std::vector<std::vector<Complex>> pion_corr_t_el = {};
           std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
     
           for (size_t nn = 0; nn < f_temp4.size(); nn++){
             std::fill(result_global.begin(), result_global.end(), 0.0);
-            contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
+            contractSummedQuda(f_temp4[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
             comm_allreduce_sum(result_global);
             pion_corr_t_el.push_back(result_global);
+              printfQuda("elemendt of reslt %f\n",result_global[2].real());
             }
-            ferm_m->pion_corr.push_back(pion_corr_t_el);    
+            ferm_m->pion_corr.push_back(pion_corr_t_el);
+          printfQuda("flow a distance of %i\n",m);
+          gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedPionCorrelator, ferm_m);
       }
 }
 
