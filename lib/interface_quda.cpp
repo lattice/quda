@@ -6292,7 +6292,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<ColorSpinorField> fin_h, fin, fout;
   // auxilliary fermion fields [0], [1], [2] and [3]
   std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
-    ColorSpinorParam hostParam;
   for (size_t i = 0; i < nSpinors; i++) {
     ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
     fin_h.push_back(ColorSpinorField(cpuParam));
@@ -6308,7 +6307,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     f_temp4.push_back(ColorSpinorField(deviceParam));
     // set [3] = input spinor
     f_temp3[i] = fin[i];
-    if (i == 0) {hostParam = cpuParam; hostParam.create = QUDA_ZERO_FIELD_CREATE;}
   }
   // The following is crucial when inverting matrices on the GPU
   inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
@@ -6328,16 +6326,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   
   ColorSpinorParam deviceParam(hostParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
   deviceParam.create = QUDA_NULL_FIELD_CREATE;
-
-  std::vector<ColorSpinorField> pion_source_host, pion_source, pion_out;
-
-    for(int j = 0; j < 5; j++){
-        pion_source_host.push_back(ColorSpinorField(hostParam));
-        pion_source.push_back(ColorSpinorField(deviceParam));
-        pion_out.push_back(ColorSpinorField(deviceParam));
-        genericSource(pion_source_host[j],QUDA_POINT_SOURCE,0,0,0);
-        pion_source[j] = pion_source_host[j];
-    }
       
   std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
@@ -6394,28 +6382,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, m, gaugeTemp, precise);
     }
 
-    if (true){
-        printfQuda("begin pion correlator measurement\n");
-        GaugeField gcurr = gin;
-        std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
-        QudaInvertParam *lq_inv_param = inv_param;
-
-        double lq_mass = 0.0102;
-        int dimension = inv_param->laplace3D < 4 ? 3 : 4;
-        double kappa = 1.0 / (2 * dimension + lq_mass);
-
-        lq_inv_param->mass = lq_mass;
-        lq_inv_param->kappa = kappa;
-        t_gf_list = {gcurr,gaugeTemp,precise};
-        auto num_sub_partition = lq_inv_param->num_src/lq_inv_param->num_src_per_sub_partition;
-        lq_inv_param->num_src = pion_source.size();
-        lq_inv_param->num_src_per_sub_partition = lq_inv_param->num_src/num_sub_partition;
-        
-        perform_flow_pion_corr(pion_out,pion_source,t_gf_list,lq_inv_param,&ferm_m,smear_param);
-
-        
-    }
-
   }
   
  
@@ -6442,12 +6408,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       size_t nft_ppb = ferm_m.ppb_t.size();
       for (size_t i = 0; i < nft_ppb; i++){
           ppb_t_ptr->push_back(ferm_m.ppb_t[i]);
-      }
-
-      auto* pion_corr_ptr = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas->pion_corr);
-      size_t nft_pion_corr = ferm_m.pion_corr.size();
-      for (size_t i = 0; i < nft_pion_corr; i++){
-          pion_corr_ptr->push_back(ferm_m.pion_corr[i]);
       }
         
       auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);

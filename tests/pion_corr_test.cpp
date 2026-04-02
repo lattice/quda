@@ -31,6 +31,7 @@ bool use_multi_src = false;
 
 int start_seed = 0;
 std::string meas_vec_file_str = "";
+std::string source_vec_file_str = "";
 
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
@@ -143,6 +144,14 @@ std::vector<unsigned int> read_meas_int_vec()
     return res;
 }
 
+// std::vector<unsigned int> std::vector<> read_source_points()
+// {
+//     std::vector<unsigned int> res = {};
+//     std::ifstream file(source_vec_file_str);
+//     return res;
+ 
+// }
+
 int linkIndex(const int* x, const int* X) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     return idx;
@@ -200,11 +209,12 @@ void write_files(const QudaFermMeasurements &ferm_meas)
       printfQuda("begin writing flow time #%i\n",flow_idx);
       for (const auto& s_src : flow_t) {
         for (const auto& elem : s_src) {
-          out_pion_corr_vec[flow_idx] << elem.real()/(V*comm_size()) << " ";
+          // We will not be normalizing by volume
+          // out_pion_corr_vec[flow_idx] << elem.real()/(V*comm_size()) << " ";
+          out_pion_corr_vec[flow_idx] << elem.real() << " ";
         }
         out_pion_corr_vec[flow_idx] << "\n";
       }
-    // out_ppb_t_vec[flow_idx].close();
     flow_idx += 1;
   }
 }
