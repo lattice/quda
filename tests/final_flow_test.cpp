@@ -495,11 +495,6 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  // Create a temporary spinor just to seed the rng
-  // quda::ColorSpinorField tmp(cs_param);
-  // quda::RNG rng(tmp, 1234);
-  // tmp = quda::ColorSpinorField();
-
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
     quda::spinorNoise(in_raw[n], n + start_seed, QUDA_NOISE_GAUSS);
@@ -508,36 +503,6 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     out_ptr[n] = out[n].data();
     out_flowed_ptr[n] = out_flowed[n].data();
   }
-
-  quda::ColorSpinorField pion_source(cs_param);
-  quda::ColorSpinorField one_field(cs_param);
-  // genericSource(pion_source,QUDA_CONSTANT_SOURCE,0,0,0);
-  genericSource(pion_source,QUDA_POINT_SOURCE,0,0,0);
-  genericSource(one_field,QUDA_CONSTANT_SOURCE,1,0,0);
-  std::complex<double> dott = quda::blas::cDotProduct(pion_source,one_field);
-  double dot_real = dott.real();
-  printfQuda("dott %f\n",dot_real);
-  printfQuda("comm_dim first %d\n",comm_dim(3));
-  // pion_source.PrintVector(0,0,0);
-  // pion_source.PrintVector(1,0,0);
-  genericPrintVector(pion_source,0,0);
-    //BAD
-  // genericPrintVector(pion_source,0,0,1);
-  
-  int origin[4] = {0, 0, 0, 0};
-  auto x_cb_true = linkIndex(origin, pion_source.X() );
-  auto which_rank = lex_rank_from_coords_t(origin, (void*)pion_source.X());
-  
-  // Topology *topo = quda::comm_default_topology();
-  // auto which_rank = quda::comm_rank_from_coords(topo,origin);
-  // auto which_rank = comm_coords(origin);
-  // invertQuda(out[0].data(), in_raw[0].data(), &inv_param);
-  // in_raw[0].PrintVector(0,0,0);
-  // out[0].PrintVector(0,0,0);
-  // auto PsiPsibarTest = quda::blas::cDotProduct(out[0], out[0]);
-  // printfQuda("dot product just out : %f\n",PsiPsibarTest);
-  // PsiPsibarTest = quda::blas::cDotProduct(in_raw[0], out[0]);
-  // printfQuda("dot product in out : %f\n",PsiPsibarTest);
 
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
 

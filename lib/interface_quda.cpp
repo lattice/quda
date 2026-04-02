@@ -6111,7 +6111,6 @@ invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
 }
         
       f_temp4[0].PrintVector(0,0,0);
-      f_temp4[0].PrintVector(1,0,0);
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
       printfQuda("here?\n");
       std::array<int, 4> mom_modes = {0,0,0,0};
@@ -6120,7 +6119,10 @@ invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
       QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
         
       for (const auto& m : ferm_m->meas_diff_vec){
-          
+          printfQuda("flow a distance of %i\n",m);
+          if (m != 0){
+            gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedPionCorrelator, ferm_m);
+          }
           std::vector<std::vector<Complex>> pion_corr_t_el = {};
           std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
     
@@ -6129,11 +6131,10 @@ invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
             contractSummedQuda(f_temp4[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
             comm_allreduce_sum(result_global);
             pion_corr_t_el.push_back(result_global);
-              printfQuda("elemendt of reslt %f\n",result_global[2].real());
             }
             ferm_m->pion_corr.push_back(pion_corr_t_el);
-          printfQuda("flow a distance of %i\n",m);
-          gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedPionCorrelator, ferm_m);
+          
+          
       }
 }
 
@@ -6323,9 +6324,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   ferm_m.meas_interval = ferm_meas->meas_int;
   ferm_m.take_meas = ferm_meas->take_meas;
   ferm_m.take_fwd_gflow = ferm_meas->take_fwd_gflow;
-  
-  ColorSpinorParam deviceParam(hostParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  deviceParam.create = QUDA_NULL_FIELD_CREATE;
       
   std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
@@ -6486,6 +6484,8 @@ void computeFlowedPionCorrelator(void **h_out, void **h_in, QudaInvertParam *inv
 
   std::vector<unsigned int> meas_diff_vec(meas_int_vec.size());
   std::adjacent_difference(meas_int_vec.begin(), meas_int_vec.end(), meas_diff_vec.begin());
+  printfQuda("add zero to the beggining\n");
+  meas_diff_vec.insert(meas_diff_vec.begin(), 0);
   FermMeasObj ferm_m;
   ferm_m.meas_diff_vec = meas_diff_vec;
   perform_flow_pion_corr(fout,fin,t_gf_list,inv_param,&ferm_m,smear_param);
