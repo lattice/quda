@@ -308,7 +308,7 @@ namespace quda {
     LatticeField::setTuningString();
     std::stringstream aux_ss;
     aux_ss << "vol=" << volume << ",stride=" << stride << ",precision=" << precision << ",geometry=" << geometry
-           << ",Nc=" << nColor << ",order=" << order;
+           << ",Nc=" << nColor << ",order=" << order << ",nFace=" << nFace;
     if (isNative()) aux_ss << ",N=" << gauge::get_vector_order(precision, 128);
     if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << ",r=" << r[0] << r[1] << r[2] << r[3];
