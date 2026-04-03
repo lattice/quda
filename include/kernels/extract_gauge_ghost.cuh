@@ -9,7 +9,7 @@ namespace quda {
 
   using namespace gauge;
 
-  template <typename Float, int nColor_, typename Gauge, bool extract_>
+  template <typename Float, int nColor_, typename Gauge, bool extract_, bool fine_grain>
   struct ExtractGhostArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nDim = 4;
@@ -26,10 +26,7 @@ namespace quda {
     int faceVolumeCB[nDim];
     const int offset;
     ExtractGhostArg(const GaugeField &u, Float **Ghost, int offset, uint64_t size) :
-      kernel_param(dim3(size, 1, 1)),
-      u(u, 0, Ghost),
-      nFace(u.Nface()),
-      offset(offset)
+      kernel_param(dim3(size, fine_grain ? nColor : 1, 2 * nDim)), u(u, 0, Ghost), nFace(u.Nface()), offset(offset)
     {
       for (int d=0; d<nDim; d++) {
 	X[d] = u.X()[d];
