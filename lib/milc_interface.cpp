@@ -234,10 +234,6 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
   gParam.anisotropy    = 1.0;
   gParam.tadpole_coeff = 1.0;
   gParam.scale         = 0;
-  gParam.ga_pad        = 0;
-  gParam.site_ga_pad   = 0;
-  gParam.mom_ga_pad    = 0;
-  gParam.llfat_ga_pad  = 0;
   return gParam;
 }
 
@@ -725,19 +721,6 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
   // if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   if (phase_in) qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  qudaGaugeParam.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = qudaGaugeParam.X[1] * qudaGaugeParam.X[2] * qudaGaugeParam.X[3] / 2;
-  int y_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[2] * qudaGaugeParam.X[3] / 2;
-  int z_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[1] * qudaGaugeParam.X[3] / 2;
-  int t_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[1] * qudaGaugeParam.X[2] / 2;
-  int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
-  pad_size = pad_size > z_face_size ? pad_size : z_face_size;
-  pad_size = pad_size > t_face_size ? pad_size : t_face_size;
-  qudaGaugeParam.ga_pad = pad_size;
-#endif
-
   if (!have_resident_gauge) {
     qudaGaugeParam.make_resident_gauge = false;
     qudaGaugeParam.use_resident_gauge = false;
@@ -862,14 +845,6 @@ void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2],
   return;
 }
 
-static int getLinkPadding(const int dim[4])
-{
-  int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
-  return padding;
-}
-
 // set the params for the single mass solver
 static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
                             double mass, double target_residual, double target_residual_hq, int maxiter,
@@ -980,7 +955,6 @@ static void setGaugeParams(QudaGaugeParam &fat_param, QudaGaugeParam &long_param
   fat_param.anisotropy = 1.0;
   fat_param.t_boundary = QUDA_PERIODIC_T; // anti-periodic boundary conditions are built into the gauge field
   fat_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  fat_param.ga_pad = getLinkPadding(dim);
 
   if (longlink != nullptr) {
     // improved staggered parameters
@@ -991,7 +965,6 @@ static void setGaugeParams(QudaGaugeParam &fat_param, QudaGaugeParam &long_param
     long_param.tadpole_coeff = tadpole;
     long_param.scale = -(1.0 + naik_epsilon) / (24.0 * long_param.tadpole_coeff * long_param.tadpole_coeff);
     long_param.type = QUDA_THREE_LINKS;
-    long_param.ga_pad = 3*fat_param.ga_pad;
     getReconstruct(long_param.reconstruct, long_param.reconstruct_sloppy);
     long_param.reconstruct_precondition = long_param.reconstruct_sloppy;
   } else {
@@ -2015,7 +1988,6 @@ void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], QudaInvert
   qudaGaugeParam.cuda_prec_sloppy = device_precision_sloppy;
   qudaGaugeParam.cuda_prec_precondition = device_precision_sloppy;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  qudaGaugeParam.ga_pad = getLinkPadding(dim);
 }
 
 void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
@@ -2426,8 +2398,6 @@ void qudaTwoLinkGaussianSmear( int external_precision, int quda_precision, void 
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO; // need to fix
   gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
   
-  gaugeParam.ga_pad = getLinkPadding( dim );
-  gaugeParam.mom_ga_pad = 0;
   //--------------------------- gauge setup
 
   // Load gauge field
