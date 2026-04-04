@@ -1978,7 +1978,7 @@ namespace quda {
         }
 
         // use the extended_idx to determine the boundary condition
-        reconstruct.Unpack(v, tmp, extended_idx, g, 2. * phase, X, R);
+        reconstruct.Unpack(v, tmp, extended_idx, g, phase, X, R);
       }
 
       __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int x, int, int dir, int dim, int g,
