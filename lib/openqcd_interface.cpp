@@ -515,14 +515,6 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
   initQuda(device);
 }
 
-static int getLinkPadding(const int dim[4])
-{
-  int padding = MAX(dim[1] * dim[2] * dim[3] / 2, dim[0] * dim[2] * dim[3] / 2);
-  padding = MAX(padding, dim[0] * dim[1] * dim[3] / 2);
-  padding = MAX(padding, dim[0] * dim[1] * dim[2] / 2);
-  return padding;
-}
-
 /**
  * @brief      Creates a new quda parameter struct
  *
@@ -586,7 +578,6 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructTy
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
   param.anisotropy = 1.0;                 /* 1.0 means not anisotropic */
-  param.ga_pad = getLinkPadding(param.X); /* Why this? */
 
   return param;
 }

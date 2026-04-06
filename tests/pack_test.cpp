@@ -29,7 +29,6 @@ QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
 void init()
 {
-
   param.cpu_prec = prec_cpu;
   param.cuda_prec = prec;
   param.reconstruct = link_recon;
@@ -40,11 +39,6 @@ void init()
   param.X[1] = ydim;
   param.X[2] = zdim;
   param.X[3] = tdim;
-#ifdef MULTI_GPU
-  param.ga_pad = xdim * ydim * zdim / 2;
-#else
-  param.ga_pad = 0;
-#endif
   setDims(param.X);
 
   param.anisotropy = 2.3;
@@ -61,7 +55,6 @@ void init()
   csParam.pc_type = QUDA_4D_PC;
   for (int d = 0; d < 4; d++) csParam.x[d] = param.X[d];
   csParam.setPrecision(prec_cpu);
-  csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -112,7 +105,6 @@ void packTest()
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
     cpsParam.reconstruct = param.reconstruct;
     cpsParam.setPrecision(param.cuda_prec, true);
-    cpsParam.pad = param.ga_pad;
     GaugeField cudaCpsGauge(cpsParam);
 
     host_timer.start();
@@ -136,7 +128,6 @@ void packTest()
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
     qdpParam.reconstruct = param.reconstruct;
     qdpParam.setPrecision(param.cuda_prec, true);
-    qdpParam.pad = param.ga_pad;
     GaugeField cudaQdpGauge(qdpParam);
 
     host_timer.start();
