@@ -604,33 +604,54 @@ namespace quda {
       }
     };
 
+    /**
+       @brief Complex index for QUDA_NATIVE_GAUGE_ORDER, matching gauge::FloatNOrder bulk
+       raw_load/raw_save layout (vector chunks of N reals plus optional Nrem remainder).
+
+       Two equivalent implementations: real indexing (#if 0) as reference; complex indexing (#else)
+       default for fewer ops. Toggle #if 0 to compare or debug.
+     */
     template <int nColor, int N>
-    __device__ __host__ inline int indexFloatN(int dim, int parity, int x_cb, int row, int col, int stride,
-                                               unsigned int offset_cb)
+    __device__ __host__ inline unsigned int indexFloatN(int dim, int parity, int x_cb, int row, int col, int stride,
+                                                        unsigned int offset_cb, int geometry)
     {
 #if 0
-      // real-value indexing (more math)
-      constexpr int length = 2 * nColor * nColor;
-      constexpr int M = length / N;
-      constexpr int Nrem = length - M * N;
+      // real-value indexing (reference; must match gauge::FloatNOrder bulk raw_load/raw_save)
+      constexpr int reconLen = nColor * nColor * 2;
+      constexpr int M = reconLen / N;
+      constexpr int Nrem = reconLen - M * N;
 
-      int k = (row * nColor + col) * 2;
-      int j = k / N;
-      int i = k % N;
-      int Nvec = (Nrem == 0 || j < M) ? N : Nrem;
-      int index = dim * stride * length + j * stride * N + x_cb * Nvec + i;
-      return parity * offset_cb + index / 2; // back to a complex offset
+      const int k = row * nColor + col;
+      const int r = k + k;
+      int float_off;
+      if (Nrem == 0 || r < M * N) {
+        const int i = r / N;
+        const int off = r % N;
+        float_off = N * (stride * (dim * M + i) + x_cb) + off;
+      } else {
+        const int off2 = r - M * N;
+        float_off = stride * (geometry * M * N + dim * Nrem) + Nrem * x_cb + off2;
+      }
+      return parity * offset_cb + static_cast<unsigned int>(float_off >> 1);
 #else
-      // complex-value indexing (optimal)
+      // complex-value indexing (optimal; equivalent to real path above when N is even)
+      static_assert(N % 2 == 0, "indexFloatN expects even vector width N (reals per vector load)");
       constexpr int length = nColor * nColor;
-      constexpr int M = length / (N / 2);
-      constexpr int Nrem = length - M * (N / 2);
+      constexpr int reconLen = 2 * length;
+      constexpr int M = reconLen / N;
+      constexpr int Nrem = reconLen - M * N;
+      constexpr int kMainLim = (M * N + 1) / 2;
 
-      int k = row * nColor + col;
-      int j = k / (N / 2);
-      int i = k % (N / 2);
-      int Nvec = (Nrem == 0 || j < M) ? N / 2 : Nrem;
-      return parity * offset_cb + dim * stride * length + j * stride * (N / 2) + x_cb * Nvec + i;
+      const int k = row * nColor + col;
+      if (Nrem == 0 || k < kMainLim) {
+        const int j = k / (N / 2);
+        const int i = k % (N / 2);
+        return parity * offset_cb + static_cast<unsigned int>((N / 2) * (stride * (dim * M + j) + x_cb) + i);
+      } else {
+        const int off2 = k + k - M * N;
+        return parity * offset_cb
+          + static_cast<unsigned int>((stride * (geometry * M * N + dim * Nrem) + Nrem * x_cb + off2) >> 1);
+      }
 #endif
     }
 
@@ -667,8 +688,8 @@ namespace quda {
 
       __device__ __host__ inline wrapper operator()(int dim, int parity, int x_cb, int row, int col) const
       {
-        auto index = indexFloatN<nColor, get_vector_order<storeFloat>(nColor * nColor * 2)>(dim, parity, x_cb, row, col,
-                                                                                            stride, offset_cb);
+        auto index = indexFloatN<nColor, get_vector_order<storeFloat>(nColor * nColor * 2)>(
+          dim, parity, x_cb, row, col, stride, offset_cb, geometry);
         return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
       }
 
@@ -677,8 +698,8 @@ namespace quda {
                                           const complex<theirFloat> &val) const
       {
         using vec2 = array<storeFloat, 2>;
-        auto index = indexFloatN<nColor, get_vector_order<storeFloat>(nColor * nColor * 2)>(dim, parity, x_cb, row, col,
-                                                                                            stride, offset_cb);
+        auto index = indexFloatN<nColor, get_vector_order<storeFloat>(nColor * nColor * 2)>(
+          dim, parity, x_cb, row, col, stride, offset_cb, geometry);
         vec2 *u2 = reinterpret_cast<vec2 *>(u + index);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
@@ -752,19 +773,27 @@ namespace quda {
         }
       }
 
-      constexpr auto indexNative(int dim, int parity, int x_cb, int row, int col) const
+      __device__ __host__ inline unsigned int indexNative(int dim, int parity, int x_cb, int row, int col) const
       {
-        // complex-value indexing (optimal)
-        constexpr int length = nColor * nColor;
-        constexpr int N = get_vector_order<storeFloat>(nColor * nColor * 2);
-        constexpr int M = length / (N / 2);
-        constexpr int Nrem = length - M * (N / 2);
-        int k = row * nColor + col;
-        int j = k / (N / 2);
-        int i = k % (N / 2);
-        int Nvec = (Nrem == 0 || j < M) ? N / 2 : Nrem;
+        constexpr int reconLen = nColor * nColor * 2;
+        constexpr int N = get_vector_order<storeFloat>(reconLen);
+        constexpr int M = reconLen / N;
+        constexpr int Nrem = reconLen - M * N;
 
-        return j * (N / 2) * 2 * ghostVolumeCB[dim] + (parity * ghostVolumeCB[dim] + x_cb) * Nvec + i;
+        const int k = row * nColor + col;
+        const int r = 2 * k;
+        unsigned int float_off;
+        if (r < M * N) {
+          const int i = r / N;
+          const int off = r % N;
+          const int vec_idx = (i * 2 + parity) * ghostVolumeCB[dim] + x_cb;
+          float_off = static_cast<unsigned int>(vec_idx * N + off);
+        } else {
+          const int off2 = r - M * N;
+          float_off = static_cast<unsigned int>(2 * ghostVolumeCB[dim] * M * N
+                                                + Nrem * (parity * ghostVolumeCB[dim] + x_cb) + off2);
+        }
+        return float_off >> 1;
       }
 
       __device__ __host__ inline wrapper operator()(int d, int parity, int x_cb, int row, int col) const
