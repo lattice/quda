@@ -30,7 +30,7 @@ namespace quda
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     template <bool shifted>
     using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
-                                    QUDA_NATIVE_GAUGE_ORDER, shifted>::type;
+                                    QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
 
     typedef typename mapper<Float>::type real;
 

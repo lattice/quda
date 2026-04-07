@@ -1584,11 +1584,13 @@ namespace quda {
         }
       }
 
-      template <typename Float, int length_, QudaReconstructType recon,
-                QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
-                QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false, bool shifted = false>
+      template <typename Float, int length_, QudaReconstructType recon, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO,
+                bool huge_alloc = default_huge_alloc, QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID,
+                bool use_inphase = false, bool shifted = false, QudaFieldGeometry geometry_ = QUDA_INVALID_GEOMETRY>
       struct FloatNOrder {
-        using Accessor = FloatNOrder<Float, length_, recon, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted>;
+        static constexpr bool static_geometry = (geometry_ != QUDA_INVALID_GEOMETRY);
+        using Accessor
+          = FloatNOrder<Float, length_, recon, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted, geometry_>;
 
         using store_t = Float;
         static constexpr int length = length_;
@@ -1620,6 +1622,9 @@ namespace quda {
         const real combined_scale; // Precomputed scale for copy_and_scale: fixedInvMaxValue * reconstruct.scale
         const real phase_scale; // Precomputed scale for phase loading: fixedInvMaxValue * 2.0 (or just 2.0 for float)
 
+        /** Geometry for indexing: compile-time `geometry_` when set, else runtime field geometry. */
+        constexpr int geom() const { return static_geometry ? static_cast<int>(geometry_) : geometry; }
+
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
           gauge(gauge_ ? gauge_ : u.data<Float *>()),
@@ -1642,7 +1647,13 @@ namespace quda {
           phase_scale(isFixed<Float>::value ? fixedInvMaxValue<Float>::value * static_cast<real>(2.0) :
                                               static_cast<real>(2.0))
         {
-          if (geometry == QUDA_COARSE_GEOMETRY)
+          if constexpr (static_geometry) {
+            if (static_cast<int>(geometry_) != u.Geometry())
+              errorQuda("FloatNOrder: compile-time geometry %d != field geometry %d", static_cast<int>(geometry_),
+                        u.Geometry());
+          }
+
+          if (geom() == QUDA_COARSE_GEOMETRY)
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
           // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
@@ -1672,7 +1683,7 @@ namespace quda {
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x);
+          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -1699,7 +1710,7 @@ namespace quda {
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x);
+          auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
           memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
         }
 
@@ -1716,7 +1727,7 @@ namespace quda {
 
           // now load any remainder
           if constexpr (Nrem > 0)
-            prefetch_cache_line(gauge + (parity * offset + (geometry * M * N + dir * Nrem) * stride + x * Nrem));
+            prefetch_cache_line(gauge + (parity * offset + (geom() * M * N + dir * Nrem) * stride + x * Nrem));
 
           if constexpr (loadPhase) prefetch_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
         } else if constexpr (type == PrefetchType::BULK) { // bulk prefetch
@@ -1729,7 +1740,7 @@ namespace quda {
 
             // now load any remainder
             if constexpr (Nrem > 0)
-              prefetch_cache_bulk(gauge + (parity * offset + (geometry * M * N + dir * Nrem) * stride + x * Nrem),
+              prefetch_cache_bulk(gauge + (parity * offset + (geom() * M * N + dir * Nrem) * stride + x * Nrem),
                                   block_size * Nrem * sizeof(Float));
 
             if constexpr (loadPhase)
@@ -1749,7 +1760,7 @@ namespace quda {
 
           // now load any remainder
           if constexpr (Nrem > 0)
-            prefetch_L1_cache_line(gauge + (parity * offset + (geometry * M * N + dir * Nrem) * stride + x * Nrem));
+            prefetch_L1_cache_line(gauge + (parity * offset + (geom() * M * N + dir * Nrem) * stride + x * Nrem));
 
           if constexpr (loadPhase) prefetch_L1_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
 #endif
@@ -1777,7 +1788,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x, vecTmp);
+          vector_store(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x, vecTmp);
         }
 
         if constexpr (hasPhase) {
@@ -1802,7 +1813,7 @@ namespace quda {
           array<store_t, Nrem> vecTmp;
           memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
           // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + (geometry * M * N + dir * Nrem) * stride, x, vecTmp);
+          vector_store(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x, vecTmp);
         }
 
         if constexpr (hasPhase)
@@ -1975,8 +1986,8 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory
-          auto vecTmp = vector_load<Float, N>(ghost[dim], dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                                              ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
+          auto vecTmp = vector_load<Float, N>(ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
+                                              ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
@@ -1985,8 +1996,8 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<Float, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                                       (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
+            = vector_load<Float, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
+                                       (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
@@ -1995,13 +2006,13 @@ namespace quda {
         if constexpr (hasPhase) {
           if constexpr (isFixed<Float>::value) {
             copy_and_scale(phase,
-                           ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
-                                      + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
+                           ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geom() * R[dim] * faceVolumeCB[dim]
+                                      + (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x],
                            phase_scale);
           } else {
             copy(phase,
-                 ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
-                            + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x]);
+                 ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geom() * R[dim] * faceVolumeCB[dim]
+                            + (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x]);
             phase *= static_cast<real>(2.0);
           }
         }
@@ -2023,8 +2034,8 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
           // second do vectorized copy to memory
-          vector_store(ghost[dim], dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                       ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
+          vector_store(ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
+                       ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
         // now save any remainder
@@ -2033,14 +2044,14 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
-          vector_store(ghost[dim], (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                       (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
+          vector_store(ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
+                       (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
         if constexpr (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy(ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
-                          + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
+          copy(ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geom() * R[dim] * faceVolumeCB[dim]
+                          + (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x],
                static_cast<real>(0.5) * phase);
         }
       }
@@ -2732,20 +2743,21 @@ namespace quda {
 
   template <typename T, QudaReconstructType recon, int N = 18, QudaStaggeredPhase stag = QUDA_STAGGERED_PHASE_NO,
             bool huge_alloc = gauge::default_huge_alloc, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID,
-            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER, bool shifted = false>
+            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER, bool shifted = false,
+            QudaFieldGeometry geometry_ = QUDA_INVALID_GEOMETRY>
   struct gauge_mapper {
-    typedef gauge::FloatNOrder<T, N, recon, stag, huge_alloc, ghostExchange, use_inphase, shifted> type;
+    typedef gauge::FloatNOrder<T, N, recon, stag, huge_alloc, ghostExchange, use_inphase, shifted, geometry_> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER, shifted> {
+            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted, QudaFieldGeometry geometry_>
+  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER, shifted, geometry_> {
     typedef gauge::MILCOrder<T, N> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER, shifted> {
+            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted, QudaFieldGeometry geometry_>
+  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER, shifted, geometry_> {
     typedef gauge::QDPOrder<T, N> type;
   };
 
