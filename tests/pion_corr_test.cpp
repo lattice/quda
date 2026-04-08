@@ -451,7 +451,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   std::vector<double> time(Nsrc);
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
-  assert(Nsrc == 1);
+  assert(Nsrc == 3);
   
   std::vector<quda::ColorSpinorField> pion_source(Nsrc,cs_param);
   std::vector<quda::ColorSpinorField> out(Nsrc,cs_param);
@@ -465,7 +465,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with source points.
-    genericSource(pion_source[n],QUDA_POINT_SOURCE,0,0,0);
+    genericSource(pion_source[n],QUDA_POINT_SOURCE,0,0,n);
     pion_source_ptr[n] = pion_source[n].data();
     out_ptr[n] = out[n].data();
     if (false){

@@ -6107,8 +6107,8 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
       }
       else{
           printfQuda("doing single source\n");
-invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
-}
+          invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
+      }
         
       f_temp4[0].PrintVector(0,0,0);
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
@@ -6125,14 +6125,18 @@ invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
           }
           std::vector<std::vector<Complex>> pion_corr_t_el = {};
           std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
-    
+          //moving result_global outside here
+          std::fill(result_global.begin(), result_global.end(), 0.0);
+          //at this iteration, f_temp4.size() is simply the number of coors (3)
           for (size_t nn = 0; nn < f_temp4.size(); nn++){
-            std::fill(result_global.begin(), result_global.end(), 0.0);
+            
             contractSummedQuda(f_temp4[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
             comm_allreduce_sum(result_global);
-            pion_corr_t_el.push_back(result_global);
+            
             }
-            ferm_m->pion_corr.push_back(pion_corr_t_el);
+          pion_corr_t_el.push_back(result_global);
+          
+          ferm_m->pion_corr.push_back(pion_corr_t_el);
           
           
       }
