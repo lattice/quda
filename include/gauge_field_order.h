@@ -1057,10 +1057,10 @@ namespace quda {
         }
       }
 
-        template <typename I>
-        __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real, const I *,
-                                               const int *) const
-        {
+      template <bool = false, typename I>
+      __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real, const I *,
+                                             const int *) const
+      {
 #pragma unroll
           for (int i = 0; i < N / 2; i++) { out[i] = complex(in[2 * i + 0], in[2 * i + 1]); }
         }
@@ -1068,31 +1068,36 @@ namespace quda {
         __device__ __host__ inline real getPhase(const complex[]) const { return 0; }
     };
 
-      /**
-         @brief timeBoundary Compute boundary condition correction
-         @tparam ghostExhange_ Optional template the ghostExchange type to avoid the run-time overhead
-         @param idx extended field linear index
-         @param X the gauge field dimensions
-         @param R the radii dimenions of the extended region
-         @param tBoundary the boundary condition
-         @param isFirstTimeSlice if we're on the first time slice of nodes
-         @param isLastTimeSlide if we're on the last time slice of nodes
-         @param ghostExchange if the field is extended or not (determines indexing type)
-      */
-    template <QudaGhostExchange ghostExchange_, bool shifted, typename T, typename I>
+    /**
+       @brief timeBoundary Compute boundary condition correction
+       @tparam ghostExchange_ Optional template the ghostExchange type to avoid the run-time overhead
+       @tparam shifted Whether this is a shifted field
+       @tparam is_ghost Whether this is a
+       @param[in] idx extended field linear index
+       @param[in] X the gauge field dimensions
+       @param[in] R the radii dimenions of the extended region
+       @param[in] tBoundary the boundary condition
+       @param[in] scale scaling factor to apply
+       @param[in] isFirstTimeSliceBound checkerboard index that is the end of the first time slice
+       @param[in] isLastTimeSlideBound checkerboad index that is the start of the last time slice
+       @param[in] isFirstTimeSlice if we're on the first time slice of nodes
+       @param[in] isLastTimeSlide if we're on the last time slice of nodes
+       @param[in] ghostExchange if the field is extended or not (determines indexing type)
+       @return The scaling factor to be applied
+    */
+    template <QudaGhostExchange ghostExchange_, bool shifted, bool is_ghost, typename T, typename I>
     __device__ __host__ inline T timeBoundary(int idx, const I X[QUDA_MAX_DIM], const int R[QUDA_MAX_DIM], T tBoundary,
                                               T scale, int firstTimeSliceBound, int lastTimeSliceBound,
                                               bool isFirstTimeSlice, bool isLastTimeSlice,
                                               QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_NO)
     {
-
-      // MWTODO: should this return tBoundary : scale or tBoundary*scale : scale
-
       if (ghostExchange_ == QUDA_GHOST_EXCHANGE_PAD
           || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED)) {
 
-        if (!shifted && idx >= firstTimeSliceBound) { // halo region on the first time slice
+        if constexpr (!shifted && is_ghost) { // halo region on the first time slice
           return isFirstTimeSlice ? tBoundary : scale;
+        } else if constexpr (shifted && is_ghost) {
+          return isLastTimeSlice ? tBoundary : scale;
         } else if (shifted && idx < firstTimeSliceBound) { // shifted link on first time slice
           return isFirstTimeSlice ? tBoundary : scale;
         } else if (!shifted && idx >= lastTimeSliceBound) { // last link on the last time slice
@@ -1150,7 +1155,7 @@ namespace quda {
         Reconstruct(const GaugeField &u) :
           anisotropy(u.Anisotropy()),
           tBoundary(static_cast<real>(u.TBoundary())),
-          firstTimeSliceBound(!shifted ? u.VolumeCB() : u.X()[0] * u.X()[1] * u.X()[2] / 2),
+          firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
           isLastTimeSlice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
@@ -1167,7 +1172,7 @@ namespace quda {
           }
         }
 
-        template <typename I>
+        template <bool is_ghost = false, typename I>
         __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real, const I *X,
                                                const int *R) const
         {
@@ -1176,8 +1181,9 @@ namespace quda {
 
           const real u0 = dir < 3 ?
             anisotropy :
-            timeBoundary<ghostExchange_, shifted>(idx, X, R, tBoundary, static_cast<real>(1.0), firstTimeSliceBound,
-                                                  lastTimeSliceBound, isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+            timeBoundary<ghostExchange_, shifted, is_ghost>(idx, X, R, tBoundary, static_cast<real>(1.0),
+                                                            firstTimeSliceBound, lastTimeSliceBound, isFirstTimeSlice,
+                                                            isLastTimeSlice, ghostExchange);
 
           // out[6] = u0*conj(out[1]*out[5] - out[2]*out[4]);
           out[6] = cmul(out[2], out[4]);
@@ -1230,7 +1236,7 @@ namespace quda {
           out[9] = 0.0;
         }
 
-        template <typename I>
+        template <bool = false, typename I>
         __device__ __host__ inline void Unpack(complex out[9], const real in[10], int, int, real, const I *,
                                                const int *) const
         {
@@ -1271,7 +1277,7 @@ namespace quda {
 
         __device__ __host__ inline void Pack(real out[12], const complex in[9]) const { reconstruct_12.Pack(out, in); }
 
-        template <typename I>
+        template <bool = false, typename I>
         __device__ __host__ inline void Unpack(complex out[9], const real in[12], int, int, real phase, const I *,
                                                const int *) const
         {
@@ -1351,7 +1357,7 @@ namespace quda {
         Reconstruct(const GaugeField &u, real scale = 1.0) :
           anisotropy(u.Anisotropy() * scale, 1.0 / (u.Anisotropy() * scale)),
           tBoundary(static_cast<real>(u.TBoundary()) * scale, 1.0 / (static_cast<real>(u.TBoundary()) * scale)),
-          firstTimeSliceBound(!shifted ? u.VolumeCB() : u.X()[0] * u.X()[1] * u.X()[2] / 2),
+          firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
           isLastTimeSlice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
@@ -1379,7 +1385,7 @@ namespace quda {
 
         template <typename I>
         __device__ __host__ inline void Unpack(complex out[9], const real in[8], int, int, real, const I *, const int *,
-                                               const complex, const complex u) const
+                                               const complex u) const
         {
           real u0 = u.real();
           real u0_inv = u.imag();
@@ -1461,17 +1467,17 @@ namespace quda {
           }
         }
 
-        template <typename I>
-        __device__ __host__ inline void
-        Unpack(complex out[9], const real in[8], int idx, int dir, real phase, const I *X, const int *R,
-               const complex scale = complex(static_cast<real>(1.0), static_cast<real>(1.0))) const
+        template <bool is_ghost = false, typename I>
+        __device__ __host__ inline void Unpack(complex out[9], const real in[8], int idx, int dir, real phase,
+                                               const I *X, const int *R) const
         {
           complex u = dir < 3 ?
             anisotropy :
-            timeBoundary<ghostExchange_, shifted>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
-                                                  isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+            timeBoundary<ghostExchange_, shifted, is_ghost>(
+              idx, X, R, tBoundary, {static_cast<real>(1.0), static_cast<real>(1.0)}, firstTimeSliceBound,
+              lastTimeSliceBound, isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
-          Unpack(out, in, idx, dir, phase, X, R, scale, u);
+          Unpack(out, in, idx, dir, phase, X, R, u);
         }
 
         __device__ __host__ inline real getPhase(const complex[]) const { return 0; }
@@ -1538,12 +1544,11 @@ namespace quda {
           reconstruct_8.Pack(out, su3);
         }
 
-        template <typename I>
+        template <bool = false, typename I>
         __device__ __host__ inline void Unpack(complex out[9], const real in[8], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
-          reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, complex(static_cast<real>(1.0), static_cast<real>(1.0)),
-                               complex(static_cast<real>(1.0), static_cast<real>(1.0)));
+          reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, {static_cast<real>(1.0), static_cast<real>(1.0)});
 
           if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phase
             real cos_sin[2];
@@ -1584,16 +1589,18 @@ namespace quda {
         }
       }
 
-      template <typename Float, int length_, QudaReconstructType recon, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO,
+      template <typename Float, int length_, QudaReconstructType recon_, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO,
                 bool huge_alloc = default_huge_alloc, QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID,
                 bool use_inphase = false, bool shifted = false, QudaFieldGeometry geometry_ = QUDA_INVALID_GEOMETRY>
       struct FloatNOrder {
+        static constexpr bool is_native = true;
         static constexpr bool static_geometry = (geometry_ != QUDA_INVALID_GEOMETRY);
         using Accessor
-          = FloatNOrder<Float, length_, recon, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted, geometry_>;
+          = FloatNOrder<Float, length_, recon_, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted, geometry_>;
 
         using store_t = Float;
         static constexpr int length = length_;
+        static constexpr QudaReconstructType recon = recon_;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         typedef typename AllocType<huge_alloc>::type AllocInt;
@@ -1912,7 +1919,7 @@ namespace quda {
             phase *= static_cast<real>(2.0);
           }
         }
-        reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
+        reconstruct.template Unpack<true>(v, tmp, x, dir, phase, X, R);
       }
 
       __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity) const
@@ -2064,6 +2071,7 @@ namespace quda {
          all non-native fields, which use the same ghost zone storage.
       */
       template <typename Float, int length_> struct LegacyOrder {
+        static constexpr bool is_native = false;
         static constexpr int length = length_;
         using Accessor = LegacyOrder<Float, length>;
         using store_t = Float;
