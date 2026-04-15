@@ -15,13 +15,21 @@ namespace quda
     using Link = Matrix<complex<real>, nColor>;
     using RawLink = array<store_t, recon>;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
+
+    static constexpr bool gauge_direct_load = false;
+    static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
+    template <bool shifted>
+    using G = typename gauge_mapper<store_t, recon, 2 * nColor * nColor, QUDA_STAGGERED_PHASE_NO, gauge_direct_load,
+                                    ghost, false, QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
     static constexpr bool verify = verify_;
 
     int X[4]; // true grid dimensions
-    Gauge out;
-    const Gauge in;
+    G<true> out;
+    const G<false> in;
     int shift;
     int volume_cb;
+    // fuzz factor for verifying the shifted field - not guaranteed to be bitwise identical
+    const real epsilon = std::is_same_v<store_t, double> ? 1e-14 : 3e-7;
 
     GaugeShiftArg(GaugeField &out, const GaugeField &in, int shift) :
       kernel_param(dim3(in.VolumeCB(), 2, 4)), out(out), in(in), shift(shift), volume_cb(in.VolumeCB())
@@ -64,22 +72,22 @@ namespace quda
         using Link = typename Arg::Link;
         if (x[dir] < arg.shift && arg.comms_dim_partitioned[dir]) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, 1);
-          Link in = arg.in(dir, arg.volume_cb + ghost_idx, 1 - parity);
+          Link in = arg.in.Ghost(dir, ghost_idx, 1 - parity);
           Link out = arg.out(dir, x_cb, parity);
-          assert(in.L1() == out.L1());
+          assert((in - out).L1() < arg.epsilon);
         } else {
           byte_array<int8_t, 4> dx = {};
           dx[dir] = dx[dir] - arg.shift;
           int x_cb_back = linkIndexShift(x, dx, arg.X);
           Link in = arg.in(dir, x_cb_back, 1 - parity);
           Link out = arg.out(dir, x_cb, parity);
-          assert(in.L1() == out.L1());
+          assert((in - out).L1() < arg.epsilon);
 
           if (x[dir] >= arg.X[dir] - arg.shift && arg.comms_dim_partitioned[dir]) {
             const int ghost_idx = ghostFaceIndexStaggered<1>(x, arg.X, dir, arg.shift);
             Link in = arg.in(dir, x_cb, parity);
             Link out = arg.out.Ghost(dir, ghost_idx, 1 - parity);
-            assert(in.L1() == out.L1());
+            assert((in - out).L1() < arg.epsilon);
           }
         }
       }
