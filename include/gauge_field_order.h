@@ -1406,10 +1406,10 @@ namespace quda {
           row_sum += out[1].imag() * out[1].imag();
           row_sum += out[2].real() * out[2].real();
           row_sum += out[2].imag() * out[2].imag();
-          real row_sum_inv = static_cast<real>(1.0) / row_sum;
+          real row_sum_inv = quda::fdivide(static_cast<real>(1.0), row_sum);
 
           real diff = u0_inv * u0_inv - row_sum;
-          real U00_mag = diff > 0.0 ? diff * quda::rsqrt(diff) : static_cast<real>(0.0);
+          real U00_mag = quda::sqrt(quda::max(diff, static_cast<real>(0.0)));
 
           out[0] *= U00_mag;
 
@@ -1420,7 +1420,7 @@ namespace quda {
           column_sum += out[3].imag() * out[3].imag();
 
           diff = u0_inv * u0_inv - column_sum;
-          real U20_mag = diff > 0.0 ? diff * quda::rsqrt(diff) : static_cast<real>(0.0);
+          real U20_mag = quda::sqrt(quda::max(diff, static_cast<real>(0.0)));
 
           out[6] *= U20_mag;
 

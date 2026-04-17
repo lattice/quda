@@ -664,7 +664,7 @@ namespace quda
         if constexpr (ghost_fixed) {
           if constexpr (block_float_ghost) {
             norm_ptr = ghost.norm(2 * dim + dir);
-            scale = fdividef(fixedMaxValue<ghostFloat>::value, max);
+            scale = fdivide(fixedMaxValue<ghostFloat>::value, max);
             scale_inv = fixedInvMaxValue<ghostFloat>::value * max;
           } else {
             scale = ghost.scale;
@@ -1066,7 +1066,7 @@ namespace quda
 #pragma unroll
           for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
           ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale * fixedInvMaxValue<Float>::value;
-          scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+          scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
         }
 
 #pragma unroll
@@ -1199,7 +1199,7 @@ namespace quda
 #pragma unroll
           for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
           reinterpret_cast<norm_t *>(field)[x + norm_offset] = scale * fixedInvMaxValue<Float>::value;
-          scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+          scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
         }
 
 #pragma unroll
@@ -1306,7 +1306,7 @@ namespace quda
         for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
         norm_type nrm = scale * fixedInvMaxValue<Float>::value;
 
-        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+        real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
 
         array<Float, 8> vecTmp;
         memcpy(&vecTmp[6], &nrm, sizeof(norm_type)); // pack the norm
@@ -1412,7 +1412,7 @@ namespace quda
         for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
         norm_type nrm = scale * fixedInvMaxValue<Float>::value;
 
-        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+        real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
 
         array<Float, 8> vecTmp;
         memcpy(&vecTmp[6], &nrm, sizeof(norm_type)); // pack the norm

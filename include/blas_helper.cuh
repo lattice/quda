@@ -198,7 +198,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         norm = scale * fixedInvMaxValue<store_t>::value;
-        return fdividef(fixedMaxValue<store_t>::value, scale);
+        return fdivide(fixedMaxValue<store_t>::value, scale);
       }
 
       /**
