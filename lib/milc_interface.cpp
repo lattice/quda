@@ -1438,6 +1438,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   } else if (load_type == QUDA_MILC_EIG_LOAD) {
 
     logQuda(QUDA_VERBOSE, "Loading deflation space of size %d for parity %d and mass %e\n", n_evecs, parity, mass);
+    fflush(stdout);
 
     if (!evecs) errorQuda("qudaLoadDeflationSpace called with load_type QUDA_MILC_EIG_LOAD but evecs is null!");
 
@@ -1480,6 +1481,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       space->evecs[i] = in_evec;
 
       // Compute eigenvalue, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+
       dEig->M(temp, space->evecs[i]);
       auto vtAv = blas::cDotProduct(space->evecs[i], temp);
       auto v2 = blas::norm2(space->evecs[i]);
