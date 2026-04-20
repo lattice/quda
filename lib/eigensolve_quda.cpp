@@ -628,7 +628,7 @@ namespace quda
       // If size = n_conv, this routine is called post sort
       if (size == n_conv) {
         for (int j = lower; j < upper; j++) {
-          logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", j, evals[j].real(),
+          logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", j, evals[j].real(),
                   evals[j].imag(), abs(evals[j]), residua[j]);
         }
       }
