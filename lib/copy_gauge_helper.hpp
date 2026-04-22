@@ -81,7 +81,7 @@ namespace quda
 
   template <typename FloatOut, typename FloatIn, int length, bool fine_grain, typename OutOrder, typename InOrder>
   void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, GaugeField &out, const GaugeField &in,
-                 QudaFieldLocation location, int type, double scale)
+                 QudaFieldLocation location, double scale, int type)
   {
     using Arg = CopyGaugeArg<FloatOut, FloatIn, length, fine_grain, OutOrder, InOrder>;
     Arg arg(outOrder, inOrder, in, static_cast<typename Arg::real_in_t>(scale));
