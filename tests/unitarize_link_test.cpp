@@ -73,7 +73,6 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
   qudaGaugeParam.anisotropy = 1.0;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  qudaGaugeParam.ga_pad = 0;
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
   qudaGaugeParam.cuda_prec_sloppy = prec;
@@ -84,8 +83,6 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.type = QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
   qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct;
-
-  qudaGaugeParam.llfat_ga_pad = qudaGaugeParam.site_ga_pad = qudaGaugeParam.ga_pad = qudaGaugeParam.staple_pad = 0;
 
   quda::GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -133,7 +130,6 @@ static int unitarize_link_test(int &test_rc)
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaResult = new quda::GaugeField(gParam);
 
-  gParam.pad = 0;
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec, true);

@@ -19,18 +19,19 @@ namespace quda
     using Dslash = Dslash<cloverHasenbusch, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     WilsonCloverHasenbuschTwist(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                                const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay)
         Dslash::template instantiate<packShmem, true>(tp, stream);
       else
@@ -83,7 +84,7 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       WilsonCloverHasenbuschTwistArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, A, a, b, x, parity,
                                                                             dagger, comm_override);
-      WilsonCloverHasenbuschTwist<decltype(arg)> wilson(arg, out, in, halo);
+      WilsonCloverHasenbuschTwist<decltype(arg)> wilson(arg, out, in, halo, U);
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };

@@ -80,7 +80,7 @@ namespace quda {
   };
 
   template <typename Arg> struct BlockOrtho_Params {
-    static constexpr int mVec = tile_size<Arg::nColor, Arg::nVec, Arg::block_size>();
+    static constexpr int mVec = tile_size<Arg::nColor, Arg::nVec, Arg::block_size_cxpr>();
     using dot_t = array<complex<typename Arg::sum_t>, mVec>;
     static constexpr int block_dim = 1;
     using BlockReduceDot = BlockReduce<dot_t, block_dim>;
@@ -90,7 +90,7 @@ namespace quda {
 
   template <typename Arg> struct BlockOrtho_ : BlockOrtho_Params<Arg>::Ops {
     const Arg &arg;
-    static constexpr unsigned block_size = Arg::block_size;
+    static constexpr unsigned block_size = Arg::block_size_cxpr;
     static constexpr int fineSpin = Arg::fineSpin;
     static constexpr int spinBlock = (fineSpin == 1) ? 1 : fineSpin / Arg::coarseSpin; // size of spin block
     static constexpr int nColor = Arg::nColor;

@@ -28,6 +28,7 @@ set (QUDA_OBJS
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
+  gauge_shift.cu
   gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu gauge_plaqrect.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cgnr.cpp inv_cgne.cpp
@@ -502,20 +503,35 @@ mark_as_advanced(QUDA_ORDER_HALF)
 mark_as_advanced(QUDA_ORDER_QUARTER)
 
 # set the percentage of I2F conversions that use the alternative conversion path (using FFMA)
-set(QUDA_ALTERNATIVE_I_TO_F 0 CACHE STRING "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100)")
+if(NOT DEFINED QUDA_ALTERNATIVE_I_TO_F_DEFAULT)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+set(QUDA_ALTERNATIVE_I_TO_F
+    "${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}"
+    CACHE STRING
+        "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100); CUDA builds with sm_100+ default to 25")
 set(VALID_I2F_VALUES "0" "25" "50" "75" "100")
 if(NOT QUDA_ALTERNATIVE_I_TO_F IN_LIST VALID_I2F_VALUES)
     message(FATAL_ERROR "Invalid value for QUDA_ALTERNATIVE_I_TO_F: '${QUDA_ALTERNATIVE_I_TO_F}'\n"
                         "Valid values are: ${VALID_I2F_VALUES}")
 endif()
 set_property(CACHE QUDA_ALTERNATIVE_I_TO_F PROPERTY STRINGS ${VALID_I2F_VALUES})
-message(STATUS "QUDA_ALTERNATIVE_I_TO_F set to: ${QUDA_ALTERNATIVE_I_TO_F}%")
+message(
+  STATUS
+  "QUDA_ALTERNATIVE_I_TO_F is ${QUDA_ALTERNATIVE_I_TO_F}% (alternative integer-to-float conversion path)")
 mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 # Set the maximum multi-RHS per kernel if not already set by the target
 if(NOT DEFINED QUDA_MAX_MULTI_RHS)
   set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
   message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+endif()
+
+# Disable dslash prefetching if not already set
+if(NOT QUDA_DSLASH_PREFETCH_TYPE)
+  set(QUDA_DSLASH_PREFETCH_TYPE "NONE" CACHE STRING "enable Dslash prefetching" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions" FORCE)
 endif()
 
 # make one library

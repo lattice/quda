@@ -701,7 +701,7 @@ namespace quda
     }
 
     std::vector<std::pair<Complex, Complex>> array(n);
-    for (int i = 0; i < n; i++) array[i] = std::make_pair(x[i], y[i]);
+    for (int i = 0; i < n; i++) array[i] = {x[i], y[i]};
 
     switch (spec_type) {
     case QUDA_SPECTRUM_LM_EIG:

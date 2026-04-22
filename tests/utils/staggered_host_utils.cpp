@@ -58,24 +58,10 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
 
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param)
 {
-  // Specific gauge parameters for MILC
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
-#endif
-
-  int fat_pad = pad_size;
-  int link_pad = 3 * pad_size;
-
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :
     QUDA_ASQTAD_FAT_LINKS;
 
-  gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
@@ -91,7 +77,6 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-    gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
@@ -688,7 +673,6 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
 
   // Lattice vector data properties
   cs_param->setPrecision(inv_param->cpu_prec);
-  cs_param->pad = 0;
   cs_param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   cs_param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   cs_param->gammaBasis = inv_param->gamma_basis;

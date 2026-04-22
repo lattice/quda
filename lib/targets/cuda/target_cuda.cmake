@@ -149,6 +149,16 @@ else()
   set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 endif()
 
+# Default I2F alternative-path percentage: Blackwell and newer (sm_100+).
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "25")
+else()
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+message(
+  STATUS
+  "I2F alternative-path cache default: ${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}% (QUDA_COMPUTE_CAPABILITY=${QUDA_COMPUTE_CAPABILITY})")
+
 # large arg support requires CUDA 12.1 and Volta+
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
   "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"
@@ -175,6 +185,89 @@ message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
 option(QUDA_SHARED_MEMORY_SPILL "enable shared memory spilling?" OFF)
 mark_as_advanced(QUDA_SHARED_MEMORY_SPILL)
 message(STATUS "Shared memory spilling: ${QUDA_SHARED_MEMORY_SPILL}")
+
+
+# ---------------------------
+# Set Dslash prefetching
+# ---------------------------
+
+# Arch-dependent defaults
+set(_dslash_double_store_default OFF)
+set(_dslash_prefetch_type_default NONE)
+set(_dslash_prefetch_dist_w_default 0)
+set(_dslash_prefetch_dist_s_default 0)
+
+# These are expected Blackwell+ defaults
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
+  set(_dslash_double_store_default ON)
+  set(_dslash_prefetch_type_default BULK)
+  set(_dslash_prefetch_dist_w_default 2)
+  set(_dslash_prefetch_dist_s_default 2)
+endif()
+
+# Cache variables (set only if not already defined)
+if(NOT DEFINED QUDA_DSLASH_DOUBLE_STORE)
+  set(QUDA_DSLASH_DOUBLE_STORE ${_dslash_double_store_default}
+      CACHE BOOL "store a forwards shifted copy of the gauge fields for simplified Dslash indexing")
+endif()
+mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
+message(STATUS "QUDA_DSLASH_DOUBLE_STORE: ${QUDA_DSLASH_DOUBLE_STORE}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_TYPE)
+  set(QUDA_DSLASH_PREFETCH_TYPE ${_dslash_prefetch_type_default}
+      CACHE STRING "enable Dslash prefetching (NONE, THREAD, BULK, TENSOR)")
+endif()
+set_property(CACHE QUDA_DSLASH_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK TENSOR)
+mark_as_advanced(QUDA_DSLASH_PREFETCH_TYPE)
+message(STATUS "QUDA_DSLASH_PREFETCH_TYPE: ${QUDA_DSLASH_PREFETCH_TYPE}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON ${_dslash_prefetch_dist_w_default}
+      CACHE STRING "Dslash prefetch distance for Wilson kernels")
+endif()
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+message(STATUS "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON: ${QUDA_DSLASH_PREFETCH_DISTANCE_WILSON}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED ${_dslash_prefetch_dist_s_default}
+      CACHE STRING "Dslash prefetch distance for Staggered kernels")
+endif()
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+message(STATUS "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED: ${QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED}")
+
+# Validate prefetch type
+set(_valid_prefetch NONE THREAD BULK TENSOR)
+if(NOT QUDA_DSLASH_PREFETCH_TYPE IN_LIST _valid_prefetch)
+  message(FATAL_ERROR
+    "Invalid QUDA_DSLASH_PREFETCH_TYPE='${QUDA_DSLASH_PREFETCH_TYPE}'. "
+    "Allowed: ${_valid_prefetch}")
+endif()
+
+# TMA prefetching requires double-store
+set(_tma_modes BULK TENSOR)
+
+# TMA prefetching requires double store
+if(QUDA_DSLASH_PREFETCH_TYPE IN_LIST _tma_modes AND NOT QUDA_DSLASH_DOUBLE_STORE)
+  message(FATAL_ERROR
+    "QUDA_DSLASH_PREFETCH_TYPE=${QUDA_DSLASH_PREFETCH_TYPE} "
+    "requires QUDA_DSLASH_DOUBLE_STORE=ON")
+endif()
+
+# TMA prefetching requires sm_90+
+if(QUDA_DSLASH_PREFETCH_TYPE IN_LIST _tma_modes AND QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR
+    "QUDA_DSLASH_PREFETCH_TYPE=${QUDA_DSLASH_PREFETCH_TYPE} "
+    "requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
+
+# validate prefetching distances
+if(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON GREATER 7)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON is greater than pipeline length")
+endif()
+if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
+endif()
+
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
@@ -418,6 +511,13 @@ target_link_libraries(quda PUBLIC CUDA::nvml)
 if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
+
+CPMAddPackage(
+    NAME CCCL
+    GITHUB_REPOSITORY nvidia/cccl
+    GIT_TAG v3.1.4 # Fetches this tagged commit
+)
+target_link_libraries(quda PRIVATE CCCL::CCCL)
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)
