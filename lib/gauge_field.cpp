@@ -600,6 +600,9 @@ namespace quda {
 
       for (int d = 0; d < geometry; d++) host_free(send[d]);
     }
+
+    // if we have a shifted member gauge field then this should be invalidated
+    shift_reset();
   }
 
   // This does the opposite of exchangeGhost and sends back the ghost
