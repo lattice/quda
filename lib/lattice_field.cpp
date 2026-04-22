@@ -57,7 +57,7 @@ namespace quda {
     mh_send_rdma {},
     mem_type(param.mem_type)
   {
-    create(param, is_native_gauge);
+    create(param);
   }
 
   LatticeField::LatticeField(const LatticeField &field) noexcept :
@@ -98,7 +98,7 @@ namespace quda {
   {
     LatticeFieldParam param;
     field.fill(param);
-    create(param, false);
+    create(param);
   }
 
   LatticeField::LatticeField(LatticeField &&field) noexcept { move(std::move(field)); }
@@ -111,7 +111,7 @@ namespace quda {
       destroyComms();
       LatticeFieldParam param;
       src.fill(param);
-      create(param, false);
+      create(param);
     }
     return *this;
   }
@@ -125,7 +125,7 @@ namespace quda {
     return *this;
   }
 
-  void LatticeField::create(const LatticeFieldParam &param, bool is_native_gauge)
+  void LatticeField::create(const LatticeFieldParam &param)
   {
     if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Invalid field location");
     location = param.location;
