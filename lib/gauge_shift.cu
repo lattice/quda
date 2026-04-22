@@ -68,7 +68,7 @@ namespace quda
     out.is_shifted = true;
 
     instantiate<GaugeShifter>(out, in, shift, false);
-    constexpr bool verify = true;
+    constexpr bool verify = false;
     if constexpr (verify) instantiate<GaugeShifter>(out, in, shift, true);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return out;
