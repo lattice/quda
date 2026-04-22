@@ -149,6 +149,16 @@ else()
   set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 endif()
 
+# Default I2F alternative-path percentage: Blackwell and newer (sm_100+).
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "25")
+else()
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+message(
+  STATUS
+  "I2F alternative-path cache default: ${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}% (QUDA_COMPUTE_CAPABILITY=${QUDA_COMPUTE_CAPABILITY})")
+
 # large arg support requires CUDA 12.1 and Volta+
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
   "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"
@@ -188,7 +198,7 @@ set(_dslash_prefetch_dist_w_default 0)
 set(_dslash_prefetch_dist_s_default 0)
 
 # These are expected Blackwell+ defaults
-if(QUDA_COMPUTE_CAPABILITY GREATER_EQUAL 100)
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
   set(_dslash_double_store_default ON)
   set(_dslash_prefetch_type_default BULK)
   set(_dslash_prefetch_dist_w_default 2)

@@ -503,14 +503,22 @@ mark_as_advanced(QUDA_ORDER_HALF)
 mark_as_advanced(QUDA_ORDER_QUARTER)
 
 # set the percentage of I2F conversions that use the alternative conversion path (using FFMA)
-set(QUDA_ALTERNATIVE_I_TO_F 0 CACHE STRING "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100)")
+if(NOT DEFINED QUDA_ALTERNATIVE_I_TO_F_DEFAULT)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+set(QUDA_ALTERNATIVE_I_TO_F
+    "${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}"
+    CACHE STRING
+        "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100); CUDA builds with sm_100+ default to 25")
 set(VALID_I2F_VALUES "0" "25" "50" "75" "100")
 if(NOT QUDA_ALTERNATIVE_I_TO_F IN_LIST VALID_I2F_VALUES)
     message(FATAL_ERROR "Invalid value for QUDA_ALTERNATIVE_I_TO_F: '${QUDA_ALTERNATIVE_I_TO_F}'\n"
                         "Valid values are: ${VALID_I2F_VALUES}")
 endif()
 set_property(CACHE QUDA_ALTERNATIVE_I_TO_F PROPERTY STRINGS ${VALID_I2F_VALUES})
-message(STATUS "QUDA_ALTERNATIVE_I_TO_F set to: ${QUDA_ALTERNATIVE_I_TO_F}%")
+message(
+  STATUS
+  "QUDA_ALTERNATIVE_I_TO_F is ${QUDA_ALTERNATIVE_I_TO_F}% (alternative integer-to-float conversion path)")
 mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 # Set the maximum multi-RHS per kernel if not already set by the target
