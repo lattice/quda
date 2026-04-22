@@ -29,7 +29,7 @@ namespace quda
     int shift;
     int volume_cb;
     // fuzz factor for verifying the shifted field - not guaranteed to be bitwise identical
-    const real epsilon = std::is_same_v<store_t, double> ? 1e-14 : 3e-7;
+    static constexpr real epsilon = std::is_same_v<store_t, double> ? 1e-14 : 3e-7;
 
     GaugeShiftArg(GaugeField &out, const GaugeField &in, int shift) :
       kernel_param(dim3(in.VolumeCB(), 2, 4)), out(out), in(in), shift(shift), volume_cb(in.VolumeCB())
