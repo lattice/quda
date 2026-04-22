@@ -500,7 +500,7 @@ namespace quda {
        @brief Constructor for creating a LatticeField from a LatticeFieldParam
        @param param Contains the metadata for creating the field
     */
-    LatticeField(const LatticeFieldParam &param, bool is_native_gauge = false);
+    LatticeField(const LatticeFieldParam &param);
 
     /**
        @brief Destructor for LatticeField

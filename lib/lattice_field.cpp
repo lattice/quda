@@ -25,7 +25,7 @@ namespace quda {
     }
   }
 
-  LatticeField::LatticeField(const LatticeFieldParam &param, bool is_native_gauge) :
+  LatticeField::LatticeField(const LatticeFieldParam &param) :
     volume(1),
     localVolume(1),
     pad(param.pad),
