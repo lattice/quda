@@ -43,7 +43,9 @@
 
 #include <gauge_path_quda.h>
 #include <gauge_update_quda.h>
+#include <clover_field.h>
 #include <nested_fgi.h>
+#include <hmc_quda.h>
 #include <momentum.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
@@ -207,6 +209,7 @@ static TimeProfile profilePlaq("plaqQuda");
 
 //!<Profiler for hmcTrajectoryQuda
 static TimeProfile profileHMC("hmcTrajectoryQuda");
+static TimeProfile profileEigenTrack("eigenTracking");
 
 //!< Profiler for wuppertalQuda
 static TimeProfile profileWuppertal("wuppertalQuda");
@@ -4985,14 +4988,94 @@ void updateGaugeFieldQuda(void *gauge, void *momentum, double dt, int conj_mom, 
 // HMC Trajectory API
 // ============================================================
 
+#include <eigen_tracking_state.h>
+#include <cg_tracker.h>
+#include <coarse_deflation_manager.h>
+
+// Forward declarations for internal QUDA functions used by HMC
+namespace quda
+{
+  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
+             Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param);
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
+                          bool pc_solve, bool use_smeared_gauge = false);
+} // namespace quda
+
 // Persistent HMC state (survives across trajectories for deflation reuse)
 static quda::NestedFGIIntegrator *nestedFGIInstance = nullptr;
+
+// Persistent eigenspace tracking state (survives across trajectories)
+static quda::EigenTrackingState *eigenTrackingInstance = nullptr;
+
+// Persistent coarse-grid deflation tracker (survives across trajectories)
+static quda::CoarseDeflationManager *coarseDeflManager = nullptr;
+
+// Stored pseudofermion for reversibility tests (reuse_pseudofermion=1)
+static std::unique_ptr<quda::ColorSpinorField> storedPhi = nullptr;
 
 // Wilson plaquette gauge force paths (allocated once, reused)
 static int **hmc_gauge_paths[4] = {nullptr, nullptr, nullptr, nullptr};
 static int hmc_gauge_path_length[6];
 static double hmc_gauge_path_coeff[6];
 static bool hmc_gauge_paths_initialized = false;
+
+// Per-trajectory CG iteration counter (reset before each trajectory)
+static int hmc_traj_cg_iters = 0;
+static int hmc_traj_cg_solves = 0;
+
+void quda::seedEigenTrackingFromMG(void *mg_instance, QudaHMCParam *hmc_param, QudaInvertParam *inv_param)
+{
+  using namespace quda;
+  if (!mg_instance || !hmc_param->eigentracking_enabled) return;
+
+  auto *mg_solver = static_cast<multigrid_solver *>(mg_instance);
+  int nVec = static_cast<int>(mg_solver->B.size());
+  if (nVec == 0) return;
+
+  logQuda(QUDA_SUMMARIZE, "seedEigenTrackingFromMG: extracting %d even-parity vectors from MG null space\n", nVec);
+
+  // Extract even-parity components, promoting to outer solve precision
+  // and converting gamma basis from DEGRAND_ROSSI (MG internal) to UKQCD (Dirac operator).
+  std::vector<ColorSpinorField> evenVecs;
+  for (int i = 0; i < nVec; i++) {
+    ColorSpinorField evenRef = mg_solver->B[i][QUDA_EVEN_PARITY];
+    ColorSpinorParam param(evenRef);
+    param.create = QUDA_COPY_FIELD_CREATE;
+    param.field = &evenRef;
+    param.setPrecision(inv_param->cuda_prec);
+    param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS; // convert from DEGRAND_ROSSI
+    evenVecs.push_back(ColorSpinorField(param));
+  }
+
+  // Create or configure eigentracking state
+  if (!eigenTrackingInstance) {
+    eigenTrackingInstance = new EigenTrackingState();
+    EigenTrackingParam etp;
+    etp.enabled = true;
+    etp.nEv = hmc_param->eigentracking_n_ev;
+    etp.poolCapacity = hmc_param->eigentracking_pool_capacity;
+    etp.nRitz = hmc_param->eigentracking_n_ritz;
+    etp.forecastOrder = hmc_param->eigentracking_forecast_order;
+    etp.freshTRLMInterval = hmc_param->eigentracking_fresh_trlm_interval;
+    etp.solutionHistoryDepth = hmc_param->eigentracking_solution_history;
+    eigenTrackingInstance->configure(etp);
+  }
+
+  // Create Dirac operator for Dpool computation
+  QudaInvertParam ip = *inv_param;
+  ip.solve_type = QUDA_DIRECT_PC_SOLVE;
+  bool pc = true;
+  Dirac *d = nullptr, *dS = nullptr, *dP = nullptr, *dE = nullptr;
+  createDiracWithEig(d, dS, dP, dE, ip, pc, false);
+  DiracM matHalf(*d);
+
+  eigenTrackingInstance->seedFromMGNullVectors(evenVecs, matHalf, ip);
+
+  delete d;
+  if (dS && dS != d) delete dS;
+  if (dP && dP != d && dP != dS) delete dP;
+  if (dE && dE != d && dE != dP) delete dE;
+}
 
 QudaHMCParam newQudaHMCParam(void)
 {
@@ -5009,6 +5092,7 @@ QudaHMCParam newQudaHMCParam(void)
   // Momentum generation
   param.generate_momentum = 1;
   param.momentum_seed = 0;
+  param.reuse_pseudofermion = 0;
 
   // Omelyan default
   param.omelyan_lambda = 0.1932;
@@ -5038,6 +5122,8 @@ QudaHMCParam newQudaHMCParam(void)
   param.n_trajectories = 10;
   param.n_thermalization = 5;
 
+  param.mg_setup_interval = 0; // 0 = thin update only (no full re-setup)
+
   // Checkpointing
   param.checkpoint_interval = 0;
   memset(param.checkpoint_prefix, 0, sizeof(param.checkpoint_prefix));
@@ -5052,6 +5138,15 @@ QudaHMCParam newQudaHMCParam(void)
   param.use_resident_mom = 0;
   param.make_resident_mom = 0;
   param.return_result_mom = 1;
+
+  // Eigenspace tracking (default: disabled)
+  param.eigentracking_enabled = 0;
+  param.eigentracking_n_ev = 8;
+  param.eigentracking_pool_capacity = 32;
+  param.eigentracking_n_ritz = 4;
+  param.eigentracking_forecast_order = 1;
+  param.eigentracking_fresh_trlm_interval = 10;
+  param.eigentracking_solution_history = 3;
 
   return param;
 }
@@ -5113,6 +5208,7 @@ static void freeWilsonGaugePaths()
 static double computeGaugeAction(double beta)
 {
   using namespace quda;
+  auto profile = pushProfile(profileHMC);
   updateExtendedGaugeResident(false, R, getProfile());
   double3 plaq3 = plaquette(*extendedGaugeResident);
   int V = 1;
@@ -5126,28 +5222,106 @@ static double computeGaugeAction(double beta)
 static double computeFermionAction(quda::ColorSpinorField &phi, QudaInvertParam *inv_param)
 {
   using namespace quda;
+  auto profile = pushProfile(profileHMC);
 
-  // Solve x = (D†D)^{-1} phi using solutionResident for on-device storage.
-  // use_resident_solution=1 causes solve() to alias x into solutionResident.
+  // Solve x = (M†M)⁻¹ phi
   QudaInvertParam ip = *inv_param;
-  ip.make_resident_solution = 1;
-  ip.use_resident_solution = 1;
 
-  // Create proper host-side buffers for the invertQuda C-API interface.
-  // phi is already a single-parity device field.
-  ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
-  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField h_x(cpuParam);
-  ColorSpinorField h_b(cpuParam);
-  h_b = phi; // device → host copy
+  // Prepare solution storage
+  ColorSpinorParam csParam(phi);
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  ColorSpinorField x_dev(csParam);
 
-  invertQuda(h_x.data(), h_b.data(), &ip);
+  if (ip.preconditioner) {
+    // MG two-pass γ₅ trick: both passes use M (fast with MG)
+    ip.solve_type = QUDA_DIRECT_PC_SOLVE;
+    bool pc_solve = true;
+    Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
+    createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, pc_solve, false);
 
-  // S_f = real(phi† x) using the resident solution (native GPU field order)
-  Complex dot = blas::cDotProduct(phi, solutionResident[0]);
+    DiracM m(*dirac), mSloppy(*diracSloppy), mPre(*diracPre), mEig(*diracEig);
+    SolverParam solverParam(ip);
+
+    // Step 1: z = γ₅ phi
+    std::vector<ColorSpinorField> z(1, csParam);
+    std::vector<ColorSpinorField> b_vec(1, ColorSpinorField(phi));
+    gamma5(z, b_vec);
+
+    // Step 2: Solve M w = z
+    std::vector<ColorSpinorField> w(1, csParam);
+    {
+      Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+      (*s)(w, z);
+      delete s;
+      hmc_traj_cg_iters += solverParam.iter;
+      hmc_traj_cg_solves++;
+      solverParam.iter = 0;
+    }
+
+    // Step 3: y = γ₅ w
+    std::vector<ColorSpinorField> y(1, csParam);
+    gamma5(y, w);
+
+    // Step 4: Solve M x = y
+    std::vector<ColorSpinorField> x_vec(1, csParam);
+    {
+      Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+      (*s)(x_vec, y);
+      delete s;
+      hmc_traj_cg_iters += solverParam.iter;
+      hmc_traj_cg_solves++;
+    }
+    x_dev = x_vec[0];
+
+    // Stash normalized solution for eigentracking (action solve also provides low-mode content)
+    if (eigenTrackingInstance && eigenTrackingInstance->isActive()) {
+      ColorSpinorField xNorm(x_vec[0]);
+      double xnrm = sqrt(blas::norm2(xNorm));
+      if (xnrm > 1e-30) {
+        blas::ax(1.0 / xnrm, xNorm);
+        std::vector<ColorSpinorField> solVecs;
+        solVecs.push_back(std::move(xNorm));
+        eigenTrackingInstance->stashRitzVectors(std::move(solVecs));
+      }
+    }
+
+    delete dirac;
+    if (diracSloppy && diracSloppy != dirac) delete diracSloppy;
+    if (diracPre && diracPre != dirac && diracPre != diracSloppy) delete diracPre;
+    if (diracEig && diracEig != dirac && diracEig != diracPre) delete diracEig;
+  } else {
+    // Standard path via invertQuda
+    ip.make_resident_solution = 1;
+    ip.use_resident_solution = 1;
+    ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField h_x(cpuParam);
+    ColorSpinorField h_b(cpuParam);
+    h_b = phi;
+    invertQuda(h_x.data(), h_b.data(), &ip);
+    hmc_traj_cg_iters += ip.iter;
+    hmc_traj_cg_solves++;
+    x_dev = solutionResident[0];
+    solutionResident.clear();
+  }
+
+  // S_f = Re(phi† x)
+  Complex dot = blas::cDotProduct(phi, x_dev);
+  double sf = dot.real();
+
+  // For clover EO preconditioning with EVEN_EVEN_ASYMMETRIC:
+  //   det(D) = det(A_oo) * det(D_hat), D_hat = A_ee - κ²D_eo A_oo^{-1} D_oe
+  //   S_f = phi^dag x - 2 * TrLog[ODD]
+  // Note: the force uses ASYMMETRIC matpc for the clover sigma terms, and the
+  // action must be consistent. The CG uses SYMMETRIC, but both give the same
+  // CG solution. The log-det differs: SYMMETRIC needs both parities, ASYMMETRIC
+  // needs only ODD. We use ASYMMETRIC convention to match the force.
+  if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH && cloverPrecise) {
+    sf -= 2.0 * cloverPrecise->TrLog()[1]; // ODD parity only
+  }
 
   solutionResident.clear();
-  return dot.real();
+  return sf;
 }
 
 /**
@@ -5157,60 +5331,147 @@ static double computeFermionAction(quda::ColorSpinorField &phi, QudaInvertParam 
  * Fermion force: CG solve + computeCloverForceQuda (uses resident fields)
  */
 static void computeTotalForceAndKick(double dt, quda::ColorSpinorField &phi, double beta, QudaGaugeParam *gauge_param,
-                                     QudaInvertParam *inv_param)
+                                     QudaInvertParam *inv_param,
+                                     quda::EigenTrackingState *tracking = nullptr)
 {
   using namespace quda;
+  auto profile = pushProfile(profileHMC);
 
   setupWilsonGaugePaths();
 
-  // --- Gauge force ---
-  // Use local copy of gauge_param with resident-field flags for internal calls.
-  // IMPORTANT: use_resident_mom=1 with make_resident_mom=0 avoids the
-  // std::exchange in computeCloverForceQuda that would corrupt momResident.
-  QudaGaugeParam gp = *gauge_param;
-  gp.use_resident_gauge = 1;
-  gp.use_resident_mom = 1;
-  gp.make_resident_gauge = 1;
-  gp.make_resident_mom = 1;
-  gp.return_result_mom = 0;
-  gp.overwrite_mom = 0; // accumulate into existing momentum
-
+  // --- Gauge force (internal API) ---
+  // gaugeForce accumulates: mom -= epsilon * gauge_path_force (negative sign for HMC)
+  updateExtendedGaugeResident(false, R, getProfile());
   double eb3 = dt * beta / 3.0;
-  computeGaugeForceQuda(nullptr, nullptr, hmc_gauge_paths, hmc_gauge_path_length, hmc_gauge_path_coeff, 6, 4, eb3,
-                        &gp);
 
-  // --- Fermion force ---
-  // CG solve with use_resident_solution=1 so solve() aliases x into solutionResident.
+  std::vector<int> path_length_v(6);
+  std::vector<double> path_coeff_v(6);
+  for (int i = 0; i < 6; i++) {
+    path_length_v[i] = hmc_gauge_path_length[i];
+    path_coeff_v[i] = hmc_gauge_path_coeff[i];
+  }
+  std::vector<int **> input_path_v(4);
+  for (int d = 0; d < 4; d++) input_path_v[d] = hmc_gauge_paths[d];
+
+  gaugeForce(momResident, *extendedGaugeResident, eb3, input_path_v, path_length_v, path_coeff_v, 6, 4);
+
+  // --- Fermion force (internal API) ---
+  // 1. CG solve: x = (D†D)^{-1} phi using internal solve()
+  // With MG: keep NORMOP_PC_SOLVE so GCR+MG preconditions M†M in one solve.
+  // DIRECT_PC_SOLVE would split into M† and M solves, where M† is poorly preconditioned.
   QudaInvertParam ip = *inv_param;
-  ip.use_resident_solution = 1;
-  ip.make_resident_solution = 1;
 
-  // Create proper host-side buffers for the invertQuda C-API.
-  // phi is already a single-parity device field.
-  ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
-  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField h_x(cpuParam);
-  ColorSpinorField h_b(cpuParam);
-  h_b = phi; // device → host copy
+  // Create Dirac operators for the solve
+  bool pc_solve = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+  Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
+  createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, pc_solve, false);
 
-  invertQuda(h_x.data(), h_b.data(), &ip);
+  // Prepare x (solution) and b (source) on device in native order
+  ColorSpinorParam csParam(phi);
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  std::vector<ColorSpinorField> x(1, csParam);
+  std::vector<ColorSpinorField> b(1, ColorSpinorField(phi)); // copy of phi
 
-  // Clover force reads from solutionResident (populated by the solve above)
-  double coeff = 1.0;
-  double kappa2 = ip.kappa * ip.kappa;
-  double ck = ip.clover_csw * ip.kappa;
-  computeCloverForceQuda(nullptr, dt, nullptr, nullptr, &coeff, kappa2, ck, 1, 1.0, nullptr, &gp, &ip);
+  // Enable QUDA's native chronological forecasting when eigentracking is active.
+  if (tracking && tracking->isActive()) {
+    ip.chrono_make_resident = 1;
+    ip.chrono_use_resident = 1;
+    ip.chrono_max_dim = 3;
+    ip.chrono_index = 0;
+    ip.chrono_replace_last = 0;
+  }
 
-  // Clear resident solution after force computation
-  solutionResident.clear();
+  // Solve x = (M†M)⁻¹ b
+  if (ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
+    // MG two-pass γ₅ trick: M† = γ₅ M γ₅, so (M†M)⁻¹ = M⁻¹ (γ₅ M γ₅)⁻¹ = M⁻¹ γ₅ M⁻¹ γ₅
+    // Step 1: z = γ₅ b
+    // Step 2: Solve M w = z   (~12 iters with MG)  → w = M⁻¹ γ₅ b
+    // Step 3: y = γ₅ w        → y = γ₅ M⁻¹ γ₅ b = (M†)⁻¹ b
+    // Step 4: Solve M x = y   (~12 iters with MG)  → x = M⁻¹ (M†)⁻¹ b = (M†M)⁻¹ b
+    DiracM m(*dirac), mSloppy(*diracSloppy), mPre(*diracPre), mEig(*diracEig);
+    SolverParam solverParam(ip);
+
+    // Step 1: z = γ₅ b
+    std::vector<ColorSpinorField> z(1, csParam);
+    gamma5(z, b);
+
+    // Step 2: Solve M w = z
+    std::vector<ColorSpinorField> w(1, csParam);
+    {
+      Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+      (*s)(w, z);
+      delete s;
+      hmc_traj_cg_iters += solverParam.iter;
+      hmc_traj_cg_solves++;
+      logQuda(QUDA_VERBOSE, "γ₅ two-pass: M solve (pass 1) = %d iters\n", solverParam.iter);
+      solverParam.iter = 0;
+    }
+
+    // Step 3: y = γ₅ w
+    std::vector<ColorSpinorField> y(1, csParam);
+    gamma5(y, w);
+
+    // Step 4: Solve M x = y
+    {
+      Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+      (*s)(x, y);
+      delete s;
+      hmc_traj_cg_iters += solverParam.iter;
+      hmc_traj_cg_solves++;
+      logQuda(QUDA_VERBOSE, "γ₅ two-pass: M solve (pass 2) = %d iters\n", solverParam.iter);
+    }
+
+    // Stash normalized solution vectors for eigentracking absorption.
+    // w = M⁻¹ γ₅ b and x = (M†M)⁻¹ b are both rich in low-mode content.
+    if (tracking && tracking->isActive()) {
+      std::vector<ColorSpinorField> solVecs;
+      // Stash the final solution x (most useful — it's the full (M†M)⁻¹ vector)
+      ColorSpinorField xNorm(x[0]);
+      double xnrm = sqrt(blas::norm2(xNorm));
+      if (xnrm > 1e-30) {
+        blas::ax(1.0 / xnrm, xNorm);
+        solVecs.push_back(std::move(xNorm));
+      }
+      // Also stash the intermediate w = M⁻¹ γ₅ b
+      ColorSpinorField wNorm(w[0]);
+      double wnrm = sqrt(blas::norm2(wNorm));
+      if (wnrm > 1e-30) {
+        blas::ax(1.0 / wnrm, wNorm);
+        solVecs.push_back(std::move(wNorm));
+      }
+      if (!solVecs.empty()) tracking->stashRitzVectors(std::move(solVecs));
+    }
+
+    ip.iter = hmc_traj_cg_iters; // for logging
+  } else {
+    // Standard solve path (CG on M†M or direct without MG)
+    solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
+    hmc_traj_cg_iters += ip.iter;
+    hmc_traj_cg_solves++;
+  }
+
+  // Note: CGTracker Ritz extraction only works with CG (not GCR+MG).
+  // Solution vectors are stashed in the γ₅ two-pass path above instead.
+
+  // 2. Accumulate EO fermion force into momentum
+  computeEOFermionForce(momResident, x[0], ip, dt);
+
+  delete dirac;
+  delete diracSloppy;
+  if (diracPre != diracSloppy) delete diracPre;
+  if (diracEig != diracPre) delete diracEig;
 }
 
 /**
  * @brief Update gauge field and rebuild clover term.
  */
-static void gaugeUpdateAndCloverRebuild(double dt, QudaInvertParam *inv_param)
+static void gaugeUpdateAndCloverRebuild(double dt, QudaInvertParam *inv_param,
+                                         quda::EigenTrackingState *tracking = nullptr)
 {
   using namespace quda;
+  auto profile = pushProfile(profileHMC);
+
+  logQuda(QUDA_VERBOSE, "gaugeUpdateAndCloverRebuild: dt=%e\n", dt);
 
   // Gauge update: U_out = exp(dt * P) * U_in
   // Must use separate in/out fields — in-place update is a race condition.
@@ -5230,8 +5491,16 @@ static void gaugeUpdateAndCloverRebuild(double dt, QudaInvertParam *inv_param)
   // Rebuild extended gauge (handles ghost exchange internally)
   updateExtendedGaugeResident(true, R, getProfile());
 
-  // Rebuild clover field from updated gauge
-  if (cloverPrecise) { createCloverQuda(inv_param); }
+  // Rebuild clover field from updated gauge (loadCloverQuda recomputes,
+  // inverts, and populates TrLog needed for the EO clover action)
+  if (cloverPrecise && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    loadCloverQuda(nullptr, nullptr, inv_param);
+  }
+
+  // Note: Dpool refresh is NOT done per gauge step (too expensive: poolSize matvecs each step).
+  // Instead, Dpool is refreshed once in betweenTrajectories after the full trajectory completes.
+  // During the trajectory, pool vectors are still used for Ritz absorption (orthogonalization
+  // against pool doesn't need current Dpool) and the stale Dpool is acceptable for compress.
 }
 
 /**
@@ -5241,6 +5510,7 @@ static quda::ColorSpinorField generatePseudofermion(QudaGaugeParam *, QudaInvert
                                                     unsigned long long seed)
 {
   using namespace quda;
+  auto profile = pushProfile(profileHMC);
 
   // Create a single-parity spinor on the GPU in native field order.
   // pc_solution=true gives us the parity field the solver expects.
@@ -5271,21 +5541,22 @@ static quda::ColorSpinorField generatePseudofermion(QudaGaugeParam *, QudaInvert
  * @brief Leapfrog MD trajectory with Wilson-clover action.
  */
 static void leapfrogTrajectory(double h, int nSteps, quda::ColorSpinorField &phi, double beta,
-                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
+                                quda::EigenTrackingState *tracking = nullptr)
 {
   // Initial half-kick
   logQuda(QUDA_VERBOSE, "Leapfrog: initial half-kick dt=%e\n", h / 2.0);
-  computeTotalForceAndKick(h / 2.0, phi, beta, gauge_param, inv_param);
+  computeTotalForceAndKick(h / 2.0, phi, beta, gauge_param, inv_param, tracking);
 
   for (int step = 0; step < nSteps; step++) {
     // Full drift
     logQuda(QUDA_VERBOSE, "Leapfrog step %d/%d: drift dt=%e\n", step + 1, nSteps, h);
-    gaugeUpdateAndCloverRebuild(h, inv_param);
+    gaugeUpdateAndCloverRebuild(h, inv_param, tracking);
 
     // Full kick (or final half-kick)
     double kickDt = (step < nSteps - 1) ? h : h / 2.0;
     logQuda(QUDA_VERBOSE, "Leapfrog step %d/%d: kick dt=%e\n", step + 1, nSteps, kickDt);
-    computeTotalForceAndKick(kickDt, phi, beta, gauge_param, inv_param);
+    computeTotalForceAndKick(kickDt, phi, beta, gauge_param, inv_param, tracking);
   }
 }
 
@@ -5293,26 +5564,27 @@ static void leapfrogTrajectory(double h, int nSteps, quda::ColorSpinorField &phi
  * @brief Omelyan (2MN) MD trajectory: PQPQP pattern.
  */
 static void omelyanTrajectory(double h, int nSteps, double lam, quda::ColorSpinorField &phi, double beta,
-                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
+                               quda::EigenTrackingState *tracking = nullptr)
 {
   // Initial P(lambda*h)
-  computeTotalForceAndKick(lam * h, phi, beta, gauge_param, inv_param);
+  computeTotalForceAndKick(lam * h, phi, beta, gauge_param, inv_param, tracking);
 
   for (int step = 0; step < nSteps; step++) {
     logQuda(QUDA_VERBOSE, "Omelyan step %d/%d\n", step + 1, nSteps);
 
     // Q(h/2)
-    gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+    gaugeUpdateAndCloverRebuild(h / 2.0, inv_param, tracking);
 
     // P((1-2*lambda)*h)
-    computeTotalForceAndKick((1.0 - 2.0 * lam) * h, phi, beta, gauge_param, inv_param);
+    computeTotalForceAndKick((1.0 - 2.0 * lam) * h, phi, beta, gauge_param, inv_param, tracking);
 
     // Q(h/2)
-    gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+    gaugeUpdateAndCloverRebuild(h / 2.0, inv_param, tracking);
 
     // P(2*lambda*h) for merged steps, P(lambda*h) for final
     double kickDt = (step < nSteps - 1) ? 2.0 * lam * h : lam * h;
-    computeTotalForceAndKick(kickDt, phi, beta, gauge_param, inv_param);
+    computeTotalForceAndKick(kickDt, phi, beta, gauge_param, inv_param, tracking);
   }
 }
 
@@ -5322,6 +5594,10 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
   using namespace quda;
   auto profile = pushProfile(profileHMC);
 
+  // Reset per-trajectory CG counters
+  hmc_traj_cg_iters = 0;
+  hmc_traj_cg_solves = 0;
+
   checkGaugeParam(gauge_param);
   checkInvertParam(inv_param);
 
@@ -5330,7 +5606,10 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
   if (!gaugePrecise) errorQuda("No gauge field available for HMC trajectory");
 
   // --- 2. Load or create clover field ---
-  loadCloverQuda(nullptr, nullptr, inv_param);
+  // For clover actions: compute from gauge. For pure Wilson: no clover needed.
+  bool use_clover = (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH
+                     || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
+  if (use_clover) { loadCloverQuda(nullptr, nullptr, inv_param); }
 
   // --- 3. Momentum: load from host, use resident, or generate ---
   if (hmc_param->generate_momentum) {
@@ -5340,6 +5619,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
       mParam.location = QUDA_CUDA_FIELD_LOCATION;
       mParam.create = QUDA_ZERO_FIELD_CREATE;
       mParam.reconstruct = QUDA_RECONSTRUCT_10;
+      mParam.anisotropy = 1.0; // momentum is not a gauge field — no anisotropy
       mParam.setPrecision(gauge_param->cuda_prec, true);
       momResident = GaugeField(mParam);
     }
@@ -5349,6 +5629,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
     logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Generated Gaussian momentum (seed=%llu)\n", seed);
   } else if (!hmc_param->use_resident_mom) {
     GaugeFieldParam mParam(*gauge_param, h_momentum, QUDA_ASQTAD_MOM_LINKS);
+    mParam.anisotropy = 1.0; // momentum is not a gauge field — no anisotropy
     GaugeField cpuMom(mParam);
     mParam.location = QUDA_CUDA_FIELD_LOCATION;
     mParam.create = QUDA_COPY_FIELD_CREATE;
@@ -5359,10 +5640,17 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
   }
   if (momResident.empty()) errorQuda("No momentum field available for HMC trajectory");
 
-  // --- 4. Generate pseudofermion ---
-  unsigned long long phi_seed = hmc_param->momentum_seed ? hmc_param->momentum_seed + 1 : std::time(nullptr) + 1;
-  ColorSpinorField phi = generatePseudofermion(gauge_param, inv_param, phi_seed);
-  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Generated pseudofermion\n");
+  // --- 4. Generate or reuse pseudofermion ---
+  ColorSpinorField phi;
+  if (hmc_param->reuse_pseudofermion && storedPhi) {
+    phi = *storedPhi;
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Reusing stored pseudofermion\n");
+  } else {
+    unsigned long long phi_seed = hmc_param->momentum_seed ? hmc_param->momentum_seed + 1 : std::time(nullptr) + 1;
+    phi = generatePseudofermion(gauge_param, inv_param, phi_seed);
+    storedPhi = std::make_unique<ColorSpinorField>(phi);
+    logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Generated pseudofermion\n");
+  }
 
   // --- 5. Compute H_initial ---
   double kinetic_init = computeMomAction(momResident);
@@ -5373,19 +5661,53 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
   logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: H_init = %e (kinetic=%e, gauge=%e, fermion=%e)\n", H_init, kinetic_init,
           gauge_action_init, fermion_action_init);
 
+  // --- Eigentracking initialization ---
+  quda::EigenTrackingState *tracking = nullptr;
+  if (hmc_param->eigentracking_enabled) {
+    if (!eigenTrackingInstance) {
+      eigenTrackingInstance = new quda::EigenTrackingState();
+      quda::EigenTrackingParam etp;
+      etp.enabled = true;
+      etp.nEv = hmc_param->eigentracking_n_ev;
+      etp.poolCapacity = hmc_param->eigentracking_pool_capacity;
+      etp.nRitz = hmc_param->eigentracking_n_ritz;
+      etp.forecastOrder = hmc_param->eigentracking_forecast_order;
+      etp.freshTRLMInterval = hmc_param->eigentracking_fresh_trlm_interval;
+      etp.solutionHistoryDepth = hmc_param->eigentracking_solution_history;
+      eigenTrackingInstance->configure(etp);
+    }
+    // Initialize if needed (runs TRLM on first call)
+    {
+      using namespace quda;
+      QudaInvertParam ip = *inv_param;
+      bool pc_solve = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+      Dirac *d = nullptr, *dSloppy = nullptr, *dPre = nullptr, *dEig = nullptr;
+      createDiracWithEig(d, dSloppy, dPre, dEig, ip, pc_solve, false);
+      DiracMdagM matNorm(*d);
+      DiracM matHalf(*d);
+      eigenTrackingInstance->maybeInit(matNorm, matHalf, ip);
+      delete d;
+      if (dSloppy && dSloppy != d) delete dSloppy;
+      if (dPre && dPre != d && dPre != dSloppy) delete dPre;
+      if (dEig && dEig != d && dEig != dPre) delete dEig;
+    }
+    tracking = eigenTrackingInstance;
+  }
+
   // --- 6. MD evolution ---
   double h = hmc_param->tau / hmc_param->n_steps;
 
   switch (hmc_param->integrator) {
   case QUDA_LEAPFROG_INTEGRATOR:
     logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Leapfrog, tau=%e, n_steps=%d\n", hmc_param->tau, hmc_param->n_steps);
-    leapfrogTrajectory(h, hmc_param->n_steps, phi, hmc_param->beta, gauge_param, inv_param);
+    leapfrogTrajectory(h, hmc_param->n_steps, phi, hmc_param->beta, gauge_param, inv_param, tracking);
     break;
 
   case QUDA_OMELYAN_INTEGRATOR:
     logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: Omelyan, tau=%e, n_steps=%d, lambda=%e\n", hmc_param->tau,
             hmc_param->n_steps, hmc_param->omelyan_lambda);
-    omelyanTrajectory(h, hmc_param->n_steps, hmc_param->omelyan_lambda, phi, hmc_param->beta, gauge_param, inv_param);
+    omelyanTrajectory(h, hmc_param->n_steps, hmc_param->omelyan_lambda, phi, hmc_param->beta, gauge_param, inv_param,
+                      tracking);
     break;
 
   case QUDA_FORCE_GRADIENT_INTEGRATOR: {
@@ -5395,13 +5717,13 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
     double xi_fgi = hmc_param->fgi_xi;
 
     // Initial P(lambda*h)
-    computeTotalForceAndKick(lam * h, phi, hmc_param->beta, gauge_param, inv_param);
+    computeTotalForceAndKick(lam * h, phi, hmc_param->beta, gauge_param, inv_param, tracking);
 
     for (int step = 0; step < hmc_param->n_steps; step++) {
       logQuda(QUDA_VERBOSE, "FGI step %d/%d\n", step + 1, hmc_param->n_steps);
 
       // Q(h/2)
-      gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+      gaugeUpdateAndCloverRebuild(h / 2.0, inv_param, tracking);
 
       // Force-gradient sub-step: FG((1-2*lambda)*h, xi*h^3)
       {
@@ -5415,7 +5737,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
 
         // Zero momentum, compute force, kick with FG coefficient
         momResident.zero();
-        computeTotalForceAndKick(fgCoeff, phi, hmc_param->beta, gauge_param, inv_param);
+        computeTotalForceAndKick(fgCoeff, phi, hmc_param->beta, gauge_param, inv_param, tracking);
 
         // Displace gauge: U' = exp(1.0 * mom) * U
         GaugeFieldParam gfParam(*gaugePrecise);
@@ -5429,7 +5751,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
 
         // Restore momentum, compute force at displaced gauge
         momResident.copy(momSaved);
-        computeTotalForceAndKick(one_m_2lam * h, phi, hmc_param->beta, gauge_param, inv_param);
+        computeTotalForceAndKick(one_m_2lam * h, phi, hmc_param->beta, gauge_param, inv_param, tracking);
 
         // Restore gauge
         gaugePrecise->copy(gaugeSaved);
@@ -5439,11 +5761,11 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
       }
 
       // Q(h/2)
-      gaugeUpdateAndCloverRebuild(h / 2.0, inv_param);
+      gaugeUpdateAndCloverRebuild(h / 2.0, inv_param, tracking);
 
       // P(2*lambda*h) merged, or P(lambda*h) final
       double kickDt = (step < hmc_param->n_steps - 1) ? 2.0 * lam * h : lam * h;
-      computeTotalForceAndKick(kickDt, phi, hmc_param->beta, gauge_param, inv_param);
+      computeTotalForceAndKick(kickDt, phi, hmc_param->beta, gauge_param, inv_param, tracking);
     }
     break;
   }
@@ -5484,12 +5806,16 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
 
   if (hmc_param->return_result_mom && h_momentum) {
     GaugeFieldParam mParam(*gauge_param, h_momentum, QUDA_ASQTAD_MOM_LINKS);
+    mParam.anisotropy = 1.0;
     GaugeField cpuMom(mParam);
     cpuMom.copy(momResident);
   }
 
   if (!hmc_param->make_resident_gauge && !hmc_param->use_resident_gauge) { freeUniqueGaugeQuda(QUDA_WILSON_LINKS); }
   if (!hmc_param->make_resident_mom) { momResident = GaugeField(); }
+
+  logQuda(QUDA_SUMMARIZE, "hmcTrajectoryQuda: CG stats: %d solves, %d total iters (%.1f avg)\n", hmc_traj_cg_solves,
+          hmc_traj_cg_iters, hmc_traj_cg_solves > 0 ? (double)hmc_traj_cg_iters / hmc_traj_cg_solves : 0.0);
 
   return dH;
 }
@@ -5500,26 +5826,81 @@ void destroyHMCQuda(void)
     delete nestedFGIInstance;
     nestedFGIInstance = nullptr;
   }
+  if (eigenTrackingInstance) {
+    delete eigenTrackingInstance;
+    eigenTrackingInstance = nullptr;
+  }
+  if (coarseDeflManager) {
+    delete coarseDeflManager;
+    coarseDeflManager = nullptr;
+  }
+  // Free stored pseudofermion (GPU memory) before endQuda destroys the pool
+  storedPhi.reset();
   freeWilsonGaugePaths();
 }
 
 void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
-                void *mg_instance)
+                void *mg_instance, QudaMultigridParam *mg_param)
 {
   using namespace quda;
   auto profile = pushProfile(profileHMC);
 
   checkGaugeParam(gauge_param);
+
+  // Wire MG preconditioner: GCR outer solver with DIRECT_PC_SOLVE (required by QUDA MG validation).
+  if (mg_instance) {
+    inv_param->preconditioner = mg_instance;
+    inv_param->solve_type = QUDA_DIRECT_PC_SOLVE;
+    if (inv_param->inv_type == QUDA_CG_INVERTER) inv_param->inv_type = QUDA_GCR_INVERTER;
+    inv_param->inv_type_precondition = QUDA_MG_INVERTER;
+  }
+
   checkInvertParam(inv_param);
+
+  // Initialize coarse-grid deflation tracker if MG has >= 2 levels.
+  // Skip if --mg-eig is active (MG handles coarsest deflation internally).
+  bool mg_eig_active = false;
+  if (mg_instance && mg_param) {
+    for (int i = 0; i < mg_param->n_level; i++)
+      if (mg_param->use_eig_solver[i]) mg_eig_active = true;
+  }
+  // CoarseDeflationManager: disabled pending field allocation fix for the standalone TRLM.
+  // Use --mg-eig for built-in MG deflation instead.
+  if (false && mg_instance && !coarseDeflManager && !mg_eig_active) {
+    using namespace quda;
+    auto *mg_solver = static_cast<multigrid_solver *>(mg_instance);
+    MG *mg = mg_solver->mg;
+
+    // Find the coarsest level's operator and transfer
+    MG *coarsest_parent = mg;
+    while (coarsest_parent->getCoarse() && coarsest_parent->getCoarse()->getCoarse())
+      coarsest_parent = coarsest_parent->getCoarse();
+
+    const DiracMatrix *matCoarsest = coarsest_parent->getMatCoarseResidual();
+    const Dirac *diracCoarsest = coarsest_parent->getDiracCoarseResidual();
+    const Transfer *transferCoarsest = coarsest_parent->getTransfer();
+
+    if (matCoarsest && diracCoarsest && transferCoarsest) {
+      int nDefl = hmc_param->n_defl > 0 ? hmc_param->n_defl : 32;
+      logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Creating CoarseDeflationManager with %d coarse eigenvectors\n", nDefl);
+      coarseDeflManager = new CoarseDeflationManager(*transferCoarsest, *matCoarsest, *diracCoarsest, nDefl, 1e-6);
+      logQuda(QUDA_SUMMARIZE, "hmcRunQuda: CoarseDeflationManager initialized\n");
+    }
+  }
 
   int n_traj = hmc_param->n_trajectories;
   int n_therm = hmc_param->n_thermalization;
+  int mg_setup_interval = hmc_param->mg_setup_interval;
 
-  logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Starting HMC run: %d trajectories (%d thermalisation)\n", n_traj, n_therm);
+  logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Starting HMC run: %d trajectories (%d thermalisation), MG=%s\n", n_traj,
+          n_therm, mg_instance ? "enabled" : "disabled");
+  if (mg_instance && mg_setup_interval > 0)
+    logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Full MG re-setup every %d trajectories\n", mg_setup_interval);
+  if (coarseDeflManager)
+    logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Coarse-grid deflation tracking enabled\n");
 
   // --- 1. Load initial gauge configuration ---
   if (hmc_param->gauge_infile[0] != '\0') {
-    // Load from file via QIO
     logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Loading gauge from file: %s\n", hmc_param->gauge_infile);
     GaugeFieldParam gParam(*gauge_param);
     gParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -5534,17 +5915,16 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
   }
   if (!gaugePrecise) errorQuda("hmcRunQuda: No gauge field available");
 
-  // Load clover
-  loadCloverQuda(nullptr, nullptr, inv_param);
+  // Clover loading is handled by hmcTrajectoryQuda
 
   // --- 2. Configure trajectory params for internal use ---
-  // hmcTrajectoryQuda operates on resident fields
   hmc_param->use_resident_gauge = 1;
   hmc_param->make_resident_gauge = 1;
   hmc_param->return_result_gauge = 0;
   hmc_param->generate_momentum = 1;
 
-  // Seed for momentum RNG — increment each trajectory for reproducibility
+  // MG preconditioner already linked above (before checkInvertParam)
+
   unsigned long long base_seed = hmc_param->momentum_seed;
   if (base_seed == 0) base_seed = static_cast<unsigned long long>(std::time(nullptr));
 
@@ -5564,21 +5944,134 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
     logQuda(QUDA_SUMMARIZE, "hmcRunQuda: === Trajectory %d/%d %s=== plaquette = %e\n", traj + 1, n_traj,
             is_therm ? "(thermalisation) " : "", plaq[0]);
 
+    // Eigentracking: apply forecast pre-rotation before trajectory
+    if (eigenTrackingInstance && eigenTrackingInstance->isActive()) {
+      auto etProfile = pushProfile(profileEigenTrack);
+      using namespace quda;
+      QudaInvertParam ip = *inv_param;
+      bool pc = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+      Dirac *d = nullptr, *dS = nullptr, *dP = nullptr, *dE = nullptr;
+      createDiracWithEig(d, dS, dP, dE, ip, pc, false);
+      DiracM matHalf(*d);
+      eigenTrackingInstance->beforeTrajectory(matHalf);
+      delete d;
+      if (dS && dS != d) delete dS;
+      if (dP && dP != d && dP != dS) delete dP;
+      if (dE && dE != d && dE != dP) delete dE;
+    }
+
     // Backup gauge for accept/reject
     GaugeField gaugeBkup(*gaugePrecise);
 
     // Run MD trajectory
     double dH = hmcTrajectoryQuda(nullptr, nullptr, hmc_param, gauge_param, inv_param, mg_instance);
 
-    // Metropolis accept/reject
-    double rand_val = drand48();
+    // Metropolis accept/reject (always accept during thermalisation)
+    double rand_val = is_therm ? 0.0 : drand48();
     double prob = std::exp(-dH);
-    bool accepted = (rand_val < prob);
+    bool accepted = is_therm || (rand_val < prob);
 
     if (accepted) {
       n_accepted++;
       logQuda(QUDA_SUMMARIZE, "hmcRunQuda: ACCEPTED  dH = %+.6e  exp(-dH) = %.6e  rand = %.6e  rate = %.1f%%\n", dH,
               prob, rand_val, 100.0 * n_accepted / n_total);
+
+      // --- MG update after accepted trajectory (gauge changed) ---
+      if (mg_instance && mg_param) {
+        bool full_update = (mg_setup_interval > 0 && (n_accepted % mg_setup_interval == 0));
+
+        if (full_update) {
+          // Full MG re-setup: reconstruct null vectors and coarse operators
+          mg_param->thin_update_only = QUDA_BOOLEAN_FALSE;
+          logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Full MG re-setup (trajectory %d, accepted %d)\n", traj + 1, n_accepted);
+        } else {
+          // Thin update: refresh Dirac operators with new gauge, preserve null vectors
+          mg_param->thin_update_only = QUDA_BOOLEAN_TRUE;
+          logQuda(QUDA_VERBOSE, "hmcRunQuda: Thin MG update (trajectory %d)\n", traj + 1);
+        }
+        updateMultigridQuda(mg_instance, mg_param);
+
+        // Update deflation space if using nested FGI
+        if (nestedFGIInstance) {
+          if (full_update) {
+            // After full MG re-setup, re-solve the coarse eigenproblem
+            nestedFGIInstance->getDeflationManager().solve();
+          } else {
+            // After thin update, RR evolve is sufficient
+            nestedFGIInstance->getDeflationManager().rayleighRitzUpdate();
+          }
+        }
+      }
+
+      // Eigentracking: between-trajectory RR evolution + forecast recording
+      if (eigenTrackingInstance && eigenTrackingInstance->isActive()) {
+        auto etProfile = pushProfile(profileEigenTrack);
+        using namespace quda;
+        QudaInvertParam ip = *inv_param;
+        bool pc = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+        Dirac *d = nullptr, *dS = nullptr, *dP = nullptr, *dE = nullptr;
+        createDiracWithEig(d, dS, dP, dE, ip, pc, false);
+        DiracMdagM matNorm(*d);
+        DiracM matHalf(*d);
+        eigenTrackingInstance->betweenTrajectories(matNorm, matHalf);
+        logQuda(QUDA_SUMMARIZE, "hmcRunQuda: %s\n", eigenTrackingInstance->getSummary().c_str());
+
+        // MG prolongator refresh from tracked pool:
+        // Copy best pool vectors (even-parity) → reconstruct full-site → replace MG null vectors
+        if (mg_instance && mg_param && mg_setup_interval > 0 && (n_accepted % mg_setup_interval == 0)) {
+          auto *mg_solver = static_cast<multigrid_solver *>(mg_instance);
+          auto &pool = eigenTrackingInstance->getTracker().getPool();
+          int nVec = std::min(static_cast<int>(pool.size()), static_cast<int>(mg_solver->B.size()));
+
+          if (nVec > 0) {
+            logQuda(QUDA_SUMMARIZE, "hmcRunQuda: refreshing MG null vectors from eigentracking pool (%d vectors)\n",
+                    nVec);
+
+            for (int i = 0; i < nVec; i++) {
+              // Pool vectors are even-parity. MG null vectors are full-site.
+              // Reconstruct odd parity: v_odd = D_oe * v_even (Dslash with ODD destination)
+              // For Wilson/clover with kappa normalization: v_odd = -kappa * D_oe * v_even
+              ColorSpinorParam fullParam(pool[i]);
+              fullParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+              fullParam.x[0] *= 2;
+              fullParam.create = QUDA_ZERO_FIELD_CREATE;
+              ColorSpinorField fullVec(fullParam);
+
+              // Even part: copy from pool
+              fullVec[QUDA_EVEN_PARITY] = pool[i];
+
+              // Odd part: D_oe applied to even → odd
+              ColorSpinorParam oddParam(pool[i]);
+              oddParam.create = QUDA_ZERO_FIELD_CREATE;
+              ColorSpinorField tmpOdd(oddParam);
+              d->Dslash(tmpOdd, pool[i], QUDA_ODD_PARITY);
+              blas::ax(-inv_param->kappa, tmpOdd);
+              fullVec[QUDA_ODD_PARITY] = tmpOdd;
+
+              mg_solver->B[i] = fullVec;
+            }
+
+            // Trigger full MG refresh with the new null vectors
+            mg_param->thin_update_only = QUDA_BOOLEAN_FALSE;
+            updateMultigridQuda(mg_instance, mg_param);
+            logQuda(QUDA_SUMMARIZE, "hmcRunQuda: MG prolongator refreshed from eigentracking pool\n");
+          }
+        }
+
+        // Coarse-grid deflation: RR update to track coarse eigenvectors
+        if (coarseDeflManager) {
+          logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Coarse deflation RR update\n");
+          coarseDeflManager->rayleighRitzUpdate();
+          logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Coarse deflation: smallest eval = %e, largest = %e\n",
+                  coarseDeflManager->getEvals()[0].real(),
+                  coarseDeflManager->getEvals()[coarseDeflManager->getNDefl() - 1].real());
+        }
+
+        delete d;
+        if (dS && dS != d) delete dS;
+        if (dP && dP != d && dP != dS) delete dP;
+        if (dE && dE != d && dE != dP) delete dE;
+      }
     } else {
       // Reject: restore gauge from backup
       gaugePrecise->copy(gaugeBkup);
@@ -5586,11 +6079,37 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
       if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
         gaugePrecondition->copy(*gaugePrecise);
 
-      // Rebuild clover after restoring gauge
+      // Rebuild clover and extended gauge after restoring
+      updateExtendedGaugeResident(true, R, getProfile());
       if (cloverPrecise) createCloverQuda(inv_param);
+
+      // Verify restore
+      {
+        double plaq_check[3];
+        plaqQuda(plaq_check);
+        logQuda(QUDA_VERBOSE, "hmcRunQuda: gauge restore check: plaq = %e (should match pre-trajectory)\n",
+                plaq_check[0]);
+      }
 
       logQuda(QUDA_SUMMARIZE, "hmcRunQuda: REJECTED  dH = %+.6e  exp(-dH) = %.6e  rand = %.6e  rate = %.1f%%\n", dH,
               prob, rand_val, 100.0 * n_accepted / n_total);
+      // No MG update needed on rejection — gauge is unchanged
+
+      // Eigentracking: refresh Dpool with restored gauge (Dpool drifted during trajectory)
+      if (eigenTrackingInstance && eigenTrackingInstance->isActive()) {
+        auto etProfile = pushProfile(profileEigenTrack);
+        using namespace quda;
+        QudaInvertParam ip = *inv_param;
+        bool pc = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+        Dirac *d = nullptr, *dS = nullptr, *dP = nullptr, *dE = nullptr;
+        createDiracWithEig(d, dS, dP, dE, ip, pc, false);
+        DiracM matHalf(*d);
+        eigenTrackingInstance->getTrackerMutable().forceUpdate(matHalf);
+        delete d;
+        if (dS && dS != d) delete dS;
+        if (dP && dP != d && dP != dS) delete dP;
+        if (dE && dE != d && dE != dP) delete dE;
+      }
     }
 
     // Checkpoint: save gauge to disk periodically
@@ -5614,7 +6133,6 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
     writeGaugeQuda(hmc_param->gauge_outfile, gauge_param);
   }
 
-  // Copy back to host if requested
   if (h_gauge) { saveGaugeQuda(h_gauge, gauge_param); }
 }
 

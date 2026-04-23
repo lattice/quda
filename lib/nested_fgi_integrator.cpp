@@ -1,4 +1,6 @@
 #include <nested_fgi.h>
+#include <hmc_quda.h>
+#include <dirac_quda.h>
 #include <gauge_update_quda.h>
 #include <gauge_path_quda.h>
 #include <momentum.h>
@@ -13,6 +15,12 @@ namespace quda
   // Forward declarations for file-scope globals in interface_quda.cpp
   extern std::vector<ColorSpinorField> solutionResident;
 
+  // Forward declarations for internal solver entry points (see solve.cpp / interface_quda.cpp).
+  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
+             Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param);
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
+                          bool pc_solve, bool use_smeared_gauge);
+
   NestedFGIIntegrator::NestedFGIIntegrator(const QudaHMCParam &hmcParam, MG &mg, const DiracMatrix &matFine,
                                            void *mgPrec, QudaGaugeParam &gaugeParam_, QudaInvertParam &invParam_,
                                            GaugeField *&gaugePrecise_, GaugeField *&gaugeSloppy_,
@@ -20,7 +28,7 @@ namespace quda
                                            GaugeField *&gaugeEigensolver_, GaugeField *&gaugeExtended_,
                                            GaugeField &momResident_, CloverField *&cloverPrecise_,
                                            GaugeField *&extendedGaugeResident_) :
-    deflManager(*mg.getTransfer(), *mg.getMatCoarseResidual(), hmcParam.n_defl, hmcParam.eig_tol,
+    deflManager(*mg.getTransfer(), *mg.getMatCoarseResidual(), *mg.getDiracCoarseResidual(), hmcParam.n_defl, hmcParam.eig_tol,
                 hmcParam.eig_n_kr > 0 ? hmcParam.eig_n_kr : 3 * hmcParam.n_defl, hmcParam.eig_max_restarts,
                 hmcParam.defl_refresh_interval),
     lowModeForce(deflManager, matFine, hmcParam.n_mr_smooth, hmcParam.mr_omega),
@@ -124,27 +132,66 @@ namespace quda
     double eb3 = coeff * beta / 3.0;
     computeGaugeForceQuda(nullptr, nullptr, gaugePaths, gaugePathLength, gaugePathCoeff, 6, 4, eb3, &gp);
 
-    // --- Full fermion force (CG solve + clover force) ---
+    // --- Full fermion force ---
+    // Inherit the caller's solver choice (MG-preconditioned γ₅ two-pass or plain CG).
+    // Nested FGI's own MG hierarchy (mgPreconditioner) is used for the coarse
+    // transfer in LowModeForce only; whether the outer CG is MG-preconditioned
+    // is controlled entirely by invParam.preconditioner set by the caller.
     QudaInvertParam ip = invParam;
-    ip.use_resident_solution = 1;
-    ip.make_resident_solution = 1;
-    ip.preconditioner = mgPreconditioner;
 
-    ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
-    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField h_x(cpuParam);
-    ColorSpinorField h_b(cpuParam);
-    h_b = phi; // device → host copy
+    if (ip.dslash_type == QUDA_WILSON_DSLASH) {
+      // Wilson: device-side solve + internal EO force (same convention as leapfrog/Omelyan/FGI).
+      ColorSpinorParam csParam(phi);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      std::vector<ColorSpinorField> x(1, csParam);
+      std::vector<ColorSpinorField> b(1, ColorSpinorField(phi));
 
-    invertQuda(h_x.data(), h_b.data(), &ip);
+      bool pc_solve = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+      Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
+      createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, pc_solve, false);
 
-    double fCoeff = 1.0;
-    double kappa2 = ip.kappa * ip.kappa;
-    double ck = ip.clover_csw * ip.kappa;
-    ip.use_resident_solution = 1;
-    gp.overwrite_mom = 0; // accumulate
-    computeCloverForceQuda(nullptr, coeff, nullptr, nullptr, &fCoeff, kappa2, ck, 1, 1.0, nullptr, &gp, &ip);
-    solutionResident.clear();
+      if (ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
+        // γ₅ two-pass: (M†M)⁻¹ = M⁻¹ γ₅ M⁻¹ γ₅
+        DiracM m(*dirac), mSloppy(*diracSloppy), mPre(*diracPre), mEig(*diracEig);
+        SolverParam solverParam(ip);
+        std::vector<ColorSpinorField> z(1, csParam);
+        gamma5(z, b);
+        std::vector<ColorSpinorField> w(1, csParam);
+        { Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig); (*s)(w, z); delete s; solverParam.iter = 0; }
+        std::vector<ColorSpinorField> y(1, csParam);
+        gamma5(y, w);
+        { Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig); (*s)(x, y); delete s; }
+      } else {
+        solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
+      }
+
+      computeEOFermionForce(momResident, x[0], ip, coeff);
+
+      delete dirac;
+      delete diracSloppy;
+      if (diracPre != diracSloppy) delete diracPre;
+      if (diracEig != diracPre) delete diracEig;
+    } else {
+      // Clover: preserve the established host-side invertQuda + computeCloverForceQuda path.
+      ip.use_resident_solution = 1;
+      ip.make_resident_solution = 1;
+
+      ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
+      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+      ColorSpinorField h_x(cpuParam);
+      ColorSpinorField h_b(cpuParam);
+      h_b = phi;
+
+      invertQuda(h_x.data(), h_b.data(), &ip);
+
+      double fCoeff = 1.0;
+      double kappa2 = ip.kappa * ip.kappa;
+      double ck = ip.clover_csw * ip.kappa;
+      ip.use_resident_solution = 1;
+      gp.overwrite_mom = 0;
+      computeCloverForceQuda(nullptr, coeff, nullptr, nullptr, &fCoeff, kappa2, ck, 1, 1.0, nullptr, &gp, &ip);
+      solutionResident.clear();
+    }
 
     // --- Subtract low-mode force ---
     // The inner force contains F_low, so we subtract it here so outer + inner = total
@@ -153,20 +200,11 @@ namespace quda
 
   void NestedFGIIntegrator::computeInnerForce(double coeff, const ColorSpinorField &phi)
   {
-    // Inner force = F_gauge + F_low
+    // Inner force = F_low only. Gauge force enters exclusively through the outer
+    // force F_outer = F_gauge + F_fermion_full - F_low (Schwinger_MG convention).
+    // Including F_gauge here would apply gauge force twice per trajectory and
+    // destroy Hamiltonian conservation.
     logQuda(QUDA_VERBOSE, "NestedFGIIntegrator: computeInnerForce coeff=%e\n", coeff);
-
-    // --- Gauge force ---
-    QudaGaugeParam gp = gaugeParam;
-    gp.use_resident_gauge = 1;
-    gp.use_resident_mom = 1;
-    gp.make_resident_gauge = 1;
-    gp.make_resident_mom = 1;
-    gp.return_result_mom = 0;
-    gp.overwrite_mom = 0;
-
-    double eb3 = coeff * beta / 3.0;
-    computeGaugeForceQuda(nullptr, nullptr, gaugePaths, gaugePathLength, gaugePathCoeff, 6, 4, eb3, &gp);
 
     // --- Low-mode fermion force ---
     lowModeForce.computeForce(momResident, phi, coeff, *gaugePrecise, cloverPrecise, gaugeParam, invParam);

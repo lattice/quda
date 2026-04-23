@@ -1,4 +1,5 @@
 #include <nested_fgi.h>
+#include <hmc_quda.h>
 #include <blas_quda.h>
 #include <invert_quda.h>
 
@@ -26,8 +27,24 @@ namespace quda
       coarseSol = ColorSpinorField(csParam);
     }
 
+    // The restrict/prolong kernels are instantiated at the null-space precision.
+    // If src (and xLow) are at a different precision than the transfer expects,
+    // bounce through a fine-grid workspace at T.NullPrecision().
+    QudaPrecision nullPrec = T.NullPrecision();
+    const ColorSpinorField *srcForRestrict = &src;
+    if (src.Precision() != nullPrec) {
+      if (fineSrcBuf.empty() || fineSrcBuf.Precision() != nullPrec) {
+        ColorSpinorParam p(src);
+        p.setPrecision(nullPrec);
+        p.create = QUDA_NULL_FIELD_CREATE;
+        fineSrcBuf = ColorSpinorField(p);
+      }
+      blas::copy(fineSrcBuf, src);
+      srcForRestrict = &fineSrcBuf;
+    }
+
     // 1. Restrict source to coarse grid: phi_c = R * src
-    T.R(coarseTmp, src);
+    T.R(coarseTmp, *srcForRestrict);
 
     // 2. Project onto coarse eigenvectors: x_c = sum_k <v_k|phi_c>/lambda_k * v_k
     //    Uses the block deflation pattern from EigenSolver::deflate()
@@ -39,8 +56,20 @@ namespace quda
     blas::zero(coarseSol);
     blas::block::caxpy(dots, {evecs.begin(), evecs.begin() + nDefl}, coarseSol);
 
-    // 3. Prolong back to fine grid: x_low = P * x_c
-    T.P(xLow, coarseSol);
+    // 3. Prolong back to fine grid: x_low = P * x_c.
+    // The prolong kernel writes at T.NullPrecision(); convert back if xLow differs.
+    if (xLow.Precision() != nullPrec) {
+      if (fineProlongBuf.empty() || fineProlongBuf.Precision() != nullPrec) {
+        ColorSpinorParam p(xLow);
+        p.setPrecision(nullPrec);
+        p.create = QUDA_NULL_FIELD_CREATE;
+        fineProlongBuf = ColorSpinorField(p);
+      }
+      T.P(fineProlongBuf, coarseSol);
+      blas::copy(xLow, fineProlongBuf);
+    } else {
+      T.P(xLow, coarseSol);
+    }
 
     // 4. Optional MR smoothing to improve the approximation
     if (nMRSmooth > 0) {
@@ -99,22 +128,27 @@ namespace quda
     // Project source onto low modes
     projectLowModes(fineSol, src);
 
-    // Compute fermion force using the projected solution via existing QUDA force infrastructure.
-    // The solution vector fineSol is the low-mode approximation to (D†D)^{-1} phi.
-    // The force kernel computes dS/dU using this solution.
-    std::vector<ColorSpinorField> xVec = {fineSol};
-    std::vector<ColorSpinorField> x0Vec(1);
-    std::vector<double> forceCoeff = {coeff};
-    std::vector<array<double, 2>> fermEpsilon = {{0.0, 0.0}};
+    // Compute fermion force using the projected solution. The low-mode fine-grid
+    // vector is the approximate (D†D)^{-1} φ, structurally equivalent to the CG
+    // solution used by the standard fermion force kernel.
+    if (invParam.dslash_type == QUDA_WILSON_DSLASH) {
+      // Wilson: internal EO force (matches the other integrators' convention).
+      computeEOFermionForce(mom, fineSol, invParam, coeff);
+    } else {
+      // Clover: preserve the established computeCloverForce call path.
+      std::vector<ColorSpinorField> xVec = {fineSol};
+      std::vector<ColorSpinorField> x0Vec(1);
+      std::vector<double> forceCoeff = {coeff};
+      std::vector<array<double, 2>> fermEpsilon = {{0.0, 0.0}};
 
-    // Build extended gauge if needed
-    lat_dim_t R;
-    for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * commDimPartitioned(d);
-    GaugeField *gaugeEx = createExtendedGauge(gauge, R, getProfile());
+      lat_dim_t R;
+      for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * commDimPartitioned(d);
+      GaugeField *gaugeEx = createExtendedGauge(gauge, R, getProfile());
 
-    computeCloverForce(mom, *gaugeEx, gauge, *clover, xVec, x0Vec, forceCoeff, fermEpsilon, 0.0, false, invParam);
+      computeCloverForce(mom, *gaugeEx, gauge, *clover, xVec, x0Vec, forceCoeff, fermEpsilon, 0.0, false, invParam);
 
-    delete gaugeEx;
+      delete gaugeEx;
+    }
   }
 
 } // namespace quda

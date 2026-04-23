@@ -799,7 +799,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   if (!mat_solution && norm_error_solve) { errorQuda("Normal-error solve requires Mat solution"); }
 
-  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution)) {
+  if (param->inv_type_precondition == QUDA_MG_INVERTER && !direct_solve) {
     errorQuda("Multigrid preconditioning only supported for direct solves");
   }
 
