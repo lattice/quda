@@ -168,6 +168,36 @@
 #define GPU_DISTANCE_PRECONDITIONING
 #endif
 
+/**
+ * @def QUDA_DSLASH_DOUBLE_STORE
+ * @brief This macro sets whether to use double storage of the gauge
+ * field to simplify indexing in the Dslash kernels.
+ */
+#cmakedefine QUDA_DSLASH_DOUBLE_STORE
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_TYPE
+ * @brief This macro sets whether to use
+ * the TMA for L2 prefetching:
+ * NONE - no prefetch
+ * THREAD - per thread prefetch
+ * BULK - TMA bulk prefetch
+ * TENSOR - TMA tensor descriptor prefetch
+ */
+#define QUDA_DSLASH_PREFETCH_TYPE_@QUDA_DSLASH_PREFETCH_TYPE@
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_DISTANCE_WILSON
+ * @brief This macro sets the prefetch distance for Wilson fermions
+ */
+#define QUDA_DSLASH_PREFETCH_DISTANCE_WILSON @QUDA_DSLASH_PREFETCH_DISTANCE_WILSON@
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED
+ * @brief This macro sets the prefetch distance for staggered fermions
+ */
+#define QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED @QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED@
+
 #cmakedefine QUDA_MULTIGRID
 #ifdef QUDA_MULTIGRID
 /**

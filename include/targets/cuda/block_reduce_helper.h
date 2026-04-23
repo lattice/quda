@@ -100,7 +100,7 @@ namespace quda
     template <typename T, typename reducer_t, typename param_t>
     __device__ inline T operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
-      using warp_reduce_t = cub::WarpReduce<T, param_t::width, __COMPUTE_CAPABILITY__>;
+      using warp_reduce_t = cub::WarpReduce<T, param_t::width>;
       typename warp_reduce_t::TempStorage dummy_storage;
       warp_reduce_t warp_reduce(dummy_storage);
       T value = {};
@@ -111,7 +111,7 @@ namespace quda
       }
 
       if (all) {
-        using warp_scan_t = cub::WarpScan<T, param_t::width, __COMPUTE_CAPABILITY__>;
+        using warp_scan_t = cub::WarpScan<T, param_t::width>;
         typename warp_scan_t::TempStorage dummy_storage;
         warp_scan_t warp_scan(dummy_storage);
         value = warp_scan.Broadcast(value, 0);

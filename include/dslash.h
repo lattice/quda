@@ -8,6 +8,7 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <instantiate_dslash.h>
+#include <tma_helper.hpp>
 
 namespace quda
 {
@@ -70,6 +71,18 @@ namespace quda
       char tile_str[16];
       i32toa(tile_str, Arg::n_src_tile);
       strcat(aux_base, tile_str);
+      if constexpr (dslash_double_store()) strcat(aux_base, ",double_store");
+      if constexpr (Arg::prefetch_distance > 0) {
+        strcat(aux_base, ",prefetch=");
+        i32toa(tile_str, Arg::prefetch_distance);
+        strcat(aux_base, tile_str);
+        if constexpr (dslash_prefetch_type() == PrefetchType::THREAD)
+          strcat(aux_base, ",prefetch=thread");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::BULK)
+          strcat(aux_base, ",prefetch=bulk");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR)
+          strcat(aux_base, ",prefetch=tensor");
+      }
     }
 
     /**
@@ -130,7 +143,7 @@ namespace quda
       }
     }
 
-    inline void setParam(TuneParam &tp)
+    template <bool improved = false> inline void setParam(TuneParam &tp, const GaugeField &U, const GaugeField &L = {})
     {
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
@@ -172,6 +185,16 @@ namespace quda
           (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
           0;
         tp.grid.x += arg.exterior_blocks;
+      }
+
+      if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR && Arg::prefetch_distance > 0) {
+        Dslash::arg.U.tensor_desc = get_tensor_descriptor(U, tp.block.x);
+        Dslash::arg.Uback.tensor_desc = get_tensor_descriptor(U.shift(), tp.block.x);
+        if constexpr (improved) {
+          assert(!U.empty());
+          Dslash::arg.L.tensor_desc = get_tensor_descriptor(L, tp.block.x);
+          Dslash::arg.Lback.tensor_desc = get_tensor_descriptor(L.shift(), tp.block.x);
+        }
       }
     }
 
@@ -217,6 +240,15 @@ namespace quda
       } else {
         return false;
       }
+    }
+
+    virtual bool advanceBlockDim(TuneParam &param) const override
+    {
+      // if TMA is enabled we must keep parity separate in the block (2-d tuning)
+      if constexpr (dslash_prefetch_tma())
+        return TunableKernel2D_base<false>::advanceBlockDim(param);
+      else
+        return TunableKernel3D::advanceBlockDim(param);
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const override
@@ -268,6 +300,7 @@ namespace quda
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
+      if (dslash_prefetch_tma() && tp.block.z > 1) errorQuda("Z-dimension block size must be 1 when using TMA");
       launch_device<dslash_functor>(
         tp, stream, dslash_functor_arg<D, P, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }

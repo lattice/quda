@@ -24,19 +24,20 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
     const GaugeField &L;
 
   public:
     Staggered(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-              const ColorSpinorField &halo, const GaugeField &L) :
-      Dslash(arg, out, in, halo), L(L)
+              const ColorSpinorField &halo, const GaugeField &U, const GaugeField &L) :
+      Dslash(arg, out, in, halo), U(U), L(L)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::template setParam<true>(tp, U, L);
       // operator is anti-Hermitian so do not instantiate dagger
       if (arg.xpay)
         Dslash::template instantiate<packStaggeredShmem, false, true>(tp, stream);
@@ -153,9 +154,10 @@ namespace quda
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
       auto halo = ColorSpinorField::create_comms_batch(in, 3);
+
       StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity,
                                                                                dagger, comm_override);
-      Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
+      Staggered<decltype(arg)> staggered(arg, out, in, halo, U, L);
       dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, out, in, halo, profile);
     }
   };

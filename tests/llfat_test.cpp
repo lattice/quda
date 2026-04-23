@@ -53,7 +53,6 @@ static void llfat_test()
   qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  qudaGaugeParam.ga_pad = 0;
 
   void *fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
   void *longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);

@@ -116,7 +116,7 @@ namespace quda
     /**
        @brief Helper function that returns a linear thread index within a thread block.
     */
-    template <int dim> __device__ __host__ inline auto thread_idx_linear()
+    template <int dim> inline auto thread_idx_linear()
     {
       switch (dim) {
       case 1: return thread_idx().x;
@@ -129,7 +129,7 @@ namespace quda
     /**
        @brief Helper function that returns the total number thread in a thread block
     */
-    template <int dim> __device__ __host__ inline auto block_size()
+    template <int dim> inline auto block_size()
     {
       switch (dim) {
       case 1: return block_dim().x;
@@ -137,6 +137,20 @@ namespace quda
       case 3:
       default: return block_dim().z * block_dim().y * block_dim().x;
       }
+    }
+
+    /**
+       @brief Return true only for a single thread in a thread block.
+       This function assumes all warps in the thread block are
+       converged.  Note that the single thread that is returned is not
+       necessarily thread 0 in the thread block.
+       @tparam dim The dimension of the thread block
+       @return true for a single thread in the thread block, else
+       false
+    */
+    template <int dim = 3> inline bool is_thread_zero()
+    {
+      return thread_idx_linear<dim>() == 0;
     }
 
   } // namespace target

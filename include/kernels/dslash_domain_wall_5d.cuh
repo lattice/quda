@@ -25,7 +25,7 @@ namespace quda
     {
       // remove the batch dimension from these constants, since these are used for 5-d checkerboard indexing
       DslashArg<Float, nDim, DDArg>::dc.X[4] = in.X(4);
-      DslashArg<Float, nDim, DDArg>::dc.X5X4X3X2X1mX4X3X2X1 = (in.X(4) - 1) * DslashArg<Float, nDim, DDArg>::dc.X4X3X2X1;
+      DslashArg<Float, nDim, DDArg>::dc.X5X4X3X2X1 = in.X(4) * DslashArg<Float, nDim, DDArg>::dc.X4X3X2X1;
     }
   };
 

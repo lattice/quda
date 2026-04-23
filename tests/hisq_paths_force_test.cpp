@@ -206,16 +206,6 @@ static void hisq_force_startup()
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
 
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[2] * qudaGaugeParam_ex.X[3] / 2;
-  int y_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[2] * qudaGaugeParam_ex.X[3] / 2;
-  int z_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[3] / 2;
-  int t_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[2] / 2;
-  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
-#endif
-  qudaGaugeParam_ex.ga_pad = 3 * pad_size; // long links
-
   GaugeFieldParam gParam_ex;
   GaugeFieldParam gParam;
 

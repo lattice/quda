@@ -139,8 +139,8 @@ namespace quda
   /**
      @brief Optimized division routine on the device
   */
-  // inline float fdividef(float a, float b) { return a/b; }
-  inline float fdividef(float a, float b) { return sycl::native::divide(a, b); }
+  inline float fdivide(float a, float b) { return sycl::native::divide(a, b); }
+  inline double fdivide(double a, double b) { return a/b; }
 
   __device__ __host__ inline float2 add2(float2 a, float2 b) { return {a.x + b.x, a.y + b.y}; }
   __device__ __host__ inline double2 add2(double2 a, double2 b) { return {a.x + b.x, a.y + b.y}; }

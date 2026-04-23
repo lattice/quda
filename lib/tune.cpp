@@ -746,7 +746,7 @@ namespace quda
   }
 
   static std::string carve_out_step_str;
-  static int carve_out_step = 25; // default is 25% increment
+  static int carve_out_step = 100; // default is 100% increment
 
   void set_carve_out_step()
   {
