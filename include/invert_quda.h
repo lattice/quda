@@ -40,6 +40,9 @@ namespace quda {
      */
     void *deflation_op = nullptr;
 
+    // Note: CG-Lanczos tracking uses the global quda::activeCGTracker pointer
+    // (see cg_tracker.h) to avoid modifying the QudaInvertParam C-API struct.
+
     /**
      * Whether to use the L2 relative residual, L2 absolute residual
      * or Fermilab heavy-quark residual, or combinations therein to

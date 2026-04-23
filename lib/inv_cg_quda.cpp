@@ -16,6 +16,7 @@
 
 #include <reliable_updates.h>
 #include <invert_x_update.h>
+#include <cg_tracker.h>
 
 namespace quda {
 
@@ -302,6 +303,11 @@ namespace quda {
 
       if (!ru.trigger()) {
         for (auto i = 0u; i < beta.size(); i++) beta[i] = sigma[i] / r2_old[i]; // use the alternative beta computation
+
+        // CG-Lanczos tracking: record alpha, beta, and normalized residual for zero-cost Ritz extraction
+        if (activeCGTracker) {
+          activeCGTracker->recordIteration(x_update_batch[0].get_current_alpha(), beta[0], r_sloppy[0]);
+        }
 
         if (advanced_feature && param.pipeline && !breakdown) {
 
