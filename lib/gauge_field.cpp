@@ -310,7 +310,7 @@ namespace quda {
     aux_ss << "vol=" << volume << ",stride=" << stride << ",precision=" << precision << ",geometry=" << geometry
            << ",Nc=" << nColor << ",order=" << order << ",nFace=" << nFace;
     if (isNative()) aux_ss << ",N=" << gauge::get_vector_order(precision, 128);
-    if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
+    if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_I2F_ALT_COUNT << "/" << QUDA_I2F_PERIOD;
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << ",r=" << r[0] << r[1] << r[2] << r[3];
     aux_string = aux_ss.str();
     if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());

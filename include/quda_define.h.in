@@ -41,10 +41,20 @@
 #define MAX_MULTI_RHS_TILE @QUDA_MAX_MULTI_RHS_TILE@
 
 /**
- * @def   QUDA_ALTERNATIVE_I_TO_F
- * @brief This sets the percentage of I2F conversions using the alternative path
+ * @def   QUDA_I2F_PERIOD
+ * @brief Period r for the integer-to-float path mask (pair-index modulo r).
  */
-#define QUDA_ALTERNATIVE_I_TO_F @QUDA_ALTERNATIVE_I_TO_F@
+#define QUDA_I2F_PERIOD @QUDA_I2F_PERIOD@
+/**
+ * @def   QUDA_I2F_ALT_COUNT
+ * @brief Count m in [0,r] of pair-slots per period that use the alternative i2f path (Bresenham spread).
+ */
+#define QUDA_I2F_ALT_COUNT @QUDA_I2F_ALT_COUNT@
+/**
+ * @def   QUDA_I2F_PATTERN_INIT
+ * @brief Comma-separated bool initializer for the Bresenham i2f mask (length r).
+ */
+#define QUDA_I2F_PATTERN_INIT @QUDA_I2F_PATTERN_INIT@
 
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC

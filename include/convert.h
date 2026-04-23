@@ -9,6 +9,7 @@
  */
 
 #include <type_traits>
+#include <quda_define.h>
 #include <target_device.h>
 #include <register_traits.h>
 #include <math_helper.cuh>
@@ -61,25 +62,11 @@ namespace quda
   };
 
   /**
-     @brief This is a LUT which is used to determine whether a given
-     int-to-float conversion in a array of numbers to be converted
-     using a direct cast, or whether to use the alternative path that
-     uses an IADD and FADD.  For an array of length n, we converth
-     i^th element using the (i % 4) LUT value.  For large n, the
-     expected rations between the two conversion paths will be
-     achieved.
+     @brief Bresenham-spread LUT for whether each pair-slot uses the alternative
+     int-to-float path (IADD/FADD) vs direct cast.  Pair index (i/2) selects
+     @c i2f_i[(i/2) % QUDA_I2F_PERIOD].  Scalar paths use @c i2f_i[0].
    */
-#if QUDA_ALTERNATIVE_I_TO_F == 100
-  constexpr bool i2f_i[4] = {true, true, true, true};
-#elif QUDA_ALTERNATIVE_I_TO_F == 75
-  constexpr bool i2f_i[4] = {true, false, true, true};
-#elif QUDA_ALTERNATIVE_I_TO_F == 50
-  constexpr bool i2f_i[4] = {true, false, true, false};
-#elif QUDA_ALTERNATIVE_I_TO_F == 25
-  constexpr bool i2f_i[4] = {false, true, false, false};
-#elif QUDA_ALTERNATIVE_I_TO_F == 0
-  constexpr bool i2f_i[4] = {false, false, false, false};
-#endif
+  constexpr bool i2f_i[QUDA_I2F_PERIOD] = {QUDA_I2F_PATTERN_INIT};
 
   /**
      @brief Fast float-to-integer round used on the device
@@ -203,7 +190,8 @@ namespace quda
   {
     static_assert(n % 2 == 0);
     constexpr_for<0, n, 2>([&](auto i) {
-      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[(i / 2) % 4]>());
+      auto bi
+        = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[(i / 2) % QUDA_I2F_PERIOD]>());
       auto ai = mul2(bi, {fixedInvMaxValue<T2>::value, fixedInvMaxValue<T2>::value});
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
@@ -268,7 +256,8 @@ namespace quda
   {
     static_assert(n % 2 == 0);
     constexpr_for<0, n, 2>([&](auto i) {
-      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[(i / 2) % 4]>());
+      auto bi
+        = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[(i / 2) % QUDA_I2F_PERIOD]>());
       auto ai = mul2(bi, {c, c});
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;

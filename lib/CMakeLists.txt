@@ -502,24 +502,56 @@ mark_as_advanced(QUDA_ORDER_SINGLE)
 mark_as_advanced(QUDA_ORDER_HALF)
 mark_as_advanced(QUDA_ORDER_QUARTER)
 
-# set the percentage of I2F conversions that use the alternative conversion path (using FFMA)
-if(NOT DEFINED QUDA_ALTERNATIVE_I_TO_F_DEFAULT)
-  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+# I2F path: Bresenham-distributed m alternative pair-slots per period r (see include/convert.h)
+if(NOT DEFINED QUDA_I2F_PERIOD_DEFAULT)
+  set(QUDA_I2F_PERIOD_DEFAULT "4")
 endif()
-set(QUDA_ALTERNATIVE_I_TO_F
-    "${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}"
-    CACHE STRING
-        "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100); CUDA builds with sm_100+ default to 25")
-set(VALID_I2F_VALUES "0" "25" "50" "75" "100")
-if(NOT QUDA_ALTERNATIVE_I_TO_F IN_LIST VALID_I2F_VALUES)
-    message(FATAL_ERROR "Invalid value for QUDA_ALTERNATIVE_I_TO_F: '${QUDA_ALTERNATIVE_I_TO_F}'\n"
-                        "Valid values are: ${VALID_I2F_VALUES}")
+if(NOT DEFINED QUDA_I2F_ALT_COUNT_DEFAULT)
+  set(QUDA_I2F_ALT_COUNT_DEFAULT "0")
 endif()
-set_property(CACHE QUDA_ALTERNATIVE_I_TO_F PROPERTY STRINGS ${VALID_I2F_VALUES})
+
+set(QUDA_I2F_PERIOD
+    "${QUDA_I2F_PERIOD_DEFAULT}"
+    CACHE STRING "I2F selection period r (pair index mod r); alt slots m use Bresenham spread in [0,r]")
+set(QUDA_I2F_ALT_COUNT
+    "${QUDA_I2F_ALT_COUNT_DEFAULT}"
+    CACHE STRING "I2F alternative path count m (0..r) per period r (Bresenham interleaving)")
+
+if(NOT QUDA_I2F_PERIOD MATCHES "^[1-9][0-9]*$")
+  message(FATAL_ERROR "QUDA_I2F_PERIOD must be a positive integer, got: '${QUDA_I2F_PERIOD}'")
+endif()
+if(NOT QUDA_I2F_ALT_COUNT MATCHES "^[0-9]+$")
+  message(FATAL_ERROR "QUDA_I2F_ALT_COUNT must be a non-negative integer, got: '${QUDA_I2F_ALT_COUNT}'")
+endif()
+if(QUDA_I2F_PERIOD GREATER 256)
+  message(FATAL_ERROR "QUDA_I2F_PERIOD ${QUDA_I2F_PERIOD} exceeds maximum 256")
+endif()
+if(QUDA_I2F_ALT_COUNT GREATER QUDA_I2F_PERIOD)
+  message(FATAL_ERROR "QUDA_I2F_ALT_COUNT (${QUDA_I2F_ALT_COUNT}) must be <= QUDA_I2F_PERIOD (${QUDA_I2F_PERIOD})")
+endif()
+
+set(QUDA_I2F_PATTERN_INIT "")
+set(_i2f_sep "")
+set(_i2f_j 0)
+while(_i2f_j LESS QUDA_I2F_PERIOD)
+  math(EXPR _i2f_jp1 "${_i2f_j}+1")
+  math(EXPR _i2f_t1 "(${_i2f_jp1}*${QUDA_I2F_ALT_COUNT})/(${QUDA_I2F_PERIOD})")
+  math(EXPR _i2f_t0 "(${_i2f_j}*${QUDA_I2F_ALT_COUNT})/(${QUDA_I2F_PERIOD})")
+  math(EXPR _i2f_bit "${_i2f_t1}-${_i2f_t0}")
+  if(_i2f_bit)
+    string(APPEND QUDA_I2F_PATTERN_INIT "${_i2f_sep}true")
+  else()
+    string(APPEND QUDA_I2F_PATTERN_INIT "${_i2f_sep}false")
+  endif()
+  set(_i2f_sep ", ")
+  math(EXPR _i2f_j "${_i2f_j}+1")
+endwhile()
+
 message(
   STATUS
-  "QUDA_ALTERNATIVE_I_TO_F is ${QUDA_ALTERNATIVE_I_TO_F}% (alternative integer-to-float conversion path)")
-mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
+  "QUDA_I2F: ${QUDA_I2F_ALT_COUNT}/${QUDA_I2F_PERIOD} (pattern: ${QUDA_I2F_PATTERN_INIT})")
+mark_as_advanced(QUDA_I2F_PERIOD)
+mark_as_advanced(QUDA_I2F_ALT_COUNT)
 
 # Set the maximum multi-RHS per kernel if not already set by the target
 if(NOT DEFINED QUDA_MAX_MULTI_RHS)

@@ -149,15 +149,16 @@ else()
   set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 endif()
 
-# Default I2F alternative-path percentage: Blackwell and newer (sm_100+).
+# Default I2F Bresenham pattern (m alt slots per r pair-slots): Blackwell+ uses m=1,r=4 (was 25%).
+set(QUDA_I2F_PERIOD_DEFAULT "4")
 if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
-  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "25")
+  set(QUDA_I2F_ALT_COUNT_DEFAULT "1")
 else()
-  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+  set(QUDA_I2F_ALT_COUNT_DEFAULT "0")
 endif()
 message(
   STATUS
-  "I2F alternative-path cache default: ${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}% (QUDA_COMPUTE_CAPABILITY=${QUDA_COMPUTE_CAPABILITY})")
+  "I2F pattern cache default: ${QUDA_I2F_ALT_COUNT_DEFAULT}/${QUDA_I2F_PERIOD_DEFAULT} (QUDA_COMPUTE_CAPABILITY=${QUDA_COMPUTE_CAPABILITY})")
 
 # large arg support requires CUDA 12.1 and Volta+
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
