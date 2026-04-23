@@ -298,6 +298,22 @@ int hmc_checkpoint_interval = 0;
 std::string hmc_checkpoint_prefix = "ckpt_";
 std::string hmc_gauge_infile = "";
 std::string hmc_gauge_outfile = "";
+int hmc_mg_setup_interval = 0;
+double hmc_omelyan_lambda = 0.1932;
+double hmc_fgi_lambda = 1.0 / 6.0;
+double hmc_fgi_xi = 1.0 / 72.0;
+int hmc_momentum_seed = 12345;
+double hmc_force_eps = 1e-4;
+int hmc_reversibility_interval = 10;
+double hmc_reversibility_tol = 1e-6;
+
+bool eigentracking_enabled = false;
+int eigentracking_n_ev = 0;              // 0 = derive from MG nvec, or default 8
+int eigentracking_pool_capacity = 0;     // 0 = derive from nEv, or default 2*nEv
+int eigentracking_n_ritz = 0;            // 0 = derive from nEv, or default nEv/2
+int eigentracking_forecast_order = 1;
+int eigentracking_fresh_interval = 0;    // 0 = disabled (MG seeding replaces TRLM)
+int eigentracking_solution_history = 3;
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -1256,10 +1272,42 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--hmc-checkpoint-prefix", hmc_checkpoint_prefix,
                       "Filename prefix for gauge checkpoints (default \"ckpt_\")");
 
+  opgroup->add_option("--hmc-mg-setup-interval", hmc_mg_setup_interval,
+                      "Full MG re-setup every N trajectories, 0=thin update only (default 0)");
   opgroup->add_option("--hmc-gauge-infile", hmc_gauge_infile,
                       "Load initial gauge configuration from file (requires QIO)");
   opgroup->add_option("--hmc-gauge-outfile", hmc_gauge_outfile,
                       "Save final gauge configuration to file (requires QIO)");
+
+  opgroup->add_option("--hmc-omelyan-lambda", hmc_omelyan_lambda,
+                      "Omelyan integrator lambda parameter (default 0.1932)");
+  opgroup->add_option("--hmc-fgi-lambda", hmc_fgi_lambda,
+                      "Force-gradient integrator lambda parameter (default 1/6)");
+  opgroup->add_option("--hmc-fgi-xi", hmc_fgi_xi,
+                      "Force-gradient integrator xi parameter (default 1/72)");
+  opgroup->add_option("--hmc-momentum-seed", hmc_momentum_seed,
+                      "Base seed for momentum generation (default 12345)");
+  opgroup->add_option("--hmc-force-eps", hmc_force_eps,
+                      "Perturbation size for numerical force calibration (default 1e-4)");
+  opgroup->add_option("--hmc-reversibility-interval", hmc_reversibility_interval,
+                      "Run reversibility test every N trajectories (default 10)");
+  opgroup->add_option("--hmc-reversibility-tol", hmc_reversibility_tol,
+                      "Plaquette tolerance for reversibility check (default 1e-6)");
+
+  opgroup->add_option("--eigentracking", eigentracking_enabled,
+                      "Enable eigenspace tracking during HMC (default false)");
+  opgroup->add_option("--eigentracking-n-ev", eigentracking_n_ev,
+                      "Number of tracked eigenpairs (0=derive from MG nvec, default 0)");
+  opgroup->add_option("--eigentracking-pool-capacity", eigentracking_pool_capacity,
+                      "Maximum eigentracker pool size (0=derive from n-ev, default 0)");
+  opgroup->add_option("--eigentracking-n-ritz", eigentracking_n_ritz,
+                      "Ritz pairs to extract per CG solve (0=derive from n-ev, default 0)");
+  opgroup->add_option("--eigentracking-forecast-order", eigentracking_forecast_order,
+                      "Forecast order: 0=constant, 1=linear, 2=quadratic (default 1)");
+  opgroup->add_option("--eigentracking-fresh-interval", eigentracking_fresh_interval,
+                      "Trajectories between fresh TRLM (0=disabled, default 0)");
+  opgroup->add_option("--eigentracking-solution-history", eigentracking_solution_history,
+                      "Chronological solution history depth (default 3)");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)

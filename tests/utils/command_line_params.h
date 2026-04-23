@@ -554,6 +554,22 @@ extern int hmc_checkpoint_interval;
 extern std::string hmc_checkpoint_prefix;
 extern std::string hmc_gauge_infile;
 extern std::string hmc_gauge_outfile;
+extern int hmc_mg_setup_interval;
+extern double hmc_omelyan_lambda;
+extern double hmc_fgi_lambda;
+extern double hmc_fgi_xi;
+extern int hmc_momentum_seed;
+extern double hmc_force_eps;
+extern int hmc_reversibility_interval;
+extern double hmc_reversibility_tol;
+
+extern bool eigentracking_enabled;
+extern int eigentracking_n_ev;
+extern int eigentracking_pool_capacity;
+extern int eigentracking_n_ritz;
+extern int eigentracking_forecast_order;
+extern int eigentracking_fresh_interval;
+extern int eigentracking_solution_history;
 
 extern int gf_gauge_dir;
 extern int gf_maxiter;
