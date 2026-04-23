@@ -847,6 +847,7 @@ extern "C" {
     /** Momentum generation */
     int generate_momentum;            /**< If 1, generate Gaussian momentum internally; if 0, use caller-supplied */
     unsigned long long momentum_seed; /**< RNG seed for momentum generation (ignored if generate_momentum=0) */
+    int reuse_pseudofermion;          /**< If 1, reuse pseudofermion from previous trajectory (for reversibility tests) */
 
     /** Omelyan parameter */
     double omelyan_lambda;            /**< Omelyan-Mryglod-Folk lambda (default 0.1932) */
@@ -875,6 +876,7 @@ extern "C" {
     /** Multi-trajectory control (used by hmcRunQuda) */
     int n_trajectories;               /**< Total number of MD trajectories to run */
     int n_thermalization;             /**< Number of thermalisation trajectories (no measurements) */
+    int mg_setup_interval;            /**< Full MG re-setup every N trajectories (0=thin update only) */
 
     /** Checkpointing */
     int checkpoint_interval;          /**< Save gauge every N accepted trajectories (0=disabled) */
@@ -891,6 +893,15 @@ extern "C" {
     int use_resident_mom;             /**< Use existing resident momentum */
     int make_resident_mom;            /**< Store result momentum as resident */
     int return_result_mom;            /**< Copy result momentum back to host */
+
+    /** Eigenspace tracking during HMC */
+    int eigentracking_enabled;              /**< 1=enable eigentracking, 0=disabled (default 0) */
+    int eigentracking_n_ev;                 /**< Number of tracked eigenpairs (default 8) */
+    int eigentracking_pool_capacity;        /**< Maximum pool size (default 32) */
+    int eigentracking_n_ritz;               /**< Ritz pairs to extract per CG solve (default 4) */
+    int eigentracking_forecast_order;       /**< Generator forecast order: 0/1/2 (default 1) */
+    int eigentracking_fresh_trlm_interval;  /**< Trajectories between fresh TRLM (0=disabled, default 10) */
+    int eigentracking_solution_history;     /**< Chronological solution history depth (default 3) */
   } QudaHMCParam;
 
   typedef struct QudaGaugeObservableParam_s {
@@ -1385,10 +1396,11 @@ extern "C" {
    * @param[in]     hmc_param   HMC parameters including trajectory count and checkpointing
    * @param[in]     gauge_param Gauge field metadata
    * @param[in]     inv_param   Inverter parameters
-   * @param[in]     mg_instance MG preconditioner (or nullptr)
+   * @param[in]     mg_instance MG preconditioner (from newMultigridQuda, or nullptr)
+   * @param[in]     mg_param    MG parameters for updates (or nullptr if mg_instance is nullptr)
    */
   void hmcRunQuda(void *gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
-                  void *mg_instance);
+                  void *mg_instance, QudaMultigridParam *mg_param);
 
   /**
    * @brief Destroy any persistent HMC-internal state (coarse deflation manager, etc.)
