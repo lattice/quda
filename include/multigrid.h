@@ -499,6 +499,9 @@ namespace quda {
     /** @brief Access the coarse Dirac residual matrix wrapper */
     const DiracMatrix *getMatCoarseResidual() const { return matCoarseResidual; }
 
+    /** @brief Access the coarse Dirac operator (raw, for creating MdagM wrappers) */
+    const Dirac *getDiracCoarseResidual() const { return diracCoarseResidual; }
+
     /** @brief Access the next coarser MG level */
     MG *getCoarse() const { return coarse; }
 

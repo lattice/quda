@@ -1,4 +1,4 @@
-#include <nested_fgi.h>
+#include <coarse_deflation_manager.h>
 #include <eigensolve_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
@@ -6,9 +6,11 @@
 namespace quda
 {
 
-  CoarseDeflationManager::CoarseDeflationManager(const Transfer &transfer_, const DiracMatrix &matCoarse_, int nDefl_,
-                                                 double eigTol, int nKr, int maxRestarts, int refreshInterval_) :
+  CoarseDeflationManager::CoarseDeflationManager(const Transfer &transfer_, const DiracMatrix &matCoarse_,
+                                                 const Dirac &diracCoarse_, int nDefl_, double eigTol, int nKr,
+                                                 int maxRestarts, int refreshInterval_) :
     matCoarse(&matCoarse_),
+    diracCoarse(&diracCoarse_),
     transfer(&transfer_),
     nDefl(nDefl_),
     refreshInterval(refreshInterval_),
@@ -17,7 +19,7 @@ namespace quda
     if (nKr <= 0) nKr = 3 * nDefl;
 
     // Configure the TRLM eigensolver parameters
-    eigParam = newQudaEigParam();
+    memset(&eigParam, 0, sizeof(QudaEigParam));
     eigParam.eig_type = QUDA_EIG_TR_LANCZOS;
     eigParam.spectrum = QUDA_SPECTRUM_SR_EIG;
     eigParam.n_ev = nDefl;
@@ -27,7 +29,7 @@ namespace quda
     eigParam.tol = eigTol;
     eigParam.max_restarts = maxRestarts;
     eigParam.require_convergence = QUDA_BOOLEAN_TRUE;
-    eigParam.use_norm_op = QUDA_BOOLEAN_FALSE;
+    eigParam.use_norm_op = QUDA_BOOLEAN_TRUE; // coarse operator is non-Hermitian; solve M†M
     eigParam.use_dagger = QUDA_BOOLEAN_FALSE;
     eigParam.use_pc = QUDA_BOOLEAN_FALSE;
     eigParam.use_poly_acc = QUDA_BOOLEAN_FALSE;
@@ -36,6 +38,8 @@ namespace quda
     eigParam.batched_rotate = 0;
     eigParam.preserve_deflation = QUDA_BOOLEAN_FALSE;
     eigParam.check_interval = 10;
+    eigParam.max_ortho_attempts = 10;
+    eigParam.compute_evals_batch_size = nDefl;
 
     // Run initial eigensolve
     solve();
@@ -43,14 +47,27 @@ namespace quda
 
   void CoarseDeflationManager::solve()
   {
-    logQuda(QUDA_VERBOSE, "CoarseDeflationManager: Running TRLM eigensolver for %d coarse eigenvectors\n", nDefl);
+    logQuda(QUDA_SUMMARIZE, "CoarseDeflationManager: Running TRLM eigensolver for %d coarse eigenvectors\n", nDefl);
 
     // Make a local copy of eigParam so the solver can modify it
     QudaEigParam ep = eigParam;
 
-    auto *eigSolve = EigenSolver::create(&ep, *matCoarse);
+    // The coarse operator is non-Hermitian. TRLM requires Hermitian input.
+    // Wrap in DiracMdagM to solve for eigenvectors of M†M.
+    DiracMdagM matNorm(*diracCoarse);
+    auto *eigSolve = EigenSolver::create(&ep, matNorm);
 
-    // Resize eigenvector storage -- the eigensolver will allocate if empty
+    // Pre-allocate kSpace — TRLM expects at least one vector for field metadata.
+    // Use the Transfer's null-space vectors to create coarse-grid fields via create_coarse().
+    int nKr = ep.n_kr;
+    if (coarseEvecs.empty()) {
+      ColorSpinorField V(transfer->Vectors()); // non-const copy for create_coarse
+      auto coarseRef = V.create_coarse(transfer->Geo_bs(), transfer->Spin_bs(), transfer->nvec(),
+                                        V.Precision(), QUDA_CUDA_FIELD_LOCATION);
+      ColorSpinorParam csParam(coarseRef);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      coarseEvecs.resize(nKr, csParam);
+    }
     coarseEvals.resize(nDefl);
 
     (*eigSolve)(coarseEvecs, coarseEvals);
