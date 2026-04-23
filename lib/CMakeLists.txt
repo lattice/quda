@@ -77,7 +77,7 @@ set (QUDA_OBJS
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
-  coarse_deflation_manager.cpp low_mode_force.cpp nested_fgi_integrator.cpp
+  hmc.cpp coarse_deflation_manager.cpp low_mode_force.cpp nested_fgi_integrator.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
@@ -108,7 +108,8 @@ set (QUDA_OBJS
   inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu pgauge_det_trace.cu clover_outer_product.cu
-  clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
+  clover_sigma_outer_product.cu
+  momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu
   madwf_ml.cpp quda_ptr.cpp
