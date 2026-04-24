@@ -1051,8 +1051,8 @@ TEST(EigenTracking, PoolInitAndCompress)
   DiracMdagM matNorm(*dirac);
   DiracM matHalf(*dirac);
 
-  int nEv = 4;
-  int nKr = 3 * nEv;
+  int nEv = 6;
+  int nKr = 3 * nEv; // TRLM search space ≈ 3×N_ev
   int poolCapacity = 8;
 
   // Run TRLM for reference eigenvalues
@@ -1065,20 +1065,35 @@ TEST(EigenTracking, PoolInitAndCompress)
   ep.n_conv = nEv;
   ep.n_ev_deflate = nEv;
   ep.tol = 1e-6;
-  ep.max_restarts = 100;
+  ep.max_restarts = 200;
   ep.require_convergence = QUDA_BOOLEAN_TRUE;
   ep.use_norm_op = QUDA_BOOLEAN_FALSE;
   ep.use_dagger = QUDA_BOOLEAN_FALSE;
   ep.use_pc = QUDA_BOOLEAN_FALSE;
-  ep.use_poly_acc = QUDA_BOOLEAN_FALSE;
+  // Polynomial acceleration: 4^4 hot-start gauges with heavy mass push the
+  // M^dag M spectrum well off zero; a_min should be ~1 order of magnitude
+  // above the target smallest eigenvalue (per QUDA wiki guidance).
+  // Start conservatively at 1.0 — reduce if a thermalised run needs it.
+  ep.use_poly_acc = QUDA_BOOLEAN_TRUE;
+  ep.poly_deg = 50;
+  ep.a_min = 1.0;
+  ep.a_max = 0.0; // 0 => auto-detect via power iteration
   ep.compute_svd = QUDA_BOOLEAN_FALSE;
   ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
   ep.batched_rotate = 0;
   ep.preserve_deflation = QUDA_BOOLEAN_FALSE;
   ep.check_interval = 10;
+  ep.max_ortho_attempts = 10;
+  ep.compute_evals_batch_size = nEv;
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
+
+  // TRLM needs kSpace populated with at least one field for metadata;
+  // use an even-parity pseudofermion as the template.
+  ColorSpinorField templateField = generateEOPseudofermion(inv_param, 1);
   std::vector<ColorSpinorField> kSpace;
+  kSpace.reserve(nKr);
+  kSpace.push_back(std::move(templateField));
   std::vector<Complex> evals(nEv);
   (*eigSolve)(kSpace, evals);
   delete eigSolve;
@@ -1125,7 +1140,7 @@ TEST(EigenTracking, ForceUpdate)
   DiracMdagM matNorm(*dirac);
   DiracM matHalf(*dirac);
 
-  int nEv = 4;
+  int nEv = 6;
 
   // Run TRLM and init tracker
   QudaEigParam ep;
@@ -1133,24 +1148,35 @@ TEST(EigenTracking, ForceUpdate)
   ep.eig_type = QUDA_EIG_TR_LANCZOS;
   ep.spectrum = QUDA_SPECTRUM_SR_EIG;
   ep.n_ev = nEv;
-  ep.n_kr = 3 * nEv;
+  ep.n_kr = 3 * nEv; // TRLM search space ≈ 3×N_ev
   ep.n_conv = nEv;
   ep.n_ev_deflate = nEv;
   ep.tol = 1e-6;
-  ep.max_restarts = 100;
+  ep.max_restarts = 200;
   ep.require_convergence = QUDA_BOOLEAN_TRUE;
   ep.use_norm_op = QUDA_BOOLEAN_FALSE;
   ep.use_dagger = QUDA_BOOLEAN_FALSE;
   ep.use_pc = QUDA_BOOLEAN_FALSE;
-  ep.use_poly_acc = QUDA_BOOLEAN_FALSE;
+  // Polynomial acceleration with a_min above the target spectrum
+  // (QUDA wiki: a_min ~ 1 order of magnitude above the smallest target eval).
+  ep.use_poly_acc = QUDA_BOOLEAN_TRUE;
+  ep.poly_deg = 50;
+  ep.a_min = 1.0;
+  ep.a_max = 0.0; // auto-detect
   ep.compute_svd = QUDA_BOOLEAN_FALSE;
   ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
   ep.batched_rotate = 0;
   ep.preserve_deflation = QUDA_BOOLEAN_FALSE;
   ep.check_interval = 10;
+  ep.max_ortho_attempts = 10;
+  ep.compute_evals_batch_size = nEv;
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
+  // Seed kSpace metadata via a pseudofermion (TRLM needs one field)
+  ColorSpinorField templateField = generateEOPseudofermion(inv_param, 2);
   std::vector<ColorSpinorField> kSpace;
+  kSpace.reserve(3 * nEv);
+  kSpace.push_back(std::move(templateField));
   std::vector<Complex> evals(nEv);
   (*eigSolve)(kSpace, evals);
   delete eigSolve;
@@ -1225,7 +1251,7 @@ TEST(EigenTracking, RayleighRitzEvolve)
   DiracMdagM matNorm(*dirac);
   DiracM matHalf(*dirac);
 
-  int nEv = 4;
+  int nEv = 6;
 
   // Run TRLM and init tracker
   QudaEigParam ep;
@@ -1233,24 +1259,35 @@ TEST(EigenTracking, RayleighRitzEvolve)
   ep.eig_type = QUDA_EIG_TR_LANCZOS;
   ep.spectrum = QUDA_SPECTRUM_SR_EIG;
   ep.n_ev = nEv;
-  ep.n_kr = 3 * nEv;
+  ep.n_kr = 3 * nEv; // TRLM search space ≈ 3×N_ev
   ep.n_conv = nEv;
   ep.n_ev_deflate = nEv;
   ep.tol = 1e-6;
-  ep.max_restarts = 100;
+  ep.max_restarts = 200;
   ep.require_convergence = QUDA_BOOLEAN_TRUE;
   ep.use_norm_op = QUDA_BOOLEAN_FALSE;
   ep.use_dagger = QUDA_BOOLEAN_FALSE;
   ep.use_pc = QUDA_BOOLEAN_FALSE;
-  ep.use_poly_acc = QUDA_BOOLEAN_FALSE;
+  // Polynomial acceleration with a_min above the target spectrum
+  // (QUDA wiki: a_min ~ 1 order of magnitude above the smallest target eval).
+  ep.use_poly_acc = QUDA_BOOLEAN_TRUE;
+  ep.poly_deg = 50;
+  ep.a_min = 1.0;
+  ep.a_max = 0.0; // auto-detect
   ep.compute_svd = QUDA_BOOLEAN_FALSE;
   ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
   ep.batched_rotate = 0;
   ep.preserve_deflation = QUDA_BOOLEAN_FALSE;
   ep.check_interval = 10;
+  ep.max_ortho_attempts = 10;
+  ep.compute_evals_batch_size = nEv;
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
+  // Seed kSpace metadata via a pseudofermion (TRLM needs one field)
+  ColorSpinorField templateField = generateEOPseudofermion(inv_param, 2);
   std::vector<ColorSpinorField> kSpace;
+  kSpace.reserve(3 * nEv);
+  kSpace.push_back(std::move(templateField));
   std::vector<Complex> evals(nEv);
   (*eigSolve)(kSpace, evals);
   delete eigSolve;
@@ -1376,9 +1413,10 @@ TEST(EigenTracking, CGRitzExtraction)
   std::vector<ColorSpinorField> b(1, ColorSpinorField(phi));
   solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
 
-  // Extract Ritz pairs
+  // Extract Ritz pairs (N_kr ≈ 3·N_ev rule; CGRitzExtractor clamps to QUDA's
+  // n_kr >= n_conv + 12, so nRitz = 6 gives n_kr = 18 ≈ 3·nRitz).
   DiracMdagM matNorm(*dirac);
-  int nRitz = 4;
+  int nRitz = 6;
   std::vector<ColorSpinorField> ritzVecs;
   std::vector<Complex> ritzVals;
   CGRitzExtractor::extract(ritzVecs, ritzVals, x[0], matNorm, nRitz);
@@ -1406,9 +1444,9 @@ TEST(EigenTracking, FullTrajectory)
 {
   QudaHMCParam hmc_param = makeHMCParam(QUDA_LEAPFROG_INTEGRATOR);
   hmc_param.eigentracking_enabled = 1;
-  hmc_param.eigentracking_n_ev = 4;
+  hmc_param.eigentracking_n_ev = 6; // TRLM n_kr = 3*n_ev must satisfy QUDA's n_kr >= n_conv + 12
   hmc_param.eigentracking_pool_capacity = 16;
-  hmc_param.eigentracking_n_ritz = 2;
+  hmc_param.eigentracking_n_ritz = 3;
   hmc_param.eigentracking_forecast_order = 1;
   hmc_param.eigentracking_fresh_trlm_interval = 0; // disable periodic refresh for this test
   hmc_param.eigentracking_solution_history = 2;
