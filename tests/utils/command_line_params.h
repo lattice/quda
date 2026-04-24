@@ -562,6 +562,11 @@ extern int hmc_momentum_seed;
 extern double hmc_force_eps;
 extern int hmc_reversibility_interval;
 extern double hmc_reversibility_tol;
+extern double hmc_reversibility_tol_mg;
+extern int hmc_per_link_test_links;
+extern double hmc_eigentest_trlm_tol;
+extern int hmc_eigentest_trlm_max_restarts;
+extern int hmc_eigentest_pool_capacity;
 
 extern bool eigentracking_enabled;
 extern int eigentracking_n_ev;

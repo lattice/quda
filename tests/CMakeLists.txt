@@ -1735,25 +1735,27 @@ if(QUDA_DIRAC_CLOVER)
     --gtest_output=xml:hmc_production.xml)
 
   # --- Eigentracking unit tests ---
-  # PoolInitAndCompress, ForceUpdate, RayleighRitzEvolve, and Forecast run
-  # directly against the heavy-mass M^dag M spectrum (target evals ~0.65);
-  # their test-fixture TRLM uses polynomial acceleration with a_min = 1.0
-  # (above the spectrum) per the QUDA eigensolver wiki.
+  # All test fixture knobs (TRLM tol, max_restarts, n_ev, poly-acc settings)
+  # are CLI-driven via --hmc-eigentest-* and --eigentracking-* flags.
+  # Heavy mass + a_min above the M^dag M target spectrum (~0.65) makes TRLM
+  # converge on 4^4 hot-start gauges (per QUDA eigensolver wiki guidance).
+  set(HMC_EIGENTEST_POLYACC --eigentracking-use-poly-acc true --eigentracking-a-min 1.0)
+
   add_test(NAME hmc_eigentracking_pool_init_and_compress
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
-    ${HMC_DIM} ${HMC_WILSON_HEAVY}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
     --gtest_filter=EigenTracking.PoolInitAndCompress
     --gtest_output=xml:hmc_eigentracking_pool_init_and_compress.xml)
 
   add_test(NAME hmc_eigentracking_force_update
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
-    ${HMC_DIM} ${HMC_WILSON_HEAVY}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
     --gtest_filter=EigenTracking.ForceUpdate
     --gtest_output=xml:hmc_eigentracking_force_update.xml)
 
   add_test(NAME hmc_eigentracking_rayleigh_ritz_evolve
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
-    ${HMC_DIM} ${HMC_WILSON_HEAVY}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
     --gtest_filter=EigenTracking.RayleighRitzEvolve
     --gtest_output=xml:hmc_eigentracking_rayleigh_ritz_evolve.xml)
 
@@ -1771,23 +1773,22 @@ if(QUDA_DIRAC_CLOVER)
   # the heavy-mass (mass=2.0) M^dag M spectrum.
   add_test(NAME hmc_eigentracking_cg_ritz_extraction
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
-    ${HMC_DIM} ${HMC_WILSON_HEAVY}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
     --gtest_filter=EigenTracking.CGRitzExtraction
     --gtest_output=xml:hmc_eigentracking_cg_ritz_extraction.xml)
 
   add_test(NAME hmc_eigentracking_full_trajectory
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
-    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY} ${HMC_EIGENTEST_POLYACC}
     --gtest_filter=EigenTracking.FullTrajectory
     --gtest_output=xml:hmc_eigentracking_full_trajectory.xml)
 
   add_test(NAME hmc_eigentracking_thermalize_and_track
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
-    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY} ${HMC_EIGENTEST_POLYACC}
     --hmc-n-trajectories 2 --hmc-thermalization 1
     --eigentracking true --eigentracking-n-ev 6
     --eigentracking-pool-capacity 16 --eigentracking-n-ritz 3
-    --eigentracking-use-poly-acc true --eigentracking-a-min 1.0
     --gtest_filter=EigenTracking.ThermalizeAndTrack
     --gtest_output=xml:hmc_eigentracking_thermalize_and_track.xml)
 endif()

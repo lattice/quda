@@ -363,16 +363,17 @@ TEST(HMC, MGPreconditionedRun)
   mg_inv_param.clover_cuda_prec_precondition = mg_prec;
   mg_inv_param.clover_cuda_prec_eigensolver = mg_prec;
 
-  // Configure 2-level MG directly (avoids CLI global conflicts from setMultigridParam)
+  // Configure 2-level MG. CLI-overridable knobs (block size, n_vec, smoother,
+  // setup solver, etc.) are honoured by HMC.Production, which uses the full
+  // snapshot/restore + setMultigridParam pipeline. This focused MG test pins
+  // a known-good 4^4 configuration so it exercises the MG+HMC plumbing
+  // deterministically; for arbitrary CLI-driven MG configs, use HMC.Production.
   QudaMultigridParam mg_param = newQudaMultigridParam();
   mg_param.invert_param = &mg_inv_param;
   mg_param.n_level = 2;
 
   // Level 0 (fine)
-  mg_param.geo_block_size[0][0] = 2;
-  mg_param.geo_block_size[0][1] = 2;
-  mg_param.geo_block_size[0][2] = 2;
-  mg_param.geo_block_size[0][3] = 2;
+  for (int d = 0; d < 4; d++) mg_param.geo_block_size[0][d] = 2;
   mg_param.n_vec[0] = 24;
   mg_param.spin_block_size[0] = 2;
   mg_param.nu_pre[0] = 2;
@@ -568,7 +569,7 @@ TEST(HMC, PerLinkForceTest)
   using namespace quda;
 
   double eps = hmc_force_eps;
-  int nTestLinks = 2;
+  int nTestLinks = hmc_per_link_test_links;
 
   printfQuda("\n=== Per-link fermion force test (eps=%e) ===\n", eps);
 
@@ -887,13 +888,14 @@ TEST(HMC, ReversibilityAllIntegrators)
     bool needs_mg;
     double tol; // plaquette-recovery tolerance
   };
-  // Pure-double CG integrators hit machine precision; nested FGI's transfer
-  // runs at single, so the tolerance is looser.
+  // Pure-double CG integrators hit machine precision (use --hmc-reversibility-tol);
+  // MG-using integrators (nested FGI) run with single-precision transfer so the
+  // tolerance is looser (use --hmc-reversibility-tol-mg). Both are CLI-driven.
   const Case cases[] = {
-    {"Leapfrog",      QUDA_LEAPFROG_INTEGRATOR,       false, 1e-10},
-    {"Omelyan",       QUDA_OMELYAN_INTEGRATOR,        false, 1e-10},
-    {"ForceGradient", QUDA_FORCE_GRADIENT_INTEGRATOR, false, 1e-10},
-    {"NestedFGI",     QUDA_NESTED_FGI_INTEGRATOR,     true,  1e-5},
+    {"Leapfrog",      QUDA_LEAPFROG_INTEGRATOR,       false, hmc_reversibility_tol},
+    {"Omelyan",       QUDA_OMELYAN_INTEGRATOR,        false, hmc_reversibility_tol},
+    {"ForceGradient", QUDA_FORCE_GRADIENT_INTEGRATOR, false, hmc_reversibility_tol},
+    {"NestedFGI",     QUDA_NESTED_FGI_INTEGRATOR,     true,  hmc_reversibility_tol_mg},
   };
 
   // Save the starting gauge so every integrator starts from the same U_0.
@@ -926,6 +928,8 @@ TEST(HMC, ReversibilityAllIntegrators)
       mg_ip.matpc_type = QUDA_MATPC_EVEN_EVEN;
       mg_param.invert_param = &mg_ip;
       mg_param.n_level = 2;
+      // Pinned 4^4 nested-FGI MG configuration (see HMC.Production for a
+      // CLI-driven MG setup with full snapshot/restore).
       for (int d = 0; d < 4; d++) mg_param.geo_block_size[0][d] = 2;
       mg_param.n_vec[0] = 24;
       mg_param.spin_block_size[0] = 2;
@@ -1064,6 +1068,51 @@ static void createEODirac(quda::Dirac *&dirac, QudaInvertParam &ip)
 }
 
 /**
+ * Helper: build a QudaEigParam for the EigenTracking test fixtures from CLI vars.
+ *
+ * All fixture knobs are CLI-driven via the --hmc-eigentest-* and
+ * --eigentracking-* flags so reviewers can adapt to different operators
+ * (heavier mass, polynomial-acceleration tweaks, looser convergence) without
+ * editing the test source.
+ */
+static QudaEigParam makeEigentestEigParam(int nEv)
+{
+  QudaEigParam ep;
+  memset(&ep, 0, sizeof(QudaEigParam));
+  ep.eig_type = QUDA_EIG_TR_LANCZOS;
+  ep.spectrum = QUDA_SPECTRUM_SR_EIG;
+  ep.n_ev = nEv;
+  ep.n_kr = 3 * nEv;          // QUDA wiki rule of thumb
+  ep.n_conv = nEv;
+  ep.n_ev_deflate = nEv;
+  ep.tol = hmc_eigentest_trlm_tol;
+  ep.max_restarts = hmc_eigentest_trlm_max_restarts;
+  ep.require_convergence = QUDA_BOOLEAN_TRUE;
+  ep.use_norm_op = QUDA_BOOLEAN_FALSE;
+  ep.use_dagger = QUDA_BOOLEAN_FALSE;
+  ep.use_pc = QUDA_BOOLEAN_FALSE;
+  ep.use_poly_acc = eigentracking_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  ep.poly_deg = eigentracking_poly_deg;
+  ep.a_min = eigentracking_a_min;
+  ep.a_max = eigentracking_a_max;
+  ep.compute_svd = QUDA_BOOLEAN_FALSE;
+  ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
+  ep.batched_rotate = 0;
+  ep.preserve_deflation = QUDA_BOOLEAN_FALSE;
+  ep.check_interval = 10;
+  ep.max_ortho_attempts = 10;
+  ep.compute_evals_batch_size = nEv;
+  return ep;
+}
+
+/**
+ * Helper: resolve the EigenTracking test n_ev. CLI default is 0 ("derive
+ * from MG nvec or fall back to 8"); the unit-test fixture wants a small
+ * fixed value, so we substitute 6 only when the CLI hasn't overridden it.
+ */
+static int makeEigentestNev() { return eigentracking_n_ev > 0 ? eigentracking_n_ev : 6; }
+
+/**
  * Test: Initialize EigenTracker from TRLM and verify compress.
  */
 TEST(EigenTracking, PoolInitAndCompress)
@@ -1078,40 +1127,10 @@ TEST(EigenTracking, PoolInitAndCompress)
   DiracMdagM matNorm(*dirac);
   DiracM matHalf(*dirac);
 
-  int nEv = 6;
-  int nKr = 3 * nEv; // TRLM search space ≈ 3×N_ev
-  int poolCapacity = 8;
-
-  // Run TRLM for reference eigenvalues
-  QudaEigParam ep;
-  memset(&ep, 0, sizeof(QudaEigParam));
-  ep.eig_type = QUDA_EIG_TR_LANCZOS;
-  ep.spectrum = QUDA_SPECTRUM_SR_EIG;
-  ep.n_ev = nEv;
-  ep.n_kr = nKr;
-  ep.n_conv = nEv;
-  ep.n_ev_deflate = nEv;
-  ep.tol = 1e-6;
-  ep.max_restarts = 200;
-  ep.require_convergence = QUDA_BOOLEAN_TRUE;
-  ep.use_norm_op = QUDA_BOOLEAN_FALSE;
-  ep.use_dagger = QUDA_BOOLEAN_FALSE;
-  ep.use_pc = QUDA_BOOLEAN_FALSE;
-  // Polynomial acceleration: 4^4 hot-start gauges with heavy mass push the
-  // M^dag M spectrum well off zero; a_min should be ~1 order of magnitude
-  // above the target smallest eigenvalue (per QUDA wiki guidance).
-  // Start conservatively at 1.0 — reduce if a thermalised run needs it.
-  ep.use_poly_acc = QUDA_BOOLEAN_TRUE;
-  ep.poly_deg = 50;
-  ep.a_min = 1.0;
-  ep.a_max = 0.0; // 0 => auto-detect via power iteration
-  ep.compute_svd = QUDA_BOOLEAN_FALSE;
-  ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
-  ep.batched_rotate = 0;
-  ep.preserve_deflation = QUDA_BOOLEAN_FALSE;
-  ep.check_interval = 10;
-  ep.max_ortho_attempts = 10;
-  ep.compute_evals_batch_size = nEv;
+  const int nEv = makeEigentestNev();
+  const int nKr = 3 * nEv;
+  const int poolCapacity = hmc_eigentest_pool_capacity;
+  QudaEigParam ep = makeEigentestEigParam(nEv);
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
 
@@ -1167,36 +1186,8 @@ TEST(EigenTracking, ForceUpdate)
   DiracMdagM matNorm(*dirac);
   DiracM matHalf(*dirac);
 
-  int nEv = 6;
-
-  // Run TRLM and init tracker
-  QudaEigParam ep;
-  memset(&ep, 0, sizeof(QudaEigParam));
-  ep.eig_type = QUDA_EIG_TR_LANCZOS;
-  ep.spectrum = QUDA_SPECTRUM_SR_EIG;
-  ep.n_ev = nEv;
-  ep.n_kr = 3 * nEv; // TRLM search space ≈ 3×N_ev
-  ep.n_conv = nEv;
-  ep.n_ev_deflate = nEv;
-  ep.tol = 1e-6;
-  ep.max_restarts = 200;
-  ep.require_convergence = QUDA_BOOLEAN_TRUE;
-  ep.use_norm_op = QUDA_BOOLEAN_FALSE;
-  ep.use_dagger = QUDA_BOOLEAN_FALSE;
-  ep.use_pc = QUDA_BOOLEAN_FALSE;
-  // Polynomial acceleration with a_min above the target spectrum
-  // (QUDA wiki: a_min ~ 1 order of magnitude above the smallest target eval).
-  ep.use_poly_acc = QUDA_BOOLEAN_TRUE;
-  ep.poly_deg = 50;
-  ep.a_min = 1.0;
-  ep.a_max = 0.0; // auto-detect
-  ep.compute_svd = QUDA_BOOLEAN_FALSE;
-  ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
-  ep.batched_rotate = 0;
-  ep.preserve_deflation = QUDA_BOOLEAN_FALSE;
-  ep.check_interval = 10;
-  ep.max_ortho_attempts = 10;
-  ep.compute_evals_batch_size = nEv;
+  const int nEv = makeEigentestNev();
+  QudaEigParam ep = makeEigentestEigParam(nEv);
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
   // Seed kSpace metadata via a pseudofermion (TRLM needs one field)
@@ -1214,7 +1205,7 @@ TEST(EigenTracking, ForceUpdate)
   setDiracParam(dp, &ip, true);
   Dirac *d = Dirac::create(dp);
   DiracM mHalf(*d);
-  tracker.init(kSpace, evals, mHalf, nEv, 16);
+  tracker.init(kSpace, evals, mHalf, nEv, hmc_eigentest_pool_capacity);
   delete d;
 
   // Save gauge
@@ -1278,36 +1269,8 @@ TEST(EigenTracking, RayleighRitzEvolve)
   DiracMdagM matNorm(*dirac);
   DiracM matHalf(*dirac);
 
-  int nEv = 6;
-
-  // Run TRLM and init tracker
-  QudaEigParam ep;
-  memset(&ep, 0, sizeof(QudaEigParam));
-  ep.eig_type = QUDA_EIG_TR_LANCZOS;
-  ep.spectrum = QUDA_SPECTRUM_SR_EIG;
-  ep.n_ev = nEv;
-  ep.n_kr = 3 * nEv; // TRLM search space ≈ 3×N_ev
-  ep.n_conv = nEv;
-  ep.n_ev_deflate = nEv;
-  ep.tol = 1e-6;
-  ep.max_restarts = 200;
-  ep.require_convergence = QUDA_BOOLEAN_TRUE;
-  ep.use_norm_op = QUDA_BOOLEAN_FALSE;
-  ep.use_dagger = QUDA_BOOLEAN_FALSE;
-  ep.use_pc = QUDA_BOOLEAN_FALSE;
-  // Polynomial acceleration with a_min above the target spectrum
-  // (QUDA wiki: a_min ~ 1 order of magnitude above the smallest target eval).
-  ep.use_poly_acc = QUDA_BOOLEAN_TRUE;
-  ep.poly_deg = 50;
-  ep.a_min = 1.0;
-  ep.a_max = 0.0; // auto-detect
-  ep.compute_svd = QUDA_BOOLEAN_FALSE;
-  ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
-  ep.batched_rotate = 0;
-  ep.preserve_deflation = QUDA_BOOLEAN_FALSE;
-  ep.check_interval = 10;
-  ep.max_ortho_attempts = 10;
-  ep.compute_evals_batch_size = nEv;
+  const int nEv = makeEigentestNev();
+  QudaEigParam ep = makeEigentestEigParam(nEv);
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
   // Seed kSpace metadata via a pseudofermion (TRLM needs one field)
@@ -1326,7 +1289,7 @@ TEST(EigenTracking, RayleighRitzEvolve)
     setDiracParam(dp, &ip, true);
     Dirac *d = Dirac::create(dp);
     DiracM mHalf(*d);
-    tracker.init(kSpace, evals, mHalf, nEv, 16);
+    tracker.init(kSpace, evals, mHalf, nEv, hmc_eigentest_pool_capacity);
     delete d;
   }
 
@@ -1440,17 +1403,22 @@ TEST(EigenTracking, CGRitzExtraction)
   std::vector<ColorSpinorField> b(1, ColorSpinorField(phi));
   solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
 
-  // Extract Ritz pairs (N_kr ≈ 3·N_ev rule; CGRitzExtractor clamps to QUDA's
-  // n_kr >= n_conv + 12, so nRitz = 6 gives n_kr = 18 ≈ 3·nRitz).
-  // Enable poly-acc with a_min above the target heavy-mass spectrum.
+  // Extract Ritz pairs. All knobs CLI-driven via --eigentracking-* and
+  // --hmc-eigentest-* flags; CLI default of --eigentracking-n-ritz=0 maps
+  // to a fixture-friendly value of 6 (giving n_kr = 3*6 = 18 which
+  // satisfies QUDA's n_kr >= n_conv + 12).
   DiracMdagM matNorm(*dirac);
-  int nRitz = 6;
+  const int nRitz = eigentracking_n_ritz > 0 ? eigentracking_n_ritz : 6;
   std::vector<ColorSpinorField> ritzVecs;
   std::vector<Complex> ritzVals;
   CGRitzExtractor::extract(ritzVecs, ritzVals, x[0], matNorm, nRitz,
-                           /*nKr=*/0, /*maxRestarts=*/200, /*tol=*/1e-4,
-                           /*usePolyAcc=*/true, /*polyDeg=*/50,
-                           /*aMin=*/1.0, /*aMax=*/0.0);
+                           /*nKr=*/0,
+                           /*maxRestarts=*/hmc_eigentest_trlm_max_restarts,
+                           /*tol=*/hmc_eigentest_trlm_tol,
+                           /*usePolyAcc=*/eigentracking_use_poly_acc,
+                           /*polyDeg=*/eigentracking_poly_deg,
+                           /*aMin=*/eigentracking_a_min,
+                           /*aMax=*/eigentracking_a_max);
 
   printfQuda("CGRitzExtraction: extracted %d Ritz pairs\n", static_cast<int>(ritzVals.size()));
   for (int i = 0; i < static_cast<int>(ritzVals.size()); i++) {
@@ -1474,19 +1442,16 @@ TEST(EigenTracking, CGRitzExtraction)
 TEST(EigenTracking, FullTrajectory)
 {
   QudaHMCParam hmc_param = makeHMCParam(QUDA_LEAPFROG_INTEGRATOR);
+  // Enable eigentracking; everything else honours --eigentracking-* CLI
+  // (defaults inherit from makeHMCParam, which already pulled CLI vars).
   hmc_param.eigentracking_enabled = 1;
-  hmc_param.eigentracking_n_ev = 6; // TRLM n_kr = 3*n_ev must satisfy QUDA's n_kr >= n_conv + 12
-  hmc_param.eigentracking_pool_capacity = 16;
-  hmc_param.eigentracking_n_ritz = 3;
-  hmc_param.eigentracking_forecast_order = 1;
-  hmc_param.eigentracking_fresh_trlm_interval = 0; // disable periodic refresh for this test
-  hmc_param.eigentracking_solution_history = 2;
-  // Poly-acc for hot-start 4^4 runs: smallest target M^dag M eval ~O(1) at
-  // mass=2.0, so a_min=1.0 sits safely above the target spectrum.
-  hmc_param.eigentracking_use_poly_acc = 1;
-  hmc_param.eigentracking_poly_deg = 50;
-  hmc_param.eigentracking_a_min = 1.0;
-  hmc_param.eigentracking_a_max = 0.0;
+  // CLI default for n_ev/pool_capacity/n_ritz is "0 = derive": substitute
+  // small fixture-friendly values only when CLI hasn't overridden.
+  if (hmc_param.eigentracking_n_ev <= 0) hmc_param.eigentracking_n_ev = 6;
+  if (hmc_param.eigentracking_pool_capacity <= 0) hmc_param.eigentracking_pool_capacity = 16;
+  if (hmc_param.eigentracking_n_ritz <= 0) hmc_param.eigentracking_n_ritz = 3;
+  // Disable periodic TRLM refresh for this single-trajectory test.
+  hmc_param.eigentracking_fresh_trlm_interval = 0;
 
   // First trajectory
   double dH1 = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
