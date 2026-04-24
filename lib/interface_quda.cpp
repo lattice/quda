@@ -5058,6 +5058,8 @@ void quda::seedEigenTrackingFromMG(void *mg_instance, QudaHMCParam *hmc_param, Q
     etp.forecastOrder = hmc_param->eigentracking_forecast_order;
     etp.freshTRLMInterval = hmc_param->eigentracking_fresh_trlm_interval;
     etp.solutionHistoryDepth = hmc_param->eigentracking_solution_history;
+    etp.trlmTol = hmc_param->eigentracking_trlm_tol;
+    etp.trlmMaxRestarts = hmc_param->eigentracking_trlm_max_restarts;
     etp.usePolyAcc = hmc_param->eigentracking_use_poly_acc != 0;
     etp.polyDeg = hmc_param->eigentracking_poly_deg;
     etp.aMin = hmc_param->eigentracking_a_min;
@@ -5151,6 +5153,8 @@ QudaHMCParam newQudaHMCParam(void)
   param.eigentracking_forecast_order = 1;
   param.eigentracking_fresh_trlm_interval = 10;
   param.eigentracking_solution_history = 3;
+  param.eigentracking_trlm_tol = 1e-6;
+  param.eigentracking_trlm_max_restarts = 100;
   param.eigentracking_use_poly_acc = 0;
   param.eigentracking_poly_deg = 50;
   param.eigentracking_a_min = 0.0;
@@ -5682,6 +5686,8 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
       etp.forecastOrder = hmc_param->eigentracking_forecast_order;
       etp.freshTRLMInterval = hmc_param->eigentracking_fresh_trlm_interval;
       etp.solutionHistoryDepth = hmc_param->eigentracking_solution_history;
+      etp.trlmTol = hmc_param->eigentracking_trlm_tol;
+      etp.trlmMaxRestarts = hmc_param->eigentracking_trlm_max_restarts;
       etp.usePolyAcc = hmc_param->eigentracking_use_poly_acc != 0;
       etp.polyDeg = hmc_param->eigentracking_poly_deg;
       etp.aMin = hmc_param->eigentracking_a_min;

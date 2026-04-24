@@ -53,8 +53,8 @@ namespace quda
     ep.n_kr = nKr;
     ep.n_conv = param_.nEv;
     ep.n_ev_deflate = param_.nEv;
-    ep.tol = 1e-6;
-    ep.max_restarts = 100;
+    ep.tol = param_.trlmTol;
+    ep.max_restarts = param_.trlmMaxRestarts;
     ep.require_convergence = QUDA_BOOLEAN_TRUE;
     ep.use_norm_op = QUDA_BOOLEAN_FALSE;
     ep.use_dagger = QUDA_BOOLEAN_FALSE;

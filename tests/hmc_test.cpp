@@ -174,6 +174,8 @@ static QudaHMCParam makeHMCParam(QudaIntegratorType integrator_override = static
   p.eigentracking_forecast_order = eigentracking_forecast_order;
   p.eigentracking_fresh_trlm_interval = eigentracking_fresh_interval;
   p.eigentracking_solution_history = eigentracking_solution_history;
+  p.eigentracking_trlm_tol = eigentracking_trlm_tol;
+  p.eigentracking_trlm_max_restarts = eigentracking_trlm_max_restarts;
   p.eigentracking_use_poly_acc = eigentracking_use_poly_acc ? 1 : 0;
   p.eigentracking_poly_deg = eigentracking_poly_deg;
   p.eigentracking_a_min = eigentracking_a_min;
@@ -1070,10 +1072,11 @@ static void createEODirac(quda::Dirac *&dirac, QudaInvertParam &ip)
 /**
  * Helper: build a QudaEigParam for the EigenTracking test fixtures from CLI vars.
  *
- * All fixture knobs are CLI-driven via the --hmc-eigentest-* and
- * --eigentracking-* flags so reviewers can adapt to different operators
- * (heavier mass, polynomial-acceleration tweaks, looser convergence) without
- * editing the test source.
+ * All fixture knobs are CLI-driven via the --eigentracking-* flags so
+ * reviewers can adapt to different operators (heavier mass,
+ * polynomial-acceleration tweaks, looser convergence) without editing
+ * the test source. The same flags drive EigenTrackingState::maybeInit
+ * for production HMC runs.
  */
 static QudaEigParam makeEigentestEigParam(int nEv)
 {
@@ -1085,8 +1088,8 @@ static QudaEigParam makeEigentestEigParam(int nEv)
   ep.n_kr = 3 * nEv;          // QUDA wiki rule of thumb
   ep.n_conv = nEv;
   ep.n_ev_deflate = nEv;
-  ep.tol = hmc_eigentest_trlm_tol;
-  ep.max_restarts = hmc_eigentest_trlm_max_restarts;
+  ep.tol = eigentracking_trlm_tol;
+  ep.max_restarts = eigentracking_trlm_max_restarts;
   ep.require_convergence = QUDA_BOOLEAN_TRUE;
   ep.use_norm_op = QUDA_BOOLEAN_FALSE;
   ep.use_dagger = QUDA_BOOLEAN_FALSE;
@@ -1129,7 +1132,7 @@ TEST(EigenTracking, PoolInitAndCompress)
 
   const int nEv = makeEigentestNev();
   const int nKr = 3 * nEv;
-  const int poolCapacity = hmc_eigentest_pool_capacity;
+  const int poolCapacity = (eigentracking_pool_capacity > 0 ? eigentracking_pool_capacity : 8);
   QudaEigParam ep = makeEigentestEigParam(nEv);
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
@@ -1205,7 +1208,7 @@ TEST(EigenTracking, ForceUpdate)
   setDiracParam(dp, &ip, true);
   Dirac *d = Dirac::create(dp);
   DiracM mHalf(*d);
-  tracker.init(kSpace, evals, mHalf, nEv, hmc_eigentest_pool_capacity);
+  tracker.init(kSpace, evals, mHalf, nEv, (eigentracking_pool_capacity > 0 ? eigentracking_pool_capacity : 8));
   delete d;
 
   // Save gauge
@@ -1289,7 +1292,7 @@ TEST(EigenTracking, RayleighRitzEvolve)
     setDiracParam(dp, &ip, true);
     Dirac *d = Dirac::create(dp);
     DiracM mHalf(*d);
-    tracker.init(kSpace, evals, mHalf, nEv, hmc_eigentest_pool_capacity);
+    tracker.init(kSpace, evals, mHalf, nEv, (eigentracking_pool_capacity > 0 ? eigentracking_pool_capacity : 8));
     delete d;
   }
 
@@ -1413,8 +1416,8 @@ TEST(EigenTracking, CGRitzExtraction)
   std::vector<Complex> ritzVals;
   CGRitzExtractor::extract(ritzVecs, ritzVals, x[0], matNorm, nRitz,
                            /*nKr=*/0,
-                           /*maxRestarts=*/hmc_eigentest_trlm_max_restarts,
-                           /*tol=*/hmc_eigentest_trlm_tol,
+                           /*maxRestarts=*/eigentracking_trlm_max_restarts,
+                           /*tol=*/eigentracking_trlm_tol,
                            /*usePolyAcc=*/eigentracking_use_poly_acc,
                            /*polyDeg=*/eigentracking_poly_deg,
                            /*aMin=*/eigentracking_a_min,

@@ -30,6 +30,9 @@ namespace quda
     int forecastOrder = 1;         /**< Generator forecast order (0/1/2) */
     int freshTRLMInterval = 10;    /**< Trajectories between fresh TRLM (0=disabled) */
     int solutionHistoryDepth = 3;  /**< Number of previous solutions to store */
+    /** Initial TRLM convergence knobs (also used for fresh-TRLM refreshes). */
+    double trlmTol = 1e-6;         /**< TRLM convergence tolerance */
+    int trlmMaxRestarts = 100;     /**< TRLM maximum restarts */
     /** @name Initial TRLM polynomial acceleration (Chebyshev filter)
      *  For clustered or near-zero M^dag M spectra (hot-start gauges,
      *  critical-mass runs without MG), Chebyshev acceleration is needed

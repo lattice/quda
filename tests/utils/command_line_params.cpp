@@ -308,9 +308,8 @@ int hmc_reversibility_interval = 10;
 double hmc_reversibility_tol = 1e-6;
 double hmc_reversibility_tol_mg = 1e-5;       // looser tol for MG-using integrators (e.g. nested FGI)
 int hmc_per_link_test_links = 2;              // SU(3) test links to perturb in PerLinkForceTest
-double hmc_eigentest_trlm_tol = 1e-6;         // EigenTracking test fixture: TRLM convergence tolerance
-int hmc_eigentest_trlm_max_restarts = 200;    // EigenTracking test fixture: TRLM maximum restarts
-int hmc_eigentest_pool_capacity = 8;          // EigenTracking test fixture: pool capacity
+double eigentracking_trlm_tol = 1e-6;         // TRLM convergence tolerance for eigentracking initial solve
+int eigentracking_trlm_max_restarts = 100;    // TRLM maximum restarts for eigentracking initial solve
 
 bool eigentracking_enabled = false;
 int eigentracking_n_ev = 0;              // 0 = derive from MG nvec, or default 8
@@ -1306,12 +1305,10 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Plaquette tolerance for MG-using integrators in reversibility-all (default 1e-5)");
   opgroup->add_option("--hmc-per-link-test-links", hmc_per_link_test_links,
                       "Number of (mu, site) link samples in HMC.PerLinkForceTest (default 2)");
-  opgroup->add_option("--hmc-eigentest-trlm-tol", hmc_eigentest_trlm_tol,
-                      "TRLM tolerance for EigenTracking test fixture (default 1e-6)");
-  opgroup->add_option("--hmc-eigentest-trlm-max-restarts", hmc_eigentest_trlm_max_restarts,
-                      "TRLM max restarts for EigenTracking test fixture (default 200)");
-  opgroup->add_option("--hmc-eigentest-pool-capacity", hmc_eigentest_pool_capacity,
-                      "Pool capacity for EigenTracking test fixture (default 8)");
+  opgroup->add_option("--eigentracking-trlm-tol", eigentracking_trlm_tol,
+                      "TRLM convergence tolerance for eigentracking initial solve (default 1e-6)");
+  opgroup->add_option("--eigentracking-trlm-max-restarts", eigentracking_trlm_max_restarts,
+                      "TRLM maximum restarts for eigentracking initial solve (default 100)");
 
   opgroup->add_option("--eigentracking", eigentracking_enabled,
                       "Enable eigenspace tracking during HMC (default false)");

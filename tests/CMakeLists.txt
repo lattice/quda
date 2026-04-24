@@ -1735,8 +1735,9 @@ if(QUDA_DIRAC_CLOVER)
     --gtest_output=xml:hmc_production.xml)
 
   # --- Eigentracking unit tests ---
-  # All test fixture knobs (TRLM tol, max_restarts, n_ev, poly-acc settings)
-  # are CLI-driven via --hmc-eigentest-* and --eigentracking-* flags.
+  # All knobs (TRLM tol, max_restarts, n_ev, pool capacity, poly-acc settings)
+  # are CLI-driven via --eigentracking-* flags. The same flags configure
+  # production EigenTrackingState::maybeInit via QudaHMCParam.
   # Heavy mass + a_min above the M^dag M target spectrum (~0.65) makes TRLM
   # converge on 4^4 hot-start gauges (per QUDA eigensolver wiki guidance).
   set(HMC_EIGENTEST_POLYACC --eigentracking-use-poly-acc true --eigentracking-a-min 1.0)

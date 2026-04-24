@@ -902,6 +902,9 @@ extern "C" {
     int eigentracking_forecast_order;       /**< Generator forecast order: 0/1/2 (default 1) */
     int eigentracking_fresh_trlm_interval;  /**< Trajectories between fresh TRLM (0=disabled, default 10) */
     int eigentracking_solution_history;     /**< Chronological solution history depth (default 3) */
+    /** Initial TRLM convergence knobs (also applied to fresh-TRLM refreshes) */
+    double eigentracking_trlm_tol;          /**< TRLM convergence tolerance (default 1e-6) */
+    int eigentracking_trlm_max_restarts;    /**< TRLM maximum restarts (default 100) */
     /** Chebyshev acceleration for the initial TRLM (ill-conditioned M^dag M) */
     int eigentracking_use_poly_acc;         /**< 1=Chebyshev poly acceleration on, 0=off (default 0) */
     int eigentracking_poly_deg;             /**< Chebyshev polynomial degree (default 50) */
