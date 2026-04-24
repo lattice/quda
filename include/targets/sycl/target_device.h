@@ -231,7 +231,8 @@ namespace quda
     constexpr size_t max_kernel_arg_size()
     {
       // return std::max(QUDA_MAX_ARGUMENT_SIZE-8, 0);  // reserve 8 bytes for local accessor
-      return std::max(MAX_KERNEL_ARG_SIZE - 8, 0); // reserve 8 bytes for local accessor
+      //return std::max(MAX_KERNEL_ARG_SIZE - 8, 0); // reserve 8 bytes for local accessor
+      return std::max(MAX_KERNEL_ARG_SIZE - 16, 0); // reserve 8 bytes for local accessor
     }
 
     /**
