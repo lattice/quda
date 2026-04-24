@@ -1274,6 +1274,150 @@ void printQudaBLASParam(QudaBLASParam *param)
 #endif
 }
 
+#if defined INIT_PARAM
+QudaHMCParam newQudaHMCParam(void)
+{
+  QudaHMCParam ret;
+#elif defined CHECK_PARAM
+static void checkHMCParam(QudaHMCParam *param)
+{
+#else
+void printQudaHMCParam(QudaHMCParam *param)
+{
+  printfQuda("QUDA HMC parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaHMCParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+#if defined INIT_PARAM
+  // Trajectory
+  P(tau, 1.0);
+  P(n_steps, 10);
+  P(integrator, QUDA_LEAPFROG_INTEGRATOR);
+  P(beta, 6.0);
+  // Momentum
+  P(generate_momentum, 1);
+  P(momentum_seed, (unsigned long long)0);
+  P(reuse_pseudofermion, 0);
+  // Omelyan
+  P(omelyan_lambda, 0.1932);
+  // Force-gradient (PQPQP_FGI) outer coefficients from Yin & Mawhinney
+  P(fgi_lambda, 1.0 / 6.0);
+  P(fgi_xi, 1.0 / 72.0);
+  // Nested-FGI inner sub-integrator
+  P(n_inner_steps, 3);
+  P(inner_integrator, QUDA_LEAPFROG_INTEGRATOR);
+  P(inner_omelyan_lambda, 0.1932);
+  // Coarse-grid deflation (for nested FGI)
+  P(n_defl, 32);
+  P(eig_tol, 1e-6);
+  P(eig_n_kr, 0);
+  P(eig_max_restarts, 100);
+  P(defl_refresh_interval, 0);
+  P(coarse_level, 1);
+  // MR smoothing of the low-mode force
+  P(n_mr_smooth, 0);
+  P(mr_omega, 1.0);
+  // Multi-trajectory driver
+  P(n_trajectories, 10);
+  P(n_thermalization, 5);
+  P(mg_setup_interval, 0);
+  P(checkpoint_interval, 0);
+  // Resident field management
+  P(use_resident_gauge, 0);
+  P(make_resident_gauge, 0);
+  P(return_result_gauge, 1);
+  P(use_resident_mom, 0);
+  P(make_resident_mom, 0);
+  P(return_result_mom, 1);
+  // Eigenspace tracking
+  P(eigentracking_enabled, 0);
+  P(eigentracking_n_ev, 8);
+  P(eigentracking_pool_capacity, 32);
+  P(eigentracking_n_ritz, 4);
+  P(eigentracking_forecast_order, 1);
+  P(eigentracking_fresh_trlm_interval, 10);
+  P(eigentracking_solution_history, 3);
+  P(eigentracking_trlm_tol, 1e-6);
+  P(eigentracking_trlm_max_restarts, 100);
+  P(eigentracking_use_poly_acc, 0);
+  P(eigentracking_poly_deg, 50);
+  P(eigentracking_a_min, 0.0);
+  P(eigentracking_a_max, 0.0);
+#elif defined PRINT_PARAM
+  P(tau, INVALID_DOUBLE);
+  P(n_steps, INVALID_DOUBLE);
+  P(integrator, INVALID_DOUBLE);
+  P(beta, INVALID_DOUBLE);
+  P(generate_momentum, INVALID_DOUBLE);
+  P(momentum_seed, INVALID_DOUBLE);
+  P(reuse_pseudofermion, INVALID_DOUBLE);
+  P(omelyan_lambda, INVALID_DOUBLE);
+  P(fgi_lambda, INVALID_DOUBLE);
+  P(fgi_xi, INVALID_DOUBLE);
+  P(n_inner_steps, INVALID_DOUBLE);
+  P(inner_integrator, INVALID_DOUBLE);
+  P(inner_omelyan_lambda, INVALID_DOUBLE);
+  P(n_defl, INVALID_DOUBLE);
+  P(eig_tol, INVALID_DOUBLE);
+  P(eig_n_kr, INVALID_DOUBLE);
+  P(eig_max_restarts, INVALID_DOUBLE);
+  P(defl_refresh_interval, INVALID_DOUBLE);
+  P(coarse_level, INVALID_DOUBLE);
+  P(n_mr_smooth, INVALID_DOUBLE);
+  P(mr_omega, INVALID_DOUBLE);
+  P(n_trajectories, INVALID_DOUBLE);
+  P(n_thermalization, INVALID_DOUBLE);
+  P(mg_setup_interval, INVALID_DOUBLE);
+  P(checkpoint_interval, INVALID_DOUBLE);
+  P(use_resident_gauge, INVALID_DOUBLE);
+  P(make_resident_gauge, INVALID_DOUBLE);
+  P(return_result_gauge, INVALID_DOUBLE);
+  P(use_resident_mom, INVALID_DOUBLE);
+  P(make_resident_mom, INVALID_DOUBLE);
+  P(return_result_mom, INVALID_DOUBLE);
+  P(eigentracking_enabled, INVALID_DOUBLE);
+  P(eigentracking_n_ev, INVALID_DOUBLE);
+  P(eigentracking_pool_capacity, INVALID_DOUBLE);
+  P(eigentracking_n_ritz, INVALID_DOUBLE);
+  P(eigentracking_forecast_order, INVALID_DOUBLE);
+  P(eigentracking_fresh_trlm_interval, INVALID_DOUBLE);
+  P(eigentracking_solution_history, INVALID_DOUBLE);
+  P(eigentracking_trlm_tol, INVALID_DOUBLE);
+  P(eigentracking_trlm_max_restarts, INVALID_DOUBLE);
+  P(eigentracking_use_poly_acc, INVALID_DOUBLE);
+  P(eigentracking_poly_deg, INVALID_DOUBLE);
+  P(eigentracking_a_min, INVALID_DOUBLE);
+  P(eigentracking_a_max, INVALID_DOUBLE);
+#endif
+  // CHECK_PARAM: struct_size was validated above; all scalar fields have
+  // defaults (INIT_PARAM) so none are strict-required at check time.
+
+#ifdef INIT_PARAM
+  // Character-array fields are not expressible via the P() macro; handle them
+  // directly. Empty strings are the "no file / no prefix" sentinels.
+  memset(ret.checkpoint_prefix, 0, sizeof(ret.checkpoint_prefix));
+  strncpy(ret.checkpoint_prefix, "ckpt_", sizeof(ret.checkpoint_prefix) - 1);
+  memset(ret.gauge_infile, 0, sizeof(ret.gauge_infile));
+  memset(ret.gauge_outfile, 0, sizeof(ret.gauge_outfile));
+#endif
+
+#ifdef PRINT_PARAM
+  if (param->checkpoint_prefix[0]) printfQuda("checkpoint_prefix = %s\n", param->checkpoint_prefix);
+  if (param->gauge_infile[0]) printfQuda("gauge_infile = %s\n", param->gauge_infile);
+  if (param->gauge_outfile[0]) printfQuda("gauge_outfile = %s\n", param->gauge_outfile);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
 // clean up
 
 #undef INVALID_INT

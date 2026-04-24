@@ -1217,6 +1217,12 @@ extern "C" {
   void printQudaBLASParam(QudaBLASParam *param);
 
   /**
+   * Print the members of QudaHMCParam.
+   * @param param The QudaHMCParam whose elements we are to print.
+   */
+  void printQudaHMCParam(QudaHMCParam *param);
+
+  /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
    * @param param   Contains all metadata regarding host and device storage
