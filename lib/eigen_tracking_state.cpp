@@ -59,7 +59,14 @@ namespace quda
     ep.use_norm_op = QUDA_BOOLEAN_FALSE;
     ep.use_dagger = QUDA_BOOLEAN_FALSE;
     ep.use_pc = QUDA_BOOLEAN_FALSE;
-    ep.use_poly_acc = QUDA_BOOLEAN_FALSE;
+    // Optional Chebyshev acceleration for ill-conditioned M^dag M spectra
+    // (hot-start gauges, critical-mass runs without MG preconditioning).
+    ep.use_poly_acc = param_.usePolyAcc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    if (param_.usePolyAcc) {
+      ep.poly_deg = param_.polyDeg;
+      ep.a_min = param_.aMin;
+      ep.a_max = param_.aMax; // 0 => QUDA power-iteration auto-estimate
+    }
     ep.compute_svd = QUDA_BOOLEAN_FALSE;
     ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
     ep.batched_rotate = 0;

@@ -314,6 +314,10 @@ int eigentracking_n_ritz = 0;            // 0 = derive from nEv, or default nEv/
 int eigentracking_forecast_order = 1;
 int eigentracking_fresh_interval = 0;    // 0 = disabled (MG seeding replaces TRLM)
 int eigentracking_solution_history = 3;
+bool eigentracking_use_poly_acc = false; // Chebyshev acceleration for initial TRLM
+int eigentracking_poly_deg = 50;         // Chebyshev polynomial degree
+double eigentracking_a_min = 0.0;        // ~10x smallest target eval; 0 => caller fills
+double eigentracking_a_max = 0.0;        // 0 => QUDA power-iteration auto-estimate
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -1308,6 +1312,14 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Trajectories between fresh TRLM (0=disabled, default 0)");
   opgroup->add_option("--eigentracking-solution-history", eigentracking_solution_history,
                       "Chronological solution history depth (default 3)");
+  opgroup->add_option("--eigentracking-use-poly-acc", eigentracking_use_poly_acc,
+                      "Enable Chebyshev polynomial acceleration in initial TRLM (default false)");
+  opgroup->add_option("--eigentracking-poly-deg", eigentracking_poly_deg,
+                      "Chebyshev polynomial degree (default 50)");
+  opgroup->add_option("--eigentracking-a-min", eigentracking_a_min,
+                      "Poly-acc lower suppression bound, ~10x smallest target eigenvalue");
+  opgroup->add_option("--eigentracking-a-max", eigentracking_a_max,
+                      "Poly-acc upper bound; 0 => QUDA power-iteration auto-estimate (default 0)");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)

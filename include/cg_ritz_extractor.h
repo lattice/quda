@@ -35,10 +35,15 @@ namespace quda
      * @param nKr       Krylov space size (default: 3*nRitz)
      * @param maxRestarts Maximum restarts for short TRLM (default: 5)
      * @param tol       Convergence tolerance (default: 1e-4, relaxed)
+     * @param usePolyAcc Enable Chebyshev polynomial acceleration (default false)
+     * @param polyDeg   Chebyshev polynomial degree (default 50)
+     * @param aMin      Lower suppression bound for poly-acc (~10x smallest target eval)
+     * @param aMax      Upper bound for poly-acc; 0 => auto-estimate via power iteration
      */
     static void extract(std::vector<ColorSpinorField> &ritzVecs, std::vector<Complex> &ritzVals,
                         const ColorSpinorField &sol, const DiracMatrix &mat, int nRitz, int nKr = 0,
-                        int maxRestarts = 5, double tol = 1e-4);
+                        int maxRestarts = 5, double tol = 1e-4,
+                        bool usePolyAcc = false, int polyDeg = 50, double aMin = 0.0, double aMax = 0.0);
   };
 
 } // namespace quda

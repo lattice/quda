@@ -174,6 +174,10 @@ static QudaHMCParam makeHMCParam(QudaIntegratorType integrator_override = static
   p.eigentracking_forecast_order = eigentracking_forecast_order;
   p.eigentracking_fresh_trlm_interval = eigentracking_fresh_interval;
   p.eigentracking_solution_history = eigentracking_solution_history;
+  p.eigentracking_use_poly_acc = eigentracking_use_poly_acc ? 1 : 0;
+  p.eigentracking_poly_deg = eigentracking_poly_deg;
+  p.eigentracking_a_min = eigentracking_a_min;
+  p.eigentracking_a_max = eigentracking_a_max;
 
   return p;
 }
@@ -327,14 +331,37 @@ TEST(HMC, MultiTrajectoryRun)
 TEST(HMC, MGPreconditionedRun)
 {
   // --- Set up MG preconditioner ---
-  // MG setup requires clover field loaded — load it now
-  loadCloverQuda(nullptr, nullptr, &inv_param);
+  // MG setup requires clover field loaded for clover-family dslashes. Align
+  // inv_param's clover precisions with its gauge precisions so the clover
+  // field loaded here matches the precision at which MG sees the gauge —
+  // otherwise calculateY() and the Wilson-clover preconditioned arg packer
+  // will hit "Precisions 4 8 do not match" errors.
+  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    inv_param.clover_cuda_prec = inv_param.cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = inv_param.cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = inv_param.cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = inv_param.cuda_prec_precondition;
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
 
-  // Create a separate inv_param for MG setup (needs DIRECT_SOLVE, symmetric PC)
+  // Create a separate inv_param for MG setup (needs DIRECT_SOLVE, symmetric PC).
+  // MG internal precision must match the null-vector precision below, otherwise
+  // the Y-matrix construction (coarse_op_*.cu:calculateY) and the smoother
+  // Wilson-clover argument packer will hit "Precisions 4 8 do not match" errors.
+  QudaPrecision mg_prec =
+    (prec_precondition != QUDA_INVALID_PRECISION) ? prec_precondition : QUDA_SINGLE_PRECISION;
   QudaInvertParam mg_inv_param = inv_param;
   mg_inv_param.solve_type = QUDA_DIRECT_SOLVE;
   mg_inv_param.solution_type = QUDA_MAT_SOLUTION;
   mg_inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  mg_inv_param.cuda_prec = gauge_param.cuda_prec; // must match gauge precise
+  mg_inv_param.cuda_prec_sloppy = mg_prec;
+  mg_inv_param.cuda_prec_precondition = mg_prec;
+  mg_inv_param.cuda_prec_eigensolver = mg_prec;
+  mg_inv_param.clover_cuda_prec = gauge_param.cuda_prec;
+  mg_inv_param.clover_cuda_prec_sloppy = mg_prec;
+  mg_inv_param.clover_cuda_prec_precondition = mg_prec;
+  mg_inv_param.clover_cuda_prec_eigensolver = mg_prec;
 
   // Configure 2-level MG directly (avoids CLI global conflicts from setMultigridParam)
   QudaMultigridParam mg_param = newQudaMultigridParam();
@@ -358,7 +385,7 @@ TEST(HMC, MGPreconditionedRun)
   mg_param.setup_maxiter[0] = 500;
   mg_param.num_setup_iter[0] = 1;
   mg_param.n_block_ortho[0] = 1;
-  mg_param.precision_null[0] = QUDA_SINGLE_PRECISION;
+  mg_param.precision_null[0] = mg_prec;
   mg_param.coarse_solver[0] = QUDA_GCR_INVERTER;
   mg_param.coarse_solver_tol[0] = 0.25;
   mg_param.coarse_solver_maxiter[0] = 16;
@@ -1415,11 +1442,15 @@ TEST(EigenTracking, CGRitzExtraction)
 
   // Extract Ritz pairs (N_kr ≈ 3·N_ev rule; CGRitzExtractor clamps to QUDA's
   // n_kr >= n_conv + 12, so nRitz = 6 gives n_kr = 18 ≈ 3·nRitz).
+  // Enable poly-acc with a_min above the target heavy-mass spectrum.
   DiracMdagM matNorm(*dirac);
   int nRitz = 6;
   std::vector<ColorSpinorField> ritzVecs;
   std::vector<Complex> ritzVals;
-  CGRitzExtractor::extract(ritzVecs, ritzVals, x[0], matNorm, nRitz);
+  CGRitzExtractor::extract(ritzVecs, ritzVals, x[0], matNorm, nRitz,
+                           /*nKr=*/0, /*maxRestarts=*/200, /*tol=*/1e-4,
+                           /*usePolyAcc=*/true, /*polyDeg=*/50,
+                           /*aMin=*/1.0, /*aMax=*/0.0);
 
   printfQuda("CGRitzExtraction: extracted %d Ritz pairs\n", static_cast<int>(ritzVals.size()));
   for (int i = 0; i < static_cast<int>(ritzVals.size()); i++) {
@@ -1450,6 +1481,12 @@ TEST(EigenTracking, FullTrajectory)
   hmc_param.eigentracking_forecast_order = 1;
   hmc_param.eigentracking_fresh_trlm_interval = 0; // disable periodic refresh for this test
   hmc_param.eigentracking_solution_history = 2;
+  // Poly-acc for hot-start 4^4 runs: smallest target M^dag M eval ~O(1) at
+  // mass=2.0, so a_min=1.0 sits safely above the target spectrum.
+  hmc_param.eigentracking_use_poly_acc = 1;
+  hmc_param.eigentracking_poly_deg = 50;
+  hmc_param.eigentracking_a_min = 1.0;
+  hmc_param.eigentracking_a_max = 0.0;
 
   // First trajectory
   double dH1 = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);

@@ -570,6 +570,10 @@ extern int eigentracking_n_ritz;
 extern int eigentracking_forecast_order;
 extern int eigentracking_fresh_interval;
 extern int eigentracking_solution_history;
+extern bool eigentracking_use_poly_acc;
+extern int eigentracking_poly_deg;
+extern double eigentracking_a_min;
+extern double eigentracking_a_max;
 
 extern int gf_gauge_dir;
 extern int gf_maxiter;

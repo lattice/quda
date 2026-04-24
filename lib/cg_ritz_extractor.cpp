@@ -122,7 +122,8 @@ namespace quda
 
   void CGRitzExtractor::extract(std::vector<ColorSpinorField> &ritzVecs, std::vector<Complex> &ritzVals,
                                 const ColorSpinorField &sol, const DiracMatrix &mat, int nRitz, int nKr,
-                                int maxRestarts, double tol)
+                                int maxRestarts, double tol, bool usePolyAcc, int polyDeg, double aMin,
+                                double aMax)
   {
     if (nRitz <= 0) return;
     if (nKr <= 0) nKr = std::max(3 * nRitz, nRitz + 14);
@@ -143,7 +144,12 @@ namespace quda
     ep.use_norm_op = QUDA_BOOLEAN_FALSE;
     ep.use_dagger = QUDA_BOOLEAN_FALSE;
     ep.use_pc = QUDA_BOOLEAN_FALSE;
-    ep.use_poly_acc = QUDA_BOOLEAN_FALSE;
+    ep.use_poly_acc = usePolyAcc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    if (usePolyAcc) {
+      ep.poly_deg = polyDeg;
+      ep.a_min = aMin;
+      ep.a_max = aMax; // 0 => QUDA auto-estimates via power iteration
+    }
     ep.compute_svd = QUDA_BOOLEAN_FALSE;
     ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
     ep.batched_rotate = 0;

@@ -30,6 +30,16 @@ namespace quda
     int forecastOrder = 1;         /**< Generator forecast order (0/1/2) */
     int freshTRLMInterval = 10;    /**< Trajectories between fresh TRLM (0=disabled) */
     int solutionHistoryDepth = 3;  /**< Number of previous solutions to store */
+    /** @name Initial TRLM polynomial acceleration (Chebyshev filter)
+     *  For clustered or near-zero M^dag M spectra (hot-start gauges,
+     *  critical-mass runs without MG), Chebyshev acceleration is needed
+     *  to resolve the low modes reliably. Set a_min ~1 order of magnitude
+     *  above the smallest target eigenvalue; a_max = 0 triggers QUDA's
+     *  power-iteration auto-estimate. See QUDA eigensolver wiki. */
+    bool usePolyAcc = false;       /**< Enable Chebyshev acceleration in initial TRLM */
+    int polyDeg = 50;              /**< Chebyshev polynomial degree */
+    double aMin = 0.0;             /**< Lower suppression boundary (must be set when usePolyAcc) */
+    double aMax = 0.0;             /**< Upper boundary; 0 => auto-estimate */
   };
 
   /**

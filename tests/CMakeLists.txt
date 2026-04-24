@@ -1694,13 +1694,21 @@ if(QUDA_DIRAC_CLOVER)
     --gtest_filter=HMC.MultiTrajectoryRun
     --gtest_output=xml:hmc_multi_trajectory_run.xml)
 
-  # --- MG-preconditioned multi-trajectory (clover) ---
-  # DISABLED: the hard-coded mg_param.precision_null=SINGLE in this test
-  # conflicts with gauge/clover precision in calculateY(). Requires a
-  # test-fixture rework to use the shared CLI-driven MG setup pattern.
-  # Binary still runs via:
-  #   ./tests/hmc_test --gtest_filter=HMC.MGPreconditionedRun ...
-  # add_test(NAME hmc_mg_preconditioned_run ...)
+  # --- MG-preconditioned multi-trajectory (clover, single precision) ---
+  # Run at uniform single precision throughout: MG internal kernels (smoother
+  # WilsonClover dslash, calculateY) are instantiated for matching gauge/clover
+  # precisions; mixed double-precise + single-sloppy creates double clover with
+  # single sloppy gauge, which the smoother arg packer rejects. Pure single
+  # avoids that mismatch and is sufficient for testing the MG+HMC pipeline.
+  add_test(NAME hmc_mg_preconditioned_run
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} --dslash-type clover --mass 0.5
+    --prec single --prec-sloppy single --prec-precondition single
+    --compute-clover true --clover-coeff 1.0
+    ${HMC_TRAJECTORY}
+    --hmc-n-trajectories 2 --hmc-thermalization 1
+    --gtest_filter=HMC.MGPreconditionedRun
+    --gtest_output=xml:hmc_mg_preconditioned_run.xml)
 
   # --- Reversibility (MANDATORY coverage of every integrator) ---
   add_test(NAME hmc_reversibility_test
@@ -1755,15 +1763,33 @@ if(QUDA_DIRAC_CLOVER)
     --gtest_filter=EigenTracking.Forecast
     --gtest_output=xml:hmc_eigentracking_forecast.xml)
 
-  # DISABLED: these three paths build TRLM outside the test fixture (either
-  # in CGRitzExtractor's legacy wrapper or inside EigenTrackingState::maybeInit)
-  # and don't currently expose polynomial-acceleration parameters. They pass
-  # on production lattices where MG conditions the spectrum; re-enabling in
-  # ctest requires plumbing poly-acc settings through to those call sites.
-  # Invoke via the binary with --gtest_filter when the test fixture is extended.
-  # add_test(NAME hmc_eigentracking_cg_ritz_extraction ...)
-  # add_test(NAME hmc_eigentracking_full_trajectory ...)
-  # add_test(NAME hmc_eigentracking_thermalize_and_track ...)
+  # CGRitzExtraction, FullTrajectory, and ThermalizeAndTrack exercise TRLM
+  # through CGRitzExtractor::extract and EigenTrackingState::maybeInit;
+  # both now accept polynomial-acceleration parameters. Poly-acc is enabled
+  # either in the test fixture (CGRitzExtraction, FullTrajectory) or via the
+  # --eigentracking-* CLI flags (ThermalizeAndTrack) with a_min = 1.0 above
+  # the heavy-mass (mass=2.0) M^dag M spectrum.
+  add_test(NAME hmc_eigentracking_cg_ritz_extraction
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY}
+    --gtest_filter=EigenTracking.CGRitzExtraction
+    --gtest_output=xml:hmc_eigentracking_cg_ritz_extraction.xml)
+
+  add_test(NAME hmc_eigentracking_full_trajectory
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY}
+    --gtest_filter=EigenTracking.FullTrajectory
+    --gtest_output=xml:hmc_eigentracking_full_trajectory.xml)
+
+  add_test(NAME hmc_eigentracking_thermalize_and_track
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY}
+    --hmc-n-trajectories 2 --hmc-thermalization 1
+    --eigentracking true --eigentracking-n-ev 6
+    --eigentracking-pool-capacity 16 --eigentracking-n-ritz 3
+    --eigentracking-use-poly-acc true --eigentracking-a-min 1.0
+    --gtest_filter=EigenTracking.ThermalizeAndTrack
+    --gtest_output=xml:hmc_eigentracking_thermalize_and_track.xml)
 endif()
 
 add_test(NAME gauge_path
