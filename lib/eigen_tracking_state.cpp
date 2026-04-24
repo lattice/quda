@@ -11,6 +11,7 @@
 #include <blas_quda.h>
 #include <gauge_field.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <cstdio>
 
 // gaugePrecise is at file scope (not in quda namespace) in interface_quda.cpp
@@ -18,6 +19,8 @@ extern quda::GaugeField *gaugePrecise;
 
 namespace quda
 {
+
+  static TimeProfile profileEigenTracking("EigenTrackingState");
 
   EigenTrackingState::EigenTrackingState() : invParamSet_(false), trajectoryCount_(0), totalRitzAbsorbed_(0), totalCGSolves_(0) { }
 
@@ -33,6 +36,7 @@ namespace quda
   void EigenTrackingState::maybeInit(const DiracMatrix &mat, const DiracMatrix &matHalf,
                                      QudaInvertParam &inv_param)
   {
+    auto profile = pushProfile(profileEigenTracking);
     if (tracker_.isInitialized()) return;
 
     // Cache inv_param for future re-initialization (periodic TRLM refresh)
@@ -102,6 +106,7 @@ namespace quda
   void EigenTrackingState::seedFromMGNullVectors(std::vector<ColorSpinorField> &evenVecs,
                                                    const DiracMatrix &matHalf, QudaInvertParam &inv_param)
   {
+    auto profile = pushProfile(profileEigenTracking);
     if (tracker_.isInitialized()) {
       logQuda(QUDA_VERBOSE, "EigenTrackingState: tracker already initialized, skipping MG seed\n");
       return;
@@ -137,6 +142,7 @@ namespace quda
 
   void EigenTrackingState::afterCGSolve(const ColorSpinorField &sol, const DiracMatrix &matHalf)
   {
+    auto profile = pushProfile(profileEigenTracking);
     totalCGSolves_++;
 
     // Absorb the normalized CG solution into the tracker pool.
@@ -155,12 +161,14 @@ namespace quda
 
   void EigenTrackingState::afterGaugeUpdate(const DiracMatrix &matHalf)
   {
+    auto profile = pushProfile(profileEigenTracking);
     if (!tracker_.isInitialized()) return;
     tracker_.forceUpdate(matHalf);
   }
 
   void EigenTrackingState::betweenTrajectories(const DiracMatrix &mat, const DiracMatrix &matHalf)
   {
+    auto profile = pushProfile(profileEigenTracking);
     if (!tracker_.isInitialized()) return;
 
     trajectoryCount_++;
@@ -199,6 +207,7 @@ namespace quda
 
   void EigenTrackingState::beforeTrajectory(const DiracMatrix &matHalf)
   {
+    auto profile = pushProfile(profileEigenTracking);
     if (!tracker_.isInitialized()) return;
 
     // Apply forecast pre-rotation if we have sufficient history

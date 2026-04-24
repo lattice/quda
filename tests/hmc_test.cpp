@@ -204,6 +204,77 @@ static void resolveEigenTrackingDefaults(QudaHMCParam &p, int mg_nvec)
 }
 
 /**
+ * Helper: populate a 2-level 4^4 MG param block with known-good fixture defaults.
+ *
+ * Used by HMC.MGPreconditionedRun and the nested-FGI branch of
+ * HMC.ReversibilityAllIntegrators. For CLI-driven MG configuration, use
+ * HMC.Production (which runs through setQudaDefaultMgTestParams +
+ * setMultigridParam with the full snapshot/restore CLI override pattern).
+ */
+static void configureHMCTestMG(QudaMultigridParam &mg_param, QudaInvertParam &mg_inv_param,
+                               QudaPrecision precision_null)
+{
+  mg_param.invert_param = &mg_inv_param;
+  mg_param.n_level = 2;
+
+  // Level 0 (fine)
+  for (int d = 0; d < 4; d++) mg_param.geo_block_size[0][d] = 2;
+  mg_param.n_vec[0] = 24;
+  mg_param.spin_block_size[0] = 2;
+  mg_param.nu_pre[0] = 2;
+  mg_param.nu_post[0] = 2;
+  mg_param.smoother[0] = QUDA_MR_INVERTER;
+  mg_param.smoother_tol[0] = 0.25;
+  mg_param.smoother_solve_type[0] = QUDA_DIRECT_PC_SOLVE;
+  mg_param.setup_inv_type[0] = QUDA_BICGSTAB_INVERTER;
+  mg_param.setup_tol[0] = 5e-6;
+  mg_param.setup_maxiter[0] = 500;
+  mg_param.num_setup_iter[0] = 1;
+  mg_param.n_block_ortho[0] = 1;
+  mg_param.precision_null[0] = precision_null;
+  mg_param.coarse_solver[0] = QUDA_GCR_INVERTER;
+  mg_param.coarse_solver_tol[0] = 0.25;
+  mg_param.coarse_solver_maxiter[0] = 16;
+  mg_param.coarse_grid_solution_type[0] = QUDA_MATPC_SOLUTION;
+  mg_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
+  mg_param.setup_location[0] = QUDA_CUDA_FIELD_LOCATION;
+
+  // Level 1 (coarse)
+  mg_param.smoother[1] = QUDA_GCR_INVERTER;
+  mg_param.smoother_tol[1] = 0.25;
+  mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE;
+  mg_param.coarse_solver[1] = QUDA_GCR_INVERTER;
+  mg_param.coarse_solver_tol[1] = 0.25;
+  mg_param.coarse_solver_maxiter[1] = 16;
+  mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
+  mg_param.location[1] = QUDA_CUDA_FIELD_LOCATION;
+  mg_param.setup_location[1] = QUDA_CUDA_FIELD_LOCATION;
+
+  // Shared level params
+  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+    mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
+    mg_param.verbosity[i] = QUDA_SILENT;
+    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+    mg_param.n_vec_batch[i] = 1;
+    mg_param.omega[i] = 0.85;
+    mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS;
+    mg_param.setup_ca_basis_size[i] = 4;
+    mg_param.setup_ca_lambda_min[i] = 0.0;
+    mg_param.setup_ca_lambda_max[i] = -1.0;
+    mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    mg_param.coarse_solver_ca_basis_size[i] = 4;
+    mg_param.coarse_solver_ca_lambda_min[i] = 0.0;
+    mg_param.coarse_solver_ca_lambda_max[i] = -1.0;
+    mg_param.smoother_halo_precision[i] = QUDA_INVALID_PRECISION;
+    mg_param.setup_maxiter_refresh[i] = 0;
+  }
+
+  mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+  mg_param.generate_all_levels = QUDA_BOOLEAN_TRUE;
+  mg_param.run_verify = QUDA_BOOLEAN_FALSE;
+}
+
+/**
  * Test: Leapfrog trajectory with energy conservation check.
  *
  * Demonstrates the self-contained usage pattern:
@@ -371,63 +442,7 @@ TEST(HMC, MGPreconditionedRun)
   // a known-good 4^4 configuration so it exercises the MG+HMC plumbing
   // deterministically; for arbitrary CLI-driven MG configs, use HMC.Production.
   QudaMultigridParam mg_param = newQudaMultigridParam();
-  mg_param.invert_param = &mg_inv_param;
-  mg_param.n_level = 2;
-
-  // Level 0 (fine)
-  for (int d = 0; d < 4; d++) mg_param.geo_block_size[0][d] = 2;
-  mg_param.n_vec[0] = 24;
-  mg_param.spin_block_size[0] = 2;
-  mg_param.nu_pre[0] = 2;
-  mg_param.nu_post[0] = 2;
-  mg_param.smoother[0] = QUDA_MR_INVERTER;
-  mg_param.smoother_tol[0] = 0.25;
-  mg_param.smoother_solve_type[0] = QUDA_DIRECT_PC_SOLVE;
-  mg_param.setup_inv_type[0] = QUDA_BICGSTAB_INVERTER;
-  mg_param.setup_tol[0] = 5e-6;
-  mg_param.setup_maxiter[0] = 500;
-  mg_param.num_setup_iter[0] = 1;
-  mg_param.n_block_ortho[0] = 1;
-  mg_param.precision_null[0] = mg_prec;
-  mg_param.coarse_solver[0] = QUDA_GCR_INVERTER;
-  mg_param.coarse_solver_tol[0] = 0.25;
-  mg_param.coarse_solver_maxiter[0] = 16;
-  mg_param.coarse_grid_solution_type[0] = QUDA_MATPC_SOLUTION;
-  mg_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
-  mg_param.setup_location[0] = QUDA_CUDA_FIELD_LOCATION;
-
-  // Level 1 (coarse)
-  mg_param.smoother[1] = QUDA_GCR_INVERTER;
-  mg_param.smoother_tol[1] = 0.25;
-  mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE;
-  mg_param.coarse_solver[1] = QUDA_GCR_INVERTER;
-  mg_param.coarse_solver_tol[1] = 0.25;
-  mg_param.coarse_solver_maxiter[1] = 16;
-  mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
-  mg_param.location[1] = QUDA_CUDA_FIELD_LOCATION;
-  mg_param.setup_location[1] = QUDA_CUDA_FIELD_LOCATION;
-
-  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-    mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
-    mg_param.verbosity[i] = QUDA_SUMMARIZE;
-    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
-    mg_param.n_vec_batch[i] = 1;
-    mg_param.omega[i] = 0.85;
-    mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS;
-    mg_param.setup_ca_basis_size[i] = 4;
-    mg_param.setup_ca_lambda_min[i] = 0.0;
-    mg_param.setup_ca_lambda_max[i] = -1.0;
-    mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
-    mg_param.coarse_solver_ca_basis_size[i] = 4;
-    mg_param.coarse_solver_ca_lambda_min[i] = 0.0;
-    mg_param.coarse_solver_ca_lambda_max[i] = -1.0;
-    mg_param.smoother_halo_precision[i] = QUDA_INVALID_PRECISION;
-    mg_param.setup_maxiter_refresh[i] = 0;
-  }
-
-  mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-  mg_param.generate_all_levels = QUDA_BOOLEAN_TRUE;
-  mg_param.run_verify = QUDA_BOOLEAN_FALSE;
+  configureHMCTestMG(mg_param, mg_inv_param, mg_prec);
 
   // Create MG preconditioner (builds null vectors, coarse operators)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
@@ -928,59 +943,7 @@ TEST(HMC, ReversibilityAllIntegrators)
       mg_ip.solve_type = QUDA_DIRECT_SOLVE;
       mg_ip.solution_type = QUDA_MAT_SOLUTION;
       mg_ip.matpc_type = QUDA_MATPC_EVEN_EVEN;
-      mg_param.invert_param = &mg_ip;
-      mg_param.n_level = 2;
-      // Pinned 4^4 nested-FGI MG configuration (see HMC.Production for a
-      // CLI-driven MG setup with full snapshot/restore).
-      for (int d = 0; d < 4; d++) mg_param.geo_block_size[0][d] = 2;
-      mg_param.n_vec[0] = 24;
-      mg_param.spin_block_size[0] = 2;
-      mg_param.nu_pre[0] = 2;
-      mg_param.nu_post[0] = 2;
-      mg_param.smoother[0] = QUDA_MR_INVERTER;
-      mg_param.smoother_tol[0] = 0.25;
-      mg_param.smoother_solve_type[0] = QUDA_DIRECT_PC_SOLVE;
-      mg_param.setup_inv_type[0] = QUDA_BICGSTAB_INVERTER;
-      mg_param.setup_tol[0] = 5e-6;
-      mg_param.setup_maxiter[0] = 500;
-      mg_param.num_setup_iter[0] = 1;
-      mg_param.n_block_ortho[0] = 1;
-      mg_param.precision_null[0] = QUDA_SINGLE_PRECISION;
-      mg_param.coarse_solver[0] = QUDA_GCR_INVERTER;
-      mg_param.coarse_solver_tol[0] = 0.25;
-      mg_param.coarse_solver_maxiter[0] = 16;
-      mg_param.coarse_grid_solution_type[0] = QUDA_MATPC_SOLUTION;
-      mg_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
-      mg_param.setup_location[0] = QUDA_CUDA_FIELD_LOCATION;
-      mg_param.smoother[1] = QUDA_GCR_INVERTER;
-      mg_param.smoother_tol[1] = 0.25;
-      mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE;
-      mg_param.coarse_solver[1] = QUDA_GCR_INVERTER;
-      mg_param.coarse_solver_tol[1] = 0.25;
-      mg_param.coarse_solver_maxiter[1] = 16;
-      mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
-      mg_param.location[1] = QUDA_CUDA_FIELD_LOCATION;
-      mg_param.setup_location[1] = QUDA_CUDA_FIELD_LOCATION;
-      for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-        mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
-        mg_param.verbosity[i] = QUDA_SILENT;
-        mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
-        mg_param.n_vec_batch[i] = 1;
-        mg_param.omega[i] = 0.85;
-        mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS;
-        mg_param.setup_ca_basis_size[i] = 4;
-        mg_param.setup_ca_lambda_min[i] = 0.0;
-        mg_param.setup_ca_lambda_max[i] = -1.0;
-        mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
-        mg_param.coarse_solver_ca_basis_size[i] = 4;
-        mg_param.coarse_solver_ca_lambda_min[i] = 0.0;
-        mg_param.coarse_solver_ca_lambda_max[i] = -1.0;
-        mg_param.smoother_halo_precision[i] = QUDA_INVALID_PRECISION;
-        mg_param.setup_maxiter_refresh[i] = 0;
-      }
-      mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-      mg_param.generate_all_levels = QUDA_BOOLEAN_TRUE;
-      mg_param.run_verify = QUDA_BOOLEAN_FALSE;
+      configureHMCTestMG(mg_param, mg_ip, QUDA_SINGLE_PRECISION);
       if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(nullptr, nullptr, &inv_param);
       mg_prec = newMultigridQuda(&mg_param);
     }

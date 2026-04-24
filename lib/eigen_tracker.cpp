@@ -11,15 +11,19 @@
 #include <blas_quda.h>
 #include <eigen_helper.h>
 #include <quda_internal.h>
+#include <timer.h>
 
 namespace quda
 {
+
+  static TimeProfile profileEigenTracker("EigenTracker");
 
   EigenTracker::EigenTracker() : nEv_(0), poolCapacity_(0), initialized_(false) { }
 
   void EigenTracker::init(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
                           const DiracMatrix &mat, int nEv, int capacity)
   {
+    auto profile = pushProfile(profileEigenTracker);
     if (capacity < nEv) errorQuda("EigenTracker: capacity (%d) must be >= nEv (%d)", capacity, nEv);
 
     nEv_ = nEv;
@@ -49,6 +53,7 @@ namespace quda
 
   void EigenTracker::compress()
   {
+    auto profile = pushProfile(profileEigenTracker);
     if (!initialized_) return;
     int k = static_cast<int>(pool_.size());
     if (k <= 1) return;
@@ -116,6 +121,7 @@ namespace quda
 
   int EigenTracker::absorb(std::vector<ColorSpinorField> &newVecs, const DiracMatrix &mat)
   {
+    auto profile = pushProfile(profileEigenTracker);
     if (!initialized_) return 0;
     int absorbed = 0;
 
@@ -160,6 +166,7 @@ namespace quda
 
   void EigenTracker::forceUpdate(const DiracMatrix &mat)
   {
+    auto profile = pushProfile(profileEigenTracker);
     if (!initialized_) return;
     int k = static_cast<int>(pool_.size());
 
@@ -174,6 +181,7 @@ namespace quda
 
   std::vector<Complex> EigenTracker::rayleighRitzEvolve(const DiracMatrix &mat)
   {
+    auto profile = pushProfile(profileEigenTracker);
     if (!initialized_) return {};
     int k = static_cast<int>(pool_.size());
 

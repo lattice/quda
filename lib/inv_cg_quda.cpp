@@ -304,7 +304,13 @@ namespace quda {
       if (!ru.trigger()) {
         for (auto i = 0u; i < beta.size(); i++) beta[i] = sigma[i] / r2_old[i]; // use the alternative beta computation
 
-        // CG-Lanczos tracking: record alpha, beta, and normalized residual for zero-cost Ritz extraction
+        // CG-Lanczos tracking: record alpha, beta, and the normalized residual
+        // for zero-cost Ritz extraction after the solve. The activeCGTracker
+        // global (cg_tracker.h) is null unless eigentracking has explicitly
+        // attached a tracker for this solve, so this hot-loop branch is
+        // predict-not-taken and effectively free for users who don't use
+        // eigentracking. The global is only READ here; the tracker itself is
+        // thread-safe for the single-writer single-reader pattern used by HMC.
         if (activeCGTracker) {
           activeCGTracker->recordIteration(x_update_batch[0].get_current_alpha(), beta[0], r_sloppy[0]);
         }

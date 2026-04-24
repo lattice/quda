@@ -8,11 +8,17 @@
 #include <malloc_quda.h>
 #include <quda_internal.h>
 #include <quda.h>
+#include <timer.h>
+#include <clover_field.h>
 
 namespace quda
 {
 
+  static TimeProfile profileNestedFGI("NestedFGIIntegrator");
+
   // Forward declarations for file-scope globals in interface_quda.cpp
+  // (cloverPrecise is accessed only via the class's constructor-injected
+  // reference member, not the global, so no extern is needed here.)
   extern std::vector<ColorSpinorField> solutionResident;
 
   // Forward declarations for internal solver entry points (see solve.cpp / interface_quda.cpp).
@@ -303,6 +309,7 @@ namespace quda
 
   void NestedFGIIntegrator::trajectory(double tau, int nSteps, const ColorSpinorField &phi)
   {
+    auto profile = pushProfile(profileNestedFGI);
     double h = tau / nSteps;
 
     logQuda(QUDA_SUMMARIZE, "NestedFGIIntegrator: trajectory tau=%e, n_outer=%d, h=%e, inner=%s\n", tau, nSteps, h,

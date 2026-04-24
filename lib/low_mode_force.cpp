@@ -1,10 +1,29 @@
+/**
+ * @file low_mode_force.cpp
+ * @brief Low-mode fermion force using coarse-grid deflation + optional MR smoothing.
+ *
+ * Implements the "cheap" inner force for the nested force-gradient integrator:
+ *   1. Restrict the pseudofermion to the coarse grid via the MG transfer.
+ *   2. Project onto the tracked coarse eigenvectors (deflation).
+ *   3. Prolong the low-mode correction back to the fine grid.
+ *   4. Optional MR smoothing iterations on the fine-grid operator.
+ *   5. Feed the resulting approximate solution to the standard fermion-force
+ *      kernel (computeEOFermionForce for Wilson, computeCloverForce for clover).
+ *
+ * This is the force component that is refreshed at the inner (fast) timescale
+ * in the nested FGI integrator, while the "expensive" F_full - F_low
+ * correction is applied only at the outer (slow) timescale.
+ */
 #include <nested_fgi.h>
 #include <hmc_quda.h>
 #include <blas_quda.h>
 #include <invert_quda.h>
+#include <timer.h>
 
 namespace quda
 {
+
+  static TimeProfile profileLowModeForce("LowModeForce");
 
   LowModeForce::LowModeForce(CoarseDeflationManager &deflManager_, const DiracMatrix &matFine_, int nMRSmooth_,
                               double mrOmega_) :
@@ -14,6 +33,7 @@ namespace quda
 
   void LowModeForce::projectLowModes(ColorSpinorField &xLow, const ColorSpinorField &src)
   {
+    auto profile = pushProfile(profileLowModeForce);
     const auto &evecs = deflManager.getEvecs();
     const auto &evals = deflManager.getEvals();
     const Transfer &T = deflManager.getTransfer();
@@ -118,6 +138,7 @@ namespace quda
   void LowModeForce::computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &gauge,
                                    const CloverField *clover, QudaGaugeParam &, QudaInvertParam &invParam)
   {
+    auto profile = pushProfile(profileLowModeForce);
     // Lazily allocate fine solution workspace
     if (fineSol.empty()) {
       ColorSpinorParam fineParam{src};

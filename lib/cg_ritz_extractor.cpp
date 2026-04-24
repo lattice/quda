@@ -13,11 +13,14 @@
 #include <eigen_helper.h>
 #include <blas_quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <algorithm>
 #include <cmath>
 
 namespace quda
 {
+
+  static TimeProfile profileCGRitz("CGRitzExtractor");
 
   // Global active tracker pointer (set before solve, read by CG, cleared after)
   CGTracker *activeCGTracker = nullptr;
@@ -58,6 +61,7 @@ namespace quda
 
   void CGTracker::extractRitzPairs(std::vector<ColorSpinorField> &vecs, std::vector<Complex> &vals)
   {
+    auto profile = pushProfile(profileCGRitz);
     vecs.clear();
     vals.clear();
 
@@ -125,6 +129,7 @@ namespace quda
                                 int maxRestarts, double tol, bool usePolyAcc, int polyDeg, double aMin,
                                 double aMax)
   {
+    auto profile = pushProfile(profileCGRitz);
     if (nRitz <= 0) return;
     if (nKr <= 0) nKr = std::max(3 * nRitz, nRitz + 14);
 

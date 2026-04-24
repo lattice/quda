@@ -1406,6 +1406,9 @@ extern "C" {
    * @param[in]     inv_param   Inverter parameters
    * @param[in]     mg_instance MG preconditioner (from newMultigridQuda, or nullptr)
    * @param[in]     mg_param    MG parameters for updates (or nullptr if mg_instance is nullptr)
+   * @since        QudaMultigridParam* parameter added with the HMC multi-trajectory
+   *               driver; this signature is stable for callers built against
+   *               this branch or later.
    */
   void hmcRunQuda(void *gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
                   void *mg_instance, QudaMultigridParam *mg_param);

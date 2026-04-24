@@ -21,6 +21,13 @@ namespace quda
 
   /**
    * @brief Parameters controlling eigenspace tracking during HMC.
+   *
+   * Defaults here are the fallback values used if the caller does not set
+   * anything. Callers that thread values from QudaHMCParam (the normal
+   * production path) should set every field explicitly; the struct defaults
+   * are informational only. In tests/hmc_test.cpp, the test fixture
+   * substitutes small fixture-friendly values (nEv=6, poolCapacity=8, etc.)
+   * when CLI flags are left at their "0 = derive" sentinel.
    */
   struct EigenTrackingParam {
     bool enabled = false;          /**< Master enable/disable switch */
