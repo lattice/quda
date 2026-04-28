@@ -53,16 +53,31 @@ namespace quda
           if (i < arg.threads.x) f.prefetch(i);
         }
       }
+      const auto stride = gridDim.x * blockDim.x;
       while (i < arg.threads.x) {
         if constexpr (grid_stride) {
+          if constexpr (Arg::grid_stride_unroll > 1u) {
+            if (i + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+#pragma unroll
+              for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+                if constexpr (kernel_prefetch::kernel_functor_prefetch_1d_v<Functor, Arg>) {
+                  const auto i_pf = i + (e + 1u) * stride;
+                  if (i_pf < arg.threads.x) f.prefetch(i_pf);
+                }
+                f(i + e * stride);
+              }
+              i += Arg::grid_stride_unroll * stride;
+              continue;
+            }
+          }
           if constexpr (kernel_prefetch::kernel_functor_prefetch_1d_v<Functor, Arg>) {
-            const auto i_next = i + gridDim.x * blockDim.x;
+            const auto i_next = i + stride;
             if (i_next < arg.threads.x) f.prefetch(i_next);
           }
         }
         f(i);
         if constexpr (grid_stride) {
-          i += gridDim.x * blockDim.x;
+          i += stride;
         } else
           break;
       }
@@ -184,16 +199,31 @@ namespace quda
           if (i < arg.threads.x) f.prefetch(i, j);
         }
       }
+      const auto stride = gridDim.x * blockDim.x;
       while (i < arg.threads.x) {
         if constexpr (grid_stride) {
+          if constexpr (Arg::grid_stride_unroll > 1u) {
+            if (i + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+#pragma unroll
+              for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+                if constexpr (kernel_prefetch::kernel_functor_prefetch_2d_v<Functor, Arg>) {
+                  const auto i_pf = i + (e + 1u) * stride;
+                  if (i_pf < arg.threads.x) f.prefetch(i_pf, j);
+                }
+                f(i + e * stride, j);
+              }
+              i += Arg::grid_stride_unroll * stride;
+              continue;
+            }
+          }
           if constexpr (kernel_prefetch::kernel_functor_prefetch_2d_v<Functor, Arg>) {
-            const auto i_next = i + gridDim.x * blockDim.x;
+            const auto i_next = i + stride;
             if (i_next < arg.threads.x) f.prefetch(i_next, j);
           }
         }
         f(i, j);
         if constexpr (grid_stride) {
-          i += gridDim.x * blockDim.x;
+          i += stride;
         } else
           break;
       }
@@ -317,16 +347,31 @@ namespace quda
           if (i < arg.threads.x) f.prefetch(i, j, k);
         }
       }
+      const auto stride = gridDim.x * blockDim.x;
       while (i < arg.threads.x) {
         if constexpr (grid_stride) {
+          if constexpr (Arg::grid_stride_unroll > 1u) {
+            if (i + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+#pragma unroll
+              for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+                if constexpr (kernel_prefetch::kernel_functor_prefetch_3d_v<Functor, Arg>) {
+                  const auto i_pf = i + (e + 1u) * stride;
+                  if (i_pf < arg.threads.x) f.prefetch(i_pf, j, k);
+                }
+                f(i + e * stride, j, k);
+              }
+              i += Arg::grid_stride_unroll * stride;
+              continue;
+            }
+          }
           if constexpr (kernel_prefetch::kernel_functor_prefetch_3d_v<Functor, Arg>) {
-            const auto i_next = i + gridDim.x * blockDim.x;
+            const auto i_next = i + stride;
             if (i_next < arg.threads.x) f.prefetch(i_next, j, k);
           }
         }
         f(i, j, k);
         if constexpr (grid_stride) {
-          i += gridDim.x * blockDim.x;
+          i += stride;
         } else
           break;
       }

@@ -25,6 +25,7 @@ namespace quda
     struct BlasArg : kernel_param<> {
       using real = real_;
       using Functor = Functor_;
+      static constexpr unsigned int grid_stride_unroll = QUDA_BLAS_GRID_STRIDE_UNROLL;
       static constexpr int n = n_;
       Spinor<store_t, N> X[MAX_MULTI_RHS];
       Spinor<y_store_t, Ny> Y[MAX_MULTI_RHS];

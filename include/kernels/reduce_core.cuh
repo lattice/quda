@@ -25,6 +25,7 @@ namespace quda
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
       using real = real_;
+      static constexpr unsigned int grid_stride_unroll = QUDA_BLAS_GRID_STRIDE_UNROLL;
       static constexpr int n = n_;
       using Reducer = Reducer_;
       using reduce_t = typename Reducer_::reduce_t;

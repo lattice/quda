@@ -20,6 +20,8 @@ namespace quda
     static constexpr int max_regs = 0;          // by default we don't limit register count
     static constexpr bool spill_shared = false; // whether a given kernel should use shared memory spilling
     static constexpr bool is_dslash = false;    // whether the arg is for a dslash (with its nested arg struct)
+    /** Grid-stride x-dimension: process this many indices \c i, \c i+stride, ... per outer while iteration (see \c kernel.h). */
+    static constexpr unsigned int grid_stride_unroll = 1;
     dim3 threads;          /** number of active threads required */
     int block_size;        /** product of thread block dimensions */
     int comms_rank;        /** per process value of comm_rank() */

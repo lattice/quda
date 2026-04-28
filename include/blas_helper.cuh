@@ -1,6 +1,11 @@
 #pragma once
 
+#include <cstdio>
 #include <cstring>
+
+#ifndef QUDA_BLAS_GRID_STRIDE_UNROLL
+#define QUDA_BLAS_GRID_STRIDE_UNROLL 1
+#endif
 
 #include <color_spinor_field.h>
 #include <quda_define.h>
@@ -117,11 +122,19 @@ namespace quda
     /** Append BLAS prefetch mode to \a aux for \c TuneKey when non-NONE. */
     inline void blas_tune_aux_prefetch(char *aux)
     {
-#if defined(QUDA_BLAS_PREFETCH_TYPE_THREAD)
-      strcat(aux, ",prefetch=thread");
-#elif defined(QUDA_BLAS_PREFETCH_TYPE_BULK)
-      strcat(aux, ",prefetch=bulk");
-#endif
+      switch (blas_prefetch_type()) {
+      case PrefetchType::THREAD: strcat(aux, ",prefetch=thread"); break;
+      case PrefetchType::BULK: strcat(aux, ",prefetch=bulk"); break;
+      default: break;
+      }
+    }
+
+    /** Append \c grid_stride_unroll (Blas / Reduction / multi-blas / multi-reduce) for autotune separation. */
+    inline void blas_tune_aux_grid_stride_unroll(char *aux)
+    {
+      char buf[32];
+      snprintf(buf, sizeof(buf), ",gs_u=%d", QUDA_BLAS_GRID_STRIDE_UNROLL);
+      strcat(aux, buf);
     }
 
     /**

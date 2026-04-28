@@ -50,16 +50,31 @@ namespace quda
         if (idx < arg.threads.x) t.prefetch(idx, j);
       }
     }
+    const auto stride = blockDim.x * gridDim.x;
     while (idx < arg.threads.x) {
       if constexpr (grid_stride) {
+        if constexpr (Arg::grid_stride_unroll > 1u) {
+          if (idx + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+#pragma unroll
+            for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+              if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
+                const auto idx_pf = idx + (e + 1u) * stride;
+                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, j);
+              }
+              value = t(value, idx + e * stride, j);
+            }
+            idx += Arg::grid_stride_unroll * stride;
+            continue;
+          }
+        }
         if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
-          const auto idx_next = idx + blockDim.x * gridDim.x;
+          const auto idx_next = idx + stride;
           if (idx_next < arg.threads.x) t.prefetch(idx_next, j);
         }
       }
       value = t(value, idx, j);
       if constexpr (grid_stride) {
-        idx += blockDim.x * gridDim.x;
+        idx += stride;
       } else
         break;
     }
@@ -141,16 +156,31 @@ namespace quda
         if (idx < arg.threads.x) t.prefetch(idx, k, j);
       }
     }
+    const auto stride = blockDim.x * gridDim.x;
     while (idx < arg.threads.x) {
       if constexpr (grid_stride) {
+        if constexpr (Arg::grid_stride_unroll > 1u) {
+          if (idx + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+#pragma unroll
+            for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+              if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
+                const auto idx_pf = idx + (e + 1u) * stride;
+                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, k, j);
+              }
+              value = t(value, idx + e * stride, k, j);
+            }
+            idx += Arg::grid_stride_unroll * stride;
+            continue;
+          }
+        }
         if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
-          const auto idx_next = idx + blockDim.x * gridDim.x;
+          const auto idx_next = idx + stride;
           if (idx_next < arg.threads.x) t.prefetch(idx_next, k, j);
         }
       }
       value = t(value, idx, k, j);
       if constexpr (grid_stride) {
-        idx += blockDim.x * gridDim.x;
+        idx += stride;
       } else
         break;
     }

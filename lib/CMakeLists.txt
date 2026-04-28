@@ -732,6 +732,7 @@ endif()
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+target_compile_definitions(quda PRIVATE "QUDA_BLAS_GRID_STRIDE_UNROLL=${QUDA_BLAS_GRID_STRIDE_UNROLL}")
 
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)

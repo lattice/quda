@@ -56,6 +56,7 @@ namespace quda {
         }
         setRHSstring(aux, x.size());
         blas_tune_aux_prefetch(aux);
+        blas_tune_aux_grid_stride_unroll(aux);
 
         apply(device::get_default_stream());
       }
