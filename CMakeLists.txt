@@ -22,6 +22,7 @@ endif()
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Disable gnu exentions
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -242,11 +243,6 @@ option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction k
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
-set(QUDA_CXX_STANDARD
-    17
-    CACHE STRING "set the CXX Standard (14 or 17)")
-
-set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
@@ -289,7 +285,6 @@ mark_as_advanced(QUDA_INTERFACE_ALL)
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOLVER)
-mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 ####################################################################################
@@ -335,8 +330,6 @@ if(${CPU_ARCH} STREQUAL "x86_64")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
-
-set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
 set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3"
