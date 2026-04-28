@@ -117,6 +117,34 @@ namespace quda
           }
         }
       }
+
+      __device__ __host__ inline void prefetch(int i, int j, int k) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          constexpr int warp_size = device::warp_size();
+          constexpr int warp_split = Arg::warp_split;
+          constexpr int vector_site_width = warp_size / warp_split;
+          const int lane_id = i % warp_size;
+          const int warp_id = i / warp_size;
+          const int idx = warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
+          const int l_idx = lane_id / vector_site_width;
+          const int nyw = j;
+          const int parity = k;
+
+          if (l_idx == 0 || warp_split == 1) {
+            if constexpr (arg.f.read.Y) arg.Y[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+            if constexpr (arg.f.read.W) arg.W[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+          }
+#pragma unroll
+          for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
+            const int l = l_ + l_idx;
+            if (l < Arg::NXZ || warp_split == 1) {
+              if constexpr (arg.f.read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+              if constexpr (arg.f.read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+            }
+          }
+        }
+      }
     };
 
     template <typename coeff_t_, bool multi_1d_ = false>

@@ -79,6 +79,22 @@ namespace quda
         if constexpr (arg.f.write.W) arg.W[src_idx].save(w, i, parity);
         if constexpr (arg.f.write.V) arg.V[src_idx].save(v, i, parity);
       }
+
+      __device__ __host__ inline void prefetch(int i, int src_idx, int parity) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          if constexpr (arg.f.read.X)
+            arg.X[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.f.read.Y)
+            arg.Y[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.f.read.Z)
+            arg.Z[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.f.read.W)
+            arg.W[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.f.read.V)
+            arg.V[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+        }
+      }
     };
 
     /**

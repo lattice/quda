@@ -7,6 +7,24 @@
 namespace quda
 {
 
+  namespace kernel_prefetch
+  {
+    template <template <typename> class Functor, typename Arg>
+    inline constexpr bool kernel_functor_prefetch_1d_v = requires(Functor<Arg> &f) {
+      f.prefetch(0);
+    };
+
+    template <template <typename> class Functor, typename Arg>
+    inline constexpr bool kernel_functor_prefetch_2d_v = requires(Functor<Arg> &f) {
+      f.prefetch(0, 0);
+    };
+
+    template <template <typename> class Functor, typename Arg>
+    inline constexpr bool kernel_functor_prefetch_3d_v = requires(Functor<Arg> &f) {
+      f.prefetch(0, 0, 0);
+    };
+  } // namespace kernel_prefetch
+
   /**
      @brief Kernel1D_impl is the implementation of the generic 1-d
      kernel.  Functors that utilize this kernel have a
@@ -30,14 +48,28 @@ namespace quda
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
 
     if constexpr (Arg::check_bounds) {
+      if constexpr (grid_stride) {
+        if constexpr (kernel_prefetch::kernel_functor_prefetch_1d_v<Functor, Arg>) {
+          if (i < arg.threads.x) f.prefetch(i);
+        }
+      }
       while (i < arg.threads.x) {
+        if constexpr (grid_stride) {
+          if constexpr (kernel_prefetch::kernel_functor_prefetch_1d_v<Functor, Arg>) {
+            const auto i_next = i + gridDim.x * blockDim.x;
+            if (i_next < arg.threads.x) f.prefetch(i_next);
+          }
+        }
         f(i);
-        if (grid_stride)
+        if constexpr (grid_stride) {
           i += gridDim.x * blockDim.x;
-        else
+        } else
           break;
       }
     } else {
+      if constexpr (grid_stride) {
+        if constexpr (kernel_prefetch::kernel_functor_prefetch_1d_v<Functor, Arg>) { f.prefetch(i); }
+      }
       f(i);
     }
   }
@@ -147,14 +179,28 @@ namespace quda
     if constexpr (Arg::check_bounds) {
       if (j >= arg.threads.y) return;
 
+      if constexpr (grid_stride) {
+        if constexpr (kernel_prefetch::kernel_functor_prefetch_2d_v<Functor, Arg>) {
+          if (i < arg.threads.x) f.prefetch(i, j);
+        }
+      }
       while (i < arg.threads.x) {
+        if constexpr (grid_stride) {
+          if constexpr (kernel_prefetch::kernel_functor_prefetch_2d_v<Functor, Arg>) {
+            const auto i_next = i + gridDim.x * blockDim.x;
+            if (i_next < arg.threads.x) f.prefetch(i_next, j);
+          }
+        }
         f(i, j);
-        if (grid_stride)
+        if constexpr (grid_stride) {
           i += gridDim.x * blockDim.x;
-        else
+        } else
           break;
       }
     } else {
+      if constexpr (grid_stride) {
+        if constexpr (kernel_prefetch::kernel_functor_prefetch_2d_v<Functor, Arg>) { f.prefetch(i, j); }
+      }
       f(i, j);
     }
   }
@@ -266,14 +312,28 @@ namespace quda
       if (j >= arg.threads.y) return;
       if (k >= arg.threads.z) return;
 
+      if constexpr (grid_stride) {
+        if constexpr (kernel_prefetch::kernel_functor_prefetch_3d_v<Functor, Arg>) {
+          if (i < arg.threads.x) f.prefetch(i, j, k);
+        }
+      }
       while (i < arg.threads.x) {
+        if constexpr (grid_stride) {
+          if constexpr (kernel_prefetch::kernel_functor_prefetch_3d_v<Functor, Arg>) {
+            const auto i_next = i + gridDim.x * blockDim.x;
+            if (i_next < arg.threads.x) f.prefetch(i_next, j, k);
+          }
+        }
         f(i, j, k);
-        if (grid_stride)
+        if constexpr (grid_stride) {
           i += gridDim.x * blockDim.x;
-        else
+        } else
           break;
       }
     } else {
+      if constexpr (grid_stride) {
+        if constexpr (kernel_prefetch::kernel_functor_prefetch_3d_v<Functor, Arg>) { f.prefetch(i, j, k); }
+      }
       f(i, j, k);
     }
   }

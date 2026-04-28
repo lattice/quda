@@ -268,6 +268,10 @@ if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
   message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
 endif()
 
+# BLAS bulk prefetch uses cp.async.bulk on CUDA Hopper+
+if(QUDA_BLAS_PREFETCH_TYPE STREQUAL "BULK" AND QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})

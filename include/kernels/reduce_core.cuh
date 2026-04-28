@@ -88,6 +88,19 @@ namespace quda
 
         return sum;
       }
+
+      __device__ __host__ inline void prefetch(int tid, int, int src_idx) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          const unsigned int parity = tid >= arg.length_cb ? 1u : 0u;
+          const unsigned int i = tid - parity * static_cast<unsigned int>(arg.length_cb);
+          if constexpr (arg.r.read.X) arg.X[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.r.read.Y) arg.Y[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.r.read.Z) arg.Z[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.r.read.W) arg.W[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (arg.r.read.V) arg.V[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+        }
+      }
     };
 
     /**

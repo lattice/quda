@@ -79,6 +79,7 @@ namespace quda {
 #ifdef QUDA_FAST_COMPILE_REDUCE
         strcat(aux, ",fast_compile");
 #endif
+        blas_tune_aux_prefetch(aux);
 
         apply(device::get_default_stream());
       }

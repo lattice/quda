@@ -241,6 +241,11 @@ option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
+if(NOT DEFINED QUDA_BLAS_PREFETCH_TYPE)
+  set(QUDA_BLAS_PREFETCH_TYPE "THREAD" CACHE STRING "BLAS grid-stride prefetch: NONE, THREAD (per-cache-line L2), BULK (CUDA sm_90+; CMake rejects older arches)")
+endif()
+set_property(CACHE QUDA_BLAS_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK)
+mark_as_advanced(QUDA_BLAS_PREFETCH_TYPE)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 
@@ -298,6 +303,15 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 # is to configure the build given the options above
 
 # Some checks for invalid combinations
+set(_valid_blas_pf NONE THREAD BULK)
+if(NOT QUDA_BLAS_PREFETCH_TYPE IN_LIST _valid_blas_pf)
+  message(FATAL_ERROR "Invalid QUDA_BLAS_PREFETCH_TYPE='${QUDA_BLAS_PREFETCH_TYPE}'. Allowed: ${_valid_blas_pf}")
+endif()
+if(NOT QUDA_TARGET_TYPE STREQUAL "CUDA" AND QUDA_BLAS_PREFETCH_TYPE STREQUAL "BULK")
+  message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_TARGET_TYPE=CUDA (TMA bulk prefetch is CUDA-only).")
+endif()
+message(STATUS "BLAS prefetch: ${QUDA_BLAS_PREFETCH_TYPE}")
+
 if(QUDA_MPI AND QUDA_QMP)
   message(
     SEND_ERROR

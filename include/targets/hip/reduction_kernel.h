@@ -6,6 +6,19 @@
 namespace quda
 {
 
+  namespace reduction_prefetch
+  {
+    template <template <typename> class Transformer, typename Arg>
+    inline constexpr bool reduction_functor_prefetch_2d_v = requires(Transformer<Arg> &t) {
+      t.prefetch(0, 0);
+    };
+
+    template <template <typename> class Functor, typename Arg>
+    inline constexpr bool reduction_functor_prefetch_3d_v = requires(Functor<Arg> &t) {
+      t.prefetch(0, 0, 0);
+    };
+  } // namespace reduction_prefetch
+
   /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
      reduction kernel.  Functors that utilize this kernel have two
@@ -32,11 +45,22 @@ namespace quda
 
     reduce_t value = reducer_t::init();
 
+    if constexpr (grid_stride) {
+      if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
+        if (idx < arg.threads.x) t.prefetch(idx, j);
+      }
+    }
     while (idx < arg.threads.x) {
+      if constexpr (grid_stride) {
+        if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
+          const auto idx_next = idx + blockDim.x * gridDim.x;
+          if (idx_next < arg.threads.x) t.prefetch(idx_next, j);
+        }
+      }
       value = t(value, idx, j);
-      if (grid_stride)
+      if constexpr (grid_stride) {
         idx += blockDim.x * gridDim.x;
-      else
+      } else
         break;
     }
 
@@ -112,11 +136,22 @@ namespace quda
 
     reduce_t value = reducer_t::init();
 
+    if constexpr (grid_stride) {
+      if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
+        if (idx < arg.threads.x) t.prefetch(idx, k, j);
+      }
+    }
     while (idx < arg.threads.x) {
+      if constexpr (grid_stride) {
+        if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
+          const auto idx_next = idx + blockDim.x * gridDim.x;
+          if (idx_next < arg.threads.x) t.prefetch(idx_next, k, j);
+        }
+      }
       value = t(value, idx, k, j);
-      if (grid_stride)
+      if constexpr (grid_stride) {
         idx += blockDim.x * gridDim.x;
-      else
+      } else
         break;
     }
 

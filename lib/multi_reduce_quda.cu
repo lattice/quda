@@ -86,6 +86,7 @@ namespace quda {
           }
         }
         if (is_norm) strcat(aux, ",norm");
+        blas_tune_aux_prefetch(aux);
 
         apply(device::get_default_stream());
       }
@@ -328,6 +329,7 @@ namespace quda {
         u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
         strcat(aux, ",max_nyw_tile=");
         strcat(aux, max_nyw_tile);
+        blas_tune_aux_prefetch(aux);
 
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning
@@ -489,6 +491,7 @@ namespace quda {
         u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
         strcat(aux, ",max_nyw_tile=");
         strcat(aux, max_nyw_tile);
+        blas_tune_aux_prefetch(aux);
 
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning

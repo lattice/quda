@@ -55,6 +55,7 @@ namespace quda {
           strcat(aux, y.AuxString().c_str());
         }
         setRHSstring(aux, x.size());
+        blas_tune_aux_prefetch(aux);
 
         apply(device::get_default_stream());
       }
