@@ -87,8 +87,8 @@ namespace quda
         vec x, y, z, w;
         if (!allthreads || alive) {
           if (l_idx == 0 || warp_split == 1) {
-            if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
-            if (arg.f.read.W) arg.W[k].load(w, idx, parity);
+            if constexpr (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
+            if constexpr (arg.f.read.W) arg.W[k].load(w, idx, parity);
           } else {
             y = ::quda::zero<complex<typename Arg::real>, Arg::n / 2>();
             w = ::quda::zero<complex<typename Arg::real>, Arg::n / 2>();
@@ -98,8 +98,8 @@ namespace quda
           for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
             const int l = l_ + l_idx;
             if (l < Arg::NXZ || warp_split == 1) {
-              if (arg.f.read.X) arg.X[l].load(x, idx, parity);
-              if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
+              if constexpr (arg.f.read.X) arg.X[l].load(x, idx, parity);
+              if constexpr (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
 
               arg.f(x, y, z, w, k, l);
             }
@@ -107,13 +107,13 @@ namespace quda
         }
 
         // now combine the results across the warp if needed
-        if (arg.f.write.Y) y = warp_combine<warp_split>(y);
-        if (arg.f.write.W) w = warp_combine<warp_split>(w);
+        if constexpr (arg.f.write.Y) y = warp_combine<warp_split>(y);
+        if constexpr (arg.f.write.W) w = warp_combine<warp_split>(w);
 
         if (!allthreads || alive) {
           if (l_idx == 0 || warp_split == 1) {
-            if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
-            if (arg.f.write.W) arg.W[k].save(w, idx, parity);
+            if constexpr (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
+            if constexpr (arg.f.write.W) arg.W[k].save(w, idx, parity);
           }
         }
       }

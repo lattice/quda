@@ -99,22 +99,22 @@ namespace quda
         unsigned int i = tid - parity * arg.length_cb;
 
         vec x, y, z, w;
-        if (arg.f.read.Y) arg.Y[k].load(y, i, parity);
-        if (arg.f.read.W) arg.W[k].load(w, i, parity);
+        if constexpr (arg.f.read.Y) arg.Y[k].load(y, i, parity);
+        if constexpr (arg.f.read.W) arg.W[k].load(w, i, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < Arg::NXZ; l++) {
-          if (arg.f.read.X) arg.X[l].load(x, i, parity);
-          if (arg.f.read.Z) arg.Z[l].load(z, i, parity);
+          if constexpr (arg.f.read.X) arg.X[l].load(x, i, parity);
+          if constexpr (arg.f.read.Z) arg.Z[l].load(z, i, parity);
 
           arg.f(sum[l], x, y, z, w, k, l);
 
         }
-        if (arg.f.write.Y) arg.Y[k].save(y, i, parity);
-        if (arg.f.write.W) arg.W[k].save(w, i, parity);
+        if constexpr (arg.f.write.Y) arg.Y[k].save(y, i, parity);
+        if constexpr (arg.f.write.W) arg.W[k].save(w, i, parity);
 
         return sum;
       }

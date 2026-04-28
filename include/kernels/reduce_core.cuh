@@ -72,19 +72,19 @@ namespace quda
         unsigned int i = tid - parity * arg.length_cb;
 
         vec x, y, z, w, v;
-        if (arg.r.read.X) arg.X[src_idx].load(x, i, parity);
-        if (arg.r.read.Y) arg.Y[src_idx].load(y, i, parity);
-        if (arg.r.read.Z) arg.Z[src_idx].load(z, i, parity);
-        if (arg.r.read.W) arg.W[src_idx].load(w, i, parity);
-        if (arg.r.read.V) arg.V[src_idx].load(v, i, parity);
+        if constexpr (arg.r.read.X) arg.X[src_idx].load(x, i, parity);
+        if constexpr (arg.r.read.Y) arg.Y[src_idx].load(y, i, parity);
+        if constexpr (arg.r.read.Z) arg.Z[src_idx].load(z, i, parity);
+        if constexpr (arg.r.read.W) arg.W[src_idx].load(w, i, parity);
+        if constexpr (arg.r.read.V) arg.V[src_idx].load(v, i, parity);
 
         arg.r(sum, x, y, z, w, v, src_idx);
 
-        if (arg.r.write.X) arg.X[src_idx].save(x, i, parity);
-        if (arg.r.write.Y) arg.Y[src_idx].save(y, i, parity);
-        if (arg.r.write.Z) arg.Z[src_idx].save(z, i, parity);
-        if (arg.r.write.W) arg.W[src_idx].save(w, i, parity);
-        if (arg.r.write.V) arg.V[src_idx].save(v, i, parity);
+        if constexpr (arg.r.write.X) arg.X[src_idx].save(x, i, parity);
+        if constexpr (arg.r.write.Y) arg.Y[src_idx].save(y, i, parity);
+        if constexpr (arg.r.write.Z) arg.Z[src_idx].save(z, i, parity);
+        if constexpr (arg.r.write.W) arg.W[src_idx].save(w, i, parity);
+        if constexpr (arg.r.write.V) arg.V[src_idx].save(v, i, parity);
 
         return sum;
       }

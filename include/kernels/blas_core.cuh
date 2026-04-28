@@ -65,19 +65,19 @@ namespace quda
         arg.f.init(src_idx);
 
         vec x, y, z, w, v;
-        if (arg.f.read.X) arg.X[src_idx].load(x, i, parity);
-        if (arg.f.read.Y) arg.Y[src_idx].load(y, i, parity);
-        if (arg.f.read.Z) arg.Z[src_idx].load(z, i, parity);
-        if (arg.f.read.W) arg.W[src_idx].load(w, i, parity);
-        if (arg.f.read.V) arg.V[src_idx].load(v, i, parity);
+        if constexpr (arg.f.read.X) arg.X[src_idx].load(x, i, parity);
+        if constexpr (arg.f.read.Y) arg.Y[src_idx].load(y, i, parity);
+        if constexpr (arg.f.read.Z) arg.Z[src_idx].load(z, i, parity);
+        if constexpr (arg.f.read.W) arg.W[src_idx].load(w, i, parity);
+        if constexpr (arg.f.read.V) arg.V[src_idx].load(v, i, parity);
 
         arg.f(x, y, z, w, v, src_idx);
 
-        if (arg.f.write.X) arg.X[src_idx].save(x, i, parity);
-        if (arg.f.write.Y) arg.Y[src_idx].save(y, i, parity);
-        if (arg.f.write.Z) arg.Z[src_idx].save(z, i, parity);
-        if (arg.f.write.W) arg.W[src_idx].save(w, i, parity);
-        if (arg.f.write.V) arg.V[src_idx].save(v, i, parity);
+        if constexpr (arg.f.write.X) arg.X[src_idx].save(x, i, parity);
+        if constexpr (arg.f.write.Y) arg.Y[src_idx].save(y, i, parity);
+        if constexpr (arg.f.write.Z) arg.Z[src_idx].save(z, i, parity);
+        if constexpr (arg.f.write.W) arg.W[src_idx].save(w, i, parity);
+        if constexpr (arg.f.write.V) arg.V[src_idx].save(v, i, parity);
       }
     };
 
