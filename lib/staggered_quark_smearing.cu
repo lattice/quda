@@ -104,7 +104,7 @@ namespace quda
 
     virtual long long bytes() const override
     {
-      int gauge_bytes = arg.reconstruct * in.Precision();
+      int gauge_bytes = static_cast<int>(arg.reconstruct) * static_cast<int>(in.Precision());
       int spinor_bytes = 2 * in.Ncolor() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = (spinor_bytes + gauge_bytes) + 2 * spinor_bytes;      // 2 since we have to load the partial
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);                           // 3D or 4D operator
