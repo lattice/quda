@@ -37,9 +37,28 @@ namespace quda
     int forecastOrder = 1;         /**< Generator forecast order (0/1/2) */
     int freshTRLMInterval = 10;    /**< Trajectories between fresh TRLM (0=disabled) */
     int solutionHistoryDepth = 3;  /**< Number of previous solutions to store */
+    /** When false, stashRitzVectors becomes a no-op so the pool stays as
+     *  the (RR-evolved) original MG null vectors. Mirrors the Schwinger
+     *  pattern where MG-null-vector store is kept separate from any
+     *  CG-derived Ritz-vector cache; preserves smoother-aware structure
+     *  needed for MG-prolongator refresh at extreme mass. */
+    bool absorbRitz = true;
+    /** Pool-driven MG null-vector refresh on accepted-trajectory re-setup.
+     *  -1 = disabled (standard CG re-setup), 0 = pure pool replacement,
+     *  N>0 = hybrid pool + N CG inverse-iter polish steps per vector.
+     *  Mirrors QudaHMCParam::eigentracking_mg_refresh_iters. */
+    int mgRefreshIters = -1;
     /** Initial TRLM convergence knobs (also used for fresh-TRLM refreshes). */
     double trlmTol = 1e-6;         /**< TRLM convergence tolerance */
     int trlmMaxRestarts = 100;     /**< TRLM maximum restarts */
+    int trlmCheckInterval = 10;    /**< TRLM iterations between convergence checks */
+    /** Eigensolver to use for the initial / fresh-TRLM solves. Defaults to
+     *  standard TRLM. BLKTRLM operates on multiple Lanczos vectors per
+     *  step (larger arithmetic intensity per kernel; n_kr and n_ev must be
+     *  multiples of blockSize — auto-rounded if not).
+     *  Other QudaEigType values flow through unchanged for advanced users. */
+    QudaEigType eigType = QUDA_EIG_TR_LANCZOS;
+    int blockSize = 4;             /**< Block size for block solvers (BLKTRLM/BLKIRAM) */
     /** @name Initial TRLM polynomial acceleration (Chebyshev filter)
      *  For clustered or near-zero M^dag M spectra (hot-start gauges,
      *  critical-mass runs without MG), Chebyshev acceleration is needed
@@ -162,6 +181,34 @@ namespace quda
 
     /** @brief Check if tracking is enabled and initialized */
     bool isActive() const { return param_.enabled && tracker_.isInitialized(); }
+
+    /**
+     * @brief True when the periodic refresh interval has elapsed and the
+     *        tracker should be re-seeded (or re-TRLM'd).
+     *
+     * The refresh policy lives outside this class because the orchestrator
+     * (hmcTrajectoryQuda) has access to the MG instance and can prefer
+     * MG re-seeding over a fresh TRLM. Returns false when the interval is
+     * disabled (freshTRLMInterval = 0) or the tracker isn't yet initialised.
+     */
+    bool shouldRefresh() const
+    {
+      return tracker_.isInitialized() && param_.freshTRLMInterval > 0
+        && trajectoryCount_ > 0 && trajectoryCount_ % param_.freshTRLMInterval == 0;
+    }
+
+    /**
+     * @brief Mark the tracker uninitialised so the next seed / TRLM call
+     *        rebuilds the pool from scratch. Preserves configuration.
+     *
+     * Caller follows up with seedEigenTrackingFromMG (when MG is available)
+     * or maybeInit (TRLM fallback) — the existing init paths handle both.
+     */
+    void resetForRefresh()
+    {
+      tracker_ = EigenTracker();
+      forecast_.reset();
+    }
 
     /**
      * @brief Stash Ritz vectors from a CG solve for batch absorption later.

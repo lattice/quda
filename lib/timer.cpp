@@ -25,6 +25,21 @@ namespace quda {
         accounted += profile[i].time;
       }
     }
+
+    // Per-child-profile delegated time: wall-clock spent inside nested
+    // pushProfile calls. Each entry is also accounted under its own
+    // profile's TOTAL, so we exclude it from the global aggregate but
+    // include it here so per-profile accounted == per-profile TOTAL.
+    if (!child_times.empty()) {
+      printfQuda("        delegated to child profiles:\n");
+      for (const auto &[name, val] : child_times) {
+        const auto &[t, n] = val;
+        printfQuda("     %20s     = %9.3f secs (%7.3f%%),\t with %8d calls at %6.3e us per call\n",
+                   name.c_str(), t, 100 * t / profile[QUDA_PROFILE_TOTAL].time, n, 1e6 * t / n);
+        accounted += t;
+      }
+    }
+
     if (accounted > 0.0) {
       double missing = profile[QUDA_PROFILE_TOTAL].time - accounted;
       printfQuda("        total accounted       = %9.3f secs (%7.3f%%)\n", accounted,
@@ -176,6 +191,32 @@ namespace quda {
     if (use_global) StartGlobal(func, file, line, idx);
   }
 
+  void TimeProfile::PauseRunning(std::vector<QudaProfileType> &out, const char *func, const char *file, int line)
+  {
+    // Only pause real sub-phases. TOTAL is owned by pushProfile and lower-level
+    // (dslash/api) timers don't contribute to the global accounted sum.
+    for (int i = 0; i < QUDA_PROFILE_LOWER_LEVEL; i++) {
+      if (i == QUDA_PROFILE_TOTAL) continue;
+      if (profile[i].running) {
+        profile[i].stop(func, file, line);
+        if (use_global) StopGlobal(func, file, line, static_cast<QudaProfileType>(i));
+        out.push_back(static_cast<QudaProfileType>(i));
+      }
+    }
+  }
+
+  void TimeProfile::ResumeRunning(std::vector<QudaProfileType> &paused, const char *func, const char *file, int line)
+  {
+    // Restart in reverse order so the most recently paused phase is
+    // restored last (mirroring a LIFO suspend/resume).
+    while (!paused.empty()) {
+      auto idx = paused.back();
+      paused.pop_back();
+      profile[idx].start(func, file, line);
+      if (use_global) StartGlobal(func, file, line, idx);
+    }
+  }
+
   void TimeProfile::Stop_(const char *func, const char *file, int line, QudaProfileType idx)
   {
     auto i = !pt_stack.empty() ? pt_stack.top() : QUDA_PROFILE_COUNT;
@@ -254,6 +295,13 @@ namespace quda {
     flops(Tunable::flops_global())
   {
     if (profile.Name() != getProfile().Name()) {
+      // Pause the parent profile's running sub-phases so they don't
+      // double-count wall-clock with the child's sub-phases. Skip when
+      // the stack is empty (parent is the dummy profile).
+      if (!tp_stack.empty()) {
+        parent_profile = tp_stack.top();
+        parent_profile->PauseRunning(parent_paused, __func__, __FILE__, __LINE__);
+      }
       // only push to stack if this profile not already the active one
       profile.TPSTART(QUDA_PROFILE_TOTAL);
       tp_stack.push(&profile);
@@ -273,6 +321,10 @@ namespace quda {
     flops(Tunable::flops_global())
   {
     if (profile.Name() != getProfile().Name()) {
+      if (!tp_stack.empty()) {
+        parent_profile = tp_stack.top();
+        parent_profile->PauseRunning(parent_paused, __func__, __FILE__, __LINE__);
+      }
       // only push to stack if this profile not already the active one
       profile.TPSTART(QUDA_PROFILE_TOTAL);
       tp_stack.push(&profile);
@@ -291,7 +343,17 @@ namespace quda {
       tp_stack.pop();
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
 
+      // Resume any parent sub-phases we paused on entry.
+      if (parent_profile) parent_profile->ResumeRunning(parent_paused, __func__, __FILE__, __LINE__);
+
       secs = profile.Last(QUDA_PROFILE_TOTAL);
+
+      // Credit our wall-clock to the parent's per-child-profile breakdown.
+      // This makes per-profile accounted == per-profile TOTAL for compound
+      // operations like hmcTrajectoryQuda; global aggregate is unaffected
+      // because child_times entries aren't summed into PrintGlobal.
+      if (parent_profile) parent_profile->AddChildTime(profile.Name(), secs);
+
       comm_allreduce_max(secs);
 
       gflops = (Tunable::flops_global() - flops) * 1e-9;

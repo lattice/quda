@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <cmath>
 
 #include <quda.h>
 #include <gauge_field.h>
@@ -75,7 +76,9 @@ void initHMCTest(int argc, char **argv)
 
   // Initialize inverter parameters
   inv_param = newQudaInvertParam();
-  // Ensure all precision fields have valid values (CLI may leave some INVALID)
+  // Ensure all precision fields have valid values (CLI may leave some INVALID).
+  // Chain the fallbacks: sloppy → precise, precondition → sloppy, eigensolver → sloppy.
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (prec_eigensolver == QUDA_INVALID_PRECISION) prec_eigensolver = prec_sloppy;
   setInvertParam(inv_param);
@@ -174,11 +177,25 @@ static QudaHMCParam makeHMCParam(QudaIntegratorType integrator_override = static
   p.eigentracking_forecast_order = eigentracking_forecast_order;
   p.eigentracking_fresh_trlm_interval = eigentracking_fresh_interval;
   p.eigentracking_solution_history = eigentracking_solution_history;
+  p.eigentracking_absorb_ritz = eigentracking_absorb_ritz ? 1 : 0;
+  p.eigentracking_mg_refresh_iters = eigentracking_mg_refresh_iters;
   p.eigentracking_trlm_tol = eigentracking_trlm_tol;
   p.eigentracking_trlm_max_restarts = eigentracking_trlm_max_restarts;
-  p.eigentracking_use_poly_acc = eigentracking_use_poly_acc ? 1 : 0;
+  p.eigentracking_trlm_check_interval = eigentracking_trlm_check_interval;
+  p.eigentracking_eig_type = eigentracking_eig_type;
+  p.eigentracking_blk_size = eigentracking_blk_size;
+  // Poly-acc defaulting: if the CLI left it off and a_min unset, auto-enable
+  // with the empirically-proven a_min=1.0 default so bare
+  // `./hmc_test --dim 4 4 4 4` invocations converge on 4^4 hot-start gauges.
+  // Explicit CLI values always win.
+  if (!eigentracking_use_poly_acc && eigentracking_a_min == 0.0) {
+    p.eigentracking_use_poly_acc = 1;
+    p.eigentracking_a_min = 1.0;
+  } else {
+    p.eigentracking_use_poly_acc = eigentracking_use_poly_acc ? 1 : 0;
+    p.eigentracking_a_min = eigentracking_a_min;
+  }
   p.eigentracking_poly_deg = eigentracking_poly_deg;
-  p.eigentracking_a_min = eigentracking_a_min;
   p.eigentracking_a_max = eigentracking_a_max;
 
   return p;
@@ -446,6 +463,14 @@ TEST(HMC, MGPreconditionedRun)
 
   // Create MG preconditioner (builds null vectors, coarse operators)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
+
+  // Snapshot inv_param's solver-config fields so this MG-specific
+  // reconfiguration does not leak into subsequent gtest cases.
+  const void *saved_preconditioner = inv_param.preconditioner;
+  const QudaInverterType saved_inv_type = inv_param.inv_type;
+  const QudaInverterType saved_inv_type_precondition = inv_param.inv_type_precondition;
+  const QudaSolveType saved_solve_type = inv_param.solve_type;
+
   // Outer solve: GCR + MG, with DIRECT_PC_SOLVE for compatibility with both MG and force.
   // solution_type stays MATPCDAG_MATPC_SOLUTION (set in initHMCTest).
   inv_param.preconditioner = mg_preconditioner;
@@ -458,12 +483,17 @@ TEST(HMC, MGPreconditionedRun)
   hmc_param.n_trajectories = hmc_n_trajectories;
   hmc_param.n_thermalization = hmc_n_thermalization;
   hmc_param.mg_setup_interval = hmc_mg_setup_interval;
+  hmc_param.mg_setup_iter_ratio = hmc_mg_setup_iter_ratio;
+  hmc_param.mg_setup_iter_baseline_traj = hmc_mg_setup_iter_baseline_traj;
 
   hmcRunQuda(nullptr, &hmc_param, &gauge_param, &inv_param, mg_preconditioner, &mg_param);
 
-  // Cleanup MG
+  // Cleanup MG and fully restore inv_param so the next test starts clean.
   destroyMultigridQuda(mg_preconditioner);
-  inv_param.preconditioner = nullptr;
+  inv_param.preconditioner = const_cast<void *>(saved_preconditioner);
+  inv_param.inv_type = saved_inv_type;
+  inv_param.inv_type_precondition = saved_inv_type_precondition;
+  inv_param.solve_type = saved_solve_type;
 
   SUCCEED();
 }
@@ -589,6 +619,28 @@ TEST(HMC, PerLinkForceTest)
   int nTestLinks = hmc_per_link_test_links;
 
   printfQuda("\n=== Per-link fermion force test (eps=%e) ===\n", eps);
+
+  // Sync hostGauge from the device so the per-link numerical derivative
+  // perturbs the CURRENT gauge state (prior tests may have run HMC
+  // trajectories that mutated the device gauge but not hostGauge).
+  {
+    auto saved_order = gauge_param.gauge_order;
+    gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    saveGaugeQuda(hostGauge, &gauge_param);
+    gauge_param.gauge_order = saved_order;
+  }
+
+  // Tighten the CG tolerance for this test only. PerLinkForceTest is a
+  // correctness oracle: it compares the analytical force against a central
+  // difference of the action. Both the action evaluations (S_plus/S_minus)
+  // and the force-input solve consume inv_param.tol, and at the project
+  // default (~2.4e-7 = 2*float_epsilon) the residual noise on x dominates
+  // the relrr threshold (1e-3) at large volumes where κ(M†M) is non-trivial.
+  // 1e-10 is small enough to make the noise floor negligible against the
+  // central-difference truncation error at eps=1e-4 without exploding the
+  // iteration count.
+  const double saved_tol = inv_param.tol;
+  inv_param.tol = 1e-10;
 
   if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     loadCloverQuda(nullptr, nullptr, &inv_param);
@@ -770,6 +822,7 @@ TEST(HMC, PerLinkForceTest)
     loadCloverQuda(nullptr, nullptr, &inv_param);
   }
   gauge_param.use_resident_gauge = 1;
+  inv_param.tol = saved_tol;
 
   printfQuda("\n  Results: %d pass, %d fail, max_rel_err = %.2e\n", nPass, nFail, maxRelErr);
   EXPECT_EQ(nFail, 0) << "Per-link force test failed: analytical force does not match numerical derivative";
@@ -782,7 +835,6 @@ TEST(HMC, PerLinkForceTest)
 
 // CompareDerivativeKernels test removed — served its purpose (confirmed kernel geometry).
 // See REPORT_clover_sigma_force_derivation.md for the mathematical analysis.
-
 /**
  * Test: Thermalisation + reversibility test for detailed balance.
  *
@@ -1057,9 +1109,19 @@ static QudaEigParam makeEigentestEigParam(int nEv)
   ep.use_norm_op = QUDA_BOOLEAN_FALSE;
   ep.use_dagger = QUDA_BOOLEAN_FALSE;
   ep.use_pc = QUDA_BOOLEAN_FALSE;
-  ep.use_poly_acc = eigentracking_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  // Poly-acc defaulting: random 4^4 hot-start gauges need a conservative
+  // a_min ≈ 1.0 for reliable TRLM convergence (per empirical experience —
+  // mass-scaled heuristics land too close to the auto-estimated a_max and
+  // give a weak Chebyshev filter). Explicit CLI values always win.
+  bool usePA = eigentracking_use_poly_acc;
+  double aMin = eigentracking_a_min;
+  if (!usePA && aMin == 0.0) {
+    usePA = true;
+    aMin = 1.0;
+  }
+  ep.use_poly_acc = usePA ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   ep.poly_deg = eigentracking_poly_deg;
-  ep.a_min = eigentracking_a_min;
+  ep.a_min = aMin;
   ep.a_max = eigentracking_a_max;
   ep.compute_svd = QUDA_BOOLEAN_FALSE;
   ep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
@@ -1072,11 +1134,32 @@ static QudaEigParam makeEigentestEigParam(int nEv)
 }
 
 /**
- * Helper: resolve the EigenTracking test n_ev. CLI default is 0 ("derive
- * from MG nvec or fall back to 8"); the unit-test fixture wants a small
- * fixed value, so we substitute 6 only when the CLI hasn't overridden it.
+ * Helper: resolve the EigenTracking test n_ev. CLI value wins. Otherwise scale
+ * linearly with L = V^(1/4): the low-mode density of M†M grows with V, so the
+ * Krylov space (n_kr = 3·n_ev) needs to grow too or TRLM hits its restart cap
+ * before resolving the cluster. Empirically: n_ev=6 converges at 4^4, n_ev=24
+ * is needed at 16^4 (same heavy fixture mass=2.0). The formula below gives
+ * those values and scales monotonically for intermediate volumes.
  */
-static int makeEigentestNev() { return eigentracking_n_ev > 0 ? eigentracking_n_ev : 6; }
+static int makeEigentestNev()
+{
+  if (eigentracking_n_ev > 0) return eigentracking_n_ev;
+  long V = 1;
+  for (int d = 0; d < 4; d++) V *= gauge_param.X[d];
+  int L = static_cast<int>(std::round(std::pow(static_cast<double>(V), 0.25)));
+  return std::max(6, (3 * L + 1) / 2); // ceil(1.5·L), floor at 6
+}
+
+/**
+ * Helper: resolve pool capacity for the EigenTracker fixture. Must be ≥ n_ev
+ * (EigenTracker::init enforces this). CLI value wins; otherwise default to
+ * max(8, n_ev) so it scales with the volume-driven n_ev above.
+ */
+static int makeEigentestPoolCapacity(int nEv)
+{
+  if (eigentracking_pool_capacity > 0) return eigentracking_pool_capacity;
+  return std::max(8, nEv);
+}
 
 /**
  * Test: Initialize EigenTracker from TRLM and verify compress.
@@ -1095,7 +1178,7 @@ TEST(EigenTracking, PoolInitAndCompress)
 
   const int nEv = makeEigentestNev();
   const int nKr = 3 * nEv;
-  const int poolCapacity = (eigentracking_pool_capacity > 0 ? eigentracking_pool_capacity : 8);
+  const int poolCapacity = makeEigentestPoolCapacity(nEv);
   QudaEigParam ep = makeEigentestEigParam(nEv);
 
   auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
@@ -1171,7 +1254,7 @@ TEST(EigenTracking, ForceUpdate)
   setDiracParam(dp, &ip, true);
   Dirac *d = Dirac::create(dp);
   DiracM mHalf(*d);
-  tracker.init(kSpace, evals, mHalf, nEv, (eigentracking_pool_capacity > 0 ? eigentracking_pool_capacity : 8));
+  tracker.init(kSpace, evals, mHalf, nEv, makeEigentestPoolCapacity(nEv));
   delete d;
 
   // Save gauge
@@ -1255,7 +1338,7 @@ TEST(EigenTracking, RayleighRitzEvolve)
     setDiracParam(dp, &ip, true);
     Dirac *d = Dirac::create(dp);
     DiracM mHalf(*d);
-    tracker.init(kSpace, evals, mHalf, nEv, (eigentracking_pool_capacity > 0 ? eigentracking_pool_capacity : 8));
+    tracker.init(kSpace, evals, mHalf, nEv, makeEigentestPoolCapacity(nEv));
     delete d;
   }
 
@@ -1354,12 +1437,13 @@ TEST(EigenTracking, CGRitzExtraction)
 
   if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) { loadCloverQuda(nullptr, nullptr, &inv_param); }
 
-  // Generate pseudofermion and solve
-  ColorSpinorField phi = generateEOPseudofermion(inv_param, 77777);
-
   QudaInvertParam ip = inv_param;
   ip.solve_type = QUDA_NORMOP_PC_SOLVE;
   ip.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+
+  // Generate pseudofermion with the (possibly bumped) mass
+  ColorSpinorField phi = generateEOPseudofermion(ip, 77777);
+
   Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
   createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, true, false);
 
@@ -1370,11 +1454,12 @@ TEST(EigenTracking, CGRitzExtraction)
   solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
 
   // Extract Ritz pairs. All knobs CLI-driven via --eigentracking-* and
-  // --hmc-eigentest-* flags; CLI default of --eigentracking-n-ritz=0 maps
-  // to a fixture-friendly value of 6 (giving n_kr = 3*6 = 18 which
-  // satisfies QUDA's n_kr >= n_conv + 12).
+  // --hmc-eigentest-* flags. CLI default of --eigentracking-n-ritz=0 maps to
+  // a volume-scaled value via makeEigentestNev (same scaling rationale: the
+  // low-mode density of M†M grows with V, so n_ritz must too — otherwise
+  // TRLM exhausts max_restarts and returns un-converged zero eigenvalues).
   DiracMdagM matNorm(*dirac);
-  const int nRitz = eigentracking_n_ritz > 0 ? eigentracking_n_ritz : 6;
+  const int nRitz = eigentracking_n_ritz > 0 ? eigentracking_n_ritz : makeEigentestNev();
   std::vector<ColorSpinorField> ritzVecs;
   std::vector<Complex> ritzVals;
   CGRitzExtractor::extract(ritzVecs, ritzVals, x[0], matNorm, nRitz,
@@ -1412,21 +1497,28 @@ TEST(EigenTracking, FullTrajectory)
   // (defaults inherit from makeHMCParam, which already pulled CLI vars).
   hmc_param.eigentracking_enabled = 1;
   // CLI default for n_ev/pool_capacity/n_ritz is "0 = derive": substitute
-  // small fixture-friendly values only when CLI hasn't overridden.
-  if (hmc_param.eigentracking_n_ev <= 0) hmc_param.eigentracking_n_ev = 6;
-  if (hmc_param.eigentracking_pool_capacity <= 0) hmc_param.eigentracking_pool_capacity = 16;
-  if (hmc_param.eigentracking_n_ritz <= 0) hmc_param.eigentracking_n_ritz = 3;
+  // volume-scaled fixture-friendly values only when CLI hasn't overridden.
+  // Same scaling rationale as makeEigentestNev: low-mode density grows with
+  // V, so n_ev (and n_ritz, which feeds TRLM with n_kr = 3·n_ritz) must too.
+  const int derivedNev = makeEigentestNev();
+  if (hmc_param.eigentracking_n_ev <= 0) hmc_param.eigentracking_n_ev = derivedNev;
+  if (hmc_param.eigentracking_pool_capacity <= 0)
+    hmc_param.eigentracking_pool_capacity = std::max(16, hmc_param.eigentracking_n_ev);
+  if (hmc_param.eigentracking_n_ritz <= 0)
+    hmc_param.eigentracking_n_ritz = std::max(3, hmc_param.eigentracking_n_ev / 2);
   // Disable periodic TRLM refresh for this single-trajectory test.
   hmc_param.eigentracking_fresh_trlm_interval = 0;
 
+  QudaInvertParam ip = inv_param;
+
   // First trajectory
-  double dH1 = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
+  double dH1 = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &ip, nullptr);
   printfQuda("EigenTracking FullTrajectory: dH1 = %e\n", dH1);
   EXPECT_TRUE(std::isfinite(dH1));
 
   // Second trajectory (tests persistent state)
   hmc_param.momentum_seed = hmc_momentum_seed + 1;
-  double dH2 = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &inv_param, nullptr);
+  double dH2 = hmcTrajectoryQuda(nullptr, nullptr, &hmc_param, &gauge_param, &ip, nullptr);
   printfQuda("EigenTracking FullTrajectory: dH2 = %e\n", dH2);
   EXPECT_TRUE(std::isfinite(dH2));
 }
@@ -1446,6 +1538,11 @@ TEST(EigenTracking, FullTrajectory)
  */
 TEST(EigenTracking, ThermalizeAndTrack)
 {
+  // Honour the CLI --mass directly. If the user picks a small mass with a
+  // small lattice, TRLM may not converge — that's a configuration choice,
+  // not something to silently override here.
+  QudaInvertParam ip = inv_param;
+
   // --- Phase 1: Thermalize (eigentracking off) ---
   QudaHMCParam therm_param = makeHMCParam();
   therm_param.n_trajectories = hmc_n_thermalization;
@@ -1457,7 +1554,7 @@ TEST(EigenTracking, ThermalizeAndTrack)
   printfQuda("Phase 1: Thermalizing for %d trajectories\n", hmc_n_thermalization);
   printfQuda("========================================\n");
 
-  hmcRunQuda(nullptr, &therm_param, &gauge_param, &inv_param, nullptr, nullptr);
+  hmcRunQuda(nullptr, &therm_param, &gauge_param, &ip, nullptr, nullptr);
 
   // Destroy HMC state between phases so eigentracking starts fresh
   destroyHMCQuda();
@@ -1472,7 +1569,7 @@ TEST(EigenTracking, ThermalizeAndTrack)
              prod_param.eigentracking_enabled);
   printfQuda("========================================\n");
 
-  hmcRunQuda(nullptr, &prod_param, &gauge_param, &inv_param, nullptr, nullptr);
+  hmcRunQuda(nullptr, &prod_param, &gauge_param, &ip, nullptr, nullptr);
 
   SUCCEED();
 }
@@ -1495,6 +1592,13 @@ TEST(HMC, Production)
   void *mg_preconditioner = nullptr;
   QudaMultigridParam mg_param = {};
   QudaInvertParam mg_inv_param = {};
+
+  // Snapshot inv_param's solver-config fields so the optional MG
+  // reconfiguration below does not leak into subsequent gtest cases.
+  const void *saved_preconditioner = inv_param.preconditioner;
+  const QudaInverterType saved_inv_type = inv_param.inv_type;
+  const QudaInverterType saved_inv_type_precondition = inv_param.inv_type_precondition;
+  const QudaSolveType saved_solve_type = inv_param.solve_type;
 
   // --- Optional MG setup (if --mg-levels >= 2) ---
   if (mg_levels >= 2) {
@@ -1635,16 +1739,11 @@ TEST(HMC, Production)
     inv_param.inv_type_precondition = QUDA_MG_INVERTER;
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     printfQuda("MG preconditioner ready.\n");
-
-    // Seed eigentracker from MG null-space vectors (zero extra cost).
-    // Extracts even-parity of B vectors → feeds into eigentracker pool → skips TRLM.
-    if (eigentracking_enabled) {
-      auto *mg_s = static_cast<quda::multigrid_solver *>(mg_preconditioner);
-      int mg_nvec = static_cast<int>(mg_s->B.size());
-      QudaHMCParam seed_param = makeHMCParam();
-      resolveEigenTrackingDefaults(seed_param, mg_nvec);
-      quda::seedEigenTrackingFromMG(mg_preconditioner, &seed_param, &inv_param);
-    }
+    // Note: inv_param solver-config fields are restored to pre-MG values in
+    // the "Cleanup MG" block below so this test doesn't leak MG state into
+    // any subsequent gtest case.
+    // Eigentracker MG seeding is now done by hmcTrajectoryQuda
+    // automatically when mg_instance is passed; no explicit call needed.
   }
 
   // --- Configure HMC ---
@@ -1662,6 +1761,8 @@ TEST(HMC, Production)
   hmc_param.n_thermalization = hmc_n_thermalization;
   hmc_param.checkpoint_interval = hmc_checkpoint_interval;
   hmc_param.mg_setup_interval = hmc_mg_setup_interval;
+  hmc_param.mg_setup_iter_ratio = hmc_mg_setup_iter_ratio;
+  hmc_param.mg_setup_iter_baseline_traj = hmc_mg_setup_iter_baseline_traj;
 
   strncpy(hmc_param.checkpoint_prefix, hmc_checkpoint_prefix.c_str(), sizeof(hmc_param.checkpoint_prefix) - 1);
   strncpy(hmc_param.gauge_outfile, hmc_gauge_outfile.c_str(), sizeof(hmc_param.gauge_outfile) - 1);
@@ -1685,11 +1786,14 @@ TEST(HMC, Production)
   hmcRunQuda(nullptr, &hmc_param, &gauge_param, &inv_param, mg_preconditioner,
              mg_preconditioner ? &mg_param : nullptr);
 
-  // Cleanup MG
+  // Cleanup MG and fully restore inv_param so the next test starts clean.
   if (mg_preconditioner) {
     destroyMultigridQuda(mg_preconditioner);
-    inv_param.preconditioner = nullptr;
   }
+  inv_param.preconditioner = const_cast<void *>(saved_preconditioner);
+  inv_param.inv_type = saved_inv_type;
+  inv_param.inv_type_precondition = saved_inv_type_precondition;
+  inv_param.solve_type = saved_solve_type;
 
   SUCCEED();
 }
@@ -1698,6 +1802,17 @@ int main(int argc, char **argv)
 {
   // Let gtest strip its args first
   ::testing::InitGoogleTest(&argc, argv);
+
+  // HMC tests need double outer precision for numerical force/action
+  // consistency: single-precision CG convergence introduces 10-15%
+  // per-link errors that masquerade as algorithmic bugs (see CLAUDE.md).
+  // Sloppy/precondition stay at single so MG (which doesn't have double
+  // kernels compiled in this build) can use them. Set BEFORE CLI parsing
+  // so any explicit --prec / --prec-sloppy / --prec-precondition wins.
+  prec = QUDA_DOUBLE_PRECISION;
+  prec_sloppy = QUDA_SINGLE_PRECISION;
+  prec_precondition = QUDA_SINGLE_PRECISION;
+  prec_eigensolver = QUDA_SINGLE_PRECISION;
 
   // Process remaining command line options
   auto app = make_app();

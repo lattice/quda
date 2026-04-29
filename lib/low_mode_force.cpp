@@ -14,16 +14,15 @@
  * in the nested FGI integrator, while the "expensive" F_full - F_low
  * correction is applied only at the outer (slow) timescale.
  */
-#include <nested_fgi.h>
+#include <low_mode_force.h>
 #include <hmc_quda.h>
 #include <blas_quda.h>
 #include <invert_quda.h>
-#include <timer.h>
 
 namespace quda
 {
 
-  static TimeProfile profileLowModeForce("LowModeForce");
+  
 
   LowModeForce::LowModeForce(CoarseDeflationManager &deflManager_, const DiracMatrix &matFine_, int nMRSmooth_,
                               double mrOmega_) :
@@ -33,7 +32,8 @@ namespace quda
 
   void LowModeForce::projectLowModes(ColorSpinorField &xLow, const ColorSpinorField &src)
   {
-    auto profile = pushProfile(profileLowModeForce);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     const auto &evecs = deflManager.getEvecs();
     const auto &evals = deflManager.getEvals();
     const Transfer &T = deflManager.getTransfer();
@@ -138,7 +138,8 @@ namespace quda
   void LowModeForce::computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &gauge,
                                    const CloverField *clover, QudaGaugeParam &, QudaInvertParam &invParam)
   {
-    auto profile = pushProfile(profileLowModeForce);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     // Lazily allocate fine solution workspace
     if (fineSol.empty()) {
       ColorSpinorParam fineParam{src};

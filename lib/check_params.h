@@ -1327,6 +1327,8 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(n_trajectories, 10);
   P(n_thermalization, 5);
   P(mg_setup_interval, 0);
+  P(mg_setup_iter_ratio, 0.0);
+  P(mg_setup_iter_baseline_traj, 5);
   P(checkpoint_interval, 0);
   // Resident field management
   P(use_resident_gauge, 0);
@@ -1343,8 +1345,13 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(eigentracking_forecast_order, 1);
   P(eigentracking_fresh_trlm_interval, 10);
   P(eigentracking_solution_history, 3);
+  P(eigentracking_absorb_ritz, 1);
+  P(eigentracking_mg_refresh_iters, -1);
   P(eigentracking_trlm_tol, 1e-6);
   P(eigentracking_trlm_max_restarts, 100);
+  P(eigentracking_trlm_check_interval, 10);
+  P(eigentracking_eig_type, QUDA_EIG_TR_LANCZOS);
+  P(eigentracking_blk_size, 4);
   P(eigentracking_use_poly_acc, 0);
   P(eigentracking_poly_deg, 50);
   P(eigentracking_a_min, 0.0);
@@ -1374,6 +1381,8 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(n_trajectories, INVALID_DOUBLE);
   P(n_thermalization, INVALID_DOUBLE);
   P(mg_setup_interval, INVALID_DOUBLE);
+  P(mg_setup_iter_ratio, INVALID_DOUBLE);
+  P(mg_setup_iter_baseline_traj, INVALID_DOUBLE);
   P(checkpoint_interval, INVALID_DOUBLE);
   P(use_resident_gauge, INVALID_DOUBLE);
   P(make_resident_gauge, INVALID_DOUBLE);
@@ -1388,8 +1397,13 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(eigentracking_forecast_order, INVALID_DOUBLE);
   P(eigentracking_fresh_trlm_interval, INVALID_DOUBLE);
   P(eigentracking_solution_history, INVALID_DOUBLE);
+  P(eigentracking_absorb_ritz, INVALID_DOUBLE);
+  P(eigentracking_mg_refresh_iters, INVALID_DOUBLE);
   P(eigentracking_trlm_tol, INVALID_DOUBLE);
   P(eigentracking_trlm_max_restarts, INVALID_DOUBLE);
+  P(eigentracking_trlm_check_interval, INVALID_DOUBLE);
+  P(eigentracking_eig_type, QUDA_EIG_INVALID);
+  P(eigentracking_blk_size, INVALID_DOUBLE);
   P(eigentracking_use_poly_acc, INVALID_DOUBLE);
   P(eigentracking_poly_deg, INVALID_DOUBLE);
   P(eigentracking_a_min, INVALID_DOUBLE);

@@ -11,19 +11,18 @@
 #include <blas_quda.h>
 #include <eigen_helper.h>
 #include <quda_internal.h>
-#include <timer.h>
+#include <hmc_quda.h>
 
 namespace quda
 {
-
-  static TimeProfile profileEigenTracker("EigenTracker");
 
   EigenTracker::EigenTracker() : nEv_(0), poolCapacity_(0), initialized_(false) { }
 
   void EigenTracker::init(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
                           const DiracMatrix &mat, int nEv, int capacity)
   {
-    auto profile = pushProfile(profileEigenTracker);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     if (capacity < nEv) errorQuda("EigenTracker: capacity (%d) must be >= nEv (%d)", capacity, nEv);
 
     nEv_ = nEv;
@@ -53,7 +52,8 @@ namespace quda
 
   void EigenTracker::compress()
   {
-    auto profile = pushProfile(profileEigenTracker);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     if (!initialized_) return;
     int k = static_cast<int>(pool_.size());
     if (k <= 1) return;
@@ -61,13 +61,10 @@ namespace quda
     logQuda(QUDA_VERBOSE, "EigenTracker: compressing pool of %d vectors (capacity=%d)\n", k, poolCapacity_);
 
     // Build k x k projected matrix: T_ij = Dpool[i]^dag Dpool[j]
-    // This gives eigenvalues of D_hat^dag D_hat within the subspace
+    // This gives eigenvalues of D_hat^dag D_hat within the subspace.
     MatrixXcd T = MatrixXcd::Zero(k, k);
     for (int j = 0; j < k; j++) {
       std::vector<Complex> dots(k);
-      blas::block::cDotProduct(dots, {pool_.begin(), pool_.begin() + k}, Dpool_[j]);
-      // dots[i] = pool_[i]^dag Dpool_[j], but we need Dpool_[i]^dag Dpool_[j]
-      // Re-do with Dpool as the left operand
       blas::block::cDotProduct(dots, {Dpool_.begin(), Dpool_.begin() + k}, Dpool_[j]);
       for (int i = 0; i < k; i++) { T(i, j) = std::complex<double>(dots[i].real(), dots[i].imag()); }
     }
@@ -91,14 +88,25 @@ namespace quda
       newDpool[i] = ColorSpinorField(param);
     }
 
-    // Rotate: new_v_i = sum_j U_{ji} * old_v_j
-    for (int i = 0; i < keep; i++) {
-      for (int j = 0; j < k; j++) {
-        Complex alpha(eigensolver.eigenvectors().col(i)[j].real(), eigensolver.eigenvectors().col(i)[j].imag());
-        blas::caxpy(alpha, pool_[j], newPool[i]);
-        blas::caxpy(alpha, Dpool_[j], newDpool[i]);
+    // Rotate: new_v_i = sum_j U(j,i) * old_v_j  (i = 0..keep-1, j = 0..k-1).
+    // block::caxpy expects a row-major coefficient matrix laid out as
+    //     a[j * n_y + i],   n_x = k = old size,   n_y = keep = new size.
+    // One block kernel replaces k*keep separate caxpys; the same matrix
+    // rotates pool and Dpool.
+    std::vector<Complex> rotCoeff(k * keep);
+    for (int j = 0; j < k; j++) {
+      for (int i = 0; i < keep; i++) {
+        auto c = eigensolver.eigenvectors().col(i)[j];
+        rotCoeff[j * keep + i] = Complex(c.real(), c.imag());
       }
-      // Renormalize pool vector (Dpool follows the same rotation)
+    }
+    blas::block::caxpy(rotCoeff, {pool_.begin(), pool_.begin() + k}, {newPool.begin(), newPool.end()});
+    blas::block::caxpy(rotCoeff, {Dpool_.begin(), Dpool_.begin() + k}, {newDpool.begin(), newDpool.end()});
+
+    // Per-vector renormalisation: SelfAdjointEigenSolver returns
+    // unit-norm eigenvectors so the new pool vectors should already be
+    // unit-norm; this only catches small numerical drift.
+    for (int i = 0; i < keep; i++) {
       double nv = sqrt(blas::norm2(newPool[i]));
       if (nv > 1e-14 && std::abs(nv - 1.0) > 1e-10) {
         blas::ax(1.0 / nv, newPool[i]);
@@ -121,7 +129,8 @@ namespace quda
 
   int EigenTracker::absorb(std::vector<ColorSpinorField> &newVecs, const DiracMatrix &mat)
   {
-    auto profile = pushProfile(profileEigenTracker);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     if (!initialized_) return 0;
     int absorbed = 0;
 
@@ -131,13 +140,37 @@ namespace quda
       // Copy the input vector so we don't modify it
       ColorSpinorField v(vIn);
 
-      // Orthogonalize against existing pool (double MGS for stability)
+      // Orthogonalise v against the existing pool. Follow QUDA's BLKTRLM
+      // pattern (eig_block_trlm.cpp): block-CGS pass via block::cDotProduct
+      // + block::caxpy (single kernel each, vs. poolSz separate calls),
+      // iterated until the largest projection drops below tolerance. One
+      // pass would be classical Gram-Schmidt; iterating to convergence
+      // gives MGS-equivalent stability per Daniel-Gragg-Kaufman-Stewart.
+      //
+      // Tolerance scales with field precision: a fixed 1e-12 would be
+      // unreachable in single (eps ~1.2e-7) or half (eps ~9.7e-4) and would
+      // burn the full max_attempts budget. We use ~10x machine epsilon for
+      // the field's working precision, capped at 1e-12 so double-precision
+      // doesn't chase noise floor.
+      double ortho_tol;
+      switch (v.Precision()) {
+      case QUDA_DOUBLE_PRECISION: ortho_tol = 1e-12; break;
+      case QUDA_SINGLE_PRECISION: ortho_tol = 1e-6;  break;
+      case QUDA_HALF_PRECISION:   ortho_tol = 1e-3;  break;
+      default:                    ortho_tol = 1e-2;  break; // quarter / unknown
+      }
+      const int max_attempts = 4;
       int poolSz = static_cast<int>(pool_.size());
-      for (int pass = 0; pass < 2; pass++) {
-        for (int j = 0; j < poolSz; j++) {
-          Complex proj = blas::cDotProduct(pool_[j], v);
-          blas::caxpy(-proj, pool_[j], v);
+      for (int attempt = 0; attempt < max_attempts; attempt++) {
+        std::vector<Complex> projs(poolSz);
+        blas::block::cDotProduct(projs, {pool_.begin(), pool_.begin() + poolSz}, v);
+        double maxProj = 0.0;
+        for (auto &p : projs) {
+          maxProj = std::max(maxProj, std::abs(p));
+          p = -p;
         }
+        blas::block::caxpy(projs, {pool_.begin(), pool_.begin() + poolSz}, v);
+        if (maxProj < ortho_tol) break;
       }
 
       double nv = sqrt(blas::norm2(v));
@@ -166,7 +199,8 @@ namespace quda
 
   void EigenTracker::forceUpdate(const DiracMatrix &mat)
   {
-    auto profile = pushProfile(profileEigenTracker);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     if (!initialized_) return;
     int k = static_cast<int>(pool_.size());
 
@@ -181,7 +215,8 @@ namespace quda
 
   std::vector<Complex> EigenTracker::rayleighRitzEvolve(const DiracMatrix &mat)
   {
-    auto profile = pushProfile(profileEigenTracker);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     if (!initialized_) return {};
     int k = static_cast<int>(pool_.size());
 
@@ -210,7 +245,8 @@ namespace quda
     // Diagonalize on host
     SelfAdjointEigenSolver<MatrixXcd> eigensolver(H);
 
-    // Build rotation matrix in column-major layout for return
+    // Build rotation matrix in caller-facing layout (R[i*k + j] is the
+    // j-th component of the i-th eigenvector — used by EigenForecast).
     std::vector<Complex> rotation(k * k);
     for (int col = 0; col < k; col++) {
       for (int row = 0; row < k; row++) {
@@ -225,10 +261,15 @@ namespace quda
       eigvals_[i] = Complex(eigensolver.eigenvalues()[i], 0.0);
     }
 
-    // Rotate pool AND Dpool vectors: new_v_i = sum_j U_{ji} * old_v_j
-    // Dpool is rotated with the same matrix. The result is approximate (Dpool
-    // was computed with the old D), but the caller will call forceUpdate() to
-    // replace Dpool with exact values from the current operator.
+    // Rotate pool AND Dpool: new_v_i = sum_j U(j,i) * old_v_j (Dpool with the
+    // same matrix; approximate — caller calls forceUpdate to refresh Dpool).
+    // block::caxpy wants row-major a[j*n_y + i] with n_x = n_y = k. That's
+    // the transpose of the caller-facing rotation above.
+    std::vector<Complex> rotCoeff(k * k);
+    for (int j = 0; j < k; j++) {
+      for (int i = 0; i < k; i++) { rotCoeff[j * k + i] = rotation[i * k + j]; }
+    }
+
     std::vector<ColorSpinorField> newPool(k);
     std::vector<ColorSpinorField> newDpool(k);
     for (int i = 0; i < k; i++) {
@@ -236,11 +277,9 @@ namespace quda
       param.create = QUDA_ZERO_FIELD_CREATE;
       newPool[i] = ColorSpinorField(param);
       newDpool[i] = ColorSpinorField(param);
-      for (int j = 0; j < k; j++) {
-        blas::caxpy(rotation[i * k + j], pool_[j], newPool[i]);
-        blas::caxpy(rotation[i * k + j], Dpool_[j], newDpool[i]);
-      }
     }
+    blas::block::caxpy(rotCoeff, {pool_.begin(), pool_.begin() + k}, {newPool.begin(), newPool.end()});
+    blas::block::caxpy(rotCoeff, {Dpool_.begin(), Dpool_.begin() + k}, {newDpool.begin(), newDpool.end()});
     pool_ = std::move(newPool);
     Dpool_ = std::move(newDpool);
 

@@ -2,12 +2,10 @@
 #include <eigensolve_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
-#include <timer.h>
+#include <hmc_quda.h>
 
 namespace quda
 {
-
-  static TimeProfile profileCoarseDefl("CoarseDeflationManager");
 
   CoarseDeflationManager::CoarseDeflationManager(const Transfer &transfer_, const DiracMatrix &matCoarse_,
                                                  const Dirac &diracCoarse_, int nDefl_, double eigTol, int nKr,
@@ -50,7 +48,8 @@ namespace quda
 
   void CoarseDeflationManager::solve()
   {
-    auto profile = pushProfile(profileCoarseDefl);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     logQuda(QUDA_SUMMARIZE, "CoarseDeflationManager: Running TRLM eigensolver for %d coarse eigenvectors\n", nDefl);
 
     // Make a local copy of eigParam so the solver can modify it
@@ -86,7 +85,8 @@ namespace quda
 
   void CoarseDeflationManager::rayleighRitzUpdate()
   {
-    auto profile = pushProfile(profileCoarseDefl);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
     logQuda(QUDA_VERBOSE, "CoarseDeflationManager: Performing Rayleigh-Ritz update\n");
 
     // Allocate workspace if needed
@@ -131,7 +131,8 @@ namespace quda
   {
     if (refreshInterval <= 0) return;
     if (stepCounter < refreshInterval) return;
-    auto profile = pushProfile(profileCoarseDefl);
+    auto profile = pushProfile(getEigenTrackProfile());
+    ScopedComputePhase _scope_;
 
     logQuda(QUDA_VERBOSE, "CoarseDeflationManager: Periodic refresh triggered at step %d\n", stepCounter);
 

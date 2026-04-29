@@ -144,13 +144,15 @@ namespace quda
       work[i] = ColorSpinorField(param);
     }
 
-    // Rotate: work[i] = sum_j R[i*k + j] * vecs[j]  (column-major: R[col*k + row])
-    // We want new_v_i = sum_j U_{ji} old_v_j = sum_j rotation[i*k + j] old_v_j
-    for (int i = 0; i < k; i++) {
-      for (int j = 0; j < k; j++) {
-        blas::caxpy(rotation[i * k + j], vecs[j], work[i]);
-      }
+    // Rotate: work[i] = sum_j rotation[i*k + j] * vecs[j].
+    // block::caxpy wants row-major a[j*n_y + i] (n_x = n_y = k); the caller
+    // hands us the transposed layout, so build the matching coefficient
+    // matrix once and let one block kernel replace k*k separate caxpys.
+    std::vector<Complex> rotCoeff(k * k);
+    for (int j = 0; j < k; j++) {
+      for (int i = 0; i < k; i++) { rotCoeff[j * k + i] = rotation[i * k + j]; }
     }
+    blas::block::caxpy(rotCoeff, {vecs.begin(), vecs.begin() + k}, {work.begin(), work.begin() + k});
 
     // Copy back
     for (int i = 0; i < k; i++) { blas::copy(vecs[i], work[i]); }

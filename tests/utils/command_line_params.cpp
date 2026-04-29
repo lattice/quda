@@ -299,6 +299,8 @@ std::string hmc_checkpoint_prefix = "ckpt_";
 std::string hmc_gauge_infile = "";
 std::string hmc_gauge_outfile = "";
 int hmc_mg_setup_interval = 0;
+double hmc_mg_setup_iter_ratio = 0.0;
+int hmc_mg_setup_iter_baseline_traj = 5;
 double hmc_omelyan_lambda = 0.1932;
 double hmc_fgi_lambda = 1.0 / 6.0;
 double hmc_fgi_xi = 1.0 / 72.0;
@@ -310,6 +312,9 @@ double hmc_reversibility_tol_mg = 1e-5;       // looser tol for MG-using integra
 int hmc_per_link_test_links = 2;              // SU(3) test links to perturb in PerLinkForceTest
 double eigentracking_trlm_tol = 1e-6;         // TRLM convergence tolerance for eigentracking initial solve
 int eigentracking_trlm_max_restarts = 100;    // TRLM maximum restarts for eigentracking initial solve
+int eigentracking_trlm_check_interval = 10;   // TRLM iterations between convergence checks
+QudaEigType eigentracking_eig_type = QUDA_EIG_TR_LANCZOS; // Lanczos variant for eigentracking
+int eigentracking_blk_size = 4;               // Block size for block solvers (n_ev rounded up)
 
 bool eigentracking_enabled = false;
 int eigentracking_n_ev = 0;              // 0 = derive from MG nvec, or default 8
@@ -318,6 +323,8 @@ int eigentracking_n_ritz = 0;            // 0 = derive from nEv, or default nEv/
 int eigentracking_forecast_order = 1;
 int eigentracking_fresh_interval = 0;    // 0 = disabled (MG seeding replaces TRLM)
 int eigentracking_solution_history = 3;
+bool eigentracking_absorb_ritz = true;   // false = pool stays as RR-evolved MG null vectors only
+int eigentracking_mg_refresh_iters = -1; // -1=disabled, 0=pure pool, N>0=pool+N CG polish iters (Fix 2)
 bool eigentracking_use_poly_acc = false; // Chebyshev acceleration for initial TRLM
 int eigentracking_poly_deg = 50;         // Chebyshev polynomial degree
 double eigentracking_a_min = 0.0;        // ~10x smallest target eval; 0 => caller fills
@@ -1282,6 +1289,13 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--hmc-mg-setup-interval", hmc_mg_setup_interval,
                       "Full MG re-setup every N trajectories, 0=thin update only (default 0)");
+  opgroup->add_option("--hmc-mg-setup-iter-ratio", hmc_mg_setup_iter_ratio,
+                      "Adaptive MG re-setup: refresh when current iters-per-solve > ratio x baseline. "
+                      "0.0=disabled (default). Recommended 2.0 for double-precision outer solver. "
+                      "ORs with --hmc-mg-setup-interval.");
+  opgroup->add_option("--hmc-mg-setup-iter-baseline-traj", hmc_mg_setup_iter_baseline_traj,
+                      "Number of accepted trajectories used to establish the iters-per-solve "
+                      "baseline for the adaptive trigger (default 5).");
   opgroup->add_option("--hmc-gauge-infile", hmc_gauge_infile,
                       "Load initial gauge configuration from file (requires QIO)");
   opgroup->add_option("--hmc-gauge-outfile", hmc_gauge_outfile,
@@ -1309,6 +1323,13 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "TRLM convergence tolerance for eigentracking initial solve (default 1e-6)");
   opgroup->add_option("--eigentracking-trlm-max-restarts", eigentracking_trlm_max_restarts,
                       "TRLM maximum restarts for eigentracking initial solve (default 100)");
+  opgroup->add_option("--eigentracking-trlm-check-interval", eigentracking_trlm_check_interval,
+                      "TRLM iterations between convergence checks (default 10)");
+  opgroup->add_option("--eigentracking-eig-type", eigentracking_eig_type,
+                      "Eigensolver for eigentracking (trlm, blktrlm, trlm-3d, iram, blkiram; default trlm)")
+    ->transform(CLI::QUDACheckedTransformer(eig_type_map));
+  opgroup->add_option("--eigentracking-blk-size", eigentracking_blk_size,
+                      "Block size for block solvers; n_ev rounded up to a multiple (default 4)");
 
   opgroup->add_option("--eigentracking", eigentracking_enabled,
                       "Enable eigenspace tracking during HMC (default false)");
@@ -1324,6 +1345,16 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Trajectories between fresh TRLM (0=disabled, default 0)");
   opgroup->add_option("--eigentracking-solution-history", eigentracking_solution_history,
                       "Chronological solution history depth (default 3)");
+  opgroup->add_option("--eigentracking-absorb-ritz", eigentracking_absorb_ritz,
+                      "Absorb CG-extracted Ritz vectors into pool. Default true. Set false to keep "
+                      "pool as RR-evolved MG null vectors only (Schwinger-style: smoother-aware "
+                      "structure preserved, useful for MG-prolongator refresh at light mass).");
+  opgroup->add_option("--eigentracking-mg-refresh-iters", eigentracking_mg_refresh_iters,
+                      "Pool-driven MG null-vector refresh on accepted-trajectory re-setup. "
+                      "-1 (default) = disabled (standard CG re-setup). 0 = pure pool replacement "
+                      "(pair with --eigentracking-absorb-ritz false). N>0 = hybrid pool warm-start + "
+                      "N CG inverse-iter polish steps per vector (Fix 2). ~5 iters typically "
+                      "matches standard re-setup quality at L=16^4 Wilson, mass=-1.5.");
   opgroup->add_option("--eigentracking-use-poly-acc", eigentracking_use_poly_acc,
                       "Enable Chebyshev polynomial acceleration in initial TRLM (default false)");
   opgroup->add_option("--eigentracking-poly-deg", eigentracking_poly_deg,

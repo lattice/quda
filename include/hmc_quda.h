@@ -2,10 +2,56 @@
 
 #include <color_spinor_field.h>
 #include <gauge_field.h>
+#include <random_quda.h>
+#include <timer.h>
 #include <quda.h>
 
 namespace quda
 {
+
+  // Forward declaration; full definition lives in eigen_tracking_state.h.
+  // Only pulled in by translation units that actually dereference it.
+  class EigenTrackingState;
+
+  /**
+   * @brief Accessor for the shared HMC eigentracking TimeProfile.
+   *
+   * Backed by a function-local static in interface_quda.cpp. All
+   * eigentracking translation units push this via pushProfile so the
+   * per-function cost aggregates into one "eigenTracking" row of the
+   * end-of-run summary printed at endQuda.
+   */
+  TimeProfile &getEigenTrackProfile();
+
+  /**
+   * @brief Accessor for the one-shot eigentracking setup profile.
+   *
+   * Distinct from getEigenTrackProfile so that the wall-clock cost of
+   * the initial TRLM (or MG-null seeding) is separated from the
+   * per-trajectory tracker work in the hmcTrajectoryQuda child-profile
+   * breakdown. Pushed only by EigenTrackingState::maybeInit and
+   * EigenTrackingState::seedFromMGNullVectors.
+   */
+  TimeProfile &getEigenTrackSetupProfile();
+
+  /**
+   * @brief RAII guard for QUDA_PROFILE_COMPUTE on the active profile.
+   *
+   * Pair with `auto p = pushProfile(...)` so the body of a function is
+   * fully accounted under the active profile's COMPUTE phase. Destruction
+   * order (reverse of construction) ensures TPSTOP(COMPUTE) fires before
+   * the outer pushProfile pops the active profile.
+   *
+   * Sub-phase TPSTART/TPSTOP are reference-counted in QUDA, so nested
+   * ScopedComputePhase instances (e.g. when this function calls another
+   * function that also wraps COMPUTE) compose correctly.
+   */
+  struct ScopedComputePhase {
+    ScopedComputePhase() { getProfile().TPSTART(QUDA_PROFILE_COMPUTE); }
+    ~ScopedComputePhase() { getProfile().TPSTOP(QUDA_PROFILE_COMPUTE); }
+    ScopedComputePhase(const ScopedComputePhase &) = delete;
+    ScopedComputePhase &operator=(const ScopedComputePhase &) = delete;
+  };
 
   /**
    * @brief Gauge action: S_g = beta * (1 - plaq) * V * 6.
@@ -15,16 +61,95 @@ namespace quda
   /**
    * @brief Generate EO pseudofermion: φ_e = D̂ η_e, η_e ~ N(0,1).
    *
-   * Creates a single-parity (even) pseudofermion field on the GPU.
+   * Creates a single-parity (even) pseudofermion field on the GPU. The
+   * seed-based overload allocates a one-shot RNG state array; prefer the
+   * RNG& overload for hot-path use so state advances between calls.
    */
   ColorSpinorField generateEOPseudofermion(QudaInvertParam &inv_param, unsigned long long seed);
+  ColorSpinorField generateEOPseudofermion(QudaInvertParam &inv_param, RNG &rng);
+
+  /**
+   * @brief HMC RNG family.
+   *
+   * Three persistent streams seeded deterministically from a single user
+   * base seed (offsets +1 spinor, +2 gauge, +3 Metropolis). The spinor /
+   * gauge RNGs follow QUDA's multigrid.cpp pattern (one cuRAND state per
+   * site, state advances across calls). The Metropolis RNG is a host-side
+   * MT19937_64 used for the scalar accept/reject draw so the decision is
+   * reproducible under a fixed user seed regardless of process-wide
+   * drand48() state.
+   */
+  void setHMCBaseSeed(unsigned long long seed);
+
+  /**
+   * @brief Get-or-build the HMC spinor RNG for the preconditioned spinor
+   *        geometry implied by the resident gauge field and @p inv_param.
+   */
+  RNG &getHMCSpinorRNG(QudaInvertParam &inv_param);
+
+  /**
+   * @brief Get-or-build the HMC gauge RNG matching @p meta's volume.
+   */
+  RNG &getHMCGaugeRNG(const GaugeField &meta);
+
+  /**
+   * @brief Draw one uniform [0,1) double from the Metropolis stream.
+   */
+  double hmcMetropolisUniform();
+
+  /**
+   * @brief Release all three RNG streams.
+   *
+   * Called from destroyHMCQuda and endQuda before the device pool is
+   * flushed (the spinor/gauge state arrays live in the QUDA pool).
+   */
+  void releaseHMCRNG();
+
+  /**
+   * @brief Persistent EigenTrackingState singleton.
+   *
+   * Lifecycle: created lazily by the HMC entry points (or
+   * seedEigenTrackingFromMG), configured from QudaHMCParam, used by
+   * hmcTrajectoryQuda / hmcRunQuda for low-mode tracking, destroyed by
+   * destroyHMCQuda before the device pool is flushed.
+   */
+  EigenTrackingState *getEigenTrackingInstance();
+  void setEigenTrackingInstance(EigenTrackingState *inst);
+  void releaseEigenTrackingInstance();
+
+  /**
+   * @brief Pseudofermion stored across trajectories for reversibility tests
+   *        (used when QudaHMCParam::reuse_pseudofermion is set).
+   */
+  ColorSpinorField *getStoredPhi();
+  void setStoredPhi(ColorSpinorField phi);
+  void releaseStoredPhi();
 
   /**
    * @brief EO fermion action: S_f = Re(φ_e† x_e) where D̂†D̂ x_e = φ_e.
    *
    * Solves the even-odd preconditioned normal equations via CG.
+   * Plain primitive: no MG γ₅ two-pass, no clover TrLog.
    */
   double computeEOFermionAction(ColorSpinorField &phi_even, QudaInvertParam &inv_param);
+
+  /**
+   * @brief Full fermion action used by hmcTrajectoryQuda for H_init / H_final.
+   *
+   * Differs from computeEOFermionAction:
+   *   - Uses MG γ₅ two-pass when @p inv_param.preconditioner is set.
+   *   - Subtracts the odd-parity clover TrLog for QUDA_CLOVER_WILSON_DSLASH
+   *     (matches the asymmetric matpc convention used by the force).
+   *   - Optionally stashes the normalized solution into the eigentracker for
+   *     low-mode absorption.
+   *
+   * @param phi        Pseudofermion (parity field, native order, on device)
+   * @param inv_param  Inverter parameters (CG / GCR+MG / etc.)
+   * @param tracking   Optional eigentracking state; if non-null and active,
+   *                   the normalized solution is stashed for absorption.
+   */
+  double computeFermionAction(ColorSpinorField &phi, QudaInvertParam &inv_param,
+                              EigenTrackingState *tracking = nullptr);
 
   /**
    * @brief EO fermion force: accumulates dS_eo/dU into momentum.

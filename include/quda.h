@@ -877,6 +877,15 @@ extern "C" {
     int n_trajectories;               /**< Total number of MD trajectories to run */
     int n_thermalization;             /**< Number of thermalisation trajectories (no measurements) */
     int mg_setup_interval;            /**< Full MG re-setup every N trajectories (0=thin update only) */
+    /** Adaptive MG re-setup trigger: refresh when current per-trajectory
+     *  iters-per-solve exceeds this ratio times the baseline iters-per-solve.
+     *  0.0 disables the adaptive trigger. Recommended 2.0 for double-precision
+     *  outer solver. ORs with the fixed-interval trigger above. */
+    double mg_setup_iter_ratio;
+    /** Number of accepted trajectories used to establish the baseline
+     *  iters-per-solve for the adaptive trigger. The baseline is the mean
+     *  iters-per-solve over those trajectories. Default 5. */
+    int mg_setup_iter_baseline_traj;
 
     /** Checkpointing */
     int checkpoint_interval;          /**< Save gauge every N accepted trajectories (0=disabled) */
@@ -902,9 +911,39 @@ extern "C" {
     int eigentracking_forecast_order;       /**< Generator forecast order: 0/1/2 (default 1) */
     int eigentracking_fresh_trlm_interval;  /**< Trajectories between fresh TRLM (0=disabled, default 10) */
     int eigentracking_solution_history;     /**< Chronological solution history depth (default 3) */
+    /** Whether to absorb CG-extracted Ritz vectors into the tracker pool.
+     *  When true (default), the pool drifts toward exact D†D eigenvectors,
+     *  which is good for deflation but degrades MG-null-vector quality at
+     *  light mass. Set to 0 to keep the pool as RR-evolved MG null vectors
+     *  only (Schwinger-style: smoother-aware structure preserved). */
+    int eigentracking_absorb_ritz;          /**< 1=absorb Ritz vectors into pool, 0=skip (default 1) */
+    /** Pool-driven MG null-vector refresh ("Fix 2: hybrid pool + CG").
+     *
+     * On accepted-trajectory MG re-setup, copy the eigentracker pool into the
+     * MG null-space slots (`mg_solver->B`) instead of regenerating with CG
+     * from random vectors, then run N CG inverse-iter steps per vector to
+     * polish them against the current gauge. The pool is already a good
+     * approximation of the slow subspace, so a small N suffices.
+     *
+     *   -1 (default) — disabled; use the standard CG-based MG re-setup.
+     *    0           — pure pool replacement (no CG polish). Cheapest, but
+     *                  drifts when the gauge moves between refreshes; only
+     *                  reliable when `absorb_ritz=0` keeps the pool
+     *                  smoother-aware (Schwinger-style).
+     *    N > 0       — hybrid: pool warm-start + N CG iters of polish.
+     *                  Recovers smoother-aware structure even with
+     *                  Ritz-contaminated pools. Empirically ~5 iters
+     *                  closes the gap to standard re-setup at L=16^4
+     *                  Wilson, mass=-1.5. */
+    int eigentracking_mg_refresh_iters;
     /** Initial TRLM convergence knobs (also applied to fresh-TRLM refreshes) */
     double eigentracking_trlm_tol;          /**< TRLM convergence tolerance (default 1e-6) */
     int eigentracking_trlm_max_restarts;    /**< TRLM maximum restarts (default 100) */
+    int eigentracking_trlm_check_interval;  /**< TRLM iterations between convergence checks (default 10) */
+    /** Eigensolver to use for the initial / fresh-TRLM solves
+     *  (TRLM, BLKTRLM, IRAM, BLKIRAM, ...). Default QUDA_EIG_TR_LANCZOS. */
+    QudaEigType eigentracking_eig_type;
+    int eigentracking_blk_size;             /**< Block size for block solvers; n_ev rounded up (default 4) */
     /** Chebyshev acceleration for the initial TRLM (ill-conditioned M^dag M) */
     int eigentracking_use_poly_acc;         /**< 1=Chebyshev poly acceleration on, 0=off (default 0) */
     int eigentracking_poly_deg;             /**< Chebyshev polynomial degree (default 50) */
