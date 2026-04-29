@@ -835,6 +835,380 @@ TEST(HMC, PerLinkForceTest)
 
 // CompareDerivativeKernels test removed — served its purpose (confirmed kernel geometry).
 // See REPORT_clover_sigma_force_derivation.md for the mathematical analysis.
+
+/**
+ * Test: Directional derivative verification for the *gauge* force.
+ *
+ * Counterpart of HMC.DirectionalForceTest, which checks fermion force vs.
+ * fermion action. This one tests that the Wilson plaquette gauge force
+ * is consistent with computeGaugeActionHMC. It exists because the existing
+ * fermion-force tests pass cleanly while iso 16^4 thermalisation shows a
+ * persistent ⟨dH⟩ < 0 — the gauge sector was previously unverified.
+ *
+ * Method:
+ *   1. Compute gauge force F into zero momentum at coeff=1
+ *   2. Perturb gauge: U' = exp(eps * F) * U
+ *   3. Compute dS_g = S_g(U') - S_g(U)
+ *   4. Compare dS_g/eps against -2*T_phys (the directional derivative)
+ *
+ * Same MILC -4 N_links offset on T_ferm as the fermion test (it's a property
+ * of computeMomAction, not of the force).
+ */
+TEST(HMC, GaugeForceActionConsistency)
+{
+  using namespace quda;
+
+  double eps = hmc_force_eps;
+
+  printfQuda("\n=== Directional gauge force test (eps=%e, beta=%g) ===\n", eps, hmc_beta);
+
+  // Wilson plaquette gauge paths — replicate the static setupWilsonGaugePaths
+  // in lib/hmc_integrator.cpp so the test is self-contained.
+  int *path_length = new int[6];
+  double *path_coeff = new double[6];
+  for (int i = 0; i < 6; i++) { path_length[i] = 3; path_coeff[i] = 1.0; }
+
+  int ***input_path = new int **[4];
+  for (int dir = 0; dir < 4; dir++) {
+    input_path[dir] = new int *[6];
+    int idx = 0;
+    for (int i = 0; i < 4; i++) {
+      if (i == dir) continue;
+      int opp_dir = 7 - dir;
+      int opp_i = 7 - i;
+      input_path[dir][idx]    = new int[3]{i, opp_dir, opp_i};
+      input_path[dir][idx+1]  = new int[3]{opp_i, opp_dir, i};
+      idx += 2;
+    }
+  }
+
+  // S_g(U)
+  double Sg0 = computeGaugeActionHMC(hmc_beta);
+
+  // Allocate zero momentum on device
+  GaugeFieldParam mParam(gauge_param, nullptr, QUDA_ASQTAD_MOM_LINKS);
+  mParam.location = QUDA_CUDA_FIELD_LOCATION;
+  mParam.create = QUDA_ZERO_FIELD_CREATE;
+  mParam.reconstruct = QUDA_RECONSTRUCT_10;
+  mParam.setPrecision(gauge_param.cuda_prec, true);
+  momResident = GaugeField(mParam);
+
+  // Compute gauge force into the zero mom (coeff = 1).
+  QudaGaugeParam gp = gauge_param;
+  gp.use_resident_gauge = 1;
+  gp.use_resident_mom = 1;
+  gp.make_resident_gauge = 1;
+  gp.make_resident_mom = 1;
+  gp.return_result_mom = 0;
+  gp.overwrite_mom = 0;
+  double eb3 = 1.0 * hmc_beta / 3.0;
+  computeGaugeForceQuda(nullptr, nullptr, input_path, path_length, path_coeff, 6, 4, eb3, &gp);
+
+  double T_ferm = computeMomAction(momResident);
+  int V = 1;
+  for (int d = 0; d < 4; d++) V *= gauge_param.X[d];
+  int nLinks = 4 * V;
+  double T_physical = T_ferm + 4.0 * nLinks; // MILC -4 offset (same as fermion test)
+
+  // Perturb gauge along F: U' = exp(eps * F) * U
+  GaugeField gaugeSaved(*gaugePrecise);
+  GaugeFieldParam gfParam(*gaugePrecise);
+  gfParam.create = QUDA_NULL_FIELD_CREATE;
+  GaugeField u_out(gfParam);
+  updateGaugeField(u_out, eps, *gaugePrecise, momResident, false, true);
+  gaugePrecise->copy(u_out);
+
+  double Sg1 = computeGaugeActionHMC(hmc_beta);
+
+  // Restore
+  gaugePrecise->copy(gaugeSaved);
+
+  double dSg_deps = (Sg1 - Sg0) / eps;
+  double dSg_expected = -2.0 * T_physical;
+  double ratio = dSg_deps / dSg_expected;
+
+  printfQuda("  S_g(U)     = %e\n", Sg0);
+  printfQuda("  S_g(U')    = %e\n", Sg1);
+  printfQuda("  dS/deps    = %e  (numerical)\n", dSg_deps);
+  printfQuda("  -2*T_phys  = %e  (expected if F = -dS/dU)\n", dSg_expected);
+  printfQuda("  ratio      = %f  (should be 1.0)\n", ratio);
+
+  EXPECT_NEAR(ratio, 1.0, 0.01) << "Gauge force does not match action derivative";
+
+  for (int dir = 0; dir < 4; dir++) {
+    for (int i = 0; i < 6; i++) delete[] input_path[dir][i];
+    delete[] input_path[dir];
+  }
+  delete[] input_path;
+  delete[] path_length;
+  delete[] path_coeff;
+
+  momResident = GaugeField();
+}
+
+/**
+ * Test: Multi-trajectory dH statistics (Jarzynski equality).
+ *
+ * Runs N short trajectories from the same starting gauge with N different
+ * momentum seeds, accumulates dH, and reports:
+ *   ⟨dH⟩            (should approach 0 as N grows for symplectic integrator)
+ *   σ(dH)           (integrator-error spread)
+ *   ⟨exp(-dH)⟩      (must equal 1 by Jarzynski for symplectic, reversible MD
+ *                    starting from a sample of the equilibrium distribution)
+ *
+ * Reversibility tests catch round-trip bugs but cannot catch a force↔action
+ * mismatch — the same wrong force used both directions cancels. This test
+ * does catch that class of bug.
+ */
+TEST(HMC, dHStatistics)
+{
+  using namespace quda;
+
+  int N = std::max(10, hmc_n_trajectories);
+  printfQuda("\n=== dH statistics over %d trajectories ===\n", N);
+
+  GaugeField gaugeU0(*gaugePrecise);
+
+  std::vector<double> dHs;
+  dHs.reserve(N);
+  for (int i = 0; i < N; i++) {
+    // Restore starting gauge each iteration so we sample fresh momenta from
+    // the same configuration, not from a drifting Markov chain.
+    gaugePrecise->copy(gaugeU0);
+    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+      gaugePrecondition->copy(*gaugePrecise);
+    destroyHMCQuda();
+
+    QudaHMCParam hp = makeHMCParam();
+    hp.momentum_seed = hmc_momentum_seed + i;
+    hp.reuse_pseudofermion = 0;
+    hp.use_resident_gauge = 1;
+    hp.return_result_gauge = 0;
+    double dH = hmcTrajectoryQuda(nullptr, nullptr, &hp, &gauge_param, &inv_param, nullptr);
+    dHs.push_back(dH);
+  }
+
+  double mean = 0, exp_mean = 0;
+  for (double dH : dHs) { mean += dH; exp_mean += std::exp(-dH); }
+  mean /= N; exp_mean /= N;
+  double var = 0;
+  for (double dH : dHs) var += (dH - mean) * (dH - mean);
+  var /= std::max(1, N - 1);
+  double stderr_mean = std::sqrt(var / N);
+
+  printfQuda("  ⟨dH⟩         = %+.4e ± %.4e\n", mean, stderr_mean);
+  printfQuda("  σ(dH)        = %.4e\n", std::sqrt(var));
+  printfQuda("  ⟨exp(-dH)⟩   = %.4f  (should be ~1.0 by Jarzynski)\n", exp_mean);
+  printfQuda("  individual dH values:");
+  for (double dH : dHs) printfQuda("  %+.3e", dH);
+  printfQuda("\n");
+
+  // Restore
+  gaugePrecise->copy(gaugeU0);
+  destroyHMCQuda();
+
+  // Loose-but-real bound: ⟨exp(-dH)⟩ within 50% of 1 means no order-unity bias.
+  // A tighter bound needs more trajectories than is reasonable in a unit test.
+  EXPECT_NEAR(exp_mean, 1.0, 0.5) << "Jarzynski equality violated — integrator likely not symplectic";
+}
+
+/**
+ * Test: dH scaling with integration step size.
+ *
+ * For a symplectic integrator at *fixed* trajectory length τ, |dH| should
+ * decrease as a power of dt = τ/n_steps:
+ *   Leapfrog        : |dH| ~ dt^2
+ *   Omelyan, FGI    : |dH| ~ dt^4
+ *
+ * If the integrator has a force↔action mismatch, the bias is dt-independent
+ * and |dH| plateaus at small dt. This test scans n_steps and reports the
+ * fitted exponent so a regression to a plateau or wrong scaling is visible.
+ *
+ * Same momentum seed and starting gauge for every dt → only dt varies.
+ */
+TEST(HMC, dHScaling)
+{
+  using namespace quda;
+
+  // Larger n_steps values push |dH| down to the CG residual noise floor
+  // (~1e-5 at tol=1e-9 on 4^4) and contaminate the linear fit; for FG we
+  // stay in the cleaner regime where the dt⁴ leading term still dominates.
+  QudaIntegratorType itype = static_cast<QudaIntegratorType>(hmc_integrator);
+  int n_step_list_p2[] = {10, 20, 40, 80};
+  int n_step_list_p4[] = {8, 12, 16, 22};
+  int *n_step_list = (itype == QUDA_FORCE_GRADIENT_INTEGRATOR) ? n_step_list_p4 : n_step_list_p2;
+  const int n_dt = 4;
+  double tau = hmc_tau;
+
+  const char *iname = (itype == QUDA_LEAPFROG_INTEGRATOR) ? "Leapfrog"
+                    : (itype == QUDA_OMELYAN_INTEGRATOR)  ? "Omelyan"
+                    : (itype == QUDA_FORCE_GRADIENT_INTEGRATOR) ? "ForceGradient"
+                    : "Unknown";
+  // Leapfrog and the 2nd-order Omelyan PQPQP minimum-norm scheme both have
+  // dH ∝ dt². Force-gradient (PQPQP_FG with the Hessian-free trick) is 4th
+  // order.
+  double expected_p = (itype == QUDA_FORCE_GRADIENT_INTEGRATOR) ? 4.0 : 2.0;
+
+  printfQuda("\n=== dH-vs-dt scaling for %s (expect |dH| ~ dt^%g) ===\n", iname, expected_p);
+
+  GaugeField gaugeU0(*gaugePrecise);
+
+  std::vector<double> dts, dHs;
+  for (int k = 0; k < n_dt; k++) {
+    int n = n_step_list[k];
+    double dt = tau / n;
+
+    gaugePrecise->copy(gaugeU0);
+    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+      gaugePrecondition->copy(*gaugePrecise);
+    destroyHMCQuda();
+
+    QudaHMCParam hp = makeHMCParam();
+    hp.tau = tau;
+    hp.n_steps = n;
+    hp.momentum_seed = hmc_momentum_seed; // same seed → same momenta
+    hp.reuse_pseudofermion = 0;
+    hp.use_resident_gauge = 1;
+    hp.return_result_gauge = 0;
+    double dH = hmcTrajectoryQuda(nullptr, nullptr, &hp, &gauge_param, &inv_param, nullptr);
+    printfQuda("  n_steps=%3d  dt=%.5f  dH=%+.6e  |dH|=%.6e\n", n, dt, dH, std::abs(dH));
+    dts.push_back(dt);
+    dHs.push_back(std::abs(dH));
+  }
+
+  // Linear fit log|dH| = p*log(dt) + c
+  double sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (int k = 0; k < n_dt; k++) {
+    double x = std::log(dts[k]);
+    double y = std::log(std::max(dHs[k], 1e-30));
+    sx += x; sy += y; sxx += x * x; sxy += x * y;
+  }
+  double p_fit = (n_dt * sxy - sx * sy) / (n_dt * sxx - sx * sx);
+
+  printfQuda("  fitted exponent p = %.3f  (expected %.1f for %s)\n", p_fit, expected_p, iname);
+
+  gaugePrecise->copy(gaugeU0);
+  destroyHMCQuda();
+
+  // Loose bound: scaling within ±0.5 of expected. Plateau (force-action
+  // mismatch) shows up as p ≈ 0; wrong order shows as different exponent.
+  EXPECT_NEAR(p_fit, expected_p, 0.5) << iname << ": dH does not scale as dt^" << expected_p
+                                      << " (fitted " << p_fit << ") — possible integrator bug";
+}
+
+/**
+ * Test: dH scaling for NestedFGI (with MG preconditioner).
+ *
+ * NestedFGI = outer PQPQP_FG (our patched 4th-order fgStep) + inner
+ * leapfrog/Omelyan handling only the MG-projected low-mode force. Although
+ * the inner integrator is formally 2nd-order, the inner force amplitude is
+ * small (only the low-mode component), so its dt² error coefficient is
+ * dwarfed by the outer FG's dt⁴ term. Empirically the scaling is dt⁴ in
+ * the regime where dt is large enough that the floor doesn't bite.
+ *
+ * The MG transfer is single-precision by default (--prec-precondition),
+ * which puts a noise floor around |dH| ~ 1e-5 on this 4⁴ test gauge.
+ */
+TEST(HMC, dHScalingNestedFGI)
+{
+  using namespace quda;
+
+  int n_step_list[] = {6, 10, 16, 24};
+  const int n_dt = 4;
+  double tau = hmc_tau;
+
+  printfQuda("\n=== dH-vs-dt scaling for NestedFGI ===\n");
+
+  GaugeField gaugeU0(*gaugePrecise);
+
+  // Set up MG preconditioner. Precision is CLI-driven via --prec-precondition
+  // (same convention as invert_test); the test setup at the top of this file
+  // resolves prec_precondition from CLI with fallbacks. Match all MG-internal
+  // precisions (sloppy/precondition/eigensolver/null) so calculateY doesn't
+  // see a single/double mix.
+  destroyHMCQuda();
+  QudaMultigridParam mg_param = newQudaMultigridParam();
+  QudaInvertParam mg_ip = inv_param;
+  mg_ip.solve_type = QUDA_DIRECT_SOLVE;
+  mg_ip.solution_type = QUDA_MAT_SOLUTION;
+  mg_ip.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  mg_ip.cuda_prec = gauge_param.cuda_prec;
+  mg_ip.cuda_prec_sloppy = prec_precondition;
+  mg_ip.cuda_prec_precondition = prec_precondition;
+  mg_ip.cuda_prec_eigensolver = prec_precondition;
+  mg_ip.clover_cuda_prec = gauge_param.cuda_prec;
+  mg_ip.clover_cuda_prec_sloppy = prec_precondition;
+  mg_ip.clover_cuda_prec_precondition = prec_precondition;
+  mg_ip.clover_cuda_prec_eigensolver = prec_precondition;
+  configureHMCTestMG(mg_param, mg_ip, prec_precondition);
+  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(nullptr, nullptr, &inv_param);
+  void *mg_prec = newMultigridQuda(&mg_param);
+
+  // Outer inverter: plain CG, no MG preconditioner on the outer (MG is
+  // used only for coarse transfer in the nested-FGI inner force).
+  QudaInvertParam saved_ip = inv_param;
+  inv_param.preconditioner = nullptr;
+  inv_param.inv_type = QUDA_CG_INVERTER;
+  inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+  inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+
+  std::vector<double> dts, dHs;
+  for (int k = 0; k < n_dt; k++) {
+    int n = n_step_list[k];
+    double dt = tau / n;
+
+    gaugePrecise->copy(gaugeU0);
+    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+      gaugePrecondition->copy(*gaugePrecise);
+
+    QudaHMCParam hp = makeHMCParam(QUDA_NESTED_FGI_INTEGRATOR);
+    hp.tau = tau;
+    hp.n_steps = n;
+    hp.momentum_seed = hmc_momentum_seed + 424242;
+    hp.reuse_pseudofermion = 0;
+    hp.use_resident_gauge = 1;
+    hp.return_result_gauge = 0;
+    hp.defl_refresh_interval = 0;
+    double dH = hmcTrajectoryQuda(nullptr, nullptr, &hp, &gauge_param, &inv_param, mg_prec);
+    printfQuda("  n_outer=%3d  dt=%.5f  dH=%+.6e  |dH|=%.6e\n", n, dt, dH, std::abs(dH));
+    dts.push_back(dt);
+    dHs.push_back(std::abs(dH));
+  }
+
+  // Linear fit log|dH| = p*log(dt) + c, plus consecutive-pair report
+  double sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (int k = 0; k < n_dt; k++) {
+    double x = std::log(dts[k]);
+    double y = std::log(std::max(dHs[k], 1e-30));
+    sx += x; sy += y; sxx += x * x; sxy += x * y;
+  }
+  double p_fit = (n_dt * sxy - sx * sy) / (n_dt * sxx - sx * sx);
+
+  printfQuda("  fitted exponent p = %.3f\n", p_fit);
+  for (int k = 1; k < n_dt; k++) {
+    double r = dHs[k - 1] / std::max(dHs[k], 1e-30);
+    double scale = dts[k - 1] / dts[k];
+    double p = std::log(r) / std::log(scale);
+    printfQuda("  pair (%d→%d): ratio=%.2f, implied p=%.2f\n", n_step_list[k - 1], n_step_list[k], r, p);
+  }
+
+  // Cleanup
+  inv_param = saved_ip;
+  destroyMultigridQuda(mg_prec);
+  gaugePrecise->copy(gaugeU0);
+  destroyHMCQuda();
+
+  // Inner leapfrog/Omelyan limits the overall convergence to 2nd order.
+  // Loose tolerance because MG-preconditioned transfer adds single-precision
+  // noise floor that contaminates fits at small dt.
+  EXPECT_GT(p_fit, 1.5) << "NestedFGI: dH does not scale at least as dt^2";
+  EXPECT_LT(p_fit, 4.5) << "NestedFGI: dH scales unexpectedly steeply";
+}
+
 /**
  * Test: Thermalisation + reversibility test for detailed balance.
  *
@@ -995,7 +1369,20 @@ TEST(HMC, ReversibilityAllIntegrators)
       mg_ip.solve_type = QUDA_DIRECT_SOLVE;
       mg_ip.solution_type = QUDA_MAT_SOLUTION;
       mg_ip.matpc_type = QUDA_MATPC_EVEN_EVEN;
-      configureHMCTestMG(mg_param, mg_ip, QUDA_SINGLE_PRECISION);
+      // Pin MG-internal precisions to the CLI-driven preconditioner precision
+      // (--prec-precondition) so calculateY doesn't see a fine Dirac op at one
+      // precision and prolongator/restrictor at another. Same pattern as
+      // HMC.MGPreconditionedRun (line 447) — invert_test passes precision via
+      // --prec-precondition and we follow that convention.
+      mg_ip.cuda_prec = gauge_param.cuda_prec; // must match gauge precise
+      mg_ip.cuda_prec_sloppy = prec_precondition;
+      mg_ip.cuda_prec_precondition = prec_precondition;
+      mg_ip.cuda_prec_eigensolver = prec_precondition;
+      mg_ip.clover_cuda_prec = gauge_param.cuda_prec;
+      mg_ip.clover_cuda_prec_sloppy = prec_precondition;
+      mg_ip.clover_cuda_prec_precondition = prec_precondition;
+      mg_ip.clover_cuda_prec_eigensolver = prec_precondition;
+      configureHMCTestMG(mg_param, mg_ip, prec_precondition);
       if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(nullptr, nullptr, &inv_param);
       mg_prec = newMultigridQuda(&mg_param);
     }
