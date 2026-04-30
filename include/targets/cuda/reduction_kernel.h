@@ -1,5 +1,8 @@
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 #include <target_device.h>
 #include <constant_kernel_arg.h>
 #include <reduce_helper.h>
@@ -19,6 +22,30 @@ namespace quda
       t.prefetch(0, 0, 0);
     };
   } // namespace reduction_prefetch
+
+  namespace reduction_unroll
+  {
+    template <typename Arg>
+    using grid_stride_unroll_t = std::integral_constant<int, static_cast<int>(Arg::grid_stride_unroll)>;
+
+    /**
+       True if Transformer<Arg> supports a single batched grid-stride call with
+       \c std::integral_constant<int, U> and runtime \c (sum, tid, k, src_idx, stride)
+       as in \c Reduce_::operator() (reduce_core.cuh). Reduction2D maps the y thread
+       index to \c k and passes \c src_idx = 0 when there is no batch dimension.
+     */
+    template <template <typename> class Transformer, typename Arg>
+    inline constexpr bool reduction_functor_unroll_2d_v = requires(Transformer<Arg> &t)
+    {
+      t.template operator()<grid_stride_unroll_t<Arg>>(std::declval<typename Transformer<Arg>::reduce_t &>(), 0, 0, 0, 0);
+    };
+
+    template <template <typename> class Functor, typename Arg>
+    inline constexpr bool reduction_functor_unroll_3d_v = requires(Functor<Arg> &t)
+    {
+      t.template operator()<grid_stride_unroll_t<Arg>>(std::declval<typename Functor<Arg>::reduce_t &>(), 0, 0, 0, 0);
+    };
+  } // namespace reduction_unroll
 
   /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
@@ -58,16 +85,29 @@ namespace quda
       if constexpr (grid_stride) {
         if constexpr (Arg::grid_stride_unroll > 1u) {
           if (idx + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
-#pragma unroll
-            for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+            if constexpr (reduction_unroll::reduction_functor_unroll_2d_v<Transformer, Arg>) {
               if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
-                const auto idx_pf = idx + (e + 1u) * stride;
-                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, j);
+#pragma unroll
+                for (unsigned e = 1u; e <= Arg::grid_stride_unroll; e++) {
+                  const auto idx_pf = idx + e * stride;
+                  if (idx_pf < arg.threads.x) t.prefetch(idx_pf, j);
+                }
               }
-              value = t(value, idx + e * stride, j);
+              value = t.template operator()<reduction_unroll::grid_stride_unroll_t<Arg>>(value, idx, j, 0, stride);
+              idx += Arg::grid_stride_unroll * stride;
+              continue;
+            } else {
+#pragma unroll
+              for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+                if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
+                  const auto idx_pf = idx + (e + 1u) * stride;
+                  if (idx_pf < arg.threads.x) t.prefetch(idx_pf, j);
+                }
+                value = t(value, idx + e * stride, j);
+              }
+              idx += Arg::grid_stride_unroll * stride;
+              continue;
             }
-            idx += Arg::grid_stride_unroll * stride;
-            continue;
           }
         }
         if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
@@ -206,16 +246,29 @@ namespace quda
       if constexpr (grid_stride) {
         if constexpr (Arg::grid_stride_unroll > 1u) {
           if (idx + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
-#pragma unroll
-            for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+            if constexpr (reduction_unroll::reduction_functor_unroll_3d_v<Functor, Arg>) {
               if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
-                const auto idx_pf = idx + (e + 1u) * stride;
-                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, k, j);
+#pragma unroll
+                for (unsigned e = 1u; e <= Arg::grid_stride_unroll; e++) {
+                  const auto idx_pf = idx + e * stride;
+                  if (idx_pf < arg.threads.x) t.prefetch(idx_pf, k, j);
+                }
               }
-              value = t(value, idx + e * stride, k, j);
+              value = t.template operator()<reduction_unroll::grid_stride_unroll_t<Arg>>(value, idx, k, j, stride);
+              idx += Arg::grid_stride_unroll * stride;
+              continue;
+            } else {
+#pragma unroll
+              for (unsigned e = 0; e < Arg::grid_stride_unroll; e++) {
+                if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
+                  const auto idx_pf = idx + (e + 1u) * stride;
+                  if (idx_pf < arg.threads.x) t.prefetch(idx_pf, k, j);
+                }
+                value = t(value, idx + e * stride, k, j);
+              }
+              idx += Arg::grid_stride_unroll * stride;
+              continue;
             }
-            idx += Arg::grid_stride_unroll * stride;
-            continue;
           }
         }
         if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {

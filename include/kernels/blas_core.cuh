@@ -1,5 +1,8 @@
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 #include <blas_helper.cuh>
 #include <reducer.h>
 #include <array.h>
@@ -59,26 +62,44 @@ namespace quda
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int i, int src_idx, int parity) const
+      /**
+         Grid-stride batch entry: \a UnrollCount must be \c std::integral_constant<int, N> (not a bare
+         int template arg) so it cannot collide with \c MultiBlas_::template operator()<bool>.
+       */
+      template <typename UnrollCount = std::integral_constant<int, 1>>
+      __device__ __host__ inline void operator()(int i, int src_idx, int parity, int stride = 0) const
       {
+        static_assert(std::is_same_v<UnrollCount, std::integral_constant<int, UnrollCount::value>>,
+                      "grid-stride batching uses std::integral_constant<int, N> as the template argument");
+        constexpr int n = UnrollCount::value;
+        static_assert(n >= 1, "unroll count must be positive");
+
         using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         arg.f.init(src_idx);
 
-        vec x, y, z, w, v;
-        if constexpr (arg.f.read.X) arg.X[src_idx].load(x, i, parity);
-        if constexpr (arg.f.read.Y) arg.Y[src_idx].load(y, i, parity);
-        if constexpr (arg.f.read.Z) arg.Z[src_idx].load(z, i, parity);
-        if constexpr (arg.f.read.W) arg.W[src_idx].load(w, i, parity);
-        if constexpr (arg.f.read.V) arg.V[src_idx].load(v, i, parity);
+        vec x[n], y[n], z[n], w[n], v[n];
 
-        arg.f(x, y, z, w, v, src_idx);
+#pragma unroll
+        for (int j = 0; j < n; j++) {
+          if constexpr (arg.f.read.X) arg.X[src_idx].load(x[j], i + j * stride, parity);
+          if constexpr (arg.f.read.Y) arg.Y[src_idx].load(y[j], i + j * stride, parity);
+          if constexpr (arg.f.read.Z) arg.Z[src_idx].load(z[j], i + j * stride, parity);
+          if constexpr (arg.f.read.W) arg.W[src_idx].load(w[j], i + j * stride, parity);
+          if constexpr (arg.f.read.V) arg.V[src_idx].load(v[j], i + j * stride, parity);
+        }
 
-        if constexpr (arg.f.write.X) arg.X[src_idx].save(x, i, parity);
-        if constexpr (arg.f.write.Y) arg.Y[src_idx].save(y, i, parity);
-        if constexpr (arg.f.write.Z) arg.Z[src_idx].save(z, i, parity);
-        if constexpr (arg.f.write.W) arg.W[src_idx].save(w, i, parity);
-        if constexpr (arg.f.write.V) arg.V[src_idx].save(v, i, parity);
+#pragma unroll
+        for (int j = 0; j < n; j++) arg.f(x[j], y[j], z[j], w[j], v[j], src_idx);
+
+#pragma unroll
+        for (int j = 0; j < n; j++) {
+          if constexpr (arg.f.write.X) arg.X[src_idx].save(x[j], i + j * stride, parity);
+          if constexpr (arg.f.write.Y) arg.Y[src_idx].save(y[j], i + j * stride, parity);
+          if constexpr (arg.f.write.Z) arg.Z[src_idx].save(z[j], i + j * stride, parity);
+          if constexpr (arg.f.write.W) arg.W[src_idx].save(w[j], i + j * stride, parity);
+          if constexpr (arg.f.write.V) arg.V[src_idx].save(v[j], i + j * stride, parity);
+        }
       }
 
       __device__ __host__ inline void prefetch(int i, int src_idx, int parity) const
