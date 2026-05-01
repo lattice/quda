@@ -247,8 +247,8 @@ endif()
 set_property(CACHE QUDA_BLAS_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK)
 mark_as_advanced(QUDA_BLAS_PREFETCH_TYPE)
 
-set(QUDA_BLAS_GRID_STRIDE_UNROLL "1" CACHE STRING "Grid-stride inner-loop unroll for BLAS and reduction kernels (e.g. 1 or 2)")
-mark_as_advanced(QUDA_BLAS_GRID_STRIDE_UNROLL)
+set(QUDA_BLAS_WORK_ITEM_UNROLL "1" CACHE STRING "Work-item inner-loop unroll for BLAS and reduction kernels (e.g. 1 or 2)")
+mark_as_advanced(QUDA_BLAS_WORK_ITEM_UNROLL)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 
@@ -314,7 +314,7 @@ if(NOT QUDA_TARGET_TYPE STREQUAL "CUDA" AND QUDA_BLAS_PREFETCH_TYPE STREQUAL "BU
   message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_TARGET_TYPE=CUDA (TMA bulk prefetch is CUDA-only).")
 endif()
 message(STATUS "BLAS prefetch: ${QUDA_BLAS_PREFETCH_TYPE}")
-message(STATUS "BLAS grid-stride unroll: ${QUDA_BLAS_GRID_STRIDE_UNROLL}")
+message(STATUS "BLAS work-item unroll: ${QUDA_BLAS_WORK_ITEM_UNROLL}")
 
 if(QUDA_MPI AND QUDA_QMP)
   message(

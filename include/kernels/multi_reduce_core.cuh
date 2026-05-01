@@ -38,7 +38,7 @@ namespace quda
       using real = real_;
       using Reducer = Reducer_;
       using reduce_t = array<typename Reducer_::reduce_t, NXZ_>;
-      static constexpr unsigned int grid_stride_unroll = QUDA_BLAS_GRID_STRIDE_UNROLL;
+      static constexpr unsigned int work_item_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();

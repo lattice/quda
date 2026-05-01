@@ -3,8 +3,8 @@
 #include <cstdio>
 #include <cstring>
 
-#ifndef QUDA_BLAS_GRID_STRIDE_UNROLL
-#define QUDA_BLAS_GRID_STRIDE_UNROLL 1
+#ifndef QUDA_BLAS_WORK_ITEM_UNROLL
+#define QUDA_BLAS_WORK_ITEM_UNROLL 1
 #endif
 
 #include <color_spinor_field.h>
@@ -129,11 +129,11 @@ namespace quda
       }
     }
 
-    /** Append \c grid_stride_unroll (Blas / Reduction / multi-blas / multi-reduce) for autotune separation. */
-    inline void blas_tune_aux_grid_stride_unroll(char *aux)
+    /** Append work-item unroll (Blas / Reduction / multi-blas / multi-reduce) for autotune separation. */
+    inline void blas_tune_aux_work_item_unroll(char *aux)
     {
       char buf[32];
-      snprintf(buf, sizeof(buf), ",gs_u=%d", QUDA_BLAS_GRID_STRIDE_UNROLL);
+      snprintf(buf, sizeof(buf), ",unroll=%d", QUDA_BLAS_WORK_ITEM_UNROLL);
       strcat(aux, buf);
     }
 

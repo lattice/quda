@@ -30,9 +30,9 @@ namespace quda
 
   namespace kernel_unroll
   {
-    /** \c std::integral_constant<int, Arg::grid_stride_unroll> for batched grid-stride calls. */
+    /** \c std::integral_constant<int, Arg::work_item_unroll> for batched grid-stride calls. */
     template <typename Arg>
-    using grid_stride_unroll_t = std::integral_constant<int, static_cast<int>(Arg::grid_stride_unroll)>;
+    using work_item_unroll_t = std::integral_constant<int, static_cast<int>(Arg::work_item_unroll)>;
 
     /**
        True if Functor<Arg> supports grid-stride batching: \c operator() templated on
@@ -44,19 +44,19 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     inline constexpr bool kernel_functor_unroll_1d_v = requires(Functor<Arg> &f)
     {
-      f.template operator()<grid_stride_unroll_t<Arg>>(0, 0, 0, 0);
+      f.template operator()<work_item_unroll_t<Arg>>(0, 0, 0, 0);
     };
 
     template <template <typename> class Functor, typename Arg>
     inline constexpr bool kernel_functor_unroll_2d_v = requires(Functor<Arg> &f)
     {
-      f.template operator()<grid_stride_unroll_t<Arg>>(0, 0, 0, 0);
+      f.template operator()<work_item_unroll_t<Arg>>(0, 0, 0, 0);
     };
 
     template <template <typename> class Functor, typename Arg>
     inline constexpr bool kernel_functor_unroll_3d_v = requires(Functor<Arg> &f)
     {
-      f.template operator()<grid_stride_unroll_t<Arg>>(0, 0, 0, 0);
+      f.template operator()<work_item_unroll_t<Arg>>(0, 0, 0, 0);
     };
   } // namespace kernel_unroll
 
@@ -90,18 +90,18 @@ namespace quda
       }
       const auto stride = gridDim.x * blockDim.x;
       if constexpr (grid_stride) {
-        if constexpr (Arg::grid_stride_unroll > 1u) {
+        if constexpr (Arg::work_item_unroll > 1u) {
           if constexpr (kernel_unroll::kernel_functor_unroll_1d_v<Functor, Arg>) {
-            while (i + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+            while (i + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
               if constexpr (kernel_prefetch::kernel_functor_prefetch_1d_v<Functor, Arg>) {
 #pragma unroll
-                for (unsigned e = 1u; e <= Arg::grid_stride_unroll; e++) {
+                for (unsigned e = 1u; e <= Arg::work_item_unroll; e++) {
                   const auto i_pf = i + e * stride;
                   if (i_pf < arg.threads.x) f.prefetch(i_pf);
                 }
               }
-              f.template operator()<kernel_unroll::grid_stride_unroll_t<Arg>>(i, 0, 0, stride);
-              i += Arg::grid_stride_unroll * stride;
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, 0, 0, stride);
+              i += Arg::work_item_unroll * stride;
             }
           }
         }
@@ -239,18 +239,18 @@ namespace quda
       }
       const auto stride = gridDim.x * blockDim.x;
       if constexpr (grid_stride) {
-        if constexpr (Arg::grid_stride_unroll > 1u) {
+        if constexpr (Arg::work_item_unroll > 1u) {
           if constexpr (kernel_unroll::kernel_functor_unroll_2d_v<Functor, Arg>) {
-            while (i + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+            while (i + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
               if constexpr (kernel_prefetch::kernel_functor_prefetch_2d_v<Functor, Arg>) {
 #pragma unroll
-                for (unsigned e = 1u; e <= Arg::grid_stride_unroll; e++) {
+                for (unsigned e = 1u; e <= Arg::work_item_unroll; e++) {
                   const auto i_pf = i + e * stride;
                   if (i_pf < arg.threads.x) f.prefetch(i_pf, j);
                 }
               }
-              f.template operator()<kernel_unroll::grid_stride_unroll_t<Arg>>(i, j, 0, stride);
-              i += Arg::grid_stride_unroll * stride;
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, 0, stride);
+              i += Arg::work_item_unroll * stride;
             }
           }
         }
@@ -390,18 +390,18 @@ namespace quda
       }
       const auto stride = gridDim.x * blockDim.x;
       if constexpr (grid_stride) {
-        if constexpr (Arg::grid_stride_unroll > 1u) {
+        if constexpr (Arg::work_item_unroll > 1u) {
           if constexpr (kernel_unroll::kernel_functor_unroll_3d_v<Functor, Arg>) {
-            while (i + (Arg::grid_stride_unroll - 1u) * stride < arg.threads.x) {
+            while (i + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
               if constexpr (kernel_prefetch::kernel_functor_prefetch_3d_v<Functor, Arg>) {
 #pragma unroll
-                for (unsigned e = 1u; e <= Arg::grid_stride_unroll; e++) {
+                for (unsigned e = 1u; e <= Arg::work_item_unroll; e++) {
                   const auto i_pf = i + e * stride;
                   if (i_pf < arg.threads.x) f.prefetch(i_pf, j, k);
                 }
               }
-              f.template operator()<kernel_unroll::grid_stride_unroll_t<Arg>>(i, j, k, stride);
-              i += Arg::grid_stride_unroll * stride;
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, k, stride);
+              i += Arg::work_item_unroll * stride;
             }
           }
         }

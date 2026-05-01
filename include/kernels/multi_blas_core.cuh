@@ -36,7 +36,7 @@ namespace quda
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor_>(), store_t, N, y_store_t, Ny, Functor_::use_w> {
       using real = real_;
       using Functor = Functor_;
-      static constexpr unsigned int grid_stride_unroll = QUDA_BLAS_GRID_STRIDE_UNROLL;
+      static constexpr unsigned int work_item_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
       static constexpr int warp_split = warp_split_;
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
