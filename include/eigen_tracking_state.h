@@ -248,6 +248,16 @@ namespace quda
 
     /** @brief Access the tracker (mutable, for forceUpdate on rejection) */
     EigenTracker &getTrackerMutable() { return tracker_; }
+
+    /** @brief Cumulative count of Ritz vectors absorbed into the pool
+     *         across the lifetime of this tracker. Used by the regression
+     *         tests that verify the per-solve Krylov capture
+     *         (--eigentracking-residual-cap > 0) actually feeds the pool. */
+    int getTotalRitzAbsorbed() const { return totalRitzAbsorbed_; }
+
+    /** @brief Number of trajectories the tracker has been live across.
+     *         Increments inside betweenTrajectories. */
+    int getTrajectoryCount() const { return trajectoryCount_; }
   };
 
 } // namespace quda

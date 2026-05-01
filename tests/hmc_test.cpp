@@ -27,6 +27,8 @@
 #include <eigen_tracker.h>
 #include <eigen_forecast.h>
 #include <cg_ritz_extractor.h>
+#include <gcr_tracker.h>
+#include <inv_tracker.h>
 #include <eigen_tracking_state.h>
 #include <eigensolve_quda.h>
 #include <multigrid.h>
@@ -2184,6 +2186,310 @@ TEST(HMC, Production)
   inv_param.solve_type = saved_solve_type;
 
   SUCCEED();
+}
+
+// ============================================================================
+// Eigentracking solver-side tracker regression tests
+// ----------------------------------------------------------------------------
+// These tests lock in the architectural invariants of the per-solve Krylov
+// capture (--eigentracking-residual-cap > 0) wired into inv_cg_quda.cpp and
+// inv_gcr_quda.cpp through CGTracker / GCRTracker (cg_ritz_extractor.cpp,
+// gcr_tracker.cpp) and the shared TrackerScope<T> / takeRitzVectors helpers
+// in inv_tracker.h. The implementation peeled off four real bugs during
+// development — move-assign guard on the FIFO, sloppy/double precision
+// mismatch in multiCdot, hierarchy leak from coarse-MG-level GCR, and a
+// half-to-full-site embedding that inverted the pool's site-subset match.
+// Each test below pins one of those invariants so the next person to touch
+// the trackers cannot silently reintroduce them.
+// ============================================================================
+
+namespace
+{
+
+  /** @brief Construct an empty fine-grid Wilson spinor (Ns=4, Nc=3) at the
+   *         requested precision and site subset. Uses the test fixture's
+   *         inv_param + gauge dimensions, so the field is compatible with
+   *         the operators / pool the production HMC builds. */
+  quda::ColorSpinorField makeFineSpinor(QudaPrecision prec_, QudaSiteSubset siteSubset)
+  {
+    // ColorSpinorParam wants lat_dim_t (quda::array<int, QUDA_MAX_DIM>);
+    // gauge_param.X is plain int[4]. Promote.
+    quda::lat_dim_t X{};
+    for (int i = 0; i < 4; i++) X[i] = gauge_param.X[i];
+    quda::ColorSpinorParam csParam(nullptr, inv_param, X,
+                                   /*pc_solution=*/(siteSubset == QUDA_PARITY_SITE_SUBSET),
+                                   QUDA_CUDA_FIELD_LOCATION);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.setPrecision(prec_);
+    csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
+    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    return quda::ColorSpinorField(csParam);
+  }
+
+  /** @brief Construct an empty coarse-grid spinor (Ns=2, Nc=24) by deriving
+   *         from a fine spinor's create_coarse with a 2x2x2x2 block. Used to
+   *         simulate the field shape that QUDA's MG-internal level-1 GCR
+   *         hands recordIteration when the eigentracking hook fires
+   *         throughout the MG hierarchy. */
+  quda::ColorSpinorField makeCoarseSpinor()
+  {
+    auto fine = makeFineSpinor(QUDA_DOUBLE_PRECISION, QUDA_FULL_SITE_SUBSET);
+    const int blockSize[4] = {2, 2, 2, 2};
+    return fine.create_coarse(blockSize, /*spinBlockSize=*/2, /*Nvec=*/24,
+                               QUDA_DOUBLE_PRECISION, QUDA_CUDA_FIELD_LOCATION);
+  }
+
+} // namespace
+
+/**
+ * @brief Hierarchy filter: GCRTracker silently drops residuals whose spinor
+ *        shape does not match a fine Wilson field (Ns=4, Nc=3).
+ *
+ * The activeGCRTracker hook in inv_gcr_quda.cpp fires for every GCR
+ * instance in the call tree. With MG enabled, that includes the level-1
+ * coarse-grid GCR run inside the preconditioner. Coarse residuals have
+ * (Ns=2, Nc=nVec); they do not match the EigenTracker pool's fine-grid
+ * reference vectors, so the absorb path faults if they reach it. The
+ * filter at the top of recordIteration drops them before they can be
+ * stashed.
+ */
+TEST(HMC, GCRTrackerHierarchyFilter)
+{
+  using namespace quda;
+
+  GCRTracker tracker(/*maxVecs=*/4, /*targetPrecision=*/QUDA_DOUBLE_PRECISION);
+  ASSERT_TRUE(tracker.isActive());
+  EXPECT_EQ(tracker.numStored(), 0);
+
+  // A coarse-shape spinor must be silently dropped — no contribution to
+  // the stored residual list, no exception, no crash.
+  auto coarse = makeCoarseSpinor();
+  ASSERT_NE(coarse.Nspin(), 4) << "test setup: coarse spinor should have Ns != 4";
+  ASSERT_NE(coarse.Ncolor(), 3) << "test setup: coarse spinor should have Nc != 3";
+  blas::ax(2.5, coarse); // give it a non-trivial norm so a successful
+                         // store would be detectable via takeResiduals.
+  tracker.recordIteration(coarse);
+  EXPECT_EQ(tracker.numStored(), 0) << "coarse residual leaked past the hierarchy filter";
+
+  // A fine Wilson spinor must be accepted.
+  auto fine = makeFineSpinor(QUDA_DOUBLE_PRECISION, QUDA_FULL_SITE_SUBSET);
+  ASSERT_EQ(fine.Nspin(), 4);
+  ASSERT_EQ(fine.Ncolor(), 3);
+  spinorNoise(fine, /*seed=*/12345, QUDA_NOISE_GAUSS);
+  tracker.recordIteration(fine);
+  EXPECT_EQ(tracker.numStored(), 1) << "fine residual was incorrectly filtered";
+}
+
+/**
+ * @brief Precision promotion: GCRTracker stores residuals at the target
+ *        precision passed to its constructor, regardless of the source's
+ *        precision.
+ *
+ * The pool's reference vectors and absorption kernels live at
+ * inv_param.cuda_prec (typically double). GCR runs at precision_sloppy
+ * (typically single). Without an explicit promotion the pool absorb path
+ * faults inside multiCdot — no instantiation exists for the mixed
+ * double-pool / single-residual combination.
+ */
+TEST(HMC, GCRTrackerPrecisionPromotion)
+{
+  using namespace quda;
+
+  // Construct a single-precision fine spinor with non-trivial content.
+  auto srcSingle = makeFineSpinor(QUDA_SINGLE_PRECISION, QUDA_FULL_SITE_SUBSET);
+  spinorNoise(srcSingle, /*seed=*/54321, QUDA_NOISE_GAUSS);
+  ASSERT_GT(blas::norm2(srcSingle), 0.0);
+
+  // Tracker promotes to double.
+  GCRTracker tracker(/*maxVecs=*/1, /*targetPrecision=*/QUDA_DOUBLE_PRECISION);
+  tracker.recordIteration(srcSingle);
+  ASSERT_EQ(tracker.numStored(), 1);
+
+  auto stored = tracker.takeResiduals();
+  ASSERT_EQ(stored.size(), 1u);
+
+  EXPECT_EQ(stored[0].Precision(), QUDA_DOUBLE_PRECISION) << "stored field not promoted";
+  EXPECT_EQ(stored[0].Nspin(),    4);
+  EXPECT_EQ(stored[0].Ncolor(),   3);
+
+  // recordIteration normalises: stored field should have unit L2 norm.
+  EXPECT_NEAR(blas::norm2(stored[0]), 1.0, 1e-10);
+
+  // Tracker should have drained.
+  EXPECT_EQ(tracker.numStored(), 0);
+}
+
+/**
+ * @brief Site-subset preservation: GCRTracker does NOT embed a half-site
+ *        residual into a full-site container.
+ *
+ * The EigenTracker pool is seeded by hmc.cpp's seedEigenTrackingFromMG
+ * from the EVEN-PARITY (half-site) components of the MG null vectors, so
+ * pool reference vectors are half-site fine. Inside a PC solve GCR's
+ * r_sloppy is also half-site, so the two match by construction. An
+ * earlier development version embedded half-site into full-site here
+ * "to align with the pool" — that inverted the match and reintroduced
+ * the MultiReduce length-mismatch crash. This test pins the design.
+ */
+TEST(HMC, GCRTrackerSiteSubsetPreserved)
+{
+  using namespace quda;
+
+  // Half-site (single-parity) fine spinor at single precision.
+  auto srcHalf = makeFineSpinor(QUDA_SINGLE_PRECISION, QUDA_PARITY_SITE_SUBSET);
+  spinorNoise(srcHalf, /*seed=*/13579, QUDA_NOISE_GAUSS);
+  ASSERT_EQ(srcHalf.SiteSubset(), QUDA_PARITY_SITE_SUBSET);
+
+  GCRTracker tracker(/*maxVecs=*/1, /*targetPrecision=*/QUDA_DOUBLE_PRECISION);
+  tracker.recordIteration(srcHalf);
+  ASSERT_EQ(tracker.numStored(), 1);
+
+  auto stored = tracker.takeResiduals();
+  ASSERT_EQ(stored.size(), 1u);
+
+  EXPECT_EQ(stored[0].SiteSubset(), QUDA_PARITY_SITE_SUBSET) << "half-site residual was embedded into full-site";
+  EXPECT_EQ(stored[0].Precision(),  QUDA_DOUBLE_PRECISION)   << "precision promotion still required";
+  EXPECT_NEAR(blas::norm2(stored[0]), 1.0, 1e-10);
+}
+
+/**
+ * @brief End-to-end: when --eigentracking-residual-cap > 0 the per-solve
+ *        Krylov capture actually feeds the EigenTracker pool, in addition
+ *        to the converged-solution stash that runs unconditionally.
+ *
+ * Mirrors the MG setup of HMC.MGPreconditionedRun (which is the path the
+ * GCR install instruments) and forces ET on with cap=4. After one
+ * trajectory the absorbed-Ritz count must be strictly positive — a
+ * cap=0 baseline would absorb only the converged solution, while cap=4
+ * adds 4 GCR residuals per γ₅ two-pass solve. The exact number depends
+ * on how many force / action solves an integrator step does, so we
+ * assert >= 1 (firmly catches the regression where the install path
+ * silently no-ops; the differential CG-vs-GCR-cap exact arithmetic is
+ * better verified at production scale by paired HMC.Production runs).
+ */
+TEST(HMC, EigenTrackerCapEnrichesPool)
+{
+  using namespace quda;
+
+  // Force MG-aligned clover precisions if needed (same as MGPreconditionedRun).
+  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    inv_param.clover_cuda_prec = inv_param.cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = inv_param.cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = inv_param.cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = inv_param.cuda_prec_precondition;
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
+
+  // Reuse the known-good 4^4 MG configuration from HMC.MGPreconditionedRun.
+  QudaPrecision mg_prec =
+    (prec_precondition != QUDA_INVALID_PRECISION) ? prec_precondition : QUDA_SINGLE_PRECISION;
+  QudaInvertParam mg_inv_param = inv_param;
+  mg_inv_param.solve_type = QUDA_DIRECT_SOLVE;
+  mg_inv_param.solution_type = QUDA_MAT_SOLUTION;
+  mg_inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  mg_inv_param.cuda_prec = gauge_param.cuda_prec;
+  mg_inv_param.cuda_prec_sloppy = mg_prec;
+  mg_inv_param.cuda_prec_precondition = mg_prec;
+  mg_inv_param.cuda_prec_eigensolver = mg_prec;
+  mg_inv_param.clover_cuda_prec = gauge_param.cuda_prec;
+  mg_inv_param.clover_cuda_prec_sloppy = mg_prec;
+  mg_inv_param.clover_cuda_prec_precondition = mg_prec;
+  mg_inv_param.clover_cuda_prec_eigensolver = mg_prec;
+
+  QudaMultigridParam mg_param = newQudaMultigridParam();
+  configureHMCTestMG(mg_param, mg_inv_param, mg_prec);
+
+  void *mg_preconditioner = newMultigridQuda(&mg_param);
+
+  // Snapshot inv_param for restore at exit.
+  const void *saved_preconditioner = inv_param.preconditioner;
+  const QudaInverterType saved_inv_type = inv_param.inv_type;
+  const QudaInverterType saved_inv_type_precondition = inv_param.inv_type_precondition;
+  const QudaSolveType saved_solve_type = inv_param.solve_type;
+
+  inv_param.preconditioner = mg_preconditioner;
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+
+  // Force cap > 0 + ET on for this test, restore the user's CLI values at exit.
+  const int saved_cap = eigentracking_residual_cap;
+  const bool saved_et = eigentracking_enabled;
+  eigentracking_residual_cap = 4;
+  eigentracking_enabled = true;
+
+  // Tear down any pre-existing tracker so this test starts clean.
+  if (auto *prev = getEigenTrackingInstance()) {
+    delete prev;
+    setEigenTrackingInstance(nullptr);
+  }
+
+  QudaHMCParam hmc_param = makeHMCParam();
+  hmc_param.n_trajectories = 1;
+  hmc_param.n_thermalization = 0;
+
+  hmcRunQuda(nullptr, &hmc_param, &gauge_param, &inv_param, mg_preconditioner, &mg_param);
+
+  auto *et = getEigenTrackingInstance();
+  ASSERT_NE(et, nullptr) << "EigenTrackingState was not constructed during HMC";
+
+  EXPECT_GE(et->getTrajectoryCount(), 1);
+  EXPECT_GT(et->getTotalRitzAbsorbed(), 0)
+      << "per-solve Krylov capture (cap=4) failed to feed the pool: "
+         "got " << et->getTotalRitzAbsorbed() << " absorbed";
+
+  // Restore HMC + ET state.
+  destroyMultigridQuda(mg_preconditioner);
+  inv_param.preconditioner = const_cast<void *>(saved_preconditioner);
+  inv_param.inv_type = saved_inv_type;
+  inv_param.inv_type_precondition = saved_inv_type_precondition;
+  inv_param.solve_type = saved_solve_type;
+  eigentracking_residual_cap = saved_cap;
+  eigentracking_enabled = saved_et;
+}
+
+/**
+ * @brief TrackerScope<T> install/restore lifecycle.
+ *
+ * Locks in the contract of inv_tracker.h's templated scope: on
+ * construction the scope sets the supplied global slot to the provided
+ * tracker pointer; on destruction it restores whatever value the slot
+ * had before. Nested scopes see the outer install once the inner exits.
+ */
+TEST(HMC, TrackerScopeInstallRestore)
+{
+  using namespace quda;
+
+  // Start from a known clean state regardless of previous tests.
+  GCRTracker *initial = activeGCRTracker;
+  activeGCRTracker = nullptr;
+  ASSERT_EQ(activeGCRTracker, nullptr);
+
+  GCRTracker outer(/*maxVecs=*/1, /*targetPrecision=*/QUDA_DOUBLE_PRECISION);
+  GCRTracker inner(/*maxVecs=*/2, /*targetPrecision=*/QUDA_DOUBLE_PRECISION);
+
+  {
+    TrackerScope<GCRTracker> scope_outer(activeGCRTracker, &outer);
+    EXPECT_EQ(activeGCRTracker, &outer);
+
+    {
+      TrackerScope<GCRTracker> scope_inner(activeGCRTracker, &inner);
+      EXPECT_EQ(activeGCRTracker, &inner);
+
+      // A nested scope with nullptr suspends tracking inside the inner
+      // region without disturbing the outer install.
+      {
+        TrackerScope<GCRTracker> scope_null(activeGCRTracker, nullptr);
+        EXPECT_EQ(activeGCRTracker, nullptr);
+      }
+      EXPECT_EQ(activeGCRTracker, &inner);
+    }
+    EXPECT_EQ(activeGCRTracker, &outer);
+  }
+  EXPECT_EQ(activeGCRTracker, nullptr);
+
+  // Restore prior state (paranoia for any later test).
+  activeGCRTracker = initial;
 }
 
 int main(int argc, char **argv)
