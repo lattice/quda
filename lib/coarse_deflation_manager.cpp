@@ -127,6 +127,15 @@ namespace quda
             coarseEvals[0].real(), coarseEvals[nDefl - 1].real());
   }
 
+  void CoarseDeflationManager::rebindCoarseRefs(const Transfer &transfer_, const DiracMatrix &matCoarse_,
+                                                const Dirac &diracCoarse_)
+  {
+    transfer = &transfer_;
+    matCoarse = &matCoarse_;
+    diracCoarse = &diracCoarse_;
+    stepCounter = 0;
+  }
+
   void CoarseDeflationManager::maybeRefresh()
   {
     if (refreshInterval <= 0) return;

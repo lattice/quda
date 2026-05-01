@@ -69,6 +69,19 @@ namespace quda
     /** @brief Tier 1: Rayleigh-Ritz re-diagonalization (cheap, between trajectories) */
     void rayleighRitzUpdate();
 
+    /**
+     * @brief Rebind transfer / coarse Dirac / coarse DiracMatrix references.
+     *
+     * Call after a refresh-style updateMultigridQuda which destroys and
+     * recreates the MG coarse operators. The previously stored pointers
+     * dangle the moment MG::reset(refresh=true) returns; using them
+     * (e.g. via rayleighRitzUpdate or solve) faults. After rebind the
+     * stored coarseEvecs are still valid as ColorSpinorField containers
+     * (block size and nVec are configuration-stable across refresh) but
+     * their numerical contents are stale, so call solve() to repopulate.
+     */
+    void rebindCoarseRefs(const Transfer &transfer_, const DiracMatrix &matCoarse_, const Dirac &diracCoarse_);
+
     /** @brief Tier 2: Check step counter and refresh if due */
     void maybeRefresh();
 

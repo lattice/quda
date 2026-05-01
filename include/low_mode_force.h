@@ -76,6 +76,16 @@ namespace quda
      */
     void computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &gauge,
                       const CloverField *clover, QudaGaugeParam &gaugeParam, QudaInvertParam &invParam);
+
+    /**
+     * @brief Rebind the fine-grid normal operator after an MG refresh.
+     *
+     * updateMultigridQuda(refresh) destroys mg_solver->m and replaces it
+     * with a new DiracM, leaving any cached pointer dangling. NestedFGI
+     * calls this from its afterAccepted hook so the next computeForce /
+     * projectLowModes call uses the fresh operator.
+     */
+    void rebindFineMatrix(const DiracMatrix &matFine_) { matFine = &matFine_; }
   };
 
 } // namespace quda

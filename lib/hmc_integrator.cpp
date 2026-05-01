@@ -822,6 +822,17 @@ namespace quda
   void NestedFGIIntegrator::afterAccepted(bool full_mg_update)
   {
     if (full_mg_update) {
+      // updateMultigridQuda(refresh) just destroyed and recreated the
+      // fine and coarse Dirac/DiracMatrix instances behind our backs
+      // (see interface_quda.cpp updateMultigridQuda non-thin branch and
+      // MG::reset → createCoarseDirac). The pointers cached in
+      // deflManager (matCoarse, diracCoarse) and lowModeForce (matFine)
+      // are now dangling. Rebind from the live MG hierarchy before
+      // touching them.
+      auto *mg_solver = static_cast<multigrid_solver *>(mgPreconditioner);
+      MG &mg = *mg_solver->mg;
+      deflManager.rebindCoarseRefs(*mg.getTransfer(), *mg.getMatCoarseResidual(), *mg.getDiracCoarseResidual());
+      lowModeForce.rebindFineMatrix(*mg_solver->m);
       deflManager.solve();
     } else {
       deflManager.rayleighRitzUpdate();
