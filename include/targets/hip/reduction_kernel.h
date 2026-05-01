@@ -10,6 +10,10 @@
 namespace quda
 {
 
+  /**
+     Capability traits for transformer \c prefetch methods. The reduction drivers do not
+     invoke prefetch today; functors may still implement \c prefetch for future wiring.
+   */
   namespace reduction_prefetch
   {
     template <template <typename> class Transformer, typename Arg>
@@ -67,32 +71,16 @@ namespace quda
 
     reduce_t value = reducer_t::init();
 
-    if constexpr (grid_stride) {
-      if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
-        if (idx < arg.threads.x) t.prefetch(idx, j);
-      }
-    }
     const auto stride = blockDim.x * gridDim.x;
     if constexpr (grid_stride) {
       if constexpr (Arg::work_item_unroll > 1u) {
         while (idx + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
           if constexpr (reduction_unroll::reduction_functor_unroll_2d_v<Transformer, Arg>) {
-            if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
-#pragma unroll
-              for (unsigned e = 1u; e <= Arg::work_item_unroll; e++) {
-                const auto idx_pf = idx + e * stride;
-                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, j);
-              }
-            }
             value = t.template operator()<reduction_unroll::work_item_unroll_t<Arg>>(value, idx, j, 0, stride);
             idx += Arg::work_item_unroll * stride;
           } else {
 #pragma unroll
             for (unsigned e = 0; e < Arg::work_item_unroll; e++) {
-              if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
-                const auto idx_pf = idx + (e + 1u) * stride;
-                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, j);
-              }
               value = t(value, idx + e * stride, j);
             }
             idx += Arg::work_item_unroll * stride;
@@ -101,12 +89,6 @@ namespace quda
       }
     }
     while (idx < arg.threads.x) {
-      if constexpr (grid_stride) {
-        if constexpr (reduction_prefetch::reduction_functor_prefetch_2d_v<Transformer, Arg>) {
-          const auto idx_next = idx + stride;
-          if (idx_next < arg.threads.x) t.prefetch(idx_next, j);
-        }
-      }
       value = t(value, idx, j);
       if constexpr (grid_stride) {
         idx += stride;
@@ -186,32 +168,16 @@ namespace quda
 
     reduce_t value = reducer_t::init();
 
-    if constexpr (grid_stride) {
-      if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
-        if (idx < arg.threads.x) t.prefetch(idx, k, j);
-      }
-    }
     const auto stride = blockDim.x * gridDim.x;
     if constexpr (grid_stride) {
       if constexpr (Arg::work_item_unroll > 1u) {
         while (idx + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
           if constexpr (reduction_unroll::reduction_functor_unroll_3d_v<Functor, Arg>) {
-            if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
-#pragma unroll
-              for (unsigned e = 1u; e <= Arg::work_item_unroll; e++) {
-                const auto idx_pf = idx + e * stride;
-                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, k, j);
-              }
-            }
             value = t.template operator()<reduction_unroll::work_item_unroll_t<Arg>>(value, idx, k, j, stride);
             idx += Arg::work_item_unroll * stride;
           } else {
 #pragma unroll
             for (unsigned e = 0; e < Arg::work_item_unroll; e++) {
-              if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
-                const auto idx_pf = idx + (e + 1u) * stride;
-                if (idx_pf < arg.threads.x) t.prefetch(idx_pf, k, j);
-              }
               value = t(value, idx + e * stride, k, j);
             }
             idx += Arg::work_item_unroll * stride;
@@ -220,12 +186,6 @@ namespace quda
       }
     }
     while (idx < arg.threads.x) {
-      if constexpr (grid_stride) {
-        if constexpr (reduction_prefetch::reduction_functor_prefetch_3d_v<Functor, Arg>) {
-          const auto idx_next = idx + stride;
-          if (idx_next < arg.threads.x) t.prefetch(idx_next, k, j);
-        }
-      }
       value = t(value, idx, k, j);
       if constexpr (grid_stride) {
         idx += stride;
