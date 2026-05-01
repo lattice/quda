@@ -78,7 +78,7 @@ set (QUDA_OBJS
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
   hmc.cpp hmc_integrator.cpp coarse_deflation_manager.cpp low_mode_force.cpp
-  eigen_tracker.cpp eigen_forecast.cpp cg_ritz_extractor.cpp eigen_tracking_state.cpp
+  eigen_tracker.cpp eigen_forecast.cpp cg_ritz_extractor.cpp gcr_tracker.cpp eigen_tracking_state.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
