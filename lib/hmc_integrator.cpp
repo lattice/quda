@@ -11,6 +11,7 @@
 #include <hmc_integrator.h>
 #include <hmc_quda.h>
 #include <eigen_tracking_state.h>
+#include <inv_tracker.h>
 
 #include <blas_quda.h>
 #include <clover_field.h>
@@ -354,9 +355,25 @@ namespace quda
       std::vector<ColorSpinorField> z(1, csParam);
       gamma5(z, b);
 
+      // GCR-Krylov-residual capture for the eigentracker (gcr_tracker.h).
+      // The two M solves below go through GCR-with-MG. The tracker stores
+      // up to N normalised intermediate residuals — these span the
+      // slow-converging modes the preconditioner could not flatten and
+      // complement the converged-solution stash below. Cap pulled from
+      // EigenTrackingParam::residualCap (CLI flag
+      // --eigentracking-residual-cap, default 0=off, opt-in for
+      // light-mass regimes).
+      const int gcrResCap = (tracking && tracking->isActive()) ? tracking->getParam().residualCap : 0;
+      // Promote captured residuals to inv_param.cuda_prec so the
+      // EigenTracker pool (double-precision) absorption does not fault
+      // inside multiCdot when mixing precisions.
+      GCRTracker gcrTracker(gcrResCap, ip.cuda_prec);
+      std::vector<ColorSpinorField> krylovVecs;
+
       // Step 2: Solve M w = z
       std::vector<ColorSpinorField> w(1, csParam);
       {
+        TrackerScope<GCRTracker> scope(activeGCRTracker, gcrTracker.isActive() ? &gcrTracker : nullptr);
         Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
         (*s)(w, z);
         delete s;
@@ -365,6 +382,7 @@ namespace quda
         logQuda(QUDA_VERBOSE, "γ₅ two-pass: M solve (pass 1) = %d iters\n", solverParam.iter);
         solverParam.iter = 0;
       }
+      for (auto &q : takeRitzVectors(gcrTracker)) krylovVecs.push_back(std::move(q));
 
       // Step 3: y = γ₅ w
       std::vector<ColorSpinorField> y(1, csParam);
@@ -372,6 +390,7 @@ namespace quda
 
       // Step 4: Solve M x = y
       {
+        TrackerScope<GCRTracker> scope(activeGCRTracker, gcrTracker.isActive() ? &gcrTracker : nullptr);
         Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
         (*s)(x, y);
         delete s;
@@ -379,9 +398,14 @@ namespace quda
         g_traj_cg_solves++;
         logQuda(QUDA_VERBOSE, "γ₅ two-pass: M solve (pass 2) = %d iters\n", solverParam.iter);
       }
+      for (auto &q : takeRitzVectors(gcrTracker)) krylovVecs.push_back(std::move(q));
 
-      // Stash normalized solution vectors for eigentracking absorption.
-      // w = M⁻¹ γ₅ b and x = (M†M)⁻¹ b are both rich in low-mode content.
+      // Stash converged-solution vectors plus GCR-residual vectors for
+      // eigentracking absorption. w = M⁻¹ γ₅ b and x = (M†M)⁻¹ b are
+      // rich in low-mode content (each Krylov solve concentrates
+      // amplitude on small-eigenvalue modes); the GCR residuals from the
+      // tail of the iteration carry the modes the preconditioner could
+      // not kill in the available iterations.
       if (tracking && tracking->isActive()) {
         std::vector<ColorSpinorField> solVecs;
         ColorSpinorField xNorm(x[0]);
@@ -396,15 +420,32 @@ namespace quda
           blas::ax(1.0 / wnrm, wNorm);
           solVecs.push_back(std::move(wNorm));
         }
+        for (auto &q : krylovVecs) solVecs.push_back(std::move(q));
         if (!solVecs.empty()) tracking->stashRitzVectors(std::move(solVecs));
       }
 
       ip.iter = g_traj_cg_iters; // for logging
     } else {
-      // Standard solve path (CG on M†M or direct without MG)
-      solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
-      g_traj_cg_iters += ip.iter;
-      g_traj_cg_solves++;
+      // Standard solve path (CG on M†M or direct without MG). When the
+      // user has opted in via residualCap > 0, install a CGTracker for
+      // the duration of this solve so the inv_cg_quda.cpp loop captures
+      // alpha/beta/residuals for zero-cost Lanczos-tridiag Ritz pair
+      // extraction. The extracted vectors feed the same stash path as
+      // the MG branch above.
+      const int cgRitzCap = (tracking && tracking->isActive()) ? tracking->getParam().residualCap : 0;
+      CGTracker cgTracker(cgRitzCap);
+
+      {
+        TrackerScope<CGTracker> scope(activeCGTracker, cgTracker.isActive() ? &cgTracker : nullptr);
+        solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
+        g_traj_cg_iters += ip.iter;
+        g_traj_cg_solves++;
+      }
+
+      if (tracking && tracking->isActive()) {
+        auto vecs = takeRitzVectors(cgTracker);
+        if (!vecs.empty()) tracking->stashRitzVectors(std::move(vecs));
+      }
     }
 
     // 2. Accumulate EO fermion force into momentum

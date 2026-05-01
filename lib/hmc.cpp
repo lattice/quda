@@ -14,6 +14,7 @@
 #include <hmc_quda.h>
 #include <hmc_integrator.h>
 #include <eigen_tracking_state.h>
+#include <inv_tracker.h>
 #include <dirac_quda.h>
 #include <invert_quda.h>
 #include <blas_quda.h>
@@ -371,6 +372,14 @@ namespace quda
       DiracM m(*dirac), mSloppy(*diracSloppy), mPre(*diracPre), mEig(*diracEig);
       SolverParam solverParam(ip);
 
+      // GCR-Krylov-residual capture, mirrors NestedFGI::computeOuterForce.
+      // Cap pulled from EigenTrackingParam; 0 disables capture entirely.
+      // Target precision = inv_param.cuda_prec so the pool absorption
+      // does not fault on mixed-precision multiCdot.
+      const int gcrResCap = (tracking && tracking->isActive()) ? tracking->getParam().residualCap : 0;
+      GCRTracker gcrTracker(gcrResCap, ip.cuda_prec);
+      std::vector<ColorSpinorField> krylovVecs;
+
       // Step 1: z = γ₅ phi
       std::vector<ColorSpinorField> z(1, csParam);
       std::vector<ColorSpinorField> b_vec(1, ColorSpinorField(phi));
@@ -379,12 +388,14 @@ namespace quda
       // Step 2: solve M w = z
       std::vector<ColorSpinorField> w(1, csParam);
       {
+        TrackerScope<GCRTracker> scope(activeGCRTracker, gcrTracker.isActive() ? &gcrTracker : nullptr);
         Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
         (*s)(w, z);
         delete s;
         integratorBumpCGStats(solverParam.iter);
         solverParam.iter = 0;
       }
+      for (auto &q : takeRitzVectors(gcrTracker)) krylovVecs.push_back(std::move(q));
 
       // Step 3: y = γ₅ w
       std::vector<ColorSpinorField> y(1, csParam);
@@ -393,23 +404,29 @@ namespace quda
       // Step 4: solve M x = y
       std::vector<ColorSpinorField> x_vec(1, csParam);
       {
+        TrackerScope<GCRTracker> scope(activeGCRTracker, gcrTracker.isActive() ? &gcrTracker : nullptr);
         Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
         (*s)(x_vec, y);
         delete s;
         integratorBumpCGStats(solverParam.iter);
       }
+      for (auto &q : takeRitzVectors(gcrTracker)) krylovVecs.push_back(std::move(q));
       x_dev = x_vec[0];
 
-      // Stash normalized solution for eigentracking absorption.
+      // Stash normalized solution + GCR-Krylov residuals for eigentracking
+      // absorption. The action solve runs only twice per trajectory (start
+      // and end), so the residual cap of 4 contributes at most 8 extra
+      // pool candidates per trajectory from this site.
       if (tracking && tracking->isActive()) {
         ColorSpinorField xNorm(x_vec[0]);
         double xnrm = sqrt(blas::norm2(xNorm));
+        std::vector<ColorSpinorField> solVecs;
         if (xnrm > 1e-30) {
           blas::ax(1.0 / xnrm, xNorm);
-          std::vector<ColorSpinorField> solVecs;
           solVecs.push_back(std::move(xNorm));
-          tracking->stashRitzVectors(std::move(solVecs));
         }
+        for (auto &q : krylovVecs) solVecs.push_back(std::move(q));
+        if (!solVecs.empty()) tracking->stashRitzVectors(std::move(solVecs));
       }
 
       delete dirac;
@@ -418,17 +435,35 @@ namespace quda
       if (diracEig && diracEig != dirac && diracEig != diracPre) delete diracEig;
     } else {
       // Standard host-side path via invertQuda (no MG preconditioner).
-      ip.make_resident_solution = 1;
-      ip.use_resident_solution = 1;
-      ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
-      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-      ColorSpinorField h_x(cpuParam);
-      ColorSpinorField h_b(cpuParam);
-      h_b = phi;
-      invertQuda(h_x.data(), h_b.data(), &ip);
-      integratorBumpCGStats(ip.iter);
-      x_dev = solutionResident[0];
-      solutionResident.clear();
+      // Without MG the inv_type is typically CG / CGNE / CGNR, which
+      // *does* admit zero-cost Lanczos-tridiag Ritz extraction
+      // (cg_ritz_extractor.cpp). Install activeCGTracker for the
+      // duration of the invertQuda call when the user has opted in via
+      // residualCap > 0; the tracker captures alpha/beta and
+      // normalised residuals from inside the CG loop, then we pull out
+      // up to residualCap Ritz pairs to feed the ET pool.
+      const int cgRitzCap = (tracking && tracking->isActive()) ? tracking->getParam().residualCap : 0;
+      CGTracker cgTracker(cgRitzCap);
+
+      {
+        TrackerScope<CGTracker> scope(activeCGTracker, cgTracker.isActive() ? &cgTracker : nullptr);
+        ip.make_resident_solution = 1;
+        ip.use_resident_solution = 1;
+        ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
+        cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+        ColorSpinorField h_x(cpuParam);
+        ColorSpinorField h_b(cpuParam);
+        h_b = phi;
+        invertQuda(h_x.data(), h_b.data(), &ip);
+        integratorBumpCGStats(ip.iter);
+        x_dev = solutionResident[0];
+        solutionResident.clear();
+      }
+
+      if (tracking && tracking->isActive()) {
+        auto vecs = takeRitzVectors(cgTracker);
+        if (!vecs.empty()) tracking->stashRitzVectors(std::move(vecs));
+      }
     }
 
     // S_f = Re(phi† x)

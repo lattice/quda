@@ -1347,6 +1347,7 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(eigentracking_solution_history, 3);
   P(eigentracking_absorb_ritz, 1);
   P(eigentracking_mg_refresh_iters, -1);
+  P(eigentracking_residual_cap, 0);
   P(eigentracking_trlm_tol, 1e-6);
   P(eigentracking_trlm_max_restarts, 100);
   P(eigentracking_trlm_check_interval, 10);
@@ -1399,6 +1400,7 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(eigentracking_solution_history, INVALID_DOUBLE);
   P(eigentracking_absorb_ritz, INVALID_DOUBLE);
   P(eigentracking_mg_refresh_iters, INVALID_DOUBLE);
+  P(eigentracking_residual_cap, INVALID_DOUBLE);
   P(eigentracking_trlm_tol, INVALID_DOUBLE);
   P(eigentracking_trlm_max_restarts, INVALID_DOUBLE);
   P(eigentracking_trlm_check_interval, INVALID_DOUBLE);

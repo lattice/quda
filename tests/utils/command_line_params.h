@@ -581,6 +581,7 @@ extern int eigentracking_fresh_interval;
 extern int eigentracking_solution_history;
 extern bool eigentracking_absorb_ritz;
 extern int eigentracking_mg_refresh_iters;
+extern int eigentracking_residual_cap;
 extern bool eigentracking_use_poly_acc;
 extern int eigentracking_poly_deg;
 extern double eigentracking_a_min;

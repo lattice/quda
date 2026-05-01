@@ -936,6 +936,27 @@ extern "C" {
      *                  closes the gap to standard re-setup at L=16^4
      *                  Wilson, mass=-1.5. */
     int eigentracking_mg_refresh_iters;
+    /** Per-solve cap on extra ET-pool candidates contributed by each
+     *  fermion solve (single knob covering both the CG and GCR install
+     *  paths; see cg_tracker.h, gcr_tracker.h):
+     *    - GCR (MG-preconditioned outer solve): cap on normalised
+     *      intermediate residuals stashed in a FIFO during the solve
+     *      (gcr_tracker.h).
+     *    - CG (non-preconditioned fallback): cap on Ritz pairs extracted
+     *      from the implicit Lanczos tridiagonal (cg_ritz_extractor.cpp).
+     *  Cost is linear in this knob; for either solver, value N pushes up
+     *  to N normalised ColorSpinorFields into stashRitzVectors per solve.
+     *
+     *  Default 0 (off): on Wilson and Wilson-clover at masses well
+     *  inside the safe regime, the converged-solution stash already
+     *  saturates the useful low-mode content of the pool and adding
+     *  intermediate Krylov vectors does not move the iter count.
+     *  Recommended to turn on (typical value 4) for light-mass /
+     *  large-volume regimes where the preconditioner degrades fast
+     *  enough that each solve has many "stuck" low modes the converged
+     *  solution alone misses. The HMC call sites read this through
+     *  EigenTrackingParam::residualCap. */
+    int eigentracking_residual_cap;
     /** Initial TRLM convergence knobs (also applied to fresh-TRLM refreshes) */
     double eigentracking_trlm_tol;          /**< TRLM convergence tolerance (default 1e-6) */
     int eigentracking_trlm_max_restarts;    /**< TRLM maximum restarts (default 100) */

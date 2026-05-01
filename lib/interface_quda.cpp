@@ -5192,6 +5192,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
       etp.solutionHistoryDepth = hmc_param->eigentracking_solution_history;
       etp.absorbRitz = hmc_param->eigentracking_absorb_ritz != 0;
       etp.mgRefreshIters = hmc_param->eigentracking_mg_refresh_iters;
+      etp.residualCap = hmc_param->eigentracking_residual_cap;
       etp.trlmTol = hmc_param->eigentracking_trlm_tol;
       etp.trlmMaxRestarts = hmc_param->eigentracking_trlm_max_restarts;
       etp.trlmCheckInterval = hmc_param->eigentracking_trlm_check_interval;

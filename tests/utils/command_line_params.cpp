@@ -325,6 +325,7 @@ int eigentracking_fresh_interval = 0;    // 0 = disabled (MG seeding replaces TR
 int eigentracking_solution_history = 3;
 bool eigentracking_absorb_ritz = true;   // false = pool stays as RR-evolved MG null vectors only
 int eigentracking_mg_refresh_iters = -1; // -1=disabled, 0=pure pool, N>0=pool+N CG polish iters (Fix 2)
+int eigentracking_residual_cap = 0;      // Per-solve cap on extra ET-pool candidates from CG/GCR Krylov (cg_tracker.h, gcr_tracker.h); 0=off, opt-in for light-mass regimes
 bool eigentracking_use_poly_acc = false; // Chebyshev acceleration for initial TRLM
 int eigentracking_poly_deg = 50;         // Chebyshev polynomial degree
 double eigentracking_a_min = 0.0;        // ~10x smallest target eval; 0 => caller fills
@@ -1355,6 +1356,15 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "(pair with --eigentracking-absorb-ritz false). N>0 = hybrid pool warm-start + "
                       "N CG inverse-iter polish steps per vector (Fix 2). ~5 iters typically "
                       "matches standard re-setup quality at L=16^4 Wilson, mass=-1.5.");
+  opgroup->add_option("--eigentracking-residual-cap", eigentracking_residual_cap,
+                      "Per-solve cap on extra ET-pool candidates contributed by each fermion "
+                      "solve. Single knob covering both install paths: GCR (MG-preconditioned "
+                      "outer solve, gcr_tracker.h) stashes up to N normalised residuals; CG "
+                      "(non-preconditioned fallback, cg_ritz_extractor.cpp) extracts up to N "
+                      "Ritz pairs from the implicit Lanczos tridiagonal. Default 0 (off): the "
+                      "converged-solution stash alone saturates the pool in safe-mass Wilson "
+                      "regimes. Set N>0 (typical: 4) for light-mass / large-volume runs where "
+                      "the preconditioner's stuck modes need explicit capture.");
   opgroup->add_option("--eigentracking-use-poly-acc", eigentracking_use_poly_acc,
                       "Enable Chebyshev polynomial acceleration in initial TRLM (default false)");
   opgroup->add_option("--eigentracking-poly-deg", eigentracking_poly_deg,

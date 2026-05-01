@@ -48,6 +48,16 @@ namespace quda
      *  N>0 = hybrid pool + N CG inverse-iter polish steps per vector.
      *  Mirrors QudaHMCParam::eigentracking_mg_refresh_iters. */
     int mgRefreshIters = -1;
+    /** Per-solve cap on extra ET-pool candidates contributed by each
+     *  fermion solve. Single knob covering both the GCR (residual stash,
+     *  gcr_tracker.h) and CG (Lanczos-tridiag Ritz extraction,
+     *  cg_ritz_extractor.cpp) install paths. Default 0 (off): in
+     *  safe-mass regimes the converged-solution stash alone saturates
+     *  the pool's useful low-mode content. Set N>0 (typically 4) at
+     *  light mass / large volume where the preconditioner's stuck modes
+     *  are the signal worth capturing. Mirrors
+     *  QudaHMCParam::eigentracking_residual_cap. */
+    int residualCap = 0;
     /** Initial TRLM convergence knobs (also used for fresh-TRLM refreshes). */
     double trlmTol = 1e-6;         /**< TRLM convergence tolerance */
     int trlmMaxRestarts = 100;     /**< TRLM maximum restarts */
