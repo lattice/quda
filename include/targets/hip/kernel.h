@@ -40,13 +40,13 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     inline constexpr bool kernel_functor_unroll_1d_v = requires(Functor<Arg> &f)
     {
-      f.template operator()<work_item_unroll_t<Arg>>(0, 0, 0, 0);
+      f.template operator()<work_item_unroll_t<Arg>>(0, 0);
     };
 
     template <template <typename> class Functor, typename Arg>
     inline constexpr bool kernel_functor_unroll_2d_v = requires(Functor<Arg> &f)
     {
-      f.template operator()<work_item_unroll_t<Arg>>(0, 0, 0, 0);
+      f.template operator()<work_item_unroll_t<Arg>>(0, 0, 0);
     };
 
     template <template <typename> class Functor, typename Arg>
@@ -64,23 +64,36 @@ namespace quda
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
 
     if constexpr (Arg::check_bounds) {
-      const auto stride = gridDim.x * blockDim.x;
+      const auto grid_stride_x = gridDim.x * blockDim.x;
       if constexpr (grid_stride) {
         if constexpr (Arg::work_item_unroll > 1u) {
           if constexpr (kernel_unroll::kernel_functor_unroll_1d_v<Functor, Arg>) {
-            while (i + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
-              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, 0, 0, stride);
-              i += Arg::work_item_unroll * stride;
+            while (i + (Arg::work_item_unroll - 1u) * grid_stride_x < arg.threads.x) {
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, grid_stride_x);
+              i += Arg::work_item_unroll * grid_stride_x;
+            }
+          }
+        }
+      } else {
+        if constexpr (Arg::work_item_unroll > 1u) {
+          if constexpr (kernel_unroll::kernel_functor_unroll_1d_v<Functor, Arg>) {
+            while (i + (Arg::work_item_unroll - 1u) * arg.item_stride < arg.threads.x) {
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, arg.item_stride);
+              i += Arg::work_item_unroll * arg.item_stride;
             }
           }
         }
       }
-      while (i < arg.threads.x) {
-        f(i);
-        if constexpr (grid_stride) {
-          i += stride;
-        } else
-          break;
+      constexpr bool scalar_tail = grid_stride || (Arg::work_item_unroll <= 1u)
+        || !kernel_unroll::kernel_functor_unroll_1d_v<Functor, Arg>;
+      if constexpr (scalar_tail) {
+        while (i < arg.threads.x) {
+          f(i);
+          if constexpr (grid_stride) {
+            i += grid_stride_x;
+          } else
+            break;
+        }
       }
     } else {
       f(i);
@@ -112,23 +125,36 @@ namespace quda
     if constexpr (Arg::check_bounds) {
       if (j >= arg.threads.y) return;
 
-      const auto stride = gridDim.x * blockDim.x;
+      const auto grid_stride_x = gridDim.x * blockDim.x;
       if constexpr (grid_stride) {
         if constexpr (Arg::work_item_unroll > 1u) {
           if constexpr (kernel_unroll::kernel_functor_unroll_2d_v<Functor, Arg>) {
-            while (i + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
-              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, 0, stride);
-              i += Arg::work_item_unroll * stride;
+            while (i + (Arg::work_item_unroll - 1u) * grid_stride_x < arg.threads.x) {
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, grid_stride_x);
+              i += Arg::work_item_unroll * grid_stride_x;
+            }
+          }
+        }
+      } else {
+        if constexpr (Arg::work_item_unroll > 1u) {
+          if constexpr (kernel_unroll::kernel_functor_unroll_2d_v<Functor, Arg>) {
+            while (i + (Arg::work_item_unroll - 1u) * arg.item_stride < arg.threads.x) {
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, arg.item_stride);
+              i += Arg::work_item_unroll * arg.item_stride;
             }
           }
         }
       }
-      while (i < arg.threads.x) {
-        f(i, j);
-        if constexpr (grid_stride) {
-          i += stride;
-        } else
-          break;
+      constexpr bool scalar_tail = grid_stride || (Arg::work_item_unroll <= 1u)
+        || !kernel_unroll::kernel_functor_unroll_2d_v<Functor, Arg>;
+      if constexpr (scalar_tail) {
+        while (i < arg.threads.x) {
+          f(i, j);
+          if constexpr (grid_stride) {
+            i += grid_stride_x;
+          } else
+            break;
+        }
       }
     } else {
       f(i, j);
@@ -162,23 +188,36 @@ namespace quda
       if (j >= arg.threads.y) return;
       if (k >= arg.threads.z) return;
 
-      const auto stride = gridDim.x * blockDim.x;
+      const auto grid_stride_x = gridDim.x * blockDim.x;
       if constexpr (grid_stride) {
         if constexpr (Arg::work_item_unroll > 1u) {
           if constexpr (kernel_unroll::kernel_functor_unroll_3d_v<Functor, Arg>) {
-            while (i + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
-              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, k, stride);
-              i += Arg::work_item_unroll * stride;
+            while (i + (Arg::work_item_unroll - 1u) * grid_stride_x < arg.threads.x) {
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, k, grid_stride_x);
+              i += Arg::work_item_unroll * grid_stride_x;
+            }
+          }
+        }
+      } else {
+        if constexpr (Arg::work_item_unroll > 1u) {
+          if constexpr (kernel_unroll::kernel_functor_unroll_3d_v<Functor, Arg>) {
+            while (i + (Arg::work_item_unroll - 1u) * arg.item_stride < arg.threads.x) {
+              f.template operator()<kernel_unroll::work_item_unroll_t<Arg>>(i, j, k, arg.item_stride);
+              i += Arg::work_item_unroll * arg.item_stride;
             }
           }
         }
       }
-      while (i < arg.threads.x) {
-        f(i, j, k);
-        if constexpr (grid_stride) {
-          i += stride;
-        } else
-          break;
+      constexpr bool scalar_tail = grid_stride || (Arg::work_item_unroll <= 1u)
+        || !kernel_unroll::kernel_functor_unroll_3d_v<Functor, Arg>;
+      if constexpr (scalar_tail) {
+        while (i < arg.threads.x) {
+          f(i, j, k);
+          if constexpr (grid_stride) {
+            i += grid_stride_x;
+          } else
+            break;
+        }
       }
     } else {
       f(i, j, k);

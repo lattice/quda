@@ -1,6 +1,7 @@
 #pragma once
 
 #include "comm_quda.h"
+#include <quda_internal.h>
 
 namespace quda
 {
@@ -29,10 +30,20 @@ namespace quda
     int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */
     int comms_dim[4];      /** array storing {comm_dim(0), ..., comm_dim(3)} */
     int comms_dim_partitioned[4]; /** array storing {comm_dim_partitioned(0), ..., comm_dim_partiitoned(3)} */
+    /** When \a work_item_unroll > 1: \c threads.x / work_item_unroll after exact divisibility check; else 0. */
+    int item_stride = 0;
+    /** Grid-stride x batch spacing (\c gridDim.x * blockDim.x); set at launch when using grid-stride unroll. */
+    unsigned int x_batch_stride = 0;
 
     constexpr kernel_param() = default;
 
-    constexpr kernel_param(dim3 threads) :
+    /**
+       @param[in] threads Active thread counts (\c threads.x is the x-domain size)
+       @param[in] work_unroll When > 1, require \c threads.x % work_unroll == 0 and set \a item_stride to \c threads.x / work_unroll.
+       Defaults to \c kernel_param::work_item_unroll (1). Derived args that define their own \c work_item_unroll should pass
+       it explicitly in the mem-init list so lookup resolves to the derived constant (the default does not see a derived \c work_item_unroll).
+     */
+    kernel_param(dim3 threads, unsigned work_unroll = work_item_unroll) :
       threads(threads),
       comms_rank(comm_rank()),
       comms_rank_global(comm_rank_global()),
@@ -41,6 +52,11 @@ namespace quda
       comms_dim_partitioned {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2),
                              comm_dim_partitioned(3)}
     {
+      if (work_unroll > 1u) {
+        if (threads.x % work_unroll != 0u)
+          errorQuda("kernel_param: threads.x (%u) must be divisible by work_unroll (%u)", threads.x, work_unroll);
+        item_stride = static_cast<int>(threads.x / static_cast<int>(work_unroll));
+      }
     }
 
     /**
