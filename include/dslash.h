@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 #include <typeinfo>
 
 #include <color_spinor_field.h>
