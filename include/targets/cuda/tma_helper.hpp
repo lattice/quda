@@ -1,20 +1,30 @@
 #pragma once
 
 #include <quda_define.h>
+#include <target_device.h>
+#include <gauge_field.h>
+#include <complex_quda.h>
 
 #if (__COMPUTE_CAPABILITY__ >= 900) && (CUDA_VERSION >= 12060)
 #define USE_TENSOR_MEMORY_ACCELERATOR
 #endif
 
-#ifdef USE_TENSOR_MEMORY_ACCELERATOR
+#ifndef USE_TENSOR_MEMORY_ACCELERATOR
+
+#include "../generic/tma_helper.hpp"
+
+#else
 #include <cuda.h>
 #include <unordered_map>
+#include <cuda/ptx>
+#include <cuda/barrier>
 
 using barrier_t = cuda::barrier<cuda::thread_scope_block>;
-namespace cde = cuda::device::experimental;
 
 namespace quda
 {
+
+  enum class PrefetchType { NONE, THREAD, BULK, TENSOR };
 
   struct tma_descriptor_t {
     CUtensorMap map;
@@ -160,6 +170,7 @@ namespace quda
     return get_tma_descriptor<T, 4>(key);
   }
 
+#if defined(__CUDACC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
   /**
     @brief Launch TMA load from a 5-d tensor in global memory to a 2-d box in shared memory.
     @param smem_ptr The destination shared memory pointer
@@ -177,7 +188,9 @@ namespace quda
   {
     static_assert(box_a <= tma_box_limit);
     static_assert(box_b <= tma_box_limit);
-    cde::cp_async_bulk_tensor_5d_global_to_shared(smem_ptr, map, offset_a, offset_b, offset_c, offset_d, offset_e, *bar);
+    int32_t coords[5] = {offset_a, offset_b, offset_c, offset_d, offset_e};
+    cuda::ptx::cp_async_bulk_tensor(cuda::ptx::space_shared, cuda::ptx::space_global, smem_ptr, map, coords,
+                                    reinterpret_cast<uint64_t *>(bar));
   }
 
   /**
@@ -196,8 +209,29 @@ namespace quda
   {
     static_assert(box_a <= tma_box_limit);
     static_assert(box_b <= tma_box_limit);
-    cde::cp_async_bulk_tensor_4d_global_to_shared(smem_ptr, map, offset_a, offset_b, offset_c, offset_d, *bar);
+    int32_t coords[4] = {offset_a, offset_b, offset_c, offset_d};
+    cuda::ptx::cp_async_bulk_tensor(cuda::ptx::space_shared, cuda::ptx::space_global, smem_ptr, map, coords,
+                                    reinterpret_cast<uint64_t *>(bar));
   }
+#endif
+
+  namespace gauge
+  {
+
+    struct tensor_desc_t {
+      tma_descriptor_t N;
+      tma_descriptor_t Nrem;
+      tma_descriptor_t phase;
+    };
+
+  } // namespace gauge
+
+  /*
+   * @brief Create a tensor descriptor associated with a GaugeField instance with the supplied block size
+   * @param[in] u the gauge field we are getting the descriptor for
+   * @param[in] block_size the thread block size we associate with this descriptor
+   */
+  gauge::tensor_desc_t &get_tensor_descriptor(const GaugeField &u, uint32_t block_size);
 
 } // namespace quda
 

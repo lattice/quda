@@ -1,9 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
-
 #include <comm_key.h>
 
 namespace quda {
@@ -147,6 +147,7 @@ namespace quda {
   class GaugeField : public LatticeField {
 
     friend std::ostream &operator<<(std::ostream &output, const GaugeField &param);
+    friend GaugeField shift(const GaugeField &in, int shift);
 
   private:
     /**
@@ -193,8 +194,11 @@ namespace quda {
     double tadpole = 0.0;
     double fat_link_max = 0.0;
 
-    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost
-      = {}; // stores the ghost zone of the gauge field (non-native fields only)
+    mutable std::unique_ptr<GaugeField> shifted
+      = nullptr;             // shifted copy of the gauge field, used for double-store enabled dslash
+    bool is_shifted = false; // whether this instance is a shifted one
+
+    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost = {}; // ghost zone (separate allocation when QUDA_GHOST_EXCHANGE_PAD)
 
     mutable array<int, QUDA_MAX_DIM> ghostFace = {}; // the size of each face
 
@@ -502,11 +506,7 @@ namespace quda {
 
     virtual int full_dim(int d) const { return x[d]; }
 
-    auto &Ghost() const
-    {
-      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return ghost;
-    }
+    auto &Ghost() const { return ghost; }
 
     /**
        @return The offset into the struct to the start of the gauge
@@ -528,8 +528,9 @@ namespace quda {
     /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
+     * @param[in] scale Arbitrary scale factor we want to apply
      */
-    void copy(const GaugeField &src);
+    void copy(const GaugeField &src, double scale = 1.0);
 
     /**
        @brief Compute the L1 norm of the field
@@ -648,6 +649,20 @@ namespace quda {
     }
 
     /**
+       @brief Return the shifted gauge field by shift in each
+       dimension.  Shifted field is cached for subsequent reuse.
+       @param[in] shift value (1 or 3 supported).  If no argument
+       passed the shift is set to Nface.
+       @return Reference to shifted field
+    */
+    GaugeField &shift(int shift = -1) const;
+
+    /**
+       @brief Resets the shifted field (if it exists).
+    */
+    void shift_reset() const;
+
+    /**
      * @brief Print the site data
      * @param[in] parity Parity index
      * @param[in] dim The dimension in which we are printing
@@ -668,6 +683,17 @@ namespace quda {
      @param[in] rank The rank we are requesting from (default is rank = 0)
   */
   void genericPrintMatrix(const GaugeField &a, int dim, int parity, unsigned int x_cb, int rank = 0);
+
+  /**
+     @brief Shift the gauge field by shift in each dimension and store
+     the resulting shifted field.  This is used to move the backwards
+     links on to this site.  The input field must be a padded field
+     with the ghost pre-exchanged if communications are enabled.
+     @param[in] in Input shifted field
+     @param[in] shift value (1 or 3 supported)
+     @return Shifted field
+   */
+  GaugeField shift(const GaugeField &in, int shift);
 
   /**
      @brief This is a debugging function, where we cast a gauge field
@@ -698,14 +724,15 @@ namespace quda {
      @param out The output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
      @param ghostOut The output ghost buffer (optional)
      @param ghostIn The input ghost buffer (optional)
      @param type The type of copy we doing (0 body and ghost else ghost only)
   */
-  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
-                        void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                        void *Out = 0, void *In = 0, void **ghostOut = 0, void **ghostIn = 0, int type = 0);
 
   /**
     @brief This function is used for copying from a source gauge field to a destination gauge field
@@ -723,11 +750,12 @@ namespace quda {
      @param out The extended output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
   */
-  void copyExtendedGauge(GaugeField &out, const GaugeField &in,
-			 QudaFieldLocation location, void *Out=0, void *In=0);
+  void copyExtendedGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                         void *Out = 0, void *In = 0);
 
   /**
      This function is used for creating an exteneded gauge field from the input,

@@ -27,7 +27,8 @@ namespace quda
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type;
+    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+                                    QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type;
 
     using real = typename mapper<Float>::type;
 

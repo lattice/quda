@@ -804,7 +804,7 @@ namespace quda {
           // the orthogonality of the gradient vector, recompute beta, update `p`, and carry on with our lives.
           logQuda(QUDA_DEBUG_VERBOSE, "Regular restart == explicit gradient vector re-orthogonalization\n");
           auto rp = blas::cDotProduct(r_sloppy, p);
-          for (auto i = 0u; i < b.size(); i++) rp[i] / r2[i];
+          for (auto i = 0u; i < b.size(); i++) rp[i] /= r2[i];
           blas::caxpy(-rp, r_sloppy, p);
 
           for (auto i = 0u; i < b.size(); i++) beta[i] = r2[i] / r2_old[i];
