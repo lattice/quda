@@ -139,7 +139,8 @@ namespace quda
   /**
      @brief Optimized division routine on the device
   */
-  inline float fdivide(float a, float b) { return sycl::native::divide(a, b); }
+  //inline float fdivide(float a, float b) { return sycl::native::divide(a, b); } FIXME causes dslash_staggered_matpc_policytune to fail (barely)
+  inline float fdivide(float a, float b) { return a/b; }
   inline double fdivide(double a, double b) { return a/b; }
 
   __device__ __host__ inline float2 add2(float2 a, float2 b) { return {a.x + b.x, a.y + b.y}; }
