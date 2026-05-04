@@ -15,7 +15,7 @@ namespace quda
   namespace blas
   {
 
-    constexpr unsigned int reduce_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
+    constexpr unsigned int reduce_unroll = QUDA_BLAS_UNROLL_REDUCE;
 
     /**
        @brief Parameter struct for generic reduction blas kernel.
@@ -30,7 +30,7 @@ namespace quda
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
       using real = real_;
-      static constexpr unsigned int work_item_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
+      static constexpr unsigned int work_item_unroll = QUDA_BLAS_UNROLL_REDUCE;
       static constexpr int n = n_;
       using Reducer = Reducer_;
       using reduce_t = typename Reducer_::reduce_t;

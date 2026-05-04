@@ -247,8 +247,27 @@ endif()
 set_property(CACHE QUDA_BLAS_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK)
 mark_as_advanced(QUDA_BLAS_PREFETCH_TYPE)
 
-set(QUDA_BLAS_WORK_ITEM_UNROLL "1" CACHE STRING "Work-item inner-loop unroll for BLAS and reduction kernels (e.g. 1 or 2)")
-mark_as_advanced(QUDA_BLAS_WORK_ITEM_UNROLL)
+# Work-item inner-loop unroll: separate knobs for streaming BLAS vs reduction BLAS kernels.
+if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_STREAMING})
+  if(DEFINED CACHE{QUDA_BLAS_WORK_ITEM_UNROLL})
+    set(QUDA_BLAS_UNROLL_STREAMING "${CACHE{QUDA_BLAS_WORK_ITEM_UNROLL}}" CACHE STRING
+        "Work-item unroll for streaming BLAS (blas_core.cuh, multi_blas_core.cuh). Typical values: 1 or 2." FORCE)
+  else()
+    set(QUDA_BLAS_UNROLL_STREAMING "1" CACHE STRING
+        "Work-item unroll for streaming BLAS (blas_core.cuh, multi_blas_core.cuh). Typical values: 1 or 2.")
+  endif()
+endif()
+if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_REDUCE})
+  if(DEFINED CACHE{QUDA_BLAS_WORK_ITEM_UNROLL})
+    set(QUDA_BLAS_UNROLL_REDUCE "${CACHE{QUDA_BLAS_WORK_ITEM_UNROLL}}" CACHE STRING
+        "Work-item unroll for reduction BLAS (reduce_core.cuh, multi_reduce_core.cuh). Typical values: 1 or 2." FORCE)
+  else()
+    set(QUDA_BLAS_UNROLL_REDUCE "1" CACHE STRING
+        "Work-item unroll for reduction BLAS (reduce_core.cuh, multi_reduce_core.cuh). Typical values: 1 or 2.")
+  endif()
+endif()
+mark_as_advanced(QUDA_BLAS_UNROLL_STREAMING)
+mark_as_advanced(QUDA_BLAS_UNROLL_REDUCE)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 
@@ -314,7 +333,8 @@ if(NOT QUDA_TARGET_TYPE STREQUAL "CUDA" AND QUDA_BLAS_PREFETCH_TYPE STREQUAL "BU
   message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_TARGET_TYPE=CUDA (TMA bulk prefetch is CUDA-only).")
 endif()
 message(STATUS "BLAS prefetch: ${QUDA_BLAS_PREFETCH_TYPE}")
-message(STATUS "BLAS work-item unroll: ${QUDA_BLAS_WORK_ITEM_UNROLL}")
+message(STATUS "BLAS unroll (streaming): ${QUDA_BLAS_UNROLL_STREAMING}")
+message(STATUS "BLAS unroll (reduction): ${QUDA_BLAS_UNROLL_REDUCE}")
 
 if(QUDA_MPI AND QUDA_QMP)
   message(

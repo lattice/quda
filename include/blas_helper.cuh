@@ -3,8 +3,12 @@
 #include <cstdio>
 #include <cstring>
 
-#ifndef QUDA_BLAS_WORK_ITEM_UNROLL
-#define QUDA_BLAS_WORK_ITEM_UNROLL 1
+/* Defaults when CMake does not define these (e.g. IDE / standalone parse). */
+#ifndef QUDA_BLAS_UNROLL_STREAMING
+#define QUDA_BLAS_UNROLL_STREAMING 1
+#endif
+#ifndef QUDA_BLAS_UNROLL_REDUCE
+#define QUDA_BLAS_UNROLL_REDUCE 1
 #endif
 
 #include <color_spinor_field.h>
@@ -133,13 +137,13 @@ namespace quda
        @brief Append a work-item unroll tag to a BLAS autotune auxiliary string.
 
        Appends a substring of the form \c ",unroll=N" to \a aux so kernels that vary
-       \c QUDA_BLAS_WORK_ITEM_UNROLL (or an effective unroll such as multi-blas vs. NXZ)
+       \c QUDA_BLAS_UNROLL_STREAMING (or an effective unroll such as multi-blas vs. NXZ)
        receive distinct \c TuneKey entries.
 
        @param[in,out] aux Null-terminated auxiliary string buffer (e.g. \c Tunable::aux)
        to append to; must have space for the additional suffix.
-       @param[in] unroll Unroll factor to record (typically \c QUDA_BLAS_WORK_ITEM_UNROLL
-       or an effective value such as \c 1 when multi-blas disables unroll).
+       @param[in] unroll Unroll factor to record: typically \c QUDA_BLAS_UNROLL_STREAMING or
+       \c QUDA_BLAS_UNROLL_REDUCE, or an effective value such as \c 1 when multi-blas disables unroll.
 
        @return None.
      */

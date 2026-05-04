@@ -18,13 +18,13 @@ namespace quda
        @brief Effective work-item unroll for multi-BLAS given the X/Z batch width \a NXZ.
 
        When \a NXZ > 1, multi-blas uses unroll 1 because the inner batch dimension already provides parallelism;
-       otherwise the compile-time \c QUDA_BLAS_WORK_ITEM_UNROLL value is used.
+       otherwise the compile-time \c QUDA_BLAS_UNROLL_STREAMING value is used.
 
        @param[in] NXZ Number of X (and Z) vectors in the multi-blas batch.
 
-       @return Unroll factor to pass to \c kernel_param and autotune aux strings (1 or \c QUDA_BLAS_WORK_ITEM_UNROLL).
+       @return Unroll factor to pass to \c kernel_param and autotune aux strings (1 or \c QUDA_BLAS_UNROLL_STREAMING).
      */
-    constexpr unsigned int multi_blas_unroll(int NXZ) { return NXZ > 1 ? 1 : QUDA_BLAS_WORK_ITEM_UNROLL; }
+    constexpr unsigned int multi_blas_unroll(int NXZ) { return NXZ > 1 ? 1 : QUDA_BLAS_UNROLL_STREAMING; }
 
 #ifndef QUDA_FAST_COMPILE_REDUCE
     constexpr bool enable_warp_split() { return false; }

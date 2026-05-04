@@ -732,7 +732,10 @@ endif()
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
-target_compile_definitions(quda PRIVATE "QUDA_BLAS_WORK_ITEM_UNROLL=${QUDA_BLAS_WORK_ITEM_UNROLL}")
+target_compile_definitions(
+  quda
+  PRIVATE "QUDA_BLAS_UNROLL_STREAMING=${QUDA_BLAS_UNROLL_STREAMING}"
+          "QUDA_BLAS_UNROLL_REDUCE=${QUDA_BLAS_UNROLL_REDUCE}")
 
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)

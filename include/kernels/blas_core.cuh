@@ -16,7 +16,7 @@ namespace quda
 
     constexpr bool grid_stride = false;
 
-    constexpr unsigned int blas_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
+    constexpr unsigned int blas_unroll = QUDA_BLAS_UNROLL_STREAMING;
 
     /**
        Parameter struct for generic blas kernel
