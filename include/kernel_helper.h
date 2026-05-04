@@ -38,10 +38,18 @@ namespace quda
     constexpr kernel_param() = default;
 
     /**
-       @param[in] threads Active thread counts (\c threads.x is the x-domain size)
-       @param[in] work_unroll When > 1, require \c threads.x % work_unroll == 0 and set \a item_stride to \c threads.x / work_unroll.
-       Defaults to \c kernel_param::work_item_unroll (1). Derived args that define their own \c work_item_unroll should pass
-       it explicitly in the mem-init list so lookup resolves to the derived constant (the default does not see a derived \c work_item_unroll).
+       @brief Initialize thread geometry, communicator metadata, and optional work-item unroll stride.
+
+       When \a work_unroll exceeds 1, checks that \c threads.x is divisible by \a work_unroll and sets \c item_stride to
+       \c threads.x / work_unroll. Use the default second argument for grid-stride kernels where a remainder tail
+       handles partial batches. For non-grid-stride work-item unroll, pass the derived \c work_item_unroll explicitly in
+       the initializer list when the base default would not pick up a derived class's \c work_item_unroll.
+
+       @param[in] threads Active thread counts (\c threads.x is the x-domain size).
+       @param[in] work_unroll Work-item unroll factor; when greater than 1, enforces divisibility of \c threads.x and
+       sets \c item_stride. Defaults to \c kernel_param::work_item_unroll (typically 1).
+
+       @return None.
      */
     kernel_param(dim3 threads, unsigned work_unroll = work_item_unroll) :
       threads(threads),

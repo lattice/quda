@@ -15,6 +15,8 @@ namespace quda
   namespace blas
   {
 
+    constexpr unsigned int reduce_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
+
     /**
        @brief Parameter struct for generic reduction blas kernel.
        @tparam real_ The precision of the calculation

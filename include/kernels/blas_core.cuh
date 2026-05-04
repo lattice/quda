@@ -14,6 +14,10 @@ namespace quda
   namespace blas
   {
 
+    constexpr bool grid_stride = false;
+
+    constexpr unsigned int blas_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
+
     /**
        Parameter struct for generic blas kernel
        @tparam real_ The precision of the calculation
@@ -28,7 +32,7 @@ namespace quda
     struct BlasArg : kernel_param<> {
       using real = real_;
       using Functor = Functor_;
-      static constexpr unsigned int work_item_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
+      static constexpr unsigned int work_item_unroll = blas_unroll;
       static constexpr int n = n_;
       Spinor<store_t, N> X[MAX_MULTI_RHS];
       Spinor<y_store_t, Ny> Y[MAX_MULTI_RHS];
@@ -40,7 +44,7 @@ namespace quda
       const int nParity;
       BlasArg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
               cvector_ref<ColorSpinorField> &w, cvector_ref<ColorSpinorField> &v, Functor f, int length, int nParity) :
-        kernel_param(dim3(length, x.size(), nParity)), f(f), nParity(nParity)
+        kernel_param(dim3(length, x.size(), nParity), grid_stride ? 1u : work_item_unroll), f(f), nParity(nParity)
       {
         for (auto i = 0u; i < x.size(); i++) {
           X[i] = x[i];
@@ -63,14 +67,27 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       /**
-         Grid-stride batch entry: \a UnrollCount must be \c std::integral_constant<int, N> (not a bare
-         int template arg) so it cannot collide with \c MultiBlas_::template operator()<bool>.
+         @brief Device/host entry point for generic BLAS with optional work-item unroll over the x index.
+
+         \a UnrollCount must be \c std::integral_constant<int, N> (not a bare \c int template parameter) so it cannot
+         collide with other \c operator() template overloads. For \c Kernel3D launches, \a stride is
+         \c gridDim.x * blockDim.x when grid-stride unroll is active, or \c arg.item_stride for non-grid-stride
+         work-item unroll.
+
+         @tparam UnrollCount Compile-time unroll width as \c std::integral_constant<int, N> (\c N >= 1).
+
+         @param[in] i Base x-domain index for this thread.
+         @param[in] src_idx Right-hand-side / vector index within the batch (second kernel dimension).
+         @param[in] parity Parity or site subset index (third kernel dimension).
+         @param[in] stride Spacing between unrolled x indices: \c i + j*stride for \c j in \c [0, N).
+
+         @return None.
        */
       template <typename UnrollCount = std::integral_constant<int, 1>>
       __device__ __host__ inline void operator()(int i, int src_idx, int parity, int stride = 0) const
       {
         static_assert(std::is_same_v<UnrollCount, std::integral_constant<int, UnrollCount::value>>,
-                      "grid-stride batching uses std::integral_constant<int, N> as the template argument");
+                      "work-item unroll uses std::integral_constant<int, N> as the template argument");
         constexpr int n = UnrollCount::value;
         static_assert(n >= 1, "unroll count must be positive");
 

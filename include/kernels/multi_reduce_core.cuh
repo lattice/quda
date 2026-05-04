@@ -13,6 +13,8 @@ namespace quda
   namespace blas
   {
 
+    constexpr unsigned int multi_reduce_unroll = QUDA_BLAS_WORK_ITEM_UNROLL;
+
     /**
        @brief Return the batch block size used for multi reductions.
      */

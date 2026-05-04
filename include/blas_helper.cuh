@@ -129,11 +129,24 @@ namespace quda
       }
     }
 
-    /** Append work-item unroll (Blas / Reduction / multi-blas / multi-reduce) for autotune separation. */
-    inline void blas_tune_aux_work_item_unroll(char *aux)
+    /**
+       @brief Append a work-item unroll tag to a BLAS autotune auxiliary string.
+
+       Appends a substring of the form \c ",unroll=N" to \a aux so kernels that vary
+       \c QUDA_BLAS_WORK_ITEM_UNROLL (or an effective unroll such as multi-blas vs. NXZ)
+       receive distinct \c TuneKey entries.
+
+       @param[in,out] aux Null-terminated auxiliary string buffer (e.g. \c Tunable::aux)
+       to append to; must have space for the additional suffix.
+       @param[in] unroll Unroll factor to record (typically \c QUDA_BLAS_WORK_ITEM_UNROLL
+       or an effective value such as \c 1 when multi-blas disables unroll).
+
+       @return None.
+     */
+    inline void blas_tune_aux_work_item_unroll(char *aux, unsigned int unroll)
     {
       char buf[32];
-      snprintf(buf, sizeof(buf), ",unroll=%d", QUDA_BLAS_WORK_ITEM_UNROLL);
+      snprintf(buf, sizeof(buf), ",unroll=%d", unroll);
       strcat(aux, buf);
     }
 

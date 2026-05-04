@@ -86,8 +86,10 @@ namespace quda {
           }
         }
         if (is_norm) strcat(aux, ",norm");
-        blas_tune_aux_prefetch(aux);
-        blas_tune_aux_work_item_unroll(aux);
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, multi_reduce_unroll);
+        }
 
         apply(device::get_default_stream());
       }
@@ -330,8 +332,10 @@ namespace quda {
         u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
         strcat(aux, ",max_nyw_tile=");
         strcat(aux, max_nyw_tile);
-        blas_tune_aux_prefetch(aux);
-        blas_tune_aux_work_item_unroll(aux);
+        if (x0.Location() == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, multi_reduce_unroll);
+        }
 
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning
@@ -493,8 +497,10 @@ namespace quda {
         u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
         strcat(aux, ",max_nyw_tile=");
         strcat(aux, max_nyw_tile);
-        blas_tune_aux_prefetch(aux);
-        blas_tune_aux_work_item_unroll(aux);
+        if (x[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, multi_reduce_unroll);
+        }
 
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning
