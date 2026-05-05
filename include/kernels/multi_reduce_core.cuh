@@ -102,22 +102,22 @@ namespace quda
         unsigned int i = tid - parity * arg.length_cb;
 
         vec x, y, z, w;
-        if constexpr (arg.f.read.Y) arg.Y[k].load(y, i, parity);
-        if constexpr (arg.f.read.W) arg.W[k].load(w, i, parity);
+        if constexpr (Arg::Reducer::read.Y) arg.Y[k].load(y, i, parity);
+        if constexpr (Arg::Reducer::read.W) arg.W[k].load(w, i, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < Arg::NXZ; l++) {
-          if constexpr (arg.f.read.X) arg.X[l].load(x, i, parity);
-          if constexpr (arg.f.read.Z) arg.Z[l].load(z, i, parity);
+          if constexpr (Arg::Reducer::read.X) arg.X[l].load(x, i, parity);
+          if constexpr (Arg::Reducer::read.Z) arg.Z[l].load(z, i, parity);
 
           arg.f(sum[l], x, y, z, w, k, l);
 
         }
-        if constexpr (arg.f.write.Y) arg.Y[k].save(y, i, parity);
-        if constexpr (arg.f.write.W) arg.W[k].save(w, i, parity);
+        if constexpr (Arg::Reducer::write.Y) arg.Y[k].save(y, i, parity);
+        if constexpr (Arg::Reducer::write.W) arg.W[k].save(w, i, parity);
 
         return sum;
       }
@@ -127,12 +127,12 @@ namespace quda
         if constexpr (blas_prefetch_enabled_v) {
           const unsigned int parity = tid >= arg.length_cb ? 1u : 0u;
           const unsigned int i = tid - parity * static_cast<unsigned int>(arg.length_cb);
-          if constexpr (arg.f.read.Y) arg.Y[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.f.read.W) arg.W[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.Y) arg.Y[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.W) arg.W[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
 #pragma unroll
           for (int l = 0; l < Arg::NXZ; l++) {
-            if constexpr (arg.f.read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-            if constexpr (arg.f.read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+            if constexpr (Arg::Reducer::read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+            if constexpr (Arg::Reducer::read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
           }
         }
       }

@@ -94,11 +94,11 @@ namespace quda
           const unsigned int parity = tid_u >= arg.length_cb ? 1u : 0u;
           const unsigned int i = static_cast<unsigned int>(tid_u) - parity * static_cast<unsigned int>(arg.length_cb);
 
-          if constexpr (arg.r.read.X) arg.X[src_idx].load(x[u], i, parity);
-          if constexpr (arg.r.read.Y) arg.Y[src_idx].load(y[u], i, parity);
-          if constexpr (arg.r.read.Z) arg.Z[src_idx].load(z[u], i, parity);
-          if constexpr (arg.r.read.W) arg.W[src_idx].load(w[u], i, parity);
-          if constexpr (arg.r.read.V) arg.V[src_idx].load(v[u], i, parity);
+          if constexpr (Arg::Reducer::read.X) arg.X[src_idx].load(x[u], i, parity);
+          if constexpr (Arg::Reducer::read.Y) arg.Y[src_idx].load(y[u], i, parity);
+          if constexpr (Arg::Reducer::read.Z) arg.Z[src_idx].load(z[u], i, parity);
+          if constexpr (Arg::Reducer::read.W) arg.W[src_idx].load(w[u], i, parity);
+          if constexpr (Arg::Reducer::read.V) arg.V[src_idx].load(v[u], i, parity);
         }
 
 #pragma unroll
@@ -110,11 +110,11 @@ namespace quda
           const unsigned int parity = tid_u >= arg.length_cb ? 1u : 0u;
           const unsigned int i = static_cast<unsigned int>(tid_u) - parity * static_cast<unsigned int>(arg.length_cb);
 
-          if constexpr (arg.r.write.X) arg.X[src_idx].save(x[u], i, parity);
-          if constexpr (arg.r.write.Y) arg.Y[src_idx].save(y[u], i, parity);
-          if constexpr (arg.r.write.Z) arg.Z[src_idx].save(z[u], i, parity);
-          if constexpr (arg.r.write.W) arg.W[src_idx].save(w[u], i, parity);
-          if constexpr (arg.r.write.V) arg.V[src_idx].save(v[u], i, parity);
+          if constexpr (Arg::Reducer::write.X) arg.X[src_idx].save(x[u], i, parity);
+          if constexpr (Arg::Reducer::write.Y) arg.Y[src_idx].save(y[u], i, parity);
+          if constexpr (Arg::Reducer::write.Z) arg.Z[src_idx].save(z[u], i, parity);
+          if constexpr (Arg::Reducer::write.W) arg.W[src_idx].save(w[u], i, parity);
+          if constexpr (Arg::Reducer::write.V) arg.V[src_idx].save(v[u], i, parity);
         }
 
         return sum;
@@ -125,11 +125,11 @@ namespace quda
         if constexpr (blas_prefetch_enabled_v) {
           const unsigned int parity = tid >= arg.length_cb ? 1u : 0u;
           const unsigned int i = tid - parity * static_cast<unsigned int>(arg.length_cb);
-          if constexpr (arg.r.read.X) arg.X[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.r.read.Y) arg.Y[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.r.read.Z) arg.Z[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.r.read.W) arg.W[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.r.read.V) arg.V[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.X) arg.X[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.Y) arg.Y[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.Z) arg.Z[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.W) arg.W[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.V) arg.V[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
         }
       }
     };

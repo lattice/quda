@@ -129,8 +129,8 @@ namespace quda
 #pragma unroll
           for (int j = 0; j < n; j++) {
             if (l_idx[j] == 0 || warp_split == 1) {
-              if constexpr (arg.f.read.Y) arg.Y[k].load(y[j], idx[j], parity);
-              if constexpr (arg.f.read.W) arg.W[k].load(w[j], idx[j], parity);
+              if constexpr (Arg::Functor::read.Y) arg.Y[k].load(y[j], idx[j], parity);
+              if constexpr (Arg::Functor::read.W) arg.W[k].load(w[j], idx[j], parity);
             } else {
               y[j] = {};
               w[j] = {};
@@ -144,8 +144,8 @@ namespace quda
             for (int j = 0; j < n; j++) {
               const int l = l_ + l_idx[j];
               if (l < Arg::NXZ || warp_split == 1) {
-                if constexpr (arg.f.read.X) arg.X[l].load(x[j], idx[j], parity);
-                if constexpr (arg.f.read.Z) arg.Z[l].load(z[j], idx[j], parity);
+                if constexpr (Arg::Functor::read.X) arg.X[l].load(x[j], idx[j], parity);
+                if constexpr (Arg::Functor::read.Z) arg.Z[l].load(z[j], idx[j], parity);
               }
             }
 
@@ -160,16 +160,16 @@ namespace quda
         // now combine the results across the warp if needed
 #pragma unroll
         for (int j = 0; j < n; j++) {
-          if constexpr (arg.f.write.Y) y[j] = warp_combine<warp_split>(y[j]);
-          if constexpr (arg.f.write.W) w[j] = warp_combine<warp_split>(w[j]);
+          if constexpr (Arg::Functor::write.Y) y[j] = warp_combine<warp_split>(y[j]);
+          if constexpr (Arg::Functor::write.W) w[j] = warp_combine<warp_split>(w[j]);
         }
 
         if (!allthreads || alive) {
 #pragma unroll
           for (int j = 0; j < n; j++) {
             if (l_idx[j] == 0 || warp_split == 1) {
-              if constexpr (arg.f.write.Y) arg.Y[k].save(y[j], idx[j], parity);
-              if constexpr (arg.f.write.W) arg.W[k].save(w[j], idx[j], parity);
+              if constexpr (Arg::Functor::write.Y) arg.Y[k].save(y[j], idx[j], parity);
+              if constexpr (Arg::Functor::write.W) arg.W[k].save(w[j], idx[j], parity);
             }
           }
         }
@@ -207,15 +207,15 @@ namespace quda
           const int parity = k;
 
           if (l_idx == 0 || warp_split == 1) {
-            if constexpr (arg.f.read.Y) arg.Y[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
-            if constexpr (arg.f.read.W) arg.W[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+            if constexpr (Arg::Functor::read.Y) arg.Y[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+            if constexpr (Arg::Functor::read.W) arg.W[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
           }
 #pragma unroll
           for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
             const int l = l_ + l_idx;
             if (l < Arg::NXZ || warp_split == 1) {
-              if constexpr (arg.f.read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
-              if constexpr (arg.f.read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+              if constexpr (Arg::Functor::read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+              if constexpr (Arg::Functor::read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
             }
           }
         }

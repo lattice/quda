@@ -99,11 +99,11 @@ namespace quda
 
 #pragma unroll
         for (int j = 0; j < n; j++) {
-          if constexpr (arg.f.read.X) arg.X[src_idx].load(x[j], i + j * stride, parity);
-          if constexpr (arg.f.read.Y) arg.Y[src_idx].load(y[j], i + j * stride, parity);
-          if constexpr (arg.f.read.Z) arg.Z[src_idx].load(z[j], i + j * stride, parity);
-          if constexpr (arg.f.read.W) arg.W[src_idx].load(w[j], i + j * stride, parity);
-          if constexpr (arg.f.read.V) arg.V[src_idx].load(v[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.X) arg.X[src_idx].load(x[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.Y) arg.Y[src_idx].load(y[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.Z) arg.Z[src_idx].load(z[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.W) arg.W[src_idx].load(w[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.V) arg.V[src_idx].load(v[j], i + j * stride, parity);
         }
 
 #pragma unroll
@@ -111,26 +111,26 @@ namespace quda
 
 #pragma unroll
         for (int j = 0; j < n; j++) {
-          if constexpr (arg.f.write.X) arg.X[src_idx].save(x[j], i + j * stride, parity);
-          if constexpr (arg.f.write.Y) arg.Y[src_idx].save(y[j], i + j * stride, parity);
-          if constexpr (arg.f.write.Z) arg.Z[src_idx].save(z[j], i + j * stride, parity);
-          if constexpr (arg.f.write.W) arg.W[src_idx].save(w[j], i + j * stride, parity);
-          if constexpr (arg.f.write.V) arg.V[src_idx].save(v[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.X) arg.X[src_idx].save(x[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.Y) arg.Y[src_idx].save(y[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.Z) arg.Z[src_idx].save(z[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.W) arg.W[src_idx].save(w[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.V) arg.V[src_idx].save(v[j], i + j * stride, parity);
         }
       }
 
       __device__ __host__ inline void prefetch(int i, int src_idx, int parity) const
       {
         if constexpr (blas_prefetch_enabled_v) {
-          if constexpr (arg.f.read.X)
+          if constexpr (Arg::Functor::read.X)
             arg.X[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.f.read.Y)
+          if constexpr (Arg::Functor::read.Y)
             arg.Y[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.f.read.Z)
+          if constexpr (Arg::Functor::read.Z)
             arg.Z[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.f.read.W)
+          if constexpr (Arg::Functor::read.W)
             arg.W[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
-          if constexpr (arg.f.read.V)
+          if constexpr (Arg::Functor::read.V)
             arg.V[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
         }
       }
