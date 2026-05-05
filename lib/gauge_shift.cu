@@ -61,6 +61,9 @@ namespace quda
       errorQuda("Extended ghost exchange not supported");
     if (in.GhostExchange() == QUDA_GHOST_EXCHANGE_NO && comm_partitioned())
       errorQuda("comm_dim_partition() == true requires we have GhostExchange = QUDA_GHOST_EXCHANGE_PAD");
+    for (int d = 0; d < 4; d++)
+      if (in.X()[d] > 256) errorQuda("Local lattice dimension X[%d] = %d must not exceed 256", d, in.X()[d]);
+
     GaugeFieldParam param(in);
     param.create = QUDA_NULL_FIELD_CREATE;
     GaugeField out(param);
