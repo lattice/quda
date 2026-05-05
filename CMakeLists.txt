@@ -249,22 +249,12 @@ mark_as_advanced(QUDA_BLAS_PREFETCH_TYPE)
 
 # Work-item inner-loop unroll: separate knobs for streaming BLAS vs reduction BLAS kernels.
 if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_STREAMING})
-  if(DEFINED CACHE{QUDA_BLAS_WORK_ITEM_UNROLL})
-    set(QUDA_BLAS_UNROLL_STREAMING "${CACHE{QUDA_BLAS_WORK_ITEM_UNROLL}}" CACHE STRING
-        "Work-item unroll for streaming BLAS (blas_core.cuh, multi_blas_core.cuh). Typical values: 1 or 2." FORCE)
-  else()
-    set(QUDA_BLAS_UNROLL_STREAMING "1" CACHE STRING
-        "Work-item unroll for streaming BLAS (blas_core.cuh, multi_blas_core.cuh). Typical values: 1 or 2.")
-  endif()
+  set(QUDA_BLAS_UNROLL_STREAMING "1" CACHE STRING
+      "Work-item unroll for streaming BLAS (blas_core.cuh, multi_blas_core.cuh). Typical values: 1 or 2.")
 endif()
 if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_REDUCE})
-  if(DEFINED CACHE{QUDA_BLAS_WORK_ITEM_UNROLL})
-    set(QUDA_BLAS_UNROLL_REDUCE "${CACHE{QUDA_BLAS_WORK_ITEM_UNROLL}}" CACHE STRING
-        "Work-item unroll for reduction BLAS (reduce_core.cuh, multi_reduce_core.cuh). Typical values: 1 or 2." FORCE)
-  else()
-    set(QUDA_BLAS_UNROLL_REDUCE "1" CACHE STRING
-        "Work-item unroll for reduction BLAS (reduce_core.cuh, multi_reduce_core.cuh). Typical values: 1 or 2.")
-  endif()
+  set(QUDA_BLAS_UNROLL_REDUCE "1" CACHE STRING
+      "Work-item unroll for reduction BLAS (reduce_core.cuh, multi_reduce_core.cuh). Typical values: 1 or 2.")
 endif()
 mark_as_advanced(QUDA_BLAS_UNROLL_STREAMING)
 mark_as_advanced(QUDA_BLAS_UNROLL_REDUCE)
