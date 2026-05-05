@@ -36,7 +36,6 @@ namespace quda {
         constexpr bool site_unroll
           = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
         constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
-        constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
         constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
         return x.Length() / (nParity * M);
       }
