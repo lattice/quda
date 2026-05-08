@@ -74,7 +74,7 @@ namespace quda
       int flavor = src_flavor % 2;
 
       bool active = mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
-      int thread_dim; // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                     // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
@@ -82,17 +82,19 @@ namespace quda
       Vector out;
       if (!allthreads || alive) {
         if (arg.dd_out.isZero(coord)) {
-	  if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-          if constexpr (!allthreads) return;
-          else alive = false;
+          if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+          if constexpr (!allthreads)
+            return;
+          else
+            alive = false;
         }
       }
 
       if (!allthreads || alive) {
-	if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
-	  applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-	else // defined in dslash_twisted_mass_preconditioned
-	  applyWilsonTM<dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
+          applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        else // defined in dslash_twisted_mass_preconditioned
+          applyWilsonTM<dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
         if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
           if constexpr (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
@@ -116,25 +118,25 @@ namespace quda
 
       if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
         SharedMemoryCache<Vector> cache {*this};
-	if (!allthreads || alive) {
-	  if (isComplete<mykernel_type>(arg, coord) && active) {
-	    // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
-	    cache.save(out);
-	  }
-	}
+        if (!allthreads || alive) {
+          if (isComplete<mykernel_type>(arg, coord) && active) {
+            // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
+            cache.save(out);
+          }
+        }
         cache.sync(); // safe to sync here since other threads will exit if allowed, or all be here
-	if (!allthreads || alive) {
-	  if (isComplete<mykernel_type>(arg, coord) && active) {
-	    if (flavor == 0)
-	      out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y + 1));
-	    else
-	      out = arg.a * (out - arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y - 1));
-	  }
-	}
+        if (!allthreads || alive) {
+          if (isComplete<mykernel_type>(arg, coord) && active) {
+            if (flavor == 0)
+              out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y + 1));
+            else
+              out = arg.a * (out - arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y - 1));
+          }
+        }
       }
 
       if (!allthreads || alive)
-	if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
   };
 

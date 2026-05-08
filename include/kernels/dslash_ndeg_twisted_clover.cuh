@@ -68,7 +68,7 @@ namespace quda
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
       bool active = mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
-      int thread_dim; // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                     // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
@@ -77,25 +77,27 @@ namespace quda
       Vector out;
 
       if (!allthreads || alive) {
-	if (arg.dd_out.isZero(coord)) {
-	  if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-	  if constexpr (!allthreads) return;
-	  else alive = false;
-	}
+        if (arg.dd_out.isZero(coord)) {
+          if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+          if constexpr (!allthreads)
+            return;
+          else
+            alive = false;
+        }
       }
 
       if (!allthreads || alive) {
-	// defined in dslash_wilson.cuh
-	applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        // defined in dslash_wilson.cuh
+        applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       }
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
         if (arg.dd_x.isZero(coord)) {
-	  if (!allthreads || alive) out = arg.a * out;
+          if (!allthreads || alive) out = arg.a * out;
         } else {
           SharedMemoryCache<Vector> cache {*this};
           Vector tmp;
-	  if (!allthreads || alive) {
+          if (!allthreads || alive) {
             // apply the chiral and flavor twists
             // use consistent load order across s to ensure better cache locality
             Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
@@ -120,7 +122,7 @@ namespace quda
             // tmp += (c * tau_1) * x
           }
           cache.sync();
-	  if (!allthreads || alive) {
+          if (!allthreads || alive) {
             tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
 
             // add the Wilson part with normalisation
@@ -133,7 +135,7 @@ namespace quda
       }
 
       if (!allthreads || alive)
-	if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
   };
 
