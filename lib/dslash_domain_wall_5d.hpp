@@ -18,18 +18,19 @@ namespace quda
     using Dslash = Dslash<domainWall5D, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     DomainWall5D(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                 const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                 const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       Dslash::template instantiate<packShmem>(tp, stream);
     }
 
@@ -74,7 +75,7 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       DomainWall5DArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, m_f, a != 0.0, x, parity, dagger,
                                                              comm_override);
-      DomainWall5D<decltype(arg)> dwf(arg, out, in, halo);
+      DomainWall5D<decltype(arg)> dwf(arg, out, in, halo, U);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, out, in, halo, profile);
     }
   };

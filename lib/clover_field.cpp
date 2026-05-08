@@ -187,6 +187,7 @@ namespace quda {
     std::stringstream aux_ss;
     aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor << ",order=" << order;
     if (isNative()) aux_ss << ",N=" << clover::get_vector_order(precision, 128);
+    if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
     aux_string = aux_ss.str();
     if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }

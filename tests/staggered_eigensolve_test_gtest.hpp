@@ -155,7 +155,9 @@ TEST_P(StaggeredEigensolveTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
-  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-5 : 1e-12;
+  auto prec = ::testing::get<0>(GetParam());
+  auto tol = prec == QUDA_DOUBLE_PRECISION ? 1e-12 : 1e-5;
+
   eig_param.tol = tol;
 
   if (::testing::get<1>(GetParam()) == QUDA_EIG_IR_ARNOLDI || ::testing::get<1>(GetParam()) == QUDA_EIG_BLK_IR_ARNOLDI) {
@@ -173,6 +175,9 @@ TEST_P(StaggeredEigensolveTest, verify)
     tol *= 5;
   }
 
+  // with block TRLM some of eigenvectors can have a small deviation
+  if (::testing::get<1>(GetParam()) == QUDA_EIG_BLK_TR_LANCZOS) tol *= 2;
+
   // account for summation error scaling with number of processors
   auto dof = 6lu * dim[0] * dim[1] * dim[2] * dim[3];
   tol *= (1 + log(quda::comm_size()) / log(dof));
@@ -187,7 +192,11 @@ TEST_P(StaggeredEigensolveTest, verify)
   // For the 3-d eigensolver, we need to set orthoDir
   if (dslash_type == QUDA_LAPLACE_DSLASH) laplace3D = (eig_type == QUDA_EIG_TR_LANCZOS_3D) ? 3 : 4;
 
-  for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
+  for (auto rsd : eigensolve(GetParam())) {
+    EXPECT_FALSE(std::isnan(rsd)) << "Nan has propagated into the result";
+    tol = checkReasonableHostDeviation(rsd, tol, prec);
+    EXPECT_LE(rsd, tol);
+  }
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)

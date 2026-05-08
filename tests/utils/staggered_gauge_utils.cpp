@@ -61,6 +61,7 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
       constructRandomGaugeField(longlink, param, precision, dslash_type);
       // incorporate non-trivial phase into long links
       for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
         for (int i = 0; i < Vh; ++i) {
           for (int parity = 0; parity < 2; parity++) {
             double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
@@ -93,6 +94,7 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
 
       // incorporate non-trivial phase into long links
       for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
         for (int i = 0; i < Vh; ++i) {
           for (int parity = 0; parity < 2; parity++) {
             double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
@@ -424,19 +426,6 @@ void computeStaggeredPlaquetteQDPOrder(void **qdp_link, double plaq[3], const Qu
 
   gauge_param.anisotropy = 1;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
-  pad_size = pad_size > z_face_size ? pad_size : z_face_size;
-  pad_size = pad_size > t_face_size ? pad_size : t_face_size;
-  gauge_param.ga_pad = pad_size;
-#endif
 
   loadGaugeQuda(qdp_link, &gauge_param);
   plaqQuda(plaq);

@@ -928,14 +928,14 @@ namespace quda
   template <typename real> __host__ __device__ inline complex<real> cmul(const complex<real> &x, const complex<real> &y)
   {
     complex<real> rtn = mul2({x.real(), x.real()}, y);
-    return fma2({x.imag(), x.imag()}, {-y.imag(), y.real()}, rtn);
+    return fma2({-x.imag(), x.imag()}, {y.imag(), y.real()}, rtn);
   }
 
   template <typename real>
   __host__ __device__ inline complex<real> cmac(const complex<real> &x, const complex<real> &y, const complex<real> &z)
   {
     complex<real> w = fma2({x.real(), x.real()}, y, z);
-    return fma2({x.imag(), x.imag()}, {-y.imag(), y.real()}, w);
+    return fma2({-x.imag(), x.imag()}, {y.imag(), y.real()}, w);
   }
 
   template <typename T1, typename T2, typename T3>

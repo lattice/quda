@@ -298,6 +298,7 @@ namespace quda
       aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",Ns=" << nSpin
              << ",Nc=" << nColor << ",order=" << fieldOrder;
       if (isNative()) aux_ss << ",N=" << colorspinor::get_vector_order(precision, 128);
+      if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
       if (nVec > 1) aux_ss << ",nVec=" << nVec;
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
@@ -384,10 +385,7 @@ namespace quda
       dc.X2X1 = X[1] * X[0];
       dc.X3X2X1 = X[2] * X[1] * X[0];
       dc.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
-      dc.X2X1mX1 = (X[1] - 1) * X[0];
-      dc.X3X2X1mX2X1 = (X[2] - 1) * X[1] * X[0];
-      dc.X4X3X2X1mX3X2X1 = (X[3] - 1) * X[2] * X[1] * X[0];
-      dc.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
+      dc.X5X4X3X2X1 = X[4] * X[3] * X[2] * X[1] * X[0];
     }
 
     spin_project_allocated = spin_project;

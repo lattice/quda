@@ -104,7 +104,13 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
+
+#ifndef CHECK_PARAM
+  P(ga_pad, 0);
+#elif defined CHECK_PARAM
   P(ga_pad, INVALID_INT);
+  param->ga_pad = 0;
+#endif
 
 #if defined INIT_PARAM
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_NO);
