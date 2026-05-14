@@ -1503,10 +1503,10 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   loadGaugeQuda(const_cast<void *>(links), &fat_param);
 
   // Get deflation spaces
-  deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_even_deflation_space);
-  deflation_space *space_odd = reinterpret_cast<deflation_space *>(preserved_odd_deflation_space);
+  deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_deflation_space[0]);
+  deflation_space *space_odd = reinterpret_cast<deflation_space *>(preserved_deflation_space[1]);
   if (!space_even || !space_odd) errorQuda("One or both deflation spaces is not loaded!");
-  if ( preserved_even_evals_mass != 0.0 || preserved_odd_evals_mass != 0.0 )
+  if ( preserved_evals_mass[0] != 0.0 || preserved_evals_mass[1] != 0.0 )
     errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
   int n_evecs = eigargs.n_ev;
   
