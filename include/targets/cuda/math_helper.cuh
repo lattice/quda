@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <type_traits>
 #include <target_device.h>
 
 #if (CUDA_VERSION >= 11070) && !defined(_NVHPC_CUDA)
@@ -11,12 +12,37 @@
 #define BUILTIN_ASSUME(x)
 #endif
 
+#define FTZ
+
 namespace quda {
 
   inline __host__ __device__ float abs(const float a) { return fabs(a); }
   inline __host__ __device__ double abs(const double a) { return fabs(a); }
 
-  template <typename T> inline __host__ __device__ T sqrt(const T a) { return ::sqrt(a); }
+  template <bool is_device> struct sqrt_impl {
+    template <typename T> inline __host__ __device__ T operator()(const T a) { return ::sqrt(a); }
+  };
+
+  /** Device float sqrt via PTX sqrt.approx.ftz.f32 (matches fast math / avoids denormal range sequence). */
+  template <> struct sqrt_impl<true> {
+    template <typename T> __device__ inline std::enable_if_t<std::is_same_v<T, float>, float> operator()(const T a)
+    {
+      float s;
+#ifdef FTZ
+      asm volatile("sqrt.approx.ftz.f32 %0, %1;" : "=f"(s) : "f"(a));
+#else
+      asm volatile("sqrt.approx.f32 %0, %1;" : "=f"(s) : "f"(a));
+#endif
+      return s;
+    }
+    template <typename T> __device__ inline std::enable_if_t<!std::is_same_v<T, float>, T> operator()(const T a)
+    {
+      return ::sqrt(a);
+    }
+  };
+
+  template <typename T> inline __host__ __device__ T sqrt(const T a) { return target::dispatch<sqrt_impl>(a); }
+
   template <typename T> inline __host__ __device__ T exp(const T a) { return ::exp(a); }
   template <typename T> inline __host__ __device__ T log(const T a) { return ::log(a); }
   template <typename T> inline __host__ __device__ T sin(const T a) { return ::sin(a); }
@@ -35,6 +61,13 @@ namespace quda {
    */
   template<typename T>
   inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
+
+  /**
+   * @brief Maximum of two numbers (float specialization)
+   * @param a first number
+   * @param b second number
+   */
+  template <> inline __host__ __device__ float max(const float &a, const float &b) { return fmaxf(a, b); }
 
   /**
    * @brief Minimum of two numbers
@@ -203,13 +236,31 @@ namespace quda {
   */
   template <typename real> __device__ __host__ inline real fpow(real a, int b) { return target::dispatch<fpow_impl>(a, b); }
 
-  template <bool is_device> struct fdividef_impl { inline float operator()(float a, float b) { return a / b; } };
-  template <> struct fdividef_impl<true> { __device__ inline float operator()(float a, float b) { return __fdividef(a, b); } };
+  template <bool is_device> struct fdivide_impl {
+    inline float operator()(float a, float b) { return a / b; }
+    inline double operator()(double a, double b) { return a / b; }
+  };
+
+  /** Device float divide via PTX div.approx{.ftz}.f32 (same FTZ toggle as quda::sqrt; avoids long rcp range prologue). */
+  template <> struct fdivide_impl<true> {
+    __device__ inline float operator()(float a, float b)
+    {
+      float d;
+#ifdef FTZ
+      asm volatile("div.approx.ftz.f32 %0, %1, %2;" : "=f"(d) : "f"(a), "f"(b));
+#else
+      asm volatile("div.approx.f32 %0, %1, %2;" : "=f"(d) : "f"(a), "f"(b));
+#endif
+      return d;
+    }
+    __device__ inline double operator()(double a, double b) { return a / b; }
+  };
 
   /**
-     @brief Optimized division routine on the device
-  */
-  __device__ __host__ inline float fdividef(float a, float b) { return target::dispatch<fdividef_impl>(a, b); }
+   * @brief Fast division on host/device (float uses device PTX on CUDA GPU).
+   */
+  __device__ __host__ inline float fdivide(float a, float b) { return target::dispatch<fdivide_impl>(a, b); }
+  __device__ __host__ inline double fdivide(double a, double b) { return target::dispatch<fdivide_impl>(a, b); }
 
   template <bool is_device> struct ffma2_impl {
     inline float2 operator()(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }

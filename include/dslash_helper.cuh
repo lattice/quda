@@ -13,6 +13,7 @@
 #include <tune_quda.h>
 #include <domain_decomposition_helper.cuh>
 #include <kernel_ops.h>
+#include <tma_helper.hpp>
 
 constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 
@@ -20,13 +21,48 @@ constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 
 namespace quda
 {
+
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+  constexpr bool dslash_double_store() { return true; }
+#else
+  constexpr bool dslash_double_store() { return false; }
+#endif
+
+  constexpr PrefetchType dslash_prefetch_type()
+  {
+#if defined(QUDA_DSLASH_PREFETCH_TYPE_NONE)
+    return PrefetchType::NONE;
+#elif defined(QUDA_DSLASH_PREFETCH_TYPE_THREAD)
+    return PrefetchType::THREAD;
+#elif defined(QUDA_DSLASH_PREFETCH_TYPE_BULK)
+    return PrefetchType::BULK;
+#elif defined(QUDA_DSLASH_PREFETCH_TYPE_TENSOR)
+    return PrefetchType::TENSOR;
+#else
+#error "Invalid or missing QUDA_DSLASH_PREFETCH_TYPE"
+#endif
+    return PrefetchType::NONE;
+  }
+
+#if defined(NVSHMEM_COMMS) && (defined(QUDA_DSLASH_PREFETCH_TYPE_BULK) || defined(QUDA_DSLASH_PREFETCH_TYPE_TENSOR))
+#error NVSHMEM cannot be used in combination with TMA prefetching at present
+#endif
+
+  constexpr bool dslash_prefetch_tma()
+  {
+    return (dslash_prefetch_type() == PrefetchType::BULK || dslash_prefetch_type() == PrefetchType::TENSOR);
+  }
+
+  static_assert(!dslash_prefetch_tma() || dslash_double_store(),
+                "Cannot use TMA prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
+
   /**
      @brief Helper function to determine if we should do halo
      computation
      @param[in] dim Dimension we are working on.  If dim=-1 (default
      argument) then we return true if type is any halo kernel.
   */
-  template <KernelType type> __host__ __device__ __forceinline__ bool doHalo(int dim = -1)
+  template <KernelType type> __host__ __device__ __forceinline__ constexpr bool doHalo(int dim = -1)
   {
     switch (type) {
     case EXTERIOR_KERNEL_ALL: return true;
@@ -44,7 +80,7 @@ namespace quda
      computation
      @param[in] dim Dimension we are working on
   */
-  template <KernelType type> __host__ __device__ __forceinline__ bool doBulk()
+  template <KernelType type> __host__ __device__ __forceinline__ constexpr bool doBulk()
   {
     switch (type) {
     case EXTERIOR_KERNEL_ALL:
@@ -109,6 +145,7 @@ namespace quda
 
     if (kernel_type == INTERIOR_KERNEL) {
       coord.x_cb = idx;
+      coord.x_cb_0 = (target::block_idx().x - arg.pack_blocks) * target::block_dim().x;
       if (nDim == 5)
         coord.X = getCoords5CB(coord, idx, arg.dc.X, arg.X0h, parity, pc_type);
       else
@@ -158,11 +195,66 @@ namespace quda
 
 #pragma unroll
     for (int d = 0; d < nDim; d++) {
-      coord.in_boundary[1][d] = coord[d] + arg.nFace >= arg.dc.X[d];
-      coord.in_boundary[0][d] = coord[d] - arg.nFace < 0;
+      coord.in_boundary[1][d] = -(coord[d] + arg.nFace >= arg.dc.X[d]);
+      coord.in_boundary[0][d] = -(coord[d] - arg.nFace < 0);
     }
 
     return coord;
+  }
+
+  /**
+     @brief Compute the checkerboard 1-d index for the nearest
+     neighbor
+     @param[in] lattice coordinates
+     @param[in] mu dimension in which to add 1
+     @param[in] dir direction (+1 or -1)
+     @param[in] arg parameter struct
+     @return 1-d checkboard index
+   */
+  template <int nFace = 1, typename Coord, typename Arg>
+  __device__ __host__ inline int getNeighborIndexCB(const Coord &x, int mu, int dir, const Arg &arg)
+  {
+    switch (nFace) {
+    case 1:
+      switch (dir) {
+      case +1: // positive direction
+        switch (mu) {
+        case 0: return (x.X + 1 - (x.in_boundary[1][0] & arg.X[0])) >> 1;
+        case 1: return (x.X + arg.X[0] - (x.in_boundary[1][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X + arg.X2X1 - (x.in_boundary[1][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X + arg.X3X2X1 - (x.in_boundary[1][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X + arg.X4X3X2X1 - (x.in_boundary[1][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      case -1:
+        switch (mu) {
+        case 0: return (x.X - 1 + (x.in_boundary[0][0] & arg.X[0])) >> 1;
+        case 1: return (x.X - arg.X[0] + (x.in_boundary[0][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X - arg.X2X1 + (x.in_boundary[0][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X - arg.X3X2X1 + (x.in_boundary[0][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X - arg.X4X3X2X1 + (x.in_boundary[0][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      }
+    case 3:
+      switch (dir) {
+      case +1: // positive direction
+        switch (mu) {
+        case 0: return (x.X + 3 - (x.in_boundary[1][0] & arg.X[0])) >> 1;
+        case 1: return (x.X + 3 * arg.X[0] - (x.in_boundary[1][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X + 3 * arg.X2X1 - (x.in_boundary[1][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X + 3 * arg.X3X2X1 - (x.in_boundary[1][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X + 3 * arg.X4X3X2X1 - (x.in_boundary[1][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      case -1:
+        switch (mu) {
+        case 0: return (x.X - 3 + (x.in_boundary[0][0] & arg.X[0])) >> 1;
+        case 1: return (x.X - 3 * arg.X[0] + (x.in_boundary[0][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X - 3 * arg.X2X1 + (x.in_boundary[0][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X - 3 * arg.X3X2X1 + (x.in_boundary[0][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X - 3 * arg.X4X3X2X1 + (x.in_boundary[0][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      }
+    }
+    return 0; // should never reach here
   }
 
   /**
@@ -243,7 +335,8 @@ namespace quda
     static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
     static constexpr int max_regs = 0;             // by default we don't limit register count
     static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
-
+    static constexpr int prefetch_distance = 0;    // whether we are using prefetching in the dslash
+    static constexpr PrefetchType prefetch_type = dslash_prefetch_type();
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
     const QudaReconstructType reconstruct;
@@ -285,6 +378,7 @@ namespace quda
     int pack_blocks = 0;   // total number of blocks used for packing in the dslash
     int exterior_dims = 0; // dimension to run in the exterior Dslash
     int exterior_blocks = 0;
+    int block_size = 0;
 
     DDArg dd_out;
     DDArg dd_in;
@@ -494,10 +588,13 @@ namespace quda
     }   // parity
   }
 
-  template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity)
+  template <KernelType kernel_type, bool allthreads = false, class D>
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool alive = true)
   {
-    dslash.template operator()<kernel_type>(x_cb, s, parity);
+    if constexpr (allthreads)
+      dslash.template operator()<kernel_type, true>(x_cb, s, parity, alive);
+    else
+      dslash.template operator()<kernel_type>(x_cb, s, parity);
   }
 
 #ifdef NVSHMEM_COMMS
@@ -652,6 +749,7 @@ namespace quda
     static constexpr KernelType kernel_type = kernel_type_;
     static constexpr int max_regs = Arg::max_regs;
     static constexpr bool spill_shared = Arg::spill_shared;
+    static constexpr bool is_dslash = true;
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
@@ -678,18 +776,28 @@ namespace quda
     {
     }
 
-    __forceinline__ __device__ void operator()(int, int s, int parity)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __forceinline__ __device__ void operator()(int, int s, int parity, bool alive = true)
     {
       typename Arg::D dslash(*this);
+
+      if constexpr (dslash_prefetch_tma()) {
+        // FIXME need warp uniform parity which is not composable with
+        // NVSHMEM since the latter requires blockDim.y and blockDim.z to
+        // cover the entire extent
+        parity = target::block_idx().z; // ensure parity is warp uniform
+      }
+
       // for full fields set parity from z thread index else use arg setting
       if (arg.nParity == 1) parity = arg.parity;
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
-        // first few blocks do packing kernel
-        typename Arg::template P<dslash.pc_type()> packer;
-        packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
-
+        if (!allthreads || alive) {
+          // first few blocks do packing kernel
+          typename Arg::template P<dslash.pc_type()> packer;
+          packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+        }
         // we use that when running the exterior -- this is either
         // * an explicit call to the exterior when not merged with the interior or
         // * the interior with exterior_blocks > 0
@@ -731,9 +839,14 @@ namespace quda
           }
 #endif
         } else {
-          if (x_cb >= arg.threads) return;
-
-          apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity);
+          if (x_cb >= arg.threads) {
+            if constexpr (allthreads)
+              alive = false;
+            else
+              return;
+          }
+          apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(dslash, x_cb, s, parity,
+                                                                                               alive);
           if constexpr (use_nvshmem_comms && kernel_type == UBER_KERNEL) {
             __syncthreads();
             if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0)

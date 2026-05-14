@@ -20,18 +20,19 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     TwistedCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                                const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       // specialize here to constrain the template instantiation
       if (arg.nParity == 1) {
         if (arg.xpay) {
@@ -123,8 +124,8 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       TwistedCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, C, a, b, xpay, x, parity, dagger,
                                                               comm_override);
-      TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo, U);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };
 

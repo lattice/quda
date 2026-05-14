@@ -181,17 +181,20 @@ namespace quda
     return target::dispatch<fpow_impl>(a, b);
   }
 
-  template <bool is_device> struct fdividef_impl {
+  template <bool is_device> struct fdivide_impl {
     inline float operator()(float a, float b) { return a / b; }
+    inline double operator()(double a, double b) { return a / b; }
   };
-  template <> struct fdividef_impl<true> {
+  template <> struct fdivide_impl<true> {
     __device__ inline float operator()(float a, float b) { return __fdividef(a, b); }
+    __device__ inline double operator()(double a, double b) { return a / b; }
   };
 
   /**
-     @brief Optimized division routine on the device
-  */
-  __device__ __host__ inline float fdividef(float a, float b) { return target::dispatch<fdividef_impl>(a, b); }
+   * @brief Fast division on host/device (float uses __fdividef on HIP device).
+   */
+  __device__ __host__ inline float fdivide(float a, float b) { return target::dispatch<fdivide_impl>(a, b); }
+  __device__ __host__ inline double fdivide(double a, double b) { return target::dispatch<fdivide_impl>(a, b); }
 
   __device__ __host__ inline float2 fma2(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
   __device__ __host__ inline double2 fma2(double2 a, double2 b, double2 c)

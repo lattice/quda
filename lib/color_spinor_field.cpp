@@ -298,6 +298,7 @@ namespace quda
       aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",Ns=" << nSpin
              << ",Nc=" << nColor << ",order=" << fieldOrder;
       if (isNative()) aux_ss << ",N=" << colorspinor::get_vector_order(precision, 128);
+      if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
       if (nVec > 1) aux_ss << ",nVec=" << nVec;
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
@@ -384,10 +385,7 @@ namespace quda
       dc.X2X1 = X[1] * X[0];
       dc.X3X2X1 = X[2] * X[1] * X[0];
       dc.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
-      dc.X2X1mX1 = (X[1] - 1) * X[0];
-      dc.X3X2X1mX2X1 = (X[2] - 1) * X[1] * X[0];
-      dc.X4X3X2X1mX3X2X1 = (X[3] - 1) * X[2] * X[1] * X[0];
-      dc.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
+      dc.X5X4X3X2X1 = X[4] * X[3] * X[2] * X[1] * X[0];
     }
 
     spin_project_allocated = spin_project;
@@ -1484,17 +1482,23 @@ namespace quda
 
   void ColorSpinorField::backup() const
   {
-    if (backup_h.size()) errorQuda("ColorSpinorField already backed up");
-    backup_h.resize(1);
-    backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
-    qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
+    if (backup_depth == 0) {
+      backup_h.resize(1);
+      backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
+      qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
+    }
+    backup_depth++;
   }
 
   void ColorSpinorField::restore() const
   {
-    if (!backup_h.size()) errorQuda("Cannot restore since not backed up");
-    qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
-    backup_h.resize(0);
+    backup_depth--;
+    if (backup_depth < 0) errorQuda("Cannot restore since not backed up");
+
+    if (backup_depth == 0) {
+      qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
+      backup_h.resize(0);
+    }
   }
 
   void ColorSpinorField::copy_to_buffer(void *buffer) const

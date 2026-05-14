@@ -21,6 +21,7 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
     unsigned int sharedBytesPerThread() const
     {
@@ -32,8 +33,8 @@ namespace quda
 
   public:
     NdegTwistedClover(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                      const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
       TunableKernel3D::resizeStep(2, 1);
     }
@@ -41,7 +42,7 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay)
         Dslash::template instantiate<packShmem, true>(tp, stream);
       else
@@ -87,8 +88,8 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       NdegTwistedCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, A, a, b, c, x, parity, dagger,
                                                                   comm_override);
-      NdegTwistedClover<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      NdegTwistedClover<decltype(arg)> twisted(arg, out, in, halo, U);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };
 

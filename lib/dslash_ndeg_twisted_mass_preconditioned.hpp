@@ -28,6 +28,7 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   protected:
     bool shared;
@@ -38,8 +39,8 @@ namespace quda
 
   public:
     NdegTwistedMassPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                  const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo), shared(arg.asymmetric || !arg.dagger)
+                                  const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U), shared(arg.asymmetric || !arg.dagger)
     {
       if (shared) TunableKernel3D::resizeStep(2, 1); // this will force flavor to be contained in the block
     }
@@ -47,7 +48,7 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
       if (arg.nParity != 1)
@@ -105,13 +106,13 @@ namespace quda
       if (asymmetric) {
         NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, halo, U, a, b, c, xpay, x, parity,
                                                                         dagger, comm_override);
-        NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       } else {
         NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon, false> arg(out, in, halo, U, a, b, c, xpay, x, parity,
                                                                          dagger, comm_override);
-        NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       }
     }
   };

@@ -10,12 +10,21 @@ namespace quda
   {
 
     // hip-clang: compile-time dispatch
-    template <template <bool, typename...> class f, typename... Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
 #ifdef __HIP_DEVICE_COMPILE__
-      return f<true>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<true>()(args...);
+      } else {
+        return f<true>().template operator()<Params...>(args...);
+      }
 #else
-      return f<false>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<false>()(args...);
+      } else {
+        return f<false>().template operator()<Params...>(args...);
+      }
 #endif
     }
 
@@ -134,6 +143,25 @@ namespace quda
       default: return block_dim().z * block_dim().y * block_dim().x;
       }
     }
+
+    template <int dim = 3> __device__ __host__ inline bool is_thread_zero()
+    {
+      return thread_idx_linear<dim>() == 0;
+    }
+
+    __device__ __host__ inline bool is_lane_zero()
+    {
+      return (thread_idx_linear<3>() % 64) == 0; // switch this to warp_size
+    }
+
+    /**
+       @brief Return the warp uniform variant of a given operand.
+       This is used to suggest to a compiler that a variable is
+       constant across the warp.  Dummy for HIP.
+       @param[in] t The input value we want to make warp uniform
+       @return The warp uniform variant
+    */
+    template <typename T> constexpr bool uniform(const T &t) { return t; }
 
   } // namespace target
 

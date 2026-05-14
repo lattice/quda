@@ -166,9 +166,12 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not available for NG)" OFF)
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
+option(QUDA_QCD_PLUS_QED "Enable QCD+QED features (builds QUDA_RECONSTRUCT_9/13 instead of 8/12 for Wilson-type operators)" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
+option(QUDA_INTERFACE_OPENQCD "build OpenQCD interface (for QCD+QED support, see QUDA_QCD_PLUS_QED)" OFF)
 option(QUDA_INTERFACE_CPS "build cps interface" OFF)
 option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
 option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)
@@ -236,7 +239,7 @@ option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest 
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
-option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
+option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
@@ -306,6 +309,13 @@ if(QUDA_MPI AND QUDA_QMP)
     "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
+if(QUDA_INTERFACE_OPENQCD AND QUDA_QMP)
+  message(SEND_ERROR "OpenQCD does not support QMP comms.")
+endif()
+
+if(QUDA_INTERFACE_OPENQCD AND NOT (QUDA_MPI))
+  message(SEND_ERROR "OpenQCD requires QUDA built with MPI comms.")
+endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")

@@ -25,11 +25,12 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     StaggeredQSmear(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                    const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
@@ -53,7 +54,7 @@ namespace quda
       }
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
 
       // operator is Hermitian so do not instantiate dagger
       Dslash::template instantiate<packStaggeredShmem, false, false>(tp, stream);
@@ -194,8 +195,8 @@ namespace quda
         auto halo = ColorSpinorField::create_comms_batch(in, 3);
         StaggeredQSmearArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity,
                                                                          dir, dagger, comm_override);
-        StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, in, halo, profile);
+        StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, out, in, halo, profile);
       } else {
         errorQuda("Unsupported nSpin = %d", in.Nspin());
       }

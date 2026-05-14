@@ -241,9 +241,9 @@ namespace quda
         constexpr int M = nSpinBlock * nColor * nVec;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          vec_t tmp
-            = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
-          memcpy(&out[i], &tmp, sizeof(vec_t));
+          auto tmp
+            = vector_load<Float, 2>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
+          memcpy(&out[i], &tmp, sizeof(tmp));
         }
       }
     };
@@ -664,7 +664,7 @@ namespace quda
         if constexpr (ghost_fixed) {
           if constexpr (block_float_ghost) {
             norm_ptr = ghost.norm(2 * dim + dir);
-            scale = fdividef(fixedMaxValue<ghostFloat>::value, max);
+            scale = fdivide(fixedMaxValue<ghostFloat>::value, max);
             scale_inv = fixedInvMaxValue<ghostFloat>::value * max;
           } else {
             scale = ghost.scale;
@@ -1010,11 +1010,14 @@ namespace quda
       {
         for (int dim = 0; dim < 4; dim++) {
           for (int dir = 0; dir < 2; dir++) {
-            ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
-            ghost_norm[2 * dim + dir] = !comm_dim_partitioned(dim) ?
-              nullptr :
-              reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
-                                            + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
+            if (comm_dim_partitioned(dim) && ghost_[2 * dim + dir]) {
+              ghost[2 * dim + dir] = static_cast<Float *>(ghost_[2 * dim + dir]);
+              ghost_norm[2 * dim + dir] = reinterpret_cast<norm_type *>(
+                static_cast<char *>(ghost_[2 * dim + dir]) + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
+            } else {
+              ghost[2 * dim + dir] = nullptr;
+              ghost_norm[2 * dim + dir] = nullptr;
+            }
           }
         }
       }
@@ -1023,7 +1026,7 @@ namespace quda
       {
         real v[length_ghost];
         norm_type nrm
-          = isFixed<Float>::value ? vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x) : 0.0;
+          = isFixed<Float>::value ? vector_load<float, 1>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x)[0] : 0.0;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
@@ -1063,7 +1066,7 @@ namespace quda
 #pragma unroll
           for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
           ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale * fixedInvMaxValue<Float>::value;
-          scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+          scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
         }
 
 #pragma unroll
@@ -1123,16 +1126,9 @@ namespace quda
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using AllocInt = typename AllocType<huge_alloc>::type;
-      using norm_type = float;
+      using norm_t = float;
       Float *field = nullptr;
-      //#define LEGACY_ACCESSOR_NORM // legacy code where norm pointer and offset are stored instead of computed
-#ifdef LEGACY_ACCESSOR_NORM
-      norm_type *norm = nullptr;
-#endif
       AllocInt offset = 0; // offset can be 32-bit or 64-bit
-#ifdef LEGACY_ACCESSOR_NORM
-      AllocInt norm_offset = 0;
-#endif
       int volumeCB = 0;
 
       FloatNOrder() = default;
@@ -1141,14 +1137,7 @@ namespace quda
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
         GhostNOrder(a, nFace, ghost_),
         field(buffer ? buffer : a.data<Float *>()),
-#ifdef LEGACY_ACCESSOR_NORM
-        norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
-                      const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
-#endif
         offset(a.Bytes() / (2 * sizeof(Float))),
-#ifdef LEGACY_ACCESSOR_NORM
-        norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
-#endif
         volumeCB(a.VolumeCB())
       {
       }
@@ -1157,23 +1146,19 @@ namespace quda
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
         real v[length];
-#ifndef LEGACY_ACCESSOR_NORM
-        auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
-        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
-#endif
-        norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
-
+        auto norm_offset = (volumeCB * 2 * Nc * Ns + parity * offset) * sizeof(Float) / sizeof(norm_t);
+        norm_t nrm = isFixed<Float>::value ? vector_load<norm_t, 1>(field, x + norm_offset)[0] : 0.0;
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(field + parity * offset, volumeCB * i + x);
+          auto vecTmp = vector_load<Float, N>(field, parity * offset, volumeCB * i + x);
           // now copy into output and scale
           copy_and_scale(v + i * N, vecTmp, nrm);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(field + parity * offset + volumeCB * M * N, x);
+          auto vecTmp = vector_load<Float, Nrem>(field, parity * offset + volumeCB * M * N, x);
           copy_and_scale(v + M * N, vecTmp, nrm);
         }
 
@@ -1181,31 +1166,40 @@ namespace quda
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
       }
 
+      __device__ __host__ inline void prefetch(int x, int parity = 0) const
+      {
+        auto norm_offset = (volumeCB * 2 * Nc * Ns + parity * offset) * sizeof(Float) / sizeof(norm_t);
+        if constexpr (isFixed<Float>::value) prefetch_cache_line(reinterpret_cast<norm_t *>(field) + (x + norm_offset));
+
+#pragma unroll
+        for (int i = 0; i < M; i++) prefetch_cache_line(field + (parity * offset + (volumeCB * i + x) * N));
+
+        // now load any remainder
+        if constexpr (Nrem > 0) prefetch_cache_line(field + (parity * offset + volumeCB * M * N + x * Nrem));
+      }
+
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
       {
         real v[length];
-#ifndef LEGACY_ACCESSOR_NORM
-        auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
-        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
-#endif
+        auto norm_offset = (volumeCB * 2 * Nc * Ns + parity * offset) * sizeof(Float) / sizeof(norm_t);
+
 #pragma unroll
         for (int i = 0; i < length / 2; i++) {
           v[2 * i + 0] = in[i].real();
           v[2 * i + 1] = in[i].imag();
         }
 
-        norm_type scale = 0.0;
-        norm_type scale_inv = 0.0;
+        norm_t scale = 0.0;
+        norm_t scale_inv = 0.0;
         if constexpr (isFixed<Float>::value) {
-          norm_type max_[length / 2];
+          norm_t max_[length / 2];
           // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-          for (int i = 0; i < length / 2; i++)
-            max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
+          for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_t)v[i]), fabsf((norm_t)v[i + length / 2]));
 #pragma unroll
           for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-          norm[x + parity * norm_offset] = scale * fixedInvMaxValue<Float>::value;
-          scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+          reinterpret_cast<norm_t *>(field)[x + norm_offset] = scale * fixedInvMaxValue<Float>::value;
+          scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
         }
 
 #pragma unroll
@@ -1214,14 +1208,14 @@ namespace quda
           // first do scalar copy converting into storage type
           copy_and_scale<Float, real, N>(vecTmp, v + i * N, scale_inv);
           // second do vectorized copy into memory
-          vector_store(field + parity * offset, volumeCB * i + x, vecTmp);
+          vector_store(field, parity * offset, volumeCB * i + x, vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           array<Float, Nrem> vecTmp;
           copy_and_scale<Float, real, Nrem>(vecTmp, v + M * N, scale_inv);
           // second do vectorized copy into memory
-          vector_store(field + parity * offset + volumeCB * M * N, x, vecTmp);
+          vector_store(field, parity * offset + volumeCB * M * N, x, vecTmp);
         }
       }
 
@@ -1312,7 +1306,7 @@ namespace quda
         for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
         norm_type nrm = scale * fixedInvMaxValue<Float>::value;
 
-        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+        real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
 
         array<Float, 8> vecTmp;
         memcpy(&vecTmp[6], &nrm, sizeof(norm_type)); // pack the norm
@@ -1418,7 +1412,7 @@ namespace quda
         for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
         norm_type nrm = scale * fixedInvMaxValue<Float>::value;
 
-        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+        real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
 
         array<Float, 8> vecTmp;
         memcpy(&vecTmp[6], &nrm, sizeof(norm_type)); // pack the norm
@@ -1758,6 +1752,85 @@ namespace quda
 
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
+
+    /**
+     * struct to define order of spinor fields in OpenQCD
+     *
+     * @tparam     Float  Underlying type of data (precision)
+     * @tparam     Ns     Number of spin degrees of freedom
+     * @tparam     Nc     Number of color degrees of freedom
+     */
+    template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder {
+      using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
+      using real = typename mapper<Float>::type;
+      using complex = complex<real>;
+
+      static const int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
+      Float *field;
+      size_t offset;
+      Float *ghost[8];
+      int volumeCB;
+      int faceVolumeCB[4];
+      int nParity;
+      const int dim[4]; // xyzt convention
+      const int L[4];   // txyz convention
+
+      OpenQCDDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
+        field(field_ ? field_ : a.data<Float *>()),
+        offset(a.Bytes() / (2 * sizeof(Float))), // TODO: What's this for??
+        volumeCB(a.VolumeCB()),
+        nParity(a.SiteSubset()),
+        dim {a.X(0), a.X(1), a.X(2), a.X(3)}, // *local* lattice dimensions, xyzt
+        L {a.X(3), a.X(0), a.X(1), a.X(2)}    // *local* lattice dimensions, txyz
+      {
+        if constexpr (length != 24) { errorQuda("Spinor field length %d not supported", length); }
+      }
+
+      /**
+       * @brief      Gets the offset in Floats from the openQCD base pointer to
+       *             the spinor field.
+       *
+       * @param[in]  x       Checkerboard index coming from quda
+       * @param[in]  parity  The parity coming from quda
+       *
+       * @return     The offset.
+       */
+      __device__ __host__ inline int getSpinorOffset(int x_cb, int parity) const
+      {
+        int x_quda[4], x[4];
+        getCoords(x_quda, x_cb, dim, parity); // x_quda contains xyzt local Carthesian corrdinates
+        openqcd::rotate_coords(x_quda, x);    // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
+        return openqcd::ipt(x, L) * length;
+      }
+
+      __device__ __host__ inline void load(complex v[length / 2], int x_cb, int parity = 0) const
+      {
+        auto in = &field[getSpinorOffset(x_cb, parity)];
+        block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
+      }
+
+      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int parity = 0) const
+      {
+        auto out = &field[getSpinorOffset(x_cb, parity)];
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      }
+
+      /**
+         @brief This accessor routine returns a colorspinor_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a colorspinor_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto operator()(int x_cb, int parity) const
+      {
+        return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+      }
+
+      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
+    }; // openQCDDiracOrder
 
   } // namespace colorspinor
 

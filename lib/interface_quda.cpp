@@ -520,7 +520,7 @@ void initQudaDevice(int dev)
 /*
  * Any persistent memory allocations that QUDA uses are done here.
  */
-void initQudaMemory()
+void initQudaMemory(void)
 {
   auto profile = pushProfile(profileInit);
   profileInit.TPSTART(QUDA_PROFILE_INIT);
@@ -546,7 +546,7 @@ void initQudaMemory()
   profileInit.TPSTOP(QUDA_PROFILE_INIT);
 }
 
-void updateR()
+void updateR(void)
 {
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 }
@@ -694,7 +694,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // set update_split_gauge to reuse backup or not and free the buf if needed
   // always update the flag even gauge reuse with checksum
   // better way would be do the checks more consistently along with clover/stagger
-  if (param->use_split_gauge_bkup == true) {
+  if (param->use_split_gauge_bkup) {
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   } else {
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_OFF;
@@ -728,7 +728,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param.reconstruct = param->reconstruct;
   gauge_param.setPrecision(param->cuda_prec, true);
   gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  gauge_param.pad = param->ga_pad;
   gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
   precise = new GaugeField(gauge_param);
@@ -885,7 +884,6 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     gauge_param.reconstruct = param->reconstruct;
     gauge_param.setPrecision(param->cuda_prec, true);
     gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    gauge_param.pad = param->ga_pad;
     cudaGauge = new GaugeField(gauge_param);
     copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
     break;
@@ -896,6 +894,58 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
 }
+
+/** Write gauge field to disk **/
+void writeGaugeQuda(const char *file, QudaGaugeParam *param)
+{
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  // Create CPU field
+  GaugeFieldParam cpu_param(*param);
+  cpu_param.pad = 0;
+  cpu_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cpu_param.location = QUDA_CPU_FIELD_LOCATION;
+  cpu_param.order = QUDA_QDP_GAUGE_ORDER;
+  cpu_param.create = QUDA_NULL_FIELD_CREATE;
+  cpu_param.setPrecision(param->cpu_prec);
+  GaugeField cpuGauge(cpu_param);
+
+  // Select source and copy into cpuGauge
+  switch (param->type) {
+  case QUDA_WILSON_LINKS:
+    if (gaugePrecise == nullptr) errorQuda("gaugePrecise is not loaded");
+    cpuGauge.copy(*gaugePrecise);
+    break;
+  case QUDA_ASQTAD_FAT_LINKS:
+    if (gaugeFatPrecise == nullptr) errorQuda("gaugeFatPrecise is not loaded");
+    cpuGauge.copy(*gaugeFatPrecise);
+    break;
+  case QUDA_ASQTAD_LONG_LINKS:
+    if (gaugeLongPrecise == nullptr) errorQuda("gaugeLongPrecise is not loaded");
+    cpuGauge.copy(*gaugeLongPrecise);
+    break;
+  case QUDA_SMEARED_LINKS: {
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared is not loaded");
+    // Copy to intermediate non-extended field before copying to cpuGauge
+    GaugeFieldParam cuda_param(*param);
+    cuda_param.location = QUDA_CUDA_FIELD_LOCATION;
+    cuda_param.create = QUDA_NULL_FIELD_CREATE;
+    cuda_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    cuda_param.pad = 0;
+    cuda_param.setPrecision(param->cuda_prec);
+    GaugeField cudaGauge(cuda_param);
+    copyExtendedGauge(cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    cpuGauge.copy(cudaGauge);
+  } break;
+  default: errorQuda("Invalid gauge type");
+  }
+
+  // Write to disk using QIO writer
+  write_gauge_field(file, reinterpret_cast<void **>(cpuGauge.raw_pointer()), cpuGauge.Precision(), param->X, 0,
+                    (char **)0);
+
+} // writeGaugeQuda
 
 void loadSloppyCloverQuda(const QudaPrecision prec[]);
 void freeSloppyCloverQuda();
@@ -1953,16 +2003,21 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
 
   GaugeCovDev myCovDev(diracParam); // create the Dirac operator
 
-  if (sym & 1) {
-    myCovDev.MCD(out, in, dir); // apply the operator
+  switch (sym) {
+  case 1: // Forward shift
+    myCovDev.MCD(out, in, dir);
+    break;
+  case 2: // Backward shift
+    myCovDev.MCD(out, in, dir + 4);
+    break;
+  case 3: // Symmetric shift
+    myCovDev.MCD(out, in, dir);
+    myCovDev.MCD(tmp, in, dir + 4);
+    quda::blas::xpy(tmp, out);
+    quda::blas::ax(0.5, out);
+    break;
+  default: errorQuda("Invalid shift type = %d\n", sym);
   }
-  if (sym & 2) {
-    myCovDev.MCD(tmp, in, dir + 4); // apply the operator
-  }
-
-  quda::blas::xpy(tmp, out);
-
-  if (sym == 3) quda::blas::ax(0.5, out);
 
   profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -3117,25 +3172,10 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
   auto link_recon_precondition = gauge_param->reconstruct_precondition;
 
   // Specific gauge parameters for MILC
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param->X[1] * gauge_param->X[2] * gauge_param->X[3] / 2;
-  int y_face_size = gauge_param->X[0] * gauge_param->X[2] * gauge_param->X[3] / 2;
-  int z_face_size = gauge_param->X[0] * gauge_param->X[1] * gauge_param->X[3] / 2;
-  int t_face_size = gauge_param->X[0] * gauge_param->X[1] * gauge_param->X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-#endif
-
-  int fat_pad = pad_size;
-  int link_pad = 3 * pad_size;
-
   gauge_param->type = (inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :
     QUDA_ASQTAD_FAT_LINKS;
 
-  gauge_param->ga_pad = fat_pad;
   if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param->reconstruct = link_recon;
     gauge_param->reconstruct_sloppy = link_recon_sloppy;
@@ -3151,7 +3191,6 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
 
   if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH) {
     gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
-    gauge_param->ga_pad = link_pad;
     gauge_param->staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
     gauge_param->reconstruct = link_recon;
     gauge_param->reconstruct_sloppy = link_recon_sloppy;
@@ -4530,8 +4569,7 @@ void computeHISQForceQuda(void* const milc_momentum,
     }
 
     { // naik terms
-      oneLinkOprod.copy(stapleOprod);
-      ax(level2_coeff[0], oneLinkOprod);
+      oneLinkOprod.copy(stapleOprod, level2_coeff[0]);
       GaugeField *oprod[2] = {&oneLinkOprod, &naikOprod};
 
       // loop over different quark fields
@@ -4547,20 +4585,9 @@ void computeHISQForceQuda(void* const milc_momentum,
     }
   }
 
-  // Compute the pad size
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gParam->X[1] * gParam->X[2] * gParam->X[3] / 2;
-  int y_face_size = gParam->X[0] * gParam->X[2] * gParam->X[3] / 2;
-  int z_face_size = gParam->X[0] * gParam->X[1] * gParam->X[3] / 2;
-  int t_face_size = gParam->X[0] * gParam->X[1] * gParam->X[2] / 2;
-  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
-#endif
-
   // Copy outer product fields into input force fields
   oParam.create = QUDA_NULL_FIELD_CREATE;
   oParam.nFace = 1;
-  oParam.pad = pad_size;
   oParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   lat_dim_t R = {2 * comm_dim_partitioned(0), 2 * comm_dim_partitioned(1), 2 * comm_dim_partitioned(2),
                  2 * comm_dim_partitioned(3)};
@@ -4616,7 +4643,6 @@ void computeHISQForceQuda(void* const milc_momentum,
   GaugeField cpuULink(uParam);
 
   // Load the W field, which contains U(3) matrices, to the device
-  gParam_field.ga_pad = 3 * pad_size;
   wParam = GaugeFieldParam(gParam_field);
   for (int dir = 0; dir < 4; dir++) {
     wParam.x[dir] += 2 * R[dir];
@@ -4664,7 +4690,6 @@ void computeHISQForceQuda(void* const milc_momentum,
   vParam.create = QUDA_NULL_FIELD_CREATE;
   vParam.setPrecision(gParam->cpu_prec, true);
   vParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
-  vParam.pad = 3 * pad_size;
   GaugeField cudaVLink(vParam);
 
   cudaVLink.copy(cpuVLink);
@@ -4689,7 +4714,6 @@ void computeHISQForceQuda(void* const milc_momentum,
   uParam.create = QUDA_NULL_FIELD_CREATE;
   uParam.setPrecision(gParam->cpu_prec, true);
   uParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
-  uParam.pad = 3 * pad_size;
   GaugeField cudaULink(uParam);
 
   cudaULink.copy(cpuULink);
@@ -5109,7 +5133,8 @@ void copyExtendedResidentGaugeQuda(void *resident_gauge)
   static_cast<GaugeField *>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
+void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, unsigned int n_steps,
+                               double alpha, size_t nSpinors)
 {
   auto profile = pushProfile(profileWuppertal);
   pushVerbosity(inv_param->verbosity);
@@ -5131,17 +5156,20 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
     precise = gaugePrecise;
   }
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
-  ColorSpinorField in_h(cpuParam);
+  std::vector<ColorSpinorField> in_h, in, out;
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_in[i], *inv_param, precise->X(), false, inv_param->input_location);
+    in_h.push_back(ColorSpinorField(cpuParam));
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField in(cudaParam);
-  in = in_h;
+    ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+    in.push_back(ColorSpinorField(cudaParam));
+    in[i] = in_h[i];
 
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+    logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h[i]), blas::norm2(in[i]));
 
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField out(cudaParam);
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    out.push_back(ColorSpinorField(cudaParam));
+  }
   int parity = 0;
 
   // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
@@ -5156,21 +5184,31 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
-    if (i) in = out;
+    // swap pointers rather than deep copying spinor
+    if (i) std::swap(in, out);
     ApplyLaplace(out, in, *precise, 3, a, b, in, parity, comm_dim, profileWuppertal);
-    logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
+    for (size_t j = 0; j < nSpinors; j++)
+      logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector %lu norm %e\n", i, j, blas::norm2(out[j]));
   }
 
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField out_h(cpuParam);
-  out_h = out;
+  // copy out to h_out
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
+    ColorSpinorField out_h(cpuParam);
+    out_h = out[i];
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+    logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out[i]));
+  }
 
   if (gaugeSmeared != nullptr) delete precise;
 
   popVerbosity();
+}
+
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
+{
+  // call multi-RHS version with only a single right-hand side
+  performWuppertalnStepQuda(&h_out, &h_in, inv_param, n_steps, alpha, 1);
 }
 
 void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)

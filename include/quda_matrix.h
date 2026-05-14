@@ -103,7 +103,8 @@ namespace quda {
            the absolute column sums.
            @return Compute L1 norm
         */
-        __device__ __host__ inline real L1() {
+        __device__ __host__ inline real L1() const
+        {
           real l1 = 0;
 #pragma unroll
           for (int j=0; j<N; j++) {
@@ -122,7 +123,8 @@ namespace quda {
            Frobenius norm which is an upper bound on the L2 norm.
            @return Computed L2 norm
         */
-        __device__ __host__ inline real L2() {
+        __device__ __host__ inline real L2() const
+        {
           real l2 = 0;
 #pragma unroll
           for (int j=0; j<N; j++) {
@@ -139,7 +141,8 @@ namespace quda {
            the absolute row sums.
            @return Computed Linfinity norm
         */
-        __device__ __host__ inline real Linf() {
+        __device__ __host__ inline real Linf() const
+        {
           real linf = 0;
 #pragma unroll
           for (int i=0; i<N; i++) {

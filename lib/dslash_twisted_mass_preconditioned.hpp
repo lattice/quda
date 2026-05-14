@@ -26,18 +26,19 @@ namespace quda
     using Dslash = Dslash<twistedMassPreconditioned, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     TwistedMassPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                              const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                              const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
       if (arg.nParity != 1) errorQuda("Preconditioned twisted-mass operator not defined nParity=%d", arg.nParity);
@@ -82,15 +83,15 @@ namespace quda
       if (asymmetric) {
         TwistedMassArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, halo, U, a, b, xpay, x, parity, dagger,
                                                                     comm_override);
-        TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
+        TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo, U);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       } else {
         TwistedMassArg<Float, nColor, nDim, DDArg, recon, false> arg(out, in, halo, U, a, b, xpay, x, parity, dagger,
                                                                      comm_override);
-        TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
+        TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo, U);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       }
     }
   };

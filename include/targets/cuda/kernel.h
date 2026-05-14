@@ -57,7 +57,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   MAXNREG(Arg::max_regs)
-  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel1D(Arg arg)
+  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel1D(const GRID_CONSTANT Arg arg)
   {
     Kernel1D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -76,7 +76,8 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel1D(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void>
+  Kernel1D(const GRID_CONSTANT Arg arg)
   {
     Kernel1D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -173,7 +174,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   MAXNREG(Arg::max_regs)
-  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel2D(Arg arg)
+  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel2D(const GRID_CONSTANT Arg arg)
   {
     Kernel2D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -192,7 +193,8 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel2D(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void>
+  Kernel2D(const GRID_CONSTANT Arg arg)
   {
     Kernel2D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -291,7 +293,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   MAXNREG(Arg::max_regs)
-  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel3D(Arg arg)
+  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel3D(const GRID_CONSTANT Arg arg)
   {
     Kernel3D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -310,7 +312,8 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel3D(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void>
+  Kernel3D(const GRID_CONSTANT Arg arg)
   {
     Kernel3D_impl<Functor, Arg, grid_stride>(arg);
   }

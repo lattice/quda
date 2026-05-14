@@ -20,18 +20,20 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     WilsonCloverHasenbuschTwistPCNoClovInv(Arg &arg, cvector_ref<ColorSpinorField> &out,
-                                           cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                                           cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+                                           const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
 
       // specialize here to constrain the template instantiation
       if (arg.nParity != 1) errorQuda("Operator not defined nParity=%d", arg.nParity);
@@ -126,9 +128,9 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, false>;
       ArgType arg(out, in, halo, U, A, a, b, x, parity, dagger, comm_override);
-      WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in, halo);
+      WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in, halo, U);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 
@@ -144,18 +146,20 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     WilsonCloverHasenbuschTwistPCClovInv(Arg &arg, cvector_ref<ColorSpinorField> &out,
-                                         cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                                         cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+                                         const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
 
       // specialize here to constrain the template instantiation
       if (arg.nParity != 1) errorQuda("Operator not defined nParity=%d", arg.nParity);
@@ -253,8 +257,8 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, true>;
       ArgType arg(out, in, halo, U, A, kappa, mu, x, parity, dagger, comm_override);
-      WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in, halo, U);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

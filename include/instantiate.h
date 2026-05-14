@@ -68,6 +68,11 @@ namespace quda
   template <> constexpr bool is_enabled<QUDA_TIFR_GAUGE_ORDER>() { return false; }
   template <> constexpr bool is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>() { return false; }
 #endif
+#ifdef BUILD_OPENQCD_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_OPENQCD_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_OPENQCD_GAUGE_ORDER>() { return false; }
+#endif
 
   /**
      @brief Helper function for returning if a given precision is enabled
@@ -140,8 +145,13 @@ namespace quda
   };
 
   struct ReconstructWilson {
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
   };
 
   struct ReconstructStaggered {
@@ -609,6 +619,21 @@ namespace quda
 #ifdef GPU_COVDEV
   template <> constexpr bool is_enabled<QUDA_COVDEV_DSLASH>() { return true; }
 #endif
+
+  struct WilsonReconstruct {
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
+  };
+
+  struct StaggeredReconstruct {
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+  };
 
 #ifdef GPU_DISTANCE_PRECONDITIONING
   constexpr bool is_enabled_distance_precondition() { return true; }

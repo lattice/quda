@@ -25,6 +25,7 @@ namespace quda
     using DomainWall4DArg::threads;
     using DomainWall4DArg::x;
     using DomainWall4DArg::xpay;
+    using DomainWall4DArg::block_size;
 
     using F = typename DomainWall4DArg::F;
 
