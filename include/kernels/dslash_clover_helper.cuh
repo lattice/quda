@@ -223,8 +223,8 @@ namespace quda {
         in.toRel(); // change to chiral basis here
         A = arg.clover(x_cb, clover_parity, chirality);
       } else {
-        in = fermion {};
-        A = Mat {};
+        in = {};
+        A = {};
       }
 
       // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
