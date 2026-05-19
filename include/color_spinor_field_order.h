@@ -243,8 +243,8 @@ namespace quda
         for (int i = 0; i < M; i++) {
           // vec_t tmp
           //   = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
-          //vec_t tmp = vector_load<vec_t>(in + parity * offset_cb, x_cb * N + chi * M + i);
-          //memcpy(&out[i], &tmp, sizeof(vec_t));
+          // vec_t tmp = vector_load<vec_t>(in + parity * offset_cb, x_cb * N + chi * M + i);
+          // memcpy(&out[i], &tmp, sizeof(vec_t));
           auto tmp
             = vector_load<Float, 2>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
           memcpy(&out[i], &tmp, sizeof(tmp));
@@ -1201,8 +1201,8 @@ namespace quda
 #pragma unroll
           for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_t)v[i]), fabsf((norm_t)v[i + length / 2]));
 #pragma unroll
-          //norm[x + parity * norm_offset] = scale * fixedInvMaxValue<Float>::value;
-          //scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+          // norm[x + parity * norm_offset] = scale * fixedInvMaxValue<Float>::value;
+          // scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
           for (int i = 0; i < length / 2; i++) scale = max(max_[i], scale);
           reinterpret_cast<norm_t *>(field)[x + norm_offset] = scale * fixedInvMaxValue<Float>::value;
           scale_inv = fdivide(fixedMaxValue<Float>::value, scale);

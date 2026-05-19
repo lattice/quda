@@ -180,11 +180,11 @@ namespace quda
         int sync_kernels_int = atoi(sync_kernels_env);
         switch (sync_kernels_int) {
         case 0:
-	  syncKernels = false;
+          syncKernels = false;
           if (getVerbosity() > QUDA_SILENT) warningQuda("Using asynchronous kernels");
           break;
         case 1:
-	  syncKernels = true;
+          syncKernels = true;
           if (getVerbosity() > QUDA_SILENT) warningQuda("Using synchronous kernels");
           break;
         default: errorQuda("Unexpected value QUDA_SYNC_KERNELS=%s\n", sync_kernels_env);
@@ -561,10 +561,7 @@ namespace quda
       }
     }
 
-    bool sync_kernels()
-    {
-      return syncKernels;
-    }
+    bool sync_kernels() { return syncKernels; }
 
   } // namespace device
 } // namespace quda

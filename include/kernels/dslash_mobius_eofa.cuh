@@ -169,10 +169,10 @@ namespace quda
             if (!allthreads || alive) {
               Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
               out = arg.a * x + out;
-	    }
-	  }
-	}
-	if (!allthreads || alive) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
+            }
+          }
+        }
+        if (!allthreads || alive) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
       }
     };
 

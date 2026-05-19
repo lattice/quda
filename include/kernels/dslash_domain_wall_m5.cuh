@@ -216,8 +216,9 @@ namespace quda
   };
 
   template <bool allthreads, bool sync, bool dagger, bool shared, class Ftor, class Arg = typename Ftor::Arg,
-	    Dslash5Type type = Arg::type, class Vector>
-  __device__ __host__ inline Vector d5(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s, int src_idx, bool alive)
+            Dslash5Type type = Arg::type, class Vector>
+  __device__ __host__ inline Vector d5(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s, int src_idx,
+                                       bool alive)
   {
     const Arg &arg = ftor.arg;
     int local_src_idx = target::thread_idx().y / arg.Ls;
@@ -240,21 +241,21 @@ namespace quda
           cache.save(in.project(4, proj_dir));
           cache.sync();
         }
-	if (!allthreads || alive) {
-	  const int fwd_s = (s + 1) % arg.Ls;
-	  const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
-	  HalfVector half_in;
-	  if constexpr (shared) {
-	    half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + fwd_s, parity);
-	  } else {
+        if (!allthreads || alive) {
+          const int fwd_s = (s + 1) % arg.Ls;
+          const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
+          HalfVector half_in;
+          if constexpr (shared) {
+            half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + fwd_s, parity);
+          } else {
             Vector full_in = arg.in[src_idx](fwd_idx, parity);
             half_in = full_in.project(4, proj_dir);
           }
-	  if (s == arg.Ls - 1) {
-	    out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
-	  } else {
-	    out += half_in.reconstruct(4, proj_dir);
-	  }
+          if (s == arg.Ls - 1) {
+            out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+          } else {
+            out += half_in.reconstruct(4, proj_dir);
+          }
         }
       }
 
@@ -265,22 +266,22 @@ namespace quda
           cache.save(in.project(4, proj_dir));
           cache.sync();
         }
-	if (!allthreads || alive) {
-	  const int back_s = (s + arg.Ls - 1) % arg.Ls;
-	  const int back_idx = back_s * arg.volume_4d_cb + x_cb;
-	  HalfVector half_in;
-	  if constexpr (shared) {
-	    half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + back_s, parity);
-	  } else {
+        if (!allthreads || alive) {
+          const int back_s = (s + arg.Ls - 1) % arg.Ls;
+          const int back_idx = back_s * arg.volume_4d_cb + x_cb;
+          HalfVector half_in;
+          if constexpr (shared) {
+            half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + back_s, parity);
+          } else {
             Vector full_in = arg.in[src_idx](back_idx, parity);
             half_in = full_in.project(4, proj_dir);
-	  }
-	  if (s == 0) {
-	    out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
-	  } else {
-	    out += half_in.reconstruct(4, proj_dir);
-	  }
-	}
+          }
+          if (s == 0) {
+            out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+          } else {
+            out += half_in.reconstruct(4, proj_dir);
+          }
+        }
       }
 
     } else { // use_half_vector
@@ -505,26 +506,26 @@ namespace quda
           cache.sync();
         }
 
-	if (!allthreads || alive) {
-	  int s = s_;
-	  auto R = coeff.inv();
-	  HalfVector r;
-	  for (int s_count = 0; s_count < arg.Ls; s_count++) {
-	    auto factorR = (s_ < s ? -arg.m_f * R : R);
+        if (!allthreads || alive) {
+          int s = s_;
+          auto R = coeff.inv();
+          HalfVector r;
+          for (int s_count = 0; s_count < arg.Ls; s_count++) {
+            auto factorR = (s_ < s ? -arg.m_f * R : R);
 
-	    if (shared) {
-	      r += factorR * cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity);
-	    } else {
+            if (shared) {
+              r += factorR * cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity);
+            } else {
               Vector in = arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
               r += factorR * in.project(4, proj_dir);
-	    }
+            }
 
-	    R *= coeff.kappa(s);
-	    s = (s + arg.Ls - 1) % arg.Ls;
-	  }
+            R *= coeff.kappa(s);
+            s = (s + arg.Ls - 1) % arg.Ls;
+          }
 
-	  out += r.reconstruct(4, proj_dir);
-	}
+          out += r.reconstruct(4, proj_dir);
+        }
       }
 
       { // second do L
@@ -535,26 +536,26 @@ namespace quda
           cache.sync();
         }
 
-	if (!allthreads || alive) {
-	  int s = s_;
-	  auto L = coeff.inv();
-	  HalfVector l;
-	  for (int s_count = 0; s_count < arg.Ls; s_count++) {
-	    auto factorL = (s_ > s ? -arg.m_f * L : L);
+        if (!allthreads || alive) {
+          int s = s_;
+          auto L = coeff.inv();
+          HalfVector l;
+          for (int s_count = 0; s_count < arg.Ls; s_count++) {
+            auto factorL = (s_ > s ? -arg.m_f * L : L);
 
-	    if (shared) {
-	      l += factorL * cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity);
-	    } else {
+            if (shared) {
+              l += factorL * cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity);
+            } else {
               Vector in = arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
               l += factorL * in.project(4, proj_dir);
             }
 
-	    L *= coeff.kappa(s);
-	    s = (s + 1) % arg.Ls;
-	  }
+            L *= coeff.kappa(s);
+            s = (s + 1) % arg.Ls;
+          }
 
-	  out += l.reconstruct(4, proj_dir);
-	}
+          out += l.reconstruct(4, proj_dir);
+        }
       }
     } else { // use_half_vector
       using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
@@ -652,11 +653,9 @@ namespace quda
       if (!allthreads || alive) { in = arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity); }
       constexpr bool sync = false;
       if constexpr (mobius_m5::var_inverse()) { // zMobius, must call variableInv
-        out
-          = variableInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(*this, in, parity, x_cb, s, src_idx, alive);
+        out = variableInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(*this, in, parity, x_cb, s, src_idx, alive);
       } else {
-        out
-          = constantInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(*this, in, parity, x_cb, s, src_idx, alive);
+        out = constantInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(*this, in, parity, x_cb, s, src_idx, alive);
       }
 
       if (!allthreads || alive) {

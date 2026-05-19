@@ -67,7 +67,7 @@ namespace quda
    */
   template <unsigned int block_size, typename Arg_> struct BlockKernelArg : Arg_ {
     using Arg = Arg_;
-    //static constexpr unsigned int block_size = block_size_;
+    // static constexpr unsigned int block_size = block_size_;
     static constexpr unsigned int block_size_cxpr = block_size;
     BlockKernelArg(const Arg &arg) : Arg(arg) { }
   };

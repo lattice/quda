@@ -77,8 +77,8 @@ namespace quda
     vector_t value_v;
     static_assert(sizeof(value_a) == sizeof(value_v), "array type and vector type are different sizes");
     memcpy(&value_v, &value_a, sizeof(vector_t));
-    //vector_storeV<vector_t>(ptr, idx, value_v);
-    scalar_t *a = static_cast<scalar_t *>(ptr) + N*idx;
+    // vector_storeV<vector_t>(ptr, idx, value_v);
+    scalar_t *a = static_cast<scalar_t *>(ptr) + N * idx;
     memcpy(a, &value_v, sizeof(value_v));
   }
 
