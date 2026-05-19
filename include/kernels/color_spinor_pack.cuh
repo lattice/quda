@@ -76,7 +76,7 @@ namespace quda {
     // disable ghost to reduce arg size
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t, true>;
 
-    static constexpr bool is_native = order <= 8;
+    static constexpr bool is_native = (order == QUDA_NATIVE_FIELD_ORDER);
     static constexpr int max_n_src = 64;
     const int_fastdiv n_src;
     G out;
