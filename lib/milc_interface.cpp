@@ -4,6 +4,7 @@
 #include <vector>
 #include <fstream>
 #include <string.h>
+#include <cassert>
 
 #include <quda.h>
 #include <quda_milc_interface.h>
@@ -68,8 +69,11 @@ static bool invalidate_quda_mg = true;
 
 static void *df_preconditioner = nullptr;
 
+// Cache both parity deflation spaces
 static void *preserved_deflation_space[2] = {nullptr, nullptr};
 static double preserved_evals_mass[2] = {-1.0, -1.0};
+// Cache zero-mass eigenvalues instead of recomputing every time the mass is changed
+static std::vector<quda::Complex> preserved_evals_zero_mass;
 
 using namespace quda;
 using namespace quda::fermion_force;
@@ -128,6 +132,7 @@ void qudaCleanUpDeflationSpace()
       preserved_evals_mass[p] = -1.0;
     }
   }
+  preserved_evals_zero_mass.clear();
   qudamilc_called<false>(__func__);
 }
 
@@ -1339,6 +1344,23 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                          static_cast<void *>(source.data()), static_cast<void *>(solution.data()), &final_residual,
                          &final_fermilab_residual, &num_iters);
 
+    // Cache zero-mass eigenvalues (lambda_0 = lambda_m - 4*m^2); valid for any mass.
+    // Unconditional overwrite is intentional: a fresh COMPUTE invalidates any prior cached zero-mass evals.
+    {
+      deflation_space *space0 = reinterpret_cast<deflation_space *>(preserved_deflation_space[parity]);
+      preserved_evals_zero_mass.resize(space0->evals.size());
+      double m2_shift = 4.0 * mass * mass;
+      for (size_t i = 0; i < space0->evals.size(); i++)
+        preserved_evals_zero_mass[i] = space0->evals[i] - Complex(m2_shift, 0.0);
+
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        logQuda(QUDA_DEBUG_VERBOSE, "Stored zero-mass eigenvalues (back-shifted from mass %e)\n", mass);
+        for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
+          logQuda(QUDA_DEBUG_VERBOSE, "Eval[%04zu] = (%+.16e,%+.16e)\n", i,
+                  preserved_evals_zero_mass[i].real(), preserved_evals_zero_mass[i].imag());
+      }
+    }
+
   } else if (load_type == QUDA_MILC_EIG_FROM_OTHER_PARITY) {
     logQuda(QUDA_VERBOSE, "Computing deflation space for parity %d from parity %d\n", parity, other_parity);
     double other_parity_mass = preserved_evals_mass[other_parity];
@@ -1380,20 +1402,35 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       blas::ax(1.0 / sqrt(norm2), temp);
       space->evecs[i] = temp;
 
-      // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-      dEig->M(temp, space->evecs[i]);
-      auto eval = other_parity_space->evals[i];       // re-use eigenvalues by default
-      if (fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
-        auto vtAv = blas::cDotProduct(space->evecs[i], temp);
-        auto v2 = blas::norm2(space->evecs[i]);
-        eval = vtAv / sqrt(v2);
-      }
-      space->evals[i] = eval;
+      if (!preserved_evals_zero_mass.empty()) {
+        // Shift from stored zero-mass eigenvalues; no mat-vec needed.
+        assert(preserved_evals_zero_mass.size() >= static_cast<size_t>(n_evecs));
+        space->evals[i] = preserved_evals_zero_mass[i] + Complex(4.0 * mass * mass, 0.0);
 
-      // res^2 = |\lambda*v - A*v|
-      auto res = blas::caxpbyNorm(eval, space->evecs[i], n_unit, temp);
-      logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(),
-              sqrt(res[0]));
+        // Opt-in residual sanity check
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+          dEig->M(temp, space->evecs[i]);
+          auto res = blas::caxpbyNorm(space->evals[i], space->evecs[i], n_unit, temp);
+          logQuda(QUDA_DEBUG_VERBOSE,
+                  "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n",
+                  i, space->evals[i].real(), space->evals[i].imag(), sqrt(res[0]));
+        }
+      } else {
+        // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+        dEig->M(temp, space->evecs[i]);
+        auto eval = other_parity_space->evals[i];       // re-use eigenvalues by default
+        if (fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
+          auto vtAv = blas::cDotProduct(space->evecs[i], temp);
+          auto v2 = blas::norm2(space->evecs[i]);
+          eval = vtAv / sqrt(v2);
+        }
+        space->evals[i] = eval;
+
+        // res^2 = |\lambda*v - A*v|
+        auto res = blas::caxpbyNorm(eval, space->evecs[i], n_unit, temp);
+        logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(),
+                sqrt(res[0]));
+      }
     }
     delete dEig;
 
@@ -1908,8 +1945,29 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
     // Check that preserved eigenvalues are for this mass
     double epsilon = device_precision == QUDA_DOUBLE_PRECISION ? __DBL_EPSILON__ : __FLT_EPSILON__;
     if (fabs(mass - preserved_evals_mass[local_parity]) > epsilon) {
-      logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
-      qep.preserve_evals = QUDA_BOOLEAN_FALSE;
+      // If not, shift to correct mass using cached zero-mass eigenvalues
+      // NAIK CAVEAT: shifted evals are only approximate when inv_args.naik_epsilon != 0
+      if (!preserved_evals_zero_mass.empty()) {
+        assert(qep.preserve_deflation_space != nullptr);
+        logQuda(QUDA_VERBOSE, "Shifting eigenvalues to mass %e\n", invertParam.mass);
+        deflation_space *space = reinterpret_cast<deflation_space *>(qep.preserve_deflation_space);
+        assert(preserved_evals_zero_mass.size() >= space->evals.size());
+        double m2_shift = 4.0 * mass * mass;
+        for (size_t i = 0; i < space->evals.size(); i++)
+          space->evals[i] = preserved_evals_zero_mass[i] + Complex(m2_shift, 0.0);
+
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+          logQuda(QUDA_DEBUG_VERBOSE, "Shifted eigenvalues (parity %d, mass %e)\n",
+                  local_parity, mass);
+          for (size_t i = 0; i < space->evals.size(); i++)
+            logQuda(QUDA_DEBUG_VERBOSE, "  Eval[%04zu] = (%+.16e,%+.16e) (shifted)\n",
+                    i, space->evals[i].real(), space->evals[i].imag());
+        }
+      } else {
+	// Compute the evals if zero-mass evals are not already cached
+        logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
+        qep.preserve_evals = QUDA_BOOLEAN_FALSE;
+      }
     }
   }
 
@@ -1940,6 +1998,24 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   if (invertParam.eig_param && qep.preserve_deflation) {
     preserved_deflation_space[local_parity] = qep.preserve_deflation_space;
     preserved_evals_mass[local_parity] = mass;
+    // Snapshot zero-mass eigenvalues the first time any space is set.
+    // The empty() guard ensures we never overwrite an earlier snapshot from a different (or fresher) source.
+    if (preserved_evals_zero_mass.empty()) {
+      deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space[local_parity]);
+      preserved_evals_zero_mass.resize(space->evals.size());
+      double m2_shift = 4.0 * mass * mass;
+      for (size_t i = 0; i < space->evals.size(); i++)
+        preserved_evals_zero_mass[i] = space->evals[i] - Complex(m2_shift, 0.0);
+
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        logQuda(QUDA_DEBUG_VERBOSE,
+                "Stored zero-mass eigenvalues (back-shifted from parity %d, mass %e)\n",
+                local_parity, mass);
+        for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
+          logQuda(QUDA_DEBUG_VERBOSE, "Eval[%04zu] = (%+.16e,%+.16e)\n", i,
+                  preserved_evals_zero_mass[i].real(), preserved_evals_zero_mass[i].imag());
+      }
+    }
   }
 
   // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
