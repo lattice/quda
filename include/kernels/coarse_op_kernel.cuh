@@ -1732,14 +1732,16 @@ namespace quda {
       if (!allthreads || alive)
         target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 
-      // if (parity > 1) return;
-      // if (c_row >= arg.vuvTile.M_tiles) return;
-      // if (c_col >= arg.vuvTile.N_tiles) return;
-      // if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
-      if (parity > 1) alive = false;
-      if (c_row >= arg.vuvTile.M_tiles) alive = false;
-      if (c_col >= arg.vuvTile.N_tiles) alive = false;
-      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) alive = false;
+      if constexpr (!allthreads) {
+        if (parity > 1) return;
+        if (c_row >= arg.vuvTile.M_tiles) return;
+        if (c_col >= arg.vuvTile.N_tiles) return;
+        if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
+      } else {
+        if ((parity > 1) || (c_row >= arg.vuvTile.M_tiles) || (c_col >= arg.vuvTile.N_tiles)
+            || (!arg.shared_atomic && x_cb >= arg.fineVolumeCB))
+          alive = false;
+      }
 
       computeVUV<nFace, allthreads>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse,
                                     x_coarse_cb, alive);
@@ -1769,14 +1771,16 @@ namespace quda {
       if (!allthreads || alive)
         target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 
-      // if (parity > 1) return;
-      // if (c_row >= arg.vuvTile.M_tiles) return;
-      // if (c_col >= arg.vuvTile.N_tiles) return;
-      // if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
-      if (parity > 1) alive = false;
-      if (c_row >= arg.vuvTile.M_tiles) alive = false;
-      if (c_col >= arg.vuvTile.N_tiles) alive = false;
-      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) alive = false;
+      if constexpr (!allthreads) {
+        if (parity > 1) return;
+        if (c_row >= arg.vuvTile.M_tiles) return;
+        if (c_col >= arg.vuvTile.N_tiles) return;
+        if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
+      } else {
+        if ((parity > 1) || (c_row >= arg.vuvTile.M_tiles) || (c_col >= arg.vuvTile.N_tiles)
+            || (!arg.shared_atomic && x_cb >= arg.fineVolumeCB))
+          alive = false;
+      }
 
       computeVUV<nFace, allthreads>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse,
                                     x_coarse_cb, alive);
