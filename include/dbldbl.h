@@ -287,7 +287,7 @@ struct doubledouble {
 
   doubledouble() = default;
   constexpr doubledouble(const doubledouble &a) = default;
-  constexpr doubledouble(const dbldbl &a) = default;
+  constexpr doubledouble(const dbldbl &b) : a(b) { }
   constexpr doubledouble(const double &head, const double &tail) : a{tail, head} { }
   constexpr doubledouble(const double &head) : a{0.0, head} { }
 

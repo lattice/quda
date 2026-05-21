@@ -974,19 +974,19 @@ namespace quda
 
     complex() = default;
 
-    constexpr complex<doubledouble>(const doubledouble &re, const doubledouble &im = doubledouble()) :
+    constexpr complex(const doubledouble &re, const doubledouble &im = doubledouble()) :
       doubledouble2 {re, im}
     {
     }
 
-    __host__ __device__ inline complex<doubledouble> &operator+=(const complex<doubledouble> &z)
+    __host__ __device__ inline complex &operator+=(const complex<doubledouble> &z)
     {
       real(real() + z.real());
       imag(imag() + z.imag());
       return *this;
     }
 
-    __host__ __device__ inline complex<doubledouble> &operator-=(const complex<doubledouble> &z)
+    __host__ __device__ inline complex &operator-=(const complex<doubledouble> &z)
     {
       real(real() - z.real());
       imag(imag() - z.imag());
