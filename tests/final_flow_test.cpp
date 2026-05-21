@@ -31,6 +31,7 @@ bool use_multi_src = false;
 
 int start_seed = 0;
 std::string meas_vec_file_str = "";
+std::string base_io_dir = std::filesystem::current_path().string();
 
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
@@ -108,6 +109,10 @@ void add_meas_io_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option(
       "--start-seed",
       start_seed, "start seed for random sources");
+    opgroup
+    ->add_option(
+      "--base-io-dir",
+      base_io_dir, "base directory to create data directory");
     
 }
 
@@ -162,7 +167,7 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   }
   assert(dirstr_vec.size() >= 2);
   printfQuda(("our deepest dir is " + deepest_dir +"\n").c_str());
-  std::filesystem::path base_output_dir(std::filesystem::current_path().string() + "/data/");
+  std::filesystem::path base_output_dir(base_io_dir + "/data/");
   if (!std::filesystem::is_directory(base_output_dir)){
       std::filesystem::create_directory(base_output_dir);
   } 
@@ -503,12 +508,13 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     out_ptr[n] = out[n].data();
     out_flowed_ptr[n] = out_flowed[n].data();
   }
-
+  quda::host_timer_t host_timer;
+  host_timer.start();
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
-
+  host_timer.stop();
   printfQuda("At end ppb has %li elements\n",ppb.size());
   printfQuda("At end ppb_t has %li elements\n",ppb_t.size());
-
+  printfQuda("Time elapsed for entire calculation procedure = %g secs\n", host_timer.last());
   printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
                  inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
       if (inv_param.energy > 0) {
