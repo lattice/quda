@@ -3,14 +3,6 @@
 #include <cstdio>
 #include <cstring>
 
-/* Defaults when CMake does not define these (e.g. IDE / standalone parse). */
-#ifndef QUDA_BLAS_UNROLL_STREAMING
-#define QUDA_BLAS_UNROLL_STREAMING 1
-#endif
-#ifndef QUDA_BLAS_UNROLL_REDUCE
-#define QUDA_BLAS_UNROLL_REDUCE 1
-#endif
-
 #include <color_spinor_field.h>
 #include <quda_define.h>
 #include <load_store.h>
