@@ -15,6 +15,7 @@ namespace quda
     GaugeField &out;
     const GaugeField &in;
 
+    bool tuneSharedBytes() const override { return false; }
     unsigned int minThreads() const override { return size; }
 
   public:
@@ -80,9 +81,10 @@ namespace quda
 
   template <typename FloatOut, typename FloatIn, int length, bool fine_grain, typename OutOrder, typename InOrder>
   void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, GaugeField &out, const GaugeField &in,
-                 QudaFieldLocation location, int type)
+                 QudaFieldLocation location, double scale, int type)
   {
-    CopyGaugeArg<FloatOut, FloatIn, length, fine_grain, OutOrder, InOrder> arg(outOrder, inOrder, in);
+    using Arg = CopyGaugeArg<FloatOut, FloatIn, length, fine_grain, OutOrder, InOrder>;
+    Arg arg(outOrder, inOrder, in, static_cast<typename Arg::real_in_t>(scale));
     CopyGauge<decltype(arg)> gaugeCopier(arg, out, in, location);
 
 #ifdef HOST_DEBUG

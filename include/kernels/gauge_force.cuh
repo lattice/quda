@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <thread_array.h>
+#include <byte_array.h>
 #include <kernel.h>
 #include <gauge_path_helper.cuh>
 
@@ -36,7 +36,7 @@ namespace quda {
       epsilon(epsilon),
       p(p)
     {
-      for (int i=0; i<4; i++) {
+      for (int i = 0; i < 4; i++) {
         X[i] = mom.X()[i];
         E[i] = u.X()[i];
         border[i] = (E[i] - X[i])/2;
@@ -44,11 +44,12 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct GaugeForce
-  {
+  template <typename Arg> struct GaugeForce {
     const Arg &arg;
-    constexpr GaugeForce(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }    
+    constexpr GaugeForce(const Arg &arg) : arg(arg)
+    {
+    }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
@@ -62,7 +63,7 @@ namespace quda {
       // prod: current matrix product
       // accum: accumulator matrix
       Link link_prod, accum;
-      thread_array<int, 4> dx{0};
+      byte_array<int8_t, 4> dx = {};
 
       for (int i=0; i<arg.p.num_paths; i++) {
         real coeff = arg.p.path_coeff[i];
@@ -95,5 +96,4 @@ namespace quda {
       arg.mom(dir, x_cb, parity) = mom;
     }
   };
-
 }

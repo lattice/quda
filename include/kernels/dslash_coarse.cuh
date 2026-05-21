@@ -19,7 +19,7 @@ namespace quda {
 
 #ifdef MULTIGRID_DSLASH_PROMOTE
   template <typename store_t>
-  using compute_prec = double;
+  using compute_prec = real_t;
 #else
   template <typename store_t>
   using compute_prec = typename mapper<store_t>::type;
@@ -44,19 +44,18 @@ namespace quda {
     static constexpr int nDim = 4;
     static constexpr int nFace = 1;
 
-    static constexpr QudaFieldOrder csOrder = native ? colorspinor::getNative<Float>(nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    static constexpr QudaGaugeFieldOrder gOrder = native ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    static constexpr QudaFieldOrder csOrder = native ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    static constexpr QudaGaugeFieldOrder gOrder = native ? QUDA_NATIVE_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
 
     using G = typename colorspinor::GhostOrder<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
     // disable ghost to reduce arg size
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
-    static constexpr unsigned int max_n_src = 64;
     const int_fastdiv n_src;
-    F out[max_n_src];
-    F inA[max_n_src];
-    F inB[max_n_src];
+    F out[MAX_MULTI_RHS];
+    F inA[MAX_MULTI_RHS];
+    F inB[MAX_MULTI_RHS];
     G halo;
     const GY Y;
     const GY X;
@@ -70,9 +69,9 @@ namespace quda {
     int ghostFaceCB[4];
 
     DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                    real kappa, int parity, const ColorSpinorField &halo) :
-      kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
+                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real kappa,
+                    int parity, const ColorSpinorField &halo) :
+      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset() * out.size(),
                         2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
       n_src(out.size()),
       halo(halo, nFace),
@@ -80,13 +79,12 @@ namespace quda {
       X(const_cast<GaugeField &>(X)),
       kappa(kappa),
       parity(parity),
-      nParity(out[0].SiteSubset()),
-      X0h(((3 - nParity) * out[0].X(0)) / 2),
-      dim {(3 - nParity) * out[0].X(0), out[0].X(1), out[0].X(2), out[0].X(3), out[0].Ndim() == 5 ? out[0].X(4) : 1},
+      nParity(out.SiteSubset()),
+      X0h(((3 - nParity) * out.X(0)) / 2),
+      dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out[0].Ndim() == 5 ? out.X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out[0].VolumeCB() / dim[4])
+      volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->inA[i] = inA[i];
@@ -292,16 +290,15 @@ namespace quda {
   }
 
   template <bool is_device> struct dim_collapse {
-    template <typename T, typename Arg> void operator()(T &out, int, int, const Arg &arg)
-    {
-      out *= -arg.kappa;
-    }
+    template <typename T, typename Ftor> void operator()(T &out, int, int, const Ftor &ftor) { out *= -ftor.arg.kappa; }
   };
 
   template <> struct dim_collapse<true> {
-    template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
+    template <typename T, typename Ftor>
+    __device__ __host__ inline void operator()(T &out, int dir, int dim, const Ftor &ftor)
     {
-      SharedMemoryCache<T> cache(target::block_dim());
+      using Arg = typename Ftor::Arg;
+      SharedMemoryCache<T> cache {ftor};
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);
 
@@ -321,14 +318,25 @@ namespace quda {
           out += cache.load_z(target::thread_idx().z + d * 2 + 1);
         }
 
-        out *= -arg.kappa;
+        out *= -ftor.arg.kappa;
       }
     }
   };
 
-  template <typename Arg> struct CoarseDslash {
+  template <typename Arg> struct CoarseDslashParams {
+    static constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
+    using array_t = array<complex<typename Arg::real>, Mc>;
+    using Ops = KernelOps<SharedMemoryCache<array_t>, op_warp_combine<array_t>>;
+  };
+
+  template <typename Arg_> struct CoarseDslash : CoarseDslashParams<Arg_>::Ops {
+    using Arg = Arg_;
     const Arg &arg;
-    constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
+    using typename CoarseDslashParams<Arg>::Ops::KernelOpsT;
+    template <typename... OpsArgs>
+    constexpr CoarseDslash(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd)
@@ -349,7 +357,7 @@ namespace quda {
       int parity = (arg.nParity == 2) ? (src_parity / arg.n_src) : arg.parity;
 
       // z thread dimension is (( s*(Nc/Mc) + color_block )*dim_thread_split + dim)*2 + dir
-      constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
+      constexpr int Mc = CoarseDslashParams<Arg>::Mc;
       int dir = sMd & 1;
       int sMdim = sMd >> 1;
       int dim = sMdim % Arg::dim_stride;
@@ -357,11 +365,11 @@ namespace quda {
       int s = sM / (Arg::nColor/Mc);
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
-      array<complex <typename Arg::real>, Mc> out{ };
+      typename CoarseDslashParams<Arg>::array_t out {};
 
       if (Arg::dslash) {
         applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        target::dispatch<dim_collapse>(out, dir, dim, arg);
+        target::dispatch<dim_collapse>(out, dir, dim, *this);
       }
 
       if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);

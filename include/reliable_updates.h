@@ -163,8 +163,9 @@ namespace quda
         pnorm = pnorm + alpha * alpha * ppnorm;
         xnorm = sqrt(pnorm);
         d_new = d + params.u * rNorm + params.uhigh * params.Anorm * xnorm;
-        if (steps_since_reliable == 0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          printfQuda("New dnew: %e (r %e , y %e)\n", double(d_new), double(params.u * rNorm), double(params.uhigh * params.Anorm * xnorm));
+        if (steps_since_reliable == 0)
+          logQuda(QUDA_DEBUG_VERBOSE, "New dnew: %e (r %e , y %e)\n", static_cast<double>(d_new),
+                  static_cast<double>(params.u * rNorm), static_cast<double>(params.uhigh * params.Anorm * xnorm));
       }
       steps_since_reliable++;
     }

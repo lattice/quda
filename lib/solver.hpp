@@ -19,7 +19,7 @@ namespace quda
      @return Norm of final power iteration result
   */
   template <typename... Args>
-  real_t Solver::performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
+  double Solver::performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
                                         ColorSpinorField &tempvec1, ColorSpinorField &tempvec2, int niter,
                                         int normalize_freq, Args &&...args)
   {
@@ -29,21 +29,22 @@ namespace quda
     // Do niter iterations, normalize every normalize_freq
     for (int i = 0; i < niter; i++) {
       if (normalize_freq > 0 && i % normalize_freq == 0) {
-        auto tmpnrm = rsqrt(blas::norm2(tempvec1));
-        blas::ax(tmpnrm, tempvec1);
+        double tmpnrm = sqrt(blas::norm2(tempvec1));
+        blas::ax(1.0 / tmpnrm, tempvec1);
       }
       diracm(tempvec2, tempvec1, args...);
       if (normalize_freq > 0 && i % normalize_freq == 0) {
-        logQuda(QUDA_VERBOSE, "Current Rayleigh Quotient step %d is %e\n", i, double(sqrt(blas::norm2(tempvec2))));
+        logQuda(QUDA_VERBOSE, "Current Rayleigh Quotient step %d is %e\n", i,
+                static_cast<double>(sqrt(blas::norm2(tempvec2))));
       }
       std::swap(tempvec1, tempvec2);
     }
     // Get Rayleigh quotient
-    auto tmpnrm = rsqrt(blas::norm2(tempvec1));
-    blas::ax(tmpnrm, tempvec1);
+    double tmpnrm = sqrt(blas::norm2(tempvec1));
+    blas::ax(1.0 / tmpnrm, tempvec1);
     diracm(tempvec2, tempvec1, args...);
-    auto lambda_max = sqrt(blas::norm2(tempvec2));
-    logQuda(QUDA_VERBOSE, "Power iterations approximate max = %e\n", double(lambda_max));
+    double lambda_max = sqrt(blas::norm2(tempvec2));
+    logQuda(QUDA_VERBOSE, "Power iterations approximate max = %e\n", static_cast<double>(lambda_max));
 
     return lambda_max;
   }
@@ -51,8 +52,8 @@ namespace quda
   /**
      @brief Generate a Krylov space in a given basis
      @param[in] diracm Dirac matrix used to generate the Krylov space
-     @param[out] Ap dirac matrix times the Krylov basis vectors
-     @param[in,out] p Krylov basis vectors; assumes p[0] is in place
+     @param[out] Ap Dirac matrix times the Krylov basis vector sets
+     @param[in,out] p Krylov basis vector set; assumes p[0] is in place
      @param[in] n_krylov Size of krylov space
      @param[in] basis Basis type
      @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
@@ -60,9 +61,9 @@ namespace quda
      @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
   */
   template <typename... Args>
-  void Solver::computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
-                                    std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, real_t m_map,
-                                    real_t b_map, Args &&...args)
+  void Solver::computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<std::vector<ColorSpinorField>> &Ap,
+                                    std::vector<std::vector<ColorSpinorField>> &p, int n_krylov, QudaCABasis basis,
+                                    double m_map, double b_map, Args &&...args)
   {
     // in some cases p or Ap may be larger
     if (static_cast<int>(p.size()) < n_krylov) errorQuda("Invalid p.size() %lu < n_krylov %d", p.size(), n_krylov);

@@ -50,11 +50,32 @@ namespace quda
   int comm_dim(int dim);
 
   /**
-     Return the coording of this process in the dimension dim
+     Return whether the dimension dim is a C* dimension or not
+     @param dim Dimension which we are querying
+     @return C* dimension or nor
+  */
+  bool comm_dim_cstar(int dim);
+
+  /**
+     Return the global number of processes in the dimension dim
+     @param dim Dimension which we are querying
+     @return Length of process dimensions
+  */
+  int comm_dim_global(int dim);
+
+  /**
+     Return the coordinate of this process in the dimension dim
      @param dim Dimension which we are querying
      @return Coordinate of this process
   */
   int comm_coord(int dim);
+
+  /**
+     Return the global coordinates of this process in the dimension dim
+     @param dim Dimension which we are querying
+     @return Coordinate of this process
+  */
+  int comm_coord_global(int dim);
 
   /**
    * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
@@ -337,6 +358,17 @@ namespace quda
   bool comm_gdr_enabled();
 
   /**
+     @brief Return if zero-copy policy kernels have been enabled.  By
+     default kernels that read their communication halos directly from
+     host memory are disabled to reduce tuning time, since on
+     PCIe-based architectures, these kernels underperform and can take
+     excessive tuning time.  They can be enabled with the environment
+     variable QUDA_ENABLE_ZERO_COPY=1
+     @return Return if zero-copy policy halos are enabled
+   */
+  bool comm_zero_copy_enabled();
+
+  /**
      @brief Query if NVSHMEM communication is enabled (global setting)
   */
   bool comm_nvshmem_enabled();
@@ -407,7 +439,18 @@ namespace quda
   */
   void comm_broadcast(void *data, size_t nbytes, int root = 0);
 
+  /**
+     @brief Multi-process barrier that applies to the present
+     communicator
+   */
   void comm_barrier(void);
+
+  /**
+     @brief Multi-process barrier that is global regardless of the
+     present communicator
+   */
+  void comm_barrier_global(void);
+
   void comm_abort(int status);
   void comm_abort_(int status);
 

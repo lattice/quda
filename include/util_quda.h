@@ -20,7 +20,25 @@ namespace quda
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
    @return If autotuning is enabled
  */
-QudaTune getTuning();
+bool getTuning();
+
+/**
+   @brief Set the tuning state
+   @param[in] tuning New tuning state
+ */
+void setTuning(bool tuning);
+
+/**
+   @brief Push a new tuning state, and back up the present one on the
+   stack.
+   @param[in] tune New tuning state
+ */
+void pushTuning(bool tune);
+
+/**
+   @brief Pop the present tuning state and restore what is on the stack.
+ */
+void popTuning();
 
 QudaVerbosity getVerbosity();
 char *getOutputPrefix();
@@ -66,7 +84,7 @@ char *getPrintBuffer();
    number of OMP threads for CPU functions recorded in the tune cache.
    @return Returns the string
 */
-char* getOmpThreadStr();
+const char *getOmpThreadStr();
 
 void errorQuda_(const char *func, const char *file, int line, ...);
 

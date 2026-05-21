@@ -25,8 +25,8 @@ namespace quda {
       if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
         GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_MILC> arg(u);
         launch<GaugePhase>(tp, stream, arg);
-      } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_CPS) {
-        GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CPS> arg(u);
+      } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_CHROMA) {
+        GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CHROMA> arg(u);
         launch<GaugePhase>(tp, stream, arg);
       } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
         GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_TIFR> arg(u);

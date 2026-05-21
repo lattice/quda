@@ -7,6 +7,32 @@
 
 namespace quda {
 
+  /**
+     @brief Helper function that returns whether we have enabled
+     clover fermions.
+   */
+  constexpr bool is_enabled_clover()
+  {
+#ifdef GPU_CLOVER_DIRAC
+    return true;
+#else
+    return false;
+#endif
+  }
+
+  /**
+     @brief Helper function that returns whether we have enabled
+     clover fermions.
+   */
+  constexpr bool is_enabled_twisted_clover()
+  {
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+    return true;
+#else
+    return false;
+#endif
+  }
+
   namespace clover
   {
 
@@ -61,25 +87,35 @@ namespace quda {
 #endif
     }
 
-    template <typename T> constexpr auto getNative() { return QUDA_FLOAT2_CLOVER_ORDER; }
-    template <> constexpr auto getNative<float>() { return QUDA_FLOAT4_CLOVER_ORDER; }
-    template <> constexpr auto getNative<short>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
-    template <> constexpr auto getNative<int8_t>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
+    template <typename T> constexpr int get_vector_order();
+    template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+    template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF <= 8 ? QUDA_ORDER_HALF : 8; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER <= 8 ? QUDA_ORDER_QUARTER : 8; }
 
-    constexpr QudaCloverFieldOrder getNative(QudaPrecision precision)
+    template <typename T> constexpr int get_vector_order(int length)
     {
-      switch (precision) {
-      case QUDA_DOUBLE_PRECISION: return getNative<double>();
-      case QUDA_SINGLE_PRECISION: return getNative<float>();
-      case QUDA_HALF_PRECISION: return getNative<short>();
-      case QUDA_QUARTER_PRECISION: return getNative<int8_t>();
-      default: return QUDA_INVALID_CLOVER_ORDER;
+      constexpr int N = get_vector_order<T>();
+      if constexpr (N == 0) {                    // legacy path, greatest vector size that is a divisor of length
+        int Nvec = length & (~(length - 1));     // greatest vector size that is a divisor of length
+        while (Nvec * sizeof(T) > 16) Nvec /= 2; // ensure we don't choose a size greater than 16 bytes
+        return Nvec;
+      } else {
+        int Nvec = N;
+        while (Nvec > length) Nvec /= 2;
+        return Nvec;
       }
     }
 
-    constexpr bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
+    constexpr int get_vector_order(size_t word_size, int length)
     {
-      return order == getNative(precision);
+      switch (word_size) {
+      case 1: return get_vector_order<int8_t>(length);
+      case 2: return get_vector_order<short>(length);
+      case 4: return get_vector_order<float>(length);
+      case 8: return get_vector_order<double>(length);
+      }
+      return 0;
     }
 
   } // namespace clover
@@ -96,15 +132,15 @@ namespace quda {
     bool reconstruct
       = clover::reconstruct(); /** Whether to create a compressed clover field that requires reconstruction */
     bool inverse = true;       /** Whether to create the inverse clover field */
+    CloverField *field = nullptr; /** Pointer to another field instance from which we can clone */
     void *clover = nullptr;    /** Pointer to the clover field */
     void *cloverInv = nullptr; /** Pointer to the clover inverse field */
-    real_t csw = 0.0;          /** C_sw clover coefficient */
-    real_t coeff = 0.0;        /** Overall clover coefficient */
+    double csw = 0.0;          /** C_sw clover coefficient */
+    double coeff = 0.0;        /** Overall clover coefficient */
     QudaTwistFlavorType twist_flavor = QUDA_TWIST_INVALID; /** Twisted-mass flavor type */
-    bool twisted = false;                                  /** Whether to create twisted mass clover */
-    real_t mu2 = 0.0;                                      /** Chiral twisted mass term */
-    real_t epsilon2 = 0.0;                                 /** Flavor twisted mass term */
-    real_t rho = 0.0;                                      /** Hasenbusch rho term */
+    double mu2 = 0.0;                                      /** Chiral twisted mass term */
+    double epsilon2 = 0.0;                                 /** Flavor twisted mass term */
+    double rho = 0.0;                                      /** Hasenbusch rho term */
 
     QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER; /** Field order */
     QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;     /** Creation type */
@@ -117,12 +153,9 @@ namespace quda {
     */
     void setPrecision(QudaPrecision precision, bool force_native = false)
     {
-      // is the current status in native field order?
-      bool native = force_native ? true : clover::isNative(order, this->precision);
       this->precision = precision;
       this->ghost_precision = precision;
-
-      if (native) order = clover::getNative(precision);
+      if (force_native) order = QUDA_NATIVE_CLOVER_ORDER;
     }
 
     CloverFieldParam() = default;
@@ -133,6 +166,8 @@ namespace quda {
       inverse(param.inverse),
       clover(param.clover),
       cloverInv(param.cloverInv),
+      csw(param.csw),
+      coeff(param.coeff),
       twist_flavor(param.twist_flavor),
       mu2(param.mu2),
       epsilon2(param.epsilon2),
@@ -169,7 +204,7 @@ namespace quda {
   class CloverField : public LatticeField {
 
   protected:
-    const bool reconstruct = clover::reconstruct(); /** Whether this field is compressed and requires reconstruction */
+    bool reconstruct = clover::reconstruct(); /** Whether this field is compressed and requires reconstruction */
 
     size_t bytes = 0; // bytes allocated per clover full field
     size_t length = 0;
@@ -182,20 +217,28 @@ namespace quda {
     quda_ptr cloverInv = {};
 
     bool inverse = false;
-    real_t diagonal = 0.0;
+    double diagonal = 0.0;
     array<real_t, 2> max = {};
 
-    real_t csw = 0.0;
-    real_t coeff = 0.0;
+    double csw = 0.0;
+    double coeff = 0.0;
     QudaTwistFlavorType twist_flavor = QUDA_TWIST_INVALID;
-    real_t mu2 = 0.0;      // chiral twisted mass squared
-    real_t epsilon2 = 0.0; // flavour twisted mass squared
-    real_t rho = 0.0;
+    double mu2 = 0.0;      // chiral twisted mass squared
+    double epsilon2 = 0.0; // flavour twisted mass squared
+    double rho = 0.0;
 
     QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER;
-    QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
 
     mutable array<real_t, 2> trlog = {};
+
+    bool init = false;
+
+    /**
+       @brief Fills the param with this field's meta data (used for
+       creating a cloned field)
+       @param[in] param The parameter we are filling
+    */
+    void fill(CloverFieldParam &) const;
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -213,13 +256,67 @@ namespace quda {
     void restore(bool which) const;
 
   public:
+    /**
+       @brief Default constructor
+    */
+    CloverField() = default;
+
+    /**
+       @brief Copy constructor for creating a CloverField from another CloverField
+       @param[in] field Instance of CloverField from which we are cloning
+    */
+    CloverField(const CloverField &field) noexcept;
+
+    /**
+       @brief Move constructor for creating a CloverField from another CloverField
+       @param[in] field Instance of CloverField from which we are moving
+    */
+    CloverField(CloverField &&field) noexcept;
+
+    /**
+       @brief Constructor for creating a CloverField from a CloverFieldParam
+       @param param Contains the metadata for creating the field
+    */
     CloverField(const CloverFieldParam &param);
+
+    /**
+       @brief Copy assignment operator
+       @param[in] field Instance from which we are copying
+       @return Reference to this field
+     */
+    CloverField &operator=(const CloverField &field);
+
+    /**
+       @brief Move assignment operator
+       @param[in] field Instance from which we are moving
+       @return Reference to this field
+     */
+    CloverField &operator=(CloverField &&field);
+
+    /**
+       @brief Returns if the object is empty (not initialized)
+       @return true if the object has not been allocated, otherwise false
+    */
+    bool empty() const { return !init; }
+
+    /**
+       @brief Field creation using the meta data provided in the param
+       struct
+       @param[in] param Contains the metadata for creating the field
+     */
+    void create(const CloverFieldParam &param);
+
+    /**
+       @brief Move the contents of a field to this
+       @param[in,out] other Field we are moving from
+    */
+    void move(CloverField &&src);
 
     static CloverField *Create(const CloverFieldParam &param);
 
     template <typename T = void *> auto data(bool inverse = false) const
     {
-      return inverse ? reinterpret_cast<T>(cloverInv.data()) : reinterpret_cast<T>(clover.data());
+      return inverse ? static_cast<T>(cloverInv.data()) : static_cast<T>(clover.data());
     }
 
     /**
@@ -230,12 +327,12 @@ namespace quda {
     /**
        @return diagonal scaling factor applied to the identity
     */
-    real_t Diagonal() const { return diagonal; }
+    double Diagonal() const { return diagonal; }
 
     /**
        @return set diagonal scaling factor applied to the identity
     */
-    void Diagonal(real_t diagonal) { this->diagonal = diagonal; }
+    void Diagonal(double diagonal) { this->diagonal = diagonal; }
 
     /**
        @return max element in the clover field for fixed-point scaling
@@ -256,7 +353,7 @@ namespace quda {
        @return True if the field is stored in an internal field order
        for the given precision.
     */
-    bool isNative() const { return clover::isNative(order, precision); }
+    bool isNative() const { return order == QUDA_NATIVE_CLOVER_ORDER; }
 
     /**
        @return Array storing trlog on each parity
@@ -296,12 +393,12 @@ namespace quda {
     /**
        @return Csw coefficient (does not include kappa)
     */
-    real_t Csw() const { return csw; }
+    double Csw() const { return csw; }
 
     /**
        @return Clover coefficient (explicitly includes kappa)
     */
-    real_t Coeff() const { return coeff; }
+    double Coeff() const { return coeff; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions and which flavor type thereof
@@ -311,24 +408,24 @@ namespace quda {
     /**
        @return mu^2 factor baked into inverse clover field (for twisted-clover inverse)
     */
-    real_t Mu2() const { return mu2; }
+    double Mu2() const { return mu2; }
 
     /**
        @return epsilon^2 factor baked into inverse clover field (for non-deg twisted-clover inverse)
     */
-    real_t Epsilon2() const { return epsilon2; }
+    double Epsilon2() const { return epsilon2; }
 
     /**
        @return rho factor backed into the clover field, (for real
        diagonal additive Hasenbusch), e.g., A + rho
     */
-    real_t Rho() const { return rho; }
+    double Rho() const { return rho; }
 
     /**
        @brief Bakes in the rho factor into the clover field, (for real
        diagonal additive Hasenbusch), e.g., A + rho
     */
-    void setRho(real_t rho) { this->rho = rho; }
+    void setRho(double rho);
 
     /**
        @brief Copy into this CloverField from CloverField src
@@ -413,6 +510,7 @@ namespace quda {
     */
     void copy_from_buffer(void *buffer);
 
+    friend struct CloverFieldParam;
   };
 
   /**
@@ -455,16 +553,43 @@ namespace quda {
                          void *Out = 0, const void *In = 0);
 
   /**
-     @brief This function compute the Cholesky decomposition of each clover
-     matrix and stores the clover inverse field.
-
-     @param clover The clover field (contains both the field itself and its inverse)
-     @param computeTraceLog Whether to compute the trace logarithm of the clover term
+     @brief This function computes the Cholesky decomposition of each
+     clover matrix and stores the clover inverse field.  The lattice
+     sum of the trace log is computed here, and if the trace log
+     reports as Nan as error is thrown.
+     @param[in,out] clover The clover field (contains both the field
+     itself and its inverse)
+     @param[in] compute_tr_log Whether to only compute the trace log
+     (and not compute the inverse)
   */
-  void cloverInvert(CloverField &clover, bool computeTraceLog);
+  void cloverInvert(CloverField &clover, bool compute_tr_log);
 
   /**
-     @brief Compute the force contribution from the solver solution fields
+     @brief Driver for the clover force computation.  Eventually the
+     construction of the x and p fields will be delegated to this
+     function, but for now, we pre-compute these and pass them in.
+     @param mom[in,out] Momentum field to be updates
+     @param gaugeEx[in] Extended gauge field
+     @param gauge[in] Gauge field
+     @param clover[in] Clover field
+     @param x[in] Vector of quark solution fields
+     @param x0[in] Vector of auxilary quark fields for determinant ratio
+     @param coeff[in] Vector of coefficients for the quark field outer
+     products
+     @param epsilon[in] Vector of scalar coefficient pairs (one per
+     parity) for the clover sigma outer product
+     @param sigma_coeff[in] Coefficient for the tr log clover force
+     @param detratio[in] Whether to compute determinant ratio
+     @param parity[in] Which parity do we need compute the tr log clover force
+  */
+  void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
+                          const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
+                          const std::vector<real_t> &coeff, const std::vector<array<real_t, 2>> &epsilon,
+                          double sigma_coeff, bool detratio, QudaInvertParam &param);
+
+  /**
+     @brief Compute outer product from the solver solution fields for
+     the force contribution from the solver solution fields
 
      Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
 
@@ -480,9 +605,8 @@ namespace quda {
      @param p Intermediate vectors (both parities)
      @param coeff Multiplicative coefficient (e.g., dt * residue)
    */
-  void computeCloverForce(GaugeField& force, const GaugeField& U,
-			  std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &p,
-			  std::vector<real_t> &coeff);
+  void computeCloverOprod(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
+                          cvector_ref<const ColorSpinorField> &p, const std::vector<real_t> &coeff);
   /**
      @brief Compute the outer product from the solver solution fields
      arising from the diagonal term of the fermion bilinear in
@@ -493,10 +617,8 @@ namespace quda {
      @param p[in] Intermediate vectors (both parities)
      @coeff coeff[in] Multiplicative coefficient (e.g., dt * residiue), one for each parity
   */
-  void computeCloverSigmaOprod(GaugeField& oprod,
-			       std::vector<ColorSpinorField*> &x,
-			       std::vector<ColorSpinorField*> &p,
-			       std::vector< std::vector<real_t> > &coeff);
+  void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
+                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<real_t, 2>> &coeff);
   /**
      @brief Compute the matrix tensor field necessary for the force calculation from
      the clover trace action.  This computes a tensor field [mu,nu].
@@ -504,8 +626,9 @@ namespace quda {
      @param output The computed matrix field (tensor matrix field)
      @param clover The input clover field
      @param coeff  Scalar coefficient multiplying the result (e.g., stepsize)
+     @param parity The field parity we are working on
    */
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, real_t coeff);
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, real_t coeff, int parity);
 
   /**
      @brief Compute the derivative of the clover matrix in the direction
@@ -516,9 +639,8 @@ namespace quda {
      @param gauge The input gauge field
      @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
-     @param parity The field parity we are working on
    */
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, real_t coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, real_t coeff);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field

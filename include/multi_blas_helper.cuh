@@ -234,7 +234,10 @@ namespace quda
       constexpr auto coeff_nyw = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_nyw;
       static_assert(coeff_nyw != 0, "coeff_nyw is zero");
 
-      return std::min(arg_nyw, coeff_nyw);
+      // additional limit since there's diminished benefit past a certain point
+      constexpr auto max_nyw = 128lu;
+
+      return std::min(arg_nyw, std::min(coeff_nyw, max_nyw));
     }
 
     /**
@@ -286,7 +289,10 @@ namespace quda
       // maximum NYW imposed by the coefficients
       const auto coeff_nyw = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_nyw;
 
-      return std::min(arg_nyw, coeff_nyw);
+      // additional limit since there's diminished benefit past a certain point
+      constexpr auto max_nyw = 128lu;
+
+      return std::min(arg_nyw, std::min(coeff_nyw, max_nyw));
     }
 
     /**
@@ -363,7 +369,8 @@ namespace quda
     */
     template <typename T> inline auto bisect_col(T &x, size_t width, size_t height0, size_t height1)
     {
-      auto x_ = std::make_pair( T(width * height0), T(width * height1) );
+      using U = typename std::remove_const<T>::type;
+      auto x_ = std::make_pair(U(width * height0), U(width * height1));
 
       unsigned int count = 0;
       unsigned count0 = 0;

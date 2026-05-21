@@ -13,26 +13,24 @@
 #include <tunable_nd.h>
 #include <kernels/copy_color_spinor_mg.cuh>
 #include <multigrid.h>
+#include <int_list.hpp>
 
 namespace quda {
 
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>
-  class CopySpinor : TunableKernel1D {
+  class CopySpinor : TunableKernel3D
+  {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     FloatOut *Out;
     FloatIn *In;
 
-    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
+    bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    CopySpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location, FloatOut* Out, FloatIn* In) :
-      TunableKernel1D(in, location),
-      out(out),
-      in(in),
-      Out(Out),
-      In(In)
+    CopySpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location, FloatOut *Out, FloatIn *In) :
+      TunableKernel3D(in, in.Nspin(), in.Ncolor(), location), out(out), in(in), Out(Out), In(In)
     {
       apply(device::get_default_stream());
     }
@@ -44,7 +42,6 @@ namespace quda {
       launch<CopySpinor_, enable_host>(tp, stream, CopyArg<Ns, Nc, OutOrder, InOrder>(out, in, Out, In));
     }
 
-    long long flops() const { return 0; }
     long long bytes() const { return in.Bytes() + out.Bytes(); }
   };
 
@@ -54,7 +51,7 @@ namespace quda {
                               FloatOut *Out, FloatIn *In)
   {
     if (out.isNative()) {
-      using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, colorspinor::getNative<FloatOut>(Ns), FloatOut>;
+      using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_NATIVE_FIELD_ORDER, FloatOut>;
       CopySpinor<FloatOut, FloatIn, Ns, Nc, O, I>(out, in, location, Out, In);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatOut>;
@@ -70,7 +67,7 @@ namespace quda {
                               FloatOut *Out, FloatIn *In)
   {
     if (in.isNative()) {
-      using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, colorspinor::getNative<FloatIn>(Ns), FloatIn>;
+      using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_NATIVE_FIELD_ORDER, FloatIn>;
       genericCopyColorSpinor<FloatOut, FloatIn, Ns, Nc, I>(out, in, location, Out, In);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatIn>;
@@ -117,14 +114,14 @@ namespace quda {
       }
 
       // set for the source subset ordering
-      srcFloat *srcEven = Src ? Src : src.data<srcFloat*>();
+      srcFloat *srcEven = Src ? Src : src.data<srcFloat *>();
       srcFloat *srcOdd = (srcFloat*)((char*)srcEven + src.Bytes()/2);
       if (src.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) {
 	std::swap<srcFloat*>(srcEven, srcOdd);
       }
 
       // set for the destination subset ordering
-      dstFloat *dstEven = Dst ? Dst : dst.data<dstFloat*>();
+      dstFloat *dstEven = Dst ? Dst : dst.data<dstFloat *>();
       dstFloat *dstOdd = (dstFloat*)((char*)dstEven + dst.Bytes()/2);
       if (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) {
 	std::swap<dstFloat*>(dstEven, dstOdd);
@@ -167,9 +164,6 @@ namespace quda {
     }
 
   }
-
-  template <int...> struct IntList {
-  };
 
   template <int fineColor, typename dst_t, typename src_t, typename param_t, int coarseColor, int... N>
   bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<coarseColor, N...>)

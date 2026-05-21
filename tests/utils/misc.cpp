@@ -1,10 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include "invert_quda.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <string>
+
+#include <util_quda.h>
+#include <invert_quda.h>
+#include <enum_quda.h>
+
 #include "misc.h"
-#include <assert.h>
-#include "util_quda.h"
-#include <host_utils.h>
 
 const char *get_verbosity_str(QudaVerbosity type)
 {
@@ -96,23 +99,6 @@ const char *get_test_type(int t)
   return ret;
 }
 
-const char *get_staggered_test_type(int t)
-{
-  const char *ret;
-  switch (t) {
-  case 0: ret = "full"; break;
-  case 1: ret = "full_ee_prec"; break;
-  case 2: ret = "full_oo_prec"; break;
-  case 3: ret = "even"; break;
-  case 4: ret = "odd"; break;
-  case 5: ret = "mcg_even"; break;
-  case 6: ret = "mcg_odd"; break;
-  default: ret = "unknown"; break;
-  }
-
-  return ret;
-}
-
 const char *get_dslash_str(QudaDslashType type)
 {
   const char *ret;
@@ -136,13 +122,78 @@ const char *get_dslash_str(QudaDslashType type)
   return ret;
 }
 
+std::vector<const char *> get_dslash_str_list()
+{
+  static std::vector<const char *> dslash_str_list;
+  bool populated = false;
+
+  if (!populated) {
+    dslash_str_list.push_back("wilson");
+    dslash_str_list.push_back("clover");
+    dslash_str_list.push_back("clover-hasenbusch-twist");
+    dslash_str_list.push_back("twisted-mass");
+    dslash_str_list.push_back("twisted-clover");
+    dslash_str_list.push_back("staggered");
+    dslash_str_list.push_back("asqtad");
+    dslash_str_list.push_back("hisq");
+    dslash_str_list.push_back("domain-wall");
+    dslash_str_list.push_back("domain-wall-4d");
+    dslash_str_list.push_back("mobius");
+    dslash_str_list.push_back("mobius-eofa");
+    dslash_str_list.push_back("laplace");
+    populated = true;
+  }
+  return dslash_str_list;
+}
+
+QudaDslashType get_dslash_from_str(const char *str)
+{
+  std::string d_type(str);
+  if (!d_type.compare("wilson")) return QUDA_WILSON_DSLASH;
+  if (!d_type.compare("clover")) return QUDA_CLOVER_WILSON_DSLASH;
+  if (!d_type.compare("clover_hasenbusch_twist") || !d_type.compare("clover-hasenbusch-twist"))
+    return QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
+  if (!d_type.compare("twisted_mass") || !d_type.compare("twisted-mass")) return QUDA_TWISTED_MASS_DSLASH;
+  if (!d_type.compare("twisted_clover") || !d_type.compare("twisted-clover")) return QUDA_TWISTED_CLOVER_DSLASH;
+  if (!d_type.compare("staggered")) return QUDA_STAGGERED_DSLASH;
+  if (!d_type.compare("asqtad")) return QUDA_ASQTAD_DSLASH;
+  if (!d_type.compare("hisq")) return QUDA_ASQTAD_DSLASH;
+  if (!d_type.compare("domain_wall") || !d_type.compare("domain-wall")) return QUDA_DOMAIN_WALL_DSLASH;
+  if (!d_type.compare("domain_wall_4d") || !d_type.compare("domain-wall-4d")) return QUDA_DOMAIN_WALL_4D_DSLASH;
+  if (!d_type.compare("mobius")) return QUDA_MOBIUS_DWF_DSLASH;
+  if (!d_type.compare("mobius_eofa") || !d_type.compare("mobius-eofa")) return QUDA_MOBIUS_DWF_EOFA_DSLASH;
+  if (!d_type.compare("laplace")) return QUDA_LAPLACE_DSLASH;
+  return QUDA_INVALID_DSLASH;
+}
+
 const char *get_contract_str(QudaContractType type)
 {
   const char *ret;
 
   switch (type) {
   case QUDA_CONTRACT_TYPE_OPEN: ret = "open"; break;
-  case QUDA_CONTRACT_TYPE_DR: ret = "Degrand_Rossi"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_SUM_T: ret = "open_sum_t"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: ret = "open_sum_z"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_FT_T: ret = "open_ft_t"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_FT_Z: ret = "open_ft_z"; break;
+  case QUDA_CONTRACT_TYPE_DR: ret = "dr"; break;
+  case QUDA_CONTRACT_TYPE_DR_FT_T: ret = "dr_ft_t"; break;
+  case QUDA_CONTRACT_TYPE_DR_FT_Z: ret = "dr_ft_z"; break;
+  case QUDA_CONTRACT_TYPE_STAGGERED: ret = "stag"; break;
+  case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: ret = "stag_ft_t"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
+const char *get_dag_str(QudaDagType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_DAG_YES: ret = "dag"; break;
+  case QUDA_DAG_NO: ret = "nodag"; break;
   default: ret = "unknown"; break;
   }
 
@@ -173,6 +224,7 @@ const char *get_eig_type_str(QudaEigType type)
   switch (type) {
   case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
   case QUDA_EIG_BLK_TR_LANCZOS: ret = "blktrlm"; break;
+  case QUDA_EIG_TR_LANCZOS_3D: ret = "trlm_3d"; break;
   case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
   case QUDA_EIG_BLK_IR_ARNOLDI: ret = "blkiram"; break;
   default: ret = "unknown eigensolver"; break;
@@ -188,9 +240,10 @@ const char *get_gauge_smear_str(QudaGaugeSmearType type)
   switch (type) {
   case QUDA_GAUGE_SMEAR_APE: ret = "APE"; break;
   case QUDA_GAUGE_SMEAR_STOUT: ret = "Stout"; break;
-  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over Improved"; break;
-  case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson Flow"; break;
-  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik Flow"; break;
+  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over_Improved"; break;
+  case QUDA_GAUGE_SMEAR_HYP: ret = "HYP"; break;
+  case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson_Flow"; break;
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik_Flow"; break;
   default: ret = "unknown"; break;
   }
 
@@ -371,6 +424,7 @@ std::string get_dilution_type_str(QudaDilutionType type)
   case QUDA_DILUTION_COLOR: s = std::string("color"); break;
   case QUDA_DILUTION_SPIN_COLOR: s = std::string("spin_color"); break;
   case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: s = std::string("spin_color_even_odd"); break;
+  case QUDA_DILUTION_BLOCK: s = std::string("block"); break;
   default: fprintf(stderr, "Error: invalid dilution type\n"); exit(1);
   }
   return s;
@@ -386,4 +440,18 @@ const char *get_blas_type_str(QudaBLASType type)
   default: fprintf(stderr, "Error: invalid BLAS type\n"); exit(1);
   }
   return s;
+}
+
+const char *get_TwistFlavor_str(QudaTwistFlavorType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_TWIST_SINGLET: ret = "singlet_"; break;
+  case QUDA_TWIST_NONDEG_DOUBLET: ret = "ndeg_doublet_"; break;
+  case QUDA_TWIST_NO: ret = ""; break;
+  default: ret = ""; break;
+  }
+
+  return ret;
 }

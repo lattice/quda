@@ -14,6 +14,7 @@
 #include <quda_internal.h>
 #include <device.h>
 #include <uint_to_char.h>
+#include <kernel_ops_base.h>
 
 namespace quda {
 
@@ -22,7 +23,8 @@ namespace quda {
     dim3 grid;
     unsigned int shared_bytes = 0;
     bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
-    int4 aux = {1, 1, 1, 1}; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    int shared_carve_out = 0;          // what to set the shared carve out
+    int4 aux = {1, 1, 1, 1};           // free parameter used as an arbitrary autotuning dimension
 
     std::string comment;
     float time = FLT_MAX;
@@ -43,7 +45,41 @@ namespace quda {
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
+  /**
+   * @brief Return the most recently used  TuneParam
+   * @retrn Most recent TuneParam
+   */
+  TuneParam getLastTuneParam();
+
+  /**
+     @brief Unify all instances of the tunecache across ranks.  This
+     is called after returning to a global communicator.
+     @param[in] rank_list The list of ranks from whose tunecaches we
+     want to merge to form the global tunecache
+   */
+  void joinTuneCache(const std::vector<int> &rank_list);
+
+  /**
+     @brief Return a string encoding the QUDA version
+   */
+  const std::string get_quda_version();
+
+  /**
+     @brief Return a string encoding the git hash
+   */
+  const std::string get_quda_hash();
+
+  /**
+     @brief Return the resource path (directory where QUDA read/write
+     tunecache and other internal info
+  */
+  const std::string get_resource_path();
+
   class Tunable {
+
+    friend TuneParam tuneLaunch(Tunable &, bool, QudaVerbosity);
+    static inline uint64_t _flops_global = 0;
+    static inline uint64_t _bytes_global = 0;
 
   protected:
     virtual long long flops() const { return 0; }
@@ -61,6 +97,10 @@ namespace quda {
     virtual bool tuneAuxDim() const { return false; }
 
     virtual bool tuneSharedBytes() const;
+    virtual bool tuneSharedCarveOut() const;
+
+    virtual int sharedCarveOutStep() const;
+    virtual std::string getSharedCarveOutStr() const;
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
@@ -92,7 +132,7 @@ namespace quda {
        by the autotuner.  This defaults to twice the number of
        processors on the GPU, since it's unlikely a large grid size
        will help (if a kernels needs more parallelism, the autotuner
-       will find this through increased block size.
+       will find this through increased block size).
      */
     virtual unsigned int maxGridSize() const { return 2 * device::processor_count(); }
 
@@ -129,6 +169,13 @@ namespace quda {
       }
     }
 
+    auto setSharedBytes(TuneParam &param) const
+    {
+      int nthreads = param.block.x * param.block.y * param.block.z;
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      return param.shared_bytes;
+    }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize(param);
@@ -136,14 +183,12 @@ namespace quda {
       bool ret;
 
       param.block.x += blockStep();
-      int nthreads = param.block.x * param.block.y * param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      setSharedBytes(param);
 
       if (param.block.x > max_threads || param.shared_bytes > max_shared
           || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
         resetBlockDim(param);
-        int nthreads = param.block.x * param.block.y * param.block.z;
-        param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+        setSharedBytes(param);
         ret = false;
       } else {
         ret = true;
@@ -172,6 +217,14 @@ namespace quda {
      */
     virtual unsigned int maxSharedBytesPerBlock() const { return device::max_default_shared_memory(); }
 
+    mutable int max_active_blocks = 0;
+
+    /**
+       @brief Return the maximum number of blocks resident per SM
+       @param[in] param TuneParam containing the launch parameters
+    */
+    virtual int maxBlocksPerMultiprocessor(const TuneParam &) const { return max_active_blocks; }
+
     /**
      * The goal here is to throttle the number of thread blocks per SM
      * by over-allocating shared memory (in order to improve L2
@@ -183,9 +236,7 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
         const auto max_shared = maxSharedBytesPerBlock();
-        const int max_blocks_per_sm
-          = std::min(device::max_threads_per_processor() / (param.block.x * param.block.y * param.block.z),
-                     device::max_blocks_per_processor());
+        int max_blocks_per_sm = maxBlocksPerMultiprocessor(param);
         int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
@@ -193,8 +244,7 @@ namespace quda {
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
-	  int nthreads = next.block.x * next.block.y * next.block.z;
-          param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(next));
+          param.shared_bytes = setSharedBytes(next);
           return false;
 	} else {
 	  return true;
@@ -203,6 +253,8 @@ namespace quda {
 	return false;
       }
     }
+
+    virtual bool advanceSharedCarveOut(TuneParam &param) const;
 
     virtual bool advanceAux(TuneParam &) const { return false; }
 
@@ -270,7 +322,6 @@ namespace quda {
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
-
 	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
@@ -280,8 +331,8 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
-      int nthreads = param.block.x*param.block.y*param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      param.shared_carve_out = 0; // set default carve out to prefer L1 cache
+      setSharedBytes(param);
     }
 
     /** sets default values for when tuning is disabled */
@@ -293,7 +344,8 @@ namespace quda {
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
-      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param) || advanceAux(param);
+      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceSharedCarveOut(param)
+        || advanceGridDim(param) || advanceAux(param);
     }
 
     /**
@@ -332,6 +384,30 @@ namespace quda {
     }
 
     /**
+     * @brief self-consistency check that the shared memory is set
+     * correctly (e.g., check that block size has been correctly
+     * factored in when set setting shared_bytes)
+     */
+    template <template <typename> class Functor, typename Arg>
+    void checkSharedBytes(const TuneParam &tp, const Arg &arg) const
+    {
+      auto tp2 = TuneParam(tp);
+      auto expected = setSharedBytes(tp2);
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block, arg);
+      if (sizeOps != expected) {
+        printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+        printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+        errorQuda("Shared bytes mismatch KernelOps: %u  cu: %u\n", sizeOps, expected);
+      }
+      if (tp.shared_bytes < expected)
+        errorQuda("Shared bytes %u insufficient (expected %u)", tp.shared_bytes, expected);
+
+      if (sharedBytesPerThread() && sharedBytesPerBlock(tp))
+        errorQuda("Not supported: non-zero shared bytes per thread (%u) and per block (%u)", sharedBytesPerThread(),
+                  sharedBytesPerBlock(tp));
+    }
+
+    /**
      * @brief Return the rank on which kernel tuning is performed.
      * This will default to 0, but can be globally overriden with the
      * QUDA_TUNING_RANK environment variable.
@@ -340,6 +416,12 @@ namespace quda {
 
     qudaError_t launchError() const { return launch_error; }
     qudaError_t &launchError() { return launch_error; }
+
+    static void flops_global(uint64_t value) { _flops_global = value; }
+    static uint64_t flops_global() { return _flops_global; }
+
+    static void bytes_global(uint64_t value) { _bytes_global = value; }
+    static uint64_t bytes_global() { return _bytes_global; }
   };
 
   /**
@@ -347,6 +429,12 @@ namespace quda {
      @return tuning in progress?
   */
   bool activeTuning();
+
+  /**
+     @brief query if tuning warmup is in progress
+     @return tuning warming up in progress?
+  */
+  bool activeTuningWarmup();
 
   void loadTuneCache();
   void saveTuneCache(bool error = false);
@@ -372,7 +460,7 @@ namespace quda {
    * @param[in] verbosity What verbosity to use during tuning?
    * @return The tuned launch parameters
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
+  TuneParam tuneLaunch(Tunable &tunable, bool enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
 
   /**
    * @brief Post an event in the trace, recording where it was posted
@@ -408,6 +496,17 @@ namespace quda {
    * @brief Query whether we are tuning an uber kernel
    */
   bool uberTuning();
+
+  /**
+   * @brief Helper for setting the rhs string
+   */
+  inline void setRHSstring(char *str, int size)
+  {
+    strcat(str, ",n_rhs=");
+    char rhs_str[16];
+    i32toa(rhs_str, size);
+    strcat(str, rhs_str);
+  }
 
 } // namespace quda
 

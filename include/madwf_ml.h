@@ -91,8 +91,6 @@ namespace quda
 
     static std::unordered_map<std::string, std::vector<transfer_float>> host_training_param_cache; // empty map
 
-    TimeProfile &profile;
-
     /**
       @brief Fill a host vector with Gaussian random numbers.
       @param[in] v the host vector
@@ -127,7 +125,7 @@ namespace quda
       @brief constructor.
       @param[in] solve_param the standard solve_param
     */
-    MadwfAcc(const SolverParam &solve_param, TimeProfile &profile);
+    MadwfAcc(const SolverParam &solve_param);
 
     /**
       @brief Apply the (trained) parameter and perform the accelerated operator

@@ -1,6 +1,16 @@
+#include <instantiate.h>
 #include <gtest/gtest.h>
 
-using test_t = ::testing::tuple<QudaEigType, QudaBoolean, QudaBoolean, QudaBoolean, QudaEigSpectrumType>;
+using test_t = ::testing::tuple<QudaPrecision, QudaEigType, QudaBoolean, QudaBoolean, QudaBoolean, QudaEigSpectrumType>;
+
+bool skip_test(test_t param)
+{
+  auto prec = ::testing::get<0>(param);
+  if (!quda::is_enabled(prec)) return true; // skip if precision is not enabled
+  // dwf-style solves must use a normal solver
+  if (is_chiral(dslash_type) && (::testing::get<2>(param) == QUDA_BOOLEAN_FALSE)) return true;
+  return false;
+}
 
 class EigensolveTest : public ::testing::TestWithParam<test_t>
 {
@@ -9,54 +19,96 @@ protected:
 
 public:
   EigensolveTest() : param(GetParam()) { }
-};
 
-bool is_chiral(QudaDslashType type)
-{
-  switch (type) {
-  case QUDA_DOMAIN_WALL_DSLASH:
-  case QUDA_DOMAIN_WALL_4D_DSLASH:
-  case QUDA_MOBIUS_DWF_DSLASH:
-  case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
-  default: return false;
+  virtual void SetUp()
+  {
+    if (skip_test(GetParam())) GTEST_SKIP();
+
+    // check if outer precision has changed and update if it has
+    if (::testing::get<0>(param) != last_prec) {
+      if (last_prec != QUDA_INVALID_PRECISION) {
+        freeGaugeQuda();
+        if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
+      }
+
+      // Load the gauge field to the device
+      gauge_param.cuda_prec = ::testing::get<0>(param);
+      gauge_param.cuda_prec_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_precondition = ::testing::get<0>(param);
+      gauge_param.cuda_prec_refinement_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_eigensolver = ::testing::get<0>(param);
+      loadGaugeQuda(gauge.data(), &gauge_param);
+
+      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        // Load the clover terms to the device
+        eig_inv_param.clover_cuda_prec = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_sloppy = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_precondition = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_refinement_sloppy = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_eigensolver = ::testing::get<0>(param);
+        loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
+      }
+      last_prec = ::testing::get<0>(param);
+    }
+
+    // Compute plaquette as a sanity check
+    double plaq[3];
+    plaqQuda(plaq);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
-}
-
-bool skip_test(test_t param)
-{
-  // dwf-style solves must use a normal solver
-  if (is_chiral(dslash_type) && (::testing::get<1>(param) == QUDA_BOOLEAN_FALSE)) return true;
-  return false;
-}
+};
 
 std::vector<double> eigensolve(test_t test_param);
 
 TEST_P(EigensolveTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
-  double factor = 1.0;
+
+  auto prec = ::testing::get<0>(GetParam());
+  auto tol = getTolerance(prec);
+  ASSERT_TRUE(tol != 0.0) << "Unexpected precision " << prec;
+  eig_param.tol = tol;
+  eig_param.require_convergence = QUDA_BOOLEAN_FALSE;
+
   // The IRAM eigensolver will sometimes report convergence with tolerances slightly
   // higher than requested. The same phenomenon occurs in ARPACK. This factor
   // prevents failure when IRAM has solved to say 2e-6 when 1e-6 is requested.
   // The solution to avoid this is to use a Krylov space (eig-n-kr) about 3-4 times the
   // size of the search space (eig-n-ev), or use a well chosen Chebyshev polynomial,
   // or use a tighter than necessary tolerance.
-  if (eig_param.eig_type == QUDA_EIG_IR_ARNOLDI || eig_param.eig_type == QUDA_EIG_BLK_IR_ARNOLDI) factor *= 10;
-  auto tol = factor * eig_param.tol;
-  for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
+  if (::testing::get<1>(GetParam()) == QUDA_EIG_IR_ARNOLDI || ::testing::get<1>(GetParam()) == QUDA_EIG_BLK_IR_ARNOLDI)
+    tol *= 15;
+
+  // for Arnoldi we double the Krylov space size
+  if (::testing::get<1>(GetParam()) == QUDA_EIG_IR_ARNOLDI) {
+    eig_param.n_kr = 2 * eig_n_kr;
+  } else {
+    eig_param.n_kr = eig_n_kr;
+  }
+
+  // account for summation error scaling with number of processors
+  auto dof = 24lu * dim[0] * dim[1] * dim[2] * dim[3] * (is_chiral(dslash_type) ? Lsdim : 1);
+  tol *= (1 + log(quda::comm_size()) / log(dof));
+
+  for (auto rsd : eigensolve(GetParam())) {
+    EXPECT_FALSE(std::isnan(rsd)) << "Nan has propagated into the result";
+    tol = checkReasonableHostDeviation(rsd, tol, prec);
+    EXPECT_LE(rsd, tol);
+  }
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
 {
   std::string name;
-  name += get_eig_type_str(::testing::get<0>(param.param)) + std::string("_");
-  name += (::testing::get<1>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("normop") : std::string("direct"))
+  name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+  name += get_eig_type_str(::testing::get<1>(param.param)) + std::string("_");
+  name += (::testing::get<2>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("normop") : std::string("direct"))
     + std::string("_");
-  name += (::testing::get<2>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("evenodd") : std::string("full"))
+  name += (::testing::get<3>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("evenodd") : std::string("full"))
     + std::string("_");
-  name += (::testing::get<3>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("withSVD") : std::string("noSVD"))
+  name += (::testing::get<4>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("withSVD") : std::string("noSVD"))
     + std::string("_");
-  name += get_eig_spectrum_str(::testing::get<4>(param.param));
+  name += get_eig_spectrum_str(::testing::get<5>(param.param));
   return name;
 }
 
@@ -74,25 +126,28 @@ auto hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG);
 auto non_hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG, QUDA_SPECTRUM_LM_EIG,
                                      QUDA_SPECTRUM_SM_EIG, QUDA_SPECTRUM_LI_EIG, QUDA_SPECTRUM_SI_EIG);
 
+auto precisions = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION);
+
 // preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(NormalEvenOdd, EigensolveTest,
-                         ::testing::Combine(hermitian_solvers, Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_TRUE),
-                                            Values(QUDA_BOOLEAN_TRUE), hermitian_spectrum),
+                         ::testing::Combine(precisions, hermitian_solvers, Values(QUDA_BOOLEAN_TRUE),
+                                            Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_TRUE), hermitian_spectrum),
                          gettestname);
 
 // full system normal solve
 INSTANTIATE_TEST_SUITE_P(NormalFull, EigensolveTest,
-                         ::testing::Combine(hermitian_solvers, Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_TRUE),
-                                            Values(QUDA_BOOLEAN_TRUE), hermitian_spectrum),
+                         ::testing::Combine(precisions, hermitian_solvers, Values(QUDA_BOOLEAN_TRUE),
+                                            Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_TRUE), hermitian_spectrum),
                          gettestname);
 
 // preconditioned direct solves
 INSTANTIATE_TEST_SUITE_P(DirectEvenOdd, EigensolveTest,
-                         ::testing::Combine(non_hermitian_solvers, Values(QUDA_BOOLEAN_FALSE), Values(QUDA_BOOLEAN_TRUE),
-                                            Values(QUDA_BOOLEAN_FALSE), non_hermitian_spectrum),
+                         ::testing::Combine(precisions, non_hermitian_solvers, Values(QUDA_BOOLEAN_FALSE),
+                                            Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_FALSE), non_hermitian_spectrum),
                          gettestname);
 // full system direct solve
 INSTANTIATE_TEST_SUITE_P(DirectFull, EigensolveTest,
-                         ::testing::Combine(non_hermitian_solvers, Values(QUDA_BOOLEAN_FALSE), Values(QUDA_BOOLEAN_FALSE),
-                                            Values(QUDA_BOOLEAN_FALSE), non_hermitian_spectrum),
+                         ::testing::Combine(precisions, non_hermitian_solvers, Values(QUDA_BOOLEAN_FALSE),
+                                            Values(QUDA_BOOLEAN_FALSE), Values(QUDA_BOOLEAN_FALSE),
+                                            non_hermitian_spectrum),
                          gettestname);

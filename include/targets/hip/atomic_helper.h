@@ -45,10 +45,15 @@ namespace quda
     for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
   }
 
+  template <typename T> __device__ __host__ inline void atomic_add_shared(T *addr, T val)
+  {
+    atomic_fetch_add(addr, val);
+  }
+
   template <bool is_device> struct atomic_fetch_abs_max_impl {
     template <typename T> inline void operator()(T *addr, T val)
     {
-#pragma omp atomic update
+#pragma omp critical
       *addr = std::max(*addr, val);
     }
   };

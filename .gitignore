@@ -4,7 +4,6 @@
 *.a
 *~
 tests/*_test
-make.inc
 milc_interface/*
 *#*
 *.pyc
@@ -20,3 +19,4 @@ include/jitify_options.hpp
 .tags*
 autom4te.cache/*
 .vscode
+cmake/CPM_*.cmake

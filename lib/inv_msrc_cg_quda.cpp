@@ -112,7 +112,7 @@ namespace quda {
     double heavy_quark_res_old = 0.0; // heavy quark residual
 
     if (use_heavy_quark_res) {
-      heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
       heavy_quark_res_old = heavy_quark_res; // heavy quark residual
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
@@ -146,7 +146,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
 
     int k=0;
 
@@ -162,8 +161,8 @@ namespace quda {
 
       bool breakdown = false;
       if (param.pipeline) {
-	double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
-	r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
+	array<real_t, 3> triplet = blas::tripleCGReduction(rSloppy, Ap, p);
+	r2 = triplet[0]; double Ap2 = triplet[1]; pAp = triplet[2];
 	r2_old = r2;
 
 	alpha = r2 / pAp;
@@ -181,9 +180,9 @@ namespace quda {
 	alpha = r2 / pAp;
 
 	// here we are deploying the alternative beta computation
-	Complex cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
-	r2 = real(cg_norm); // (r_new, r_new)
-	sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
+	auto cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
+	r2 = cg_norm[0]; // (r_new, r_new)
+	sigma = cg_norm[1] >= 0.0 ? cg_norm[1] : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
 
       // reliable update conditions
@@ -212,10 +211,10 @@ namespace quda {
 	if (use_heavy_quark_res && k%heavy_quark_check==0) {
 	  if (&x != &xSloppy) {
 	    blas::copy(tmp,y);
-	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy)[2]);
 	  } else {
 	    blas::copy(r, rSloppy);
-	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r)[2]);
 	  }
 	}
 
@@ -232,14 +231,14 @@ namespace quda {
 	blas::zero(xSloppy);
 
 	// calculate new reliable HQ resididual
-	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r)[2]);
 
 	// break-out check if we have reached the limit of the precision
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
 	  resIncrease++;
 	  resIncreaseTotal++;
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-		      sqrt(r2), r0Norm, resIncreaseTotal);
+		      QUDA_REAL(sqrt(r2)), QUDA_REAL(r0Norm), resIncreaseTotal);
 	  if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
 	      L2breakdown = true;
@@ -258,7 +257,8 @@ namespace quda {
 	  heavy_quark_restart = true;
 	  if (heavy_quark_res > heavy_quark_res_old) {
 	    hqresIncrease++;
-	    warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+	    warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
+                        QUDA_REAL(heavy_quark_res), QUDA_REAL(heavy_quark_res_old));
 	    // break out if we do not improve here anymore
 	    if (hqresIncrease > hqmaxresIncrease) {
 	      warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
@@ -315,10 +315,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-    reduceDouble(gflops);
-    param.gflops = gflops;
     param.iter += k;
 
     if (k==param.maxiter)
@@ -330,14 +326,9 @@ namespace quda {
     // compute the true residuals
     mat(r, x, y, tmp3);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
+    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]);
 
     PrintSummary("CG", k, r2, b2, stop, inv.tol_hq);
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);

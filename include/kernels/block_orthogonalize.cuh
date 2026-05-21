@@ -1,8 +1,7 @@
 #include <multigrid_helper.cuh>
 
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <color_spinor_field_order.h>
-#include <constant_kernel_arg.h> // allow for large parameter structs
 #include <block_reduce_helper.h>
 #include <fast_intdiv.h>
 #include <array.h>
@@ -51,15 +50,14 @@ namespace quda {
     static constexpr bool swizzle = false;
     int_fastdiv swizzle_factor; // for transposing blockIdx.x mapping to coarse grid coordinate
 
-    const Vector B[nVec];
+    Vector B[nVec];
 
     static constexpr bool launch_bounds = true;
     dim3 grid_dim;
     dim3 block_dim;
 
-    template <typename... T>
-    BlockOrthoArg(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
-                  const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta, T... B) :
+    BlockOrthoArg(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
+                  const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta) :
       kernel_param(dim3(meta.VolumeCB() * (fineSpin > 1 ? meta.SiteSubset() : 1), 1, chiral_blocks)),
       V(V),
       fine_to_coarse(fine_to_coarse),
@@ -69,10 +67,10 @@ namespace quda {
       nParity(meta.SiteSubset()),
       nBlockOrtho(n_block_ortho),
       fineVolumeCB(meta.VolumeCB()),
-      B{*B...},
       grid_dim(),
       block_dim()
     {
+      for (int i = 0; i < nVec; i++) this->B[i] = B[i];
       int aggregate_size = 1;
       for (int d = 0; d < V.Ndim(); d++) aggregate_size *= geo_bs[d];
       aggregate_size_cb = aggregate_size / 2;
@@ -81,9 +79,18 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct BlockOrtho_ {
+  template <typename Arg> struct BlockOrtho_Params {
+    static constexpr int mVec = tile_size<Arg::nColor, Arg::nVec, Arg::block_size_cxpr>();
+    using dot_t = array<complex<typename Arg::sum_t>, mVec>;
+    static constexpr int block_dim = 1;
+    using BlockReduceDot = BlockReduce<dot_t, block_dim>;
+    using BlockReduceNorm = BlockReduce<typename Arg::sum_t, block_dim>;
+    using Ops = KernelOps<BlockReduceDot, BlockReduceNorm>;
+  };
+
+  template <typename Arg> struct BlockOrtho_ : BlockOrtho_Params<Arg>::Ops {
     const Arg &arg;
-    static constexpr unsigned block_size = Arg::block_size;
+    static constexpr unsigned block_size = Arg::block_size_cxpr;
     static constexpr int fineSpin = Arg::fineSpin;
     static constexpr int spinBlock = (fineSpin == 1) ? 1 : fineSpin / Arg::coarseSpin; // size of spin block
     static constexpr int nColor = Arg::nColor;
@@ -98,14 +105,18 @@ namespace quda {
                   "Product of n_sites_per_thread and n_threads_per_block must equal block_size");
 
     // mVec is the number of vectors to orthogonalize at once
-    static constexpr int mVec = tile_size<nColor, Arg::nVec, block_size>();
+    static constexpr int mVec = BlockOrtho_Params<Arg>::mVec;
     static_assert(Arg::nVec % mVec == 0, "mVec must be a factor of nVec");
 
     using sum_t = typename Arg::sum_t;
-    using dot_t = array<complex<sum_t>, mVec>;
+    using dot_t = typename BlockOrtho_Params<Arg>::dot_t;
     using real = typename Arg::real;
 
-    constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}
+    using typename BlockOrtho_Params<Arg>::Ops::KernelOpsT;
+    template <typename... OpsArgs>
+    constexpr BlockOrtho_(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void load(ColorSpinor<real, nColor, spinBlock> &v, int parity, int x_cb, int chirality, int i)
@@ -124,7 +135,8 @@ namespace quda {
         for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, i) = v(s, c);
     }
 
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool alive = true)
     {
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
@@ -135,20 +147,25 @@ namespace quda {
       int x_cb[n_sites_per_thread];
 
       for (int tx = 0; tx < n_sites_per_thread; tx++) {
-        int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
-        // all threads with x_fine_offset greater than aggregate_size_cb are second parity
-        int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
-        x_offset_cb[tx] = x_fine_offset_tx - parity_offset * arg.aggregate_size_cb;
-        parity[tx] = fineSpin == 1 ? chirality : arg.nParity == 2 ? parity_offset : arg.parity;
+        if (!allthreads || alive) {
+          int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
+          // all threads with x_fine_offset greater than aggregate_size_cb are second parity
+          int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
+          x_offset_cb[tx] = x_fine_offset_tx - parity_offset * arg.aggregate_size_cb;
+          parity[tx] = fineSpin == 1 ? chirality : arg.nParity == 2 ? parity_offset : arg.parity;
 
-        x_cb[tx] = x_offset_cb[tx] >= arg.aggregate_size_cb ? 0 :
-          arg.coarse_to_fine[ (x_coarse*2 + parity[tx]) * arg.aggregate_size_cb + x_offset_cb[tx] ] - parity[tx]*arg.fineVolumeCB;
+          x_cb[tx] = x_offset_cb[tx] >= arg.aggregate_size_cb ?
+            0 :
+            arg.coarse_to_fine[(x_coarse * 2 + parity[tx]) * arg.aggregate_size_cb + x_offset_cb[tx]]
+              - parity[tx] * arg.fineVolumeCB;
+        } else {
+          x_offset_cb[tx] = arg.aggregate_size_cb;
+        }
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      constexpr int block_dim = 1;
-      BlockReduce<dot_t, block_dim> dot_reducer{0};
-      BlockReduce<sum_t, block_dim> norm_reducer{0};
+      typename BlockOrtho_Params<Arg>::BlockReduceDot dot_reducer {*this};
+      typename BlockOrtho_Params<Arg>::BlockReduceNorm norm_reducer {*this};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
@@ -190,7 +207,8 @@ namespace quda {
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
-              for (int m = 0; m < mVec; m++) caxpy(-complex<real>(dot[m].real(), dot[m].imag()), vi[tx], v[m][tx]);
+              for (int m = 0; m < mVec; m++)
+                v[m][tx] = caxpy(-complex<real>(dot[m].real(), dot[m].imag()), vi[tx], v[m][tx]);
             }
           } // i
 
@@ -204,14 +222,16 @@ namespace quda {
 #pragma unroll
               for (int i = 0; i < m; i++) dot[i] += innerProduct(v[i][tx], v[m][tx]);
             }
-            
+
             dot = dot_reducer.template AllSum<false>(dot);
-            
+
             sum_t nrm = 0.0;
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
-              for (int i = 0; i < m; i++) caxpy(-complex<real>(dot[i].real(), dot[i].imag()), v[i][tx], v[m][tx]); // subtract the blocks to orthogonalise
+              for (int i = 0; i < m; i++)
+                v[m][tx] = caxpy(-complex<real>(dot[i].real(), dot[i].imag()), v[i][tx],
+                                 v[m][tx]); // subtract the blocks to orthogonalise
               nrm += norm2(v[m][tx]);
             }
 

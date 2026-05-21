@@ -81,15 +81,31 @@ namespace quda
 
   int Communicator::comm_query(MsgHandle *) { return 1; }
 
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
   template <>
-  void Communicator::comm_allreduce_sum_array<rfa_t<double>>(rfa_t<double> *, size_t) { }
+  void Communicator::comm_allreduce_sum_array<rfa_t<reduction_t>>(rfa_t<reduction_t> *, size_t)
+  {
+  }
+#endif
 
   void Communicator::comm_allreduce_sum(size_t &) { }
 
+#if defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_USE_QUAD_SCALAR)
   template <>
   void Communicator::comm_allreduce_sum_array<double>(double *, size_t) { }
+#endif
+#if !defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_ALGORITHM_KAHAN)             \
+  || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
   template <>
   void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *, size_t) { }
+#endif
+#if defined(QUDA_USE_QUAD_SCALAR)
+  template <>
+  void Communicator::comm_allreduce_sum_array<real_t>(real_t *, size_t) { }
+#endif
+
+  template <>
+  void Communicator::comm_allreduce_sum_array<device_reduce_t>(device_reduce_t *, size_t) { }
 
   template <>
   void Communicator::comm_allreduce_max_array<deviation_t<double>>(deviation_t<double> *, size_t) { }
@@ -97,14 +113,29 @@ namespace quda
   template <>
   void Communicator::comm_allreduce_max_array<deviation_t<doubledouble>>(deviation_t<doubledouble> *, size_t) { }
 
-  template<>
-  void Communicator::comm_allreduce_max_array<rfa_t<double>>(rfa_t<double> *, size_t) { }
-
-  template<>
-  void Communicator::comm_allreduce_max_array<double>(double *, size_t) { }
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  template <>
+  void Communicator::comm_allreduce_max_array<rfa_t<reduction_t>>(rfa_t<reduction_t> *, size_t) { }
+#endif
 
   template <>
+  void Communicator::comm_allreduce_max_array<device_reduce_t>(device_reduce_t *, size_t) { }
+
+#if defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
+  template <>
+  void Communicator::comm_allreduce_max_array<double>(double *, size_t) { }
+#endif
+
+#if !defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_ALGORITHM_KAHAN)             \
+  || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  template <>
   void Communicator::comm_allreduce_max_array<doubledouble>(doubledouble *, size_t) { }
+#endif
+
+#if defined(QUDA_USE_QUAD_SCALAR)
+  template <>
+  void Communicator::comm_allreduce_max_array<real_t>(real_t *, size_t) { }
+#endif
 
   template <>
   void Communicator::comm_allreduce_min_array<double>(double *, size_t) { }

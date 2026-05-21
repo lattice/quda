@@ -100,8 +100,31 @@ namespace quda
     }
   }
 
-  static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
-  static std::string resource_path;
+  static const std::string quda_hash = QUDA_HASH;
+  const std::string get_quda_hash() { return quda_hash; }
+
+  const std::string get_resource_path()
+  {
+    static std::string resource_path = {};
+    static bool init = false;
+
+    if (!init) {
+      auto path = getenv("QUDA_RESOURCE_PATH");
+      struct stat pstat;
+
+      if (!path) {
+        warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
+      } else if (stat(path, &pstat) || !S_ISDIR(pstat.st_mode)) {
+        warningQuda("The path \"%s\" specified by QUDA_RESOURCE_PATH does not exist or is not a directory.", path);
+      } else {
+        resource_path = path;
+      }
+      init = true;
+    }
+
+    return resource_path;
+  }
+
   static map tunecache;
   static map::iterator it;
   static size_t initial_cache_size = 0;
@@ -113,11 +136,15 @@ namespace quda
 #undef STR
 #undef STR_
 
+  const std::string get_quda_version() { return quda_version; }
+
   /** tuning in progress? */
   static bool tuning = false;
   static bool candidatetuning = true;
+  static bool warmup_tuning = false;
 
   bool activeTuning() { return tuning; }
+  bool activeTuningWarmup() { return warmup_tuning; }
 
   static bool profile_count = true;
 
@@ -127,9 +154,37 @@ namespace quda
   const map &getTuneCache() { return tunecache; }
 
   /**
-   * Deserialize tunecache from an istream, useful for reading a file or receiving from other nodes.
+   * @brief Distribute the tunecache from a given rank to all other nodes.
+   * @param[in] root_rank From which global rank to do the broadcast
+   * @param[out] tc Where we wish to receive the tunecache.  This
+   * defaults to the local tunecache.
    */
-  static void deserializeTuneCache(std::istream &in)
+  static void broadcastTuneCache(int32_t root_rank = 0, map &tc_recv = tunecache);
+
+  void joinTuneCache(const std::vector<int> &global_tune_rank)
+  {
+    // vector of the split tunecaches
+    std::vector<map> split_tc(global_tune_rank.size());
+    // broadcast each tunecache to every process
+    for (auto i = 0u; i < global_tune_rank.size(); i++) {
+      broadcastTuneCache(global_tune_rank[i], split_tc[i]);
+      if (comm_rank() == global_tune_rank[i]) split_tc[i] = tunecache;
+      logQuda(QUDA_DEBUG_VERBOSE, "i = %d tune_rank = %d tc size = %lu\n", i, global_tune_rank[i], split_tc[i].size());
+    }
+
+    // now merge the maps
+    tunecache = split_tc[0];
+    for (auto i = 1u; i < global_tune_rank.size(); i++) { tunecache.merge(split_tc[i]); }
+  }
+
+  /**
+   * Deserialize tunecache from an istream, useful for reading a file
+   * or receiving from other nodes.
+   * @param[in] in The stream from which we are deserializing
+   * @param[out] tc The tunecache to which we are deserializing.  This
+   * defaults to the local tunecache.
+   */
+  static void deserializeTuneCache(std::istream &in, map &tc = tunecache)
   {
     std::string line;
     std::stringstream ls;
@@ -155,12 +210,12 @@ namespace quda
       if (check < 0 || check >= key.name_n) errorQuda("Error writing name string (check=%d)", check);
       check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
       if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string (check=%d)", check);
-      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y
-        >> param.aux.z >> param.aux.w >> param.time;
+      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.shared_carve_out >> param.aux.x
+        >> param.aux.y >> param.aux.z >> param.aux.w >> param.time;
       ls.ignore(1);               // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
       param.comment += "\n";      // our convention is to include the newline, since ctime() likes to do this
-      tunecache[key] = param;
+      tc[key] = param;
     }
   }
 
@@ -178,8 +233,8 @@ namespace quda
       out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
       out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
       out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
-      out << param.shared_bytes << "\t" << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t"
-          << param.aux.w << "\t";
+      out << param.shared_bytes << "\t" << param.shared_carve_out << "\t";
+      out << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t" << param.aux.w << "\t";
       out << param.time << "\t" << param.comment; // param.comment ends with a newline
     }
   }
@@ -295,32 +350,37 @@ namespace quda
     }
   }
 
-  /**
-   * @brief Distribute the tunecache from a given rank to all other nodes.
-   * @param[in] root_rank From which global rank to do the broadcast
-   */
-  static void broadcastTuneCache(int32_t root_rank = 0)
+  static void broadcastTuneCache(int32_t root_rank, map &tc_recv)
   {
     std::stringstream serialized;
     size_t size;
 
-    if (comm_rank_global() == root_rank) {
+    if (comm_rank() == root_rank) {
       serializeTuneCache(serialized);
       size = serialized.str().length();
     }
-    comm_broadcast_global(&size, sizeof(size_t), root_rank);
+    comm_broadcast(&size, sizeof(size_t), root_rank);
 
     if (size > 0) {
-      if (comm_rank_global() == root_rank) {
-        comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size, root_rank);
+      if (comm_rank() == root_rank) {
+        comm_broadcast(const_cast<char *>(serialized.str().c_str()), size, root_rank);
       } else {
         std::vector<char> serstr(size + 1);
-        comm_broadcast_global(serstr.data(), size, root_rank);
+        comm_broadcast(serstr.data(), size, root_rank);
         serstr[size] = '\0'; // null-terminate
         serialized.str(serstr.data());
-        deserializeTuneCache(serialized);
+        deserializeTuneCache(serialized, tc_recv);
       }
     }
+  }
+
+  auto getTuneCacheName(bool error = false, bool lock = false)
+  {
+    std::string name("/tunecache");
+    if (!getTuning()) name += "_notune";
+    if (error) name += "_error";
+    name += lock ? ".lock" : ".tsv";
+    return name;
   }
 
   /*
@@ -328,30 +388,14 @@ namespace quda
    */
   void loadTuneCache()
   {
-    if (getTuning() == QUDA_TUNE_NO) {
+    if (!getTuning()) {
       warningQuda("Autotuning disabled");
       return;
     }
 
-    char *path;
-    struct stat pstat;
     std::string cache_path, line, token;
     std::ifstream cache_file;
     std::stringstream ls;
-
-    path = getenv("QUDA_RESOURCE_PATH");
-
-    if (!path) {
-      warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
-      warningQuda("Caching of tuned parameters will be disabled.");
-      return;
-    } else if (stat(path, &pstat) || !S_ISDIR(pstat.st_mode)) {
-      warningQuda("The path \"%s\" specified by QUDA_RESOURCE_PATH does not exist or is not a directory.", path);
-      warningQuda("Caching of tuned parameters will be disabled.");
-      return;
-    } else {
-      resource_path = path;
-    }
 
     bool version_check = true;
     char *override_version_env = getenv("QUDA_TUNE_VERSION_CHECK");
@@ -361,8 +405,8 @@ namespace quda
     }
 
     if (comm_rank_global() == 0) {
-      cache_path = resource_path;
-      cache_path += "/tunecache.tsv";
+      cache_path = get_resource_path();
+      cache_path += getTuneCacheName();
       cache_file.open(cache_path.c_str());
 
       if (cache_file) {
@@ -384,10 +428,10 @@ namespace quda
                     "QUDA_RESOURCE_PATH environment variable to point to a new path.",
                     cache_path.c_str());
 #else
-      if (version_check && token.compare(quda_version))
-        errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
-                  "QUDA_RESOURCE_PATH environment variable to point to a new path.",
-                  cache_path.c_str());
+        if (version_check && token.compare(quda_version))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 #endif
         ls >> token;
         if (version_check && token.compare(quda_hash))
@@ -426,8 +470,16 @@ namespace quda
     int lock_handle;
     std::string lock_path, cache_path;
     std::ofstream cache_file;
+    auto &resource_path = get_resource_path();
 
-    if (resource_path.empty()) return;
+    if (resource_path.empty()) {
+      static bool init = false;
+      if (!init) {
+        warningQuda("Caching of tuned parameters will be disabled");
+        init = true;
+      }
+      return;
+    }
 
       // FIXME: We should really check to see if any nodes have tuned a kernel that was not also tuned on node 0, since as things
       //       stand, the corresponding launch parameters would never get cached to disk in this situation.  This will come up if we
@@ -439,7 +491,7 @@ namespace quda
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
-      lock_path = resource_path + (error ? "/tunecache_error.lock" : "/tunecache.lock");
+      lock_path = resource_path + getTuneCacheName(error, true);
       lock_handle = open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
       if (lock_handle == -1) {
         warningQuda("Unable to lock cache file.  Tuned launch parameters will not be cached to disk.  "
@@ -453,7 +505,7 @@ namespace quda
       int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
-      cache_path = resource_path + (error ? "/tunecache_error.tsv" : "/tunecache.tsv");
+      cache_path = resource_path + getTuneCacheName(error);
       cache_file.open(cache_path.c_str());
 
       logQuda(QUDA_SUMMARIZE, "Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()),
@@ -464,11 +516,12 @@ namespace quda
 #ifdef GITVERSION
       cache_file << "\t" << gitversion;
 #else
-    cache_file << "\t" << quda_version;
+      cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << std::setw(16) << "volume"
-                 << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\taux.x\taux.y\taux."
+                 << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tshared_carve_"
+                    "out\taux.x\taux.y\taux."
                     "z\taux.w\ttime\tcomment"
                  << std::endl;
       serializeTuneCache(cache_file);
@@ -514,8 +567,12 @@ namespace quda
     int lock_handle;
     std::string lock_path, profile_path, async_profile_path, trace_path;
     std::ofstream profile_file, async_profile_file, trace_file;
+    auto &resource_path = get_resource_path();
 
-    if (resource_path.empty()) return;
+    if (resource_path.empty()) {
+      warningQuda("Storing profile info disabled");
+      return;
+    }
 
     if (comm_rank_global() == 0) { // Make sure only one rank is writing to disk
 
@@ -624,7 +681,7 @@ namespace quda
 #ifdef GITVERSION
         trace_file << "\t" << gitversion;
 #else
-      trace_file << "\t" << quda_version;
+        trace_file << "\t" << quda_version;
 #endif
         trace_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
 
@@ -650,7 +707,7 @@ namespace quda
   {
     output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
     output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    output << "shared_bytes=" << param.shared_bytes;
+    output << "shared_bytes=" << param.shared_bytes << ", shared_carve_out=" << param.shared_carve_out;
     output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
     return output;
   }
@@ -668,6 +725,71 @@ namespace quda
       init = true;
     }
     return tune_shared;
+  }
+
+  bool Tunable::tuneSharedCarveOut() const
+  {
+    // if carve out tuning is not supported then just return false
+    if (!device::shared_carve_out_supported()) return false;
+
+    static bool tune_carve_out = false; // default is not to do carve out tuning
+    static bool init = false;
+
+    if (!init) {
+      char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED_CARVE_OUT");
+      if (enable_shared_env) {
+        if (strcmp(enable_shared_env, "1") == 0) { tune_carve_out = true; }
+      }
+      init = true;
+    }
+    return tune_carve_out;
+  }
+
+  static std::string carve_out_step_str;
+  static int carve_out_step = 100; // default is 100% increment
+
+  void set_carve_out_step()
+  {
+    static bool init = false;
+
+    if (!init) {
+      char *carve_out_step_env = getenv("QUDA_TUNING_SHARED_CARVE_OUT_STEP");
+      if (carve_out_step_env) {
+        carve_out_step = atoi(carve_out_step_env);
+        if (carve_out_step <= 0 || carve_out_step > 100)
+          errorQuda("Invalid shared carve-out step size %d", carve_out_step);
+      }
+      init = true;
+
+      carve_out_step_str = std::string(",carve_out,step=") + std::to_string(carve_out_step);
+    }
+  }
+
+  int Tunable::sharedCarveOutStep() const
+  {
+    set_carve_out_step();
+    return carve_out_step;
+  }
+
+  std::string Tunable::getSharedCarveOutStr() const
+  {
+    set_carve_out_step();
+    return carve_out_step_str;
+  }
+
+  bool Tunable::advanceSharedCarveOut(TuneParam &param) const
+  {
+    if (tuneSharedCarveOut()) {
+      if (param.shared_carve_out < 100) {
+        param.shared_carve_out = std::min(param.shared_carve_out + sharedCarveOutStep(), 100);
+        return true;
+      } else {
+        param.shared_carve_out = 0;
+        return false;
+      }
+    } else {
+      return false;
+    }
   }
 
   int Tunable::blockStep() const { return device::warp_size(); }
@@ -737,8 +859,8 @@ namespace quda
    *
    */
 
-  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, aux, comment, time,
-                                     n_calls)
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, shared_carve_out, aux,
+                                     comment, time, n_calls)
 
   class TuneCandidates : public std::priority_queue<TuneParam, std::vector<TuneParam>, TuneParamComp>
   {
@@ -805,20 +927,20 @@ namespace quda
      */
     void broadcast(int32_t root_rank)
     {
-      size_t size;
+      size_t size = 0;
       std::string serialized;
-      if (comm_rank_global() == root_rank) {
+      if (comm_rank() == root_rank) {
         serialized = serialize();
         size = serialized.length();
       }
-      comm_broadcast_global(&size, sizeof(size_t), root_rank);
+      comm_broadcast(&size, sizeof(size_t), root_rank);
 
       if (size > 0) {
-        if (comm_rank_global() == root_rank) {
-          comm_broadcast_global(const_cast<char *>(serialized.c_str()), size, root_rank);
+        if (comm_rank() == root_rank) {
+          comm_broadcast(const_cast<char *>(serialized.c_str()), size, root_rank);
         } else {
           std::vector<char> serstr(size + 1);
-          comm_broadcast_global(serstr.data(), size, root_rank);
+          comm_broadcast(serstr.data(), size, root_rank);
           serstr[size] = '\0'; // null-terminate
           std::string_view deserialized(serstr.data());
           deserialize(deserialized);
@@ -834,12 +956,17 @@ namespace quda
     float getBestTime() const { return besttime; }
   };
 
+  static TuneParam last_tune_param = {};
+
+  TuneParam getLastTuneParam() { return last_tune_param; }
+
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
+  TuneParam tuneLaunch(Tunable &tunable, bool enabled, QudaVerbosity verbosity)
   {
+    pushVerbosity(verbosity);
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
@@ -848,6 +975,7 @@ namespace quda
     TuneKey key = tunable.tuneKey();
     if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
+    bool is_policy = strncmp(key.aux, "policy,", 7) == 0 ? true : false;
 
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTOP(QUDA_PROFILE_INIT);
@@ -858,7 +986,7 @@ namespace quda
     it = tunecache.find(key);
 
     // first check if we have the tuned value and return if we have it
-    if (enabled == QUDA_TUNE_YES && it != tunecache.end()) {
+    if (enabled && it != tunecache.end()) {
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -890,6 +1018,12 @@ namespace quda
         trace_list.push_back(trace_entry);
       }
 
+      if (!is_policy) {
+        Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+        Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
+      }
+      popVerbosity();
+      last_tune_param = param_tuned;
       return param_tuned;
     }
 
@@ -900,14 +1034,22 @@ namespace quda
 
     static TuneParam param;
 
-    if (enabled == QUDA_TUNE_NO) {
+    if (!enabled) {
       TuneParam param_default;
       param_default.aux = make_int4(-1, -1, -1, -1);
       tunable.defaultTuneParam(param_default);
       tunable.checkLaunchParam(param_default);
+      param_default.comment = "# default\n";
+      tunecache[key] = param_default;
       logQuda(QUDA_DEBUG_VERBOSE, "Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
               tunable.paramString(param_default).c_str());
 
+      if (!is_policy) {
+        Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+        Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
+      }
+      last_tune_param = param_default;
+      popVerbosity();
       return param_default;
     } else if (!tuning) {
 
@@ -929,7 +1071,7 @@ namespace quda
          - we are tuning an uber kernel
          in which case do the tuning on all ranks since we can't
          guarantee that all nodes are partaking */
-      if (comm_rank_global() == tune_rank || !commGlobalReduction() || policyTuning() || uberTuning()) {
+      if (comm_rank() == tune_rank || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
         TuneCandidates tc(tunable.num_candidates());
         float best_time;
@@ -958,14 +1100,16 @@ namespace quda
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          logQuda(QUDA_DEBUG_VERBOSE,
-                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                  static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
-                  static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
-                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
-                  static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
+          logQuda(
+            QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d shared_carve_out=%d aux=(%d,%d,%d,%d)\n",
+            static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
+            static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
+            static_cast<int>(param.shared_bytes), param.shared_carve_out, static_cast<int>(param.aux.x),
+            static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
+          warmup_tuning = true;
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
+          warmup_tuning = false;
 
           timer.start();
           for (int i = 0; i < candidate_iterations; i++) {
@@ -1018,12 +1162,12 @@ namespace quda
           param = tc.top();
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          logQuda(QUDA_DEBUG_VERBOSE,
-                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                  static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
-                  static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
-                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
-                  static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
+          logQuda(
+            QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d shared_carve_out=%d aux=(%d,%d,%d,%d)\n",
+            static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
+            static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
+            static_cast<int>(param.shared_bytes), param.shared_carve_out, static_cast<int>(param.aux.x),
+            static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
           timer.start();
@@ -1121,6 +1265,13 @@ namespace quda
 
     param.n_calls = profile_count ? 1 : 0;
 
+    if (!is_policy) {
+      Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+      Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
+    }
+
+    last_tune_param = param;
+    popVerbosity();
     return param;
   }
 

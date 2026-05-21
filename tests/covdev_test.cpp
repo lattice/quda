@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cassert>
+#include <algorithm>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -9,42 +11,31 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>
-
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <covdev_reference.h>
 #include <gauge_field.h>
+#include <instantiate.h>
+#include <tune_quda.h>
 
-#include <assert.h>
-#include <gtest/gtest.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "covdev_reference.h"
+#include "test.h"
 
 using namespace quda;
 
+const int nColor = 3;
+
 QudaGaugeParam gauge_param;
-QudaInvertParam inv_param;
-
-GaugeField *cpuLink = nullptr;
-
-std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
-std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
-
-std::unique_ptr<ColorSpinorField> tmp;
-
+GaugeField cpuLink;
 void *links[4];
 
-QudaParity parity = QUDA_EVEN_PARITY;
-
-GaugeCovDev *dirac;
-
-const int nColor = 3;
+#include "covdev_test_gtest.hpp"
 
 void init(int argc, char **argv)
 {
-  initQuda(device_ordinal);
-
-  setVerbosity(QUDA_VERBOSE);
+  if (test_type != 0 and test_type != 1) errorQuda("Test type %d is not supported", test_type);
 
   gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -54,20 +45,70 @@ void init(int argc, char **argv)
 
   if (Nsrc != 1) warningQuda("The covariant derivative doesn't support 5-d indexing, only source 0 will be tested");
 
-  inv_param = newQudaInvertParam();
+  // Allocate host side memory for the gauge field.
+  for (int dir = 0; dir < 4; dir++) { links[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size); }
+  constructHostGaugeField(links, gauge_param, argc, argv);
+
+  // cpuLink is only used for ghost allocation
+  GaugeFieldParam cpuParam(gauge_param, links);
+  cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cpuLink = {cpuParam};
+}
+
+void end(void)
+{
+  for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
+  cpuLink = {};
+}
+
+double dslashCUDA(GaugeCovDev &dirac, ColorSpinorField &out, const ColorSpinorField &in, int niter, int mu)
+{
+  device_timer_t timer;
+  timer.start();
+
+  for (int i = 0; i < niter; i++) dirac.MCD(out, in, mu);
+
+  timer.stop();
+  return timer.last();
+}
+
+void covdevRef(ColorSpinorField &out, const ColorSpinorField &in, bool dagger, int mu)
+{
+  // compare to dslash reference implementation
+  printfQuda("Calculating reference implementation...");
+  mat(out, cpuLink, in, dagger, mu);
+  printfQuda("done.\n");
+}
+
+std::array<double, 2> covdev_test(test_t param)
+{
+  QudaPrecision test_prec = ::testing::get<0>(param);
+  QudaDagType test_dagger = ::testing::get<1>(param);
+  int mu = ::testing::get<2>(param);
+
+  printfQuda("Links sending...");
+  gauge_param.cuda_prec = test_prec;
+  gauge_param.cuda_prec_sloppy = test_prec;
+  gauge_param.cuda_prec_precondition = test_prec;
+  gauge_param.cuda_prec_refinement_sloppy = test_prec;
+  gauge_param.cuda_prec_eigensolver = test_prec;
+  loadGaugeQuda(links, &gauge_param);
+  printfQuda("Links sent\n");
+
+  auto inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
+  inv_param.cuda_prec = test_prec;
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   ColorSpinorParam csParam;
   csParam.nColor = nColor;
-  csParam.nSpin = 4;
+  csParam.nSpin = test_type == 0 ? 4 : 1; // use --test 1 for staggered case
   csParam.nDim = 4;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-  //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
-  csParam.setPrecision(inv_param.cpu_prec);
+  csParam.setPrecision(cpu_prec);
   csParam.pad = 0;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.pc_type = QUDA_4D_PC;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -76,193 +117,98 @@ void init(int argc, char **argv)
   csParam.create = QUDA_ZERO_FIELD_CREATE;
   csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  spinor = std::make_unique<ColorSpinorField>(csParam);
-  spinorOut = std::make_unique<ColorSpinorField>(csParam);
-  spinorRef = std::make_unique<ColorSpinorField>(csParam);
+  ColorSpinorField spinor(csParam);
+  ColorSpinorField spinorOut(csParam);
+  ColorSpinorField spinorRef(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gauge_param.X[0];
 
   printfQuda("Randomizing fields ...\n");
-  spinor->Source(QUDA_RANDOM_SOURCE);
-
-  // Allocate host side memory for the gauge field.
-  //----------------------------------------------------------------------------
-  for (int dir = 0; dir < 4; dir++) { links[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size); }
-  constructHostGaugeField(links, gauge_param, argc, argv);
-
-  // cpuLink is only used for ghost allocation
-  GaugeFieldParam cpuParam(gauge_param, links);
-  cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLink = new GaugeField(cpuParam);
-
-  printfQuda("Links sending...");
-  loadGaugeQuda(links, &gauge_param);
-  printfQuda("Links sent\n");
+  spinor.Source(QUDA_RANDOM_SOURCE);
 
   printfQuda("Sending fields to GPU...");
-
-  csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  csParam.setPrecision(test_prec, test_prec, true);
   csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
-  printfQuda("Creating cudaSpinor\n");
-  cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
-
-  printfQuda("Creating cudaSpinorOut\n");
-  cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
+  ColorSpinorField cudaSpinor(csParam);
+  ColorSpinorField cudaSpinorOut(csParam);
 
   printfQuda("Sending spinor field to GPU\n");
-  *cudaSpinor = *spinor;
+  cudaSpinor = spinor;
 
-  auto spinor_norm2 = blas::norm2(*spinor);
-  auto cuda_spinor_norm2 = blas::norm2(*cudaSpinor);
+  auto spinor_norm2 = blas::norm2(spinor);
+  auto cuda_spinor_norm2 = blas::norm2(cudaSpinor);
   printfQuda("Source CPU = %f, CUDA=%f\n", double(spinor_norm2), double(cuda_spinor_norm2));
-
-  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tmp = std::make_unique<ColorSpinorField>(csParam);
 
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
+  GaugeCovDev dirac(diracParam);
 
-  dirac = new GaugeCovDev(diracParam);
+  int muQuda = mu + (test_dagger ? 4 : 0);
+
+  // Reference computation
+  covdevRef(spinorRef, spinor, test_dagger, mu);
+  printfQuda("\n\nChecking muQuda = %d\n", muQuda);
+
+  { // warm-up run
+    printfQuda("Tuning...\n");
+    dslashCUDA(dirac, cudaSpinorOut, cudaSpinor, 1, muQuda);
+  }
+  printfQuda("Executing %d kernel loop(s)...", niter);
+
+  auto flops0 = quda::Tunable::flops_global();
+  double secs = dslashCUDA(dirac, cudaSpinorOut, cudaSpinor, niter, muQuda);
+  auto flops = (quda::Tunable::flops_global() - flops0);
+
+  spinorOut = cudaSpinorOut;
+
+  printfQuda("\n%fms per loop\n", 1000 * secs);
+  printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
+
+  auto spinor_ref_norm2 = blas::norm2(spinorRef);
+  auto spinor_out_norm2 = blas::norm2(spinorOut);
+  auto cuda_spinor_out_norm2 = blas::norm2(cudaSpinorOut);
+  printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muQuda, double(spinor_ref_norm2),
+             double(cuda_spinor_out_norm2), double(spinor_out_norm2));
+
+  auto deviation = pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
+  double tol = getTolerance(test_prec);
+
+  return std::array<double, 2> {deviation, tol};
 }
 
-void end(void)
-{
-  for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
+struct covdev_tester : quda_test {
+  void display_info() const override
+  {
+    quda_test::display_info();
+    printfQuda("S_dimension T_dimension Ls_dimension\n");
+    printfQuda("%3d/%3d/%3d     %3d         %2d\n", xdim, ydim, zdim, tdim, Lsdim);
+  }
 
-  delete dirac;
-  cudaSpinor.reset();
-  cudaSpinorOut.reset();
-  tmp.reset();
-  spinor.reset();
-  spinorOut.reset();
-  spinorRef.reset();
+  covdev_tester(int argc, char **argv) : quda_test("CovDev Test", argc, argv) { }
 
-  if (cpuLink) delete cpuLink;
-
-  endQuda();
-}
-
-double dslashCUDA(int niter, int mu)
-{
-  device_timer_t timer;
-  timer.start();
-
-  for (int i = 0; i < niter; i++) dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
-
-  timer.stop();
-  return timer.last();
-}
-
-void covdevRef(int mu)
-{
-  // compare to dslash reference implementation
-  printfQuda("Calculating reference implementation...");
-#ifdef MULTI_GPU
-  mat_mg4dir(*spinorRef, *cpuLink, *spinor, dagger, mu);
-#else
-  mat(*spinorRef, *cpuLink, *spinor, dagger, mu);
-#endif
-  printfQuda("done.\n");
-}
-
-TEST(dslash, verify)
-{
-  double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol
-    = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-                                                      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
-  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-}
-
-void display_test_info()
-{
-  printfQuda("running the following test:\n");
-
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
-             test_type, dagger, xdim, ydim, zdim, tdim);
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-}
+  void add_command_line_group(std::shared_ptr<QUDAApp> app) const override
+  {
+    quda_test::add_command_line_group(app);
+    add_covdev_option_group(app);
+  }
+};
 
 int main(int argc, char **argv)
 {
-  // initalize google test
-  ::testing::InitGoogleTest(&argc, argv);
-  // return code for google test
-  int test_rc = 0;
-  // command line options
-  auto app = make_app();
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
-
-  initComms(argc, argv, gridsize_from_cmdline);
-
-  // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-
-  display_test_info();
+  covdev_tester test(argc, argv);
+  test.init();
 
   init(argc, argv);
+  int result = 0;
 
-  int attempts = 1;
-  for (int i = 0; i < attempts; i++) {
-
-    // Test forward directions, then backward
-    for (int dag = 0; dag < 2; dag++) {
-      dag == 0 ? dagger = QUDA_DAG_NO : dagger = QUDA_DAG_YES;
-
-      for (int mu = 0; mu < 4; mu++) { // We test all directions in one go
-        int muCuda = mu + (dagger ? 4 : 0);
-        int muCpu = mu * 2 + (dagger ? 1 : 0);
-
-        // Reference computation
-        covdevRef(muCpu);
-        printfQuda("\n\nChecking muQuda = %d\n", muCuda);
-
-        { // warm-up run
-          printfQuda("Tuning...\n");
-          dslashCUDA(1, muCuda);
-        }
-
-        printfQuda("Executing %d kernel loop(s)...", niter);
-
-        double secs = dslashCUDA(niter, muCuda);
-        *spinorOut = *cudaSpinorOut;
-        printfQuda("\n%fms per loop\n", 1000 * secs);
-
-        unsigned long long flops
-          = niter * cudaSpinor->Nspin() * (8 * nColor - 2) * nColor * (long long)cudaSpinor->Volume();
-        printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
-
-        auto spinor_ref_norm2 = blas::norm2(*spinorRef);
-        auto spinor_out_norm2 = blas::norm2(*spinorOut);
-
-        auto cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-        printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, double(spinor_ref_norm2), double(cuda_spinor_out_norm2),
-                   double(spinor_out_norm2));
-
-        if (verify_results) {
-          ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-          if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-
-          test_rc = RUN_ALL_TESTS();
-          if (test_rc != 0) warningQuda("Tests failed");
-        }
-      } // Directions
-    }   // Dagger
+  if (enable_testing) { // tests are defined in invert_test_gtest.hpp
+    result = test.execute();
+  } else { //
+    covdev_test(test_t {prec, dagger ? QUDA_DAG_YES : QUDA_DAG_NO, covdev_mu});
   }
 
   end();
-
-  finalizeComms();
-  return test_rc;
+  return result;
 }

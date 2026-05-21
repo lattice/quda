@@ -33,16 +33,17 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      array<real_t, 3> result{};
+      array<real_t, 3> result {};
       if (!density) {
-        Arg<false> arg(Fmunu, static_cast<Float*>(qdensity));
+        Arg<false> arg(Fmunu, static_cast<Float *>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       } else {
-        Arg<true> arg(Fmunu, static_cast<Float*>(qdensity));
+        Arg<true> arg(Fmunu, static_cast<Float *>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       }
 
-      for (int i=0; i<2; i++) energy[i+1] = result[i] / (Fmunu.Volume() * comm_size());
+      const auto vol = Fmunu.Volume() * comm_size();
+      for (int i = 0; i < 2; i++) energy[i + 1] = result[i] / vol;
       energy[0] = energy[1] + energy[2];
       qcharge = result[2];
     }

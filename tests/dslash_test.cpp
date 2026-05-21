@@ -30,11 +30,15 @@ protected:
       printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
                  grid_partition[3]);
     }
+
+    if (dslash_test_wrapper.test_domain_decomposition) {
+      if (dd_red_black)
+        printfQuda("Testing DD Red Black with block: %d  %d  %d  %d\n", dd_block_size[0], dd_block_size[1],
+                   dd_block_size[2], dd_block_size[3]);
+    }
   }
 
 public:
-  DslashTest() : dslash_test_wrapper(dtest_type) { }
-
   virtual void SetUp()
   {
     dslash_test_wrapper.init_test(argc_copy, argv_copy);
@@ -43,12 +47,20 @@ public:
 
   virtual void TearDown() { dslash_test_wrapper.end(); }
 
-  static void SetUpTestCase() { initQuda(device_ordinal); }
+  static void SetUpTestCase()
+  {
+    initQuda(device_ordinal);
+    DslashTestWrapper::dtest_type = dtest_type;
+  }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
-  static void TearDownTestCase() { endQuda(); }
+  static void TearDownTestCase()
+  {
+    DslashTestWrapper::destroy();
+    endQuda();
+  }
 };
 
 TEST_F(DslashTest, benchmark) { dslash_test_wrapper.run_test(niter, /**show_metrics =*/true); }
@@ -57,7 +69,7 @@ TEST_F(DslashTest, verify)
 {
   if (!verify_results) GTEST_SKIP();
 
-  dslash_test_wrapper.dslashRef();
+  if (not dslash_test_wrapper.test_domain_decomposition) dslash_test_wrapper.dslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();
@@ -65,10 +77,10 @@ TEST_F(DslashTest, verify)
   // If we are using tensor core we tolerate a greater deviation
   if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dslash_test_wrapper.dtest_type == dslash_test_type::MatPCDagMatPCLocal)
     tol *= 10;
-  if (dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_8
-      && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
-    tol *= 10; // if recon 8, we tolerate a greater deviation
 
+  ASSERT_FALSE(std::isnan(deviation)) << "Nan has propagated into the result";
+  tol = checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec,
+                                     dslash_test_wrapper.gauge_param.reconstruct);
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
@@ -83,6 +95,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   add_eofa_option_group(app);
+  add_dd_option_group(app);
   add_comms_option_group(app);
 
   try {

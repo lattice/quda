@@ -1,4 +1,3 @@
-#include <complex_quda.h>
 #include <gauge_field.h>
 #include <gauge_tools.h>
 #include <gauge_path_quda.h>
@@ -13,23 +12,31 @@ namespace quda
       int *num_failures_h = static_cast<int *>(pool_pinned_malloc(sizeof(int)));
       int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
       *num_failures_h = 0;
-      auto tol = u.Precision() == QUDA_DOUBLE_PRECISION ? 1e-14 : 1e-6;
+      auto tol = u.toleranceSU3();
       projectSU3(u, tol, num_failures_d);
       if (*num_failures_h > 0) errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
       pool_pinned_free(num_failures_h);
     }
 
-    if (param.compute_plaquette) {
+    if (param.compute_rectangle) {
+      auto plqrct = plaquetteRectangle(u);
+      param.plaquette[0] = static_cast<double>(0.5 * (plqrct[0] + plqrct[1]));
+      param.plaquette[1] = static_cast<double>(plqrct[0]);
+      param.plaquette[2] = static_cast<double>(plqrct[1]);
+      param.rectangle[0] = static_cast<double>(0.5 * (plqrct[2] + plqrct[3]));
+      param.rectangle[1] = static_cast<double>(plqrct[2]);
+      param.rectangle[2] = static_cast<double>(plqrct[3]);
+    } else if (param.compute_plaquette) {
       auto plaq = plaquette(u);
-      param.plaquette[0] = double(plaq[0]);
-      param.plaquette[1] = double(plaq[1]);
-      param.plaquette[2] = double(plaq[2]);
+      param.plaquette[0] = static_cast<double>(plaq[0]);
+      param.plaquette[1] = static_cast<double>(plaq[1]);
+      param.plaquette[2] = static_cast<double>(plaq[2]);
     }
 
     if (param.compute_polyakov_loop) {
       auto ploop = gaugePolyakovLoop(u, 3, profile);
-      param.ploop[0] = double(ploop[0]);
-      param.ploop[1] = double(ploop[1]);
+      param.ploop[0] = static_cast<double>(ploop[0]);
+      param.ploop[1] = static_cast<double>(ploop[1]);
     }
 
     if (param.compute_gauge_loop_trace) {
@@ -53,8 +60,9 @@ namespace quda
                      param.max_length);
 
       for (int i = 0; i < param.num_paths; i++) {
-        complex<double> lt = loop_traces[i];
-        memcpy(&param.traces[i], &lt, sizeof(complex<double>));
+        auto &z = loop_traces[i];
+        __real__(param.traces[i]) = to_double(std::real(z));
+        __imag__(param.traces[i]) = to_double(std::imag(z));
       }
     }
 
@@ -68,7 +76,7 @@ namespace quda
     GaugeFieldParam tensorParam(x, u.Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
     tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
     tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+    tensorParam.order = QUDA_NATIVE_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     GaugeField gaugeFmunu(tensorParam);
 
@@ -88,8 +96,8 @@ namespace quda
         qcharge = computeQChargeDensity(energy, d_qDensity, gaugeFmunu);
       else
         qcharge = computeQCharge(energy, gaugeFmunu);
-      for (int i = 0; i < 3; i++) param.energy[i] = double(energy[i]);
-      param.qcharge = double(qcharge);
+      for (int i = 0; i < 3; i++) param.energy[i] = static_cast<double>(energy[i]);
+      param.qcharge = static_cast<double>(qcharge);
 
       if (param.compute_qcharge_density) {
         profile.TPSTART(QUDA_PROFILE_D2H);

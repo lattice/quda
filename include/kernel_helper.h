@@ -14,13 +14,19 @@ namespace quda
 
   enum class use_kernel_arg_p { FALSE, TRUE, ALWAYS };
 
-  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE> struct kernel_param {
+  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE, bool check_bounds_ = true> struct kernel_param {
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
+    static constexpr bool check_bounds = check_bounds_;
+    static constexpr int max_regs = 0;          // by default we don't limit register count
+    static constexpr bool spill_shared = false; // whether a given kernel should use shared memory spilling
+    static constexpr bool is_dslash = false;    // whether the arg is for a dslash (with its nested arg struct)
     dim3 threads;          /** number of active threads required */
+    int block_size;        /** product of thread block dimensions */
     int comms_rank;        /** per process value of comm_rank() */
     int comms_rank_global; /** per process value comm_rank_global() */
     int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */
     int comms_dim[4];      /** array storing {comm_dim(0), ..., comm_dim(3)} */
+    int comms_dim_partitioned[4]; /** array storing {comm_dim_partitioned(0), ..., comm_dim_partiitoned(3)} */
 
     constexpr kernel_param() = default;
 
@@ -29,7 +35,9 @@ namespace quda
       comms_rank(comm_rank()),
       comms_rank_global(comm_rank_global()),
       comms_coord {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)},
-      comms_dim {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)}
+      comms_dim {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)},
+      comms_dim_partitioned {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2),
+                             comm_dim_partitioned(3)}
     {
     }
 

@@ -71,20 +71,21 @@ TEST_P(BLASTest, verify)
   switch (test_type) {
   case QUDA_BLAS_GEMM: {
     auto deviation_gemm = gemm_test(param);
-    decltype(deviation_gemm) tol_gemm;
+    decltype(deviation_gemm) tol_gemm = 0.0; // initialize to suppress warning
     switch (data_type) {
     case QUDA_BLAS_DATATYPE_S:
     case QUDA_BLAS_DATATYPE_C: tol_gemm = 10 * std::numeric_limits<float>::epsilon(); break;
     case QUDA_BLAS_DATATYPE_D:
     case QUDA_BLAS_DATATYPE_Z: tol_gemm = 10 * std::numeric_limits<double>::epsilon(); break;
-    default: errorQuda("Unexpected BLAS data type %d", data_type);
+    default: ASSERT_TRUE(false) << "Unexpected BLAS data type " << data_type;
     }
+    ASSERT_FALSE(std::isnan(deviation_gemm)) << "Nan has propagated into the result";
     EXPECT_LE(deviation_gemm, tol_gemm) << "CPU and CUDA GEMM implementations do not agree";
     break;
   }
   case QUDA_BLAS_LU_INV: {
     auto deviation_lu_inv = lu_inv_test(param);
-    decltype(deviation_lu_inv) tol_lu_inv;
+    decltype(deviation_lu_inv) tol_lu_inv = 0.0; // initialize to suppress warning
     // We allow a factor of 5000 (500x more than the gemm tolerance factor)
     // due to variations in algorithmic implementation, order of arithmetic
     // operations, and possible near singular eigenvalues or degeneracies.
@@ -93,12 +94,13 @@ TEST_P(BLASTest, verify)
     case QUDA_BLAS_DATATYPE_Z: tol_lu_inv = 5000 * std::numeric_limits<double>::epsilon(); break;
     case QUDA_BLAS_DATATYPE_S:
     case QUDA_BLAS_DATATYPE_D:
-    default: errorQuda("Unexpected BLAS data type %d", data_type);
+    default: ASSERT_TRUE(false) << "Unexpected BLAS data type " << data_type;
     }
+    ASSERT_FALSE(std::isnan(deviation_lu_inv)) << "Nan has propagated into the result";
     EXPECT_LE(deviation_lu_inv, tol_lu_inv) << "CPU and CUDA LU Inversion implementations do not agree";
     break;
   }
-  default: errorQuda("Unexpected BLAS test type %d", test_type);
+  default: ASSERT_TRUE(false) << "Unexpected BLAS test type " << test_type;
   }
 }
 

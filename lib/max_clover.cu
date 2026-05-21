@@ -29,8 +29,7 @@ namespace quda {
   real_t norm(const CloverField &u, bool inverse, norm_type_ type) {
     real_t norm_ = 0.0;
     switch (u.Order()) {
-    case QUDA_FLOAT2_CLOVER_ORDER: norm_ = norm<real,Nc,QUDA_FLOAT2_CLOVER_ORDER>(u, inverse, type); break;
-    case QUDA_FLOAT4_CLOVER_ORDER: norm_ = norm<real,Nc,QUDA_FLOAT4_CLOVER_ORDER>(u, inverse, type); break;
+    case QUDA_NATIVE_CLOVER_ORDER: norm_ = norm<real, Nc, QUDA_NATIVE_CLOVER_ORDER>(u, inverse, type); break;
     case QUDA_PACKED_CLOVER_ORDER: norm_ = norm<real,Nc,QUDA_PACKED_CLOVER_ORDER>(u, inverse, type); break;
     default: errorQuda("Clover field %d order not supported", u.Order());
     }

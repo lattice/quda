@@ -331,9 +331,10 @@ namespace quda {
       ghost_pinned_send_buffer_hd[b] = nullptr;
     }
     initGhostFaceBuffer = false;
+    ghostFaceBytes = 0;
   }
 
-  void LatticeField::createComms(bool no_comms_fill)
+  void LatticeField::createComms(bool no_comms_fill) const
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -394,7 +395,7 @@ namespace quda {
     initComms = true;
   }
 
-  void LatticeField::destroyComms()
+  void LatticeField::destroyComms() const
   {
     if (Location() != QUDA_CUDA_FIELD_LOCATION) return;
 
@@ -444,7 +445,7 @@ namespace quda {
 
   }
 
-  void LatticeField::createIPCComms()
+  void LatticeField::createIPCComms() const
   {
     if ( initIPCComms && !ghost_field_reset ) return;
 
@@ -458,6 +459,10 @@ namespace quda {
       // get remote events
       comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
     }
+
+    // zero the host-side signaling buffers
+    buffer_send_p2p = {};
+    buffer_recv_p2p = {};
 
     // Create message handles for IPC synchronization
     for (int dim = 0; dim < 4; ++dim) {
@@ -549,7 +554,8 @@ namespace quda {
     for (int d = 1; d < nDim; d++) vol_ss << "x" << x[d];
     vol_string = vol_ss.str();
     if (vol_string.size() >= TuneKey::volume_n)
-      errorQuda("Vol string %s (size = %lu) larger than maximum %d", vol_string.c_str(), vol_string.size(), TuneKey::volume_n);
+      errorQuda("Vol string %s (size = %lu) larger than maximum %d", vol_string.c_str(), vol_string.size(),
+                TuneKey::volume_n);
   }
 
   void LatticeField::checkField(const LatticeField &a) const {
@@ -613,18 +619,68 @@ namespace quda {
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param)
   {
     output << "nDim = " << param.nDim << std::endl;
-    for (int i = 0; i < param.nDim; i++) { output << "x[" << i << "] = " << param.x[i] << std::endl; }
+    output << "x = " << param.x << std::endl;
     output << "pad = " << param.pad << std::endl;
     output << "precision = " << param.Precision() << std::endl;
     output << "ghost_precision = " << param.GhostPrecision() << std::endl;
-    output << "scale = " << double(param.scale) << std::endl;
-
+    output << "scale = " << param.scale << std::endl;
     output << "ghostExchange = " << param.ghostExchange << std::endl;
-    for (int i=0; i<param.nDim; i++) {
-      output << "r[" << i << "] = " << param.r[i] << std::endl;
-    }
-
+    output << "r = " << param.r << std::endl;
     return output;  // for multiple << operators.
+  }
+
+  std::ostream &operator<<(std::ostream &output, const LatticeField &field)
+  {
+    output << "volume = " << field.volume << std::endl;
+    output << "volumeCB = " << field.volumeCB << std::endl;
+    output << "localVolume = " << field.localVolume << std::endl;
+    output << "localVolumeCB = " << field.localVolumeCB << std::endl;
+    output << "stride = " << field.stride << std::endl;
+    output << "pad = " << field.pad << std::endl;
+    output << "total_bytes = " << field.total_bytes << std::endl;
+    output << "nDim = " << field.nDim << std::endl;
+    output << "x = " << field.x << std::endl;
+    output << "r = " << field.r << std::endl;
+    output << "local_x = " << field.local_x << std::endl;
+    output << "surface = " << field.surface << std::endl;
+    output << "surfaceCB = " << field.surfaceCB << std::endl;
+    output << "local_surface = " << field.local_surface << std::endl;
+    output << "local_surfaceCB = " << field.local_surfaceCB << std::endl;
+    output << "location = " << field.location << std::endl;
+    output << "precision = " << field.precision << std::endl;
+    output << "ghost_precision = " << field.ghost_precision_reset << std::endl;
+    output << "scale = " << field.scale << std::endl;
+    output << "siteSubset = " << field.siteSubset << std::endl;
+    output << "ghostExchange = " << field.ghostExchange << std::endl;
+    output << "nDimComms = " << field.nDimComms << std::endl;
+    output << "ghost_bytes = " << field.ghost_bytes_old << std::endl;
+    output << "ghost_bytes_old = " << field.ghost_bytes_old << std::endl;
+    output << "ghost_face_bytes = " << field.ghost_face_bytes << std::endl;
+    output << "ghost_face_bytes_aligned = " << field.ghost_face_bytes_aligned << std::endl;
+    output << "ghost_offset = " << field.ghost_offset << std::endl;
+    output << "my_face_h = " << field.my_face_h << std::endl;
+    output << "my_face_hd = " << field.my_face_hd << std::endl;
+    output << "my_face_d = " << field.my_face_d << std::endl;
+    output << "my_face_dim_dir_h = " << field.my_face_dim_dir_h << std::endl;
+    output << "my_face_dim_dir_hd = " << field.my_face_dim_dir_hd << std::endl;
+    output << "my_face_dim_dir_d = " << field.my_face_dim_dir_d << std::endl;
+    output << "from_face_h = " << field.from_face_h << std::endl;
+    output << "from_face_hd = " << field.from_face_hd << std::endl;
+    output << "from_face_d = " << field.from_face_d << std::endl;
+    output << "from_face_dim_dir_h = " << field.from_face_dim_dir_h << std::endl;
+    output << "from_face_dim_dir_hd = " << field.from_face_dim_dir_hd << std::endl;
+    output << "from_face_dim_dir_d = " << field.from_face_dim_dir_d << std::endl;
+    output << "mh_recv = " << field.mh_recv << std::endl;
+    output << "mh_send = " << field.mh_send << std::endl;
+    output << "mh_recv_rdma = " << field.mh_recv_rdma << std::endl;
+    output << "mh_send_rdma = " << field.mh_send_rdma << std::endl;
+    output << "initComms = " << field.initComms << std::endl;
+    output << "vol_string = " << field.vol_string << std::endl;
+    output << "aux_string = " << field.aux_string << std::endl;
+    output << "mem_type = " << field.mem_type << std::endl;
+    for (auto i = 0u; i < field.backup_h.size(); i++)
+      output << "backup_h[" << i << "] = " << field.backup_h[i] << std::endl;
+    return output;
   }
 
   static QudaFieldLocation reorder_location_ = QUDA_CUDA_FIELD_LOCATION;

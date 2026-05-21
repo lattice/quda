@@ -26,11 +26,11 @@ namespace quda {
     static constexpr bool inverse = inverse_;
     static constexpr bool dynamic_clover = clover::dynamic_inverse();
 
-    typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
-    typedef typename clover_mapper<Float,length>::type C;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, false, false, true>::type F;
+    typedef typename clover_mapper<Float, length>::type C;
 
-    F out;                // output vector field
-    const F in;           // input vector field
+    F out[MAX_MULTI_RHS]; // output vector field
+    F in[MAX_MULTI_RHS];  // input vector field
     const C clover;       // clover field
     const C cloverInv;    // inverse clover field (only set if not dynamic clover and doing twisted clover)
     const int nParity;    // number of parities we're working on
@@ -42,18 +42,27 @@ namespace quda {
     real a2_minus_b2;
     QudaTwistGamma5Type twist;
 
-    CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-	      int parity, real_t kappa=0.0, real_t mu=0.0, real_t epsilon = 0.0,
-	      bool dagger = false, QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
-      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB()/2 : in.VolumeCB(),
-                        in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? 2 : 1, in.SiteSubset())),
-      out(out), in(in),
-      clover(clover, inverse && !dynamic_clover && twist == QUDA_TWIST_GAMMA5_INVALID), // only inverse if non-twisted clover and !dynamic
-      cloverInv(clover, !dynamic_clover), // only inverse if !dynamic
-      nParity(in.SiteSubset()), parity(parity),
+    CloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const CloverField &clover,
+              int parity, real kappa = 0.0, real mu = 0.0, real epsilon = 0.0, bool dagger = false,
+              QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
+      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(),
+                        in.size() * (in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? 2 : 1), in.SiteSubset())),
+      clover(clover,
+             inverse && !dynamic_clover
+               && twist == QUDA_TWIST_GAMMA5_INVALID), // only inverse if non-twisted clover and !dynamic
+      cloverInv(clover, !dynamic_clover),              // only inverse if !dynamic
+      nParity(in.SiteSubset()),
+      parity(parity),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), twist(twist)
+      volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB()),
+      a(0.0),
+      b(0.0),
+      twist(twist)
     {
+      for (auto i = 0u; i < out.size(); i++) {
+        this->out[i] = out[i];
+        this->in[i] = in[i];
+      }
       checkPrecision(out, in, clover);
       checkLocation(out, in, clover);
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
@@ -92,12 +101,12 @@ namespace quda {
     constexpr CloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_idx, int parity)
     {
       using namespace linalg; // for Cholesky
       int clover_parity = arg.nParity == 2 ? parity : arg.parity;
       int spinor_parity = arg.nParity == 2 ? parity : 0;
-      fermion in = arg.in(x_cb, spinor_parity);
+      fermion in = arg.in[src_idx](x_cb, spinor_parity);
       fermion out;
 
       in.toRel(); // change to chiral basis here
@@ -118,7 +127,7 @@ namespace quda {
       }
 
       out.toNonRel(); // change basis back
-      arg.out(x_cb, spinor_parity) = out;
+      arg.out[src_idx](x_cb, spinor_parity) = out;
     }
   };
 
@@ -135,12 +144,12 @@ namespace quda {
     constexpr TwistCloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_idx, int parity)
     {
       using namespace linalg; // for Cholesky
       int clover_parity = arg.nParity == 2 ? parity : arg.parity;
       int spinor_parity = arg.nParity == 2 ? parity : 0;
-      fermion in = arg.in(x_cb, spinor_parity);
+      fermion in = arg.in[src_idx](x_cb, spinor_parity);
       fermion out;
 
       in.toRel(); // change to chiral basis here
@@ -169,32 +178,43 @@ namespace quda {
       }
 
       out.toNonRel(); // change basis back
-      arg.out(x_cb, spinor_parity) = out;
+      arg.out[src_idx](x_cb, spinor_parity) = out;
     }
   };
-  
+
+  template <typename Arg>
+  using NdegTwistCloverApplyOps
+    = KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>>>;
+
   // if (!inverse) apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1) to the input spinor
   // else apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1)/(Clover^2 + a^2 - b^2) to the input spinor
   // noting that appropriate signs are carried by a and b depending on inverse
-  template <typename Arg> struct NdegTwistCloverApply {
+  template <typename Arg> struct NdegTwistCloverApply : NdegTwistCloverApplyOps<Arg> {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     using Mat = HMatrix<typename Arg::real, N>;
     const Arg &arg;
-    constexpr NdegTwistCloverApply(const Arg &arg) : arg(arg) {}
+    using typename NdegTwistCloverApplyOps<Arg>::KernelOpsT;
+    template <typename... Ops>
+    constexpr NdegTwistCloverApply(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int flavor, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_flavor, int parity)
     {
       using namespace linalg; // for Cholesky
       const int clover_parity = arg.nParity == 2 ? parity : arg.parity;
       const int spinor_parity = arg.nParity == 2 ? parity : 0;
       constexpr int n_flavor = 2;
 
+      const int src_idx = src_flavor / 2;
+      const int flavor = src_flavor % 2;
+
       int my_flavor_idx = x_cb + flavor * arg.volumeCB;
-      fermion in = arg.in(my_flavor_idx, spinor_parity);
+      fermion in = arg.in[src_idx](my_flavor_idx, spinor_parity);
       in.toRel(); // change to chiral basis here
 
       int chirality = flavor; // relabel flavor as chirality
@@ -203,26 +223,25 @@ namespace quda {
 
       Mat A = arg.clover(x_cb, clover_parity, chirality);
 
-      SharedMemoryCache<half_fermion> cache(target::block_dim());
+      SharedMemoryCache<half_fermion> cache {*this};
 
       half_fermion in_chi[n_flavor]; // flavor array of chirally projected fermion
 #pragma unroll
       for (int i = 0; i < n_flavor; i++) in_chi[i] = in.chiral_project(i);
 
-      enum swizzle_direction {
-        FORWARDS = 0,
-        BACKWARDS = 1
-      };
-
-      auto swizzle = [&](half_fermion x[2], int chirality, swizzle_direction dir) {
-        if (chirality == 0) cache.save_y(x[1], dir);
-        else                cache.save_y(x[0], 1 - dir);
+      auto swizzle = [&](half_fermion x[2], int chirality) {
+        if (chirality == 0)
+          cache.save_y(x[1], target::thread_idx().y);
+        else
+          cache.save_y(x[0], target::thread_idx().y);
         cache.sync();
-        if (chirality == 0) x[1] = cache.load_y(1 - dir);
-        else                x[0] = cache.load_y(dir);
+        if (chirality == 0)
+          x[1] = cache.load_y(target::thread_idx().y + 1);
+        else
+          x[0] = cache.load_y(target::thread_idx().y - 1);
       };
 
-      swizzle(in_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads
+      swizzle(in_chi, chirality); // apply the flavor-chirality swizzle between threads
 
       half_fermion out_chi[n_flavor];
 #pragma unroll
@@ -248,12 +267,11 @@ namespace quda {
         }
       }
 
-      swizzle(out_chi, chirality, BACKWARDS); // undo the flavor-chirality swizzle
+      swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
       fermion out = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
       out.toNonRel(); // change basis back
 
-      arg.out(my_flavor_idx, spinor_parity) = out;
+      arg.out[src_idx](my_flavor_idx, spinor_parity) = out;
     }
   };
-
 }

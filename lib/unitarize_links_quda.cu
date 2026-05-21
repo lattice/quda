@@ -62,18 +62,18 @@ namespace quda {
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
           copyArrayToLink(inlink, infield.data<float *>() + (i * 4 + dir) * 18); // order of arguments?
           unitarizeLinkNewton(outlink, inlink, max_iter_newton);
-	  copyLinkToArray(outfield.data<float *>() + (i * 4 + dir) * 18, outlink);
-	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(inlink, infield.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
+          copyLinkToArray(outfield.data<float *>() + (i * 4 + dir) * 18, outlink);
+        } else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyArrayToLink(inlink, infield.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
           unitarizeLinkNewton(outlink, inlink, max_iter_newton);
-	  copyLinkToArray(outfield.data<double*>() + (i * 4 + dir) * 18, outlink);
-	} // precision?
+          copyLinkToArray(outfield.data<double *>() + (i * 4 + dir) * 18, outlink);
+        } // precision?
       } // dir
     }   // loop over volume
   }
 
   // CPU function which checks that the gauge field is unitary
-  bool isUnitary(const GaugeField& field, real_t max_error)
+  bool isUnitary(const GaugeField& field, double max_error)
   {
     if (field.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     Matrix<complex<double>,3> link, identity;
@@ -85,9 +85,9 @@ namespace quda {
         } else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
           copyArrayToLink(link, field.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
         } else {
-	  errorQuda("Unsupported precision\n");
-	}
-	if (link.isUnitary(double(max_error)) == false) {
+          errorQuda("Unsupported precision\n");
+        }
+        if (link.isUnitary(max_error) == false) {
 	  printf("Unitarity failure\n");
 	  printf("site index = %u,\t direction = %d\n", i, dir);
 	  printLink(link);
@@ -157,7 +157,7 @@ namespace quda {
     unsigned int minThreads() const { return u.VolumeCB(); }
 
   public:
-    ProjectSU3(GaugeField &u, real_t tol, int *fails) :
+    ProjectSU3(GaugeField &u, double tol, int *fails) :
       TunableKernel3D(u, 2, 4),
       u(u),
       tol(tol),

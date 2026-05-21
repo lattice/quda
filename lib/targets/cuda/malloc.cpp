@@ -774,6 +774,7 @@ namespace quda
 
     void flush_pinned()
     {
+      logQuda(QUDA_DEBUG_VERBOSE, "Flushing host pinned memory pool\n");
       if (pinned_memory_pool) {
         for (auto it : pinnedCache) { host_free(it.second); }
         pinnedCache.clear();
@@ -782,6 +783,7 @@ namespace quda
 
     void flush_device()
     {
+      logQuda(QUDA_DEBUG_VERBOSE, "Flushing device memory pool\n");
       if (device_memory_pool) {
         for (auto it : deviceCache) { device_free(it.second); }
         deviceCache.clear();

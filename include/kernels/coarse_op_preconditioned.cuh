@@ -4,12 +4,14 @@
 #include <index_helper.cuh>
 #include <matrix_tile.cuh>
 #include <kernel.h>
+#include <math_helper.h>
 
 namespace quda {
 
-  template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_, bool compute_max_>
+  template <typename Float_, typename store_t_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_, bool compute_max_>
   struct CalculateYhatArg : kernel_param<> {
     using Float = Float_;
+    using store_t = store_t_;
     using yhatTileType = TileSize<n_, n_, n_, M_, N_, 1>;
     yhatTileType tile;
 
@@ -113,7 +115,7 @@ namespace quda {
         yHat.mma_nn(X, Y);
       }
       if constexpr (Arg::compute_max) {
-        yHatMax = fmax(yHatMax, yHat.abs_max());
+        yHatMax = max(yHatMax, yHat.abs_max());
       } else {
         yHat.save(arg.Yhat, d + 4, parity, x_cb, i0, j0);
       }

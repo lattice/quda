@@ -22,29 +22,30 @@ namespace quda
        @tparam Functor_ Functor used to operate on data
     */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
-    struct BlasArg : kernel_param<Functor_::use_kernel_arg> {
+    struct BlasArg : kernel_param<> {
       using real = real_;
       using Functor = Functor_;
       static constexpr int n = n_;
-      Spinor<store_t, N> X;
-      Spinor<y_store_t, Ny> Y;
-      Spinor<store_t, N> Z;
-      Spinor<store_t, N> W;
-      Spinor<y_store_t, Ny> V;
+      Spinor<store_t, N> X[MAX_MULTI_RHS];
+      Spinor<y_store_t, Ny> Y[MAX_MULTI_RHS];
+      Spinor<store_t, N> Z[MAX_MULTI_RHS];
+      Spinor<store_t, N> W[MAX_MULTI_RHS];
+      Spinor<y_store_t, Ny> V[MAX_MULTI_RHS];
       Functor f;
 
       const int nParity;
-      BlasArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
-              ColorSpinorField &v, Functor f, int length, int nParity) :
-        kernel_param<Functor::use_kernel_arg>(dim3(length, nParity, 1)),
-        X(x),
-        Y(y),
-        Z(z),
-        W(w),
-        V(v),
-        f(f),
-        nParity(nParity)
-      { ; }
+      BlasArg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+              cvector_ref<ColorSpinorField> &w, cvector_ref<ColorSpinorField> &v, Functor f, int length, int nParity) :
+        kernel_param(dim3(length, x.size(), nParity)), f(f), nParity(nParity)
+      {
+        for (auto i = 0u; i < x.size(); i++) {
+          X[i] = x[i];
+          Y[i] = y[i];
+          Z[i] = z[i];
+          W[i] = w[i];
+          V[i] = v[i];
+        }
+      }
     };
 
     /**
@@ -54,41 +55,38 @@ namespace quda
       Arg &arg;
       constexpr Blas_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
-        // The safety of making the arg non-const (required for caxpyxmazMR) is guaranteed
-        // by settting `use_kernel_arg = use_kernel_arg_p::ALWAYS` inside the functor.
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int i, int parity) const
+      __device__ __host__ inline void operator()(int i, int src_idx, int parity) const
       {
         using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
-        arg.f.init();
+        arg.f.init(src_idx);
 
         vec x, y, z, w, v;
-        if (arg.f.read.X) arg.X.load(x, i, parity);
-        if (arg.f.read.Y) arg.Y.load(y, i, parity);
-        if (arg.f.read.Z) arg.Z.load(z, i, parity);
-        if (arg.f.read.W) arg.W.load(w, i, parity);
-        if (arg.f.read.V) arg.V.load(v, i, parity);
+        if (arg.f.read.X) arg.X[src_idx].load(x, i, parity);
+        if (arg.f.read.Y) arg.Y[src_idx].load(y, i, parity);
+        if (arg.f.read.Z) arg.Z[src_idx].load(z, i, parity);
+        if (arg.f.read.W) arg.W[src_idx].load(w, i, parity);
+        if (arg.f.read.V) arg.V[src_idx].load(v, i, parity);
 
-        arg.f(x, y, z, w, v);
+        arg.f(x, y, z, w, v, src_idx);
 
-        if (arg.f.write.X) arg.X.save(x, i, parity);
-        if (arg.f.write.Y) arg.Y.save(y, i, parity);
-        if (arg.f.write.Z) arg.Z.save(z, i, parity);
-        if (arg.f.write.W) arg.W.save(w, i, parity);
-        if (arg.f.write.V) arg.V.save(v, i, parity);
+        if (arg.f.write.X) arg.X[src_idx].save(x, i, parity);
+        if (arg.f.write.Y) arg.Y[src_idx].save(y, i, parity);
+        if (arg.f.write.Z) arg.Z[src_idx].save(z, i, parity);
+        if (arg.f.write.W) arg.W[src_idx].save(w, i, parity);
+        if (arg.f.write.V) arg.V[src_idx].save(v, i, parity);
       }
     };
 
     /**
        Base class from which all blas functors should derive
-     */
+    */
     struct BlasFunctor {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       //! pre-computation routine before the main loop
-      __device__ __host__ void init() const { ; }
+      __device__ __host__ void init(int) const { }
     };
 
     /**
@@ -97,13 +95,19 @@ namespace quda
     template <typename real> struct axpbyz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 0, 0, 0> read{ };
       static constexpr memory_access<0, 0, 0, 0, 1> write{ };
-      const real a;
-      const real b;
-      axpbyz_(const real_t &a, const real_t &b, const real_t &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &v) const
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
+
+      axpbyz_(cvector<real_t> &a, cvector<real_t> &b, cvector<real_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      }
+
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &v, int j) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) v[i] = a * x[i] + b * y[i];
+        for (int i = 0; i < x.size(); i++) v[i] = a[j] * x[i] + b[j] * y[i];
       }                                  // use v not z to ensure same precision as y
       constexpr int flops() const { return 3; }   //! flops per element
     };
@@ -114,14 +118,18 @@ namespace quda
     template <typename real> struct axy_ : public BlasFunctor {
       static constexpr memory_access<1, 0> read{ };
       static constexpr memory_access<0, 1> write{ };
-      const real a;
-      axy_(const real_t &a, const real_t &, const real_t &) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      axy_(cvector<complex_t> &a, cvector<complex_t> &, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+      }
+
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &, int j) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) y[i] = a * x[i];
+        for (int i = 0; i < x.size(); i++) y[i] = a[j] * x[i];
       }
-      constexpr int flops() const { return 1; }   //! flops per element
+      constexpr int flops() const { return 3; } //! flops per element
     };
 
     /**
@@ -130,12 +138,15 @@ namespace quda
     template <typename real> struct caxpy_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      const complex<real> a;
-      caxpy_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      caxpy_(cvector<complex_t> &a, cvector<complex_t> &, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &, int j) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) y[i] = cmac(a, x[i], y[i]);
+        for (int i = 0; i < x.size(); i++) y[i] = cmac(a[j], x[i], y[i]);
       }
       constexpr int flops() const { return 4; }   //! flops per element
     };
@@ -162,13 +173,17 @@ namespace quda
     template <typename real> struct caxpby_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      const complex<real> a;
-      const complex<real> b;
-      caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
+      caxpby_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < a.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &, int j) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) _caxpby(a, x[i], b, y[i]);
+        for (int i = 0; i < x.size(); i++) _caxpby(a[j], x[i], b[j], y[i]);
       }
       constexpr int flops() const { return 7; }   //! flops per element
     };
@@ -179,16 +194,19 @@ namespace quda
     template <typename real> struct axpbypczw_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 0, 0, 1> write{ };
-      const real a;
-      const real b;
-      const real c;
-      axpbypczw_(const real_t &a, const real_t &b, const real_t &c) : a(a), b(b), c(c) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
+      real c[MAX_MULTI_RHS] = {};
+      axpbypczw_(cvector<real_t> &a, cvector<real_t> &b, cvector<real_t> &c)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+        for (auto i = 0u; i < c.size(); i++) this->c[i] = c[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &, int j) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          w[i] = a * x[i] + b * y[i] + c * z[i];
-        }
+        for (int i = 0; i < x.size(); i++) { w[i] = a[j] * x[i] + b[j] * y[i] + c[j] * z[i]; }
       }
       constexpr int flops() const { return 5; }   //! flops per element
     };
@@ -199,16 +217,21 @@ namespace quda
     template <typename real> struct axpyBzpcx_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      const real a;
-      const real b;
-      const real c;
-      axpyBzpcx_(const real_t &a, const real_t &b, const real_t &c) : a(a), b(b), c(c) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
+      real c[MAX_MULTI_RHS] = {};
+      axpyBzpcx_(cvector<real_t> &a, cvector<real_t> &b, cvector<real_t> &c)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+        for (auto i = 0u; i < c.size(); i++) this->c[i] = c[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] += a * x[i];
-          x[i] = b * z[i] + c * x[i];
+          y[i] += a[j] * x[i];
+          x[i] = b[j] * z[i] + c[j] * x[i];
         }
       }
       constexpr int flops() const { return 5; }   //! flops per element
@@ -220,15 +243,19 @@ namespace quda
     template <typename real> struct axpyZpbx_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      const real a;
-      const real b;
-      axpyZpbx_(const real_t &a, const real_t &b, const real_t &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
+      axpyZpbx_(cvector<real_t> &a, cvector<real_t> &b, cvector<real_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] += a * x[i];
-          x[i] = z[i] + b * x[i];
+          y[i] += a[j] * x[i];
+          x[i] = z[i] + b[j] * x[i];
         }
       }
       constexpr int flops() const { return 4; }   //! flops per element
@@ -240,14 +267,18 @@ namespace quda
     template <typename real> struct cxpaypbz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 0, 1> write{ };
-      const complex<real> a;
-      const complex<real> b;
-      cxpaypbz_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
+      cxpaypbz_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          _caxpby(a, y[i], b, z[i]);
+          _caxpby(a[j], y[i], b[j], z[i]);
           z[i] += x[i];
         }
       }
@@ -260,15 +291,19 @@ namespace quda
     template <typename real> struct caxpyBzpx_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      const complex<real> a;
-      const complex<real> b;
-      caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
+      caxpyBzpx_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] = cmac(a, x[i], y[i]);
-          x[i] = cmac(b, z[i], x[i]);
+          y[i] = cmac(a[j], x[i], y[i]);
+          x[i] = cmac(b[j], z[i], x[i]);
         }
       }
       constexpr int flops() const { return 8; }   //! flops per element
@@ -280,15 +315,19 @@ namespace quda
     template <typename real> struct caxpyBxpz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
-      const complex<real> a;
-      const complex<real> b;
-      caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
+      caxpyBxpz_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] = cmac(a, x[i], y[i]);
-          z[i] = cmac(b, x[i], z[i]);
+          y[i] = cmac(a[j], x[i], y[i]);
+          z[i] = cmac(b[j], x[i], z[i]);
         }
       }
       constexpr int flops() const { return 8; }   //! flops per element
@@ -300,16 +339,20 @@ namespace quda
     template <typename real> struct caxpbypzYmbw_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
-      const complex<real> a;
-      const complex<real> b;
-      caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
+      caxpbypzYmbw_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          z[i] = cmac(a, x[i], z[i]);
-          z[i] = cmac(b, y[i], z[i]);
-          y[i] = cmac(-b, w[i], y[i]);
+          z[i] = cmac(a[j], x[i], z[i]);
+          z[i] = cmac(b[j], y[i], z[i]);
+          y[i] = cmac(-b[j], w[i], y[i]);
         }
       }
       constexpr int flops() const { return 12; }  //! flops per element
@@ -321,77 +364,96 @@ namespace quda
     template <typename real> struct cabxpyAx_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      const real a;
-      const complex<real> b;
-      cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a.real()), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
+      real a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
+      cabxpyAx_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i].real();
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          x[i] *= a;
-          y[i] = cmac(b, x[i], y[i]);
+          x[i] *= a[j];
+          y[i] = cmac(b[j], x[i], y[i]);
         }
       }
       constexpr int flops() const { return 5; }   //! flops per element
     };
 
     /**
-       double caxpyXmaz(c a, V x, V y, V z){}
+       real_t caxpyXmaz(c a, V x, V y, V z){}
        First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmaz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      const complex<real> a;
-      caxpyxmaz_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      complex<real> a[MAX_MULTI_RHS] = {};
+      caxpyxmaz_(cvector<complex_t> &a, cvector<complex_t> &, cvector<complex_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] = cmac(a, x[i], y[i]);
-          x[i] = cmac(-a, z[i], x[i]);
+          y[i] = cmac(a[j], x[i], y[i]);
+          x[i] = cmac(-a[j], z[i], x[i]);
         }
       }
       constexpr int flops() const { return 8; }   //! flops per element
     };
 
+    /** Device buffer layout written by CdotNormAB (async reduction). */
+    using cdot_norm_buf_t = array<device_reduce_t, 4>;
+
+    template <typename T> __device__ __host__ inline reduction_t to_reduction_scalar(const T &x)
+    {
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+      return x.conv();
+#else
+      return x;
+#endif
+    }
+
+    template <typename real>
+    __device__ __host__ inline complex<real> mr_alpha_from_cdot_norm(const cdot_norm_buf_t &ar4, const complex<real> &omega)
+    {
+      const complex<reduction_t> cdot {to_reduction_scalar(ar4[0]), to_reduction_scalar(ar4[1])};
+      const reduction_t scale = omega.real() / to_reduction_scalar(ar4[2]);
+      const complex<reduction_t> alpha_r = {cdot.real() * scale, cdot.imag() * scale};
+      return complex<real>(static_cast<real>(alpha_r.real()), static_cast<real>(alpha_r.imag()));
+    }
+
     /**
-       double caxpyXmazMR(c a, V x, V y, V z){}
+       real_t caxpyXmazMR(c a, V x, V y, V z){}
 
        This is a special variant of caxpyxmaz where we source the scalar multiplier from device memory.
 
        First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
     */
-    template <typename real> struct caxpyxmazMR_ {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
+    template <typename real> struct caxpyxmazMR_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      complex<real> a;
-      array<device_reduce_t, 3> *Ar3;
-      bool init_;
-      caxpyxmazMR_(const real_t &a, const real_t &, const real_t &) :
-        a(real(a)),
-        Ar3(static_cast<array<device_reduce_t, 3>*>(reducer::get_device_buffer())),
-        init_(false)
-      { ; }
-
-      __device__ __host__ void init()
+      complex<real> a[MAX_MULTI_RHS] = {};
+      cdot_norm_buf_t *Ar4;
+      caxpyxmazMR_(cvector<real_t> &a, cvector<real_t> &, cvector<real_t> &) :
+        Ar4(static_cast<cdot_norm_buf_t *>(reducer::get_device_buffer()))
       {
-        if (!init_) {
-          auto result = *Ar3;
-          a = a.real() * complex<real>((real)result[0], (real)result[1]) / (real)result[2];
-          init_ = true;
-        }
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
       }
 
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
+        const complex<real> aj = mr_alpha_from_cdot_norm(Ar4[j], a[j]);
+
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] = cmac(a, x[i], y[i]);
-          x[i] = cmac(-a, z[i], x[i]);
+          y[i] = cmac(aj, x[i], y[i]);
+          x[i] = cmac(-aj, z[i], x[i]);
         }
       }
 
@@ -399,7 +461,7 @@ namespace quda
     };
 
     /**
-       double tripleCGUpdate(d a, d b, V x, V y, V z, V w){}
+       real_t tripleCGUpdate(d a, d b, V x, V y, V z, V w){}
        First performs the operation y[i] = y[i] + a*w[i]
        Second performs the operation z[i] = z[i] - a*x[i]
        Third performs the operation w[i] = z[i] + b*w[i]
@@ -407,16 +469,20 @@ namespace quda
     template <typename real> struct tripleCGUpdate_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1, 1> write{ };
-      const real a;
-      const real b;
-      tripleCGUpdate_(const real_t &a, const real_t &b, const real_t &) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
+      tripleCGUpdate_(cvector<real_t> &a, cvector<real_t> &b, cvector<real_t> &)
+      {
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < a.size(); i++) this->b[i] = b[i];
+      }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &, int j) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] += a * w[i];
-          z[i] -= a * x[i];
-          w[i] = z[i] + b * w[i];
+          y[i] += a[j] * w[i];
+          z[i] -= a[j] * x[i];
+          w[i] = z[i] + b[j] * w[i];
         }
       }
       constexpr int flops() const { return 6; }   //! flops per element

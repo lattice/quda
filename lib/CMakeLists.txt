@@ -17,25 +17,29 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
-  dirac_coarse.cpp dslash_coarse.cpp
+  solve.cpp monitor.cpp dirac_coarse.cpp dslash_coarse.cpp
   coarse_op.cpp coarsecoarse_op.cpp
   coarse_op_preconditioned.cpp staggered_coarse_op.cpp
-  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
-  eigensolve_quda.cpp quda_arpack_interface.cpp
+  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp
+  eig_trlm_3d.cpp blas_3d.cu
+  vector_io.cpp eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cpp
   prolongator.cpp restrictor.cpp staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
+  gauge_shift.cu
+  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu gauge_plaqrect.cu
   gauge_laplace.cpp gauge_observable.cpp
+  inv_cgnr.cpp inv_cgne.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu
+  color_spinor_field.cpp color_spinor_util.cu color_spinor_project_domain_decomp.cu
   field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
+  evec_project.cu
   extract_gauge_ghost.cu
   gauge_norm.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
@@ -47,14 +51,37 @@ set (QUDA_OBJS
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
+  dslash_wilson.cpp
+  dslash_staggered.cpp dslash_improved_staggered.cpp
+  dslash_wilson_distance.cpp
+  dslash_wilson_clover.cpp dslash_wilson_clover_distance.cpp
+  dslash_wilson_clover_preconditioned.cpp
+  dslash_wilson_clover_preconditioned_distance.cpp
+  dslash_twisted_mass.cpp dslash_twisted_mass_preconditioned.cpp
+  dslash_ndeg_twisted_mass.cpp dslash_ndeg_twisted_mass_preconditioned.cpp
+  dslash_twisted_clover.cpp dslash_twisted_clover_preconditioned.cpp
+  dslash_ndeg_twisted_clover.cpp dslash_ndeg_twisted_clover_preconditioned.cpp
+  dslash_wilson_clover_hasenbusch_twist.cpp
+  dslash_wilson_clover_hasenbusch_twist_preconditioned.cpp
+  dslash_domain_wall_4d.cpp  dslash_domain_wall_5d.cpp
+  dslash_domain_wall_4d_m5inv.cpp
+  dslash_domain_wall_4d_m5pre.cpp
+  dslash_domain_wall_4d_m5pre_m5inv.cpp
+  dslash_domain_wall_4d_m5inv_m5pre.cpp
+  dslash_domain_wall_4d_m5inv_m5inv.cpp
+  dslash_domain_wall_4d_m5mob.cpp
+  dslash_domain_wall_4d_m5pre_m5mob.cpp
+  laplace.cpp
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
-  contract.cu comm_common.cpp communicator_stack.cpp
+  contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
+  clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
-  spinor_noise.cu spinor_dilute.cu
+  spin_duplicate.cu
+  spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -75,7 +102,7 @@ set (QUDA_OBJS
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
-  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
+  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
   tune.cpp
   device_vector.cu
   inv_gmresdr_quda.cpp
@@ -89,27 +116,159 @@ set (QUDA_OBJS
   block_transpose.cu )
 # cmake-format: on
 
+# only add the OpenQCD interface file if we're compiling with it enabled
+if(QUDA_INTERFACE_OPENQCD)
+  list(APPEND QUDA_OBJS openqcd_interface.cpp)
+endif()
+
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
   dslash_quda.cu color_spinor_pack.cu
-  dslash_staggered.cu dslash_improved_staggered.cu
-  dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
-  dslash_wilson_clover_preconditioned.cu 
-  dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
-  dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
-  dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
-  dslash_ndeg_twisted_clover.cu dslash_ndeg_twisted_clover_preconditioned.cu
-  dslash_wilson_clover_hasenbusch_twist.cu
-  dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
-  dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
-  dslash_domain_wall_4d_m5inv.cu
-  dslash_domain_wall_4d_m5pre.cu
-  dslash_domain_wall_4d_m5pre_m5inv.cu
-  dslash_domain_wall_4d_m5inv_m5pre.cu
-  dslash_domain_wall_4d_m5inv_m5inv.cu
-  dslash_domain_wall_4d_m5mob.cu
-  dslash_domain_wall_4d_m5pre_m5mob.cu
-  dslash_pack2.cu laplace.cu covDev.cu staggered_quark_smearing.cu)
+  dslash5_domain_wall.cu
+  dslash_pack2.cu covariant_derivative.cu staggered_quark_smearing.cu)
+
+# Function to check if a specific bit is set
+function(check_bit number bit)
+  # Perform bitwise AND with (1 << bit) to check if the bit is set
+  math(EXPR result "${number} & (1 << ${bit})")
+  set(BIT_CHECK "${result}" PARENT_SCOPE)
+endfunction()
+
+set(QUDA_DSLASH_FILENAME_LIST "") 
+if(QUDA_DIRAC_CLOVER_HASENBUSCH)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_hasenbusch_twist")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_hasenbusch_twist_preconditioned_no_clovinv")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_hasenbusch_twist_preconditioned_clovinv")
+endif()
+if(QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_CLOVER_HASENBUSCH)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_clover")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_clover_preconditioned")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_clover")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_clover_preconditioned")
+endif()
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_CLOVER_HASENBUSCH)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_preconditioned")
+  if(QUDA_DIRAC_DISTANCE_PRECONDITIONING)
+    list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_distance")
+    list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_preconditioned_distance")
+  endif()
+endif()
+if(QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_mass")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_mass_preconditioned")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_mass")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_mass_preconditioned")
+endif()
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson")
+  if(QUDA_DIRAC_DISTANCE_PRECONDITIONING)
+    list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_distance")
+  endif()
+endif()
+if(QUDA_DIRAC_STAGGERED)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_staggered")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_improved_staggered")
+endif()
+if(QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_CLOVER_HASENBUSCH)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_domain_wall_4d")
+endif()
+if(QUDA_DIRAC_DOMAIN_WALL)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_domain_wall_5d")
+endif()
+if(QUDA_DIRAC_LAPLACE)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "laplace")
+endif()
+
+set(QUDA_DSLASH_PREC_LIST "")
+set(QUDA_DSLASH_NCOLOR_LIST "3")
+set(QUDA_DSLASH_DDARG_LIST "DDNo")
+set(QUDA_DSLASH_RECONI_LIST "")
+set(QUDA_DSLASH_RECON_LIST "")
+set(QUDA_DSLASH5_TYPE_LIST "")
+
+if(QUDA_DIRAC_DOMAIN_WALL)
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "DSLASH5_MOBIUS_PRE")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "DSLASH5_MOBIUS")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_INV_MOBIUS")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_INV_MOBIUS_M5_PRE")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_PRE_MOBIUS_M5_INV")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_INV_MOBIUS_M5_INV_DAG")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "DSLASH5_MOBIUS_PRE_M5_MOB")
+endif()
+
+check_bit(${QUDA_PRECISION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "QUARTER")
+endif()
+
+check_bit(${QUDA_PRECISION} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "HALF")
+endif()
+
+check_bit(${QUDA_PRECISION} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "SINGLE")
+endif()
+
+check_bit(${QUDA_PRECISION} 3)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "DOUBLE")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "2")
+  list(APPEND QUDA_DSLASH_RECON_LIST "9or8")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "1")
+  list(APPEND QUDA_DSLASH_RECON_LIST "13or12")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "0")
+  list(APPEND QUDA_DSLASH_RECON_LIST "18")
+endif()
+
+check_bit(${QUDA_DOMAIN_DECOMPOSITION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_DDARG_LIST "DDRedBlack")
+endif()
+
+message(STATUS "QUDA_DSLASH_FILENAME_LIST=${QUDA_DSLASH_FILENAME_LIST}")
+message(STATUS "QUDA_DSLASH_PREC_LIST=${QUDA_DSLASH_PREC_LIST}")
+message(STATUS "QUDA_DSLASH_NCOLOR_LIST=${QUDA_DSLASH_NCOLOR_LIST}")
+message(STATUS "QUDA_DSLASH_DDARG_LIST=${QUDA_DSLASH_DDARG_LIST}")
+message(STATUS "QUDA_DSLASH_RECONI_LIST=${QUDA_DSLASH_RECONI_LIST}")
+message(STATUS "QUDA_DSLASH5_TYPE_LIST=${QUDA_DSLASH5_TYPE_LIST}")
+
+foreach(QUDA_DSLASH_PREC ${QUDA_DSLASH_PREC_LIST})
+  string(TOLOWER "${QUDA_DSLASH_PREC}" QUDA_DSLASH_PREC_LOWER)
+  foreach(QUDA_DSLASH_NCOLOR ${QUDA_DSLASH_NCOLOR_LIST})
+    foreach(QUDA_DSLASH_DDARG ${QUDA_DSLASH_DDARG_LIST})
+      string(TOLOWER "${QUDA_DSLASH_DDARG}" QUDA_DSLASH_DDARG_LOWER)
+      foreach(QUDA_DSLASH_RECONI QUDA_DSLASH_RECON IN ZIP_LISTS QUDA_DSLASH_RECONI_LIST QUDA_DSLASH_RECON_LIST)
+        set(DSLASH_SPECS "${QUDA_DSLASH_PREC_LOWER}_ncolor${QUDA_DSLASH_NCOLOR}_${QUDA_DSLASH_DDARG_LOWER}_recon${QUDA_DSLASH_RECON}")
+        foreach(QUDA_DSLASH_FILENAME ${QUDA_DSLASH_FILENAME_LIST})
+          set(TMP_FILENAME "${QUDA_DSLASH_FILENAME}_${DSLASH_SPECS}.cu")
+          configure_file(${QUDA_DSLASH_FILENAME}.in.cu ${TMP_FILENAME} @ONLY)
+          list(PREPEND QUDA_DSLASH_OBJS ${TMP_FILENAME})
+        endforeach()
+        foreach(QUDA_DSLASH5_TYPE ${QUDA_DSLASH5_TYPE_LIST})
+          string(TOLOWER "${QUDA_DSLASH5_TYPE}" QUDA_DSLASH5_TYPE_LOWER)
+          set(TMP_FILENAME "dslash_domain_wall_4d_${QUDA_DSLASH5_TYPE_LOWER}_${DSLASH_SPECS}.cu")
+          configure_file(dslash_domain_wall_4d_fused_m5.in.cu ${TMP_FILENAME} @ONLY)
+          list(PREPEND QUDA_DSLASH_OBJS ${TMP_FILENAME})
+        endforeach()
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
 
 if(QUDA_NVSHMEM)
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
@@ -174,15 +333,24 @@ configure_file(extract_gauge_ghost.in.cu extract_gauge_ghost.cu @ONLY)
 configure_file(gauge_noise.in.cu gauge_noise.cu @ONLY)
 configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
+configure_file(spinor_dilute.in.cu spinor_dilute.cu @ONLY)
+configure_file(spin_duplicate.in.cu spin_duplicate.cu @ONLY)
 configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
 configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
 configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
 configure_file(dslash_coarse_mma.in.hpp dslash_coarse_mma.hpp @ONLY)
 configure_file(block_transpose.in.cu block_transpose.cu @ONLY)
+configure_file(multigrid.in.hpp multigrid.hpp @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
   string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
+  foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
+    math(EXPR MOD "${QUDA_MULTIGRID_MRHS} % 8")
+    if(NOT (${QUDA_MULTIGRID_MRHS} GREATER_EQUAL "8" AND ${QUDA_MULTIGRID_MRHS} LESS_EQUAL "64" AND ${MOD} EQUAL "0"))
+      message(FATAL_ERROR "${QUDA_MULTIGRID_MRHS} is not a valid value for QUDA_MULTIGRID_MRHS_LIST")
+    endif()
+  endforeach()
   foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
     configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     configure_file(extract_gauge_ghost_mg.in.cu "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
@@ -218,6 +386,12 @@ if(QUDA_MULTIGRID)
          list(PREPEND QUDA_CU_OBJS "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
          list(PREPEND QUDA_CU_OBJS "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
          list(PREPEND QUDA_CU_OBJS "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
+           list(PREPEND QUDA_CU_OBJS "prolongator_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu")
+           configure_file(prolongator_mma.in.cu "prolongator_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+           list(PREPEND QUDA_CU_OBJS "restrictor_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu")
+           configure_file(restrictor_mma.in.cu "restrictor_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+         endforeach()
       endif()
     endforeach()
   endforeach()
@@ -256,8 +430,21 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   mark_as_advanced(QUDA_GITDIR)
 endif()
 
+set(QUDA_SCALAR_TYPE
+    double
+    CACHE STRING "set the host scalar coefficient type (double, doubledouble, __float128)")
+set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble __float128)
+
+if(${QUDA_SCALAR_TYPE} STREQUAL "__float128")
+  set(QUDA_USE_QUAD_SCALAR 1)
+endif()
+
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
+
+if(QUDA_USE_QUAD_SCALAR)
+  target_link_libraries(quda_cpp PUBLIC quadmath)
+endif()
 
 # add comms and QIO
 target_sources(
@@ -287,6 +474,79 @@ if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
 
+# order variables will be set in the target file
+set(VALID_ORDER_DOUBLE_VALUES "0" "2" "4")
+set(VALID_ORDER_SINGLE_VALUES "0" "2" "4" "8")
+set(VALID_ORDER_HALF_VALUES "0" "2" "4" "8" "16")
+set(VALID_ORDER_QUARTER_VALUES "0" "2" "4" "8" "16")
+
+if(NOT QUDA_ORDER_DOUBLE IN_LIST VALID_ORDER_DOUBLE_VALUES)
+  message(FATAL_ERROR  "Invalid value for QUDA_ORDER_DOUBLE: '${QUDA_ORDER_DOUBLE}'\n"
+                       "Valid values are: ${VALID_ORDER_DOUBLE_VALUES}")
+endif()
+
+if(NOT QUDA_ORDER_SINGLE IN_LIST VALID_ORDER_SINGLE_VALUES)
+  message(FATAL_ERROR "Invalid value for QUDA_ORDER_SINGLE: '${QUDA_ORDER_SINGLE}'\n"
+                      "Valid values are: ${VALID_ORDER_SINGLE_VALUES}")
+endif()
+
+if(NOT QUDA_ORDER_HALF IN_LIST VALID_ORDER_HALF_VALUES)
+  message(FATAL_ERROR "Invalid value for QUDA_ORDER_HALF: '${QUDA_ORDER_HALF}'\n"
+                      "Valid values are: ${VALID_ORDER_HALF_VALUES}")
+endif()
+
+if(NOT QUDA_ORDER_QUARTER IN_LIST VALID_ORDER_QUARTER_VALUES)
+  message(FATAL_ERROR "Invalid value for QUDA_ORDER_QUARTER: '${QUDA_ORDER_QUARTER}'\n"
+                      "Valid values are: ${VALID_ORDER_QUARTER_VALUES}")
+endif()
+
+set_property(CACHE QUDA_ORDER_DOUBLE PROPERTY STRINGS ${VALID_ORDER_DOUBLE_VALUES})
+set_property(CACHE QUDA_ORDER_SINGLE PROPERTY STRINGS ${VALID_ORDER_SINGLE_VALUES})
+set_property(CACHE QUDA_ORDER_HALF PROPERTY STRINGS ${VALID_ORDER_HALF_VALUES})
+set_property(CACHE QUDA_ORDER_QUARTER PROPERTY STRINGS ${VALID_ORDER_QUARTER_VALUES})
+
+message(STATUS "QUDA_ORDER_DOUBLE: ${QUDA_ORDER_DOUBLE}")
+message(STATUS "QUDA_ORDER_SINGLE: ${QUDA_ORDER_SINGLE}")
+message(STATUS "QUDA_ORDER_HALF: ${QUDA_ORDER_HALF}")
+message(STATUS "QUDA_ORDER_QUARTER: ${QUDA_ORDER_QUARTER}")
+
+mark_as_advanced(QUDA_ORDER_DOUBLE)
+mark_as_advanced(QUDA_ORDER_SINGLE)
+mark_as_advanced(QUDA_ORDER_HALF)
+mark_as_advanced(QUDA_ORDER_QUARTER)
+
+# set the percentage of I2F conversions that use the alternative conversion path (using FFMA)
+if(NOT DEFINED QUDA_ALTERNATIVE_I_TO_F_DEFAULT)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+set(QUDA_ALTERNATIVE_I_TO_F
+    "${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}"
+    CACHE STRING
+        "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100); CUDA builds with sm_100+ default to 25")
+set(VALID_I2F_VALUES "0" "25" "50" "75" "100")
+if(NOT QUDA_ALTERNATIVE_I_TO_F IN_LIST VALID_I2F_VALUES)
+    message(FATAL_ERROR "Invalid value for QUDA_ALTERNATIVE_I_TO_F: '${QUDA_ALTERNATIVE_I_TO_F}'\n"
+                        "Valid values are: ${VALID_I2F_VALUES}")
+endif()
+set_property(CACHE QUDA_ALTERNATIVE_I_TO_F PROPERTY STRINGS ${VALID_I2F_VALUES})
+message(
+  STATUS
+  "QUDA_ALTERNATIVE_I_TO_F is ${QUDA_ALTERNATIVE_I_TO_F}% (alternative integer-to-float conversion path)")
+mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
+
+# Set the maximum multi-RHS per kernel if not already set by the target
+if(NOT DEFINED QUDA_MAX_MULTI_RHS)
+  set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+  message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+endif()
+
+# Disable dslash prefetching if not already set
+if(NOT QUDA_DSLASH_PREFETCH_TYPE)
+  set(QUDA_DSLASH_PREFETCH_TYPE "NONE" CACHE STRING "enable Dslash prefetching" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions" FORCE)
+endif()
+
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
                             ${QUDA_CU_OBJS})
@@ -303,7 +563,9 @@ if(NOT QUDA_BACKWARDS)
   endif()
   if(${QUDA_COMPRESS_DEBUG})
     target_compile_options(quda_cpp PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
-    target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+    if(NOT ${CMAKE_CUDA_COMPILER} MATCHES "clang")
+      target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+    endif()
   endif()
 endif()
 
@@ -338,13 +600,13 @@ add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
 
-# ignore any unkown pragmas
+# ignore any unknown pragmas
 target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
   $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
   $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
   >)
 
-# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+# add some definitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
@@ -360,6 +622,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 target_link_libraries(quda PUBLIC Threads::Threads)
+if(QUDA_USE_QUAD_SCALAR)
+  target_link_libraries(quda PUBLIC quadmath)
+endif()
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
@@ -372,6 +637,10 @@ endif()
 if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()
+
+if(QUDA_QCD_PLUS_QED)
+  target_compile_definitions(quda PUBLIC BUILD_QCD_PLUS_QED)
+endif(QUDA_QCD_PLUS_QED)
 
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_QDP_INTERFACE)
@@ -396,6 +665,10 @@ endif(QUDA_INTERFACE_BQCD OR QUDA_INTERFACE_ALL)
 if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
+
+if(QUDA_INTERFACE_OPENQCD OR QUDA_INTERFACE_ALL)
+  target_compile_definitions(quda PUBLIC BUILD_OPENQCD_INTERFACE)
+endif(QUDA_INTERFACE_OPENQCD OR QUDA_INTERFACE_ALL)
 
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)
@@ -469,19 +742,12 @@ endif()
 
 if(QUDA_OPENMP)
   target_link_libraries(quda PUBLIC OpenMP::OpenMP_CXX)
+  target_compile_definitions(quda PUBLIC QUDA_OPENMP)
 endif()
 
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
-
-if(QUDA_ENABLE_MMA)
-  target_compile_definitions(quda PUBLIC QUDA_ENABLE_MMA)
-endif()
-
-if(QUDA_MULTIGRID_SETUP_USE_SMMA)
-  target_compile_definitions(quda PUBLIC QUDA_MULTIGRID_SETUP_USE_SMMA)
-endif()
 
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)
@@ -489,10 +755,6 @@ endif()
 
 if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
-endif()
-
-if(QUDA_ALTERNATIVE_I_TO_F)
-  target_compile_definitions(quda PRIVATE QUDA_ALTERNATIVE_I_TO_F)
 endif()
 
 if(QUDA_BACKWARDS)
@@ -509,15 +771,13 @@ if(QUDA_BACKWARDS)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 
-set(QUDA_SCALAR_TYPE
-    double
-    CACHE STRING "set the host scalar coefficient type (double, doubledouble, __float128)")
-set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble __float128)
-
 set(QUDA_REDUCTION_TYPE
     double
     CACHE STRING "set the reduction computation type (double, doubledouble)")
 set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble)
+if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
+  set(QUDA_REDUCTION_IS_DOUBLEDOUBLE 1)
+endif()
 
 set(QUDA_REDUCTION_ALGORITHM
     NAIVE
@@ -579,4 +839,4 @@ write_basic_package_version_file(
   COMPATIBILITY AnyNewerVersion)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
-	DESTINATION lib/cmake/QUDA)
+  DESTINATION lib/cmake/QUDA)

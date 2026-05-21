@@ -4,7 +4,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <kernel.h>
-#include <thread_array.h>
+#include <byte_array.h>
 #include <array.h>
 #include <reduce_helper.h>
 #include <reduction_kernel.h>
@@ -51,13 +51,12 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct GaugeLoop : plus<typename Arg::reduce_t>
-  {
+  template <typename Arg> struct GaugeLoop : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     static constexpr int reduce_block_dim = 2; // x_cb and parity are mapped to x
     const Arg &arg;
-    constexpr GaugeLoop(const Arg &arg) : arg(arg) {}
+    constexpr GaugeLoop(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity, int path_id)
@@ -68,7 +67,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx{0};
+      byte_array<int8_t, 4> dx = {};
 
       auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return value;
@@ -81,9 +80,10 @@ namespace quda {
       // compute trace
       auto trace = getTrace(link_prod);
 
-      array<double, 2> loop_trace = {coeff_loop * trace.real(), coeff_loop * trace.imag()};
+      reduce_t loop_trace {};
+      loop_trace[0] = coeff_loop * trace.real();
+      loop_trace[1] = coeff_loop * trace.imag();
       return operator()(value, loop_trace);
     }
   };
-
 }

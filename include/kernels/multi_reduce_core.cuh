@@ -10,7 +10,7 @@
 namespace quda
 {
 
-  using compute_t = double;
+  using compute_t = reduction_t;
 
   namespace blas
   {

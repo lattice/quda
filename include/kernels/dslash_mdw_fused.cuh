@@ -37,10 +37,11 @@ namespace quda {
       static constexpr bool reload = reload_;
       static constexpr bool spin_project = true;
       static constexpr bool spinor_direct_load = true; // false means texture load
-      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load>::type; // color spin field order
+      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load, true>::type; // color spin field order
       static constexpr bool gauge_direct_load = true;                          // false means texture load
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_EXTENDED; // gauge field used is an extended one
-      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type; // gauge field order
+      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+                                      QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type; // gauge field order
 
       F out;      // output vector field
       const F in; // input vector field
@@ -116,8 +117,8 @@ namespace quda {
 
         if (b_5[0] != b_5[1] || b_5[0].imag() != 0) { errorQuda("zMobius is NOT supported yet.\n"); }
 
-        b = double(b_5[0].real());
-        c = double(c_5[0].real());
+        b = real_t(b_5[0].real());
+        c = real_t(c_5[0].real());
         kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
 
         if (kappa * kappa < 1e-6) { small_kappa = true; }
@@ -199,7 +200,7 @@ namespace quda {
     -> Everything should be understood in a 4d checkboarding sense.
     */
     template <class storage_type, bool dagger, bool halo, bool back, class Vector, class Arg>
-    __device__ inline void apply_wilson_5d(Vector &out, int coordinate[4], Arg &arg, int s)
+    __device__ inline void apply_wilson_5d(Vector &out, int coordinate[4], const Arg &arg, int s)
     {
       typedef typename mapper<storage_type>::type compute_type;
       typedef Matrix<complex<compute_type>, 3> Link;
@@ -275,13 +276,41 @@ namespace quda {
       for (int d = 0; d < 4; d++) { coordinate[d] += shift[d]; }
     }
 
+    template <typename Arg> struct FusedMobiusDslashParams {
+      struct SmemSize {
+        template <typename... Args> static constexpr unsigned int size(const dim3 block, const Args &...)
+        {
+          const int a_size = (block.y * 4) * (block.y * 4 + sm_m_pad_size(block.y * 4));
+          const int b_size = (block.y * 4) * (block.x * 6 + sm_n_pad_size(block.x * 6));
+          int size = 0;
+          // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
+          // if (param.aux.x == 1) { // aux.x == 1 --> reload == true
+          if constexpr (Arg::reload) {
+            if constexpr (Arg::type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
+              size = (a_size * 2 + b_size);
+            } else {
+              size = (a_size + b_size);
+            }
+          } else {
+            size = (a_size > b_size ? a_size : b_size);
+          }
+          return size / 2; // number of half2 elements
+        }
+      };
+    };
+    // template <typename Arg> using FusedMobiusDslashSmem = SharedMemory<half2, typename
+    // FusedMobiusDslashParams<Arg>::SmemSize,load_matrix_b_vector_ops>;
+    template <typename Arg>
+    using FusedMobiusDslashSmem = SharedMemory<half2, typename FusedMobiusDslashParams<Arg>::SmemSize>;
+    template <typename Arg>
+    using FusedMobiusDslashOps = combineOps<load_matrix_b_vector_ops, KernelOps<FusedMobiusDslashSmem<Arg>>>;
     /**
       @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha * M5inv operator
       The integer kernel types corresponds to the enum MdwfFusedDslashType.
     */
-    template <typename Arg> struct FusedMobiusDslash {
-      Arg &arg;
-      constexpr FusedMobiusDslash(Arg &arg) : arg(arg) {}
+    template <typename Arg> struct FusedMobiusDslash : FusedMobiusDslashOps<Arg> {
+      const Arg &arg;
+      constexpr FusedMobiusDslash(const Arg &arg) : arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __forceinline__ void operator()()
@@ -292,7 +321,8 @@ namespace quda {
         constexpr int Ls = Arg::Ls;
         const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
-        SharedMemoryCache<half2> cache;
+        // SharedMemoryCache<half2> cache {*this};
+        FusedMobiusDslashSmem<Arg> cache {*this};
 
         static_assert(Arg::block_dim_x * Ls / 32 < 32, "Number of threads in a threadblock should be less than 1024.");
 
@@ -302,7 +332,8 @@ namespace quda {
         constexpr int N_sm = N + sm_n_pad_size(N);
         constexpr int M_sm = M + sm_m_pad_size(M);
 
-        half2 *sm_b = cache.data();
+        // half2 *sm_b = cache.data();
+        half2 *sm_b = &cache[0];
         half *sm_c = reinterpret_cast<half *>(sm_b);
 
         half *sm_a = Arg::reload ? sm_c + M * N_sm : sm_c;
@@ -311,22 +342,22 @@ namespace quda {
 
         if (Arg::type == MdwfFusedDslashType::D4_D5INV_D5PRE) {
           if (arg.small_kappa) {
-            construct_matrix_a_d5<M_sm, false, Arg>(arg, sm_a); // dagger = false
+            construct_matrix_a_d5<M_sm, false, Arg>(arg, sm_a, arg.alpha, arg.beta); // dagger = false
           } else {
-            construct_matrix_a_m5inv<M_sm, false, Arg>(arg, sm_a); // dagger = false
+            construct_matrix_a_m5inv<M_sm, false, Arg>(arg, sm_a, arg.alpha, arg.beta); // dagger = false
           }
         } else if (Arg::type == MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG) {
           if (arg.small_kappa) {
-            construct_matrix_a_d5<M_sm, true, Arg>(arg, sm_a); // dagger =  true
+            construct_matrix_a_d5<M_sm, true, Arg>(arg, sm_a, arg.alpha, arg.beta); // dagger =  true
           } else {
-            construct_matrix_a_m5inv<M_sm, true, Arg>(arg, sm_a); // dagger = false
+            construct_matrix_a_m5inv<M_sm, true, Arg>(arg, sm_a, arg.alpha, arg.beta); // dagger = false
           }
         } else if (Arg::type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
-          construct_matrix_a_m5inv<M_sm, false, Arg>(arg, sm_a); // dagger = false
+          construct_matrix_a_m5inv<M_sm, false, Arg>(arg, sm_a, arg.alpha, arg.beta); // dagger = false
         } else if (Arg::type == MdwfFusedDslashType::D4DAG_D5PREDAG) {
-          construct_matrix_a_d5<M_sm, true, Arg>(arg, sm_a); // dagger =  true
+          construct_matrix_a_d5<M_sm, true, Arg>(arg, sm_a, arg.alpha, arg.beta); // dagger =  true
         } else if (Arg::type == MdwfFusedDslashType::D5PRE) {
-          construct_matrix_a_d5<M_sm, false, Arg>(arg, sm_a); // dagger =  true
+          construct_matrix_a_d5<M_sm, false, Arg>(arg, sm_a, arg.alpha, arg.beta); // dagger =  true
         }
         __syncthreads();
 
@@ -355,9 +386,8 @@ namespace quda {
         }
 
         if (Arg::type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
-          arg.alpha = 1.;
           if (!Arg::reload) {                                                           // in the preload case we preload ...
-            construct_matrix_a_m5inv<M_sm, true, Arg>(arg, sm_a); // dagger = true
+            construct_matrix_a_m5inv<M_sm, true, Arg>(arg, sm_a, 1.0, arg.beta);        // dagger = true
             __syncthreads();
 
 #pragma unroll
@@ -366,7 +396,7 @@ namespace quda {
             }
 
           } else {
-            construct_matrix_a_m5inv<M_sm, true, Arg>(arg, sm_a_black); // dagger = true
+            construct_matrix_a_m5inv<M_sm, true, Arg>(arg, sm_a_black, 1.0, arg.beta); // dagger = true
             __syncthreads();
           }
         }
@@ -397,7 +427,7 @@ namespace quda {
             // store result to shared memory
           }
           float scale;
-          load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, scale); // acc(accumulation) = false
+          load_matrix_b_vector<N_sm / 2, false>(*this, in_vec, sm_b, scale); // acc(accumulation) = false
 
           __syncthreads();
           mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a, sm_a, sm_c, sm_c, wrm);
@@ -414,7 +444,7 @@ namespace quda {
                 aux_in_vec = arg.x(sid_back, explicit_parity);
               }
             }
-            load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, scale, arg.m_scale); // acc = true
+            load_matrix_b_vector<N_sm / 2, true>(*this, aux_in_vec, sm_b, scale, arg.m_scale); // acc = true
             if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, scale); }
             __syncthreads();
             mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a_aux, sm_a_black, sm_c,
@@ -425,7 +455,7 @@ namespace quda {
             Vector aux_in_vec;
             int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
             if (!idle) { aux_in_vec = arg.x(sid_shift, explicit_parity); }
-            load_matrix_b_vector<N_sm / 2, true, false>(aux_in_vec, sm_b, scale, arg.m_scale);
+            load_matrix_b_vector<N_sm / 2, true, false>(*this, aux_in_vec, sm_b, scale, arg.m_scale);
             if (!idle) { arg.out(sid_shift, explicit_parity) = aux_in_vec; }
           }
 
@@ -441,7 +471,7 @@ namespace quda {
         } // while
       }
     };
-    
+
 #endif // QUDA_MMA_AVAILABLE
   }
 

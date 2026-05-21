@@ -54,6 +54,7 @@ module quda_fortran
      integer(4) :: staple_pad   ! Used by link fattening
      integer(4) :: llfat_ga_pad ! Used by link fattening
      integer(4) :: mom_ga_pad   ! Used by the gauge and fermion forces
+     integer(4) :: use_split_gauge_bkup ! Used by gauge split buffers (default=true keep split gauge after usage)
 
      ! Set the staggered phase type of the links
      QudaStaggeredPhase :: staggered_phase_type
@@ -114,16 +115,18 @@ module quda_fortran
      real(8) :: mu    ! Chiral twisted mass parameter
      real(8) :: tm_rho ! Chiral twisted mass shift used for Hasenbusch mass preconditioning for twisted clover
      real(8) :: epsilon ! Flavor twisted mass parameter
+     real(8) :: evmax ! Maximum of the eigenvalues of the ndeg twisted mass operator needed for fermionic forces
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace
-     
+     integer(4) :: covdev_mu    ! Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3)
+
      real(8) :: tol ! Requested L2 residual norm
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm
      integer(4) :: compute_true_res ! Whether to compute the true residual post solve
-     real(8) :: true_res ! Actual L2 residual norm achieved in solver
-     real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
+     real(8), dimension(QUDA_MAX_MULTI_SRC) :: true_res ! Actual L2 residual norm achieved in solver
+     real(8), dimension(QUDA_MAX_MULTI_SRC) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
      real(8) :: reliable_delta_refinement ! Reliable update tolerance used in post multi-shift solver refinement
@@ -217,9 +220,10 @@ module quda_fortran
      integer(4) :: iter
      real(8) :: gflops
      real(8) :: secs
-
-     ! Enable auto-tuning?
-     QudaTune :: tune
+     real(8) :: energy
+     real(8) :: power
+     real(8) :: temp
+     real(8) :: clock
 
      ! Number of steps in s-step algorithms
      integer(4) :: nsteps
@@ -358,6 +362,14 @@ module quda_fortran
 
      ! Whether to use the fused kernels for Mobius/DWF-4D dslash
      QudaBoolean :: use_mobius_fused_kernel
+
+     ! The alpha0 parameter for distance preconditioning, related to the pseudoscalar meson mass
+     real(8) distance_pc_alpha0
+     ! The t0 parameter for distance preconditioning, the timeslice where the source is located
+     integer(4) distance_pc_t0
+
+     ! Additional user-defined properties
+     integer(8) :: additional_prop
 
   end type quda_invert_param
 

@@ -62,7 +62,7 @@ namespace quda {
     // return the plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      array<double, 2> plaq {};
+      reduce_t plaq {};
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

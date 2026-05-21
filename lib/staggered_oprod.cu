@@ -83,8 +83,16 @@ namespace quda {
       }
     } // apply
 
-    void preTune() { U.backup(); if (U.data() != L.data()) L.backup(); }
-    void postTune() { U.restore(); if (U.data() != L.data()) L.restore(); }
+    void preTune()
+    {
+      U.backup();
+      if (U.data() != L.data()) L.backup();
+    }
+    void postTune()
+    {
+      U.restore();
+      if (U.data() != L.data()) L.restore();
+    }
 
     long long flops() const { return 0; } // FIXME
     long long bytes() const { return 0; } // FIXME
@@ -103,27 +111,24 @@ namespace quda {
     inB.bufferIndex = (1 - inB.bufferIndex);
   }
 
-#ifdef GPU_STAGGERED_DIRAC
   void computeStaggeredOprod(GaugeField *out[], ColorSpinorField& in, const double coeff[], int nFace)
   {
-    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    if (nFace == 1) {
-      computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 0, coeff, nFace);
-      double coeff_[2] = {-coeff[0],0.0}; // need to multiply by -1 on odd sites
-      computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 1, coeff_, nFace);
-    } else if (nFace == 3) {
-      computeStaggeredOprod(*out[0], *out[1], in.Even(), in.Odd(), 0, coeff, nFace);
-      computeStaggeredOprod(*out[0], *out[1], in.Even(), in.Odd(), 1, coeff, nFace);
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      if (nFace == 1) {
+        computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 0, coeff, nFace);
+        double coeff_[2] = {-coeff[0], 0.0}; // need to multiply by -1 on odd sites
+        computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 1, coeff_, nFace);
+      } else if (nFace == 3) {
+        computeStaggeredOprod(*out[0], *out[1], in.Even(), in.Odd(), 0, coeff, nFace);
+        computeStaggeredOprod(*out[0], *out[1], in.Even(), in.Odd(), 1, coeff, nFace);
+      } else {
+        errorQuda("Invalid nFace=%d", nFace);
+      }
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     } else {
-      errorQuda("Invalid nFace=%d", nFace);
+      errorQuda("Staggered Operator has not been built");
     }
-    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else // GPU_STAGGERED_DIRAC not defined
-  void computeStaggeredOprod(GaugeField *[], ColorSpinorField &, const double [], int)
-  {
-    errorQuda("Staggered Outer Product has not been built!");
-  }
-#endif
 
 } // namespace quda

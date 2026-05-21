@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <quda_api.h>
 
 namespace quda
@@ -11,6 +12,7 @@ namespace quda
     /**
        @brief Create the device context.  Called by initQuda when
        initializing the library.
+       @param[in] dev Device ordinal for which to initialize
      */
     void init(int dev);
 
@@ -20,6 +22,34 @@ namespace quda
        init() has not previously been called.
      */
     void init_thread();
+
+    /**
+       @brief Struct that is used to record the state of the device
+       (or host in the future).  At present this is used for storing
+       the power, clock rate and temperature at a given point in time,
+       but can be expanded as necessary in the future.
+     */
+    struct state_t {
+      std::chrono::time_point<std::chrono::high_resolution_clock> time;
+      float power;
+      unsigned int clock;
+      unsigned int temp;
+    };
+
+    /**
+       @brief Record the present state of the GPU (power, temperature, clock)
+     */
+    state_t get_state();
+
+    /**
+       @brief Get device driver version
+     */
+    int get_driver_version();
+
+    /**
+       @brief Get device runtime version
+     */
+    int get_runtime_version();
 
     /**
        @brief Get number of devices present on node
@@ -135,6 +165,11 @@ namespace quda
      * @return The maximum number of simultaneously resident blocks per SM
      */
     unsigned int max_blocks_per_processor();
+
+    /**
+       @return Whether shared carve out configuration is supported
+    */
+    bool shared_carve_out_supported();
 
     namespace profile
     {

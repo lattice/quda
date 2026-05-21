@@ -142,12 +142,12 @@ namespace quda
         if (arg.mode == QudaOffsetCopyMode::COLLECT) {
           // we are collecting so x_cb is the index for the input.
           idx_in = x_cb;
-          getCoordsExtended(coordinate, x_cb, arg.dim_in, parity, arg.offset.array);
+          getCoordsExtended(coordinate, x_cb, arg.dim_in, parity, arg.offset.data());
           idx_out = linkIndex(coordinate, arg.dim_out);
         } else {
           // we are dispersing so x_cb is the index for the output.
           idx_out = x_cb;
-          getCoordsExtended(coordinate, x_cb, arg.dim_out, parity, arg.offset.array);
+          getCoordsExtended(coordinate, x_cb, arg.dim_out, parity, arg.offset.data());
           idx_in = linkIndex(coordinate, arg.dim_in);
         }
         copy_field(s * arg.volume_4d_cb_out + idx_out, s * arg.volume_4d_cb_in + idx_in, parity, arg);

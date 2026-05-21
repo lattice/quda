@@ -1,3 +1,5 @@
+#pragma once
+
 /**
    @file quda_define.h
    @brief Macros defined set by the cmake build system.  This file
@@ -18,6 +20,32 @@
  */
 #define MAX_MULTI_BLAS_N @QUDA_MAX_MULTI_BLAS_N@
 
+/**
+ * @def   MAX_MULTI_BLAS_N
+ * @brief This macro sets the limit of blas fusion in the multi-blas
+ * and multi-reduce kernels
+ */
+#define MAX_MULTI_RHS @QUDA_MAX_MULTI_RHS@
+
+/**
+ * @def   MAX_KERNEL_ARG_SIZE
+ * @brief This macro sets the maximum static size of the kernel arguments
+ * in bytes passed to a kernel on the target architecture
+ */
+#define MAX_KERNEL_ARG_SIZE @QUDA_MAX_KERNEL_ARG_SIZE@
+
+/**
+ * @def   MAX_MULTI_BLAS_N
+ * @brief This macro sets the register tile size for MRHS kernels
+ */
+#define MAX_MULTI_RHS_TILE @QUDA_MAX_MULTI_RHS_TILE@
+
+/**
+ * @def   QUDA_ALTERNATIVE_I_TO_F
+ * @brief This sets the percentage of I2F conversions using the alternative path
+ */
+#define QUDA_ALTERNATIVE_I_TO_F @QUDA_ALTERNATIVE_I_TO_F@
+
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**
@@ -29,25 +57,19 @@
 #undef QUDA_HETEROGENEOUS_ATOMIC
 #endif
 
+#cmakedefine QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
+#ifdef QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
+/**
+ * @def   HETEROGENEOUS_ATOMIC_INF_INIT
+ * @brief This macro sets whether we are using infinity for the signaling sentinel
+ */
+#define HETEROGENEOUS_ATOMIC_INF_INIT
+#undef QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
+#endif
+
+#cmakedefine QUDA_SHARED_MEMORY_SPILL
+
 #cmakedefine QUDA_LARGE_KERNEL_ARG
-
-#cmakedefine QUDA_DIRAC_NDEG_TWISTED_CLOVER
-#ifdef QUDA_DIRAC_NDEG_TWISTED_CLOVER
-/**
- * @def   GPU_NDEG_TWISTED_CLOVER_DIRAC
- * @brief This macro is set when we have ndeg-TMC fermions enabled
- */
-#define GPU_NDEG_TWISTED_CLOVER_DIRAC
-#endif
-
-#cmakedefine QUDA_DIRAC_NDEG_TWISTED_MASS
-#if defined(QUDA_DIRAC_NDEG_TWISTED_MASS) || defined(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-/**
- * @def   GPU_NDEG_TWISTED_MASS_DIRAC
- * @brief This macro is set when we have ndeg-TM fermions enabled
- */
-#define GPU_NDEG_TWISTED_MASS_DIRAC
-#endif
 
 #cmakedefine QUDA_DIRAC_CLOVER_HASENBUSCH
 #ifdef QUDA_DIRAC_CLOVER_HASENBUSCH
@@ -59,7 +81,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_TWISTED_CLOVER
-#if defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH) || defined(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+#if defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH)
 /**
  * @def   GPU_TWISTED_CLOVER_DIRAC
  * @brief This macro is set when we have TMC fermions enabled
@@ -68,7 +90,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_CLOVER
-#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER)
+#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH)
 /**
  * @def   GPU_CLOVER_DIRAC
  * @brief This macro is set when we have clover fermions enabled
@@ -86,7 +108,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_WILSON
-#if defined(QUDA_DIRAC_WILSON) || defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWSITED_MASS)
+#if defined(QUDA_DIRAC_WILSON) || defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_MASS)
 /**
  * @def   GPU_WILSON_DIRAC
  * @brief This macro is set when we kave Wilson fermions enabled
@@ -112,8 +134,8 @@
 #define GPU_STAGGERED_DIRAC
 #endif
 
-#cmakedefine QUDA_LAPLACE
-#ifdef QUDA_LAPLACE
+#cmakedefine QUDA_DIRAC_LAPLACE
+#ifdef QUDA_DIRAC_LAPLACE
 /**
  * @def   GPU_LAPLACE
  * @brief This macro is set when we have the Laplace operator enabled
@@ -121,8 +143,8 @@
 #define GPU_LAPLACE
 #endif
 
-#cmakedefine QUDA_COVDEV
-#ifdef QUDA_COVDEV
+#cmakedefine QUDA_DIRAC_COVDEV
+#ifdef QUDA_DIRAC_COVDEV
 /**
  * @def   GPU_COVDEV
  * @brief This macro is set when we have the covariant derivative enabled
@@ -130,23 +152,51 @@
 #define GPU_COVDEV
 #endif
 
-#cmakedefine QUDA_CONTRACT
-#ifdef QUDA_CONTRACT
 /**
- * @def   GPU_CONTRACT
- * @brief This macro is set when we have contractions enabled
+ * @def   QUDA_DOMAIN_DECOMPOSITION
+ * @brief This macro sets the type of Domain Decomposition (DD)-aware Dirac operator enabled
  */
-#define GPU_CONTRACT
+#define QUDA_DOMAIN_DECOMPOSITION @QUDA_DOMAIN_DECOMPOSITION@
+
+#cmakedefine QUDA_DIRAC_DISTANCE_PRECONDITIONING
+#ifdef QUDA_DIRAC_DISTANCE_PRECONDITIONING
+/**
+ * @def GPU_DISTANCE_PRECONDITIONING
+ * @brief This macro is set when we have distance preconditioned
+ * Wilson/clover dslash enabled
+ */
+#define GPU_DISTANCE_PRECONDITIONING
 #endif
 
-#cmakedefine QUDA_SMEAR_GAUSS_TWOLINK
-#ifdef QUDA_SMEAR_GAUSS_TWOLINK
 /**
- * @def   GPU_TWOLINK_GSMEAR
- * @brief This macro is set when we have the two link smearing enabled
+ * @def QUDA_DSLASH_DOUBLE_STORE
+ * @brief This macro sets whether to use double storage of the gauge
+ * field to simplify indexing in the Dslash kernels.
  */
-#define GPU_TWOLINK_GSMEAR
-#endif
+#cmakedefine QUDA_DSLASH_DOUBLE_STORE
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_TYPE
+ * @brief This macro sets whether to use
+ * the TMA for L2 prefetching:
+ * NONE - no prefetch
+ * THREAD - per thread prefetch
+ * BULK - TMA bulk prefetch
+ * TENSOR - TMA tensor descriptor prefetch
+ */
+#define QUDA_DSLASH_PREFETCH_TYPE_@QUDA_DSLASH_PREFETCH_TYPE@
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_DISTANCE_WILSON
+ * @brief This macro sets the prefetch distance for Wilson fermions
+ */
+#define QUDA_DSLASH_PREFETCH_DISTANCE_WILSON @QUDA_DSLASH_PREFETCH_DISTANCE_WILSON@
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED
+ * @brief This macro sets the prefetch distance for staggered fermions
+ */
+#define QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED @QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED@
 
 #cmakedefine QUDA_MULTIGRID
 #ifdef QUDA_MULTIGRID
@@ -155,6 +205,44 @@
  * @brief This macro is set when we have multigrid enabled
  */
 #define GPU_MULTIGRID
+#endif
+
+/**
+ * @def   QUDA_MULTIGRID
+ * @brief This macro is set when we have MMA enabled for the CUDA targets
+ */
+#cmakedefine QUDA_ENABLE_MMA
+
+#ifdef QUDA_MULTIGRID
+
+/**
+ * @def   QUDA_MULTIGRID_SETUP_*
+ * @brief This macro is used to set the MMA type used for multigrid setup
+ */
+#define QUDA_MULTIGRID_MMA_SETUP_HALF @QUDA_MULTIGRID_MMA_SETUP_TYPE_HALF@
+#define QUDA_MULTIGRID_MMA_SETUP_SINGLE @QUDA_MULTIGRID_MMA_SETUP_TYPE_SINGLE@
+
+/**
+ * @def   QUDA_MULTIGRID_MMA_DSLASH_*
+ * @brief This macro is used to set the MMA type used for coarse dslash
+ */
+#define QUDA_MULTIGRID_MMA_DSLASH_HALF @QUDA_MULTIGRID_MMA_DSLASH_TYPE_HALF@
+#define QUDA_MULTIGRID_MMA_DSLASH_SINGLE @QUDA_MULTIGRID_MMA_DSLASH_TYPE_SINGLE@
+
+/**
+ * @def   QUDA_MULTIGRID_MMA_PROLONGATOR_*
+ * @brief This macro is used to set the MMA type used for prolongator
+ */
+#define QUDA_MULTIGRID_MMA_PROLONGATOR_HALF @QUDA_MULTIGRID_MMA_PROLONGATOR_TYPE_HALF@
+#define QUDA_MULTIGRID_MMA_PROLONGATOR_SINGLE @QUDA_MULTIGRID_MMA_PROLONGATOR_TYPE_SINGLE@
+
+/**
+ * @def   QUDA_MULTIGRID_MMA_RESTRICTOR_*
+ * @brief This macro is used to set the MMA type used for restrictor
+ */
+#define QUDA_MULTIGRID_MMA_RESTRICTOR_HALF @QUDA_MULTIGRID_MMA_RESTRICTOR_TYPE_HALF@
+#define QUDA_MULTIGRID_MMA_RESTRICTOR_SINGLE @QUDA_MULTIGRID_MMA_RESTRICTOR_TYPE_SINGLE@
+
 #endif
 
 #cmakedefine QUDA_CLOVER_DYNAMIC
@@ -203,35 +291,34 @@
 #endif
 
 /**
- * @def QUDA_ORDER_FP
- * @brief This macro sets the data ordering for Wilson, gauge
- * (recon-8/9) and clover fixed-point fields
+ * @def QUDA_ORDER_DOUBLE
+ * @brief This macro sets the data ordering for double precision fields
  */
-#define QUDA_ORDER_FP @QUDA_ORDER_FP@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP");
-#endif
+#define QUDA_ORDER_DOUBLE @QUDA_ORDER_DOUBLE@
 
 /**
- * @def QUDA_ORDER_SP
- * @brief This macro sets the data ordering for single-precision multigrid fields
+ * @def QUDA_ORDER_SINGLE
+ * @brief This macro sets the data ordering for single precision fields
  */
-#define QUDA_ORDER_SP_MG @QUDA_ORDER_SP_MG@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDER_SP_MG");
-#endif
+#define QUDA_ORDER_SINGLE @QUDA_ORDER_SINGLE@
 
 /**
- * @def QUDA_ORDER_FP_MG
- * @brief This macro sets the data ordering for fixed-point multigrid fields
+ * @def QUDA_ORDER_HALF
+ * @brief This macro sets the data ordering for half precision fields
  */
-#define QUDA_ORDER_FP_MG @QUDA_ORDER_FP_MG@
+#define QUDA_ORDER_HALF @QUDA_ORDER_HALF@
 
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
-#endif
+/**
+ * @def QUDA_ORDER_QUARTER
+ * @brief This macro sets the data ordering for quarter precision fields
+ */
+#define QUDA_ORDER_QUARTER @QUDA_ORDER_QUARTER@
+
+/**
+ * @def QUDA_VECTORIZE_SINGLE
+ * @brief Whether to employ vectorized instruction for single precision (where supported)
+ */
+#cmakedefine QUDA_VECTORIZE_SINGLE
 
 /**
  * @def QUDA_BUILD_NATIVE_FFT
@@ -263,6 +350,8 @@ static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG
 
 #cmakedefine QUDA_SCALAR_TYPE @QUDA_SCALAR_TYPE@
 #cmakedefine QUDA_REDUCTION_TYPE @QUDA_REDUCTION_TYPE@
+#cmakedefine QUDA_REDUCTION_IS_DOUBLEDOUBLE @QUDA_REDUCTION_IS_DOUBLEDOUBLE@
+#cmakedefine QUDA_USE_QUAD_SCALAR @QUDA_USE_QUAD_SCALAR@
 
 #cmakedefine QUDA_REDUCTION_ALGORITHM_NAIVE @QUDA_REDUCTION_ALGORITHM_NAIVE@
 #cmakedefine QUDA_REDUCTION_ALGORITHM_KAHAN @QUDA_REDUCTION_ALGORITHM_KAHAN@

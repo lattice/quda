@@ -18,7 +18,8 @@ namespace quda {
     return *this;
   }
 
-  void GaugeLaplace::Dslash(ColorSpinorField &out, const ColorSpinorField &in,  const QudaParity parity) const
+  void GaugeLaplace::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity) const
   {
     checkSpinorAlias(in, out);
 
@@ -28,13 +29,11 @@ namespace quda {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
-    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, dagger, comm_dim, profile);
-    flops += 1320ll*in.Volume(); // FIXME
+    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, comm_dim, profile);
   }
 
-  void GaugeLaplace::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const real_t &k) const
+  void GaugeLaplace::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkSpinorAlias(in, out);
 
@@ -44,41 +43,47 @@ namespace quda {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
-    ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, dagger, comm_dim, profile);
-    flops += 1368ll*in.Volume(); // FIXME
+    ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, comm_dim, profile);
   }
 
-  void GaugeLaplace::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplace::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
     DslashXpay(out, in, QUDA_INVALID_PARITY, in, -kappa);
   }
 
-  void GaugeLaplace::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplace::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
 
-  void GaugeLaplace::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
+  void GaugeLaplace::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                             cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                             const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void GaugeLaplace::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void GaugeLaplace::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                 const QudaSolutionType) const
   {
     // do nothing
   }
 
-  GaugeLaplacePC::GaugeLaplacePC(const DiracParam &param) : GaugeLaplace(param) { }
+  GaugeLaplacePC::GaugeLaplacePC(const DiracParam &param) : GaugeLaplace(param)
+  {
+    for (auto i = 0; i < 4; i++)
+      if (laplace3D == i) errorQuda("Cannot use 3-d operator with e/o preconditioning");
+  }
 
   GaugeLaplacePC::GaugeLaplacePC(const GaugeLaplacePC &dirac) : GaugeLaplace(dirac) { }
 
@@ -90,10 +95,10 @@ namespace quda {
     return *this;
   }
 
-  void GaugeLaplacePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplacePC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto kappa2 = -kappa*kappa;
-    auto tmp = getFieldTmp(in);
+    auto kappa2 = -kappa * kappa;
+    auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(tmp, in, QUDA_ODD_PARITY);
@@ -106,59 +111,44 @@ namespace quda {
     }
   }
 
-  void GaugeLaplacePC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplacePC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
 
-  void GaugeLaplacePC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			      ColorSpinorField &x, ColorSpinorField &b, 
-			      const QudaSolutionType solType) const
+  void GaugeLaplacePC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                               cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                               const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      src = &b;
-      sol = &x;
-    } else {
-      // we desire solution to full system
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-	// src = b_e + k D_eo b_o
-	DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-	src = &(x.Odd());
-	sol = &(x.Even());
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-	// src = b_o + k D_oe b_e
-	DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-	src = &(x.Even());
-	sol = &(x.Odd());
-      } else {
-	errorQuda("MatPCType %d not valid for GaugeLaplacePC", matpcType);
+      for (auto i = 0u; i < b.size(); i++) {
+        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+        sol[i] = x[i].create_alias();
       }
-      // here we use final solution to store parity solution and parity source
-      // b is now up for grabs if we want
+      return;
     }
 
+    // we desire solution to full system
+    for (auto i = 0u; i < b.size(); i++) {
+      // src = b_e + k D_eo b_o
+      DslashXpay(x[i][other_parity], b[i][other_parity], this_parity, b[i][this_parity], kappa);
+      src[i] = x[i][other_parity].create_alias();
+      sol[i] = x[i][this_parity].create_alias();
+    }
   }
 
-  void GaugeLaplacePC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				  const QudaSolutionType solType) const
+  void GaugeLaplacePC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                   const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      return;
-    }				
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
 
-    // create full solution
-    checkFullSpinor(x, b);
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      // x_o = b_o + k D_oe x_e
-      DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      // x_e = b_e + k D_eo x_o
-      DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-    } else {
-      errorQuda("MatPCType %d not valid for GaugeLaplacePC", matpcType);
+    for (auto i = 0u; i < b.size(); i++) {
+      // create full solution
+      checkFullSpinor(x[i], b[i]);
+      DslashXpay(x[i][other_parity], x[i][this_parity], other_parity, b[i][other_parity], kappa);
     }
   }
 

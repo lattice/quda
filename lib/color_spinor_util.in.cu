@@ -5,6 +5,8 @@
 #include <index_helper.cuh>
 #include <blas_quda.h>
 #include <instantiate.h>
+#include <domain_decomposition_helper.cuh>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -126,8 +128,6 @@ namespace quda {
     else if (sourceType == QUDA_CORNER_SOURCE) corner(A, x, s, c, a);
     else errorQuda("Unsupported source type %d", sourceType);
   }
-
-  template <int...> struct IntList { };
 
   template <typename Float, int nSpin, QudaFieldOrder order, typename pack_t, int nColor, int...N>
   void genericSource(const pack_t &pack, IntList<nColor, N...>)
@@ -329,7 +329,7 @@ namespace quda {
       printf("rank = %d x = %u, s = %d, { ", comm_rank(), x_cb, s);
       for (int c = 0; c < o.Ncolor(); c++) {
         auto value = complex<double>(o(parity, x_cb, s, c));
-        printf("(%f,%f) ", value.real(), value.imag());
+        printf("(%g,%g) ", value.real(), value.imag());
       }
       printf("}\n");
     }
@@ -339,7 +339,7 @@ namespace quda {
   void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb)
   {
     if (a.isNative()) {
-      constexpr auto order = colorspinor::getNative<Float>(nSpin);
+      constexpr auto order = QUDA_NATIVE_FIELD_ORDER;
       print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, true>(a), parity, x_cb);
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       constexpr auto order = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -378,8 +378,6 @@ namespace quda {
 
   void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb, int rank)
   {
-    if (rank != comm_rank()) return;
-
     ColorSpinorParam param(a);
     param.location = QUDA_CPU_FIELD_LOCATION;
     param.create = QUDA_COPY_FIELD_CREATE;
@@ -387,6 +385,8 @@ namespace quda {
     bool host_clone = (a.Location() == QUDA_CUDA_FIELD_LOCATION && a.MemType() == QUDA_MEMORY_DEVICE && !use_managed_memory()) ? true : false;
     std::unique_ptr<ColorSpinorField> clone_a = !host_clone ? nullptr : std::make_unique<ColorSpinorField>(param);
     const ColorSpinorField &a_ = !host_clone ? a : *clone_a.get();
+
+    if (rank != comm_rank()) return; // rank returns after potential copy to host to prevent tuning hang
 
     switch (a.Precision()) {
     case QUDA_DOUBLE_PRECISION:  genericPrintVector<double>(a_, parity, x_cb); break;
@@ -417,9 +417,24 @@ namespace quda {
 
     param.create = create;
     if (create == QUDA_COPY_FIELD_CREATE) param.field = &const_cast<ColorSpinorField&>(src);
-    else if (create == QUDA_REFERENCE_FIELD_CREATE) param.v = src.data();
+    else if (create == QUDA_REFERENCE_FIELD_CREATE)
+      param.v = src.data();
 
     resize(v, new_size, param);
+  }
+
+  void create_alias(cvector_ref<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param)
+  {
+    if (alias.size() != v.size()) errorQuda("sets differ in size (%lu != %lu)", alias.size(), v.size());
+    for (auto i = 0u; i < v.size(); i++) alias[i] = const_cast<ColorSpinorField &>(v[i]).create_alias(param);
+  }
+
+  void create_alias(std::vector<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param)
+  {
+    alias.resize(v.size());
+    create_alias(cvector_ref<ColorSpinorField>(alias), v, param);
   }
 
 } // namespace quda

@@ -52,6 +52,7 @@ namespace quda
     }
 
     comm_init(nDim, commDims, rank_from_coords, map_data);
+
     globalReduce.push(true);
   }
 
@@ -120,6 +121,9 @@ namespace quda
                 grid_size, size);
     }
 
+    // defer handling MPI errors to QUDA
+    MPI_Comm_set_errhandler(MPI_COMM_HANDLE, MPI_ERRORS_RETURN);
+
     comm_init_common(ndim, dims, rank_from_coords, map_data);
   }
 
@@ -164,7 +168,7 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
@@ -186,7 +190,7 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
@@ -209,7 +213,7 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
@@ -237,7 +241,7 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
@@ -289,6 +293,31 @@ namespace quda
 
       for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans.data() + i * n, n); }
     }
+  }
+
+  template <>
+  void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *data, size_t size)
+  {
+    size_t n = comm_size();
+    std::vector<doubledouble> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE_COMPLEX, recv_buf.data(), size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<doubledouble> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) { data[i] = deterministic_sum_reduce(recv_trans.data() + i * n, n); }
+  }
+
+  template <>
+  void Communicator::comm_allreduce_sum_array<device_reduce_t>(device_reduce_t *data, size_t size)
+  {
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+    comm_allreduce_sum_array<rfa_t<reduction_t>>(reinterpret_cast<rfa_t<reduction_t> *>(data), size);
+#else
+    comm_allreduce_sum_array<reduction_t>(reinterpret_cast<reduction_t *>(data), size);
+#endif
   }
 
   void Communicator::comm_allreduce_sum(size_t &a)

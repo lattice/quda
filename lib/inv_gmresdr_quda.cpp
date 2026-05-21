@@ -29,19 +29,20 @@ namespace quda {
   using namespace std;
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
-  using DenseMatrix = Matrix<complex_t, Dynamic, Dynamic>;
-  using VectorSet = Matrix<complex_t, Dynamic, Dynamic>;
-  using Vector = Matrix<complex_t, Dynamic, 1>;
+
+  using DenseMatrix = EigMatrixXcd;
+  using VectorSet = EigMatrixXcd;
+  using Vector = EigVectorXcd;
 
   // special types needed for compatibility with QUDA blas:
   using RowMajorDenseMatrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;
 
   struct SortedEvals {
 
-    real_t _val;
+    double _val;
     int _idx;
 
-    SortedEvals(real_t val, int idx) : _val(val), _idx(idx) {};
+    SortedEvals(double val, int idx) : _val(val), _idx(idx) {};
     static bool SelectSmall(SortedEvals v1, SortedEvals v2) { return (v1._val < v2._val); }
   };
 
@@ -72,7 +73,7 @@ namespace quda {
       restarts(0),
       Vkp1(nullptr)
     {
-      c = static_cast<complex_t *>(ritzVecs.col(k).data());
+      c = reinterpret_cast<complex_t *>(ritzVecs.col(k).data());
     }
 
     inline void ResetArgs()
@@ -96,8 +97,9 @@ namespace quda {
     DenseMatrix cH = args.H.block(0, 0, args.m, args.m).adjoint();
     DenseMatrix Gk = args.H.block(0, 0, args.m, args.m);
 
-    VectorSet harVecs = VectorSet::Zero(args.m, args.m);
+    VectorSet harVecs = DenseMatrix::Zero(args.m, args.m);
     Vector harVals = Vector::Zero(args.m);
+
     Vector em = Vector::Zero(args.m);
 
     em(args.m - 1) = norm(args.H(args.m, args.m - 1));
@@ -141,8 +143,6 @@ namespace quda {
     inner.precision_sloppy = outer.precision_precondition;
 
     inner.iter = 0;
-    inner.gflops = 0;
-    inner.secs = 0;
 
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true;
@@ -151,25 +151,24 @@ namespace quda {
   }
 
   GMResDR::GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                   SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile),
+                   SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matPrecon, param),
     K(nullptr),
     Kparam(param),
     Vm(nullptr),
     Zm(nullptr),
-    profile(profile),
     gmresdr_args(nullptr)
   {
     fillFGMResDRInnerSolveParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER)
-      K = new CG(matPrecon, matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matPrecon, matPrecon, matPrecon, matPrecon, Kparam);
     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER)
-      K = new BiCGstab(matPrecon, matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = new BiCGstab(matPrecon, matPrecon, matPrecon, matPrecon, Kparam);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER)
-      K = new MR(matPrecon, matPrecon, Kparam, profile);
+      K = new MR(matPrecon, matPrecon, Kparam);
     else if (param.inv_type_precondition == QUDA_SD_INVERTER)
-      K = new SD(matPrecon, Kparam, profile);
+      K = new SD(matPrecon, Kparam);
     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER)
       K = nullptr;
     else
@@ -177,20 +176,19 @@ namespace quda {
   }
 
   GMResDR::GMResDR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                   SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile),
+                   SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matPrecon, param),
     K(&K),
     Kparam(param),
     Vm(nullptr),
     Zm(nullptr),
-    profile(profile),
     gmresdr_args(nullptr)
   {
   }
 
   GMResDR::~GMResDR()
   {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
     if (init) {
       delete Vm;
@@ -214,7 +212,7 @@ namespace quda {
       delete gmresdr_args;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
@@ -235,14 +233,13 @@ namespace quda {
     std::vector<ColorSpinorField *> x_, r_;
     x_.push_back(x), r_.push_back(r);
 
-    blas::caxpy(static_cast<complex_t *>(args.eta.data()), Z_, x_);
+    blas::legacy::caxpy(reinterpret_cast<complex_t *>(args.eta.data()), Z_, x_);
 
     Vector minusHeta = -(args.H * args.eta);
     Map<Vector, Unaligned> c_(args.c, args.m + 1);
     c_ += minusHeta;
 
-    blas::caxpy(static_cast<complex_t *>(minusHeta.data()), V_, r_);
-    return;
+    blas::legacy::caxpy(reinterpret_cast<complex_t *>(minusHeta.data()), V_, r_);
   }
 
   void GMResDR::RestartVZH()
@@ -270,7 +267,7 @@ namespace quda {
     std::vector<ColorSpinorField *> vm(Vm->Components());
 
     RowMajorDenseMatrix Alpha(Qkp1); // convert Qkp1 to Row-major format first
-    blas::caxpy(static_cast<complex_t *>(Alpha.data()), vm, vkp1);
+    blas::legacy::caxpy(static_cast<complex_t *>(Alpha.data()), vm, vkp1);
 
     for (int i = 0; i < (args.m + 1); i++) {
       if (i < (args.k + 1)) {
@@ -285,7 +282,7 @@ namespace quda {
       std::vector<ColorSpinorField *> vk(args.Vkp1->Components().begin(), args.Vkp1->Components().begin() + args.k);
 
       RowMajorDenseMatrix Beta(Qkp1.topLeftCorner(args.m, args.k));
-      blas::caxpy(static_cast<complex_t *>(Beta.data()), z, vk);
+      blas::legacy::caxpy(static_cast<complex_t *>(Beta.data()), z, vk);
 
       for (int i = 0; i < (args.m); i++) {
         if (i < (args.k))
@@ -313,7 +310,7 @@ namespace quda {
 
     std::unique_ptr<complex_t[]> givensH((do_givens) ? new complex_t[(args.m + 1) * args.m] : nullptr);
     std::unique_ptr<complex_t[]> cn((do_givens) ? new complex_t[args.m] : nullptr);
-    std::unique_ptr<real_t[]> sn((do_givens) ? new real_t[args.m] : nullptr);
+    std::unique_ptr<double[]> sn((do_givens) ? new double[args.m] : nullptr);
 
     complex_t c0 = args.c[0];
 
@@ -335,7 +332,7 @@ namespace quda {
       args.H(0, j) = cDotProduct(Vm->Component(0), Vm->Component(j + 1));
       caxpy(-args.H(0, j), Vm->Component(0), Vm->Component(j + 1));
 
-      complex_t h0 = do_givens ? args.H(0, j) : complex_t(0.0);
+      complex_t h0 = do_givens ? args.H(0, j) : 0.0;
 
       for (int i = 1; i <= j; i++) {
         args.H(i, j) = cDotProduct(Vm->Component(i), Vm->Component(j + 1));
@@ -350,7 +347,7 @@ namespace quda {
       args.H(j + 1, j) = complex_t(sqrt(norm2(Vm->Component(j + 1))), 0.0);
       blas::ax(1.0 / args.H(j + 1, j).real(), Vm->Component(j + 1));
       if (do_givens) {
-        real_t inv_denom = rsqrt(norm(h0) + norm(args.H(j + 1, j)));
+        double inv_denom = 1.0 / sqrt(norm(h0) + norm(args.H(j + 1, j)));
         cn[j] = h0 * inv_denom;
         sn[j] = args.H(j + 1, j).real() * inv_denom;
         givensH[j * (args.m + 1) + j] = conj(cn[j]) * h0 + sn[j] * args.H(j + 1, j);
@@ -377,17 +374,17 @@ namespace quda {
       std::vector<ColorSpinorField *> r_;
       r_.push_back(static_cast<ColorSpinorField *>(r_sloppy));
 
-      blas::cDotProduct(args.c, v_, r_);
+      blas::legacy::cDotProduct(args.c, v_, r_);
     }
     return (j - start_idx);
   }
 
-  void GMResDR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void GMResDR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
-    const real_t tol_threshold     = 1.2;
-    const real_t det_max_deviation = 0.4;
+    const double tol_threshold     = 1.2;
+    const double det_max_deviation = 0.4;
 
     ColorSpinorField *ep = nullptr;
 
@@ -439,21 +436,22 @@ namespace quda {
 
     ColorSpinorField &rSloppy = *r_sloppy;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     int tot_iters = 0;
 
-    real_t normb = norm2( b );
-    real_t stop  = param.tol*param.tol* normb;  
+    double normb = norm2( b );
+    double stop  = param.tol*param.tol* normb;  
 
     mat(r, x);
     
-    real_t r2 = xmyNorm(b, r);
-    real_t b2 = r2;
+    double r2 = xmyNorm(b, r);
+    double b2 = r2;
     args.c[0] = complex_t(sqrt(r2), 0.0);
 
-    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", double(r2), double(sqrt(normb)), double(param.tol));
+    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", QUDA_REAL(r2),
+               QUDA_REAL(sqrt(normb)), QUDA_REAL(param.tol));
 
     rSloppy = r;
 
@@ -465,13 +463,12 @@ namespace quda {
       blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));   
     }
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
-    real_t heavy_quark_res = 0.0;  
+    double heavy_quark_res = 0.0;  
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
 
@@ -486,7 +483,7 @@ namespace quda {
       r2 = norm2(rSloppy);
 
       bool do_clean_restart = false;
-      real_t ext_r2 = 1.0;
+      double ext_r2 = 1.0;
 
       if ((restart_idx + 1) % check_interval) {
         mat(y, e);
@@ -501,19 +498,19 @@ namespace quda {
           std::vector<ColorSpinorField *> v2_;
           v2_.push_back(static_cast<ColorSpinorField *>(&Vm->Component(l)));
 
-          blas::cDotProduct(col, v1_, v2_);
+          blas::legacy::cDotProduct(col, v1_, v2_);
 
         } // end l-loop
 
         complex_t detGm = Gm.determinant();
 
         PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
-        printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx,
-                   double(ext_r2), double(detGm.real()), double(detGm.imag()));
+        printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, QUDA_REAL(ext_r2),
+                   QUDA_REAL(detGm.real()), QUDA_REAL(detGm.imag()));
 
         Gm.setZero();
 
-        do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
+        do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || (fabs(1.0 - norm(detGm)) > det_max_deviation);
       }
 
       if (((restart_idx != param.deflation_grid - 1) && !do_clean_restart)) {
@@ -523,7 +520,7 @@ namespace quda {
 
       } else {
 
-        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, double(ext_r2));
+        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, QUDA_REAL(ext_r2));
         args.ResetArgs();
 
         // update solution:
@@ -544,12 +541,9 @@ namespace quda {
     // final solution:
     xpy(e, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops()) * 1e-9;
-    param.gflops = gflops;
     param.iter += tot_iters;
 
     mat(r, x);
@@ -558,14 +552,12 @@ namespace quda {
 
     PrintSummary("FGMResDR:", tot_iters, r2, b2, stop, param.tol_hq);
 
-    blas::flops = 0;
-    mat.flops();
-
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     param.rhs_idx += 1;
 
     if (ep) delete ep;
+    return;
   }
 
 } // namespace quda

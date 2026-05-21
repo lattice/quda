@@ -55,12 +55,16 @@ namespace quda
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = v.data<char *>() + j * stride; }
       }
 
+      // if we're loading inflated vectors, we need to grab the spinor size from `tmp` instead of `v0`.
+      auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
+      auto spinor_site_subset = (create_tmp && parity_inflate) ? tmp[0].SiteSubset() : v0.SiteSubset();
+
       // time loading
       quda::host_timer_t host_timer;
       host_timer.start(); // start the timer
 
-      read_spinor_field(filename.c_str(), V.data(), v0.Precision(), v0.X(), v0.SiteSubset(),
-                        spinor_parity, v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr);
+      read_spinor_field(filename.c_str(), V.data(), v0.Precision(), spinor_X, spinor_site_subset, spinor_parity,
+                        v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr);
 
       host_timer.stop(); // stop the timer
       logQuda(QUDA_SUMMARIZE, "Time spent loading vectors from %s = %g secs\n", filename.c_str(), host_timer.last());
@@ -140,12 +144,16 @@ namespace quda
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = v.data<const char *>() + j * stride; }
       }
 
+      // if we performed parity inflation, we need to grab the spinor size from `tmp` instead of `v0`.
+      auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
+      auto spinor_site_subset = (create_tmp && parity_inflate) ? tmp[0].SiteSubset() : v0.SiteSubset();
+
       // time saving
       quda::host_timer_t host_timer;
       host_timer.start(); // start the timer
 
-      write_spinor_field(filename.c_str(), V.data(), save_prec, v0.X(), v0.SiteSubset(), spinor_parity, v0.Ncolor(),
-                         v0.Nspin(), Nvec * Ls, 0, nullptr, partfile);
+      write_spinor_field(filename.c_str(), V.data(), save_prec, spinor_X, spinor_site_subset, spinor_parity,
+                         v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr, partfile);
 
       host_timer.stop(); // stop the timer
       logQuda(QUDA_SUMMARIZE, "Time spent saving vectors to %s = %g secs\n", filename.c_str(), host_timer.last());

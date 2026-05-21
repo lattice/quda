@@ -245,7 +245,7 @@ namespace quda {
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const override
     {
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV)
+      if (arg.shared_atomic && (type == COMPUTE_VUV || type == COMPUTE_VLV))
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
@@ -577,9 +577,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
       arg.kd_dagger = kd_dagger;
 
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
       Launch<location_template>(arg, tp, type, stream);
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
     /**
@@ -715,6 +713,11 @@ namespace quda {
       return ((type == COMPUTE_VUV || type == COMPUTE_VLV) ? (advanceAtomic(param) || advanceParityFlip(param) || advanceSwizzle(param)) : false);
     }
 
+    bool tuneSharedBytes() const override
+    {
+      return (!arg.shared_atomic && !from_coarse && (type == COMPUTE_VUV || type == COMPUTE_VLV)) || type == COMPUTE_COARSE_CLOVER;
+    }
+
     bool advanceSharedBytes(TuneParam &param) const override
     {
       return ( (!arg.shared_atomic && !from_coarse && (type == COMPUTE_VUV || type == COMPUTE_VLV)) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
@@ -789,7 +792,7 @@ namespace quda {
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
 #ifdef QUDA_MMA_AVAILABLE
-          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+          strcat(Aux, mma::mg_mma_setup_t<typename Arg::store_t>::type::get_type_name().c_str());
 #endif
         }
       }
@@ -804,7 +807,7 @@ namespace quda {
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
 #ifdef QUDA_MMA_AVAILABLE
-          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+          strcat(Aux, mma::mg_mma_setup_t<typename Arg::store_t>::type::get_type_name().c_str());
 #endif
         }
       }
@@ -887,8 +890,8 @@ namespace quda {
 	X_atomic.backup();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.data() == Y.data()) Y.backup();
-	if (X_atomic.data() == X.data()) X.backup();
+        if (Y_atomic.data() == Y.data()) Y.backup();
+        if (X_atomic.data() == X.data()) X.backup();
         break;
       case COMPUTE_RESCALE:
         Y.backup();
@@ -921,8 +924,8 @@ namespace quda {
 	X_atomic.restore();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.data() == Y.data()) Y.restore();
-	if (X_atomic.data() == X.data()) X.restore();
+        if (Y_atomic.data() == Y.data()) Y.restore();
+        if (X_atomic.data() == X.data()) X.restore();
         break;
       case COMPUTE_RESCALE:
         Y.restore();
@@ -968,7 +971,7 @@ namespace quda {
      @param need_bidirectional[in] If we need to force bi-directional build or not. Required
      if some previous level was preconditioned, even if this one isn't
    */
-  template <bool use_mma, QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin,
+  template <bool use_mma, QudaFieldLocation location, bool from_coarse, typename Float, typename store_t, int fineSpin, int fineColor, int coarseSpin,
             int coarseColor, typename avSpinor, typename uvSpinor, typename vSpinor, typename coarseGauge, typename coarseGaugeAtomic,
             typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, uvSpinor &UV,
@@ -1039,7 +1042,7 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
+    using Arg = CalculateYArg<from_coarse, Float, store_t, fineSpin, coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, v, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));

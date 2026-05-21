@@ -20,19 +20,28 @@ namespace quda
 
     static int device_id = -1;
 
+    int get_driver_version()
+    {
+      int driver_version;
+      CHECK_HIP_ERROR(hipDriverGetVersion(&driver_version));
+      return driver_version;
+    }
+
+    int get_runtime_version()
+    {
+      int runtime_version;
+      CHECK_HIP_ERROR(hipRuntimeGetVersion(&runtime_version));
+      return runtime_version;
+    }
+
     void init(int dev)
     {
       if (initialized) return;
       initialized = true;
       printfQuda("*** HIP BACKEND ***\n");
 
-      int driver_version = 0;
-      CHECK_HIP_ERROR(hipDriverGetVersion(&driver_version));
-      printfQuda("HIP Driver version = %d\n", driver_version);
-
-      int runtime_version = 0;
-      CHECK_HIP_ERROR(hipRuntimeGetVersion(&runtime_version));
-      printfQuda("HIP Runtime version = %d\n", runtime_version);
+      printfQuda("HIP Driver version = %d\n", get_driver_version());
+      printfQuda("HIP Runtime version = %d\n", get_runtime_version());
 
       for (int i = 0; i < get_device_count(); i++) {
         CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, i));
@@ -56,6 +65,11 @@ namespace quda
       if (device_id == -1) errorQuda("No HIP device has been initialized for this process");
       CHECK_HIP_ERROR(hipSetDevice(device_id));
     }
+
+    void init_monitor() { }
+
+    // not implemented on HIP at present
+    state_t get_state() { return {}; }
 
     int get_device_count()
     {
@@ -178,6 +192,8 @@ namespace quda
     unsigned int processor_count() { return deviceProp.multiProcessorCount; }
 
     unsigned int max_blocks_per_processor() { return 32; }
+
+    bool shared_carve_out_supported() { return false; }
 
     namespace profile
     {

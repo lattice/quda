@@ -40,7 +40,6 @@ namespace quda
        @param[in] size Optional cap to number of vectors saved
     */
     void save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0);
-
   };
 
 } // namespace quda

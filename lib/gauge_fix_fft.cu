@@ -283,14 +283,14 @@ namespace quda {
       //------------------------------------------------------------------------
       gfixquality.apply(device::get_default_stream());
       real_t action = argQ.getAction();
-      diff = abs(action0 - action);
+      diff = quda::fabs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
         printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1,
                double(argQ.getAction()), double(argQ.getTheta()), double(diff));
       if ( autotune && ((action - action0) < -1e-14) ) {
         if ( arg.alpha > 0.01 ) {
           arg.alpha = 0.95 * arg.alpha;
-          if(getVerbosity() >= QUDA_SUMMARIZE) printf(">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", arg.alpha);
+          logQuda(QUDA_SUMMARIZE, ">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", arg.alpha);
         }
       }
       //------------------------------------------------------------------------
@@ -325,9 +325,7 @@ namespace quda {
     arg.free();
     FFTDestroyPlan(plan_zt);
     FFTDestroyPlan(plan_xy);
-    qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
-
 
     double secs = profileInternalGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);
     double fftflop = 5.0 * (log2((double)( data.X()[0] * data.X()[1]) ) + log2( (double)(data.X()[2] * data.X()[3] )));
@@ -357,7 +355,7 @@ namespace quda {
     
     gflops = (gflops * 1e-9) / (secs);
     gbytes = gbytes / (secs * 1e9);
-    if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
+    logQuda(QUDA_SUMMARIZE, "Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
 
     host_free(num_failures_h);
   }
@@ -367,10 +365,10 @@ namespace quda {
                    real_t alpha, int autotune, real_t tolerance, int stopWtheta)
     {
       if (gauge_dir != 3) {
-	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with FFTs...\n");
+        logQuda(QUDA_SUMMARIZE, "Starting Landau gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 4>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else {
-	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
+        logQuda(QUDA_SUMMARIZE, "Starting Coulomb gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 3>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       }
     }

@@ -7,19 +7,28 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+#include <timer.h>
 //#include <color_spinor_field.h> // convenient quark field container
 
-#include <misc.h>
-#include <timer.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "test.h"
 
 // Place params above "eigensolve_test_gtest.hpp" so they
 // are visible therein.
 QudaGaugeParam gauge_param;
 QudaInvertParam eig_inv_param;
 QudaEigParam eig_param;
+QudaGaugeSmearParam smear_param;
+
+std::vector<char> gauge_;
+std::array<void *, 4> gauge;
+std::vector<char> clover;
+std::vector<char> clover_inv;
+QudaPrecision last_prec = QUDA_INVALID_PRECISION;
 
 // if "--enable-testing true" is passed, we run the tests defined in here
 #include <eigensolve_test_gtest.hpp>
@@ -28,10 +37,10 @@ void display_test_info(QudaEigParam &param)
 {
   printfQuda("running the following test:\n");
 
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
-             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
-             tdim, Lsdim);
+  printfQuda("prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s      %s            %s            %d/%d/%d          %d         %d\n",
+             get_prec_str(eig_inv_param.cuda_prec_eigensolver), get_recon_str(link_recon),
+             get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim);
 
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(param.eig_type));
@@ -65,17 +74,16 @@ void display_test_info(QudaEigParam &param)
              dimPartitioned(3));
 }
 
-std::vector<char> gauge_;
-std::array<void *, 4> gauge;
-std::vector<char> clover;
-std::vector<char> clover_inv;
-
 void init(int argc, char **argv)
 {
   // Construct QUDA param structures to define the problem
   //------------------------------------------------------
   gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+  }
 
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
@@ -103,29 +111,43 @@ void init(int argc, char **argv)
   gauge_.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
   for (int i = 0; i < 4; i++) gauge[i] = gauge_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
   constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
-  // Load the gauge field to the device
-  loadGaugeQuda(gauge.data(), &gauge_param);
 
   // Allocate host side memory for clover terms if needed.
-  //----------------------------------------------------------------------------
-  // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     clover.resize(V * clover_site_size * host_clover_data_type_size);
     clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover.data(), clover_inv.data(), eig_inv_param);
-    // Load the clover terms to the device
-    loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
+  }
+
+  if (!enable_testing) {
+    // Load the gauge field to the device
+    loadGaugeQuda(gauge.data(), &gauge_param);
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      // Load the clover terms to the device
+      loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
+    }
+
+    // Compute plaquette as a sanity check
+    double plaq[3];
+    plaqQuda(plaq);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
 }
 
 std::vector<double> eigensolve(test_t test_param)
 {
   // Collect testing parameters from gtest
-  eig_param.eig_type = ::testing::get<0>(test_param);
-  eig_param.use_norm_op = ::testing::get<1>(test_param);
-  eig_param.use_pc = ::testing::get<2>(test_param);
-  eig_param.compute_svd = ::testing::get<3>(test_param);
-  eig_param.spectrum = ::testing::get<4>(test_param);
+  eig_inv_param.cuda_prec = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_eigensolver = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_sloppy = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_precondition = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_refinement_sloppy = ::testing::get<0>(test_param);
+  eig_param.eig_type = ::testing::get<1>(test_param);
+  eig_param.use_norm_op = ::testing::get<2>(test_param);
+  eig_param.use_pc = ::testing::get<3>(test_param);
+  eig_param.compute_svd = ::testing::get<4>(test_param);
+  eig_param.spectrum = ::testing::get<5>(test_param);
 
   // For preconditioned matrices, spinors are only half the normal length.
   // QUDA constructs spinors based on the "solution type" which is
@@ -171,16 +193,14 @@ std::vector<double> eigensolve(test_t test_param)
   // Host side arrays to store the eigenpairs computed by QUDA
   int n_eig = eig_n_conv;
   if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
-  std::vector<quda::ColorSpinorField> evecs(n_eig);
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
+
   // Void pointers to host side arrays, compatible with the QUDA interface.
   std::vector<void *> host_evecs_ptr(n_eig);
   // Allocate host side memory and pointers
-  for (int i = 0; i < n_eig; i++) {
-    evecs[i] = quda::ColorSpinorField(cs_param);
-    host_evecs_ptr[i] = evecs[i].data();
-  }
+  std::vector<quda::ColorSpinorField> evecs(n_eig, cs_param);
+  for (int i = 0; i < n_eig; i++) host_evecs_ptr[i] = evecs[i].data();
 
   // Complex eigenvalues
   std::vector<__complex__ double> evals(eig_n_conv);
@@ -198,6 +218,7 @@ std::vector<double> eigensolve(test_t test_param)
   if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
+
   eigensolveQuda(host_evecs_ptr.data(), evals.data(), &eig_param);
   host_timer.stop();
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
@@ -229,6 +250,7 @@ int main(int argc, char **argv)
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
+  add_su3_option_group(app);
   add_madwf_option_group(app);
   add_comms_option_group(app);
   add_testing_option_group(app);
@@ -249,8 +271,7 @@ int main(int argc, char **argv)
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
       && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
       && dslash_type != QUDA_DOMAIN_WALL_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH) {
-    printfQuda("dslash_type %d not supported\n", dslash_type);
-    exit(0);
+    errorQuda("dslash_type %d not supported", dslash_type);
   }
 
   // Initialize the QUDA library
@@ -259,27 +280,19 @@ int main(int argc, char **argv)
   // Initialise this test (parameters, gauge, clover)
   init(argc, argv);
 
-  // Compute plaquette as a sanity check
-  double plaq[3];
-  plaqQuda(plaq);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
   int result = 0;
   if (enable_testing) { // tests are defined in invert_test_gtest.hpp
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    eigensolve(
-      test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
+    eigensolve(test_t {prec, eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd,
+                       eig_param.spectrum});
   }
 
   // Memory clean-up
   freeGaugeQuda();
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    freeCloverQuda();
-  }
-
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
   // Finalize the QUDA library
   endQuda();
   finalizeComms();

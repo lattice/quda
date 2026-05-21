@@ -10,6 +10,7 @@ namespace quda
 
     /**
       @brief A constexpr function to returns the maximum dyanmic shared memory per block.
+        See https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#feature-availability
      */
     constexpr int maximum_dynamic_shared_memory()
     {
@@ -32,10 +33,40 @@ namespace quda
         return 100 * 1024;
 #elif (__COMPUTE_CAPABILITY__ == 900)
         return 228 * 1024;
+#elif (__COMPUTE_CAPABILITY__ == 1000) || (__COMPUTE_CAPABILITY__ == 1030)
+        return 228 * 1024;
+#elif (__COMPUTE_CAPABILITY__ == 1200)
+        return 100 * 1024;
 #else
         return 0;
 #endif
       }
     }
+
+    /**
+      @brief A constexpr function to return the maximum number of resident threads per SM.
+        See https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#feature-availability
+     */
+    constexpr unsigned int maximum_resident_threads()
+    {
+#if (__COMPUTE_CAPABILITY__ < 750)
+      return 2048;
+#elif (__COMPUTE_CAPABILITY__ == 750)
+      return 1024;
+#elif (__COMPUTE_CAPABILITY__ == 800)
+      return 2048;
+#elif ((__COMPUTE_CAPABILITY__ > 800) && (__COMPUTE_CAPABILITY__ < 900))
+      return 1536;
+#elif (__COMPUTE_CAPABILITY__ == 900)
+      return 2048;
+#elif (__COMPUTE_CAPABILITY__ == 1000) || (__COMPUTE_CAPABILITY__ == 1030)
+      return 2048;
+#elif (__COMPUTE_CAPABILITY__ == 1200)
+      return 1536;
+#else
+      return 0;
+#endif
+    }
+
   } // namespace device
 } // namespace quda

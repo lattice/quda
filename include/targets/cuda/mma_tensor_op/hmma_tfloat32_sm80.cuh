@@ -11,6 +11,11 @@ namespace quda
 
     template <int inst_k_, int warp_m_, int warp_n_> struct hmma_tfloat32_t {
 
+      static constexpr bool do_rescale()
+      {
+        return false; // false because TF32 has the same range as FP32
+      }
+
       static constexpr int warp_m = warp_m_;
       static constexpr int warp_n = warp_n_;
 

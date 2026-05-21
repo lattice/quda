@@ -61,11 +61,14 @@ namespace quda {
 
 template <class T> auto abs_max(const T&);
 
-template <> __host__ __device__ inline auto abs_max(const float4 &x) { return fmax( fmaxf(fabs(x.x), fabs(x.y)), fmax(fabs(x.z), fabs(x.w)) ); }
+template <> __host__ __device__ inline auto abs_max(const float4 &x)
+{
+  return fmaxf(fmaxf(fabsf(x.x), fabsf(x.y)), fmaxf(fabsf(x.z), fabsf(x.w)));
+}
 
-template <> __host__ __device__ inline auto abs_max(const double2 &x) { return fmax(fabs(x.x), fabs(x.y)); }
+template <> __host__ __device__ inline auto abs_max(const double2 &x) { return ::fmax(::fabs(x.x), ::fabs(x.y)); }
 
-template <> __host__ __device__ inline auto abs_max(const float2 &x) { return fmax(fabs(x.x), fabs(x.y)); }
+template <> __host__ __device__ inline auto abs_max(const float2 &x) { return ::fmaxf(::fabsf(x.x), ::fabsf(x.y)); }
 
 template <class ftype> struct RFA_bins
 {
@@ -897,7 +900,11 @@ private:
 
   template <class T> using rfa_t = reproducible::ReproducibleFloatingAccumulator<T>;
 
-  template <> struct get_scalar<rfa_t<double>> { using type = rfa_t<double>; };
+  // RFA only supports float/double as ftype (not doubledouble / __float128 reduction types)
+  template <class T>
+  struct get_scalar<rfa_t<T>, std::enable_if_t<std::is_floating_point_v<T>>> {
+    using type = rfa_t<T>;
+  };
 
   template <class T, class Enable = void>
   struct is_rfa {

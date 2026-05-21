@@ -5,6 +5,8 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <instantiate.h>
+#include <domain_decomposition_helper.cuh>
+#include <domain_wall_helper.h>
 
 namespace quda
 {
@@ -16,30 +18,52 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-            typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float,
+            int nColor, typename DDArg, typename... Args>
+  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
-#if QUDA_RECONSTRUCT & 4
-      Apply<Float, nColor, Recon::recon[0]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
-#endif
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
+        Apply<Float, nColor, DDArg, Recon::recon[0]>(out, in, x, U, args...);
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
     } else if (U.Reconstruct() == Recon::recon[1]) {
-#if QUDA_RECONSTRUCT & 2
-      Apply<Float, nColor, Recon::recon[1]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
-#endif
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_12>())
+        Apply<Float, nColor, DDArg, Recon::recon[1]>(out, in, x, U, args...);
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
     } else if (U.Reconstruct() == Recon::recon[2]) {
-#if QUDA_RECONSTRUCT & 1
-      Apply<Float, nColor, Recon::recon[2]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
-#endif
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_8>())
+        Apply<Float, nColor, DDArg, Recon::recon[2]>(out, in, x, U, args...);
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
     } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      errorQuda("Unsupported reconstruct type %d", U.Reconstruct());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the domain decomposition type
+     @param[out] out Output result field
+     @param[in] in Input field
+     @param[in] U Gauge field
+     @param[in] args Additional arguments for different dslash kernels
+  */
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float,
+            int nColor, typename... Args>
+  inline void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
+  {
+    if (out.DD().type == QUDA_DD_NO && in.DD().type == QUDA_DD_NO) {
+      instantiate<Apply, Recon, Float, 3, DDNo>(out, in, x, U, args...);
+    } else if (out.DD().type == QUDA_DD_RED_BLACK || in.DD().type == QUDA_DD_RED_BLACK) {
+      if constexpr (is_enabled(QUDA_DD_RED_BLACK))
+        instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, x, U, args...);
+      else
+        errorQuda("QUDA_DOMAIN_DECOMPOSITION=%d does not enable RedBlack", QUDA_DOMAIN_DECOMPOSITION);
+    } else {
+      errorQuda("Unsupported DD type %d\n", out.DD().type);
     }
   }
 
@@ -50,13 +74,14 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
+  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
     if (in.Ncolor() == 3) {
-      instantiate<Apply, Recon, Float, 3>(out, in, U, args...);
+      instantiate<Apply, Recon, Float, 3>(out, in, x, U, args...);
     } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+      errorQuda("Unsupported number of colors %d", U.Ncolor());
     }
   }
 
@@ -67,35 +92,32 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
+  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
-      instantiate<Apply, Recon, double>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-#if QUDA_PRECISION & 4
-      instantiate<Apply, Recon, float>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      instantiate<Apply, Recon, short>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate<Apply, Recon>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
+                                {x.begin(), x.begin() + x.size() / 2}, U, args...);
+      instantiate<Apply, Recon>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
+                                {x.begin() + x.size() / 2, x.end()}, U, args...);
+      return;
+    }
+
+    auto precision = checkPrecision(out, in, x, U); // check all precisions match
+    if (!is_enabled(precision)) errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, precision);
+
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION)) instantiate<Apply, Recon, double>(out, in, x, U, args...);
+    } else if (precision == QUDA_SINGLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) instantiate<Apply, Recon, float>(out, in, x, U, args...);
+    } else if (precision == QUDA_HALF_PRECISION) {
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) instantiate<Apply, Recon, short>(out, in, x, U, args...);
+    } else if (precision == QUDA_QUARTER_PRECISION) {
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) instantiate<Apply, Recon, int8_t>(out, in, x, U, args...);
     } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
+      errorQuda("Unsupported precision %d", precision);
     }
   }
 
@@ -109,39 +131,43 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-#if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                        Args &&...args)
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
+  void instantiatePreconditioner(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
+    if (!is_enabled(U.Precision()))
+      errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, U.Precision());
+
     if (U.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      instantiate<Apply, Recon, short>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) instantiate<Apply, Recon, short>(out, in, x, U, args...);
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) instantiate<Apply, Recon, int8_t>(out, in, x, U, args...);
     } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
+      errorQuda("Unsupported precision %d", U.Precision());
     }
   }
-#else
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiatePreconditioner(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, Args &&...)
+
+  // use custom instantiate to deal with 4 quark fields
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
+  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U,
+                   Args... args)
   {
-    if (U.Precision() == QUDA_HALF_PRECISION) {
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate<Apply, Recon>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
+                                {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2}, U, args...);
+      instantiate<Apply, Recon>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
+                                {x.begin() + x.size() / 2, x.end()}, {y.begin() + y.size() / 2, y.end()}, U, args...);
+      return;
     }
+    instantiate<Apply, Recon>(out, in, x, U, y, args...);
   }
-#endif
+
+  template <bool distance_pc> using DistanceType = std::integral_constant<bool, distance_pc>;
+
+  template <Dslash5Type...> struct Dslash5TypeList {
+  };
 
 } // namespace quda

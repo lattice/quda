@@ -42,7 +42,7 @@ namespace quda
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
-      array<double, 3> E_local{0, 0, 0};
+      reduce_t E_local {};
       auto &Q = E_local[2];
 
       // Load the field-strength tensor from global memory
@@ -60,8 +60,10 @@ namespace quda
         auto tmp = F[i] - n_inv * getTrace(F[i]) * iden;
 
         // Sum trace of square, normalise in .cu
-        if (i<3) E_local[0] -= getTrace(tmp * tmp).real(); //spatial
-        else     E_local[1] -= getTrace(tmp * tmp).real(); //temporal
+        if (i < 3)
+          E_local[0] -= getTrace(tmp * tmp).real(); // spatial
+        else
+          E_local[1] -= getTrace(tmp * tmp).real(); // temporal
       }
 
       // now compute topological charge
@@ -70,13 +72,16 @@ namespace quda
       // unroll computation
 #pragma unroll
       for (int i=0; i<3; i++) {
-        Qi[i] = getTrace(F[i] * F[5 - i]).real();
+        auto tmp_s = F[i] - n_inv * getTrace(F[i]) * iden;
+        auto tmp_t = F[5 - i] - n_inv * getTrace(F[5 - i]) * iden;
+        Qi[i] = getTrace(tmp_s * tmp_t).real();
       }
 
       // apply correct levi-civita symbol
       for (int i=0; i<3; i++) i % 2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
-      Q = Q_idx * q_norm;
-      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q;
+      const real q_site = static_cast<real>(Q_idx) * q_norm;
+      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = q_site;
+      Q = q_site;
 
       return operator()(E, E_local);
     }

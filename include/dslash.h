@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 #include <typeinfo>
 
 #include <color_spinor_field.h>
@@ -8,6 +10,7 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <instantiate_dslash.h>
+#include <tma_helper.hpp>
 
 namespace quda
 {
@@ -27,14 +30,14 @@ namespace quda
      kernel.  For the wilson class example above, the WilsonArg class
      defined in the same file is the corresponding argument class.
   */
-  template <template <int, bool, bool, KernelType, typename> class D, typename Arg>
-  class Dslash : public TunableKernel3D
+  template <template <bool, bool, KernelType, typename> class D, typename Arg> class Dslash : public TunableKernel3D
   {
 
   protected:
     Arg &arg;
-    const ColorSpinorField &out;
-    const ColorSpinorField &in;
+    cvector_ref<ColorSpinorField> &out;
+    cvector_ref<const ColorSpinorField> &in;
+    const ColorSpinorField &halo;
 
     const int nDimComms;
 
@@ -65,6 +68,23 @@ namespace quda
 
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
+      setRHSstring(aux_base, in.size());
+      strcat(aux_base, ",n_rhs_tile=");
+      char tile_str[16];
+      i32toa(tile_str, Arg::n_src_tile);
+      strcat(aux_base, tile_str);
+      if constexpr (dslash_double_store()) strcat(aux_base, ",double_store");
+      if constexpr (Arg::prefetch_distance > 0) {
+        strcat(aux_base, ",prefetch=");
+        i32toa(tile_str, Arg::prefetch_distance);
+        strcat(aux_base, tile_str);
+        if constexpr (dslash_prefetch_type() == PrefetchType::THREAD)
+          strcat(aux_base, ",prefetch=thread");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::BULK)
+          strcat(aux_base, ",prefetch=bulk");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR)
+          strcat(aux_base, ",prefetch=tensor");
+      }
     }
 
     /**
@@ -77,6 +97,22 @@ namespace quda
       strcpy(aux[kernel_type], kernel_str);
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
       if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
+    }
+
+    bool tuneSharedCarveOut() const override
+    {
+      // default is to do carve out tuning if the architecture supports it
+      static bool tune_shared = device::shared_carve_out_supported();
+      static bool init = false;
+
+      if (!init) {
+        char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED_CARVE_OUT_DSLASH");
+        if (enable_shared_env) {
+          if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
+        }
+        init = true;
+      }
+      return tune_shared;
     }
 
     virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
@@ -109,7 +145,7 @@ namespace quda
       }
     }
 
-    inline void setParam(TuneParam &tp)
+    template <bool improved = false> inline void setParam(TuneParam &tp, const GaugeField &U, const GaugeField &L = {})
     {
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
@@ -125,17 +161,17 @@ namespace quda
           // kernel, then we only have to update the non-p2p ghosts,
           // since these may have been assigned to zero-copy memory
           if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL) {
-            ghost[2 * dim + dir] = (typename Arg::Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir));
+            ghost[2 * dim + dir] = (typename Arg::Float *)((char *)halo.Ghost2() + halo.GhostOffset(dim, dir));
           }
         }
       }
 
-      arg.in.resetGhost(ghost);
+      arg.halo.resetGhost(ghost, halo.SiteSubset());
 
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
-        arg.in_pack.resetGhost(this->packBuffer);
+        arg.halo_pack.resetGhost(this->packBuffer, halo.SiteSubset());
         tp.grid.x += arg.pack_blocks;
         arg.counter = dslash::get_dslash_shmem_sync_counter();
       }
@@ -152,10 +188,20 @@ namespace quda
           0;
         tp.grid.x += arg.exterior_blocks;
       }
+
+      if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR && Arg::prefetch_distance > 0) {
+        Dslash::arg.U.tensor_desc = get_tensor_descriptor(U, tp.block.x);
+        Dslash::arg.Uback.tensor_desc = get_tensor_descriptor(U.shift(), tp.block.x);
+        if constexpr (improved) {
+          assert(!U.empty());
+          Dslash::arg.L.tensor_desc = get_tensor_descriptor(L, tp.block.x);
+          Dslash::arg.Lback.tensor_desc = get_tensor_descriptor(L.shift(), tp.block.x);
+        }
+      }
     }
 
-    virtual int blockStep() const override { return 16; }
-    virtual int blockMin() const override { return 16; }
+    virtual int blockStep() const override { return (arg.shmem & 64) ? 8 : 16; }
+    virtual int blockMin() const override { return (arg.shmem & 64) ? 8 : 16; }
 
     unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
@@ -198,24 +244,36 @@ namespace quda
       }
     }
 
+    virtual bool advanceBlockDim(TuneParam &param) const override
+    {
+      // if TMA is enabled we must keep parity separate in the block (2-d tuning)
+      if constexpr (dslash_prefetch_tma())
+        return TunableKernel2D_base<false>::advanceBlockDim(param);
+      else
+        return TunableKernel3D::advanceBlockDim(param);
+    }
+
     virtual bool advanceTuneParam(TuneParam &param) const override
     {
-      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
+      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceSharedCarveOut(param)
+        || advanceGridDim(param);
     }
 
     virtual void initTuneParam(TuneParam &param) const override
     {
-      /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
+      /* for nvshmem uber kernels the current synchronization requires us to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly */
-      if (arg.shmem & 64) {
-        step_y = vector_length_y;
-        step_z = vector_length_z;
-      }
+      step_y = arg.shmem & 64 ? vector_length_y : step_y_bkup;
+      step_z = arg.shmem & 64 ? vector_length_z : step_z_bkup;
+
       TunableKernel3D::initTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
+
+      // if not autotuning the carve out, set to the historical optimal value (prefer shared memory)
+      param.shared_carve_out = tuneSharedCarveOut() ? 0 : 100;
     }
 
     virtual void defaultTuneParam(TuneParam &param) const override
@@ -223,14 +281,15 @@ namespace quda
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly. */
-      if (arg.shmem & 64) {
-        step_y = vector_length_y;
-        step_z = vector_length_z;
-      }
+      step_y = arg.shmem & 64 ? vector_length_y : step_y_bkup;
+      step_z = arg.shmem & 64 ? vector_length_z : step_z_bkup;
+
       TunableKernel3D::defaultTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
+
+      param.shared_carve_out = 100; // historical optimal value
     }
 
     /**
@@ -239,12 +298,13 @@ namespace quda
        all dslash types, though in some cases we specialize to reduce
        compilation time.
     */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+    template <template <bool, QudaPCType, typename> class P, bool dagger, bool xpay, KernelType kernel_type>
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
+      if (dslash_prefetch_tma() && tp.block.z > 1) errorQuda("Z-dimension block size must be 1 when using TMA");
       launch_device<dslash_functor>(
-        tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
+        tp, stream, dslash_functor_arg<D, P, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }
 
   public:
@@ -254,23 +314,23 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, bool dagger, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: launch<P, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
 #ifdef NVSHMEM_COMMS
-        case UBER_KERNEL: launch<P, nParity, dagger, xpay, UBER_KERNEL>(tp, stream); break;
+        case UBER_KERNEL: launch<P, dagger, xpay, UBER_KERNEL>(tp, stream); break;
 #endif
-        case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        case EXTERIOR_KERNEL_X: launch<P, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        case EXTERIOR_KERNEL_Y: launch<P, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        case EXTERIOR_KERNEL_Z: launch<P, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        case EXTERIOR_KERNEL_T: launch<P, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        case EXTERIOR_KERNEL_ALL: launch<P, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -285,29 +345,13 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
-    inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (arg.dagger)
-        instantiate<P, nParity, true, xpay>(tp, stream);
-      else
-        instantiate<P, nParity, false, xpay>(tp, stream);
-    }
-
-    /**
-       @brief This instantiate function is used to instantiate the
-       the nParity template
-       @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The qudaStream_t where the kernel will run
-     */
     template <template <bool, QudaPCType, typename> class P, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-      switch (arg.nParity) {
-      case 1: instantiate<P, 1, xpay>(tp, stream); break;
-      case 2: instantiate<P, 2, xpay>(tp, stream); break;
-      default: errorQuda("nParity = %d undefined\n", arg.nParity);
-      }
+      if (arg.dagger)
+        instantiate<P, true, xpay>(tp, stream);
+      else
+        instantiate<P, false, xpay>(tp, stream);
     }
 
     /**
@@ -327,15 +371,23 @@ namespace quda
 
     Arg &dslashParam; // temporary addition for policy compatibility
 
-    Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in, const std::string &app_base = "") :
-      TunableKernel3D(in, 1, arg.nParity), arg(arg), out(out), in(in), nDimComms(4), dslashParam(arg)
+    Dslash(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+           const ColorSpinorField &halo, const std::string &app_base = "") :
+      TunableKernel3D(in[0], (halo.X(4) + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity),
+      arg(arg),
+      out(out),
+      in(in),
+      halo(halo),
+      nDimComms(4),
+      dslashParam(arg)
     {
       if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION)
         errorQuda("CPU Fields not supported in Dslash framework yet");
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      // strcpy(aux, in.AuxString().c_str());
+      if (!TunableKernel3D::tuneSharedCarveOut() && tuneSharedCarveOut())
+        strcat(TunableKernel3D::aux, getSharedCarveOutStr().c_str());
       fillAuxBase(app_base);
 #ifdef MULTI_GPU
       fillAux(INTERIOR_KERNEL, "policy_kernel=interior,");
@@ -376,21 +428,21 @@ namespace quda
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
-            packBuffer[2 * dim + dir] = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir);
+            packBuffer[2 * dim + dir] = static_cast<char *>(halo.remoteFace_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
-            packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
+            packBuffer[2 * dim + dir] = halo.myFace_hd(dir, dim);
           } else if (location & Shmem) {
             // we check whether we can directly pack into the in.remoteFace_d(dir, dim) buffer on the remote GPU
             // pack directly into remote or local memory
-            packBuffer[2 * dim + dir] = in.remoteFace_d(dir, dim) ?
-              static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir) :
-              in.myFace_d(dir, dim);
+            packBuffer[2 * dim + dir] = halo.remoteFace_d(dir, dim) ?
+              static_cast<char *>(halo.remoteFace_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir) :
+              halo.myFace_d(dir, dim);
             // whether we need to shmem_putmem into the receiving buffer
-            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = in.remoteFace_d(dir, dim) ?
+            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = halo.remoteFace_d(dir, dim) ?
               nullptr :
-              static_cast<char *>(in.remoteFace_r()) + in.GhostOffset(dim, 1 - dir);
+              static_cast<char *>(halo.remoteFace_r()) + halo.GhostOffset(dim, 1 - dir);
           } else { // pack to local gpu memory
-            packBuffer[2 * dim + dir] = in.myFace_d(dir, dim);
+            packBuffer[2 * dim + dir] = halo.myFace_d(dir, dim);
           }
         }
       }
@@ -410,6 +462,7 @@ namespace quda
       case Shmem:
         strcat(aux_pack, arg.exterior_dims > 0 ? ",shmemuber" : ",shmem");
         strcat(aux_pack, (arg.shmem & 1 && arg.shmem & 2) ? "3" : "1");
+        strcat(aux_pack, comm_dim_topology_string());
         break;
 
       default: errorQuda("Unknown pack target location %d\n", location);
@@ -490,10 +543,11 @@ namespace quda
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * 2 * in.GhostFace()[arg.kernel_type];
+        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * 2 * halo.GhostFace()[arg.kernel_type];
         break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * ghost_sites;
         break;
       }
@@ -501,8 +555,8 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
-          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
-        long long sites = in.Volume();
+          flops_ += pack_flops * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
+        long long sites = halo.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
                   num_dir * num_mv_multiply * mv_flops +                  // SU(3) matrix-vector multiplies
                   ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
@@ -513,11 +567,11 @@ namespace quda
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         flops_ -= ghost_flops * ghost_sites;
 
         if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
-          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
+          flops_ += pack_flops * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }
@@ -541,9 +595,10 @@ namespace quda
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
@@ -551,8 +606,8 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
-          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
-        long long sites = in.Volume();
+          bytes_ += pack_bytes * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
+        long long sites = halo.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
         if (arg.xpay) bytes_ += spinor_bytes;
 
@@ -560,11 +615,11 @@ namespace quda
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
 
         if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
-          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
+          bytes_ += pack_bytes * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }

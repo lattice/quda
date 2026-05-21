@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
 #include <nvml.h>
-
+#include "monitor.h"
 
 static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
@@ -12,6 +12,16 @@ static const int Nstream = 9;
 
 #define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+
+#define NVML_CHECK(func)                                                                                               \
+  {                                                                                                                    \
+    nvmlReturn_t ret = func;                                                                                           \
+    if (ret == NVML_ERROR_NOT_SUPPORTED) {                                                                             \
+      warningQuda("%s not supported on this GPU\n", nvmlErrorString(ret));                                             \
+    } else if (ret != NVML_SUCCESS) {                                                                                  \
+      errorQuda(" NVML returns %s", nvmlErrorString(ret));                                                             \
+    }                                                                                                                  \
+  }
 
 namespace quda
 {
@@ -23,34 +33,43 @@ namespace quda
 
     static int device_id = -1;
 
+    static nvmlDevice_t monitor_device_id;
+
+    int get_driver_version()
+    {
+      int driver_version;
+      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
+      return driver_version;
+    }
+
+    int get_runtime_version()
+    {
+      int runtime_version;
+      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
+      return runtime_version;
+    }
+
     void init(int dev)
     {
       if (initialized) return;
       initialized = true;
 
-      int driver_version;
-      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
-      printfQuda("CUDA Driver version = %d\n", driver_version);
+      printfQuda("CUDA Driver version = %d\n", get_driver_version());
+      printfQuda("CUDA Runtime version = %d\n", get_runtime_version());
 
-      int runtime_version;
-      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
-      printfQuda("CUDA Runtime version = %d\n", runtime_version);
+#ifdef QUDA_LARGE_KERNEL_ARG
+      if (get_driver_version() < 12010) errorQuda("Large kernel arguments not supported on pre CUDA 12.1 driver");
+#endif
 
-      nvmlReturn_t result = nvmlInit();
-      if (NVML_SUCCESS != result) errorQuda("NVML Init failed with error %d", result);
+      NVML_CHECK(nvmlInit());
       const int length = 80;
       char graphics_version[length];
-      result = nvmlSystemGetDriverVersion(graphics_version, length);
-      if (NVML_SUCCESS != result) errorQuda("nvmlSystemGetDriverVersion failed with error %d", result);
+      NVML_CHECK(nvmlSystemGetDriverVersion(graphics_version, length));
       printfQuda("Graphic driver version = %s\n", graphics_version);
-      result = nvmlShutdown();
-      if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
 
       for (int i = 0; i < get_device_count(); i++) {
         CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
-        if (getVerbosity() >= QUDA_SUMMARIZE) {
-          printfQuda("Found device %d: %s\n", i, deviceProp.name);
-        }
+        logQuda(QUDA_SUMMARIZE, "Found device %d: %s\n", i, deviceProp.name);
       }
 
       CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, dev));
@@ -96,7 +115,7 @@ namespace quda
 
       if (!deviceProp.unifiedAddressing) errorQuda("Device %d does not support unified addressing", dev);
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Using device %d: %s\n", dev, deviceProp.name);
+      logQuda(QUDA_SUMMARIZE, "Using device %d: %s\n", dev, deviceProp.name);
 #ifndef USE_QDPJIT
       CHECK_CUDA_ERROR(cudaSetDevice(dev));
 #endif
@@ -106,12 +125,61 @@ namespace quda
       // cudaGetDeviceProperties(&deviceProp, dev);
 
       device_id = dev;
+
+      char pciBusId[13];
+      CHECK_CUDA_ERROR(cudaDeviceGetPCIBusId(pciBusId, 13, device_id));
+      NVML_CHECK(nvmlDeviceGetHandleByPciBusId(pciBusId, &monitor_device_id));
+      char name[NVML_DEVICE_NAME_BUFFER_SIZE];
+      NVML_CHECK(nvmlDeviceGetName(monitor_device_id, name, NVML_DEVICE_NAME_BUFFER_SIZE));
+
+      printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
+      monitor::init();
     }
 
     void init_thread()
     {
       if (device_id == -1) errorQuda("No CUDA device has been initialized for this process");
       CHECK_CUDA_ERROR(cudaSetDevice(device_id));
+    }
+
+    auto get_power()
+    {
+      unsigned int power = 0;
+      NVML_CHECK(nvmlDeviceGetPowerUsage(monitor_device_id, &power));
+      return 1e-3 * power;
+    }
+
+    auto get_clock()
+    {
+      // other clocks available NVML_CLOCK_MEM and NVML_CLOCK_GRAPHICS
+      unsigned int clock = 0;
+      NVML_CHECK(nvmlDeviceGetClockInfo(monitor_device_id, NVML_CLOCK_SM, &clock));
+      return clock;
+    }
+
+    auto get_temperature()
+    {
+      unsigned int temp = 0;
+#if defined(nvmlTemperature_v1)
+      nvmlTemperature_t temperature;
+      temperature.version = nvmlTemperature_v1;
+      temperature.sensorType = NVML_TEMPERATURE_GPU;
+      NVML_CHECK(nvmlDeviceGetTemperatureV(monitor_device_id, &temperature));
+      temp = static_cast<unsigned int>(temperature.temperature);
+#else
+      NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
+#endif
+      return temp;
+    }
+
+    state_t get_state()
+    {
+      state_t state;
+      state.time = std::chrono::high_resolution_clock::now();
+      state.power = get_power();
+      state.clock = get_clock();
+      state.temp = get_temperature();
+      return state;
     }
 
     int get_device_count()
@@ -168,13 +236,16 @@ namespace quda
         printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
                    deviceProp.totalConstMem / (float)1024);
         printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
-        printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
         printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
+#if CUDA_VERSION <= 12090
         printfQuda("%d - kernelExecTimeoutEnabled %s\n", device,
                    (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
+#endif
         printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
         printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
-        switch (deviceProp.computeMode) {
+        int deviceComputeMode;
+        CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&deviceComputeMode, cudaDevAttrComputeMode, device));
+        switch (deviceComputeMode) {
         case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
         case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
         case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
@@ -196,7 +267,9 @@ namespace quda
         default: errorQuda("Unknown deviceProp.asyncEngineCount.");
         }
         printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
+#if CUDA_VERSION <= 12090
         printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
+#endif
         printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
         printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
         printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);
@@ -223,6 +296,10 @@ namespace quda
         delete []streams;
         streams = nullptr;
       }
+
+      monitor::destroy();
+
+      NVML_CHECK(nvmlShutdown());
 
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
       if (device_reset_env && strcmp(device_reset_env, "1") == 0) {
@@ -291,6 +368,8 @@ namespace quda
         CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid()));
       return max_blocks_per_sm;
     }
+
+    bool shared_carve_out_supported() { return true; }
 
     namespace profile
     {

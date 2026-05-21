@@ -91,6 +91,11 @@ namespace quda
 
       static constexpr bool use_intermediate_accumulator() { return true; };
 
+      static constexpr bool do_rescale()
+      {
+        return std::is_same_v<shuffle_t, half> ? true : false; // true if we use FP16
+      }
+
       static constexpr int warp_m = warp_m_;
       static constexpr int warp_n = warp_n_;
 
@@ -314,6 +319,12 @@ namespace quda
           for (int i = 0; i < warp_m * warp_n * thread_count; i++) { reg[i] *= alpha; }
         }
 
+        __device__ inline void axpy(float alpha, OperandC x)
+        {
+#pragma unroll
+          for (int i = 0; i < warp_m * warp_n * thread_count; i++) { reg[i] += alpha * x.reg[i]; }
+        }
+
         template <int ldc> __device__ void store(void *ptr, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
         {
           // This method is only used for the mobius preconditioner where shuffle_t = half.
@@ -381,7 +392,7 @@ namespace quda
                                                   gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag,
                                                   op_t op)
       {
-        using store_t = typename gmem_op_t::store_type;
+        using store_t = typename gmem_op_t::store_t;
         using complex_t = complex<store_t>;
 
         auto *C = reinterpret_cast<complex_t *>(cc.data());
@@ -402,7 +413,7 @@ namespace quda
                 for (int wm = 0; wm < warp_m; wm++) {
                   int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
                   int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                  if (!check_bounds || (m < N && n < M)) {
+                  if (!check_bounds || (m < M && n < N)) {
                     int reg_index = (wn * warp_m + wm) * thread_count + tm * thread_n + tn;
                     if constexpr (gmem_op_t::fixed) {
                       auto scale = cc.get_scale();

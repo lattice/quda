@@ -2,31 +2,55 @@
 
 #include <register_traits.h>
 
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
 namespace quda
 {
+
+  /**
+     @brief Element type used for coalesced storage.
+   */
+  template <typename T>
+  using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
 
   // pre-declaration of vector_load that we wish to specialize
   template <bool> struct vector_load_impl;
 
-  // CUDA specializations of the vector_load
+  // pre-declaration of the prefetch type
+  template <size_t prefetch> struct prefetch_t;
+
+  // HIP specializations of the vector_load
   template <> struct vector_load_impl<true> {
-    template <typename T> __device__ inline void operator()(T &value, const void *ptr, int idx)
+    template <typename T, size_t prefetch_size>
+    __device__ inline void operator()(T &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
       value = reinterpret_cast<const T *>(ptr)[idx];
     }
 
-    __device__ inline void operator()(short8 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(short8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
     {
       float4 tmp;
-      operator()(tmp, ptr, idx);
-      memcpy(&value, &tmp, sizeof(float4));
+      operator()(tmp, ptr, idx, prefetch);
+#if __has_builtin(__builtin_bit_cast)
+      value = __builtin_bit_cast(short8, tmp);
+#else
+      __builtin_memcpy(&value, &tmp, sizeof(float4));
+#endif
     }
 
-    __device__ inline void operator()(char8 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(char8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
     {
       float2 tmp;
-      operator()(tmp, ptr, idx);
-      memcpy(&value, &tmp, sizeof(float2));
+      operator()(tmp, ptr, idx, prefetch);
+#if __has_builtin(__builtin_bit_cast)
+      value = __builtin_bit_cast(char8, tmp);
+#else
+      __builtin_memcpy(&value, &tmp, sizeof(float2));
+#endif
     }
   };
 

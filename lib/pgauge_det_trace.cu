@@ -39,26 +39,27 @@ namespace quda {
         launch<DetTrace>(det_trace, tp, stream, arg);
       }
 
-      result = complex_t(det_trace[0], det_trace[1]) / (real_t)(4*u.LocalVolume()*comm_size());
+      result = complex_t(det_trace[0], det_trace[1]) / (real_t)(4 * u.LocalVolume() * comm_size());
     }
 
-    long long flops() const {
-      if (u.Ncolor() == 3 && type == compute_type::determinant) return 264LL*u.LocalVolume();
-      else if (type == compute_type::trace) return 2*u.Geometry()*u.Ncolor()*u.LocalVolume();
-      else return 0;
+    long long flops() const
+    {
+      if (u.Ncolor() == 3 && type == compute_type::determinant) return 264LL * u.LocalVolume();
+      if (type == compute_type::trace) return 2 * u.Geometry() * u.Ncolor() * u.LocalVolume();
+      return 0;
     }
 
     long long bytes() const { return u.Bytes(); }
   };
 
-  complex_t getLinkDeterminant(GaugeField& data)
+  complex_t getLinkDeterminant(GaugeField &data)
   {
     complex_t det{0.0, 0.0};
     instantiate<CalcFunc>(data, det, compute_type::determinant);
     return det;
   }
 
-  complex_t getLinkTrace(GaugeField& data)
+  complex_t getLinkTrace(GaugeField &data)
   {
     complex_t tr{0.0, 0.0};
     instantiate<CalcFunc>(data, tr, compute_type::trace);

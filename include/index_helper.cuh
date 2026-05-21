@@ -230,46 +230,18 @@ namespace quda {
 
   template <int nDim>
   struct Coord {
-    int x[nDim]; // nDim lattice coordinates
+    array<int, nDim> x = {};    // nDim lattice coordinates
+    array<int, nDim> gx = {};   // nDim global lattice coordinates
+    array<int, nDim> gDim = {}; // global lattice dimensions
     int x_cb;    // checkerboard lattice site index
+    int x_cb_0;  // value of x_cb on first thread in block
     int s;       // fifth dimension coord
     int X;       // full lattice site index
     constexpr const int& operator[](int i) const { return x[i]; }
     constexpr int& operator[](int i) { return x[i]; }
+    array_2d<int, 2, nDim> in_boundary = {};
+    constexpr int size() const { return nDim; }
   };
-
-  /**
-     @brief Compute the checkerboard 1-d index for the nearest
-     neighbor
-     @param[in] lattice coordinates
-     @param[in] mu dimension in which to add 1
-     @param[in] dir direction (+1 or -1)
-     @param[in] arg parameter struct
-     @return 1-d checkboard index
-   */
-  template <typename Coord, typename Arg>
-  __device__ __host__ inline int getNeighborIndexCB(const Coord &x, int mu, int dir, const Arg &arg)
-  {
-    switch (dir) {
-    case +1: // positive direction
-      switch (mu) {
-      case 0: return (x[0] == arg.X[0] - 1 ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
-      case 1: return (x[1] == arg.X[1] - 1 ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
-      case 2: return (x[2] == arg.X[2] - 1 ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
-      case 3: return (x[3] == arg.X[3] - 1 ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
-      case 4: return (x[4] == arg.X[4] - 1 ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
-      }
-    case -1:
-      switch (mu) {
-      case 0: return (x[0] == 0 ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
-      case 1: return (x[1] == 0 ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
-      case 2: return (x[2] == 0 ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
-      case 3: return (x[3] == 0 ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
-      case 4: return (x[4] == 0 ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
-      }
-    }
-    return 0; // should never reach here
-  }
 
   /**
      Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
@@ -454,40 +426,40 @@ namespace quda {
     case 0:
       switch(dir) {
       case 0:
-	index = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+	index = ((((x[0] * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
 	break;
       case 1:
-	index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+	index = (((((x[0] - X[0] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
 	break;
       }
       break;
     case 1:
       switch(dir) {
       case 0:
-	index = (x[1]*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
+	index = ((((x[1] * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
+	index = (((((x[1] - X[1] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
     case 2:
       switch(dir) {
       case 0:
-	index = (x[2]*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	index = ((((x[2] * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
+	index = (((((x[2] - X[2] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
     case 3:
       switch(dir) {
       case 0:
-	index = (x[3]*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	index = ((((x[3] * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+	index = (((((x[3] - X[3] + nFace) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
@@ -515,56 +487,40 @@ namespace quda {
     case 0:
       switch (dir) {
       case 0:
-        index = ((x[0] + nFace - 1) * X[4] * X[3] * X[2] * X[1] + x[4] * X[3] * X[2] * X[1] + x[3] * (X[2] * X[1])
-                    + x[2] * X[1] + x[1])
-            >> 1;
+        index = (((((x[0] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
         break;
       case 1:
-        index = ((x[0] - X[0] + nFace) * X[4] * X[3] * X[2] * X[1] + x[4] * X[3] * X[2] * X[1] + x[3] * (X[2] * X[1])
-                    + x[2] * X[1] + x[1])
-            >> 1;
+        index = (((((x[0] - X[0] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
         break;
       }
       break;
     case 1:
       switch (dir) {
       case 0:
-        index = ((x[1] + nFace - 1) * X[4] * X[3] * X[2] * X[0] + x[4] * X[3] * X[2] * X[0] + x[3] * X[2] * X[0]
-                    + x[2] * X[0] + x[0])
-            >> 1;
+        index = (((((x[1] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[1] - X[1] + nFace) * X[4] * X[3] * X[2] * X[0] + x[4] * X[3] * X[2] * X[0] + x[3] * X[2] * X[0]
-                    + x[2] * X[0] + x[0])
-            >> 1;
+        index = (((((x[1] - X[1] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
     case 2:
       switch (dir) {
       case 0:
-        index = ((x[2] + nFace - 1) * X[4] * X[3] * X[1] * X[0] + x[4] * X[3] * X[1] * X[0] + x[3] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[2] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[2] - X[2] + nFace) * X[4] * X[3] * X[1] * X[0] + x[4] * X[3] * X[1] * X[0] + x[3] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[2] - X[2] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
     case 3:
       switch (dir) {
       case 0:
-        index = ((x[3] + nFace - 1) * X[4] * X[2] * X[1] * X[0] + x[4] * X[2] * X[1] * X[0] + x[2] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[3] + nFace - 1) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[3] - X[3] + nFace) * X[4] * X[2] * X[1] * X[0] + x[4] * X[2] * X[1] * X[0] + x[2] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[3] + nFace - X[3]) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
@@ -835,10 +791,9 @@ namespace quda {
   // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
 
   template <int nDim, typename Arg>
-  constexpr int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
+  __host__ __device__ inline int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
-    const auto *dims = arg.dc.dims[dim]; // dimensions of the face
     const auto &V4 = arg.dc.volume_4d;   // 4-d volume
 
     // intrinsic parity of the face depends on offset of first element
@@ -850,6 +805,14 @@ namespace quda {
     // first compute src index, then find 4-d index from remainder
     int s = face_idx_in / arg.dc.face_XYZT[dim];
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
+
+    std::remove_const_t<std::remove_reference_t<decltype(arg.dc.X[0])>> dims[3] = {};
+    int d1 = 0;
+#pragma unroll 4
+    for (int d2 = 0; d2 < 4; d2++) { // this will evaluate at compile time
+      if (d2 == dim) continue;
+      dims[d1++] = arg.dc.X[d2];
+    }
 
     /*y,z,t here are face indexes in new order*/
     int aux1 = face_idx / dims[0];
@@ -887,7 +850,7 @@ namespace quda {
   }
 
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  constexpr int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+  __host__ __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
   {
     return indexFromFaceIndexStaggered<nDim>(dim, face_num, face_idx_in, parity, nLayers, type, arg);
   }
@@ -953,7 +916,7 @@ namespace quda {
         phase == QUDA_STAGGERED_PHASE_MILC || phase == QUDA_STAGGERED_PHASE_TIFR, "Unsupported staggered phase");
     real sign;
 
-    const auto *X = arg.dim;
+    const auto *X = arg.dc.X;
     if (phase == QUDA_STAGGERED_PHASE_MILC) {
       switch (dim) {
       case 0: sign = (coords[3]) % 2 == 0 ? static_cast<real>(1.0) : static_cast<real>(-1.0); break;
@@ -1104,6 +1067,317 @@ namespace quda {
       x[dim] = shift[dim] ? (x[dim]+shift[dim] + X[dim]) % X[dim] : x[dim];
     }
     return (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+  }
+
+  /**
+   * These are index helper functions used in the order classes of openQCD, i.e.
+   *
+   * - OpenQCDOrder       in quda:include/gauge_field_order.h
+   * - OpenQCDDiracOrder  in quda:include/color_spinor_field_order.h
+   * - OpenQCDOrder       in quda:include/clover_field_order.h.
+   *
+   * The main helper functions are ipt() and iup(), giving pure function
+   * implementations of the ipt[] and iup[][] arrays (see
+   * https://doi.org/10.22323/1.466.0280) that are needed to calculate the correct offsets
+   * of the fields base pointers.
+   */
+  namespace openqcd
+  {
+
+    /**
+     * @brief      Returns the surface in direction mu
+     *
+     * @param      X     Extent in all 4 directions
+     * @param[in]  mu    Direction
+     *
+     * @return     Surface
+     */
+    __device__ __host__ inline int surface(const int X[4], const int mu)
+    {
+      if (mu == 0) {
+        return X[1] * X[2] * X[3];
+      } else if (mu == 1) {
+        return X[0] * X[2] * X[3];
+      } else if (mu == 2) {
+        return X[0] * X[1] * X[3];
+      }
+      return X[0] * X[1] * X[2];
+    }
+
+    /**
+     * @brief      Return BNDRY (see openqcd:include/global.h)
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     *
+     * @return     BNDRY
+     */
+    __device__ __host__ inline int bndry(const int L[4], const int nproc[4])
+    {
+      return 2
+        * (((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
+           + ((1 - (nproc[2] % 2)) * surface(L, 2)) + ((1 - (nproc[3] % 2)) * surface(L, 3)));
+    }
+
+    /**
+     * @brief      Calculate the offset needed for boundary points in openQCD.
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     * @param[in]  mu     Direction in txyz
+     *
+     * @return     The offset
+     */
+    __device__ __host__ inline int ifc(const int L[4], const int nproc[4], const int mu)
+    {
+      if (mu == 0) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2;
+      } else if (mu == 1) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) + (((1 - (nproc[1] % 2)) * surface(L, 1)) / 2);
+      } else if (mu == 2) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
+          + (((1 - (nproc[2] % 2)) * surface(L, 2)) / 2);
+      }
+      return ((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
+        + ((1 - (nproc[2] % 2)) * surface(L, 2)) + (((1 - (nproc[3] % 2)) * surface(L, 3)) / 2);
+    }
+
+    /**
+     * @brief      Calculate the offset of the faces in openQCD.
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     * @param[in]  mu     Direction in txyz
+     *
+     * @return     The offset
+     */
+    __device__ __host__ inline int face_offset(const int L[4], const int nproc[4], const int mu)
+    {
+      if (mu == 0) {
+        return 0;
+      } else if (mu == 1) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2;
+      } else if (mu == 2) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2 + ((1 - (nproc[1] % 2)) * surface(L, 1)) / 2;
+      }
+      return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2 + ((1 - (nproc[1] % 2)) * surface(L, 1)) / 2
+        + ((1 - (nproc[2] % 2)) * surface(L, 2)) / 2;
+    }
+
+    /**
+     * @brief      Rotate coordinates (xyzt -> txyz)
+     *
+     * @param[in]  x_quda     Cartesian local lattice coordinates in quda
+     *                        convention (xyzt)
+     * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
+     *                        convention (txyz)
+     */
+    __device__ __host__ inline void rotate_coords(const int x_quda[4], int x_openQCD[4])
+    {
+      x_openQCD[1] = x_quda[0];
+      x_openQCD[2] = x_quda[1];
+      x_openQCD[3] = x_quda[2];
+      x_openQCD[0] = x_quda[3];
+    }
+
+    /**
+     * @brief      Generate a lexicographical index with x[Ndims-1] running
+     *             fastest, for example if Ndims=4:
+     *             ix = X3*X2*X1*x0 + X3*X2*x1 + X3*x2 + x3.
+     *
+     * @param[in]  x      Integer array of dimension Ndims with coordinates
+     * @param[in]  X      Integer array of dimension Ndims with extents
+     * @param[in]  Ndims  The number of dimensions
+     *
+     * @return     Lexicographical index
+     */
+    __device__ __host__ inline int lexi(const int *x, const int *X, const int Ndims)
+    {
+      int i, ix = x[0];
+
+#pragma unroll
+      for (i = 1; i < Ndims; i++) { ix = (X[i] * ix + x[i]); }
+      return ix;
+    }
+
+    /**
+     * @brief      Return the volume
+     *
+     * @param[in]  X     Integer array of 4 dimensions
+     *
+     * @return     Volume
+     */
+    __device__ __host__ inline int vol(const int X[4]) { return X[0] * X[1] * X[2] * X[3]; }
+
+    /**
+     * @brief      Return cbs[]. This is the cache block size in openQCD, which
+     *             the local lattice is divided into.
+     *
+     * @param[in]  mu    Direction
+     * @param[in]  X     Extents
+     *
+     * @return     cbs
+     */
+    __device__ __host__ inline int setup_cbs(const int mu, const int X[4])
+    {
+      if (mu == 0) {
+        return X[0];
+      } else if ((X[mu] % 4) == 0) {
+        return 4;
+      } else if ((X[mu] % 3) == 0) {
+        return 3;
+      } else if ((X[mu] % 2) == 0) {
+        return 2;
+      } else {
+        return 1;
+      }
+    }
+
+    /**
+     * @brief      Pure function to return ipt[iy], where
+     *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
+     *             ipt-array, but calculating the index on the fly. Notice that xi
+     *             and Li are in openQCD (txyz) convention. If they come from
+     *             QUDA, you have to rotate them first (see rotate_coords).
+     *
+     * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] < L[i]
+     * @param[in]  L     Local lattice extents
+     *
+     * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
+     *             openQCD
+     */
+    __device__ __host__ inline int ipt(const int x[4], const int L[4])
+    {
+      int xb[4], xn[4];
+
+      // openQCDs cache block size in txyz convention
+      int cbs[4] = {setup_cbs(0, L), setup_cbs(1, L), setup_cbs(2, L), setup_cbs(3, L)};
+
+      // openQCDs cache block grid in txyz convention
+      int cbn[4] = {L[0] / cbs[0], L[1] / cbs[1], L[2] / cbs[2], L[3] / cbs[3]};
+
+      xb[0] = x[0] % cbs[0];
+      xb[1] = x[1] % cbs[1];
+      xb[2] = x[2] % cbs[2];
+      xb[3] = x[3] % cbs[3];
+
+      xn[0] = x[0] / cbs[0];
+      xn[1] = x[1] / cbs[1];
+      xn[2] = x[2] / cbs[2];
+      xn[3] = x[3] / cbs[3];
+
+      return (lexi(xb, cbs, 4) / 2 + vol(cbs) * lexi(xn, cbn, 4) / 2
+              + ((x[0] + x[1] + x[2] + x[3]) % 2 != 0) * (vol(L) / 2) // odd -> +VOLUME/2
+      );
+    }
+
+    /**
+     * @brief      Determines the number of boundary points in direction mu prior to
+     *             the Carthesian index x with dimensions X
+     *
+     * @param[in]  mu    Direction
+     * @param[in]  x     Lattice point
+     * @param[in]  X     Dimensions of the lattice/block
+     *
+     * @return     Number of prior boundary points
+     */
+    __device__ __host__ inline int boundary_pts(const int mu, const int x[4], const int X[4])
+    {
+      int ret = 0;
+
+      if (mu == 3) {
+        ret = lexi(x, X, 3); // lexi without x[3]
+      } else if (mu == 2) {
+        ret = X[3] * lexi(x, X, 2);
+        if (x[2] == (X[2] - 1)) {
+          ret += x[3]; // lexi without x[2]
+        }
+      } else if (mu == 1) {
+        if (x[1] == (X[1] - 1)) {
+          ret = X[2] * X[3] * x[0] + X[3] * x[2] + x[3]; // lexi without x[1]
+        } else {
+          ret = surface(X, 1);
+        }
+      } else if (mu == 0) {
+        if (x[0] == (X[0] - 1)) {
+          ret = lexi(x + 1, X + 1, 3); // lexi without x[0]
+        } else {
+          ret = surface(X, 0);
+        }
+      }
+
+      return ret;
+    }
+
+    /**
+     * @brief      Pure implementation of iup[ix][mu]. Returns neighbouring
+     *             point of ix in positive mu direction.
+     *
+     * @param[in]  x      Cartesian local lattice corrdinates, 0 <= x[i] < Li,
+     *                    length 4 in txyz convention
+     * @param[in]  mu     Direction in txyz convention
+     * @param[in]  L      Local lattice extents, length 4 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     *
+     * @return     iup[ix][mu]
+     */
+    __device__ __host__ inline int iup(const int x[4], const int mu, const int L[4], const int nproc[4])
+    {
+      int i, ret, xb[4], xn[4];
+
+      if ((x[mu] == (L[mu] - 1)) && (nproc[mu] > 1)) {
+
+        int cbs[4] = {setup_cbs(0, L), setup_cbs(1, L), setup_cbs(2, L), setup_cbs(3, L)};
+        int cbn[4] = {L[0] / cbs[0], L[1] / cbs[1], L[2] / cbs[2], L[3] / cbs[3]};
+
+        xb[0] = x[0] % cbs[0];
+        xb[1] = x[1] % cbs[1];
+        xb[2] = x[2] % cbs[2];
+        xb[3] = x[3] % cbs[3];
+
+        xn[0] = x[0] / cbs[0];
+        xn[1] = x[1] / cbs[1];
+        xn[2] = x[2] / cbs[2];
+        xn[3] = x[3] / cbs[3];
+
+        ret = vol(L) + ifc(L, nproc, mu);
+        if ((x[0] + x[1] + x[2] + x[3]) % 2 == 0) { ret += bndry(L, nproc) / 2; }
+
+        ret += surface(cbs, mu) * boundary_pts(mu, xn, cbn) / 2;
+        ret += boundary_pts(mu, xb, cbs) / 2;
+        return ret;
+
+      } else {
+#pragma unroll
+        for (i = 0; i < 4; i++) { xb[i] = x[i]; }
+
+        xb[mu] = (xb[mu] + 1) % (L[mu] * nproc[mu]);
+        return ipt(xb, L);
+      }
+    }
+
+  } // namespace openqcd
+
+  /**
+     @brief Compute the flattened 4-d index from a separate T and
+     flattened 3-d XYZ index.
+     @param[in] t Temporal index
+     @param[in] xyz Flattened 3-d index
+     @param[in] X Lattice dimensions
+     @return The flattened 4-d index
+   */
+  template <int reduction_dim, class T> __device__ int idx_from_t_xyz(int t, int xyz, T X[4])
+  {
+    int x[4];
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      if (d != reduction_dim) {
+        x[d] = xyz % X[d];
+        xyz = xyz / X[d];
+      }
+    }
+    x[reduction_dim] = t;
+    return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
 
 } // namespace quda

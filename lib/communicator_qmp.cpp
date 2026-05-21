@@ -166,6 +166,9 @@ void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_c
               grid_size, QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE));
   }
 
+  // defer handling MPI errors to QMP
+  MPI_Comm_set_errhandler(MPI_COMM_HANDLE, MPI_ERRORS_RETURN);
+
   comm_init_common(ndim, dims, rank_from_coords, map_data);
 }
 
@@ -375,6 +378,16 @@ void Communicator::comm_allreduce_sum(size_t &a)
     errorQuda("sizeof(size_t) != sizeof(uint64_t): %lu != %lu\n", sizeof(size_t), sizeof(uint64_t));
   }
   QMP_CHECK(QMP_comm_sum_uint64_t(QMP_COMM_HANDLE, reinterpret_cast<uint64_t *>(&a)));
+}
+
+template <>
+void Communicator::comm_allreduce_sum_array<device_reduce_t>(device_reduce_t *data, size_t size)
+{
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  comm_allreduce_sum_array<rfa_t<reduction_t>>(reinterpret_cast<rfa_t<reduction_t> *>(data), size);
+#else
+  comm_allreduce_sum_array<reduction_t>(reinterpret_cast<reduction_t *>(data), size);
+#endif
 }
 
 template <>

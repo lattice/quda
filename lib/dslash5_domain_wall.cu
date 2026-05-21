@@ -9,9 +9,9 @@ namespace quda
 
   template <typename Float, int nColor> class Dslash5 : public TunableKernel3D
   {
-    ColorSpinorField &out;
-    const ColorSpinorField &in;
-    const ColorSpinorField &x;
+    cvector_ref<ColorSpinorField> &out;
+    cvector_ref<const ColorSpinorField> &in;
+    cvector_ref<const ColorSpinorField> &x;
     real_t m_f;
     real_t m_5;
     const complex_t *b_5;
@@ -45,22 +45,23 @@ namespace quda
       default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
 
-      return flops_;
+      return in.size() * flops_;
     }
 
     long long bytes() const
     {
       long long Ls = in.X(4);
+      size_t bytes = 0u;
       switch (type) {
-      case Dslash5Type::DSLASH5_DWF: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case Dslash5Type::DSLASH5_MOBIUS_PRE: return out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case Dslash5Type::DSLASH5_MOBIUS: return out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case Dslash5Type::M5_INV_DWF: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case Dslash5Type::M5_INV_MOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case Dslash5Type::M5_INV_ZMOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
+      case Dslash5Type::DSLASH5_DWF: bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: bytes = out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::DSLASH5_MOBIUS: bytes = out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::M5_INV_DWF: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::M5_INV_MOBIUS: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::M5_INV_ZMOBIUS: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;
       default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
-      return 0ll;
+      return bytes;
     }
 
     unsigned int minThreads() const { return in.VolumeCB() / in.X(4); }
@@ -68,11 +69,12 @@ namespace quda
     int blockMin() const { return 4; }
     unsigned int sharedBytesPerThread() const
     {
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
+      bool isInv
+        = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
         // spin components in shared depend on inversion algorithm
-        int nSpin = mobius_m5::var_inverse() ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() : in.Nspin();
+        int nSpin = (!isInv || mobius_m5::var_inverse()) ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() :
+                                                           in.Nspin();
         return 2 * nSpin * nColor * sizeof(typename mapper<Float>::type);
       } else {
         return 0;
@@ -82,9 +84,9 @@ namespace quda
     // overloaded to return max dynamic shared memory if doing shared-memory inverse
     unsigned int maxSharedBytesPerBlock() const
     {
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
+      bool isInv
+        = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
         return maxDynamicSharedBytesPerBlock();
       } else {
         return TunableKernel3D::maxSharedBytesPerBlock();
@@ -92,9 +94,10 @@ namespace quda
     }
 
   public:
-    Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, real_t m_f,
-            real_t m_5, const complex_t *b_5, const complex_t *c_5, real_t a, bool dagger, Dslash5Type type) :
-      TunableKernel3D(in, in.X(4), in.SiteSubset()),
+    Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+            cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5, const complex_t *c_5,
+            real_t a, bool dagger, Dslash5Type type) :
+      TunableKernel3D(in[0], in.size() * in.X(4), in.SiteSubset()),
       out(out),
       in(in),
       x(x),
@@ -107,10 +110,12 @@ namespace quda
       xpay(a == 0.0 ? false : true),
       type(type)
     {
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
-        TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
+      bool isInv
+        = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
+        // Ls must be contained in the block and different fields on different blocks
+        resizeStep(in.X(4), 1);
+        tune_block_y = false;
       }
 
       if (dagger) strcat(aux, ",Dagger");
@@ -124,12 +129,13 @@ namespace quda
       case Dslash5Type::M5_INV_ZMOBIUS: strcat(aux, ",Dslash5Type::M5_INV_ZMOBIUS"); break;
       default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
+      setRHSstring(aux, in.size());
 
       apply(device::get_default_stream());
     }
 
     template <bool dagger, bool xpay, Dslash5Type type> using Arg = Dslash5Arg<Float, nColor, dagger, xpay, type>;
-    
+
     template <Dslash5Type type, template <typename> class F>
     void Launch(TuneParam &tp, const qudaStream_t &stream)
     {
@@ -147,9 +153,9 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
+      bool isInv
+        = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
         tp.set_max_shared_bytes = true; // if inverse kernel uses shared memory then maximize total shared memory pool
       }
 
@@ -167,20 +173,17 @@ namespace quda
 
   // Apply the 5th dimension dslash operator to a colorspinor field
   // out = Dslash5*in
-#ifdef GPU_DOMAIN_WALL_DIRAC
-  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, real_t m_f,
-                    real_t m_5, const complex_t *b_5, const complex_t *c_5, real_t a, bool dagger, Dslash5Type type)
+  void ApplyDslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                    cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5,
+                    const complex_t *c_5, real_t a, bool dagger, Dslash5Type type)
   {
-    if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
-    checkLocation(out, in, x); // check all locations match
-    instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+    if (is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>()) {
+      if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
+      checkLocation(out, in, x); // check all locations match
+      instantiate_recurse3<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+    } else {
+      errorQuda("Domain wall operator has not been built");
+    }
   }
-#else
-  void ApplyDslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, real_t,
-                    real_t, const complex_t *, const complex_t *, real_t, bool, Dslash5Type)
-  {
-    errorQuda("Domain wall dslash has not been built");
-  }
-#endif
 
 } // namespace quda

@@ -4,6 +4,7 @@
 #include <enum_quda.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include "reference_wrapper_helper.h"
 
 namespace quda
 {
@@ -67,6 +68,11 @@ namespace quda
   template <> constexpr bool is_enabled<QUDA_TIFR_GAUGE_ORDER>() { return false; }
   template <> constexpr bool is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>() { return false; }
 #endif
+#ifdef BUILD_OPENQCD_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_OPENQCD_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_OPENQCD_GAUGE_ORDER>() { return false; }
+#endif
 
   /**
      @brief Helper function for returning if a given precision is enabled
@@ -84,6 +90,24 @@ namespace quda
   }
 
   /**
+     @brief precision_type_mapper Struct used to convert QudaPrecision to data-type.
+  */
+  template <QudaPrecision precision> struct precision_type_mapper {
+  };
+  template <> struct precision_type_mapper<QUDA_DOUBLE_PRECISION> {
+    using type = double;
+  };
+  template <> struct precision_type_mapper<QUDA_SINGLE_PRECISION> {
+    using type = float;
+  };
+  template <> struct precision_type_mapper<QUDA_HALF_PRECISION> {
+    using type = short;
+  };
+  template <> struct precision_type_mapper<QUDA_QUARTER_PRECISION> {
+    using type = int8_t;
+  };
+
+  /**
      @brief Helper function for returning if a given reconstruct is enabled
      @tparam reconstruct The reconstruct requested
      @return True if enabled, false if not
@@ -96,6 +120,20 @@ namespace quda
   template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_8>() { return (QUDA_RECONSTRUCT & 1) ? true : false; }
   template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_10>() { return true; }
 
+  /**
+     @brief Helper function for returning if a given domain decomposition is enabled
+     @tparam DD The domain decomposition requested
+     @return True if enabled, false if not
+  */
+  constexpr bool is_enabled(QudaDDType DD)
+  {
+    switch (DD) {
+    case QUDA_DD_NO: return true;
+    case QUDA_DD_RED_BLACK: return (QUDA_DOMAIN_DECOMPOSITION & 1) ? true : false;
+    default: return false;
+    }
+  }
+
   struct ReconstructFull {
     static constexpr std::array<QudaReconstructType, 6> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_10};
@@ -107,8 +145,13 @@ namespace quda
   };
 
   struct ReconstructWilson {
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
   };
 
   struct ReconstructStaggered {
@@ -284,6 +327,55 @@ namespace quda
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
     }
+  }
+
+  /**
+     @brief instantiate_recurse2 function is used to instantiate the
+     precision and number of colors for a class that operates on
+     batches.  If necessary the batches are split up if the set size
+     exceeds the maximum.  This specific variant is for when we have
+     two vector sets.
+     @param[out] out Output ColorSpinorField set
+     @param[in] in Input ColorSpinorField set
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int> class Apply, typename O, typename I, typename... Args>
+  constexpr void instantiate_recurse2(cvector_ref<O> &out, cvector_ref<I> &in, Args &&...args)
+  {
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate_recurse2<Apply>(cvector_ref<O> {out.begin(), out.begin() + out.size() / 2},
+                                  cvector_ref<I> {in.begin(), in.begin() + in.size() / 2}, args...);
+      instantiate_recurse2<Apply>(cvector_ref<O> {out.begin() + out.size() / 2, out.end()},
+                                  cvector_ref<I> {in.begin() + in.size() / 2, in.end()}, args...);
+      return;
+    }
+    instantiate<Apply>(out, in, args...);
+  }
+
+  /**
+     @brief instantiate_recurse3 function is used to instantiate the
+     precision and number of colors for a class that operates on
+     batches.  If necessary the batches are split up if the set size
+     exceeds the maximum.  This specific variant is for when we have
+     three vector sets.
+     @param[out] out Output set
+     @param[in] in Input set
+     @param[in] x Auxiliary set
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int> class Apply, typename O, typename I, typename X, typename... Args>
+  constexpr void instantiate_recurse3(cvector_ref<O> &out, cvector_ref<I> &in, cvector_ref<X> &x, Args &&...args)
+  {
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate_recurse3<Apply>(cvector_ref<O> {out.begin(), out.begin() + out.size() / 2},
+                                  cvector_ref<I> {in.begin(), in.begin() + in.size() / 2},
+                                  cvector_ref<X> {x.begin(), x.begin() + x.size() / 2}, args...);
+      instantiate_recurse3<Apply>(cvector_ref<O> {out.begin() + out.size() / 2, out.end()},
+                                  cvector_ref<I> {in.begin() + in.size() / 2, in.end()},
+                                  cvector_ref<X> {x.begin() + x.size() / 2, x.end()}, args...);
+      return;
+    }
+    instantiate<Apply>(out, in, x, args...);
   }
 
   /**
@@ -490,16 +582,63 @@ namespace quda
     }
   }
 
-  // these are used in dslash.h
+  /**
+     @brief Helper function for returning if a given dslash type is enabled
+     @tparam dslash_type The dslash_type requested
+     @return True if enabled, false if not
+  */
+  template <QudaDslashType dslash_type> constexpr bool is_enabled() { return false; }
+#ifdef GPU_WILSON_DIRAC
+  template <> constexpr bool is_enabled<QUDA_WILSON_DSLASH>() { return true; }
+#endif
+#ifdef GPU_CLOVER_DIRAC
+  template <> constexpr bool is_enabled<QUDA_CLOVER_WILSON_DSLASH>() { return true; }
+#endif
+#ifdef GPU_CLOVER_HASENBUSCH_TWIST
+  template <> constexpr bool is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>() { return true; }
+#endif
+#ifdef GPU_DOMAIN_WALL_DIRAC
+  template <> constexpr bool is_enabled<QUDA_DOMAIN_WALL_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_MOBIUS_DWF_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_MOBIUS_DWF_EOFA_DSLASH>() { return true; }
+#endif
+#ifdef GPU_STAGGERED_DIRAC
+  template <> constexpr bool is_enabled<QUDA_STAGGERED_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_ASQTAD_DSLASH>() { return true; }
+#endif
+#ifdef GPU_TWISTED_MASS_DIRAC
+  template <> constexpr bool is_enabled<QUDA_TWISTED_MASS_DSLASH>() { return true; }
+#endif
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+  template <> constexpr bool is_enabled<QUDA_TWISTED_CLOVER_DSLASH>() { return true; }
+#endif
+#ifdef GPU_LAPLACE
+  template <> constexpr bool is_enabled<QUDA_LAPLACE_DSLASH>() { return true; }
+#endif
+#ifdef GPU_COVDEV
+  template <> constexpr bool is_enabled<QUDA_COVDEV_DSLASH>() { return true; }
+#endif
 
   struct WilsonReconstruct {
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
   };
 
   struct StaggeredReconstruct {
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
   };
+
+#ifdef GPU_DISTANCE_PRECONDITIONING
+  constexpr bool is_enabled_distance_precondition() { return true; }
+#else
+  constexpr bool is_enabled_distance_precondition() { return false; }
+#endif
 
 } // namespace quda

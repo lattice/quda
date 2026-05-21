@@ -3,7 +3,7 @@
 #include "complex_quda.h"
 #include "quda_constants.h"
 #include "quda_api.h"
-#include "math_helper.cuh"
+#include <math_helper.h>
 #include "float_vector.h"
 #include "comm_quda.h"
 #include "fast_intdiv.h"

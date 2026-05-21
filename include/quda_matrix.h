@@ -6,52 +6,19 @@
 #include <register_traits.h>
 #include <float_vector.h>
 #include <complex_quda.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 
 namespace quda {
 
   template <typename T> constexpr bool is_nan(T x) { return x != x; }
 
-  template<class T>
-    struct Zero
-    {
-      //static const T val;
-      __device__ __host__ inline
-        static T val();
-    };
+  template <class T> struct Identity {
+    __device__ __host__ inline static T val();
+  };
 
-  template<>
-    __device__ __host__ inline
-    float2 Zero<float2>::val()
-    {
-      return make_float2(0.,0.);
-    }
+  template <> __device__ __host__ inline float2 Identity<float2>::val() { return {1., 0.}; }
 
-  template<>
-    __device__ __host__ inline
-    double2 Zero<double2>::val()
-    {
-      return make_double2(0.,0.);
-    }
-
-  template<class T>
-    struct Identity
-    {
-      __device__  __host__ inline
-        static T val();
-    };
-
-  template<>
-    __device__ __host__ inline
-    float2 Identity<float2>::val(){
-      return make_float2(1.,0.);
-    }
-
-  template<>
-    __device__ __host__ inline
-    double2 Identity<double2>::val(){
-      return make_double2(1.,0.);
-    }
+  template <> __device__ __host__ inline double2 Identity<double2>::val() { return {1., 0.}; }
 
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;
@@ -136,7 +103,8 @@ namespace quda {
            the absolute column sums.
            @return Compute L1 norm
         */
-        __device__ __host__ inline real L1() {
+        __device__ __host__ inline real L1() const
+        {
           real l1 = 0;
 #pragma unroll
           for (int j=0; j<N; j++) {
@@ -155,7 +123,8 @@ namespace quda {
            Frobenius norm which is an upper bound on the L2 norm.
            @return Computed L2 norm
         */
-        __device__ __host__ inline real L2() {
+        __device__ __host__ inline real L2() const
+        {
           real l2 = 0;
 #pragma unroll
           for (int j=0; j<N; j++) {
@@ -172,7 +141,8 @@ namespace quda {
            the absolute row sums.
            @return Computed Linfinity norm
         */
-        __device__ __host__ inline real Linf() {
+        __device__ __host__ inline real Linf() const
+        {
           real linf = 0;
 #pragma unroll
           for (int i=0; i<N; i++) {
@@ -207,15 +177,12 @@ namespace quda {
 
 #pragma unroll
           for (int i=0; i<N; ++i){
-            if( fabs(identity(i,i).real() - 1.0) > max_error ||
-                fabs(identity(i,i).imag()) > max_error) return false;
+            if (abs(identity(i, i).real() - 1.0) > max_error || abs(identity(i, i).imag()) > max_error) return false;
 
 #pragma unroll
             for (int j=i+1; j<N; ++j){
-              if( fabs(identity(i,j).real()) > max_error ||
-                  fabs(identity(i,j).imag()) > max_error ||
-                  fabs(identity(j,i).real()) > max_error ||
-                  fabs(identity(j,i).imag()) > max_error ){
+              if (abs(identity(i, j).real()) > max_error || abs(identity(i, j).imag()) > max_error
+                  || abs(identity(j, i).real()) > max_error || abs(identity(j, i).imag()) > max_error) {
                 return false;
               }
             }
@@ -434,7 +401,6 @@ namespace quda {
       for (int i = 0; i < a.size(); i++) result.data[i] = a.data[i] + b.data[i];
       return result;
     }
-
 
   template< template<typename,int> class Mat, class T, int N>
   std::enable_if_t<std::is_same_v<Mat<T,N>, Matrix<T, N>> || std::is_same_v<Mat<T,N>, HMatrix<T, N>>, Mat<T, N>>
@@ -680,15 +646,6 @@ namespace quda {
         (*m)(i, i) = 1;
 #pragma unroll
         for (int j = i + 1; j < N; ++j) { (*m)(i, j) = (*m)(j, i) = {}; }
-      }
-    }
-
-    template <class T, int N> __device__ __host__ inline void setZero(Matrix<T, N> *m)
-    {
-#pragma unroll
-      for (int i = 0; i < N; ++i) {
-#pragma unroll
-        for (int j = 0; j < N; ++j) { (*m)(i, j) = {}; }
       }
     }
 
@@ -993,8 +950,7 @@ namespace quda {
       }
 
       //[19] Construct exp{iQ}
-      Matrix<T, 3> exp_iQ;
-      setZero(&exp_iQ);
+      Matrix<T, 3> exp_iQ = {};
       Matrix<T,3> UnitM;
       setIdentity(&UnitM);
       // +f0*I

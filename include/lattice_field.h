@@ -7,6 +7,7 @@
 #include <object.h>
 #include <quda_api.h>
 #include <reference_wrapper_helper.h>
+#include <domain_decomposition.h>
 
 /**
  * @file lattice_field.h
@@ -68,10 +69,13 @@ namespace quda {
     /** Array storing the length of dimension */
     lat_dim_t x = {};
 
+    /** Padding to be added to the checker-boarded volume (only for native field ordering) */
     int pad = 0;
 
+    /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset = QUDA_INVALID_SITE_SUBSET;
 
+    /** The type of memory allocation to use for the field */
     QudaMemoryType mem_type = QUDA_MEMORY_INVALID;
 
     /** The type of ghost exchange to be done with this field */
@@ -123,7 +127,7 @@ namespace quda {
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) :
-      location(QUDA_CPU_FIELD_LOCATION),
+      location(param.location),
       precision(param.cpu_prec),
       ghost_precision(param.cpu_prec),
       init(true),
@@ -141,14 +145,17 @@ namespace quda {
     }
 
     /**
-       @brief Contructor for creating LatticeFieldParam from a LatticeField
+       @brief Constructor for creating LatticeFieldParam from a LatticeField
     */
     LatticeFieldParam(const LatticeField &field);
   };
 
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param);
+  std::ostream &operator<<(std::ostream &output, const LatticeField &field);
 
   class LatticeField : public Object {
+
+    friend std::ostream &operator<<(std::ostream &output, const LatticeField &param);
 
     /**
        @brief Create the field as specified by the param
@@ -175,9 +182,13 @@ namespace quda {
     /** Checkerboarded local volume */
     size_t localVolumeCB = 0;
 
+    /** Stride used for native field ordering (stride = volumeCB + pad) */
     size_t stride = 0;
+
+    /** Padding to be added to the checker-boarded volume (only for native field ordering) */
     int pad = 0;
 
+    /** Total size of the allocation */
     size_t total_bytes = 0;
 
     /** Number of field dimensions */
@@ -265,7 +276,7 @@ namespace quda {
     inline static array<void *, 2> ghost_pinned_recv_buffer_hd = {};
 
     /**
-       Remove ghost pointer for sending to
+       Remote ghost pointer for sending to
     */
     inline static array_3d<void *, 2, QUDA_MAX_DIM, 2> ghost_remote_send_buffer_d;
 
@@ -307,82 +318,82 @@ namespace quda {
     /**
        Pinned memory buffer used for sending messages
     */
-    array<void *, 2> my_face_h = {};
+    mutable array<void *, 2> my_face_h = {};
 
     /**
        Mapped version of my_face_h
     */
-    array<void *, 2> my_face_hd = {};
+    mutable array<void *, 2> my_face_hd = {};
 
     /**
        Device memory buffer for sending messages
      */
-    array<void *, 2> my_face_d = {};
+    mutable array<void *, 2> my_face_d = {};
 
     /**
        Local pointers to the pinned my_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_h = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_h = {};
 
     /**
        Local pointers to the mapped my_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd = {};
 
     /**
        Local pointers to the device ghost_send buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d = {};
 
     /**
        Memory buffer used for receiving all messages
     */
-    array<void *, 2> from_face_h = {};
+    mutable array<void *, 2> from_face_h = {};
 
     /**
        Mapped version of from_face_h
     */
-    array<void *, 2> from_face_hd = {};
+    mutable array<void *, 2> from_face_hd = {};
 
     /**
        Device memory buffer for receiving messages
      */
-    array<void *, 2> from_face_d = {};
+    mutable array<void *, 2> from_face_d = {};
 
     /**
        Local pointers to the pinned from_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_h = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_h = {};
 
     /**
        Local pointers to the mapped from_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd = {};
 
     /**
        Local pointers to the device ghost_recv buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d = {};
 
     /**
        Message handles for receiving
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv = {};
 
     /**
        Message handles for sending
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send = {};
 
     /**
        Message handles for receiving
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_rdma = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_rdma = {};
 
     /**
        Message handles for sending
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma = {};
 
     /**
        Message handles for receiving
@@ -417,7 +428,7 @@ namespace quda {
     /**
        Whether we have initialized communication for this field
     */
-    bool initComms = false;
+    mutable bool initComms = false;
 
     /**
        Whether we have initialized peer-to-peer communication
@@ -533,17 +544,17 @@ namespace quda {
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
     */
-    void createComms(bool no_comms_fill = false);
+    void createComms(bool no_comms_fill = false) const;
 
     /**
        Destroy the communication handlers
     */
-    void destroyComms();
+    void destroyComms() const;
 
     /**
        Create the inter-process communication handlers
     */
-    void createIPCComms();
+    void createIPCComms() const;
 
     /**
        Destroy the statically allocated inter-process communication handlers
@@ -764,19 +775,19 @@ namespace quda {
      */
     void *remoteFace_r() const;
 
-    virtual void gather(int, const qudaStream_t &) { errorQuda("Not implemented"); }
+    virtual void gather(int, const qudaStream_t &) const { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
+    virtual void commsStart(int, const qudaStream_t &, bool, bool) const { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int, const qudaStream_t &, bool, bool)
+    virtual int commsQuery(int, const qudaStream_t &, bool, bool) const
     {
       errorQuda("Not implemented");
       return 0;
     }
 
-    virtual void commsWait(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
+    virtual void commsWait(int, const qudaStream_t &, bool, bool) const { errorQuda("Not implemented"); }
 
-    virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
+    virtual void scatter(int, const qudaStream_t &) const { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
     auto VolString() const { return vol_string; }
@@ -893,6 +904,40 @@ namespace quda {
 #define checkPrecision(...) Precision_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
+     @brief Helper function for determining if the color of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If color is unique return the number of colors
+   */
+  template <typename T1, typename T2>
+  inline int Color_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
+    int nColor = 0;
+    if (a.Ncolor() == b.Ncolor())
+      nColor = a.Ncolor();
+    else
+      errorQuda("Color %d %d do not match (%s:%d in %s())", a.Ncolor(), b.Ncolor(), file, line, func);
+    return nColor;
+  }
+
+  /**
+     @brief Helper function for determining if the color of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check color on
+     @return If colors is unique return the number of colors
+   */
+  template <typename T1, typename T2, typename... Args>
+  inline int Color_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &...args)
+  {
+    return Color_(func, file, line, a, b) & Color_(func, file, line, a, args...);
+  }
+
+#define checkColor(...) Color_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
      @brief Helper function for determining if the field is in native order
      @param[in] a Input field
      @return true if field is in native order
@@ -917,6 +962,66 @@ namespace quda {
   }
 
 #define checkNative(...) Native_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+     @brief Helper function for determining if the domain decomposition of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return true if all fields match
+   */
+  template <typename T1, typename T2>
+  inline bool DD_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
+    if (!a.DD().check(a, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!b.DD().check(b, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!a.DD().match(b.DD(), true)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for determining if the domain decomposition of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check domain decomposition on
+     @return true if all fields match
+   */
+  template <typename T1, typename T2, typename... Args>
+  inline bool DD_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &...args)
+  {
+    // checking all possible pairs
+    return (DD_(func, file, line, a, b) && DD_(func, file, line, a, args...) && DD_(func, file, line, b, args...));
+  }
+
+#define checkDD(...) DD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+   @brief Helper function for signalling that DD is not supported
+   @param[in] a Input field
+   @return true if all fields are supported
+ */
+  template <typename T1> inline bool NoDD_(const char *func, const char *file, int line, const T1 &a_)
+  {
+    const unwrap_t<T1> &a(a_);
+    if (!a.DD() == false) errorQuda("DD not supported (%s:%d in %s())", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for signalling that DD is not supported
+     @param[in] a Input field
+     @param[in] args List of additional fields to check domain decomposition on
+     @return true if all fields match
+   */
+  template <typename T1, typename... Args>
+  inline bool NoDD_(const char *func, const char *file, int line, const T1 &a, const Args &...args)
+  {
+    // checking all possible pairs
+    return (NoDD_(func, file, line, a) && NoDD_(func, file, line, args...));
+  }
+
+#define assertNoDD(...) NoDD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Return whether data is reordered on the CPU or GPU.  This can set

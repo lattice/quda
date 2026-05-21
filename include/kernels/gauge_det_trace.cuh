@@ -60,7 +60,7 @@ namespace quda {
         local += Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
       }
 
-      return operator()(value, array<double, 2>{local.real(), local.imag()});
+      return operator()(value, {local.real(), local.imag()});
     }
   };
 

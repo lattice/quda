@@ -111,7 +111,7 @@ namespace quda {
                  cvector_ref<const ColorSpinorField> &v) :
       kernel_param(
         dim3(work_items, (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), a.SiteSubset())),
-      n_src(v.size() > 0 ? 1 : v.size()),
+      n_src(v.size() > 0 ? v.size() : 1),
       out(a, nFace, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
@@ -130,16 +130,19 @@ namespace quda {
       shmem(shmem_)
     {
       int prev = -1; // previous dimension that was partitioned
+
+      int Ls = nDim == 5 ? (a.X(4) / n_src) : 1;
       for (int i = 0; i < 4; i++) {
         if (!comm_dim_partitioned(i)) continue;
         // include fifth dimension but not batch dimension in face indices
-        ghostFaceCB[i] = dc.ghostFaceCB[i] * nFace * ((nDim == 5 && v.size() == 0) ? dc.Ls : 1);
+        ghostFaceCB[i] = dc.ghostFaceCB[i] * nFace * Ls;
         // include fifth and batch dimensions in thread count
-        ghostThreadsCB[i] = dc.ghostFaceCB[i] * nFace * (nDim == 5 ? dc.Ls : 1);
+        ghostThreadsCB[i] = dc.ghostFaceCB[i] * nFace * Ls * n_src;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * ghostThreadsCB[i];
         prev = i;
       }
+
 #ifdef NVSHMEM_COMMS
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
       for (int dim = 0; dim < 4; dim++) {
@@ -160,8 +163,9 @@ namespace quda {
   };
 
   template <bool is_device> struct site_max {
-    template <typename Arg> inline auto operator()(typename Arg::real thread_max, Arg &)
+    template <typename Ftor> inline auto operator()(typename Ftor::Arg::real thread_max, Ftor &)
     {
+      using Arg = typename Ftor::Arg;
       // on the host we require that both spin and color are fully thread local
       constexpr int Ms = spins_per_thread<is_device>(Arg::nSpin);
       constexpr int Mc = colors_per_thread<is_device>(Arg::nColor);
@@ -172,17 +176,27 @@ namespace quda {
   };
 
   template <> struct site_max<true> {
-    template <typename Arg> __device__ inline auto operator()(typename Arg::real thread_max, Arg &)
+    template <typename Arg> struct CacheDims {
+      static constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
+      static constexpr int Mc = colors_per_thread<true>(Arg::nColor);
+      static constexpr int color_spin_threads = (Arg::nSpin / Ms) * (Arg::nColor / Mc);
+      template <typename... Args> static constexpr dim3 dims(dim3 block, const Args &...)
+      {
+        // pad the shared block size to avoid bank conflicts for native ordering
+        if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+        block.y = color_spin_threads; // state the y block since we know it at compile time
+        return block;
+      }
+    };
+    template <typename Arg> using Cache = SharedMemoryCache<typename Arg::real, CacheDims<Arg>>;
+    template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
+
+    template <typename Ftor> __device__ inline auto operator()(typename Ftor::Arg::real thread_max, const Ftor &ftor)
     {
+      using Arg = typename Ftor::Arg;
       using real = typename Arg::real;
-      constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
-      constexpr int Mc = colors_per_thread<true>(Arg::nColor);
-      constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
-      auto block = target::block_dim();
-      // pad the shared block size to avoid bank conflicts for native ordering
-      if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
-      block.y = color_spin_threads; // state the y block since we know it at compile time
-      SharedMemoryCache<real> cache(block);
+      constexpr int color_spin_threads = CacheDims<Arg>::color_spin_threads;
+      Cache<Arg> cache {ftor};
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
@@ -195,36 +209,40 @@ namespace quda {
     }
   };
 
-  template <typename Arg> __device__ __host__ inline std::enable_if_t<!Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &, int, int, int, int, int)
+  template <bool allthreads, typename Ftor>
+  __device__ __host__ inline std::enable_if_t<!Ftor::Arg::block_float, typename Ftor::Arg::real>
+  compute_site_max(const Ftor &, int, int, int, int, int, bool)
   {
-    return static_cast<typename Arg::real>(1.0); // dummy return for non-block float
+    return static_cast<typename Ftor::Arg::real>(1.0); // dummy return for non-block float
   }
 
   /**
      Compute the max element over the spin-color components of a given site.
   */
-  template <typename Arg> __device__ __host__ inline std::enable_if_t<Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &arg, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block)
+  template <bool allthreads, typename Ftor>
+  __device__ __host__ inline std::enable_if_t<Ftor::Arg::block_float, typename Ftor::Arg::real>
+  compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block, bool alive)
   {
-    using real = typename Arg::real;
-    const int Ms = spins_per_thread(Arg::nSpin);
-    const int Mc = colors_per_thread(Arg::nColor);
+    using real = typename Ftor::Arg::real;
+    const int Ms = spins_per_thread(Ftor::Arg::nSpin);
+    const int Mc = colors_per_thread(Ftor::Arg::nColor);
     complex<real> thread_max = {0.0, 0.0};
 
+    if (!allthreads || alive) {
 #pragma unroll
-    for (int spin_local=0; spin_local<Ms; spin_local++) {
-      int s = spin_block + spin_local;
+      for (int spin_local = 0; spin_local < Ms; spin_local++) {
+        int s = spin_block + spin_local;
 #pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
-        int c = color_block + color_local;
-        complex<real> z = arg.in[src_idx](spinor_parity, x_cb, s, c);
-        thread_max.real(std::max(thread_max.real(), std::abs(z.real())));
-        thread_max.imag(std::max(thread_max.imag(), std::abs(z.imag())));
+        for (int color_local = 0; color_local < Mc; color_local++) {
+          int c = color_block + color_local;
+          complex<real> z = ftor.arg.in[src_idx](spinor_parity, x_cb, s, c);
+          thread_max.real(max(thread_max.real(), abs(z.real())));
+          thread_max.imag(max(thread_max.imag(), abs(z.imag())));
+        }
       }
     }
 
-    return target::dispatch<site_max>(std::max(thread_max.real(), thread_max.imag()), arg);
+    return target::dispatch<site_max>(max(thread_max.real(), thread_max.imag()), ftor);
   }
 
   /**
@@ -278,12 +296,20 @@ namespace quda {
     }
   }
 
-  template <typename Arg> struct GhostPacker {
+  template <typename Arg_>
+  using GhostPackerOps = std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoKernelOps>;
+
+  template <typename Arg_> struct GhostPacker : GhostPackerOps<Arg_> {
+    using Arg = Arg_;
     const Arg &arg;
-    constexpr GhostPacker(const Arg &arg) : arg(arg) {}
+    using typename GhostPackerOps<Arg>::KernelOpsT;
+    template <typename... Ops> constexpr GhostPacker(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int tid, int spin_color_block, int parity)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __device__ __host__ void operator()(int tid, int spin_color_block, int parity, bool alive = true)
     {
       const int Ms = spins_per_thread(Arg::nSpin);
       const int Mc = colors_per_thread(Arg::nColor);
@@ -299,21 +325,22 @@ namespace quda {
 
       int src_idx;
       int x_cb = indexFromFaceIndex(src_idx, dim, dir, ghost_idx, parity, arg);
-      auto max = compute_site_max<Arg>(arg, src_idx, x_cb, spinor_parity, spin_block, color_block);
+      auto max = compute_site_max<allthreads>(*this, src_idx, x_cb, spinor_parity, spin_block, color_block, alive);
 
+      if (!allthreads || alive) {
 #pragma unroll
-      for (int spin_local=0; spin_local<Ms; spin_local++) {
-        int s = spin_block + spin_local;
+        for (int spin_local = 0; spin_local < Ms; spin_local++) {
+          int s = spin_block + spin_local;
 #pragma unroll
-        for (int color_local=0; color_local<Mc; color_local++) {
-          int c = color_block + color_local;
-          arg.out.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.in[src_idx](spinor_parity, x_cb, s, c);
+          for (int color_local = 0; color_local < Mc; color_local++) {
+            int c = color_block + color_local;
+            arg.out.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.in[src_idx](spinor_parity, x_cb, s, c);
+          }
         }
-      }
-
 #ifdef NVSHMEM_COMMS
-      if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
+        if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
 #endif
+      }
     }
   };
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <target_device.h>
+#include <constant_kernel_arg.h>
 #include <reduce_helper.h>
 
 namespace quda

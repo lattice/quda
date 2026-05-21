@@ -2,10 +2,16 @@
 
 #include <quda_arch.h>
 #include <quda_api.h>
+#include <quda_define.h>
 
 #include <string>
-#include <complex>
 #include <vector>
+
+#ifdef QUDA_USE_QUAD_SCALAR
+#include "quad_scalar.h"
+#endif
+
+#include <complex>
 
 #if ((defined(QMP_COMMS) || defined(MPI_COMMS)) && !defined(MULTI_GPU))
 #error "MULTI_GPU must be enabled to use MPI or QMP"
@@ -21,8 +27,8 @@
 
 // these are helper macros used to enable spin-1, spin-2 and spin-4 building blocks as needed
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_CLOVER_DIRAC)                           \
-  || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_NDEG_TWISTED_MASS_DIRAC)      \
-  || defined(GPU_CLOVER_HASENBUSCH_TWIST) || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
+  || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_CLOVER_HASENBUSCH_TWIST)      \
+  || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
 #define NSPIN4
 #endif
 
@@ -30,7 +36,7 @@
 #define NSPIN2
 #endif
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_LAPLACE)
 #define NSPIN1
 #endif
 
@@ -64,10 +70,29 @@ namespace quda {
   */
   using complex_t = std::complex<real_t>;
 
+#ifdef QUDA_USE_QUAD_SCALAR
+  inline complex_t operator/(const complex_t &z, double x) { return z / real_t(x); }
+  inline complex_t operator*(double x, const complex_t &z) { return real_t(x) * z; }
+  inline complex_t operator*(const complex_t &z, double x) { return z * real_t(x); }
+#else
+  inline double to_double(real_t x) { return x; }
+#endif
+
+  /** Use with fprintf/printf %e, %g, %le when the value has type real_t. */
+  inline double printf_real(real_t x) { return to_double(x); }
+
+#define QUDA_REAL(x) (quda::printf_real(x))
+
   /**
      Underlying type to use for reductions
   */
   using reduction_t = QUDA_REDUCTION_TYPE;
+
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 13000
+  using double4 = ::double4_32a;
+#else
+  using double4 = ::double4;
+#endif
 
   /**
      Array object type used to storing lattice dimensions
@@ -79,6 +104,12 @@ namespace quda {
    * @param inv_param   Contains all metadata regarding host and device storage
    */
   bool canReuseResidentGauge(QudaInvertParam *inv_param);
+
+  /**
+     Runtime query of what the maximum number of RHS per kernel is
+     @return Maximum number of RHS per kernel
+   */
+  unsigned int get_max_multi_rhs();
 
   class TimeProfile;
 

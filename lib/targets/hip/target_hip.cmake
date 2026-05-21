@@ -34,7 +34,7 @@ find_package(rocprim REQUIRED)
 
 
 # ######################################################################################################################
-# define CUDA flags
+# define HIP flags
 set(CMAKE_HIP_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
     CACHE FILEPATH "Host compiler to be used by hip")
@@ -44,19 +44,25 @@ mark_as_advanced(CMAKE_HIP_HOST_COMPILER)
 
 set(CMAKE_HIP_FLAGS_DEVEL
     "-g -O3 "
-    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
+    CACHE STRING "Flags used by the HIP compiler during regular development builds.")
 set(CMAKE_HIP_FLAGS_STRICT
     "-g -O3"
-    CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
+    CACHE STRING "Flags used by the HIP compiler during strict jenkins builds.")
 set(CMAKE_HIP_FLAGS_RELEASE
     "-O3 -w"
-    CACHE STRING "Flags used by the CUDA compiler during release builds.")
+    CACHE STRING "Flags used by the HIP compiler during release builds.")
 set(CMAKE_HIP_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_HIP_FLAGS_DEBUG
-    "-g -G"
-    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
+if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
+    set(CMAKE_HIP_FLAGS_DEBUG
+        "-g -G"
+        CACHE STRING "Flags used by the HIP compiler during debug builds (with device debug support for NVIDIA).")
+else()
+    set(CMAKE_HIP_FLAGS_DEBUG
+        "-g"
+        CACHE STRING "Flags used by the HIP compiler during debug builds (with device debug support for Clang).")
+endif()
 set(CMAKE_HIP_FLAGS_SANITIZE
     "-g "
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
@@ -72,12 +78,21 @@ message(STATUS "HIP Compiler is" ${CMAKE_HIP_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_HIP_COMPILER_ID})
 
 # ######################################################################################################################
-# CUDA specific QUDA options options
-set(QUDA_HETEROGENEOUS_ATOMIC OFF)
-mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+# data order variables
+set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields (2 = default, 0 = legacy)")
+set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields (4 = default, 0 = legacy)")
+set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
+set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 
 # ######################################################################################################################
-# CUDA specific variables
+# CUDA specific QUDA options
+set(QUDA_HETEROGENEOUS_ATOMIC OFF)
+set(QUDA_LARGE_KERNEL_ARG OFF)
+mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+
+# ######################################################################################################################
+# HIP specific variables
 set_target_properties(quda PROPERTIES HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
 
 # QUDA_HASH for tunecache
@@ -87,7 +102,7 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
 
 # ######################################################################################################################
-# cuda specific compile options
+# HIP specific compile options
 
 target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/hip)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/hip>
@@ -101,11 +116,15 @@ target_compile_options(
   PRIVATE -Wall
           -Wextra
           -Wno-unknown-pragmas
-				  -Wno-unused-result
+          -Wno-unused-result
           $<$<CONFIG:STRICT>:-Werror
           -Wno-error=pass-failed>
           $<$<CONFIG:SANITIZE>:-fsanitize=address
           -fsanitize=undefined>)
+
+if(QUDA_FLUSH_DENORMALS)
+  message(FATAL_ERROR "QUDA_FLUSH_DENORMALS is not supported on this target")
+endif()
 
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE HIP)
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub

@@ -140,16 +140,22 @@ namespace quda {
 
     template<class T> constexpr T getAbsMin(const T* const array, int size)
     {
-      T min = fabs(array[0]);
+      T min = abs(array[0]);
       for (int i=1; i<size; ++i) {
-        T abs_val = fabs(array[i]);
+        T abs_val = abs(array[i]);
         if ((abs_val) < min){ min = abs_val; }
       }
       return min;
     }
 
-    template<class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon) { return fabs(a-b) < epsilon; }
-    template<class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon) { return fabs((a-b)/b) < epsilon; }
+    template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon)
+    {
+      return abs(a - b) < epsilon;
+    }
+    template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon)
+    {
+      return abs((a - b) / b) < epsilon;
+    }
 
     // Compute the reciprocal square root of the matrix q
     // Also modify q if the eigenvalues are dangerously small.
@@ -176,21 +182,19 @@ namespace quda {
 	r = c[2]/2. - (c[0] / static_cast<Float>(3.0)) * (c[1] - c[0] * c[0] / static_cast<Float>(9.0));
 
 	Float cosTheta = r * quda::rsqrt(s * s * s);
-	if (fabs(s) < arg.unitarize_eps) {
-	  cosTheta = static_cast<Float>(1.0);
-	  s = static_cast<Float>(0.0);
-	}
-	if (fabs(cosTheta) > static_cast<Float>(1.0)) {
+        if (abs(s) < arg.unitarize_eps) {
+          cosTheta = static_cast<Float>(1.0);
+          s = static_cast<Float>(0.0);
+        }
+        if (abs(cosTheta) > static_cast<Float>(1.0)) {
           if (r > static_cast<Float>(0.0)) theta = static_cast<Float>(0.0);
           else theta = static_cast<Float>(M_PI)/static_cast<Float>(3.0);
         } else {
           theta = acos(cosTheta) / static_cast<Float>(3.0);
         }
 
-	s = 2.0 * sqrt(s);
-	for (int i=0; i<3; ++i) {
-	  g[i] += s * cos(theta + (i-1) * static_cast<Float>(M_PI * 2.0 / 3.0));
-	}
+        s = 2.0 * sqrt(s);
+        for (int i = 0; i < 3; ++i) { g[i] += s * cos(theta + (i - 1) * static_cast<Float>(M_PI * 2.0 / 3.0)); }
 
       } // !REUNIT_SVD_ONLY?
 
@@ -210,28 +214,28 @@ namespace quda {
 	bool perform_svd = true;
 	if (!arg.svd_only) {
 	  const Float det = getDeterminant(q).x;
-	  if( fabs(det) >= arg.svd_abs_error) {
-	    if( checkRelativeError(g[0]*g[1]*g[2],det,arg.svd_rel_error) ) perform_svd = false;
-	  }
-	}
+          if (abs(det) >= arg.svd_abs_error) {
+            if (checkRelativeError(g[0] * g[1] * g[2], det, arg.svd_rel_error)) perform_svd = false;
+          }
+        }
 
-	if(perform_svd){
-	  Matrix<complex<Float>,3> tmp2;
-	  // compute the eigenvalues using the singular value decomposition
-	  computeSVD<Float>(q,tempq,tmp2,g);
+        if (perform_svd) {
+          Matrix<complex<Float>, 3> tmp2;
+          // compute the eigenvalues using the singular value decomposition
+          computeSVD<Float>(q,tempq,tmp2,g);
 	  // The array g contains the eigenvalues of the matrix q
 	  // The determinant is the product of the eigenvalues, and I can use this
 	  // to check the SVD
 	  const Float determinant = getDeterminant(q).x;
 	  const Float gprod = g[0]*g[1]*g[2];
 	  // Check the svd result for errors
-	  if (fabs(gprod - determinant) > arg.max_det_error) {
-	    //printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
-	    //printLink(q);
+          if (abs(gprod - determinant) > arg.max_det_error) {
+            // printf("Warning: Error in determinant computed by SVD : %g > %g\n", abs(gprod-determinant),
+            // arg.max_det_error); printLink(q);
 
             atomic_fetch_add(arg.fails, 1);
-	  }
-	} // perform_svd?
+          }
+        } // perform_svd?
 
       } // REUNIT_ALLOW_SVD?
 

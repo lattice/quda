@@ -7,8 +7,8 @@ namespace quda
 {
 
   CAGCR::CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-               const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+               const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param),
     matMdagM(matEig.Expose()),
     init(false),
     lambda_init(false),
@@ -18,27 +18,22 @@ namespace quda
 
   CAGCR::~CAGCR()
   {
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void CAGCR::create(ColorSpinorField &x, const ColorSpinorField &b)
+  void CAGCR::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
 
-    if (!init) {
-      if (!param.is_preconditioner) {
-        blas::flops = 0;
-        profile.TPSTART(QUDA_PROFILE_INIT);
-      }
+    if (!init || r.size() != b.size()) {
+      if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
-      alpha.resize(param.Nkrylov);
+      alpha.resize(b.size());
+      for (auto i = 0u; i < alpha.size(); i++) alpha[i].resize(param.Nkrylov);
 
       bool mixed = param.precision != param.precision_sloppy;
 
-      ColorSpinorParam csParam(b);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
+      ColorSpinorParam csParam(b[0]);
       csParam.setPrecision(param.precision_sloppy);
 
       if (basis == QUDA_POWER_BASIS) {
@@ -46,27 +41,30 @@ namespace quda
         p.resize(param.Nkrylov + 1);
         q.resize(param.Nkrylov);
         for (int i = 0; i < param.Nkrylov + 1; i++) {
-          p[i] = ColorSpinorField(csParam);
-          if (i > 0) q[i - 1] = p[i].create_alias(csParam);
+          resize(p[i], b.size(), csParam);
+          if (i > 0) create_alias(q[i - 1], p[i]);
         }
       } else {
         p.resize(param.Nkrylov);
         q.resize(param.Nkrylov);
         for (int i = 0; i < param.Nkrylov; i++) {
-          p[i] = ColorSpinorField(csParam);
-          q[i] = ColorSpinorField(csParam);
+          resize(p[i], b.size(), csParam);
+          resize(q[i], b.size(), csParam);
         }
       }
 
       csParam.setPrecision(param.precision);
-      r = mixed ? ColorSpinorField(csParam) : p[0].create_alias(csParam);
+      if (mixed)
+        resize(r, b.size(), csParam);
+      else
+        create_alias(r, p[0]);
 
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     } // init
   }
 
-  void CAGCR::solve(std::vector<complex_t> &psi_, std::vector<ColorSpinorField> &q, ColorSpinorField &b)
+  void CAGCR::solve(std::vector<complex_t> &psi_, cvector_ref<ColorSpinorField> &q, ColorSpinorField &b)
   {
     typedef Matrix<complex_t, Dynamic, Dynamic> matrix;
     typedef Matrix<complex_t, Dynamic, 1> vector;
@@ -82,7 +80,7 @@ namespace quda
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<complex_t> A_(N * (N + 1));
 
-    blas::cDotProduct(A_, q, {q, b});
+    blas::block::cDotProduct(A_, q, {q, b});
     for (int i = 0; i < N; i++) {
       phi(i) = A_[i * (N + 1) + N];
       for (int j = 0; j < N; j++) { A(i, j) = A_[i * (N + 1) + j]; }
@@ -91,20 +89,19 @@ namespace quda
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
     std::vector<complex_t> phi_(N);
-    blas::cDotProduct(phi_, q, b);
+    blas::block::cDotProduct(phi_, q, b);
     for (int i = 0; i < N; i++) phi(i) = phi_[i];
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<complex_t> A_(N * N);
-    blas::hDotProduct(A_, q, q);
+    blas::block::hDotProduct(A_, q, q);
     for (int i = 0; i < N; i++)
       for (int j = 0; j < N; j++) A(i, j) = A_[i * N + j];
 #endif
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     // use Cholesky LDL since this seems plenty stable
@@ -114,13 +111,12 @@ namespace quda
     for (int i = 0; i < N; i++) psi_[i] = psi(i);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      param.secs += profile.Last(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 
-  ColorSpinorField &CAGCR::get_residual()
+  cvector_ref<const ColorSpinorField> CAGCR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -134,7 +130,7 @@ namespace quda
     3. Update solution and residual vectors
     4. (Optional) restart if convergence or maxiter not reached
   */
-  void CAGCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CAGCR::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     const int n_krylov = param.Nkrylov;
 
@@ -145,25 +141,26 @@ namespace quda
 
     create(x, b);
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
-    real_t b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
-    real_t r2 = 0.0; // if zero source then we will exit immediately doing no work
+    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<real_t>(b.size(), 1.0);
+    std::vector<real_t> r2(b.size(), 0.0); // if zero source then we will exit immediately doing no work
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
-        constructDeflationSpace(b, matMdagM);
+        constructDeflationSpace(b[0], matMdagM);
       } else {
         // Use Arnoldi to inspect the space only and turn off deflation
-        constructDeflationSpace(b, mat);
+        constructDeflationSpace(b[0], mat);
         param.deflate = false;
       }
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
         if (param.deflate) {
           // double the size of the Krylov space
@@ -171,7 +168,7 @@ namespace quda
           // populate extra memory with L/R singular vectors
           eig_solve->computeSVD(evecs, evals);
         }
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -187,6 +184,8 @@ namespace quda
       // r = b - Ax0
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r);
+        for (auto i = 0u; i < b.size(); i++)
+          if (b2[i] == 0) b2[i] = r2[i];
       } else {
         blas::xpay(b, -1.0, r);
         r2 = b2; // dummy setting
@@ -217,40 +216,35 @@ namespace quda
 
     if (basis == QUDA_CHEBYSHEV_BASIS && n_krylov > 1 && lambda_max < lambda_min && !lambda_init) {
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-        profile.TPSTART(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTART(QUDA_PROFILE_INIT);
       }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
       // and q[0]/q[1] as temporaries for the power iterations. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
-      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10);
-      logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", double(lambda_max / 1.1));
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r[0], q[0][0], q[1][0], 100, 10);
+      logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", QUDA_REAL(lambda_max / 1.1));
+
       lambda_init = true;
 
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_INIT);
-        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
       }
     }
 
     // Factors which map linear operator onto [-1,1]
-    real_t m_map = 2. / (lambda_max - lambda_min);
-    real_t b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    double m_map = 2. / (lambda_max - lambda_min);
+    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (b2 == 0) {
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-        warningQuda("inverting on zero-field source\n");
-        x = b;
-        param.true_res = 0.0;
-        param.true_res_hq = 0.0;
-        return;
-      } else {
-        b2 = r2;
-      }
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      return;
     }
 
-    real_t stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : 0.0; // stopping condition of solver
+    auto stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) :
+                                   std::vector(b.size(), 0.0); // stopping condition of solver
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -260,42 +254,56 @@ namespace quda
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    real_t heavy_quark_res = 0.0; // heavy quark residual
-    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
+    std::vector<real_t> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    if (use_heavy_quark_res) {
+      auto hq = blas::HeavyQuarkResidualNorm(x, r);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
+    }
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
 
     if (!param.is_preconditioner) {
-      blas::flops = 0;
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
     int total_iter = 0;
     int restart = 0;
-    real_t r2_old = r2;
-    real_t maxr_deflate = sqrt(r2);
+    auto r2_old = r2;
+    auto maxr_deflate = sqrt(r2[0]);
     bool l2_converge = false;
 
     blas::copy(p[0], r); // no op if uni-precision
 
+    auto get_i = [](std::vector<std::vector<ColorSpinorField>> &p, int i) {
+      vector_ref<ColorSpinorField> p_i;
+      p_i.reserve(p.size());
+      for (auto &pi : p) p_i.push_back(pi[i]);
+      return p_i;
+    };
+
     PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
-    while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
+    while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
       computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map);
 
-      solve(alpha, q, p[0]);
+      for (auto i = 0u; i < b.size(); i++) solve(alpha[i], get_i(q, i), p[0][i]);
 
       // need to make sure P is only length n_krylov
-      blas::caxpy(alpha, {p.begin(), p.begin() + n_krylov}, {x});
+      for (auto i = 0u; i < b.size(); i++) {
+        auto pi = get_i(p, i);
+        blas::block::caxpy(alpha[i], {pi.begin(), pi.begin() + n_krylov}, {x[i]});
+      }
 
       // no need to compute residual vector if not returning
       // residual vector and only doing a single fixed iteration
       if (!fixed_iteration || param.return_residual) {
-        // update the residual vector
-        for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
-        blas::caxpy(alpha, q, r);
+        for (auto i = 0u; i < b.size(); i++) {
+          // update the residual vector
+          for (int j = 0; j < n_krylov; j++) alpha[i][j] = -alpha[i][j];
+          blas::block::caxpy(alpha[i], get_i(q, i), r[i]);
+        }
       }
 
       total_iter += n_krylov;
@@ -308,13 +316,13 @@ namespace quda
 
       // update since n_krylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every n_krylov steps
-      if (total_iter >= param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2 / r2_old) < param.delta) {
+      if (total_iter >= param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2[0] / r2_old[0]) < param.delta) {
 
         if ((r2 < stop || total_iter >= param.maxiter) && param.sloppy_converge) break;
         mat(r, x);
         r2 = blas::xmyNorm(b, r);
 
-        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+        if (param.deflate && sqrt(r2[0]) < maxr_deflate * param.tol_restart) {
           // Deflate and accumulate to solution vector
           eig_solve->deflateSVD(x, r, evecs, evals, true);
 
@@ -322,10 +330,13 @@ namespace quda
           mat(r, x);
           r2 = blas::xmyNorm(b, r);
 
-          maxr_deflate = sqrt(r2);
+          maxr_deflate = sqrt(r2[0]);
         }
 
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
+        if (use_heavy_quark_res) {
+          auto hq = blas::HeavyQuarkResidualNorm(x, r);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
+        }
 
         // break-out check if we have reached the limit of the precision
         if (r2 > r2_old) {
@@ -333,7 +344,7 @@ namespace quda
           resIncreaseTotal++;
           warningQuda(
             "CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            double(sqrt(r2)), double(sqrt(r2_old)), resIncreaseTotal);
+            QUDA_REAL(sqrt(r2[0])), QUDA_REAL(sqrt(r2_old[0])), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
             break;
@@ -346,7 +357,7 @@ namespace quda
       }
 
       // No matter what, if we haven't converged, we do a restart.
-      if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+      if (!convergenceL2(r2, stop)) {
         restart++; // restarting if residual is still too great
 
         PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
@@ -367,35 +378,22 @@ namespace quda
     if (param.compute_true_res) {
       // Calculate the true residual
       mat(r, x);
-      real_t true_res = blas::xmyNorm(b, r);
-      param.true_res = sqrt(true_res / b2);
-      param.true_res_hq
-        = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]) : 0.0;
+      auto true_r2 = blas::xmyNorm(b, r);
+      auto hq = blas::HeavyQuarkResidualNorm(x, r);
+      for (auto i = 0u; i < b.size(); i++) {
+        param.true_res[i] = sqrt(true_r2[i] / b2[i]);
+        param.true_res_hq[i] = sqrt(hq[i][2]);
+      }
     }
 
     if (!param.is_preconditioner) {
-      qudaDeviceSynchronize(); // ensure solver is complete before ending timing
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-
-      // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops()) * 1e-9;
-
-      param.gflops += gflops;
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       param.iter += total_iter;
-
-      // reset the flops counters
-      blas::flops = 0;
-      mat.flops();
-      matSloppy.flops();
-      matPrecon.flops();
-      matMdagM.flops();
-
-      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    PrintSummary("CA-GCR", total_iter, r2, b2, stop, param.tol_hq);
+    PrintSummary("CA-GCR", total_iter, r2, b2, stop);
+
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 } // namespace quda

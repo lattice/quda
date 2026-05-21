@@ -3,14 +3,19 @@
 #include <math.h>
 #include <string.h>
 
-#include <host_utils.h>
 #include <quda_internal.h>
 #include <quda.h>
 #include <util_quda.h>
-#include <staggered_gauge_utils.h>
-#include <llfat_utils.h>
 #include <unitarization_links.h>
+#include <qio_field.h>
+
 #include "misc.h"
+#include "host_utils.h"
+#include "command_line_params.h"
+#include "gauge_utils.h"
+#include "staggered_gauge_utils.h"
+#include "rng_utils.hpp"
+#include "llfat_utils.h"
 
 extern double tadpole_factor;
 // Unitarization coefficients
@@ -21,13 +26,161 @@ static double svd_rel_error = 1e-4;
 static double svd_abs_error = 1e-4;
 static double max_allowed_error = 1e-11;
 
+void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, GaugeFieldConstructionType type,
+                                QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
+{
+  if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
+    // Set fatlink to the identity matrix
+    constructIdentityGaugeField(fatlink, precision);
+
+    // Apply anisotropy, temporal boundary conditions, and emulate temporal
+    // gauge fixing as appropriate
+    applyGaugeFieldScaling(fatlink, Vh, param, precision);
+
+    // Repeat for the longlink field
+    constructIdentityGaugeField(longlink, precision);
+    applyGaugeFieldScaling(longlink, Vh, param, precision);
+
+    // apply MILC phases... and temporal boundary conditions? again?
+    applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
+
+    // also apply MILC phases and temporal boundary conditions (again?)
+    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
+      applyGaugeFieldScaling_long(longlink, Vh, param, dslash_type, precision);
+    }
+
+  } else if (type == GaugeFieldConstructionType::RANDOM_GAUGE) {
+    // if doing naive staggered then set to long links so that the staggered phase is applied
+    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+
+    constructRandomGaugeField(fatlink, param, precision, dslash_type);
+
+    param.type = QUDA_ASQTAD_LONG_LINKS;
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      constructRandomGaugeField(longlink, param, precision, dslash_type);
+      // incorporate non-trivial phase into long links
+      for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
+        for (int i = 0; i < Vh; ++i) {
+          for (int parity = 0; parity < 2; parity++) {
+            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+            std::complex<double> z = std::polar(1.0, phase);
+            for (auto j = 0lu; j < gauge_site_size; j += 2) {
+              if (precision == QUDA_DOUBLE_PRECISION) {
+                std::complex<double> *l
+                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              } else {
+                std::complex<float> *l
+                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              }
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // if doing naive staggered then set to long links so that the staggered phase is applied
+    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+
+    constructRandomGaugeField(fatlink, param, precision, dslash_type);
+
+    param.type = QUDA_ASQTAD_LONG_LINKS;
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      constructRandomGaugeField(longlink, param, precision, dslash_type);
+
+      // incorporate non-trivial phase into long links
+      for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
+        for (int i = 0; i < Vh; ++i) {
+          for (int parity = 0; parity < 2; parity++) {
+            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+            std::complex<double> z = std::polar(1.0, phase);
+            for (auto j = 0lu; j < gauge_site_size; j += 2) {
+              if (precision == QUDA_DOUBLE_PRECISION) {
+                std::complex<double> *l
+                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              } else {
+                std::complex<float> *l
+                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // set all links to zero to emulate the 1-link operator (needed for host comparison)
+  // FIXME: may break host comparison
+  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+    for (int dir = 0; dir < 4; ++dir) { memset(longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size); }
+  }
+}
+
+void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu)
+{
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  // load a field WITHOUT PHASES
+  if (latfile.size() > 0) {
+    // load in the command line supplied gauge field using QIO and LIME
+    read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    if (dslash_type != QUDA_LAPLACE_DSLASH) {
+      applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
+    }
+  } else {
+    GaugeFieldConstructionType construct_type
+      = (unit_gauge) ? GaugeFieldConstructionType::UNIT_GAUGE : GaugeFieldConstructionType::RANDOM_GAUGE;
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param, gauge_param.cpu_prec);
+    } else {
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink, construct_type, gauge_param.cpu_prec, gauge_param,
+                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+    }
+  }
+
+  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
+  // "compute" the fat/long links or not.
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
+    }
+  } else {
+    // QUDA_ASQTAD_DSLASH
+    if (compute_fatlong) {
+      if (compute_on_gpu)
+        computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
+      else
+        computeFatLongCPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
+    } else {
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      }
+    }
+  }
+}
+
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,
-                         void **qdp_inlink, QudaGaugeParam &gauge_param_in, double **act_path_coeffs, double eps_naik,
-                         size_t gSize, int n_naiks)
+                         void **qdp_inlink, QudaGaugeParam &gauge_param_in,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik, size_t gSize,
+                         int n_naiks)
 {
-  // since a lot of intermediaries can be general matrices, override the recon in `gauge_param_in`
+  // Intermediates can be general matrices, so override the reconstruct.
+  // Similarly, gauge links can only be built in single or double, so upscale the build precision
+  // if neccessary.
   auto gauge_param = gauge_param_in;
+  if (gauge_param.cuda_prec < QUDA_SINGLE_PRECISION) gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 
@@ -52,11 +205,11 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   }
 
   // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-  computeKSLinkQuda(milc_vlink, nullptr, milc_wlink, milc_inlink, act_path_coeffs[0], &gauge_param);
+  computeKSLinkQuda(milc_vlink, nullptr, milc_wlink, milc_inlink, act_path_coeffs[0].data(), &gauge_param);
 
   if (n_naiks > 1) {
     // Create Naiks, 3rd path table set
-    computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[2], &gauge_param);
+    computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[2].data(), &gauge_param);
 
     // Rescale+copy Naiks into Naik field
     cpu_axy(gauge_param.cpu_prec, eps_naik, milc_fatlink, milc_fatlink_eps, V * 4 * gauge_site_size);
@@ -67,7 +220,7 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   }
 
   // Create X and long links, 2nd path table set
-  computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[1], &gauge_param);
+  computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[1].data(), &gauge_param);
 
   if (n_naiks > 1) {
     // Add into Naik field
@@ -98,7 +251,7 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   }
 }
 
-void setActionPaths(double **act_paths)
+template <class T> void setActionPaths(T &act_paths)
 {
   ///////////////////////////
   // Set path coefficients //
@@ -153,15 +306,14 @@ void setActionPaths(double **act_paths)
   // Set unitarization coefficients //
   ////////////////////////////////////
 
-  setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
-                             svd_abs_error);
+  quda::setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
+                                   svd_abs_error);
 }
 
 void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlink, QudaGaugeParam &gauge_param,
                        size_t gSize, int n_naiks, double eps_naik)
 {
-  double **act_paths = new double *[3];
-  for (int i = 0; i < 3; i++) act_paths[i] = new double[6];
+  std::array<std::array<double, 6>, 3> act_paths;
   setActionPaths(act_paths);
 
   ///////////////////////////////////////////////////////////////////////
@@ -196,17 +348,12 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
       host_free(qdp_longlink_naik_temp[dir]);
     }
   }
-
-  for (int i = 0; i < 3; i++) delete[] act_paths[i];
-  delete[] act_paths;
 }
 
-void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
-                             void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param, size_t gSize,
-                             int n_naiks, double eps_naik)
+void computeFatLongCPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlink, QudaGaugeParam &gauge_param,
+                       size_t gSize, int n_naiks, double eps_naik)
 {
-  double **act_paths = new double *[3];
-  for (int i = 0; i < 3; i++) act_paths[i] = new double[6];
+  std::array<std::array<double, 6>, 3> act_paths;
   setActionPaths(act_paths);
 
   ///////////////////////////////////////////////////////////////////////
@@ -229,41 +376,26 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   //////////////////////////
 
   // defined in "llfat_reference.cpp"
-  computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
+  computeHISQLinksCPU(qdp_fatlink, qdp_longlink, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
                       (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, qdp_inlink, &gauge_param, act_paths, eps_naik);
 
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_cpu[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
-      memcpy(qdp_longlink_cpu[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
-      memset(qdp_fatlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
-      memset(qdp_longlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
-    }
-  }
-
-  //////////////////////////
-  // Create the GPU links //
-  //////////////////////////
-
-  // Skip eps field for now
-  // Note: GPU link creation only works for single and double precision
-  computeHISQLinksGPU(qdp_fatlink_gpu, qdp_longlink_gpu, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
-                      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, qdp_inlink, gauge_param, act_paths, eps_naik,
-                      gSize, n_naiks);
-
-  if (n_naiks == 2) {
-    // Override the naik fields into the fat/long link fields
-    for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
-      memcpy(qdp_longlink_gpu[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memcpy(qdp_fatlink[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memcpy(qdp_longlink[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
       host_free(qdp_fatlink_naik_temp[dir]);
       host_free(qdp_longlink_naik_temp[dir]);
     }
   }
+}
 
-  for (int i = 0; i < 3; i++) delete[] act_paths[i];
-  delete[] act_paths;
+void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
+                             void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param, size_t gSize,
+                             int n_naiks, double eps_naik)
+{
+  computeFatLongGPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
+  computeFatLongCPU(qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
 }
 
 // Routine that takes in a QDP-ordered field and outputs the plaquette.
@@ -294,19 +426,6 @@ void computeStaggeredPlaquetteQDPOrder(void **qdp_link, double plaq[3], const Qu
 
   gauge_param.anisotropy = 1;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
-  pad_size = pad_size > z_face_size ? pad_size : z_face_size;
-  pad_size = pad_size > t_face_size ? pad_size : t_face_size;
-  gauge_param.ga_pad = pad_size;
-#endif
 
   loadGaugeQuda(qdp_link, &gauge_param);
   plaqQuda(plaq);

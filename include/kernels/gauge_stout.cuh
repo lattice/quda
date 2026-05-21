@@ -6,35 +6,39 @@
 #include <su3_project.cuh>
 #include <kernels/gauge_utils.cuh>
 #include <kernel.h>
+#include <thread_local_cache.h>
 
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int stoutDim_>
-  struct STOUTArg : kernel_param<> {
-    using Float = Float_;
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int stoutDim_> struct STOUTArg : kernel_param<> {
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int stoutDim = stoutDim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
 
-    int X[4];    // grid dimensions
+    int X[4]; // grid dimensions
     int border[4];
-    const Float rho;
-    const Float staple_coeff;
-    const Float rectangle_coeff;
+    const real rho;
+    const real staple_coeff;
+    const real rectangle_coeff;
+    const int dir_ignore;
+    const real anisotropy;
 
-    STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon = 0) :
+    STOUTArg(GaugeField &out, const GaugeField &in, real rho, real epsilon, int dir_ignore, real anisotropy) :
       kernel_param(dim3(1, 2, stoutDim)),
       out(out),
       in(in),
       rho(rho),
       staple_coeff(rho * (5.0 - 2.0 * epsilon) / 3.0),
-      rectangle_coeff(rho * (1.0 - epsilon) / 12.0)
+      rectangle_coeff(rho * (1.0 - epsilon) / 12.0),
+      dir_ignore(dir_ignore),
+      anisotropy(anisotropy)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
@@ -45,18 +49,17 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct STOUT
-  {
-    using real = typename Arg::Float;
-    using Complex = complex<real>;
-    using Link = Matrix<complex<real>, Arg::nColor>;
+  template <typename Arg> struct STOUT {
 
     const Arg &arg;
-    constexpr STOUT(const Arg &arg) : arg(arg) {}
+    constexpr STOUT(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
+      using real = typename Arg::real;
+      using Link = Matrix<complex<real>, Arg::nColor>;
+
       // Compute spacetime and local coords
       int X[4];
       for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -66,11 +69,12 @@ namespace quda
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
       }
+      dir = dir + (dir >= arg.dir_ignore);
 
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
+      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -111,18 +115,30 @@ namespace quda
   //------------------------//
   // Over-Improved routines //
   //------------------------//
-  template <typename Arg> struct OvrImpSTOUT
-  {
-    using real = typename Arg::Float;
+  template <typename Arg> struct OvrImpSTOUTOps {
+    using real = typename Arg::real;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
+    using StapCacheT = ThreadLocalCache<Link>;                               // zero offset
+    using RectCacheT = ThreadLocalCache<Link, 0, StapCacheT>;                // offset by StapCacheT
+    using Ops = KernelOps<StapCacheT, RectCacheT>;
+  };
+
+  template <typename Arg> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg>::Ops {
+    using typename OvrImpSTOUTOps<Arg>::Ops::KernelOpsT;
 
     const Arg &arg;
-    constexpr OvrImpSTOUT(const Arg &arg) : arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr OvrImpSTOUT(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
+      using real = typename Arg::real;
+      using Link = Matrix<complex<real>, Arg::nColor>;
+
       // Compute spacetime and local coords
       int X[4];
       for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -132,15 +148,16 @@ namespace quda
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
       }
+      dir = dir + (dir >= arg.dir_ignore);
 
       Link U, Q;
-      SharedMemoryCache<Link> Stap(target::block_dim());
-      SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link));
+      typename OvrImpSTOUTOps<Arg>::StapCacheT Stap {*this};
+      typename OvrImpSTOUTOps<Arg>::RectCacheT Rect {*this};
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
+      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, arg.dir_ignore, arg.anisotropy);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -148,7 +165,8 @@ namespace quda
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
       // Compute \rho * staple_coeff * S - \rho * rectangle_coeff * R
-      Q = ((arg.staple_coeff * static_cast<const Link &>(Stap)) - (arg.rectangle_coeff * static_cast<const Link &>(Rect))) * conj(U);
+      Q = ((arg.staple_coeff * static_cast<const Link &>(Stap)) - (arg.rectangle_coeff * static_cast<const Link &>(Rect)))
+        * conj(U);
       // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
       //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
       makeHerm(Q);

@@ -3,7 +3,6 @@
 #include <math.h>
 #include <iostream>
 #include <sstream>
-#include <complex>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -22,12 +21,20 @@
 
 namespace quda {
 
+  auto get_i = [](std::vector<std::vector<ColorSpinorField>> &p, int i) {
+    vector_ref<ColorSpinorField> p_i;
+    p_i.reserve(p.size());
+    for (auto &pi : p) p_i.push_back(pi[i]);
+    return p_i;
+  };
+
 #ifndef LEGACY_MR
   // Compute the MR portion of BiCGstab-L
-  void BiCGstabL::computeMR(ColorSpinorField &x_sloppy, bool fixed_iteration)
+  void BiCGstabL::computeMR(ColorSpinorField &x_sloppy, cvector_ref<ColorSpinorField> &u,
+                            cvector_ref<ColorSpinorField> &r, bool fixed_iteration, int src_idx)
   {
-    using matrix = Matrix<std::complex<real_t>, Dynamic, Dynamic, RowMajor>;
-    using vector = Matrix<std::complex<real_t>, Dynamic, 1>;
+    using matrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;
+    using vector = Matrix<complex_t, Dynamic, 1>;
 
     // Compute gamma: minimize ||r - R \gamma||, where R is an L x R matrix
     // of r_1, r_2, ...
@@ -38,7 +45,7 @@ namespace quda {
     auto r_vec = {r.begin(), r.begin() + n_krylov + 1};
 
     std::vector<complex_t> r_dagger_dot_r((n_krylov + 1) * n_krylov);
-    blas::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec) ;
+    blas::block::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec);
 
     matrix R_dag_R(n_krylov, n_krylov);
     vector R_dag_r0(n_krylov);
@@ -49,9 +56,8 @@ namespace quda {
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     // Compute LDL decomposition, solve least squares problem for gamma
@@ -60,23 +66,21 @@ namespace quda {
     vector gamma = ldlt.solve(R_dag_r0);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      param.secs += profile.Last(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
     // Update omega for the next BiCG iteration
-    omega = gamma(n_krylov - 1);
+    omega[src_idx] = gamma(n_krylov - 1);
 
     std::vector<complex_t> gamma_(n_krylov);
 
     if (!fixed_iteration) {
-
       // update u
       {
         // u = u[0] - \sum_{j=1}^L \gamma_L u_L
         for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
-        blas::caxpy(gamma_, {u.begin() + 1, u.end()}, {u.begin(), u.begin() + 1});
+        blas::block::caxpy(gamma_, {u.begin() + 1, u.end()}, {u.begin(), u.begin() + 1});
       }
 
       // update x and r
@@ -93,60 +97,68 @@ namespace quda {
         gamma_for_r[0] = 0; // do not want to update with first r
         for (int i = 0; i < n_krylov; i++) gamma_for_r[i + 1] = -gamma(i);
 
-        blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, r[0]);
+        blas::block::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, r[0]);
       }
     } else {
       // fixed iteration, only need to update x
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = gamma(i); }
-      blas::caxpy(gamma_, {r.begin(), r.end() - 1}, x_sloppy);
+      blas::block::axpy(gamma_, {r.begin(), r.end() - 1}, x_sloppy);
     }
   }
 
-  void BiCGstabL::computeTau(int, int, int)
+  void BiCGstabL::computeTau(int, int, int, cvector_ref<ColorSpinorField> &, int)
   {
     errorQuda("Legacy MR path in BiCGstab-L called with a non-legacy compile");
   }
 
-  void BiCGstabL::updateR(int, int, int) { errorQuda("Legacy MR path in BiCGstab-L called with a non-legacy compile"); }
+  void BiCGstabL::updateR(int, int, int, cvector_ref<ColorSpinorField> &, int)
+  {
+    errorQuda("Legacy MR path in BiCGstab-L called with a non-legacy compile");
+  }
 
-  void BiCGstabL::legacyComputeMR(ColorSpinorField &)
+  void BiCGstabL::legacyComputeMR(ColorSpinorField &, cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &,
+                                  int)
   {
     errorQuda("Legacy MR path in BiCGstab-L called with a non-legacy compile");
   }
 
 #else
 
-  void BiCGstabL::computeMR(ColorSpinorField &, bool)
+  void BiCGstabL::computeMR(ColorSpinorField &, cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &, bool,
+                            int)
   {
     errorQuda("Non-legacy MR path in BiCGstab-L called with a legacy compile");
   }
 
   // Utility functions for Gram-Schmidt. Based on GCR functions.
   // Big change is we need to go from 1 to n_krylov, not 0 to n_krylov-1.
-  void BiCGstabL::computeTau(int begin, int size, int j)
+  void BiCGstabL::computeTau(int begin, int size, int j, cvector_ref<ColorSpinorField> &r, int src_idx)
   {
     std::vector<complex_t> Tau(size);
-    blas::cDotProduct(Tau, {r.begin() + begin, r.begin() + begin + size}, r[j]); // vectorized dot product
+    blas::block::cDotProduct(Tau, {r.begin() + begin, r.begin() + begin + size}, r[j]); // vectorized dot product
 
-    for (int k = 0; k < size; k++) { tau[(begin + k) * (n_krylov + 1) + j] = Tau[k] / sigma[begin + k]; }
+    for (int k = 0; k < size; k++) {
+      tau[src_idx][(begin + k) * (n_krylov + 1) + j] = Tau[k] / sigma[src_idx][begin + k];
+    }
   }
 
-  void BiCGstabL::updateR(int begin, int size, int j)
+  void BiCGstabL::updateR(int begin, int size, int j, cvector_ref<ColorSpinorField> &r, int src_idx)
   {
     std::vector<complex_t> tau_(size);
-    for (int i = 0; i < size; i++) { tau_[i] = -tau[(i + begin) * (n_krylov + 1) + j]; }
+    for (int i = 0; i < size; i++) { tau_[i] = -tau[src_idx][(i + begin) * (n_krylov + 1) + j]; }
 
     auto r_ = {r.begin() + begin, r.begin() + begin + size};
     auto rj = {r.begin() + j, r.begin() + j + 1};
 
-    blas::caxpy(tau_, r_ , rj);
+    blas::block::caxpy(tau_, r_, rj);
   }
 
   /**
      Legacy routine for the original pipelined Gram-Schmit
      See "The MR part" in https://etna.math.kent.edu/vol.1.1993/pp11-32.dir/pp11-32.pdf
    */
-  void BiCGstabL::legacyComputeMR(ColorSpinorField &x_sloppy)
+  void BiCGstabL::legacyComputeMR(ColorSpinorField &x_sloppy, cvector_ref<ColorSpinorField> &u,
+                                  cvector_ref<ColorSpinorField> &r, int src_idx)
   {
     // MR part. Really just modified Gram-Schmidt.
     // The algorithm uses the byproducts of the Gram-Schmidt to update x
@@ -159,8 +171,8 @@ namespace quda {
         case 0:                       // no kernel fusion
           for (int i = 1; i < j; i++) // 5 (j-2) memory transactions here. Start at 1 b/c bicgstabl convention.
           {
-            tau[i * (n_krylov + 1) + j] = blas::cDotProduct(r[i], r[j]) / sigma[i];
-            blas::caxpy(-tau[i * (n_krylov + 1) + j], r[i], r[j]);
+            tau[src_idx][i * (n_krylov + 1) + j] = blas::cDotProduct(r[i], r[j]) / sigma[src_idx][i];
+            blas::caxpy(-tau[src_idx][i * (n_krylov + 1) + j], r[i], r[j]);
           }
           break;
         case 1:       // basic kernel fusion
@@ -168,13 +180,13 @@ namespace quda {
           {
             break;
           }
-          tau[1 * (n_krylov + 1) + j] = blas::cDotProduct(r[1], r[j]) / sigma[1];
+          tau[src_idx][1 * (n_krylov + 1) + j] = blas::cDotProduct(r[1], r[j]) / sigma[src_idx][1];
           for (int i = 1; i < j - 1; i++) // 4 (j-2) memory transactions here. start at 1.
           {
-            tau[(i + 1) * (n_krylov + 1) + j]
-              = blas::caxpyDotzy(-tau[i * (n_krylov + 1) + j], r[i], r[j], r[i + 1]) / sigma[i + 1];
+            auto dot = blas::caxpyDotzy(-tau[src_idx][i * (n_krylov + 1) + j], r[i], r[j], r[i + 1]);
+            tau[src_idx][(i + 1) * (n_krylov + 1) + j] = dot / sigma[src_idx][i + 1];
           }
-          blas::caxpy(-tau[(j - 1) * (n_krylov + 1) + j], r[j - 1], r[j]);
+          blas::caxpy(-tau[src_idx][(j - 1) * (n_krylov + 1) + j], r[j - 1], r[j]);
           break;
         default: {
           const int N = pipeline;
@@ -185,43 +197,46 @@ namespace quda {
           // (j-1)/N updates of length N, at 1,1+N,1+2*N,...
           int step;
           for (step = 0; step < (j - 1) / N; step++) {
-            computeTau(1 + step * N, N, j);
-            updateR(1 + step * N, N, j);
+            computeTau(1 + step * N, N, j, r, src_idx);
+            updateR(1 + step * N, N, j, r, src_idx);
           }
 
           if ((j - 1) % N != 0) // need to update the remainder
           {
             // 1 update of length (j-1)%N.
-            computeTau(1 + step * N, (j - 1) % N, j);
-            updateR(1 + step * N, (j - 1) % N, j);
+            computeTau(1 + step * N, (j - 1) % N, j, r, src_idx);
+            updateR(1 + step * N, (j - 1) % N, j, r, src_idx);
           }
         } break;
         }
       }
 
       // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
-      // rjr.x = Re(<r[j],r[0]), rjr.y = Im(<r[j],r[0]>), rjr.z = <r[j],r[j]>
+      // rjr[0] = Re(<r[j],r[0]), rjr[1] = Im(<r[j],r[0]>), rjr[2] = <r[j],r[j]>
       auto rjr = blas::cDotProductNormA(r[j], r[0]);
-      sigma[j] = rjr[2];
-      gamma_prime[j] = complex_t(rjr[0], rjr[1]) / sigma[j];
+      sigma[src_idx][j] = rjr[2];
+      gamma_prime[src_idx][j] = complex_t(rjr[0], rjr[1]) / sigma[src_idx][j];
     }
 
     // gamma[n_krylov] = gamma'[n_krylov], omega = gamma[n_krylov]
-    gamma[n_krylov] = gamma_prime[n_krylov];
-    omega = gamma[n_krylov];
+    gamma[src_idx][n_krylov] = gamma_prime[src_idx][n_krylov];
+    omega[src_idx] = gamma[src_idx][n_krylov];
 
     // gamma = T^(-1) gamma_prime. It's in the paper, I promise.
     for (int j = n_krylov - 1; j > 0; j--) {
       // Internal def: gamma[j] = gamma'_j - \sum_{i = j+1 to n_krylov} tau_ji gamma_i
-      gamma[j] = gamma_prime[j];
-      for (int i = j + 1; i <= n_krylov; i++) { gamma[j] = gamma[j] - tau[j * (n_krylov + 1) + i] * gamma[i]; }
+      gamma[src_idx][j] = gamma_prime[src_idx][j];
+      for (int i = j + 1; i <= n_krylov; i++) {
+        gamma[src_idx][j] = gamma[src_idx][j] - tau[src_idx][j * (n_krylov + 1) + i] * gamma[src_idx][i];
+      }
     }
 
     // gamma'' = T S gamma. Check paper for defn of S.
     for (int j = 1; j < n_krylov; j++) {
-      gamma_prime_prime[j] = gamma[j + 1];
+      gamma_prime_prime[src_idx][j] = gamma[src_idx][j + 1];
       for (int i = j + 1; i < n_krylov; i++) {
-        gamma_prime_prime[j] = gamma_prime_prime[j] + tau[j * (n_krylov + 1) + i] * gamma[i + 1];
+        gamma_prime_prime[src_idx][j]
+          = gamma_prime_prime[src_idx][j] + tau[src_idx][j * (n_krylov + 1) + i] * gamma[src_idx][i + 1];
       }
     }
 
@@ -231,8 +246,8 @@ namespace quda {
     // Update U
     {
       std::vector<complex_t> gamma_(n_krylov);
-      for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[i + 1]; }
-      blas::caxpy(gamma_, {u.begin() + 1, u.end()}, u[0]);
+      for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[src_idx][i + 1]; }
+      blas::block::caxpy(gamma_, {u.begin() + 1, u.end()}, u[0]);
     }
 
     // Update X and R, which has opportunities for reuse
@@ -243,15 +258,15 @@ namespace quda {
       // the full precision, this can be a killer.
       std::vector<complex_t> gamma_prime_prime_(n_krylov + 1);
       std::vector<complex_t> gamma_prime_(n_krylov + 1);
-      gamma_prime_prime_[0] = gamma[1];
+      gamma_prime_prime_[0] = gamma[src_idx][1];
       gamma_prime_prime_[n_krylov] = 0.0; // x never gets updated with r[n_krylov]
       gamma_prime_[0] = 0.0;              // r[0] never gets updated with r[0]... obvs.
-      gamma_prime_[n_krylov] = -gamma_prime[n_krylov];
+      gamma_prime_[n_krylov] = -gamma_prime[src_idx][n_krylov];
       for (int i = 1; i < n_krylov; i++) {
-        gamma_prime_prime_[i] = gamma_prime_prime[i];
-        gamma_prime_[i] = -gamma_prime[i];
+        gamma_prime_prime_[i] = gamma_prime_prime[src_idx][i];
+        gamma_prime_[i] = -gamma_prime[src_idx][i];
       }
-      blas::caxpyBxpz(gamma_prime_prime_, r, x_sloppy, gamma_prime_, r[0]);
+      blas::block::caxpyBxpz(gamma_prime_prime_, r, x_sloppy, gamma_prime_, r[0]);
     }
   }
 
@@ -275,12 +290,12 @@ namespace quda {
 
   class BiCGstabLUpdate : public Worker {
 
-    ColorSpinorField &x;
-    std::vector<ColorSpinorField> &r;
-    std::vector<ColorSpinorField> &u;
+    std::vector<ColorSpinorField> &x;
+    std::vector<std::vector<ColorSpinorField>> &r;
+    std::vector<std::vector<ColorSpinorField>> &u;
 
-    complex_t &alpha;
-    complex_t &beta;
+    std::vector<complex_t> &alpha;
+    std::vector<complex_t> &beta;
 
     BiCGstabLUpdateType update_type;
 
@@ -298,13 +313,13 @@ namespace quda {
     int n_update;
 
   public:
-    BiCGstabLUpdate(ColorSpinorField &x, std::vector<ColorSpinorField> &r, std::vector<ColorSpinorField> &u,
-                    complex_t &alpha, complex_t &beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
+    BiCGstabLUpdate(std::vector<ColorSpinorField> &x, std::vector<std::vector<ColorSpinorField>> &r,
+                    std::vector<std::vector<ColorSpinorField>> &u, std::vector<complex_t> &alpha,
+                    std::vector<complex_t> &beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
       x(x), r(r), u(u), alpha(alpha), beta(beta), update_type(update_type), j_max(j_max), n_update(n_update)
     {
 
     }
-    virtual ~BiCGstabLUpdate() { }
 
     void update_j_max(int new_j_max) { j_max = new_j_max; }
     void update_update_type(BiCGstabLUpdateType new_update_type) { update_type = new_update_type; }
@@ -319,7 +334,7 @@ namespace quda {
       if (update_type == BICGSTABL_UPDATE_U)
       {
         for (int i = (count * j_max) / n_update; i < ((count + 1) * j_max) / n_update && i < j_max; i++) {
-          blas::caxpby(real_t(1.0), r[i], -beta, u[i]);
+          for (auto j = 0u; j < beta.size(); j++) blas::caxpby(1.0, r[i][j], -beta[j], u[i][j]);
         }
       }
       else // (update_type == BICGSTABL_UPDATE_R)
@@ -327,9 +342,8 @@ namespace quda {
         if (count == 0) { blas::caxpy(alpha, u[0], x); }
         if (j_max > 0)
         {
-          for (int i= (count*j_max)/n_update; i<((count+1)*j_max)/n_update && i<j_max; i++)
-          {
-            blas::caxpy(-alpha, u[i + 1], r[i]);
+          for (int i = (count * j_max) / n_update; i < ((count + 1) * j_max) / n_update && i < j_max; i++) {
+            for (auto j = 0u; j < beta.size(); j++) blas::caxpy(-alpha[j], u[i + 1][j], r[i][j]);
           }
         }
       }
@@ -344,21 +358,9 @@ namespace quda {
   }
 
   BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig,
-                       SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matEig, param, profile),
-    matMdagM(matEig.Expose()),
-    n_krylov(param.Nkrylov)
+                       SolverParam &param) :
+    Solver(mat, matSloppy, matSloppy, matEig, param), matMdagM(matEig.Expose()), n_krylov(param.Nkrylov)
   {
-    r.resize(n_krylov + 1);
-    u.resize(n_krylov + 1);
-
-    gamma.resize(n_krylov + 1);
-    gamma_prime.resize(n_krylov + 1);
-    gamma_prime_prime.resize(n_krylov + 1);
-    sigma.resize(n_krylov + 1);
-
-    tau.resize((n_krylov + 1) * (n_krylov + 1));
-
     std::stringstream ss;
     ss << "BiCGstab-" << n_krylov;
     solver_name = ss.str();
@@ -366,9 +368,9 @@ namespace quda {
 
   BiCGstabL::~BiCGstabL()
   {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
@@ -388,57 +390,81 @@ namespace quda {
     return updateR;
   }
 
-  void BiCGstabL::create(ColorSpinorField &x, const ColorSpinorField &b)
+  void BiCGstabL::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
 
-    if (!init) {
-      profile.TPSTART(QUDA_PROFILE_INIT);
+    if (!init || y.size() != b.size()) {
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       // Initialize fields.
-      ColorSpinorParam csParam(x);
+      ColorSpinorParam csParam(x[0]);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
 
       // Full precision variables.
-      r_full = ColorSpinorField(csParam);
+      resize(r_full, b.size(), csParam);
 
       // Create temporary.
-      y = ColorSpinorField(csParam);
+      resize(y, b.size(), csParam);
 
       // Sloppy precision variables.
       csParam.setPrecision(param.precision_sloppy);
 
       // Sloppy solution.
       if (!mixed() || !param.use_sloppy_partial_accumulator) {
-        x_sloppy = x.create_alias(); // x_sloppy and x point to the same vector in memory.
+        create_alias(x_sloppy, x); // x_sloppy and x point to the same vector in memory.
       } else {
-        x_sloppy = ColorSpinorField(csParam);
+        resize(x_sloppy, b.size(), csParam);
       }
 
       // Shadow residual.
       if (!mixed() && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-        r0 = const_cast<ColorSpinorField&>(b).create_alias();
+        create_alias(r0, b);
       } else {
-        r0 = ColorSpinorField(csParam);
+        resize(r0, b.size(), csParam);
       }
 
       // Temporary
-      temp = ColorSpinorField(csParam);
+      resize(temp, b.size(), csParam);
 
       // Residual (+ extra residuals for BiCG steps), Search directions.
       // Remark: search directions are sloppy in GCR. I wonder if we can
       //           get away with that here.
+      r.resize(n_krylov + 1);
+      u.resize(n_krylov + 1);
       for (int i = 0; i <= n_krylov; i++) {
-        r[i] = (i > 0 || mixed()) ? ColorSpinorField(csParam) : r_full.create_alias();
-        u[i] = ColorSpinorField(csParam);
+        if (i > 0 || mixed())
+          resize(r[i], b.size(), csParam);
+        else
+          create_alias(r[i], r_full);
+        resize(u[i], b.size(), csParam);
       }
 
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      alpha.resize(b.size(), 0.0);
+      beta.resize(b.size());
+      omega.resize(b.size(), 1.0);
+      rho0.resize(b.size(), 1.0);
+      rho1.resize(b.size());
+
+      gamma.resize(b.size());
+      gamma_prime.resize(b.size());
+      gamma_prime_prime.resize(b.size());
+      sigma.resize(b.size());
+      tau.resize(b.size());
+      for (auto i = 0u; i < b.size(); i++) {
+        gamma[i].resize(n_krylov + 1);
+        gamma_prime[i].resize(n_krylov + 1);
+        gamma_prime_prime[i].resize(n_krylov + 1);
+        sigma[i].resize(n_krylov + 1);
+        tau[i].resize((n_krylov + 1) * (n_krylov + 1));
+      }
+
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     }
   }
 
-  void BiCGstabL::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void BiCGstabL::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     // BiCGstab-l is based on the algorithm outlined in
     // BICGSTAB(L) FOR LINEAR EQUATIONS INVOLVING UNSYMMETRIC MATRICES WITH COMPLEX SPECTRUM
@@ -449,25 +475,25 @@ namespace quda {
     create(x, b);
 
     // Begin profiling preamble.
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
-    real_t b2 = !fixed_iteration ? blas::norm2(b) : real_t(1.0); // norm sq of source.
-    real_t r2;                  // norm sq of residual
+    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<real_t>(b.size(), real_t(1.0)); // norm sq of source.
+    vector<real_t> r2(b.size());                                         // norm sq of residual
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
-        constructDeflationSpace(b, matMdagM);
+        constructDeflationSpace(b[0], matMdagM);
       } else {
         // Use Arnoldi to inspect the space only and turn off deflation
-        constructDeflationSpace(b, mat);
+        constructDeflationSpace(b[0], mat);
         param.deflate = false;
       }
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
         if (param.deflate) {
           // double the size of the Krylov space
@@ -475,7 +501,7 @@ namespace quda {
           // populate extra memory with L/R singular vectors
           eig_solve->computeSVD(evecs, evals);
         }
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -494,6 +520,8 @@ namespace quda {
         blas::xpay(b, -1.0, r_full);
         r2 = b2; // dummy setting
       }
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
       blas::copy(y, x); // we accumulate into y
     } else {
       blas::copy(r_full, b); // r[0] = b
@@ -518,19 +546,9 @@ namespace quda {
     }
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (b2 == 0) {
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-        warningQuda("inverting on zero-field source");
-        x = b;
-        param.true_res = 0.0;
-        param.true_res_hq = 0.0;
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-        return;
-      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        b2 = r2;
-      } else {
-        errorQuda("Null vector computing requires non-zero guess!");
-      }
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+      return;
     }
 
     // Set shadow residual depending if the source vector is directly usable
@@ -551,18 +569,18 @@ namespace quda {
     // Initialize values.
     for (int i = 1; i <= n_krylov; i++) { blas::zero(r[i]); }
 
-    rho0 = 1.0;
-    alpha = 0.0;
-    omega = 1.0;
-
-    real_t stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : real_t(0.0); // stopping condition of solver.
+    auto stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) :
+                                   vector<real_t>(b.size(), 0.0); // stopping condition of solver.
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    real_t heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r_full)[2]) : real_t(0.0);
+    vector<real_t> heavy_quark_res(b.size(), 0.0);
+    if (use_heavy_quark_res) {
+      auto hq = blas::HeavyQuarkResidualNorm(x, r_full);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
+    }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    blas::flops = 0;
     //bool l2_converge = false;
     //double r2_old = r2;
 
@@ -572,36 +590,40 @@ namespace quda {
     BiCGstabLUpdate bicgstabl_update(x_sloppy, r, u, alpha, beta, BICGSTABL_UPDATE_U, 0, matSloppy.getStencilSteps());
 
     // done with preamble, begin computing.
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // count iteration counts
     int total_iter = 0;
 
     // Various variables related to reliable updates.
     int rUpdate = 0; // count reliable updates.
-    real_t delta = param.delta; // delta for reliable updates.
-    real_t rNorm = sqrt(r2); // The current residual norm.
+    double delta = param.delta; // delta for reliable updates.
+    real_t rNorm = sqrt(r2[0]); // The current residual norm.
     real_t maxrr = rNorm; // The maximum residual norm since the last reliable update.
     real_t maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
 
     PrintStats(solver_name.c_str(), total_iter, r2, b2, heavy_quark_res);
-    while (!convergence(r2, 0.0, stop, 0.0) && total_iter < param.maxiter) {
+    while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
 
       // rho0 = -omega*rho0;
-      rho0 *= -omega;
+      for (auto i = 0u; i < b.size(); i++) rho0[i] *= -omega[i];
 
       // BiCG part of calculation.
       for (int j = 0; j < n_krylov; j++) {
         // rho1 = <r0, r_j>, beta = alpha*rho1/rho0, rho0 = rho1;
         // Can fuse into updateXRend.
         rho1 = blas::cDotProduct(r0, r[j]);
-        beta = alpha*rho1/rho0;
-        rho0 = rho1;
+        for (auto i = 0u; i < b.size(); i++) {
+          beta[i] = alpha[i] * rho1[i] / rho0[i];
+          rho0[i] = rho1[i];
+        }
 
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
-        blas::caxpby(real_t(1.0), r[j], -beta, u[j]);
+        std::vector<complex_t> minus_beta(beta.size());
+        for (auto i = 0u; i < beta.size(); i++) minus_beta[i] = -beta[i];
+        blas::caxpby(1.0, r[j], minus_beta, u[j]);
         if (j > 0)
         {
           dslash::aux_worker = &bicgstabl_update;
@@ -616,11 +638,14 @@ namespace quda {
 
         // alpha = rho0/<r0, u[j+1]>
         // The machinary isn't there yet, but this could be fused with the matSloppy above.
-        alpha = rho0/blas::cDotProduct(r0, u[j+1]);
+        auto r0Tu = blas::cDotProduct(r0, u[j + 1]);
+        for (auto i = 0u; i < b.size(); i++) alpha[i] = rho0[i] / r0Tu[i];
 
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
-        blas::caxpy(-alpha, u[j+1], r[j]);
+        std::vector<complex_t> minus_alpha(alpha.size());
+        for (auto i = 0u; i < alpha.size(); i++) minus_alpha[i] = -alpha[i];
+        blas::caxpy(minus_alpha, u[j + 1], r[j]);
         // We can always at least update x.
         dslash::aux_worker = &bicgstabl_update;
         bicgstabl_update.update_j_max(j);
@@ -635,11 +660,11 @@ namespace quda {
 #ifndef LEGACY_MR
       // Perform the MR portion of BiCGstab-L
       // if we're doing a fixed number of iterations, we only need to update x
-      computeMR(x_sloppy, fixed_iteration);
+      for (auto i = 0u; i < b.size(); i++) computeMR(x_sloppy[i], get_i(u, i), get_i(r, i), fixed_iteration, i);
 #else
       // Legacy version matching the BiCGstab-L paper which performs
       // an explicit Gram-Schmidt for the MR portion
-      legacyComputeMR(x_sloppy);
+      for (auto i = 0u; i < b.size(); i++) legacyComputeMR(x_sloppy[i], get_i(u, i), get_i(r, i), i);
 #endif
 
       if (!fixed_iteration) {
@@ -649,12 +674,14 @@ namespace quda {
 
         // Check the heavy quark residual if we need to.
         if (use_heavy_quark_res && total_iter % heavy_quark_check == 0) {
-          if (&x != &x_sloppy) {
+          if (x.Precision() != x_sloppy[0].Precision()) {
             blas::copy(temp, y);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x_sloppy, temp, r[0])[2]);
+            auto hq = blas::xpyHeavyQuarkResidualNorm(x_sloppy, temp, r[0]);
+            for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
           } else {
             blas::copy(r_full, r[0]);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r_full)[2]);
+            auto hq = blas::xpyHeavyQuarkResidualNorm(x, y, r_full);
+            for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
           }
         }
       }
@@ -665,7 +692,7 @@ namespace quda {
       // updated (depending on if you're using pipelining or not). In BiCGstab-L, there's only
       // one place (for now) to get the updated residual, so we just do away with 'updateR'.
       // Further remark: "reliable" updates rNorm, maxrr, maxrx!!
-      if (total_iter >= param.maxiter || r2 < stop || reliable(rNorm, maxrx, maxrr, r2, delta)) {
+      if (total_iter >= param.maxiter || r2 < stop || reliable(rNorm, maxrx, maxrr, r2[0], delta)) {
         if ((r2 < stop || total_iter >= param.maxiter) && param.sloppy_converge) break;
 
         if (mixed()) { blas::copy(x, x_sloppy); }
@@ -686,7 +713,7 @@ namespace quda {
         blas::zero(x_sloppy);
 
         // Update rNorm, maxrr, maxrx.
-        rNorm = sqrt(r2);
+        rNorm = sqrt(r2[0]);
         maxrr = rNorm;
         maxrx = rNorm;
 
@@ -703,12 +730,9 @@ namespace quda {
     blas::xpy(y, x);
 
     // Done with compute, begin the epilogue.
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matEig.flops()) * 1e-9;
-    param.gflops = gflops;
     param.iter += total_iter;
 
     if (total_iter >= param.maxiter) // >= if n_krylov doesn't divide max iter.
@@ -721,19 +745,17 @@ namespace quda {
     // !param.is_preconditioner comes from bicgstab, param.compute_true_res came from gcr.
     if (!param.is_preconditioner && param.compute_true_res) { // do not do the below if this is an inner solver.
       mat(r_full, x);
-      real_t true_res = blas::xmyNorm(b, r_full);
-      param.true_res = real_t(sqrt(true_res / b2));
-      param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r[0])[2]) : 0.0;
+      auto true_res = blas::xmyNorm(b, r_full);
+      auto hq = use_heavy_quark_res ? blas::HeavyQuarkResidualNorm(x, r[0]) : vector<array<real_t, 3>>(b.size(), {});
+      for (auto i = 0u; i < b.size(); i++) {
+        param.true_res[i] = sqrt(true_res[i] / b2[i]);
+        param.true_res_hq[i] = sqrt(hq[i][2]);
+      }
     }
 
-    // Reset flops counters.
-    blas::flops = 0;
-    mat.flops();
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    param.secs += profile.Last(QUDA_PROFILE_EPILOGUE);
-
-    PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop, param.tol_hq);
+    PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop);
   }
 
 } // namespace quda

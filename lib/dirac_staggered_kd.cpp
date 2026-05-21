@@ -31,20 +31,21 @@ namespace quda
     return *this;
   }
 
-  void DiracStaggeredKD::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
+  void DiracStaggeredKD::Dslash(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity) const
   {
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
 
-  void DiracStaggeredKD::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity,
-                                    const ColorSpinorField &, const real_t &) const
+  void DiracStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
+                                    cvector_ref<const ColorSpinorField> &, real_t) const
   {
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
 
   // Full staggered operator
-  void DiracStaggeredKD::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     // Due to the staggered convention, the staggered part is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
     // ( -D_oe   2m    ) (x_o) = (b_o)
@@ -52,49 +53,46 @@ namespace quda
 
     checkFullSpinor(out, in);
 
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (dagger == QUDA_DAG_NO) {
 
       if (mass == 0.) {
-        ApplyStaggered(tmp, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
-        flops += 570ll * in.Volume();
+        ApplyStaggered(tmp, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data, profile);
       } else {
-        ApplyStaggered(tmp, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-        flops += 582ll * in.Volume();
+        ApplyStaggered(tmp, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
       }
+
       ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
     } else { // QUDA_DAG_YES
 
       ApplyStaggeredKahlerDiracInverse(tmp, in, *Xinv, true);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
       if (mass == 0.) {
-        ApplyStaggered(out, tmp, *gauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
-        flops += 570ll * in.Volume();
+        ApplyStaggered(out, tmp, *gauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data, profile);
       } else {
-        ApplyStaggered(out, tmp, *gauge, 2. * mass, tmp, QUDA_INVALID_PARITY, dagger, commDim, profile);
-        flops += 582ll * in.Volume();
+        ApplyStaggered(out, tmp, *gauge, 2. * mass, tmp, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
       }
     }
   }
 
-  void DiracStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    assertNoDD(out, in); // TODO: DD not supported yet
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
 
-  void DiracStaggeredKD::KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::KahlerDiracInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
   }
 
-  void DiracStaggeredKD::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-                                 ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracStaggeredKD::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                 cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                 const QudaSolutionType solType) const
   {
     // TODO: technically KD is a different type of preconditioning.
     // Should we support "preparing" and "reconstructing"?
@@ -102,47 +100,48 @@ namespace quda
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    sol = &x;
-    src = &b;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracStaggeredKD::prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-                                          ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracStaggeredKD::prepareSpecialMG(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                          cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                          const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    checkFullSpinor(x, b);
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
 
-    // need to modify rhs
-    auto tmp = getFieldTmp(b);
+      src[i] = getFieldTmp(b[i]);
+      KahlerDiracInv(src[i], b[i]);
 
-    KahlerDiracInv(tmp, b);
+      // if we're preconditioning the Schur op, we need to rescale by the mass
+      // parent could be an ASQTAD operator if we've enabled dropping the long links
+      if (parent_dirac_type == QUDA_STAGGERED_DIRAC || parent_dirac_type == QUDA_ASQTAD_DIRAC) {
+        // do nothing
+      } else if (parent_dirac_type == QUDA_STAGGEREDPC_DIRAC || parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
+        blas::ax(0.5 / mass, src[i]);
+      } else {
+        errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
+      }
 
-    // if we're preconditioning the Schur op, we need to rescale by the mass
-    // parent could be an ASQTAD operator if we've enabled dropping the long links
-    if (parent_dirac_type == QUDA_STAGGERED_DIRAC || parent_dirac_type == QUDA_ASQTAD_DIRAC) {
-      b = tmp;
-    } else if (parent_dirac_type == QUDA_STAGGEREDPC_DIRAC || parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
-      blas::axy(0.5 / mass, tmp, b);
-    } else {
-      errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
+      sol[i] = x[i].create_alias();
     }
-
-    sol = &x;
-    src = &b;
   }
 
-  void DiracStaggeredKD::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracStaggeredKD::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                     const QudaSolutionType) const
   {
     // do nothing
-
-    // TODO: technically KD is a different type of preconditioning.
-    // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracStaggeredKD::reconstructSpecialMG(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracStaggeredKD::reconstructSpecialMG(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                              const QudaSolutionType) const
   {
     // do nothing
 

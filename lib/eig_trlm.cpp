@@ -18,26 +18,26 @@ namespace quda
 {
 
   using MatrixX = Matrix<real_t, Dynamic, Dynamic>;
+  using MatrixXc = Matrix<complex_t, Dynamic, Dynamic>;
 
   // Thick Restarted Lanczos Method constructor
-  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    EigenSolver(mat, eig_param, profile)
+  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : EigenSolver(mat, eig_param)
   {
-    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
-    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
-    alpha.resize(n_kr, 0.0);
-    beta.resize(n_kr, 0.0);
+    alpha.resize(n_kr, real_t(0.0));
+    beta.resize(n_kr, real_t(0.0));
 
     // Thick restart specific checks
-    if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
+    if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than or equal to n_ev+6=%d\n", n_kr, n_ev + 6);
+    if (n_kr < n_conv + 12) errorQuda("n_kr=%d must be greater than or equal to n_conv+12=%d\n", n_kr, n_conv + 12);
 
     if (!(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
@@ -76,7 +76,7 @@ namespace quda
 
     // Begin TRLM Eigensolver computation
     //---------------------------------------------------------------------------
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
@@ -85,20 +85,36 @@ namespace quda
       iter += (n_kr - num_keep);
 
       // The eigenvalues are returned in the alpha array
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+        logQuda(QUDA_DEBUG_VERBOSE, "TRLM before eigensolveFromArrowMat: restart=%d num_locked=%d num_keep=%d n_kr=%d\n",
+                restart_iter, num_locked, num_keep, n_kr);
+        for (int i = num_locked; i < std::min(n_kr, num_locked + 8); i++)
+          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, QUDA_REAL(alpha[i]), i,
+                  QUDA_REAL(beta[i]));
+      }
       eigensolveFromArrowMat();
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-      // mat_norm is updated.
+      // mat_norm is updated and used for LR
       for (int i = num_locked; i < n_kr; i++)
-        if (abs(alpha[i]) > mat_norm) mat_norm = abs(alpha[i]);
+        if (quda::fabs(alpha[i]) > mat_norm) mat_norm = quda::fabs(alpha[i]);
+
+      // Lambda that returns mat_norm for LR and returns the relevant alpha
+      // (the corresponding Ritz value) for SR
+      auto check_norm = [&](real_t sr_norm) -> real_t {
+        if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
+          return mat_norm;
+        else
+          return sr_norm;
+      };
 
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
-        if (residua[i + num_locked] < epsilon * mat_norm) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, double(residua[i + num_locked]),
-                  double(epsilon * mat_norm));
+        if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i,
+                  QUDA_REAL(residua[i + num_locked]), QUDA_REAL(epsilon * check_norm(alpha[i + num_locked])));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -109,9 +125,9 @@ namespace quda
       // Convergence check
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
-        if (residua[i + num_locked] < tol * mat_norm) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, double(residua[i + num_locked]),
-                  double(tol * mat_norm));
+        if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i,
+                  QUDA_REAL(residua[i + num_locked]), QUDA_REAL(tol * check_norm(alpha[i + num_locked])));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -121,9 +137,9 @@ namespace quda
 
       iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - num_locked - 12);
 
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       computeKeptRitz(kSpace);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       num_converged = num_locked + iter_converged;
       num_keep = num_locked + iter_keep;
@@ -138,7 +154,8 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
       logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
       for (int i = 0; i < n_kr; i++) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, double(alpha[i]), i, double(residua[i]));
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, QUDA_REAL(alpha[i]), i,
+                QUDA_REAL(residua[i]));
       }
 
       // Check for convergence
@@ -150,7 +167,7 @@ namespace quda
       restart_iter++;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // Post computation report
     //---------------------------------------------------------------------------
@@ -168,15 +185,16 @@ namespace quda
       logQuda(QUDA_SUMMARIZE, "TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n",
               n_conv, restart_iter, iter);
 
-      // Dump all Ritz values and residua if using Chebyshev
-      for (int i = 0; i < n_conv && eig_param->use_poly_acc; i++) {
-        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, double(alpha[i]), 0.0, double(residua[i]));
+      // Dump all Ritz values and residua
+      for (int i = 0; i < n_conv; i++) {
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, QUDA_REAL(alpha[i]), 0.0,
+                QUDA_REAL(residua[i]));
       }
 
       // Compute eigenvalues/singular values
 
       computeEvals(kSpace, evals);
-      if (compute_svd) computeSVD(kSpace, evals);
+      if (compute_svd) computeSVD(kSpace, evals, eig_param->use_dagger);
     }
 
     // Local clean-up
@@ -205,7 +223,7 @@ namespace quda
       for (auto & bi : beta_) bi = -bi;
 
       // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
+      blas::block::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
     }
 
     // Orthogonalise r against the Krylov space
@@ -248,13 +266,13 @@ namespace quda
 
   void TRLM::eigensolveFromArrowMat()
   {
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     int dim = n_kr - num_locked;
     int arrow_pos = num_keep - num_locked;
 
     // Eigen objects
     MatrixX A = MatrixX::Zero(dim, dim);
-    ritz_mat.resize(dim * dim, 0.0);
+    ritz_mat.resize(dim * dim, real_t(0.0));
 
     // Invert the spectrum due to chebyshev
     if (reverse) {
@@ -286,16 +304,32 @@ namespace quda
       A(i + 1, i) = beta[i + num_locked];
     }
 
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+      logQuda(QUDA_DEBUG_VERBOSE,
+              "TRLM arrow matrix: dim=%d arrow_pos=%d num_locked=%d num_keep=%d reverse=%d\n", dim, arrow_pos,
+              num_locked, num_keep, (int)reverse);
+      for (int b = 0; b < std::min(dim, 4); b++) {
+        for (int c = 0; c < std::min(dim, 4); c++) {
+          logQuda(QUDA_DEBUG_VERBOSE, "  A(%d,%d) = %+.16e\n", b, c, QUDA_REAL(A(b, c)));
+        }
+      }
+    }
+
     // Eigensolve the arrow matrix
     SelfAdjointEigenSolver<MatrixX> eigensolver;
     eigensolver.compute(A);
+
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+      for (int i = 0; i < std::min(dim, 4); i++)
+        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, QUDA_REAL(eigensolver.eigenvalues()[i]));
+    }
 
     // repopulate ritz matrix
     for (int i = 0; i < dim; i++)
       for (int j = 0; j < dim; j++) ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
 
     for (int i = 0; i < dim; i++) {
-      residua[i + num_locked] = abs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
+      residua[i + num_locked] = quda::fabs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
       // Update the alpha array
       alpha[i + num_locked] = eigensolver.eigenvalues()[i];
     }
@@ -305,7 +339,7 @@ namespace quda
       for (int i = num_locked; i < n_kr; i++) { alpha[i] *= -1.0; }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField> &kSpace)
@@ -319,7 +353,7 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked);
 
     // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);

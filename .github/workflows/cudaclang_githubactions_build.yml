@@ -1,0 +1,77 @@
+name: cudaclang_ghactions_build_ubuntu24.04
+
+on:
+  pull_request:
+    branches: [ "develop" ]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  BUILD_TYPE: STRICT
+  CCACHE_COMPILERCHECK: content
+
+jobs:
+    build:
+      strategy:
+        matrix:
+          compiler: [clang++-19]
+      runs-on: ubuntu-24.04
+
+      steps:
+      - name: Install software
+        run: |
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
+          sudo dpkg -i cuda-keyring_1.0-1_all.deb
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends libopenmpi-dev cuda-compiler-12-8 cuda-libraries-dev-12-8 cuda-nvml-dev-12-8
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19
+      
+      # currently deactivated as it cuased build errors - maybe put in again later
+      # - uses: awalsh128/cache-apt-pkgs-action@latest
+      #   with:
+      #     packages: 
+      #     execute_install_scripts: true
+
+      - uses: actions/checkout@v4
+
+      - name: Ccache for gh actions
+        uses: hendrikmuhs/ccache-action@v1.2.17
+        with:
+          key: ${{ github.job }}-${{ matrix.compiler }}
+          max-size: 2000M
+
+      - name: Configure CMake
+        run: >
+          cmake --debug-trycompile
+          -DCMAKE_CUDA_COMPILER=${{matrix.compiler}}
+          -DCMAKE_CXX_COMPILER=${{matrix.compiler}}
+          -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CUDA_ARCHITECTURES=80
+          -DQUDA_GPU_ARCH=sm_80 -DQUDA_JITIFY=OFF
+          -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=ON
+          -DQUDA_MULTIGRID=ON
+          -DQUDA_MULTIGRID_NVEC_LIST=24
+          -DQUDA_MDW_FUSED_LS_LIST=4
+          -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON 
+          -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON -DQUDA_FAST_COMPILE_REDUCE=ON
+          -GNinja
+          -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+      - name: Upload cmake report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmake-report
+          path: ${{github.workspace}}/build 
+
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build
+
+      - name: Install
+        run: cmake --install ${{github.workspace}}/build 

@@ -11,12 +11,17 @@
 #include <cuda/std/climits>
 #include <cuda/std/type_traits>
 #include <cuda/std/limits>
-#include <cuda/std/atomic>
+#include <cuda/atomic>
 using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 
 namespace quda
 {
 
+// By default we use negative infinity as the sentinel for testing for
+// reduction completion.  On some compilers we may need to use finite
+// numbers, so the alternative approach uses negative zero (set with CMake
+// option QUDA_HETEROGENEOUS_ATOMIC_INF_INIT).
+#ifdef HETEROGENEOUS_ATOMIC_INF_INIT
   /**
      @brief The initialization value we used to check for completion
    */
@@ -27,6 +32,31 @@ namespace quda
      case the computed reduction is equal to the initialization
   */
   template <typename T> constexpr T terminate_value() { return cuda::std::numeric_limits<T>::infinity(); }
+
+  /**
+     @brief Test if the result is complete (e.g., is not equal to the sentinel)
+   */
+  template <class T> bool is_complete(const T &result) { return result != init_value<T>(); }
+#else
+  /**
+     @brief The initialization value we used to check for completion
+   */
+  template <typename T> constexpr T init_value() { return -static_cast<T>(0.0); }
+
+  /**
+     @brief The termination value we use to prevent a possible hang in
+     case the computed reduction is equal to the initialization
+  */
+  template <typename T> constexpr T terminate_value() { return static_cast<T>(0.0); }
+
+  /**
+     @brief Test if the result is complete (e.g., is not equal to the sentinel)
+   */
+  template <class T> bool is_complete(const T &result)
+  {
+    return !(result == static_cast<T>(0.0) && std::signbit(result));
+  }
+#endif
 
   // declaration of reduce function
   template <typename Reducer, typename Arg, typename T>
@@ -55,7 +85,8 @@ namespace quda
     bool reset = false; /** reset the counter post completion (required for multiple calls with the same arg instance */
     using system_atomic_t = typename atomic_type<T>::type; /** heterogeneous atomics must use lock-free atomics -> operate on scalars */
     static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t); /** number of words per reduction variable */
-    cuda::atomic<T, cuda::thread_scope_device> *partial; /** device atomic buffer */
+    // FIXME on Hopper this could be a 128-bit type
+    cuda::atomic<system_atomic_t, cuda::thread_scope_device> *partial;  /** device atomic buffer */
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_d; /** device-mapped host atomic buffer */
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h; /** host atomic buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
@@ -78,7 +109,7 @@ namespace quda
       reset(reset),
       consumed(false)
     {
-      reducer::init(n_reduce, sizeof(*partial));
+      reducer::init(n_reduce, n_item * sizeof(*partial));
       // these buffers may be allocated in init, so we can't set the local copies until now
       partial = static_cast<decltype(partial)>(reducer::get_device_buffer());
       result_d = static_cast<decltype(result_d)>(reducer::get_mapped_buffer());
@@ -125,32 +156,37 @@ namespace quda
        @brief Finalize the reduction, returning the computed reduction
        into result.  With heterogeneous atomics this means we poll the
        atomics until their value differs from the init_value.
-       @param[out] result The reduction result is copied here
-       @param[in] stream The stream on which we the reduction is being done
-     */
+       @param[in] stream The stream on which the reduction is being done
+       @return The reduction result
+    */
     auto complete(const qudaStream_t = device::get_default_stream())
     {
       std::vector<T> result(n_reduce);
-      if (consumed) errorQuda("Cannot call complete more than once for each construction");
+      using device_t = typename atomic_type<T>::type;
+      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
+      if (launch_error == QUDA_ERROR) return result; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
-      if (launch_error != QUDA_ERROR) {
-        for (int i = 0; i < n_reduce * n_item; i++) {
-          while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
-        }
+      if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
-        memcpy(reinterpret_cast<void*>(result.data()), reinterpret_cast<void*>(result_h), n_reduce * sizeof(T));
-
-        if (!reset) {
-          consumed = true;
-        } else {
-          // reset the atomic counter - this allows multiple calls to complete with ReduceArg construction
-          for (int i = 0; i < n_reduce * n_item; i++) {
-            result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
-          }
-          cuda::std::atomic_thread_fence(cuda::std::memory_order_release);
-        }
+      for (int i = 0; i < n_reduce * n_item; i++) {
+        while (!is_complete(result_h[i].load(cuda::std::memory_order_relaxed))) { }
       }
 
+      // copy back result element by element and convert if necessary to host reduce type
+      // unit size here may differ from system_atomic_t size, e.g., if doing double-double
+      std::vector<device_t> scalar_result(n_element);
+      for (int i = 0; i < n_element; i++) scalar_result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      for (int i = 0; i < n_reduce; i++)
+        memcpy(&result[i], &scalar_result[i * n_element / n_reduce], sizeof(T));
+
+      if (!reset) {
+        consumed = true;
+      } else {
+        for (int i = 0; i < n_reduce * n_item; i++) {
+          result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
+        }
+        cuda::std::atomic_thread_fence(cuda::std::memory_order_release);
+      }
       return result;
     }
   };
@@ -173,11 +209,7 @@ namespace quda
     auto tid = target::thread_idx_linear<2>();
 
     if (arg.result_d) { // write to host mapped memory
-#ifdef _NVHPC_CUDA      // WAR for nvc++
-      constexpr bool coalesced_write = false;
-#else
       constexpr bool coalesced_write = true;
-#endif
       if constexpr (coalesced_write) {
         if (tid < device::warp_size()) { // only first warp takes part in write
 
@@ -225,7 +257,15 @@ namespace quda
         if (arg.get_output_async_buffer()) {
           arg.get_output_async_buffer()[idx] = sum;
         } else { // write to device memory
-          arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
+          // write out the final reduced value
+          if (tid == 0) {
+            atomic_t sum_tmp[n];
+            memcpy(sum_tmp, &sum, sizeof(sum));
+#pragma unroll
+            for (unsigned int i = 0; i < n; i++) {
+              arg.partial[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
+            }
+          }
         }
       }
     }
@@ -259,10 +299,13 @@ namespace quda
   template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
+    using atomic_t = typename atomic_type<T>::type;
+    constexpr size_t n = sizeof(T) / sizeof(atomic_t);
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
 
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    KernelOps<BlockReduce> ops {};
+    T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 
     if (target::grid_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction
       write_result(arg, aggregate, idx);
@@ -271,8 +314,14 @@ namespace quda
 
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
         // need to call placement new constructor since partial is not necessarily constructed
-        new (arg.partial + idx * target::grid_dim().x + target::block_idx().x)
-          cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+        atomic_t aggregate_tmp[n];
+        memcpy(aggregate_tmp, &aggregate, sizeof(aggregate));
+
+#pragma unroll
+        for (int k = 0; k < n; k++) {
+          new (arg.partial + (idx * target::grid_dim().x + target::block_idx().x) * n + k)
+            cuda::atomic<atomic_t, cuda::thread_scope_device> {aggregate_tmp[k]};
+        }
 
         // increment global block counter for this reduction
         auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
@@ -288,11 +337,18 @@ namespace quda
         auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
         T sum = r.init();
         while (i < target::grid_dim().x) {
-          sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
+          atomic_t partial_tmp[n];
+          T partial;
+#pragma unroll
+          for (int k = 0; k < n; k++) {
+            partial_tmp[k] = arg.partial[(idx * target::grid_dim().x + i) * n + k].load(cuda::std::memory_order_relaxed);
+          }
+          memcpy(&partial, partial_tmp, sizeof(partial));
+          sum = r(sum, partial);
           i += target::block_size<2>();
         }
 
-        sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+        sum = BlockReduce(ops, target::thread_idx().z).Reduce(sum, r);
 
         write_result(arg, sum, idx);
       }

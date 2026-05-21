@@ -3,14 +3,18 @@
 #include <string.h>
 
 #include <quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
 #include <gauge_field.h>
+#include <instantiate.h>
+#include <gtest/gtest.h>
+#include <timer.h>
+#include <gauge_path_quda.h>
+
+#include "command_line_params.h"
+#include "host_utils.h"
+#include "momentum_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
-#include <gauge_path_quda.h>
-#include <timer.h>
-#include <gtest/gtest.h>
+#include "test.h"
 
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
@@ -77,18 +81,23 @@ int trace_path[][6] {{0, 1, 7, 6},       {0, 2, 7, 5},       {0, 3, 7, 4},      
 
 static int force_check;
 static int path_check;
-static quda::real_t force_deviation;
-static quda::real_t loop_deviation;
-static quda::real_t plaq_deviation;
+static double force_deviation;
+static double loop_deviation;
+static double plaq_deviation;
+
+using force_test_t = ::testing::tuple<QudaPrecision, bool>;
 
 // The same function is used to test computePath.
 // If compute_force is false then a path is computed
-void gauge_force_test(bool compute_force = true)
+void gauge_force_test(force_test_t test_param)
 {
   int max_length = 6;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
+
+  gauge_param.cuda_prec = ::testing::get<0>(test_param);
+  bool compute_force = ::testing::get<1>(test_param);
 
   gauge_param.gauge_order = gauge_order;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
@@ -131,7 +140,7 @@ void gauge_force_test(bool compute_force = true)
   quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   quda::GaugeField U_milc(param);
@@ -165,14 +174,14 @@ void gauge_force_test(bool compute_force = true)
     mom = Mom_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
-    sitelink = reinterpret_cast<void*>(sitelink_array);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
     for (int d = 0; d < 4; d++) mom_array[d] = Mom_qdp.data(d);
-    mom = reinterpret_cast<void*>(mom_array);
+    mom = reinterpret_cast<void *>(mom_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
 
-  if (getTuning() == QUDA_TUNE_YES) {
+  if (getTuning()) {
     if (compute_force)
       computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
                             &gauge_param);
@@ -204,20 +213,23 @@ void gauge_force_test(bool compute_force = true)
   void *refmom = Mom_ref_milc.data();
   int *check_out = compute_force ? &force_check : &path_check;
   if (verify_results) {
-    gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length,
-                          loop_coeff, num_paths, compute_force);
+    quda::host_timer_t verify_timer;
+    verify_timer.start();
+    gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length, loop_coeff, num_paths, compute_force);
     *check_out
       = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     if (compute_force) strong_check_mom(Mom_milc.data(), refmom, 4 * V, gauge_param.cpu_prec);
+    verify_timer.stop();
+    printfQuda("Verification time = %.2f ms\n", verify_timer.last());
   }
 
   if (compute_force) {
     logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
     auto action_quda = momActionQuda(mom, &gauge_param);
-    auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
-    force_deviation = abs(action_quda - action_ref) / abs(action_ref);
-    logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n",
-            action_quda, action_ref, double(force_deviation));
+    auto action_ref = momentumActionCPU(refmom, 4 * V, gauge_param.cpu_prec);
+    force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
+    logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
+            force_deviation);
   }
 
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
@@ -231,15 +243,26 @@ void gauge_force_test(bool compute_force = true)
     for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
     host_free(input_path_buf[dir]);
   }
+
+  if (compute_force) {
+    ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree";
+    ASSERT_LE(force_deviation, getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
+  } else {
+    // path check
+    ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree";
+  }
 }
 
-void gauge_loop_test()
+using loop_test_t = ::testing::tuple<QudaPrecision>;
+
+void gauge_loop_test(loop_test_t loop_param)
 {
   int max_length = 6;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
+  gauge_param.cuda_prec = ::testing::get<0>(loop_param);
   gauge_param.gauge_order = gauge_order;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
 
@@ -263,7 +286,7 @@ void gauge_loop_test()
   quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   quda::GaugeField U_milc(param);
@@ -276,7 +299,7 @@ void gauge_loop_test()
     sitelink = U_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
-    sitelink = reinterpret_cast<void*>(sitelink_array);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -285,7 +308,8 @@ void gauge_loop_test()
   loadGaugeQuda(sitelink, &gauge_param);
 
   // storage for traces
-  std::vector<double _Complex> traces(num_paths);
+  using double_complex = double _Complex;
+  std::vector<double_complex> traces(num_paths);
   double scale_factor = 2.0;
 
   // compute various observables
@@ -302,7 +326,7 @@ void gauge_loop_test()
   // compute the plaquette as part of validation
   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
 
-  if (getTuning() == QUDA_TUNE_YES) { gaugeObservablesQuda(&obsParam); }
+  if (getTuning()) { gaugeObservablesQuda(&obsParam); }
 
   quda::host_timer_t host_timer;
   // Multiple execution to exclude warmup time in the first run
@@ -317,37 +341,62 @@ void gauge_loop_test()
   std::vector<quda::complex_t> traces_ref(num_paths);
 
   if (verify_results) {
-    gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p,
-                               trace_loop_length_p, trace_loop_coeff_p, num_paths);
+    quda::host_timer_t verify_timer;
+    verify_timer.start();
+
+    gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p,
+                               num_paths);
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {
-      quda::complex_t traces_(static_cast<std::complex<double>>(traces[i]).real(), static_cast<std::complex<double>>(traces[i]).imag());
-      auto diff = abs(traces_ref[i] - traces_);
-      auto norm = abs(traces_ref[i]);
+      std::complex<double> traces_(__real__(traces[i]), __imag__(traces[i]));
+      std::complex<double> ref_d(double(traces_ref[i].real()), double(traces_ref[i].imag()));
+      auto diff = std::abs(ref_d - traces_);
+      auto norm = std::abs(ref_d);
       loop_deviation += diff / norm;
-      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i,
-              double(traces_.real()), double(traces_.imag()), double(traces_ref[i].real()),
-              double(traces_ref[i].imag()), double(diff / norm));
+      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(),
+              traces_.imag(), double(traces_ref[i].real()), double(traces_ref[i].imag()), diff / norm);
     }
 
-    // Second check: we can reconstruct the plaquette from the first six loops we calculated
-    double plaq_factor = 1. / (V * U_qdp.Ncolor() * quda::comm_size());
-    std::vector<quda::complex_t> plaq_components(6);
-    for (int i = 0; i < 6; i++) plaq_components[i] = traces_ref[i] / quda::real_t(trace_loop_coeff_d[i]) / quda::real_t(scale_factor) * quda::real_t(plaq_factor);
+    // Second check: reconstruct plaquette from the first six 1x1 loop traces.
+    // Undo path coeff and global scale, then apply 1/(Nc^2*V*comm) as in GaugePlaq. Sum the
+    // Nc-1 oriented plaquettes per component (equivalent to develop's mean with 1/(V*Nc*comm)).
+    const auto Nc = U_qdp.Ncolor();
+    const double plaq_factor = 1. / (Nc * Nc * V * quda::comm_size());
+    std::vector<std::complex<double>> plaq_components(6);
+    for (int i = 0; i < 6; i++) {
+      std::complex<double> trace_quda(__real__(traces[i]), __imag__(traces[i]));
+      plaq_components[i] = trace_quda / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
+    }
 
-    quda::real_t plaq_loop[3];
-    // spatial: xy, xz, yz
-    plaq_loop[1] = ((plaq_components[0] + plaq_components[1] + plaq_components[3]) / quda::real_t(3.)).real();
+    double plaq_loop[3];
+    // spatial: xy, xz, yz — sum (not average) matches GaugePlaq spatial sum before normalization
+    plaq_loop[1] = (plaq_components[0] + plaq_components[1] + plaq_components[3]).real();
     // temporal: xt, yt, zt
-    plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / quda::real_t(3.)).real();
+    plaq_loop[2] = (plaq_components[2] + plaq_components[4] + plaq_components[5]).real();
     plaq_loop[0] = 0.5 * (plaq_loop[1] + plaq_loop[2]);
 
-    plaq_deviation = abs(obsParam.plaquette[0] - plaq_loop[0]) / abs(obsParam.plaquette[0]);
-    logQuda(QUDA_VERBOSE,
-            "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
-            double(plaq_loop[0]), double(plaq_loop[1]), double(plaq_loop[2]), obsParam.plaquette[0], obsParam.plaquette[1],
-            obsParam.plaquette[2], double(plaq_deviation));
+    const double plaq_diff = obsParam.plaquette[0] - plaq_loop[0];
+    const double plaq_ratio = (std::abs(obsParam.plaquette[0]) > 0) ? plaq_loop[0] / obsParam.plaquette[0] : 0.0;
+    plaq_deviation = std::abs(plaq_diff) / std::abs(obsParam.plaquette[0]);
+
+    printfQuda("Plaquette cross-check (absolute values):\n");
+    printfQuda("  dedicated plaquette: total % .16e  spatial % .16e  temporal % .16e\n", obsParam.plaquette[0],
+               obsParam.plaquette[1], obsParam.plaquette[2]);
+    printfQuda("  from loop traces:    total % .16e  spatial % .16e  temporal % .16e\n", plaq_loop[0], plaq_loop[1],
+               plaq_loop[2]);
+    printfQuda("  difference (dedicated - loop): % .16e\n", plaq_diff);
+    printfQuda("  ratio (loop / dedicated):      % .16e\n", plaq_ratio);
+    printfQuda("  relative deviation:              % .16e  (tolerance % .16e)\n", plaq_deviation,
+               getTolerance(cuda_prec));
+    printfQuda("  plaq_factor = % .16e  (1 / (Nc^2 * V * comm_size), Nc = %d, V = %d)\n", plaq_factor, Nc, V);
+    for (int i = 0; i < 6; i++) {
+      printfQuda("  loop %d: trace % .16e + I % .16e  -> component % .16e + I % .16e\n", i,
+                 __real__(traces[i]), __imag__(traces[i]), plaq_components[i].real(), plaq_components[i].imag());
+    }
+
+    verify_timer.stop();
+    printfQuda("Verification time = %.2f ms\n", verify_timer.last());
   }
 
   double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);
@@ -358,27 +407,52 @@ void gauge_loop_test()
 
   for (int i = 0; i < num_paths; i++) delete[] trace_path_p[i];
   delete[] trace_path_p;
-}
 
-TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree"; }
-
-TEST(action, verify)
-{
-  ASSERT_LE(force_deviation, getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
-}
-
-TEST(path, verify) { ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree"; }
-
-TEST(loop_traces, verify)
-{
   ASSERT_LE(loop_deviation, getTolerance(cuda_prec)) << "CPU and QUDA loop trace implementations do not agree";
-}
-
-TEST(plaquette, verify)
-{
   ASSERT_LE(plaq_deviation, getTolerance(cuda_prec))
     << "Plaquette from QUDA loop trace and QUDA dedicated plaquette function do not agree";
 }
+
+struct GaugePathTest : public ::testing::TestWithParam<force_test_t>
+{
+  force_test_t param;
+  GaugePathTest() : param(GetParam()) { }
+};
+
+TEST_P(GaugePathTest, verify)
+{
+  QudaPrecision prec= ::testing::get<0>(param);
+  if (!quda::is_enabled(prec)) GTEST_SKIP();
+  gauge_force_test(param);
+}
+
+struct GaugeLoopTest : public ::testing::TestWithParam<loop_test_t>
+{
+  loop_test_t param;
+  GaugeLoopTest() : param(GetParam()) { }
+};
+
+TEST_P(GaugeLoopTest, verify)
+{
+  QudaPrecision prec= ::testing::get<0>(param);
+  if (!quda::is_enabled(prec)) GTEST_SKIP();
+  gauge_loop_test(param);
+}
+
+using ::testing::Combine;
+using ::testing::Values;
+
+INSTANTIATE_TEST_SUITE_P(GaugePathTest, GaugePathTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                 Values(true, false)),
+                         [](testing::TestParamInfo<force_test_t> param) {
+                           return std::string(get_prec_str(testing::get<0>(param.param))) +
+                             "_" + (::testing::get<1>(param.param) ? "force" : "path"); });
+
+INSTANTIATE_TEST_SUITE_P(GaugeLoopTest, GaugeLoopTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)),
+                         [](testing::TestParamInfo<loop_test_t> param)
+                         { return std::string(get_prec_str(testing::get<0>(param.param))); });
 
 static void display_test_info()
 {
@@ -404,6 +478,7 @@ int main(int argc, char **argv)
   CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
                                                             {"qdp", QUDA_QDP_GAUGE_ORDER}};
   app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
+  add_testing_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -411,27 +486,23 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
   initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 
   display_test_info();
 
-  gauge_force_test();
-
-  // The same test is also used for gauge path (compute_force=false)
-  gauge_force_test(false);
-
-  gauge_loop_test();
-
-  if (verify_results) {
+  if (enable_testing) {
     // Ensure gtest prints only from rank 0
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
     test_rc = RUN_ALL_TESTS();
     if (test_rc != 0) warningQuda("Tests failed");
+  } else {
+    gauge_force_test({prec, true});
+    gauge_force_test({prec, false});
+    gauge_loop_test({prec});
   }
 
   endQuda();

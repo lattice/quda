@@ -12,40 +12,49 @@
 namespace quda
 {
 
-  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile)
+  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param) :
+    Solver(mat, matSloppy, matSloppy, matSloppy, param)
   {
     if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ && param.Nsteps % 2 == 1) {
       errorQuda("For multiplicative Schwarz, number of solver steps %d must be even", param.Nsteps);
     }
   }
 
-  void MR::create(ColorSpinorField &x, const ColorSpinorField &b)
+  void MR::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
 
-    if (!init) {
-      ColorSpinorParam csParam(b);
+    if (!init || r.size() != b.size()) {
+
+      resize(r, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
+
+      ColorSpinorParam csParam(b[0]);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-
-      r = ColorSpinorField(csParam);
-
-      // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
-      Ar = ColorSpinorField(csParam);
-      x_sloppy = ColorSpinorField(csParam);
 
-      bool mixed = param.precision != param.precision_sloppy;
+      // Setting the value of block_dim and checking if blocks are local
+      bool local = true;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        csParam.dd.block_dim[i] = param.schwarz_block[i];
+        local &= (param.do_block_schwarz() && x.full_dim(i) % csParam.dd.block_dim[i] == 0);
+      }
+      // Disabling global_reduction if blocks are local and we do block_schwarz
+      if (param.do_block_schwarz() && param.global_reduction) param.global_reduction = !local;
 
-      if (!mixed) csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      csParam.v = r.data();
-      r_sloppy = ColorSpinorField(csParam);
+      resize(Ar, b.size(), csParam);
+      resize(x_sloppy, b.size(), csParam);
+
+      if (param.precision != param.precision_sloppy) { // mixed precision
+        resize(r_sloppy, b.size(), csParam);
+      } else {
+        create_alias(r_sloppy, r);
+      }
 
       init = true;
     } // init
   }
 
-  ColorSpinorField &MR::get_residual()
+  cvector_ref<const ColorSpinorField> MR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -53,7 +62,7 @@ namespace quda
     return r;
   }
 
-  void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void MR::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
@@ -62,16 +71,16 @@ namespace quda
 
     create(x, b); // allocate fields
 
-    if (!param.is_preconditioner) {
-      blas::flops = 0;
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    }
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    real_t b2 = blas::norm2(b); // Save norm of b
-    real_t r2 = 0.0;            // if zero source then we will exit immediately doing no work
+    vector<real_t> b2 = blas::norm2(b); // Save norm of b
+    vector<real_t> r2;
+
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r); // r = b - Ax0
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
     } else {
       r2 = b2;
       blas::copy(r, b);
@@ -79,50 +88,74 @@ namespace quda
     }
     blas::copy(r_sloppy, r);
 
-    // if invalid residual then convergence is set by iteration count only
-    real_t stop = param.residual_type == QUDA_INVALID_RESIDUAL ? 0.0 : b2 * param.tol * param.tol;
+    auto stop = stopping(param.tol, b2, param.residual_type);
 
     int iter = 0;
     int step = 0;
-    bool converged = false;
+    bool is_done = false;
 
-    PrintStats("MR", iter, r2, b2, 0.0);
-    while (!converged) {
+    PrintStats("MR", iter, r2, b2);
+    while (!is_done) {
 
       int k = 0;
-      real_t scale = 1.0;
-      if ((node_parity + step) % 2 == 0 && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
+
+      vector<real_t> scale(b.size(), 1.0);
+      vector<real_t> scale_inv(b.size(), 1.0);
+      vector<real_t> delta2(b.size(), param.delta * param.delta);
+
+      if (!param.do_block_schwarz() && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ
+          && (node_parity + step) % 2 == 0) {
         // for multiplicative Schwarz we alternate updates depending on node parity
       } else {
 
         commGlobalReductionPush(param.global_reduction); // use local reductions for DD solver
 
-        blas::zero(x_sloppy); // can get rid of this for a special first update kernel
-        real_t c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
-        scale = c2 > 0.0 ? sqrt(c2) : 1.0;
-
-        // domain-wise normalization of the initial residual to prevent underflow
-        if (c2 > 0.0) {
-          blas::ax(1 / scale, r_sloppy); // can merge this with the prior copy
-          r2 = 1.0;                      // by definition by this is now true
+        if (param.do_block_schwarz()) {
+          if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
+            for (auto i = 0u; i < b.size(); i++) {
+              // Red or black active
+              (Ar[i]).DD(DD::reset, DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+              (r_sloppy[i]).DD(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+            }
+          } else {
+            // Both red and black active but no hopping
+            for (auto i = 0u; i < b.size(); i++) {
+              (Ar[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+              (r_sloppy[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+            }
+          }
         }
 
-        while (k < param.maxiter && r2 > param.delta * param.delta) {
+        blas::zero(x_sloppy); // can get rid of this for a special first update kernel
+        auto c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
+        for (auto i = 0u; i < b.size(); i++) {
+          scale[i] = c2[i] > 0.0 ? sqrt(c2[i]) : 1.0;
+          scale_inv[i] = 1.0 / scale[i];
+          // domain-wise normalization of the initial residual to prevent underflow
+          if (c2[i] > 0.0) r2[i] = 1.0; // by definition by this is now true
+        }
+        blas::ax(scale_inv, r_sloppy); // can merge this with the prior copy
+
+        while (k < param.maxiter && r2 > delta2) {
 
           matSloppy(Ar, r_sloppy);
 
           if (param.global_reduction) {
             auto Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
-            auto alpha = complex_t(Ar4[0], Ar4[1]) / Ar4[2];
-            r2 = Ar4[3];
-            PrintStats("MR (inner)", iter, r2, b2, 0.0);
+            vector<complex_t> alpha(b.size());
+            for (auto i = 0u; i < b.size(); i++) {
+              alpha[i] = complex_t(Ar4[i][0], Ar4[i][1]) / Ar4[i][2];
+              r2[i] = Ar4[i][3];
+            }
+            PrintStats("MR (inner)", iter, r2, b2);
 
             // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = blas::norm2(r)
             blas::caxpyXmaz(param.omega * alpha, r_sloppy, x_sloppy, Ar);
           } else {
             // doing local reductions so can make it asynchronous
             commAsyncReductionSet(true);
-            blas::cDotProductNormA(Ar, r_sloppy);
+
+            blas::cDotProductNormAB(Ar, r_sloppy);
 
             // omega*alpha is done in the kernel
             blas::caxpyXmazMR(param.omega, r_sloppy, x_sloppy, Ar);
@@ -135,42 +168,41 @@ namespace quda
 
         blas::axpy(scale, x_sloppy, x); // Scale and sum to accumulator
 
+        if (param.do_block_schwarz()) {
+          // Disable domain decomposition
+          for (auto i = 0u; i < Ar.size(); i++) {
+            (Ar[i]).DD(DD::reset);
+            (r_sloppy[i]).DD(DD::reset);
+          }
+        }
+
         commGlobalReductionPop(); // renable global reductions for outer solver
       }
+
+      step++;
 
       // FIXME - add over/under relaxation in outer loop
       bool compute_true_res = param.compute_true_res || param.Nsteps > 1;
       if (compute_true_res) {
         mat(r, x);
         r2 = blas::xmyNorm(b, r);
-        param.true_res = sqrt(r2 / b2);
-        converged = (step < param.Nsteps && r2 > stop) ? false : true;
-        if (!converged) blas::copy(r_sloppy, r);
-        PrintStats("MR (restart)", iter, r2, b2, 0.0);
+        for (auto i = 0u; i < b2.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
+        is_done = (step >= param.Nsteps || r2 < stop);
+        if (!is_done) blas::copy(r_sloppy, r);
+        PrintStats("MR (restart)", iter, r2, b2);
       } else {
         blas::ax(scale, r_sloppy);
         r2 = blas::norm2(r_sloppy);
-        converged = (step < param.Nsteps && r2 > stop) ? false : true;
-        if (!converged) blas::copy(r, r_sloppy);
+        is_done = (step >= param.Nsteps || r2 < stop);
+        if (!is_done) blas::copy(r, r_sloppy);
       }
-      step++;
     }
 
-    PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+    PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type));
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-
-      // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops()) * 1e-9;
-
-      param.gflops += gflops;
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       param.iter += iter;
-      blas::flops = 0;
-
-      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
   }
 

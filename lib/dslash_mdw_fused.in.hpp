@@ -7,6 +7,7 @@
 #include <worker.h>
 #include <domain_wall_helper.h>
 #include <fast_intdiv.h>
+#include <int_list.hpp>
 
 // Tensor core functions for Mobius DWF
 namespace quda
@@ -21,8 +22,12 @@ namespace quda
                                  const complex_t *b_5, const complex_t *c_5, bool dagger, int parity, int shift[4],
                                  int halo_shift[4], MdwfFusedDslashType type);
 
-    template <int...> struct IntList {
-    };
+    void inline apply_fused_dslash_list(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                                        ColorSpinorField &, const ColorSpinorField &, real_t, real_t, const complex_t *,
+                                        const complex_t *, bool, int, int[4], int[4], MdwfFusedDslashType, IntList<>)
+    {
+      errorQuda("No Ls has not been instantiated");
+    }
 
     template <int Ls, int... N>
     void apply_fused_dslash_list(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
@@ -53,10 +58,9 @@ namespace quda
       apply_fused_dslash_list(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type, int_list);
     }
 #else
-    void inline apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                   ColorSpinorField &, const ColorSpinorField &, real_t, real_t,
-                                   const complex_t *, const complex_t *, bool, int, int[4],
-                                   int[4], MdwfFusedDslashType)
+    void inline apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
+                                   const ColorSpinorField &, real_t, real_t, const complex_t *, const complex_t *, bool,
+                                   int, int[4], int[4], MdwfFusedDslashType)
     {
       errorQuda("Domain wall dslash with tensor cores has not been built");
     }

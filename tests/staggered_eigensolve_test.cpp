@@ -7,200 +7,412 @@
 #include <quda.h>
 
 // External headers
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <staggered_gauge_utils.h>
-#include <llfat_utils.h>
-#include <qio_field.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "staggered_gauge_utils.h"
+#include "llfat_utils.h"
+#include "test.h"
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+// Place params above "eigensolve_test_gtest.hpp" so they
+// are visible therein.
+QudaGaugeParam gauge_param;
+QudaInvertParam eig_inv_param;
+QudaEigParam eig_param;
 
-void display_test_info()
+using quda::GaugeField;
+using quda::GaugeFieldParam;
+
+GaugeField cpuInQDP = {};
+GaugeField cpuFatQDP = {};
+GaugeField cpuLongQDP = {};
+GaugeField cpuFatMILC = {};
+GaugeField cpuLongMILC = {};
+QudaPrecision last_prec = QUDA_INVALID_PRECISION;
+
+// if "--enable-testing true" is passed, we run the tests defined in here
+#include <staggered_eigensolve_test_gtest.hpp>
+
+void display_test_info(QudaEigParam &param)
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
-  printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n", get_prec_str(prec),
-             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
-             get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
+
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
 
   printfQuda("\n   Eigensolver parameters\n");
-  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
-  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-  if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-  printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
-  printfQuda(" - size of Krylov space %d\n", eig_n_kr);
-  printfQuda(" - solver tolerance %e\n", eig_tol);
-  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
-  if (eig_compute_svd) {
+  printfQuda(" - solver mode %s\n", get_eig_type_str(param.eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(param.spectrum));
+  if (param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", param.block_size);
+  printfQuda(" - number of eigenvectors requested %d\n", param.n_conv);
+  printfQuda(" - size of eigenvector search space %d\n", param.n_ev);
+  printfQuda(" - size of Krylov space %d\n", param.n_kr);
+  printfQuda(" - solver tolerance %e\n", param.tol);
+  printfQuda(" - convergence required (%s)\n", param.require_convergence ? "true" : "false");
+  if (param.compute_svd) {
     printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
     printfQuda(" - ***********************************************************\n");
     printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
     printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
     printfQuda(" - ***********************************************************\n");
   } else {
-    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
-               eig_use_normop ? "true" : "false");
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s), even-odd pc (%s)\n", param.use_dagger ? "true" : "false",
+               param.use_norm_op ? "true" : "false", param.use_pc ? "true" : "false");
   }
-  if (eig_use_poly_acc) {
-    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
-    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    if (eig_amax < 0)
+  if (param.use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", param.poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", param.a_min);
+    if (param.a_max <= 0)
       printfQuda(" - Chebyshev polynomial maximum will be computed\n");
     else
-      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", param.a_max);
   }
-
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
 }
 
+void init()
+{
+  // Set QUDA internal parameters
+  gauge_param = newQudaGaugeParam();
+  setStaggeredGaugeParam(gauge_param);
+
+  // Though no inversions are performed, the inv_param
+  // structure contains all the information we need to
+  // construct the dirac operator.
+  eig_inv_param = newQudaInvertParam();
+  setStaggeredInvertParam(eig_inv_param);
+
+  eig_param = newQudaEigParam();
+  // We encapsualte the inv_param structure inside the eig_param structure
+  eig_param.invert_param = &eig_inv_param;
+  setEigParam(eig_param);
+
+  setDims(gauge_param.X);
+  dw_setDims(gauge_param.X, 1);
+
+  // Staggered Gauge construct START
+  //-----------------------------------------------------------------------------------
+  // Allocate host staggered gauge fields
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  gauge_param.location = QUDA_CPU_FIELD_LOCATION;
+
+  GaugeFieldParam cpuParam(gauge_param);
+  cpuParam.order = QUDA_QDP_GAUGE_ORDER;
+  cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cpuParam.create = QUDA_NULL_FIELD_CREATE;
+  cpuInQDP = GaugeField(cpuParam);
+  cpuFatQDP = GaugeField(cpuParam);
+  cpuParam.order = QUDA_MILC_GAUGE_ORDER;
+  cpuFatMILC = GaugeField(cpuParam);
+
+  cpuParam.link_type = QUDA_ASQTAD_LONG_LINKS;
+  cpuParam.nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
+  cpuParam.order = QUDA_QDP_GAUGE_ORDER;
+  cpuLongQDP = GaugeField(cpuParam);
+  cpuParam.order = QUDA_MILC_GAUGE_ORDER;
+  cpuLongMILC = GaugeField(cpuParam);
+
+  void *qdp_inlink[4] = {cpuInQDP.data(0), cpuInQDP.data(1), cpuInQDP.data(2), cpuInQDP.data(3)};
+  void *qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
+  void *qdp_longlink[4] = {cpuLongQDP.data(0), cpuLongQDP.data(1), cpuLongQDP.data(2), cpuLongQDP.data(3)};
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, true);
+
+  // Reorder gauge fields to MILC order
+  cpuFatMILC = cpuFatQDP;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) cpuLongMILC = cpuLongQDP;
+
+  // Make sure QDP fields have exchanged ghosts because they are used
+  // for the reference dslash
+  cpuInQDP.exchangeGhost();
+  cpuFatQDP.exchangeGhost();
+  cpuLongQDP.exchangeGhost();
+
+  if (!enable_testing) {
+    // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
+    // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
+    // gauge fields with different parameters.
+    double plaq[3];
+    computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // Compute fat link plaquette
+      computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
+      printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+    }
+
+    freeGaugeQuda();
+
+    // Load the gauge field to the device
+    loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
+  }
+
+  // Staggered Gauge construct END
+  //-----------------------------------------------------------------------------------
+}
+
+std::vector<double> eigensolve(test_t test_param)
+{
+  // Collect testing parameters from gtest
+  eig_inv_param.cuda_prec = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_eigensolver = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_sloppy = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_precondition = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_refinement_sloppy = ::testing::get<0>(test_param);
+  eig_param.eig_type = ::testing::get<1>(test_param);
+  eig_param.use_norm_op = ::testing::get<2>(test_param);
+  eig_param.use_pc = ::testing::get<3>(test_param);
+  eig_param.compute_svd = ::testing::get<4>(test_param);
+  eig_param.spectrum = ::testing::get<5>(test_param);
+
+  // For preconditioned matrices, spinors are only half the normal length.
+  // QUDA constructs spinors based on the "solution type" which is
+  // strictly an inverter option. For QUDA_MATPC_SOLUTION, the inverter
+  // will not reconstruct the full solution, hence spinors are half length.
+  // For QUDA_MAT_SOLUTION the inverter will return the full solution,
+  // hence spinors are normal length.
+  // For the eigensolver, we must emulate these conditions. Therefore, if
+  // the user requests a preconditioned solve, we need only half length spinors.
+  // For full matrices, we need full length spinors.
+  eig_inv_param.solution_type = eig_param.use_pc ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+
+  // For Laplace tests, we add support for gauge smearing
+  eig_param.use_smeared_gauge = gauge_smear;
+
+  if (enable_testing && dslash_type == QUDA_LAPLACE_DSLASH) {
+    if (eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) {
+      laplace3D = 3;
+    } else {
+      laplace3D = 4;
+    }
+  }
+
+  // For Laplace tests, we need to set the kappa parameter
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    int dimension = laplace3D < 4 ? 3 : 4;
+    eig_inv_param.kappa = 1.0 / (2 * dimension + mass);
+    eig_inv_param.laplace3D = laplace3D;
+    if (dimension == 3) {
+      eig_param.ortho_dim = laplace3D;
+      eig_param.ortho_dim_size_local = tdim;
+    }
+  }
+
+  // For gtest testing, we prohibit the use of polynomial acceleration as
+  // the fine tuning required can inhibit convergence of an otherwise
+  // perfectly good algorithm. We also have a default value of 4
+  // for the block size in Block TRLM, and 4 for the batched rotation.
+  // The user may change these values via the command line:
+  // --eig-block-size
+  // --eig-batched-rotate
+  if (enable_testing) {
+    eig_use_poly_acc = false;
+    eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
+    eig_block_size != 4 ? eig_param.block_size = eig_block_size : eig_param.block_size = 4;
+    eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 4;
+  }
+
+  logQuda(QUDA_SUMMARIZE, "Action = %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
+          get_dslash_str(dslash_type), get_eig_type_str(eig_param.eig_type),
+          eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
+
+  if (!enable_testing || (enable_testing && getVerbosity() >= QUDA_VERBOSE)) display_test_info(eig_param);
+
+  // Gauge Smearing Routines
+  if (gauge_smear) {
+    quda::host_timer_t host_timer;
+    host_timer.start(); // start the timer
+
+    std::vector<QudaGaugeObservableParam> obs_param(gauge_smear_steps / measurement_interval + 1);
+    for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+      obs_param[i] = newQudaGaugeObservableParam();
+      obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+      obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+      obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    }
+
+    // We here set all the problem parameters for all possible smearing types.
+    QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+
+    switch (smear_param.smear_type) {
+    case QUDA_GAUGE_SMEAR_APE:
+    case QUDA_GAUGE_SMEAR_STOUT:
+    case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
+    case QUDA_GAUGE_SMEAR_HYP: {
+      performGaugeSmearQuda(&smear_param, obs_param.data());
+      break;
+    }
+
+      // Here we use a typical use case which is different from simple smearing in that
+      // the user will want to compute the plaquette values to compute the gauge energy.
+    case QUDA_GAUGE_SMEAR_WILSON_FLOW:
+    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: {
+      for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+        obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+      }
+      performWFlowQuda(&smear_param, obs_param.data());
+      break;
+    }
+    default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
+    }
+
+    host_timer.stop();
+    printfQuda("Time for gauge smearing = %f\n", host_timer.last());
+  }
+
+  // Vector construct START
+  //----------------------------------------------------------------------------
+  // Host side arrays to store the eigenpairs computed by QUDA
+  int n_eig = eig_n_conv;
+  if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
+  quda::ColorSpinorParam cs_param;
+  constructStaggeredTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
+
+  // Void pointers to host side arrays, compatible with the QUDA interface.
+  std::vector<void *> host_evecs_ptr(n_eig);
+  // Allocate host side memory and pointers
+  std::vector<quda::ColorSpinorField> evecs(n_eig, cs_param);
+  for (int i = 0; i < n_eig; i++) host_evecs_ptr[i] = evecs[i].data();
+
+  // Complex eigenvalues
+  int n_batch = laplace3D == 3 ? eig_param.ortho_dim_size_local * quda::comm_dim(3) : 1;
+  std::vector<double _Complex> evals(eig_n_conv * n_batch);
+  // Vector construct END
+  //----------------------------------------------------------------------------
+
+  // QUDA eigensolver test BEGIN
+  //----------------------------------------------------------------------------
+  // This function returns the host_evecs and host_evals pointers, populated with the
+  // requested data, at the requested prec. All the information needed to perfom the
+  // solve is in the eig_param container. If eig_param.arpack_check == true and
+  // precision is double, the routine will use ARPACK rather than the GPU.
+  quda::host_timer_t host_timer;
+  host_timer.start();
+  if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
+    errorQuda("ARPACK check only available in double precision");
+  }
+
+  eigensolveQuda(host_evecs_ptr.data(), evals.data(), &eig_param);
+  host_timer.stop();
+  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
+
+  std::vector<double> residua(eig_n_conv, 0.0);
+  // Perform host side verification of eigenvector if requested.
+  if (verify_results) {
+    for (int i = 0; i < eig_n_conv; i++) {
+      if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
+        std::vector<double _Complex> sigma(n_batch);
+        for (auto b = 0; b < n_batch; b++) sigma[b] = evals[b * eig_n_conv + i];
+        residua[i] = verifyStaggeredTypeSingularVector(evecs[i], evecs[i + eig_n_conv], sigma, i, eig_param, cpuFatQDP,
+                                                       cpuLongQDP, laplace3D);
+      } else {
+        std::vector<double _Complex> lambda(n_batch);
+        for (auto b = 0; b < n_batch; b++) lambda[b] = evals[b * eig_n_conv + i];
+        residua[i] = verifyStaggeredTypeEigenvector(evecs[i], lambda, i, eig_param, cpuFatQDP, cpuLongQDP, laplace3D);
+      }
+    }
+  }
+  return residua;
+  // QUDA eigensolver test COMPLETE
+  //----------------------------------------------------------------------------
+}
+
+void cleanup()
+{
+  cpuInQDP = {};
+  cpuFatQDP = {};
+  cpuLongQDP = {};
+  cpuFatMILC = {};
+  cpuLongMILC = {};
+}
+
 int main(int argc, char **argv)
 {
-  // Set a default
-  solve_type = QUDA_INVALID_SOLVE;
+  ::testing::InitGoogleTest(&argc, argv);
+  // Set defaults
+  setQudaStaggeredDefaultInvTestParams();
 
   auto app = make_app();
   add_eigen_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"even", 3}, {"odd", 4}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-
+  add_su3_option_group(app);
+  add_testing_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
+  setVerbosity(verbosity);
 
   // Set values for precisions via the command line.
   setQudaPrecisions();
 
-  // Only these fermions are supported in this file. Ensure a reasonable default,
-  // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
-               get_dslash_str(QUDA_ASQTAD_DSLASH));
-    dslash_type = QUDA_ASQTAD_DSLASH;
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
+
+  initRand();
+
+  // Only these fermions are supported in this file
+  if constexpr (is_enabled_laplace()) {
+    if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
+      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  } else {
+    if (is_laplace(dslash_type))
+      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_DIRAC_LAPLACE=ON");
+    if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
-
-  setQudaStaggeredEigTestParams();
-
-  display_test_info();
-
-  // Set QUDA internal parameters
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setStaggeredGaugeParam(gauge_param);
-  // Though no inversions are performed, the inv_param
-  // structure contains all the information we need to
-  // construct the dirac operator. We encapsualte the
-  // inv_param structure inside the eig_param structure
-  // to avoid any confusion
-  QudaInvertParam eig_inv_param = newQudaInvertParam();
-  setStaggeredInvertParam(eig_inv_param);
-  QudaEigParam eig_param = newQudaEigParam();
-  setEigParam(eig_param);
-  // We encapsulate the eigensolver parameters inside the invert parameter structure
-  eig_param.invert_param = &eig_inv_param;
 
   if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
 
+  // Sanity check combinations of solve type and solution type
+  if ((solve_type == QUDA_DIRECT_SOLVE && solution_type != QUDA_MAT_SOLUTION)
+      || (solve_type == QUDA_DIRECT_PC_SOLVE && solution_type != QUDA_MATPC_SOLUTION)
+      || (solve_type == QUDA_NORMOP_SOLVE && solution_type != QUDA_MATDAG_MAT_SOLUTION)) {
+    errorQuda("Invalid combination of solve_type %s and solution_type %s", get_solve_str(solve_type),
+              get_solution_str(solution_type));
+  }
+
   initQuda(device_ordinal);
 
-  setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
-
-  // Staggered Gauge construct START
-  //-----------------------------------------------------------------------------------
-  void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
-  void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
-  void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
-  void *milc_fatlink = nullptr;
-  void *milc_longlink = nullptr;
-
-  for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_fatlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_longlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  }
-  milc_fatlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  milc_longlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
-
-  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
-  double plaq[3];
-  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    // Compute fat link plaquette
-    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  if (enable_testing && !compute_fatlong) {
+    // We need to force computing fat and long links, otherwise some operators end up
+    // excessively ill-conditioned
+    compute_fatlong = true;
+    warningQuda("Enabling fat/long link builds for gtest");
   }
 
-  // Reorder gauge fields to MILC order
-  reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
-  reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  init();
 
-  loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
-
-  // Staggered Gauge construct END
-  //-----------------------------------------------------------------------------------
-
-  // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
-  for (int i = 0; i < eig_n_conv; i++) {
-    host_evecs[i] = (void *)safe_malloc(V * stag_spinor_site_size * eig_inv_param.cpu_prec);
-  }
-  double _Complex *host_evals = (double _Complex *)safe_malloc(eig_param.n_ev * sizeof(double _Complex));
-
-  double time = 0.0;
-
-  // QUDA eigensolver test
-  //----------------------------------------------------------------------------
-  switch (test_type) {
-  case 0: // full parity solution
-  case 3: // even
-  case 4: // odd
-    // This function returns the host_evecs and host_evals pointers, populated with
-    // the requested data, at the requested prec. All the information needed to
-    // perfom the solve is in the eig_param container.
-    // If eig_param.arpack_check == true and precision is double, the routine will
-    // use ARPACK rather than the GPU.
-
-    time = -((double)clock());
-    eigensolveQuda(host_evecs, host_evals, &eig_param);
-    time += (double)clock();
-
-    printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
-    break;
-
-  default: errorQuda("Unsupported test type");
-
-  } // switch
-
-  // Deallocate host memory
-  for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);
-  host_free(host_evecs);
-  host_free(host_evals);
-
-  // Clean up gauge fields.
-  for (int dir = 0; dir < 4; dir++) {
-    host_free(qdp_inlink[dir]);
-    host_free(qdp_fatlink[dir]);
-    host_free(qdp_longlink[dir]);
+  int result = 0;
+  if (enable_testing) { // tests are defined in invert_test_gtest.hpp
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    result = RUN_ALL_TESTS();
+  } else {
+    eigensolve(test_t {prec, eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd,
+                       eig_param.spectrum});
   }
 
-  host_free(milc_fatlink);
-  host_free(milc_longlink);
+  cleanup();
 
+  // Memory clean-up
+  freeGaugeQuda();
+
+  // Finalize the QUDA library
   endQuda();
   finalizeComms();
+
+  return result;
 }
