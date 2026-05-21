@@ -168,7 +168,7 @@ mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
 
 # single-precision vectorization presently disabled by default
 cmake_dependent_option(QUDA_VECTORIZE_SINGLE "use vector instructions for single precision device code" ON
-  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 99.0 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.2 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
   OFF)
 message(STATUS "Single-precision vectorization support: ${QUDA_VECTORIZE_SINGLE}")
 mark_as_advanced(QUDA_VECTORIZE_SINGLE)
