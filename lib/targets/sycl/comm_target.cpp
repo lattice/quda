@@ -1,12 +1,10 @@
 #include <comm_quda.h>
 #include <quda_api.h>
-// #include <quda_cuda_api.h>
 #include <algorithm>
 
 namespace quda
 {
 
-  // bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
   bool comm_peer2peer_possible(int, int) { return false; }
 
   int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)

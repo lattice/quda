@@ -13,38 +13,15 @@ static size_t argBufSizeD[Nstream];
 static bool print = false;
 static bool syncKernels = false;
 
-#ifdef OLDSYCL
-class mySelectorT : public sycl::device_selector
-{
-  int operator()(const sycl::device &device) const override
-  {
-    int score = 1;
-    if (device.get_info<sycl::info::device::device_type>() == sycl::info::device_type::gpu) score += 10;
-    if (!device.has(sycl::aspect::fp64)) score = -1; // require fp64
-    printfQuda("Selector score: %2i %s\n", score, device.get_info<sycl::info::device::name>().c_str());
-    return score;
-  }
-};
-// static auto mySelector = sycl::default_selector();
-static auto mySelector = mySelectorT();
-#else
 int mySelectorT(const sycl::device &device)
 {
-  // printf("mySelectorT\n");
   int score = 1;
   if (device.get_info<sycl::info::device::device_type>() == sycl::info::device_type::gpu) score += 10;
-  // printf("device.has\n");
   if (!device.has(sycl::aspect::fp64)) score = -1; // require fp64
   if (print) { printfQuda("Selector score: %2i %s\n", score, device.get_info<sycl::info::device::name>().c_str()); }
-  // printf("end\n");
   return score;
 }
-// static auto mySelector = sycl::default_selector_v;
-// static auto mySelector = sycl::host_selector();
-// static auto mySelector = sycl::cpu_selector();
-// static auto mySelector = sycl::gpu_selector();
 static auto mySelector = mySelectorT;
-#endif
 
 void exception_handler(sycl::exception_list exceptions)
 {
@@ -70,13 +47,7 @@ namespace quda
       if (initialized) return;
       initialized = true;
       print = true;
-      //{
-      // auto dh = sycl::device(sycl::host_selector());
-      // printfQuda("Name: %s\n", dh.get_info<sycl::info::device::name>().c_str());
-      // printfQuda("Version: %s\n", dh.get_info<sycl::info::device::version>().c_str());
-      //}
 
-      // if (getVerbosity() >= QUDA_SUMMARIZE) {
       auto ps = sycl::platform::get_platforms();
       printfQuda("SYCL platforms available:\n");
       for (auto p : ps) {
@@ -86,8 +57,6 @@ namespace quda
       }
 
       auto p = sycl::platform(mySelector);
-      // auto p = sycl::platform(sycl::host_selector());
-      // auto p = ps.back();
       printfQuda("Selected platform: %s\n", p.get_info<sycl::info::platform::name>().c_str());
       printfQuda("  Vendor: %s\n", p.get_info<sycl::info::platform::vendor>().c_str());
       printfQuda("  Version: %s\n", p.get_info<sycl::info::platform::version>().c_str());
@@ -104,19 +73,13 @@ namespace quda
       printfQuda("  Driver version: %s\n", myDevice.get_info<sycl::info::device::driver_version>().c_str());
       printfQuda("  Max compute units: %u\n", myDevice.get_info<sycl::info::device::max_compute_units>());
       printfQuda("  Max work item dimensions: %u\n", myDevice.get_info<sycl::info::device::max_work_item_dimensions>());
-#ifdef OLDSYCL
-      printfQuda("  Max work item sizes: %s\n",
-                 str(myDevice.get_info<sycl::info::device::max_work_item_sizes>()).c_str());
-#else
       printfQuda("  Max work item sizes: %s\n",
                  str(myDevice.get_info<sycl::info::device::max_work_item_sizes<3>>()).c_str());
-#endif
       printfQuda("  Max work group size: %lu\n", myDevice.get_info<sycl::info::device::max_work_group_size>());
       printfQuda("  Max num sub groups: %u\n", myDevice.get_info<sycl::info::device::max_num_sub_groups>());
       printfQuda("  Sub group independent forward progress: %s\n",
                  myDevice.get_info<sycl::info::device::sub_group_independent_forward_progress>() ? "true" : "false");
       printfQuda("  Sub group sizes: %s\n", str(myDevice.get_info<sycl::info::device::sub_group_sizes>()).c_str());
-      // printfQuda("  Primary sub group size: %lu\n", myDevice.get_info<sycl::info::device::primary_sub_group_size>());
       printfQuda("  Preferred vector width float: %u\n",
                  myDevice.get_info<sycl::info::device::preferred_vector_width_float>());
       printfQuda("  Preferred vector width double: %u\n",
@@ -133,8 +96,6 @@ namespace quda
                  myDevice.get_info<sycl::info::device::global_mem_cache_line_size>());
       printfQuda("  Global mem cache size: %lu\n", myDevice.get_info<sycl::info::device::global_mem_cache_size>());
       printfQuda("  Global mem size: %lu\n", myDevice.get_info<sycl::info::device::global_mem_size>());
-      // printfQuda("  Max constant buffer size: %lu\n", myDevice.get_info<sycl::info::device::max_constant_buffer_size>());
-      // printfQuda("  max_constant_args: %u\n", myDevice.get_info<sycl::info::device::max_constant_args>());
       printfQuda("  Local mem size: %lu\n", myDevice.get_info<sycl::info::device::local_mem_size>());
       printfQuda("  Error correction support: %s\n",
                  myDevice.get_info<sycl::info::device::error_correction_support>() ? "true" : "false");
@@ -171,8 +132,6 @@ namespace quda
         err = true;
         warningQuda("Warp size %d not in sub group sizes %s", QUDA_WARP_SIZE, str(warps).c_str());
       }
-      // myDevice.get_info<sycl::info::device::max_parameter_size>();
-      // myDevice.get_info<sycl::info::device::max_work_group_size>();
       if (err) { errorQuda("Device checks failed"); }
 
       char *sync_kernels_env = getenv("QUDA_SYNC_KERNELS");
@@ -198,14 +157,9 @@ namespace quda
 
     int get_device_count()
     {
-      // printf("get_device_count\n");
       auto p = sycl::platform(mySelector);
-      // auto p = sycl::platform();
-      // printf("p.get_devices\n");
       auto ds = p.get_devices();
-      // printf("ds.size\n");
       auto device_count = ds.size();
-      // printf("device_count %zu\n", device_count);
       return device_count;
     }
 
@@ -224,64 +178,10 @@ namespace quda
       auto ds = p.get_devices();
       int dev_count = ds.size();
       for (int device = 0; device < dev_count; device++) {
-#ifdef OLDSYCL
-        using id = sycl::info::device;
-#else
         namespace id = sycl::info::device;
-#endif
         auto d = ds[device];
         printfQuda("%d - name:                    %s\n", device, d.get_info<id::name>().c_str());
       }
-#if 0
-      printfQuda("%d - totalGlobalMem:          %lu bytes ( %.2f Gbytes)\n", device, deviceProp.totalGlobalMem,
-		 deviceProp.totalGlobalMem / (float)(1024 * 1024 * 1024));
-      printfQuda("%d - sharedMemPerBlock:       %lu bytes ( %.2f Kbytes)\n", device, deviceProp.sharedMemPerBlock,
-		 deviceProp.sharedMemPerBlock / (float)1024);
-      printfQuda("%d - regsPerBlock:            %d\n", device, deviceProp.regsPerBlock);
-      printfQuda("%d - warpSize:                %d\n", device, deviceProp.warpSize);
-      printfQuda("%d - memPitch:                %lu\n", device, deviceProp.memPitch);
-      printfQuda("%d - maxThreadsPerBlock:      %d\n", device, deviceProp.maxThreadsPerBlock);
-      printfQuda("%d - maxThreadsDim[0]:        %d\n", device, deviceProp.maxThreadsDim[0]);
-      printfQuda("%d - maxThreadsDim[1]:        %d\n", device, deviceProp.maxThreadsDim[1]);
-      printfQuda("%d - maxThreadsDim[2]:        %d\n", device, deviceProp.maxThreadsDim[2]);
-      printfQuda("%d - maxGridSize[0]:          %d\n", device, deviceProp.maxGridSize[0]);
-      printfQuda("%d - maxGridSize[1]:          %d\n", device, deviceProp.maxGridSize[1]);
-      printfQuda("%d - maxGridSize[2]:          %d\n", device, deviceProp.maxGridSize[2]);
-      printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
-		 deviceProp.totalConstMem / (float)1024);
-      printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
-      printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
-      printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
-      printfQuda("%d - kernelExecTimeoutEnabled %s\n", device,
-		 (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
-      printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
-      printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
-      switch (deviceProp.computeMode) {
-      case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
-      case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
-      case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
-      case 3: printfQuda("%d - computeMode              3: cudaComputeModeExclusiveProcess\n", device); break;
-      default: errorQuda("Unknown deviceProp.computeMode.");
-      }
-      printfQuda("%d - surfaceAlignment         %lu\n", device, deviceProp.surfaceAlignment);
-      printfQuda("%d - concurrentKernels        %s\n", device, (deviceProp.concurrentKernels ? "true" : "false"));
-      printfQuda("%d - ECCEnabled               %s\n", device, (deviceProp.ECCEnabled ? "true" : "false"));
-      printfQuda("%d - pciBusID                 %d\n", device, deviceProp.pciBusID);
-      printfQuda("%d - pciDeviceID              %d\n", device, deviceProp.pciDeviceID);
-      printfQuda("%d - pciDomainID              %d\n", device, deviceProp.pciDomainID);
-      printfQuda("%d - tccDriver                %s\n", device, (deviceProp.tccDriver ? "true" : "false"));
-      switch (deviceProp.asyncEngineCount) {
-      case 0: printfQuda("%d - asyncEngineCount         1: host -> device only\n", device); break;
-      case 1: printfQuda("%d - asyncEngineCount         2: host <-> device\n", device); break;
-      case 2: printfQuda("%d - asyncEngineCount         0: not supported\n", device); break;
-      default: errorQuda("Unknown deviceProp.asyncEngineCount.");
-      }
-      printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
-      printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
-      printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
-      printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
-      printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);
-#endif
     }
 
     void create_context()
@@ -302,23 +202,11 @@ namespace quda
         argBufD[i] = nullptr;
         argBufSizeD[i] = 0;
       }
-#if 0
-      printfQuda("Testing submit...");
-      auto q = streams[Nstream-1];
-      q.submit([&](sycl::handler& h) {
-	h.parallel_for<class test>(sycl::range<3>{1,1,1},
-				   [=](sycl::item<3> i) {
-				     (void) i[0];
-				   });
-      });
-      printfQuda(" done\n");
-#endif
     }
 
     void destroy()
     {
       if (streams) {
-        // for (int i=0; i<Nstream; i++) streams[i].~queue();
         delete[] streams;
         streams = nullptr;
       }
@@ -326,7 +214,6 @@ namespace quda
 
     sycl::queue get_target_stream(const qudaStream_t &stream)
     {
-      // printfQuda("Getting stream %i\n", stream.idx);
       return streams[stream.idx];
     }
 
@@ -336,8 +223,6 @@ namespace quda
       qudaStream_t stream;
       stream.idx = i;
       return stream;
-      // return qudaStream_t(i);
-      //  return streams[i];
     }
 
     qudaStream_t get_default_stream()
@@ -345,15 +230,12 @@ namespace quda
       qudaStream_t stream;
       stream.idx = Nstream - 1;
       return stream;
-      // return qudaStream_t(Nstream - 1);
-      // return streams[Nstream - 1];
     }
 
     unsigned int get_default_stream_idx() { return Nstream - 1; }
 
     sycl::queue defaultQueue(void)
     {
-      // printfQuda("Getting default queue\n");
       return streams[Nstream - 1];
     }
 
@@ -428,11 +310,7 @@ namespace quda
 
     unsigned int max_threads_per_block_dim(int i)
     {
-#ifdef OLDSYCL
-      auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes>();
-#else
       auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes<3>>();
-#endif
       return val[2 - i]; // reverse order, should be consistent with RANGE_{X,Y,Z}
     }
 
@@ -471,12 +349,10 @@ namespace quda
 
       void start()
       {
-        // cudaProfilerStart();
       }
 
       void stop()
       {
-        // cudaProfilerStop();
       }
 
     } // namespace profile

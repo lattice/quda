@@ -1,16 +1,14 @@
 #include <blas_lapack.h>
 #include <timer.h>
-
 #ifdef NATIVE_LAPACK_LIB
 #include <quda_sycl_api.h>
-// #include <complex>
 #include <oneapi/mkl.hpp>
 #include <malloc_quda.h>
 using namespace oneapi::mkl;
 using namespace oneapi::mkl::lapack;
 #endif
 
-#define _DEBUG
+// #define _DEBUG
 
 #ifdef _DEBUG
 #include <eigen_helper.h>
@@ -200,7 +198,6 @@ namespace quda
 
         pool_device_free(dipiv);
 
-        // qudaDeviceSynchronize();
         gettimeofday(&stop, NULL);
         long ds = stop.tv_sec - start.tv_sec;
         long dus = stop.tv_usec - start.tv_usec;
@@ -223,7 +220,7 @@ namespace quda
       long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaBLASParam blas_param,
                                  QudaFieldLocation location)
       {
-        warningQuda("using mkl stridedBatchGEMM");
+        if (getVerbosity() >= QUDA_VERBOSE) warningQuda("using oneMKL stridedBatchGEMM");
         long long flops = 0;
         timeval start, stop;
         gettimeofday(&start, NULL);
@@ -292,7 +289,7 @@ namespace quda
         }
         //-------------------------------------------------------------------------
 
-        // Parse parameters for CUBLAS
+        // Parse parameters for oneMKL
         //-------------------------------------------------------------------------
         // Swap A and B if in row order
         if (blas_param.data_order == QUDA_BLAS_DATAORDER_ROW) {
@@ -371,7 +368,7 @@ namespace quda
         }
         //-------------------------------------------------------------------------
 
-        // Call CUBLAS
+        // Call oneMKL
         //-------------------------------------------------------------------------
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
           typedef std::complex<double> Z;
@@ -462,7 +459,7 @@ namespace quda
           }
           flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else {
-          errorQuda("MKL GEMM type %d not implemented\n", blas_param.data_type);
+          errorQuda("oneMKL GEMM type %d not implemented\n", blas_param.data_type);
         }
         //-------------------------------------------------------------------------
 
@@ -489,8 +486,8 @@ namespace quda
         long ds = stop.tv_sec - start.tv_sec;
         long dus = stop.tv_usec - start.tv_usec;
         double time = ds + 0.000001 * dus;
-        // if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+          printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
         //-------------------------------------------------------------------------
 
         return flops;
@@ -499,7 +496,7 @@ namespace quda
       long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaBLASParam blas_param,
                                  QudaFieldLocation location)
       {
-        warningQuda("using generic stridedBatchGEMM");
+        if (getVerbosity() >= QUDA_VERBOSE) warningQuda("using generic stridedBatchGEMM");
         return quda::blas_lapack::generic::stridedBatchGEMM(A_data, B_data, C_data, blas_param, location);
       }
 #endif

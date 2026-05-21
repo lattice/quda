@@ -144,7 +144,6 @@ namespace quda
     inline void apply(const qudaStream_t &stream)
     {
       if (!active_tuning) tuneLaunch(*this, getTuning(), getVerbosity());
-      // warningQuda("QudaMem apply %i %i", copy, async);
       if (copy) {
         if (async) {
 #ifdef API_PROFILE
@@ -157,13 +156,9 @@ namespace quda
           default: errorQuda("Unsupported qudaMemcpyTypeAsync %d", kind);
           }
 #endif
-          // cudaError_t error;
-          // PROFILE(cudaMemcpyAsync(dst, src, count, kind, device::get_cuda_stream(stream)), type);
-          // set_runtime_error(error, "cudaMemcpyAsync", func, file, line, active_tuning);
           auto q = device::get_target_stream(stream);
           q.memcpy(dst, src, count);
         } else {
-          // qudaMemcpy(dst, src, count, kind);
           auto q = device::get_target_stream(stream);
           q.memcpy(dst, src, count);
           device::wasSynced(stream);
@@ -171,11 +166,9 @@ namespace quda
         }
       } else {
         if (async) {
-          // qudaMemsetAsync(dst, value, count, device::get_quda_stream(stream));
           auto q = device::get_target_stream(stream);
           q.memset(dst, value, count);
         } else {
-          // qudaMemset(dst, value, count);
           auto q = device::get_target_stream(stream);
           q.memset(dst, value, count);
           device::wasSynced(stream);
@@ -222,15 +215,11 @@ namespace quda
     if (kind == qudaMemcpyDeviceToDevice) {
       QudaMem copy(dst, src, count, kind, stream, true, func, file, line);
     } else {
-      // PROFILE(cudaMemcpyAsync(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)),
-      // kind == qudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
       auto q = device::get_target_stream(stream);
       q.memcpy(dst, src, count);
     }
   }
 
-  // void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream,
-  //                          const char *func, const char *file, const char *line)
   void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream, const char *,
                            const char *, const char *)
   {
@@ -241,7 +230,6 @@ namespace quda
 
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                      qudaMemcpyKind, const char *, const char *, const char *)
-  // const char *func, const char *file, const char *line)
   {
     auto q = device::defaultQueue();
     char *d = static_cast<char *>(dst);
@@ -257,7 +245,6 @@ namespace quda
 
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           qudaMemcpyKind, const qudaStream_t &stream, const char *, const char *, const char *)
-  // const char *func, const char *file, const char *line)
   {
     auto q = device::get_target_stream(stream);
     char *d = static_cast<char *>(dst);
@@ -268,21 +255,6 @@ namespace quda
       s += spitch;
     }
   }
-
-#if 0
-  void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-			     size_t width, size_t height, const qudaStream_t &stream,
-			     const char *, const char *, const char *)
-  //const char *func, const char *file, const char *line)
-  {
-    errorQuda("qudaMemcpy2DP2PAsync_ unimplemented\n");
-#if 0
-    auto error = qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, qudaMemcpyDeviceToDevice, device::get_quda_stream(stream));
-    if (error != qudaSuccess)
-      errorQuda("qudaMemcpy2DAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-#endif
-  }
-#endif
 
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)
   {
@@ -319,38 +291,8 @@ namespace quda
     }
   }
 
-#if 0
-  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height,
-		     const char *, const char *, const char *)
-  //const char *func, const char *file, const char *line)
-  {
-    auto q = device::defaultQueue();
-    char *p = static_cast<char*>(ptr);
-    for(size_t i=0; i<height; i++) {
-      q.memset(p, value, width);
-      p += pitch;
-    }
-    device::wasSynced(device::get_default_stream());
-    q.wait_and_throw();
-  }
-
-  void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width,
-			  size_t height, const qudaStream_t &stream,
-                          const char *, const char *, const char *)
-  //const char *func, const char *file, const char *line)
-  {
-    auto q = device::get_target_stream(stream);
-    char *p = static_cast<char*>(ptr);
-    for(size_t i=0; i<height; i++) {
-      q.memset(p, value, width);
-      p += pitch;
-    }
-  }
-#endif
-
   void qudaMemset2DAsync_(quda_ptr &ptr, size_t offset, size_t pitch, int value, size_t width, size_t height,
                           const qudaStream_t &stream, const char *, const char *, const char *)
-  // const char *func, const char *file, const char *line)
   {
     if (ptr.is_device()) {
       auto q = device::get_target_stream(stream);
@@ -366,7 +308,6 @@ namespace quda
 
   void qudaMemPrefetchAsync_(void *ptr, size_t count, QudaFieldLocation, const qudaStream_t &stream, const char *,
                              const char *, const char *)
-  //                         const char *func, const char *file, const char *line)
   {
     auto q = device::get_target_stream(stream);
     q.prefetch(ptr, count);
@@ -378,7 +319,6 @@ namespace quda
     sycl::event event;
   } EventImpl;
 
-  // bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   bool qudaEventQuery_(qudaEvent_t &quda_event, const char *, const char *, const char *)
   {
     auto pe = static_cast<EventImpl *>(quda_event.event);
@@ -388,7 +328,6 @@ namespace quda
     return val;
   }
 
-  // void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
   void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *, const char *, const char *)
   {
     auto pe = static_cast<EventImpl *>(quda_event.event);
@@ -401,13 +340,10 @@ namespace quda
       //cgh.host_task([=](){});
     });
 #else
-    //*pe = q.submit_barrier();
     pe->event = q.ext_oneapi_submit_barrier();
 #endif
   }
 
-  // void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags,
-  // const char *func, const char *file, const char *line)
   void qudaStreamWaitEvent_(qudaStream_t, qudaEvent_t quda_event, unsigned int, const char *, const char *, const char *)
   {
     auto pe = static_cast<EventImpl *>(quda_event.event);
@@ -415,7 +351,6 @@ namespace quda
     pe->event.wait_and_throw();
   }
 
-  // qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line)
   qudaEvent_t qudaEventCreate_(const char *, const char *, const char *)
   {
     qudaEvent_t quda_event;
@@ -424,7 +359,6 @@ namespace quda
     return quda_event;
   }
 
-  // qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line)
   qudaEvent_t qudaChronoEventCreate_(const char *, const char *, const char *)
   {
     qudaEvent_t quda_event;
@@ -434,7 +368,6 @@ namespace quda
   }
 
   float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop, const char *, const char *, const char *)
-  // const char *func, const char *file, const char *line)
   {
     auto pe0 = static_cast<EventImpl *>(start.event);
     auto pe1 = static_cast<EventImpl *>(stop.event);
@@ -445,18 +378,15 @@ namespace quda
     pe1->event.wait_and_throw();
     auto t1 = pe1->event.get_profiling_info<sycl::info::event_profiling::command_start>();
     auto elapsed_time = 1e-9 * (t1 - t0);
-    // printfQuda("qudaEventElapsedTime: %lu %lu %g\n", t0, t1, elapsed_time);
     return elapsed_time;
   }
 
-  // void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   void qudaEventDestroy_(qudaEvent_t &event, const char *, const char *, const char *)
   {
     auto pe = static_cast<EventImpl *>(event.event);
     delete pe;
   }
 
-  // void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *, const char *, const char *)
   {
     auto pe = static_cast<EventImpl *>(quda_event.event);
@@ -464,7 +394,6 @@ namespace quda
     pe->event.wait_and_throw();
   }
 
-  // void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *, const char *, const char *)
   {
     auto q = device::get_target_stream(stream);

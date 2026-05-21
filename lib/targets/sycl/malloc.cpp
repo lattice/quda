@@ -135,37 +135,6 @@ namespace quda
 #endif
   }
 
-#if 0
-  /**
-   * Under CUDA 4.0, cudaHostRegister seems to require that both the
-   * beginning and end of the buffer be aligned on page boundaries.
-   * This local function takes care of the alignment and gets called
-   * by pinned_malloc_() and mapped_malloc_()
-   */
-  static void *aligned_malloc(MemAlloc &a, size_t size)
-  {
-    void *ptr = nullptr;
-
-    a.size = size;
-
-#if 0
-    a.base_size = size;
-    ptr = malloc(size);
-    if (!ptr) {
-#else
-    // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
-    static int page_size = 2 * getpagesize();
-    a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
-    int align = posix_memalign(&ptr, page_size, a.base_size);
-    if (!ptr || align != 0) {
-#endif
-      errorQuda("Failed to allocate aligned host memory of size %zu (%s:%d in %s())\n", size, a.file.c_str(), a.line,
-                a.func.c_str());
-    }
-    return ptr;
-  }
-#endif
-
   bool use_managed_memory()
   {
     static bool managed = false;
