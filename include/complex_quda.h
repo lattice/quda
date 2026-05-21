@@ -972,7 +972,7 @@ namespace quda
   public:
     typedef doubledouble value_type;
 
-    complex<doubledouble>() = default;
+    complex() = default;
 
     constexpr complex<doubledouble>(const doubledouble &re, const doubledouble &im = doubledouble()) :
       doubledouble2 {re, im}
