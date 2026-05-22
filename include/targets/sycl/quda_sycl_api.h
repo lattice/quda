@@ -26,20 +26,3 @@ namespace quda
     }
   } // namespace target
 } // namespace quda
-
-#if 0
-///// MATH
-
-#include <math_helper.cuh>
-
-//#define rsqrt(x) (1/sqrt(x))
-//inline float rsqrt(float x) { return 1.0f/sqrt(x); }
-//inline void sincos(float x, float *s, float *c)
-//{
-  //*s = sin(x);
-  //*c = cos(x);
-  //*s = sycl::sincos(x, c);
-//}
-
-inline float fdividef(float a, float b) { return quda::fdividef(a,b); }
-#endif

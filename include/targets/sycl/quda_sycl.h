@@ -5,29 +5,15 @@
 #include <sstream>
 #include <sycl/ext/oneapi/experimental/builtins.hpp>
 
-#ifdef __SYCL_DEVICE_ONLY__
-#define __SYCL_CONSTANT_AS __attribute__((opencl_constant))
-#else
-#define __SYCL_CONSTANT_AS
-#endif
+//using cudaStream_t = int;
 
-using cudaStream_t = int;
-
-// #include <error.h>
 #include "shortvec.h"
-// #include <stream.h>
-// #include <event.h>
 
 #define __host__
 #define __device__
-// #define __global__
 #define __forceinline__ __attribute__((always_inline)) inline
-// #define __launch_bounds__(x)
 
-// FIXME
-// #define __constant__ static
-#define __shared__
-// #define __shfl_down_sync(m, x, o) x
+//#define __shared__
 
 #define RANGE_X 2
 #define RANGE_Y 1
@@ -63,14 +49,10 @@ template <typename T> inline std::string str(std::vector<T> v)
 
 static inline auto getGroup()
 {
-  // return sycl::this_group<3>();
-  // return sycl::ext::oneapi::experimental::this_group<3>();
   return sycl::ext::oneapi::this_work_item::get_work_group<3>();
 }
 static inline auto getNdItem()
 {
-  // return sycl::this_nd_item<3>();
-  // return sycl::ext::oneapi::experimental::this_nd_item<3>();
   return sycl::ext::oneapi::this_work_item::get_nd_item<3>();
 }
 
@@ -114,76 +96,51 @@ inline dim3 makeDim3(sycl::range<3> &&r)
 inline dim3 getGridDim()
 {
   dim3 r;
-  // #ifdef __SYCL_DEVICE_ONLY__
   auto ndi = getNdItem();
   r.x = ndi.get_group_range(RANGE_X);
   r.y = ndi.get_group_range(RANGE_Y);
   r.z = ndi.get_group_range(RANGE_Z);
-  // #endif
   return r;
 }
 
 inline dim3 getBlockIdx()
 {
   dim3 r;
-  // #ifdef __SYCL_DEVICE_ONLY__
   auto ndi = getNdItem();
   r.x = ndi.get_group(RANGE_X);
   r.y = ndi.get_group(RANGE_Y);
   r.z = ndi.get_group(RANGE_Z);
-  // #endif
   return r;
 }
 
 inline dim3 getBlockDim()
 {
   dim3 r;
-  // #ifdef __SYCL_DEVICE_ONLY__
   auto ndi = getNdItem();
   r.x = ndi.get_local_range(RANGE_X);
   r.y = ndi.get_local_range(RANGE_Y);
   r.z = ndi.get_local_range(RANGE_Z);
-  // #endif
   return r;
 }
 
 inline dim3 getBlockDim(sycl::nd_item<3> &ndi)
 {
   dim3 r;
-  // #ifdef __SYCL_DEVICE_ONLY__
   r.x = ndi.get_local_range(RANGE_X);
   r.y = ndi.get_local_range(RANGE_Y);
   r.z = ndi.get_local_range(RANGE_Z);
-  // #endif
   return r;
 }
 
 inline dim3 getThreadIdx()
 {
   dim3 r;
-  // #ifdef __SYCL_DEVICE_ONLY__
-  // auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
   auto ndi = getNdItem();
   r.x = ndi.get_local_id(RANGE_X);
   r.y = ndi.get_local_id(RANGE_Y);
   r.z = ndi.get_local_id(RANGE_Z);
-  // #endif
   return r;
 }
-
-#if 0
-inline uint getLocalLinearId()
-{
-  int id = 0;
-#ifdef __SYCL_DEVICE_ONLY__
-  //auto ndi = getNdItem();
-  //auto ndi = sycl::this_nd_item<3>();
-  auto ndi = getNdItem();
-  id = ndi.get_local_linear_id();
-#endif
-  return id;
-}
-#endif
 
 #define gridDim getGridDim()
 #define blockIdx getBlockIdx()
@@ -192,8 +149,6 @@ inline uint getLocalLinearId()
 
 inline void syncthreads(void)
 {
-  // auto ndi = getNdItem();
-  // ndi.barrier();
   group_barrier(getGroup());
 }
 #define __syncthreads syncthreads
