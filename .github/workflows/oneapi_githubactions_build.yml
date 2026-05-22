@@ -53,7 +53,7 @@ jobs:
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         -DQUDA_TARGET_TYPE=SYCL
         -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt"
-        -DCMAKE_SYCL_FLAGS="-Wno-unsupported-floating-point-opt"
+        -DCMAKE_SYCL_FLAGS="-Wno-unsupported-floating-point-opt -Wno-explicit-specialization-storage-class"
         -DSYCL_LINK_FLAGS="-fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=4 -flink-huge-device-code"
         -DQUDA_MULTIGRID=ON
         -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=ON
