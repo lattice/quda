@@ -39,14 +39,11 @@ namespace quda
     if (plan.isDouble) { errorQuda("Called single precision FFT with double precision plan\n"); }
     sycl::event e;
     if (direction == FFT_FORWARD) {
-      // warningQuda("Forward FFT");
       e = compute_forward(*plan.s, (float *)data_in, (float *)data_out);
     } else {
-      // warningQuda("Backward FFT");
       e = compute_backward(*plan.s, (float *)data_in, (float *)data_out);
     }
     e.wait();
-    // warningQuda("Done FFT");
   }
 
   /**
@@ -78,24 +75,9 @@ namespace quda
    * @param[in] precision The precision of the computation
    */
 
-  // inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
   inline void SetPlanFFTMany(FFTPlanHandle &, int4, int dim, QudaPrecision precision)
   {
     warningQuda("SetPlanFFTMany %i %i : unimplemented", dim, precision);
-#if 0
-    auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
-    switch (dim) {
-    case 1: {
-      int n[1] = {size.w};
-      CUFFT_SAFE_CALL(cufftPlanMany(&plan, 1, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y * size.z));
-    } break;
-    case 3: {
-      int n[3] = {size.x, size.y, size.z};
-      CUFFT_SAFE_CALL(cufftPlanMany(&plan, 3, n, NULL, 1, 0, NULL, 1, 0, type, size.w));
-    } break;
-    }
-    CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
-#endif
   }
 
   /**
@@ -107,14 +89,12 @@ namespace quda
    */
   inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
   {
-    // warningQuda("SetPlanFFT2DMany %i %i", dim, precision);
     if (precision == QUDA_SINGLE_PRECISION) {
       plan.isDouble = false;
       if (dim == 0) {
         auto q = quda::device::defaultQueue();
         MKL_LONG distance = size.w * size.z;
         plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.w, size.z});
-        // plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.z, size.w});
         plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
         plan.s->set_value(config_param::FWD_DISTANCE, distance);
         plan.s->set_value(config_param::BWD_DISTANCE, distance);
@@ -123,7 +103,6 @@ namespace quda
       } else {
         auto q = quda::device::defaultQueue();
         MKL_LONG distance = size.x * size.y;
-        // plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.x, size.y});
         plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.y, size.x});
         plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
         plan.s->set_value(config_param::FWD_DISTANCE, distance);
@@ -137,7 +116,6 @@ namespace quda
         auto q = quda::device::defaultQueue();
         MKL_LONG distance = size.w * size.z;
         plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.w, size.z});
-        // plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.z, size.w});
         plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
         plan.d->set_value(config_param::FWD_DISTANCE, distance);
         plan.d->set_value(config_param::BWD_DISTANCE, distance);
@@ -146,7 +124,6 @@ namespace quda
       } else {
         auto q = quda::device::defaultQueue();
         MKL_LONG distance = size.x * size.y;
-        // plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.x, size.y});
         plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.y, size.x});
         plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
         plan.d->set_value(config_param::FWD_DISTANCE, distance);
@@ -155,29 +132,13 @@ namespace quda
         plan.d->commit(q);
       }
     }
-#if 0
-    auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
-    switch (dim) {
-    case 0: {
-      int n[2] = {size.w, size.z};
-      CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
-    } break;
-    case 1: {
-      int n[2] = {size.x, size.y};
-      CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
-    } break;
-    }
-    CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
-#endif
   }
 
   inline void FFTDestroyPlan(FFTPlanHandle &plan)
   {
     if (plan.isDouble) {
-      // plan.d->~descriptor();
       delete plan.d;
     } else {
-      // plan.s->~descriptor();
       delete plan.s;
     }
   }

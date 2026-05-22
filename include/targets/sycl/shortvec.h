@@ -13,7 +13,6 @@ template <typename T> inline vec2<T> make_vec2(T a, T b) { return vec2<T> {a, b}
 template <typename T> struct vec3 {
   T x, y, z;
   inline vec3() { }
-  // inline vec3(T a, T b, T c): x(a),y(b),z(c) {}
   constexpr inline vec3(T a) : x(a), y(0), z(0) { }
   constexpr inline vec3(T a, T b) : x(a), y(b), z(0) { }
   constexpr inline vec3(T a, T b, T c) : x(a), y(b), z(c) { }
@@ -22,9 +21,6 @@ template <typename T, typename A1, typename A2, typename A3> inline vec3<T> make
 {
   return vec3<T> {a, b, c};
 }
-// template <typename T>
-// inline vec3<T> vec3<T>::vec3(T a, T b, T c) { return vec3<T>{a,b,c}; }
-// inline vec3<unsigned int> vec3<unsigned int>::vec3(unsigned int a, unsigned int b, unsigned int c) { return vec3<unsigned int>{a,b,c}; }
 
 template <typename T> struct vec4 {
   T x, y, z, w;
@@ -65,7 +61,6 @@ typedef vec4<unsigned int> uint4;
 #define make_uint1(a) make_vec1<uint>(a)
 #define make_uint2(a, b) make_vec2<uint>(a, b)
 #define make_uint3(a, b, c) make_vec3<uint>(a, b, c)
-// #define make_uint3(a,b,c) uint3{a,b,c}
 #define make_uint4(a, b, c, d) make_vec4<uint>(a, b, c, d)
 
 typedef vec1<float> float1;
@@ -74,9 +69,8 @@ typedef vec3<float> float3;
 typedef vec4<float> float4;
 #define make_float1(a) make_vec1<float>(a)
 #define make_float2(a, b) make_vec2<float>(a, b)
-// #define make_float3(a,b,c) make_vec3<float>(a,b,c)
-#define make_float3(a, b, c)                                                                                           \
-  float3 { a, b, c }
+#define make_float3(a,b,c) make_vec3<float>(a,b,c)
+//#define make_float3(a, b, c) float3 { a, b, c }
 #define make_float4(a, b, c, d) make_vec4<float>(a, b, c, d)
 
 typedef vec1<double> double1;
@@ -89,4 +83,3 @@ typedef vec4<double> double4;
 #define make_double4(a, b, c, d) make_vec4<double>(a, b, c, d)
 
 typedef vec3<unsigned int> dim3;
-// constexpr dim3(unsigned int a) { return make_uint3(a,0,0); }
