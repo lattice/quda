@@ -10,11 +10,6 @@ using count_t = unsigned int;
 
 namespace quda
 {
-
-  // declaration of reduce function
-  // template <typename Reducer, typename Arg, typename T>
-  // inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
-
   /**
      @brief ReduceArg is the argument type that all kernel arguments
      shoud inherit from if the kernel is to utilize global reductions.
@@ -88,10 +83,6 @@ namespace quda
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
-      // auto event = reducer::get_event();
-      // qudaEventRecord(event, stream);
-      // while (!qudaEventQuery(event)) { }
-      // qudaEventSynchronize(event);
       auto q = device::get_target_stream(stream);
       q.wait();
 
@@ -113,14 +104,8 @@ namespace quda
   template <typename Arg, typename Reducer, typename T> struct reduceParams {
     static constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce_t = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
-    // using reduceConcurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<bool>>;
-    // using opBlockSync = getKernelOpF<reduceConcurrentOps,0>;
-    // using opSharedMem = getKernelOpF<reduceConcurrentOps,1>;
-    // using Ops = KernelOps<BlockReduce_t,reduceConcurrentOps>;
     using opBlockSync = op_blockSync;
-    // using opSharedMem = op_SharedMemory<bool>;
     using Smem = SharedMemory<bool, SizeZ>;
-    // using Ops = KernelOps<BlockReduce_t,opBlockSync,opSharedMem>;
     using Ops = KernelOps<BlockReduce_t, opBlockSync, Smem>;
   };
 
@@ -156,17 +141,9 @@ namespace quda
       return;
     }
 
-#if 0
-      auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
-      auto isLastBlockDone = *glmem.get();
-#else
-    // using opSharedMem = typename reduceParams<Arg, Reducer, T>::opSharedMem;
-    // auto isLastBlockDone = getSharedMemPtr(opSharedMem()(ops));
-    // auto isLastBlockDone = getSharedMemPtr<opSharedMem>(ops);
     using Smem = typename reduceParams<Arg, Reducer, T>::Smem;
     Smem smem(ops);
     auto isLastBlockDone = smem.sharedMem();
-#endif
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
@@ -179,13 +156,7 @@ namespace quda
       isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
     }
 
-#if 0
-    __syncthreads();
-#else
-    // using opBlockSync = typename reduceParams<Arg, Reducer, T>::opBlockSync;
-    // blockSync(opBlockSync()(ops));
     blockSync(ops);
-#endif
     bool active = false;
     if (idx < arg.threads.z) active = isLastBlockDone[target::thread_idx().z];
     bool anyActive = sycl::any_of_group(getGroup(), active);
@@ -194,18 +165,14 @@ namespace quda
     if (anyActive) {
       T sum = Reducer::init();
       if (active) {
-        // auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
         auto i = target::thread_idx_linear<2>();
         sycl::atomic_fence(sycl::memory_order::acquire, sycl::memory_scope::device);
         while (i < target::grid_dim().x) {
-          // sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
           sum = r(sum, arg.partial[idx * target::grid_dim().x + i]);
-          // i += target::block_dim().x * target::block_dim().y;
           i += target::block_size<2>();
         }
       }
 
-      // sum = BlockReduce(&ops..., target::thread_idx().z).Reduce(sum, r);
       sum = br.Reduce(sum, r);
 
       // write out the final reduced value

@@ -5,9 +5,7 @@ namespace quda
   {
     if (warp_split > 1) {
       constexpr int warp_size = device::warp_size();
-      // auto sg = sycl::ext::oneapi::experimental::this_sub_group();
       auto sg = sycl::ext::oneapi::this_work_item::get_sub_group();
-      // const int sg_size = sg.get_local_range().size();
 #if 1
       // reduce down to the first group of column-split threads
 #pragma unroll

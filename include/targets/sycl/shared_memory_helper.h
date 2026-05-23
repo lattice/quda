@@ -48,21 +48,9 @@ namespace quda
     /**
        @brief Constructor for SharedMemory object.
     */
-#if 0
-    SharedMemory() : size(S::size(target::block_dim()))
-    {
-      auto grp = getGroup();
-      using atype = T[512]; // FIXME
-      auto mem0 = sycl::ext::oneapi::group_local_memory_for_overwrite<atype>(grp);
-      auto offset = get_offset(target::block_dim());
-      data = *mem0.get() + offset;
-    }
-#endif
-
     template <typename... U, typename... Arg>
     SharedMemory(const KernelOps<U...> &ops, const Arg &...arg) : size(S::size(target::block_dim(), arg...))
     {
-      // auto op = getDependentOps<op_SharedMemory<T,SizeSmem<SharedMemory<T,S,O>>>>(ops);
       auto op = ops;
       auto offset = get_offset(target::block_dim(), arg...);
       sycl::local_ptr<void> v(op.smem + offset);
@@ -77,7 +65,7 @@ namespace quda
        @param[in] i The index to use.
        @return Reference to value stored at that index.
      */
-    __device__ __host__ T &operator[](const int i) { return data[i]; }
+    T &operator[](const int i) { return data[i]; }
   };
 
   template <typename T, typename S, typename O> static constexpr bool needsSharedMemImpl<SharedMemory<T, S, O>> = true;

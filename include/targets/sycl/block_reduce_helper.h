@@ -13,8 +13,6 @@
    warp- and block-level reductions, using the CUB library
  */
 
-// using namespace quda;
-
 namespace quda
 {
 
@@ -70,29 +68,24 @@ namespace quda
     template <typename T, typename reducer_t, typename param_t>
     T inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
-      // auto sg = sycl::ext::oneapi::experimental::this_sub_group();
       auto sg = sycl::ext::oneapi::this_work_item::get_sub_group();
       T value = value_;
 #pragma unroll
       for (int offset = param_t::width / 2; offset >= 1; offset /= 2) {
         value = r(value, sycl::shift_group_left(sg, value, offset));
       }
-      // if (all) value = sycl::select_from_group(sg, value, 0);
       if (all) value = sycl::group_broadcast(sg, value);
       return value;
     }
   };
 
   // pre-declaration of block_reduce that we wish to specialize
-  // template <bool> struct block_reduce;
   template <typename T, int block_dim, int batch_size> class BlockReduce;
 
   /**
      @brief SYCL specialization of block_reduce, using SYCL group reductions
   */
   template <typename T, int block_dim, int batch_size> struct block_reduceG {
-    // using dependencies = op_Sequential<op_blockSync>;
-    // using dependentOps = KernelOps<op_blockSync>;
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
     template <typename S> inline block_reduceG(S &) {};
     /**
@@ -111,10 +104,8 @@ namespace quda
     {
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       const int nbatch = batch_size;
-      // const int nbatch = std::min(param_t::batch_size, localRangeZ);
       auto grp = getGroup();
       T result;
-      // T result = reducer_t::init();
       for (int i = 0; i < nbatch; i++) {
         T in = (i == batch) ? value_ : reducer_t::init();
         T out;
@@ -169,7 +160,6 @@ namespace quda
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
-      // blockSync(ops);
       __syncthreads();
 
       // whether to use the first warp or first thread for the final reduction
@@ -194,7 +184,6 @@ namespace quda
 
       if (all) {
         if (thread_idx == 0) storage[batch * warp_items + 0] = value;
-        // blockSync(ops);
         __syncthreads();
         value = storage[batch * warp_items + 0];
       }
@@ -203,7 +192,6 @@ namespace quda
     }
   };
 
-  // template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceG<T,block_dim,batch_size>;
   template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T, block_dim, batch_size>;
 
 } // namespace quda
