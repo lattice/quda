@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <byte_array.h>
+#include <packed_array.h>
 #include <kernel.h>
 
 namespace quda
@@ -44,7 +44,7 @@ namespace quda
 
     // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
     {
-      byte_array<int8_t, 4> d = {};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -78,7 +78,7 @@ namespace quda
     }
 
     {
-      byte_array<int8_t, 4> d = {};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -117,7 +117,7 @@ namespace quda
     }
 
     {
-      byte_array<int8_t, 4> d = {};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -155,7 +155,7 @@ namespace quda
     // Lower leaf
     // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
     {
-      byte_array<int8_t, 4> d = {};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x-nu)(+nu)
       d[nu]--;

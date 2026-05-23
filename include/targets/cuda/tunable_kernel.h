@@ -58,6 +58,11 @@ namespace quda
     {
       checkSharedBytes<Functor>(tp, arg);
       const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
+      if constexpr (grid_stride) {
+        const_cast<Arg &>(arg).x_batch_stride = static_cast<unsigned int>(tp.grid.x * tp.block.x);
+      } else {
+        const_cast<Arg &>(arg).x_batch_stride = 0u;
+      }
       if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
@@ -79,6 +84,11 @@ namespace quda
     {
       checkSharedBytes<Functor>(tp, arg);
       const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
+      if constexpr (grid_stride) {
+        const_cast<Arg &>(arg).x_batch_stride = static_cast<unsigned int>(tp.grid.x * tp.block.x);
+      } else {
+        const_cast<Arg &>(arg).x_batch_stride = 0u;
+      }
       if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
 #ifdef JITIFY
       // note we do the copy to constant memory after the kernel has been compiled in launch_jitify

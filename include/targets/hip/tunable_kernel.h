@@ -55,6 +55,11 @@ namespace quda
     {
       checkSharedBytes<Functor>(tp, arg);
       const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
+      if constexpr (grid_stride) {
+        const_cast<Arg &>(arg).x_batch_stride = static_cast<unsigned int>(tp.grid.x * tp.block.x);
+      } else {
+        const_cast<Arg &>(arg).x_batch_stride = 0u;
+      }
       if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
       setMaxActiveBlocks(kernel, tp);
       launch_error = qudaLaunchKernel(kernel, tp, stream, static_cast<const void *>(&arg));
@@ -72,6 +77,11 @@ namespace quda
     {
       checkSharedBytes<Functor>(tp, arg);
       const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
+      if constexpr (grid_stride) {
+        const_cast<Arg &>(arg).x_batch_stride = static_cast<unsigned int>(tp.grid.x * tp.block.x);
+      } else {
+        const_cast<Arg &>(arg).x_batch_stride = 0u;
+      }
       if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
       check_arg_size(arg);
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);

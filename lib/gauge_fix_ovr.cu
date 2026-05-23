@@ -201,7 +201,11 @@ namespace quda {
     }
 
     long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }
-    long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
+    long long bytes() const
+    {
+      return 2LL * Arg::gauge_dir * meta.Volume() * static_cast<long long>(static_cast<int>(meta.Reconstruct()))
+             * static_cast<int>(meta.Precision());
+    }
   };
 
   template <typename Float, QudaReconstructType recon, bool pack, bool top>

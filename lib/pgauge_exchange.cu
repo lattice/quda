@@ -179,7 +179,11 @@ namespace quda {
       launch<unpacker>(tp, stream, arg);
     }
 
-    long long bytes() const override { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
+    long long bytes() const override
+    {
+      return 2LL * U.SurfaceCB(arg.face) * static_cast<long long>(static_cast<int>(U.Reconstruct()))
+             * static_cast<int>(U.Precision());
+    }
   };
 
   void PGaugeExchange(GaugeField& U, const int dir, const int parity)

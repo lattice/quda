@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <byte_array.h>
+#include <packed_array.h>
 
 namespace quda
 {
@@ -30,7 +30,7 @@ namespace quda
     real coeff;
     staple = Link();
 
-    byte_array<int8_t, 4> dx = {};
+    packed_array<int8_t, 4> dx = {};
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
       // Identify directions orthogonal to the link and
@@ -115,7 +115,7 @@ namespace quda
     staple = Link();
     rectangle = Link();
 
-    byte_array<int8_t, 4> dx = {};
+    packed_array<int8_t, 4> dx = {};
     for (int mu = 0; mu < 4; mu++) { // do not unroll loop to prevent register spilling
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological

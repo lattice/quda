@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <byte_array.h>
+#include <packed_array.h>
 #include <kernel.h>
 
 namespace quda
@@ -45,7 +45,7 @@ namespace quda
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
-      byte_array<int8_t, 4> x = {};
+      packed_array<uint16_t, 4> x = {};
       getCoords(x, x_cb, arg.X, parity);
 
       if constexpr (!Arg::verify) {
@@ -55,7 +55,7 @@ namespace quda
           arg.in.raw_load_ghost(link, ghost_idx, dir, 1 - parity);
           arg.out.raw_save(link, x_cb, dir, parity);
         } else { // simple shift
-          byte_array<int8_t, 4> dx = {};
+          packed_array<int8_t, 4> dx = {};
           dx[dir] = dx[dir] - arg.shift;
           int x_cb_back = linkIndexShift(x, dx, arg.X);
           arg.in.raw_load(link, x_cb_back, dir, 1 - parity);
@@ -76,7 +76,7 @@ namespace quda
           Link out = arg.out(dir, x_cb, parity);
           assert((in - out).L1() < arg.epsilon);
         } else {
-          byte_array<int8_t, 4> dx = {};
+          packed_array<int8_t, 4> dx = {};
           dx[dir] = dx[dir] - arg.shift;
           int x_cb_back = linkIndexShift(x, dx, arg.X);
           Link in = arg.in(dir, x_cb_back, 1 - parity);
