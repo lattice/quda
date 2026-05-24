@@ -30,7 +30,7 @@ namespace quda
   void CACG::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
-    if (!init || r.size() != b.size()) {
+    if (!init || r.size() != b.size() || !ColorSpinorField::are_compatible(r[0], b[0])) {
       if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       Q_AQandg.resize(b.size());
@@ -230,9 +230,9 @@ namespace quda
   cvector_ref<const ColorSpinorField> CACG::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    if (!return_residual) errorQuda("return_residual not enabled");
 
-    if (param.compute_true_res) {
+    if (compute_true_res) {
       // true residual was computed and left in r
       return r;
     } else if (mixed()) {
@@ -258,7 +258,7 @@ namespace quda
     const int n_krylov = param.Nkrylov;
 
     if (param.maxiter == 0 || n_krylov == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      if (!use_init_guess) blas::zero(x);
       return;
     }
 
@@ -267,7 +267,7 @@ namespace quda
     if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !compute_true_res;
     auto b2 = !fixed_iteration ? blas::norm2(b) : vector<double>(b.size(), 1.0);
     vector<double> r2(b.size(), 0.0); // if zero source then we will exit immediately doing no work
 
@@ -288,7 +288,7 @@ namespace quda
     }
 
     // compute initial residual depending on whether we have an initial guess or not
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       mat(r, x);
       // r = b - Ax0
       if (!fixed_iteration) {
@@ -556,7 +556,7 @@ namespace quda
     // Print number of reliable updates.
     logQuda(QUDA_VERBOSE, "%s: Reliable updates = %d\n", "CA-CG", rUpdate);
 
-    if (param.compute_true_res) {
+    if (compute_true_res) {
       // Calculate the true residual
       mat(r, x);
       auto true_res = blas::xmyNorm(b, r);

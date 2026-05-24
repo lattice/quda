@@ -15,7 +15,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init || r.size() != b.size()) {
+    if (!init || r.size() != b.size() || !ColorSpinorField::are_compatible(r[0], b[0])) {
       resize(r, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
       resize(Ar, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
       init = true;
@@ -40,7 +40,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     if (is_zero_src(x, b, b2)) return;
 
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       // Compute the true residual
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
@@ -83,7 +83,7 @@ namespace quda {
     }
 
     param.iter += k;
-    if (param.compute_true_res) {
+    if (compute_true_res) {
       // Compute the true residual
       mat(r, x);
       auto true_r2 = blas::xmyNorm(b, r);

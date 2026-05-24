@@ -395,7 +395,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init || y.size() != b.size()) {
+    if (!init || y.size() != b.size() || !ColorSpinorField::are_compatible(r_full[0], b[0])) {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       // Initialize fields.
@@ -479,7 +479,7 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !compute_true_res;
     auto b2 = !fixed_iteration ? blas::norm2(b) : vector(b.size(), 1.0); // norm sq of source.
     vector<double> r2(b.size());                                         // norm sq of residual
 
@@ -513,7 +513,7 @@ namespace quda {
     }
 
     // Compute initial residual depending on whether we have an initial guess or not.
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       mat(r_full, x); // r[0] = Ax
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r_full); // r = b - Ax, return norm.
@@ -743,8 +743,8 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Reliable updates = %d\n", solver_name.c_str(), rUpdate);
 
     // compute the true residual
-    // !param.is_preconditioner comes from bicgstab, param.compute_true_res came from gcr.
-    if (!param.is_preconditioner && param.compute_true_res) { // do not do the below if this is an inner solver.
+    // !param.is_preconditioner comes from bicgstab, compute_true_res came from gcr.
+    if (!param.is_preconditioner && compute_true_res) { // do not do the below if this is an inner solver.
       mat(r_full, x);
       auto true_res = blas::xmyNorm(b, r_full);
       auto hq = use_heavy_quark_res ? blas::HeavyQuarkResidualNorm(x, r[0]) : vector<double3>(b.size(), {});

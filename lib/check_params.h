@@ -896,6 +896,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(dslash_use_mma[i], QUDA_BOOLEAN_INVALID);
     P(transfer_use_mma[i], QUDA_BOOLEAN_INVALID);
 #endif
+#ifndef CHECK_PARAM
+    P(collapse_mrhs[i], false);
+#else
+    // collapse is ignored on level 0 at present
+    for (int i = 1; i < n_level; i++)
+      if ((param->dslash_use_mma[i] != QUDA_BOOLEAN_TRUE || param->transfer_use_mma[i - 1] != QUDA_BOOLEAN_TRUE)
+          && param->collapse_mrhs[i])
+        errorQuda("collapse[%d] = %d requires dslash_use_mma[%d] = %d and transfer_use_mma[%d] = %d to be enabled", i,
+                  param->collapse_mrhs[i], i, param->dslash_use_mma[i], i - 1, param->transfer_use_mma[i - 1]);
+#endif
 #ifdef INIT_PARAM
     P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
 #else

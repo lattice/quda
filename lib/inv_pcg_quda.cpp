@@ -53,7 +53,7 @@ namespace quda
   {
     Solver::create(x, b);
 
-    if (!init || r.size() != b.size()) {
+    if (!init || r.size() != b.size() || !ColorSpinorField::are_compatible(r[0], b[0])) {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       ColorSpinorParam csParam(b[0]);

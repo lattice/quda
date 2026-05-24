@@ -429,6 +429,12 @@ namespace quda
     bool empty() const { return !init; }
 
     /**
+       @brief Returns if the object is only a ghost
+       @return true if the object is only a ghost
+    */
+    bool is_ghost() const { return ghost_only; }
+
+    /**
        @brief Copy the source field contents into this
        @param[in] src Source from which we are copying
      */
@@ -487,6 +493,8 @@ namespace quda
     size_t GhostFaceBytes(int i) const { return ghost_face_bytes[i]; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
+
+    void set_data(void *v, QudaMemoryType type) { this->v = {v, type}; }
 
     /**
        @brief Return pointer to the field allocation
@@ -700,6 +708,8 @@ namespace quda
       */
     bool isNative() const { return fieldOrder == QUDA_NATIVE_FIELD_ORDER ? true : false; }
 
+    bool is_reference() const { return reference; }
+
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }
 
@@ -899,6 +909,15 @@ namespace quda
     static int Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int resolution = 1);
 
     /**
+       @brief Check if two instances are weakly compatible (precision
+       and order can differ)
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
        @brief Check if two instances are compatible
        @param[in] a Input field
        @param[in] b Input field
@@ -907,13 +926,21 @@ namespace quda
     static bool are_compatible(const ColorSpinorField &a, const ColorSpinorField &b);
 
     /**
-       @brief Check if two instances are weakly compatible (precision
+       @brief Check if a field and a param are weakly compatible (precision
        and order can differ)
        @param[in] a Input field
-       @param[in] b Input field
-       @return Return true if two fields are compatible
+       @param[in] b Input param
+       @return Return true if the two are compatible
      */
-    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorParam &b);
+
+    /**
+       @brief Check if a field and a param are compatible
+       @param[in] a Input field
+       @param[in] b Input param
+       @return Return true if the two are compatible
+     */
+    static bool are_compatible(const ColorSpinorField &a, const ColorSpinorParam &b);
 
     /**
        @brief Test if two instances are compatible.  Throws an error
@@ -930,6 +957,11 @@ namespace quda
        @param[in] b Input field
      */
     static void test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    static bool are_aliases(const ColorSpinorField &a, const ColorSpinorField &b)
+    {
+      return are_compatible(a, b) && a.data() == b.data();
+    }
 
     friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
     friend struct ColorSpinorParam;

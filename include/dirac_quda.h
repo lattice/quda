@@ -201,6 +201,11 @@ namespace quda {
     }
 
     /**
+       @brief Whether the Dirac operator is mma enabled
+    */
+    virtual bool is_mma_enabled() const { return false; }
+
+    /**
       @brief Whether the Dirac object is the DiracCoarse.
     */
     virtual bool isCoarse() const { return false; }
@@ -1968,6 +1973,11 @@ public:
     DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
 
     virtual bool isCoarse() const override { return true; }
+
+    /**
+       @brief Whether the Dirac operator is mma enabled
+    */
+    virtual bool is_mma_enabled() const override { return dslash_use_mma; }
 
     /**
        @brief Apply the coarse clover operator

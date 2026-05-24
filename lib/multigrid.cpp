@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include <multigrid.h>
+#include <multigrid.hpp>
 #include <tune_quda.h>
 #include <random_quda.h>
 #include <vector_io.h>
@@ -107,7 +108,6 @@ namespace quda
         transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
                                 param.spinBlockSize, param.mg_global.precision_null[param.level],
                                 param.mg_global.transfer_type[param.level]);
-        transfer->set_use_mma(param.transfer_use_mma);
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -152,6 +152,9 @@ namespace quda
       for (int i = 0; i < param.Nvec; i++) { param.B[i].prefetch(QUDA_CPU_FIELD_LOCATION); }
 
       createCoarseDirac();
+
+      // once coarse operators has been constructed, enable MMA for the transfer operators
+      transfer->set_use_mma(param.transfer_use_mma);
     }
 
     // delay allocating smoother until after coarse-links have been created
@@ -247,25 +250,17 @@ namespace quda
   {
     pushLevel(param.level);
 
-    if (presmoother) {
-      delete presmoother;
-      presmoother = nullptr;
-    }
+    if (postsmoother && postsmoother != presmoother) delete postsmoother;
+    postsmoother = nullptr;
 
-    if (param_presmooth) {
-      delete param_presmooth;
-      param_presmooth = nullptr;
-    }
+    if (presmoother) delete presmoother;
+    presmoother = nullptr;
 
-    if (postsmoother) {
-      delete postsmoother;
-      postsmoother = nullptr;
-    }
+    if (param_postsmooth) delete param_postsmooth;
+    param_postsmooth = nullptr;
 
-    if (param_postsmooth) {
-      delete param_postsmooth;
-      param_postsmooth = nullptr;
-    }
+    if (param_presmooth) delete param_presmooth;
+    param_presmooth = nullptr;
 
     popLevel();
   }
@@ -329,10 +324,14 @@ namespace quda
       // we never need to compute the true residual for a post smoother
       param_postsmooth->compute_true_res = false;
 
-      postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
-        Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
-                       *param.matSmoothSloppy) :
-        nullptr;
+      if (presmoother && param_postsmooth->inv_type == param_presmooth->inv_type && param.nu_post == param.nu_pre) {
+        postsmoother = presmoother;
+      } else {
+        postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
+          Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                         *param.matSmoothSloppy) :
+          nullptr;
+      }
     }
     logQuda(QUDA_VERBOSE, "Smoother done\n");
 
@@ -602,9 +601,7 @@ namespace quda
             param.mg_global.vec_load[param.level + 1] == QUDA_BOOLEAN_TRUE
             && (strcmp(param.mg_global.vec_infile[param.level + 1], "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile[param.level + 1]);
-          vec_infile += "_level_";
-          vec_infile += std::to_string(param.level + 1);
-          vec_infile += "_defl_";
+          vec_infile += "_level_" + std::to_string(param.level + 1) + "_defl_";
           vec_infile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_infile, vec_infile.c_str());
         }
@@ -613,9 +610,7 @@ namespace quda
             param.mg_global.vec_store[param.level + 1] == QUDA_BOOLEAN_TRUE
             && (strcmp(param.mg_global.vec_outfile[param.level + 1], "") != 0)) {
           std::string vec_outfile(param.mg_global.vec_outfile[param.level + 1]);
-          vec_outfile += "_level_";
-          vec_outfile += std::to_string(param.level + 1);
-          vec_outfile += "_defl_";
+          vec_outfile += "_level_" + std::to_string(param.level + 1) + "_defl_";
           vec_outfile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
           param_coarse_solver->eig_param.partfile = param.mg_global.mg_vec_partfile[param.level + 1];
@@ -719,16 +714,11 @@ namespace quda
       if (diracCoarseSmoother) delete diracCoarseSmoother;
       if (matCoarseResidual) delete matCoarseResidual;
       if (diracCoarseResidual) delete diracCoarseResidual;
-      if (postsmoother) delete postsmoother;
-      if (param_postsmooth) delete param_postsmooth;
     }
 
-    if (rng) {
-      delete rng;
-    }
+    if (rng) delete rng;
 
-    if (presmoother) delete presmoother;
-    if (param_presmooth) delete param_presmooth;
+    destroySmoother();
     if (param_coarse) delete param_coarse;
 
     popLevel();
@@ -1159,8 +1149,25 @@ namespace quda
 
     ColorSpinorParam csParam(b[0]);
     auto r = getFieldTmp<ColorSpinorField>(presmoother ? b.size() : 0, csParam);
-    resize(r_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
-    resize(x_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
+
+    // are we collapsing the MRHS system to a single super system?
+    auto collapse = param.mg_global.collapse_mrhs[param.level + 1] && b.size_actual() > 1;
+    auto csParam_mma = ColorSpinorParam(r_coarse[0]);
+    csParam_mma.nVec = instantiated_nVec_to_use(b.size_actual());
+    csParam_mma.nColor = r_coarse[0].Ncolor() * csParam_mma.nVec;
+    csParam_mma.nVec_actual = b.size_actual();
+    csParam_mma.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    auto r_coarse_mma = getFieldTmp<ColorSpinorField>(collapse ? 1 : 0, csParam_mma);
+    auto x_coarse_mma = getFieldTmp<ColorSpinorField>(collapse ? 1 : 0, csParam_mma);
+
+    if (!collapse) {
+      resize(r_coarse, b.size_actual(), QUDA_NULL_FIELD_CREATE);
+      resize(x_coarse, b.size_actual(), QUDA_NULL_FIELD_CREATE);
+    }
+
+    auto &r_c = collapse ? cvector_ref<ColorSpinorField> {r_coarse_mma} : r_coarse;
+    auto &x_c = collapse ? cvector_ref<ColorSpinorField> {x_coarse_mma} : x_coarse;
 
     if (outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
@@ -1172,7 +1179,10 @@ namespace quda
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
 
-      if (presmoother) (*presmoother)(out, in);
+      if (presmoother) {
+        presmoother->update_param(*param_presmooth);
+        (*presmoother)(out, in);
+      }
 
       if (!smoother_solver_uniform) diracSmoother->reconstruct(x, b, inner_solution_type);
 
@@ -1190,25 +1200,28 @@ namespace quda
                                                      r;
 
         // restrict to the coarse grid
-        transfer->R(r_coarse, residual);
+        transfer->R(r_c, residual);
 
         // recurse to the next lower level
-        (*coarse_solver)(x_coarse, r_coarse);
+        (*coarse_solver)(x_c, r_c);
 
         // prolongate back to this grid
         if (!presmoother) {
-          transfer->P(inner_solution_type == outer_solution_type ? x : x(parity), x_coarse);
+          transfer->P(inner_solution_type == outer_solution_type ? x : x(parity), x_c);
         } else { // we must sum to the presmoother solution
           auto res = inner_solution_type == outer_solution_type ? cvector_ref<ColorSpinorField>(r) :
                                                                   cvector_ref<ColorSpinorField>(r)(parity);
-          transfer->P(res, x_coarse);
+          transfer->P(res, x_c);
           xpy(res, inner_solution_type == outer_solution_type ? x : x(parity));
         }
       }
 
       if (!smoother_solver_uniform) diracSmoother->prepare(out, in, x, b, inner_solution_type);
 
-      if (postsmoother) (*postsmoother)(out, in);
+      if (postsmoother) {
+        postsmoother->update_param(*param_postsmooth);
+        (*postsmoother)(out, in);
+      }
 
       diracSmoother->reconstruct(x, b, outer_solution_type);
 

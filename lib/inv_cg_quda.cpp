@@ -31,7 +31,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init || r.size() != b.size()) {
+    if (!init || r.size() != b.size() || !ColorSpinorField::are_compatible(r[0], b[0])) {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       resize(r, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
@@ -66,7 +66,7 @@ namespace quda {
     if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
     if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      if (!use_init_guess) blas::zero(x);
       return;
     }
 
@@ -141,7 +141,7 @@ namespace quda {
 
     // compute initial residual
     vector<double> r2(b2.size(), 0.0);
-    if (advanced_feature && param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (advanced_feature && use_init_guess) {
       // Compute r = b - A * x
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
@@ -410,7 +410,7 @@ namespace quda {
 
     logQuda(QUDA_VERBOSE, "CG: Reliable updates = %d\n", ru.rUpdate);
 
-    if (advanced_feature && param.compute_true_res) {
+    if (advanced_feature && compute_true_res) {
       // compute the true residuals
       mat(r, x);
       auto true_r2 = blas::xmyNorm(b, r);
@@ -476,7 +476,7 @@ namespace quda {
 
     // compute initial residual
     vector<double> r2(b.size());
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       // Compute r = b - A * x
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
@@ -836,7 +836,7 @@ namespace quda {
 
     logQuda(QUDA_VERBOSE, "CG: Reliable updates = %d\n", rUpdate);
 
-    if (param.compute_true_res) {
+    if (compute_true_res) {
       // compute the true residuals
       mat(r, x);
       auto true_r2 = blas::xmyNorm(b, r);

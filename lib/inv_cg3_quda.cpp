@@ -19,7 +19,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init || r.size() != b.size()) {
+    if (!init || r.size() != b.size() || !ColorSpinorField::are_compatible(r[0], b[0])) {
       ColorSpinorParam csParam(b[0]);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       resize(r, b.size(), csParam);
@@ -91,7 +91,7 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     vector<double> r2;
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
       for (auto i = 0u; i < b.size(); i++)
@@ -286,7 +286,7 @@ namespace quda {
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residuals
-    if (!mixed_precision && param.compute_true_res) {
+    if (!mixed_precision && compute_true_res) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
       for (auto i = 0u; i < b.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);

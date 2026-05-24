@@ -140,7 +140,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init || r.size() != b.size()) {
+    if (!init || r.size() != b.size() || !ColorSpinorField::are_compatible(r[0], b[0])) {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
       ColorSpinorParam csParam(x[0]);
       csParam.create = QUDA_NULL_FIELD_CREATE;
@@ -186,7 +186,7 @@ namespace quda {
   cvector_ref<const ColorSpinorField> GCR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
-    if (param.compute_true_res)
+    if (compute_true_res)
       return r;
     else
       return K ? r_sloppy : p[k_break];
@@ -196,7 +196,7 @@ namespace quda {
   {
     if (n_krylov == 0) {
       // Krylov space is zero-dimensional so return doing no work
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      if (!use_init_guess) blas::zero(x);
       return;
     }
 
@@ -234,7 +234,7 @@ namespace quda {
     vector<double> r2;                  // norm sq of residual
 
     // compute initial residual depending on whether we have an initial guess or not
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       // Compute r = b - A * x
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
@@ -414,7 +414,7 @@ namespace quda {
 
     logQuda(QUDA_VERBOSE, "GCR: number of restarts = %d\n", restart);
 
-    if (param.compute_true_res) {
+    if (compute_true_res) {
       // Calculate the true residual
       mat(r, x);
       auto true_r2 = blas::xmyNorm(b, r);

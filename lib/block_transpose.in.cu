@@ -82,15 +82,18 @@ namespace quda
         constexpr bool disable_ghost = true;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
-          errorQuda("BlockTranspose does not support host invokation yet.");
+          errorQuda("BlockTranspose does not support host invocation yet.");
         } else {
           constexpr auto vOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
           constexpr auto bOrder = QUDA_NATIVE_FIELD_ORDER;
           if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
             typedef FieldOrderCB<real, nSpin, nColor, nVec, vOrder, vFloat, vFloat, disable_ghost> vAccessor;
-            typedef FieldOrderCB<real, nSpin, nColor, 1, bOrder, bFloat, bFloat, disable_ghost> bAccessor;
+            typedef FieldOrderCB<real, nSpin, nColor, 1, bOrder, bFloat, bFloat, disable_ghost, true> bAccessor;
             if constexpr (std::is_const_v<v_t>) {
-              launch_device_<const vAccessor, bAccessor>(tp, stream);
+              if constexpr (std::is_same_v<bFloat, short>)
+                errorQuda("Half precision write not supported");
+              else
+                launch_device_<const vAccessor, bAccessor>(tp, stream);
             } else {
               launch_device_<vAccessor, bAccessor>(tp, stream);
             }
@@ -106,8 +109,6 @@ namespace quda
       }
 
       virtual unsigned int minThreads() const { return V.VolumeCB(); }
-
-      long long flops() const { return 0; }
 
       long long bytes() const { return V.Bytes() + B.size() * B[0].Bytes(); }
     };
@@ -188,6 +189,9 @@ namespace quda
       } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0].Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
           launch_span_nSpin<v_t, b_t, float, float>(V, B, from_to_non_rel, nSpins);
+      } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0].Precision() == QUDA_HALF_PRECISION) {
+        if constexpr (is_enabled(QUDA_HALF_PRECISION) && is_enabled(QUDA_SINGLE_PRECISION))
+          launch_span_nSpin<v_t, b_t, float, short>(V, B, from_to_non_rel, nSpins);
       } else {
         errorQuda("Unsupported precision combination V=%d B=%d", V.Precision(), B[0].Precision());
       }
@@ -198,11 +202,13 @@ namespace quda
 
   void BlockTransposeForward(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B, bool from_non_rel)
   {
+    if (ColorSpinorField::are_aliases(V, B[0])) return;
     block_transpose(V, B, from_non_rel);
   }
 
   void BlockTransposeBackward(const ColorSpinorField &V, cvector_ref<ColorSpinorField> &B, bool to_non_rel)
   {
+    if (ColorSpinorField::are_aliases(V, B[0])) return;
     block_transpose(V, B, to_non_rel);
   }
 

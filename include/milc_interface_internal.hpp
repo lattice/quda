@@ -32,6 +32,9 @@ namespace quda
     /** Whether to accelerate transfer using MMA routines; currently set to false b/c it's generally not faster for now */
     bool transfer_use_mma[QUDA_MAX_MG_LEVEL] = {false, false, false, false, false};
 
+    /** Whether to accelerate coarse levels by "collapsing" the solve; set to false until divisibility constraints are relaxed in prolong/restrict */
+    bool collapse_mrhs[QUDA_MAX_MG_LEVEL] = {false, false, false, false, false};
+
     /** Whether to allow dropping the long links for small (less than three) aggregate directions */
     bool allow_truncation = false;
 

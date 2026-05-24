@@ -102,6 +102,11 @@ namespace quda
         errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
     } else {
+      if (ColorSpinorField::are_compatible(dst, src)) {
+        qudaMemcpy(dst.data(), src.data(), src.Bytes(), qudaMemcpyDefault);
+        return;
+      }
+
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
           copyGenericColorSpinorMGDD(pack);

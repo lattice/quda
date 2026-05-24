@@ -668,6 +668,9 @@ extern "C" {
     /** Transfer MMA usage on each level of the multigrid */
     QudaBoolean transfer_use_mma[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to treat each level of a multi-RHS multigrid solver as a single super system */
+    bool collapse_mrhs[QUDA_MAX_MG_LEVEL];
+
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 

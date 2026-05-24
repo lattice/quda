@@ -1,17 +1,13 @@
-
-#include <transfer.h>
-
-#include <blas_quda.h>
-
-#include <transfer.h>
-#include <multigrid.h>
-#include <tune_quda.h>
-#include <malloc_quda.h>
-
 #include <iostream>
 #include <algorithm>
 #include <vector>
 #include <limits>
+
+#include <blas_quda.h>
+#include <transfer.h>
+#include <multigrid.h>
+#include <multigrid.hpp>
+#include <tune_quda.h>
 
 namespace quda {
 
@@ -27,10 +23,7 @@ namespace quda {
     blockOrthoTwoPass(block_ortho_two_pass),
     null_precision(null_precision),
     spin_bs(spin_bs),
-    spin_map(0),
     nspin_fine(B[0].Nspin()),
-    site_subset(QUDA_FULL_SITE_SUBSET),
-    parity(QUDA_INVALID_PARITY),
     transfer_type(transfer_type)
   {
     postTrace();
@@ -149,9 +142,33 @@ namespace quda {
     postTrace();
   }
 
+  void Transfer::set_use_mma(bool b) const
+  {
+    if (b == _use_mma) return;
+    _use_mma = b;
+    if (_use_mma) {
+      if (transfer_type != QUDA_TRANSFER_AGGREGATE)
+        errorQuda("MMA transfer is not supported by transfer type %d, set transfer_mma to false", transfer_type);
+      ColorSpinorParam param(V);
+      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      V_mma = {param};
+      blas::copy(V_mma, V);
+      V = {};
+    } else {
+      // when disabling MMA support, we need to restore the native ordered variant
+      // FIXME this will be fixed when have an MMA block ortho
+      ColorSpinorParam param(V_mma);
+      param.setPrecision(param.Precision(), param.Precision(), true);
+      blas::copy(V, V_mma);
+      V_mma = {};
+    }
+  }
+
   void Transfer::reset()
   {
     postTrace();
+    bool use_mma = _use_mma;
+    if (use_mma) set_use_mma(false);
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
         || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
@@ -160,6 +177,8 @@ namespace quda {
     logQuda(QUDA_VERBOSE, "Transfer: block orthogonalizing\n");
 
     BlockOrthogonalize(V, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
+
+    if (use_mma) set_use_mma(true);
     postTrace();
   }
 
@@ -259,7 +278,8 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+    if (out.size_actual() != in.size_actual())
+      errorQuda("Mismatched set sizes %lu != %lu", out.size_actual(), in.size_actual());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredProlongate(out, in, fine_to_coarse_d, spin_map, parity);
@@ -277,10 +297,11 @@ namespace quda {
 
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
-      if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      if (Vectors().SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      Prolongate(out, in, V, fine_to_coarse_d, spin_map, _use_mma, parity);
+      Prolongate(out, in, _use_mma ? V_mma : V, fine_to_coarse_d, spin_map, _use_mma, parity);
+
     } else {
       errorQuda("Invalid transfer type in prolongate");
     }
@@ -292,7 +313,8 @@ namespace quda {
   void Transfer::R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+    if (out.size_actual() != in.size_actual())
+      errorQuda("Mismatched set sizes %lu != %lu", out.size_actual(), in.size_actual());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(out, in, fine_to_coarse_d, spin_map, parity);
@@ -311,10 +333,10 @@ namespace quda {
 
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
-      if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      if (Vectors().SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
+      Restrict(out, in, _use_mma ? V_mma : V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
 
     } else {
       errorQuda("Invalid transfer type in restrict");

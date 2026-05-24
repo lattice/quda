@@ -388,6 +388,9 @@ namespace quda {
 
     SolverParam &param;
     int node_parity = 0;
+    bool use_init_guess = false;      /** Whether to use an initial guess or not */
+    bool compute_true_res = false;    /** Whether to compute the true residual or not */
+    bool return_residual = false;     /** Whether the residual can be queried post solve */
     EigenSolver *eig_solve = nullptr; /** Eigensolver object. */
     bool deflate_init = false;        /** If true, the deflation space has been computed. */
     bool deflate_compute = false;     /** If true, instruct the solver to create a deflation space. */
@@ -455,6 +458,13 @@ namespace quda {
 
     void set_tol(double tol) { param.tol = tol; }
     void set_maxiter(int maxiter) { param.maxiter = maxiter; }
+
+    void update_param(const SolverParam &param)
+    {
+      this->use_init_guess = param.use_init_guess;
+      this->return_residual = param.return_residual;
+      this->compute_true_res = param.compute_true_res;
+    }
 
     const DiracMatrix &M() { return mat; }
     const DiracMatrix &Msloppy() { return matSloppy; }
@@ -1377,30 +1387,7 @@ public:
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-    void operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b) override
-    {
-      if (x.size() != b.size()) errorQuda("Mismatched set sizes %lu != %lu", x.size(), b.size());
-      pushOutputPrefix(prefix);
-
-      QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
-
-      std::vector<ColorSpinorField> out(b.size());
-      std::vector<ColorSpinorField> in(b.size());
-
-      if (dirac.hasSpecialMG()) {
-        dirac.prepareSpecialMG(out, in, x, b, solution_type);
-      } else {
-        dirac.prepare(out, in, x, b, solution_type);
-      }
-      (*solver)(out, in);
-      if (dirac.hasSpecialMG()) {
-        dirac.reconstructSpecialMG(x, b, solution_type);
-      } else {
-        dirac.reconstruct(x, b, solution_type);
-      }
-
-      popOutputPrefix();
-    }
+    void operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b) override;
 
     /**
      * @brief Return reference to the solver. Used when mass/mu

@@ -132,7 +132,7 @@ namespace quda
     case QUDA_MEMORY_MANAGED: ptr = device; break;
     case QUDA_MEMORY_HOST:
     case QUDA_MEMORY_HOST_PINNED: ptr = host; break;
-    default: errorQuda("Unknown memory type %d", type);
+    default: errorQuda("Unknown memory type %d (device = %p host = %p)", type, device, host);
     }
 
     return ptr;

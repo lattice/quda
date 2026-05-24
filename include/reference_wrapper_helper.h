@@ -230,6 +230,8 @@ namespace quda
     vector_ref() = default;
     vector_ref(const vector_ref &) = default;
     vector_ref(vector_ref &&) = default;
+    vector_ref &operator=(const vector_ref &) = default;
+    vector_ref &operator=(vector_ref &) = default;
 
     /**
        Unary constructor
@@ -468,6 +470,12 @@ namespace quda
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, std::string> AuxString() const
     {
       return operator[](0).AuxString();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> size_actual() const
+    {
+      return operator[](0).Nvec() > 1 ? operator[](0).Nvec_actual() : vector::size();
     }
 
     template <class U = T>

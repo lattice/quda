@@ -18,6 +18,9 @@ namespace quda {
     matPrecon(matPrecon),
     matEig(matEig),
     param(param),
+    use_init_guess(param.use_init_guess),
+    compute_true_res(param.compute_true_res),
+    return_residual(param.return_residual),
     deflate_compute(true),
     recompute_evals(!param.eig_param.preserve_evals)
   {
@@ -490,7 +493,7 @@ namespace quda {
 
     for (auto i = 0u; i < r2.size(); i++) {
       auto rhs_str = set_rhs_str(i, r2.size());
-      if (param.compute_true_res) {
+      if (compute_true_res) {
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           logQuda(QUDA_SUMMARIZE,
                   "%s: Convergence at %d iterations, %sL2 relative residual: iterated = %9.6e, true = %9.6e "
@@ -656,6 +659,31 @@ namespace quda {
 
     // now broadcast from global rank 0 to ensure uniformity
     comm_broadcast(&out, sizeof(QudaInvertParam));
+  }
+
+  void PreconditionedSolver::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
+  {
+    if (x.size() != b.size()) errorQuda("Mismatched set sizes %lu != %lu", x.size(), b.size());
+    pushOutputPrefix(prefix);
+
+    QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
+
+    std::vector<ColorSpinorField> out(b.size());
+    std::vector<ColorSpinorField> in(b.size());
+
+    if (dirac.hasSpecialMG()) {
+      dirac.prepareSpecialMG(out, in, x, b, solution_type);
+    } else {
+      dirac.prepare(out, in, x, b, solution_type);
+    }
+    (*solver)(out, in);
+    if (dirac.hasSpecialMG()) {
+      dirac.reconstructSpecialMG(x, b, solution_type);
+    } else {
+      dirac.reconstruct(x, b, solution_type);
+    }
+
+    popOutputPrefix();
   }
 
 } // namespace quda

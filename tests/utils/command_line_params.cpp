@@ -153,6 +153,7 @@ quda::mgarray<QudaVerbosity> mg_verbosity = {};
 quda::mgarray<bool> mg_setup_use_mma = {};
 quda::mgarray<bool> mg_dslash_use_mma = {};
 quda::mgarray<bool> mg_transfer_use_mma = {};
+quda::mgarray<bool> mg_collapse_mrhs = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
 quda::mgarray<QudaSolveType> coarse_solve_type = {};
 quda::mgarray<QudaSolveType> smoother_solve_type = {};
@@ -1113,6 +1114,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Whether multigrid dslash should use mma (default to false)");
   quda_app->add_mgoption(opgroup, "--mg-transfer-use-mma", mg_transfer_use_mma, CLI::Validator(),
                          "Whether multigrid transfer should use mma (default to false)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-collapse-mrhs", mg_collapse_mrhs, CLI::Validator(),
+    "Whether a given level of multi-RHS multigrid should be collapsed to a single RHS (default to false)");
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
 

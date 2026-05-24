@@ -399,8 +399,9 @@ namespace quda {
 
   void resize(std::vector<ColorSpinorField> &v, size_t new_size, const ColorSpinorParam &param)
   {
-    auto old_size = v.size();
+    auto old_size = v.size() > 0 ? (ColorSpinorField::are_compatible(v[0], param) ? v.size() : 0) : 0;
     v.resize(new_size);
+    for (auto k = old_size; k < v.size(); k++) v[k] = {};
     for (auto k = old_size; k < new_size; k++) v[k] = ColorSpinorField(param);
   }
 
@@ -427,6 +428,7 @@ namespace quda {
                     const ColorSpinorParam &param)
   {
     if (alias.size() != v.size()) errorQuda("sets differ in size (%lu != %lu)", alias.size(), v.size());
+    for (auto i = 0u; i < v.size(); i++) alias[i] = {};
     for (auto i = 0u; i < v.size(); i++) alias[i] = const_cast<ColorSpinorField &>(v[i]).create_alias(param);
   }
 

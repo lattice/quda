@@ -227,6 +227,7 @@ namespace quda
     init = std::exchange(src.init, false);
     alloc = std::exchange(src.alloc, false);
     reference = std::exchange(src.reference, false);
+    ghost_only = std::exchange(src.ghost_only, false);
     ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
     nFace_allocated = std::exchange(src.nFace_allocated, 0);
     nColor = std::exchange(src.nColor, 0);
@@ -669,12 +670,26 @@ namespace quda
   bool ColorSpinorField::are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
   {
     return (a.SiteSubset() == b.SiteSubset() && a.VolumeCB() == b.VolumeCB() && a.Ncolor() == b.Ncolor()
-            && a.Nspin() == b.Nspin() && a.Nvec() == b.Nvec() && a.TwistFlavor() == b.TwistFlavor());
+            && a.Nspin() == b.Nspin() && a.Nvec() == b.Nvec() && a.TwistFlavor() == b.TwistFlavor()
+            && a.Location() == b.Location() && a.MemType() == b.MemType());
   }
 
   bool ColorSpinorField::are_compatible(const ColorSpinorField &a, const ColorSpinorField &b)
   {
     return (a.Precision() == b.Precision() && a.FieldOrder() == b.FieldOrder() && a.GammaBasis() == b.GammaBasis() && are_compatible_weak(a, b));
+  }
+
+  bool ColorSpinorField::are_compatible_weak(const ColorSpinorField &a, const ColorSpinorParam &b)
+  {
+    return (a.SiteSubset() == b.siteSubset && a.Ncolor() == b.nColor && a.X(0) == b.x[0] && a.X(1) == b.x[1]
+            && a.X(2) == b.x[2] && a.X(3) == b.x[3] && a.Nspin() == b.nSpin && a.Nvec() == b.nVec
+            && a.TwistFlavor() == b.twistFlavor && a.Location() == b.location && a.MemType() == b.mem_type);
+  }
+
+  bool ColorSpinorField::are_compatible(const ColorSpinorField &a, const ColorSpinorParam &b)
+  {
+    return (a.Precision() == b.Precision() && a.FieldOrder() == b.fieldOrder && a.GammaBasis() == b.gammaBasis
+            && are_compatible_weak(a, b));
   }
 
   void ColorSpinorField::test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)

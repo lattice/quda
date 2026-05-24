@@ -346,17 +346,19 @@ std::vector<std::array<double, 2>> solve(test_t param)
 
   } else {
 
-    inv_param.num_src = Nsrc_tile;
-    inv_param.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
     // Host arrays for solutions, sources, and check
     std::vector<void *> _hp_x(Nsrc_tile);
     std::vector<void *> _hp_b(Nsrc_tile);
 
     for (int j = 0; j < Nsrc; j += Nsrc_tile) {
-      // If deflating, preserve the deflation space between solves
-      if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      inv_param.num_src = j + Nsrc_tile < Nsrc ? Nsrc_tile : Nsrc - j; // compute the tile size
+      inv_param.num_src_per_sub_partition = inv_param.num_src / num_sub_partition;
 
-      for (int i = 0; i < Nsrc_tile; i++) {
+      // If deflating, preserve the deflation space between solves
+      if (inv_deflate)
+        eig_param.preserve_deflation = j < Nsrc - inv_param.num_src ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+      for (int i = 0; i < inv_param.num_src; i++) {
         _hp_x[i] = out[j + i].data();
         _hp_b[i] = in[j + i].data();
       }
@@ -364,16 +366,17 @@ std::vector<std::array<double, 2>> solve(test_t param)
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
 
       // move residuals to (i+j)^th location for verification after solves have finished
-      for (int i = 0; i < Nsrc_tile; i++) {
+      for (int i = 0; i < inv_param.num_src; i++) {
         inv_param.true_res[j + i] = inv_param.true_res[i];
         inv_param.true_res_hq[j + i] = inv_param.true_res_hq[i];
       }
 
       printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
-                 inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
+                 inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / inv_param.num_src);
       if (inv_param.energy > 0) {
         printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n",
-                   inv_param.energy, inv_param.energy / Nsrc_tile, inv_param.power, inv_param.temp, inv_param.clock);
+                   inv_param.energy, inv_param.energy / inv_param.num_src, inv_param.power, inv_param.temp,
+                   inv_param.clock);
       }
     }
   }
