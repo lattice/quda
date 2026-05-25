@@ -149,10 +149,10 @@ void twistGamma5(real_t *out, const real_t *in, int dagger, real_t kappa, real_t
 {
   real_t a = 0.0, b = 0.0;
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
-    a = 2.0 * kappa * mu * flavor;         // mu already includes the flavor
+    a = 2.0 * kappa * mu * static_cast<real_t>(flavor); // mu already includes the flavor
     b = 1.0;
   } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) { // applying the inverse twist
-    a = -2.0 * kappa * mu * flavor;
+    a = -2.0 * kappa * mu * static_cast<real_t>(flavor);
     b = 1.0 / (1.0 + a * a);
   } else {
     errorQuda("Twist type %d not defined", twist);

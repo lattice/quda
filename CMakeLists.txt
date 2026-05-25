@@ -22,6 +22,7 @@ endif()
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Disable gnu exentions
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -244,13 +245,25 @@ option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
+if(NOT DEFINED QUDA_BLAS_PREFETCH_TYPE)
+  set(QUDA_BLAS_PREFETCH_TYPE "THREAD" CACHE STRING "BLAS grid-stride prefetch: NONE, THREAD (per-cache-line L2), BULK (CUDA sm_90+; CMake rejects older arches)")
+endif()
+set_property(CACHE QUDA_BLAS_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK)
+mark_as_advanced(QUDA_BLAS_PREFETCH_TYPE)
+
+# Work-item inner-loop unroll: separate knobs for streaming BLAS vs reduction BLAS kernels.
+if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_STREAMING})
+  set(QUDA_BLAS_UNROLL_STREAMING "1" CACHE STRING
+      "Work-item unroll for streaming BLAS (blas_core.cuh, multi_blas_core.cuh). Typical values: 1 or 2.")
+endif()
+if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_REDUCE})
+  set(QUDA_BLAS_UNROLL_REDUCE "1" CACHE STRING
+      "Work-item unroll for reduction BLAS (reduce_core.cuh, multi_reduce_core.cuh). Typical values: 1 or 2.")
+endif()
+mark_as_advanced(QUDA_BLAS_UNROLL_STREAMING)
+mark_as_advanced(QUDA_BLAS_UNROLL_REDUCE)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
-set(QUDA_CXX_STANDARD
-    17
-    CACHE STRING "set the CXX Standard (14 or 17)")
-
-set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
@@ -293,7 +306,6 @@ mark_as_advanced(QUDA_INTERFACE_ALL)
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOLVER)
-mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 ####################################################################################
@@ -307,6 +319,17 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 # is to configure the build given the options above
 
 # Some checks for invalid combinations
+set(_valid_blas_pf NONE THREAD BULK)
+if(NOT QUDA_BLAS_PREFETCH_TYPE IN_LIST _valid_blas_pf)
+  message(FATAL_ERROR "Invalid QUDA_BLAS_PREFETCH_TYPE='${QUDA_BLAS_PREFETCH_TYPE}'. Allowed: ${_valid_blas_pf}")
+endif()
+if(NOT QUDA_TARGET_TYPE STREQUAL "CUDA" AND QUDA_BLAS_PREFETCH_TYPE STREQUAL "BULK")
+  message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_TARGET_TYPE=CUDA (TMA bulk prefetch is CUDA-only).")
+endif()
+message(STATUS "BLAS prefetch: ${QUDA_BLAS_PREFETCH_TYPE}")
+message(STATUS "BLAS unroll (streaming): ${QUDA_BLAS_UNROLL_STREAMING}")
+message(STATUS "BLAS unroll (reduction): ${QUDA_BLAS_UNROLL_REDUCE}")
+
 if(QUDA_MPI AND QUDA_QMP)
   message(
     SEND_ERROR
@@ -339,8 +362,6 @@ if(${CPU_ARCH} STREQUAL "x86_64")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
-
-set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
 set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3"

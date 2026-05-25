@@ -31,7 +31,7 @@ namespace quda
     const real anisotropy;
 
     STOUTArg(GaugeField &out, const GaugeField &in, real rho, real epsilon, int dir_ignore, real anisotropy) :
-      kernel_param(dim3(1, 2, stoutDim)),
+      kernel_param(dim3(in.LocalVolumeCB(), 2, stoutDim)),
       out(out),
       in(in),
       rho(rho),
@@ -43,9 +43,7 @@ namespace quda
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
         X[dir] = in.X()[dir] - border[dir] * 2;
-        this->threads.x *= X[dir];
       }
-      this->threads.x /= 2;
     }
   };
 

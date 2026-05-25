@@ -55,6 +55,10 @@ namespace quda {
           strcat(aux, y.AuxString().c_str());
         }
         setRHSstring(aux, x.size());
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, reduce_unroll);
+        }
 
         apply(device::get_default_stream());
       }

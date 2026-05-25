@@ -464,7 +464,7 @@ namespace quda {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    double a = 2.0 * kappa * mu * static_cast<double>(T.Vectors().TwistFlavor());
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
@@ -634,7 +634,7 @@ namespace quda {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    double a = -2.0 * kappa * mu * static_cast<double>(T.Vectors().TwistFlavor());
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, -mu_factor,

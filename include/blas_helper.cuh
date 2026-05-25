@@ -1,7 +1,13 @@
 #pragma once
 
+#include <cstdio>
+#include <cstring>
+
 #include <color_spinor_field.h>
+#include <quda_define.h>
 #include <load_store.h>
+#include <tma_helper.hpp>
+#include <target_device.h>
 #include <convert.h>
 #include <float_vector.h>
 #include <array.h>
@@ -94,6 +100,51 @@ namespace quda
 
   namespace blas
   {
+    constexpr PrefetchType blas_prefetch_type() noexcept
+    {
+#if defined(QUDA_BLAS_PREFETCH_TYPE_NONE)
+      return PrefetchType::NONE;
+#elif defined(QUDA_BLAS_PREFETCH_TYPE_THREAD)
+      return PrefetchType::THREAD;
+#elif defined(QUDA_BLAS_PREFETCH_TYPE_BULK)
+      return PrefetchType::BULK;
+#else
+#error "Missing or invalid QUDA_BLAS_PREFETCH_TYPE (expect NONE, THREAD, or BULK)"
+#endif
+    }
+
+    inline constexpr bool blas_prefetch_enabled_v = (blas_prefetch_type() != PrefetchType::NONE);
+
+    /** Append BLAS prefetch mode to \a aux for \c TuneKey when non-NONE. */
+    inline void blas_tune_aux_prefetch(char *aux)
+    {
+      switch (blas_prefetch_type()) {
+      case PrefetchType::THREAD: strcat(aux, ",prefetch=thread"); break;
+      case PrefetchType::BULK: strcat(aux, ",prefetch=bulk"); break;
+      default: break;
+      }
+    }
+
+    /**
+       @brief Append a work-item unroll tag to a BLAS autotune auxiliary string.
+
+       Appends a substring of the form \c ",unroll=N" to \a aux so kernels that vary
+       \c QUDA_BLAS_UNROLL_STREAMING (or an effective unroll such as multi-blas vs. NXZ)
+       receive distinct \c TuneKey entries.
+
+       @param[in,out] aux Null-terminated auxiliary string buffer (e.g. \c Tunable::aux)
+       to append to; must have space for the additional suffix.
+       @param[in] unroll Unroll factor to record: typically \c QUDA_BLAS_UNROLL_STREAMING or
+       \c QUDA_BLAS_UNROLL_REDUCE, or an effective value such as \c 1 when multi-blas disables unroll.
+
+       @return None.
+     */
+    inline void blas_tune_aux_work_item_unroll(char *aux, unsigned int unroll)
+    {
+      char buf[32];
+      snprintf(buf, sizeof(buf), ",unroll=%d", unroll);
+      strcat(aux, buf);
+    }
 
     /**
        Helper struct that contains the meta data required for
@@ -253,6 +304,72 @@ namespace quda
 
 #pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
+        }
+      }
+
+      /**
+         @brief Prefetch cache lines that \a load would read (for grid-stride latency hiding).
+       */
+      template <typename real, int n>
+      __device__ __host__ inline void prefetch(int x, int parity = 0) const
+      {
+        if constexpr (blas_prefetch_type() == PrefetchType::NONE) return;
+
+        constexpr int len = 2 * n;
+
+        if constexpr (blas_prefetch_type() == PrefetchType::THREAD) {
+          if constexpr (!(n == 3 && isHalf<store_t>::value)) {
+            if constexpr (isFixed<store_t>::value)
+              prefetch_cache_line(data.norm + data.cb_norm_offset * parity + x);
+
+            constexpr int M = len / N;
+            constexpr int Nrem = len - M * N;
+#pragma unroll
+            for (int i = 0; i < M; i++) {
+              using vector_t = typename VectorType<store_t, N>::type;
+              prefetch_cache_line(reinterpret_cast<const vector_t *>(data.spinor + parity * data.cb_offset)
+                                  + (data.stride * i + x));
+            }
+            if constexpr (Nrem > 0) {
+              using vector_t = typename VectorType<store_t, Nrem>::type;
+              prefetch_cache_line(reinterpret_cast<const vector_t *>(data.spinor + parity * data.cb_offset
+                                                                     + data.stride * M * N)
+                                  + x);
+            }
+          } else {
+            auto cb_offset = data.cb_norm_offset / 4;
+            using vector_t = typename VectorType<store_t, 8>::type;
+            prefetch_cache_line(reinterpret_cast<const vector_t *>(data.spinor) + (parity * cb_offset + x));
+          }
+        } else if constexpr (blas_prefetch_type() == PrefetchType::BULK) {
+          if (!target::is_thread_zero()) return;
+          const unsigned bx = blockDim.x;
+
+          if constexpr (!(n == 3 && isHalf<store_t>::value)) {
+            if constexpr (isFixed<store_t>::value)
+              prefetch_cache_bulk(data.norm + data.cb_norm_offset * parity + x, bx * sizeof(norm_t));
+
+            constexpr int M = len / N;
+            constexpr int Nrem = len - M * N;
+#pragma unroll
+            for (int i = 0; i < M; i++) {
+              using vector_t = typename VectorType<store_t, N>::type;
+              prefetch_cache_bulk(reinterpret_cast<const vector_t *>(data.spinor + parity * data.cb_offset)
+                                    + (data.stride * i + x),
+                                  bx * sizeof(vector_t));
+            }
+            if constexpr (Nrem > 0) {
+              using vector_t = typename VectorType<store_t, Nrem>::type;
+              prefetch_cache_bulk(
+                reinterpret_cast<const vector_t *>(data.spinor + parity * data.cb_offset + data.stride * M * N) + x,
+                bx * sizeof(vector_t));
+            }
+          } else {
+            auto cb_offset = data.cb_norm_offset / 4;
+            using vector_t = typename VectorType<store_t, 8>::type;
+            prefetch_cache_bulk(reinterpret_cast<const vector_t *>(data.spinor) + (parity * cb_offset + x),
+                                bx * sizeof(vector_t));
+          }
         }
       }
 

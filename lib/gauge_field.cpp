@@ -1235,7 +1235,7 @@ namespace quda {
       errorQuda("Casting a GaugeField into ColorSpinorField not possible in half or quarter precision");
 
     ColorSpinorParam spinor_param;
-    spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;
+    spinor_param.nColor = static_cast<int>(a.Geometry()) * static_cast<int>(a.Reconstruct()) / 2;
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     spinor_param.pc_type = QUDA_4D_PC;

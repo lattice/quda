@@ -75,8 +75,8 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool h
   // total IO counting for the middle/side/all link kernels
   // Explanation about these numbers can be founed in the corresponding kernel functions in
   // the hisq kernel core file
-  long long linksize = prec * recon;
-  long long cmsize = prec * 18ll;
+  long long linksize = static_cast<long long>(static_cast<int>(prec)) * static_cast<int>(recon);
+  long long cmsize = static_cast<long long>(static_cast<int>(prec)) * 18ll;
 
   // FLOPS for matrix multiply, matrix add, matrix rescale, and anti-Hermitian projection
   long long matrix_flops[4] = {198ll, 18ll, 18ll, 23ll};

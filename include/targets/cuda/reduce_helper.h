@@ -102,8 +102,8 @@ namespace quda
        reduction has completed; required if the same ReduceArg
        instance will be used for multiple reductions.
     */
-    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
-      kernel_param<use_kernel_arg>(threads),
+    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false, unsigned work_unroll = 1u) :
+      kernel_param<use_kernel_arg>(threads, work_unroll),
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       reset(reset),
