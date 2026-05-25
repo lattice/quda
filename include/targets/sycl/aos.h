@@ -1,6 +1,7 @@
 #pragma once
 
-#ifdef __SYCL_DEVICE_ONLY__
+//#ifdef __SYCL_DEVICE_ONLY__
+#if 0
 
 #include <quda_sycl.h>
 
