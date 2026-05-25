@@ -137,6 +137,8 @@ if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM" OR "x${CMAKE_SYCL_COMPILER
   endif()
 endif()
 
+target_compile_options(quda PRIVATE -std=c++20)
+
 if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM")
   target_compile_options(quda PUBLIC -fhonor-nan-compares)
   target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
