@@ -1963,11 +1963,14 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
             logQuda(QUDA_DEBUG_VERBOSE, "  Eval[%04zu] = (%+.16e,%+.16e) (shifted)\n",
                     i, space->evals[i].real(), space->evals[i].imag());
         }
-      } else {
-	// Compute the evals if zero-mass evals are not already cached
+      } else if (qep.preserve_deflation_space != nullptr) {
+        // Reusing an existing deflation space at a new mass with no zero-mass
+        // snapshot to shift from -- QUDA must recompute the evals for this mass.
         logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
         qep.preserve_evals = QUDA_BOOLEAN_FALSE;
       }
+      // else: no preserved space this call -- the eigensolver (or vec_infile
+      // load) computes eigenvalues at the solve mass
     }
   }
 
