@@ -446,9 +446,9 @@ extern "C" {
    * @param[in] reload Whether to reload the MILC fields
    */
   void qudaExactCurrent(int external_precision, int quda_precision, const void *const milc_fatlink,
-		  const void *const milc_longlink, const void *const milc_shiftlink, 
-		  int nmasses, double *masses, QudaInvertArgs_t inv_args,
-		  QudaEigensolverArgs_t eigargs, double *jlowmu1, double *jlowmu2, int reload);
+                        const void *const milc_longlink, const void *const milc_shiftlink, int nmasses, double *masses,
+                        QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eigargs, double *jlowmu1, double *jlowmu2,
+                        int reload);
 
   /**
    * Solve Ax=b for an improved staggered operator. All fields are fields

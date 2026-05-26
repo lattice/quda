@@ -97,9 +97,9 @@ namespace quda
 
       int step_counter = 0;
       for (int step = num_keep; step < n_kr; step += block_size) {
-        if (step_counter%10==0) logQuda(QUDA_VERBOSE, " starting blockLanczosStep %d\n", step);
-	blockLanczosStep(kSpace, step);
-	step_counter++;
+        if (step_counter % 10 == 0) logQuda(QUDA_VERBOSE, " starting blockLanczosStep %d\n", step);
+        blockLanczosStep(kSpace, step);
+        step_counter++;
       }
       iter += (n_kr - num_keep);
 
