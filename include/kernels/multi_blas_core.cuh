@@ -12,6 +12,20 @@ namespace quda
   namespace blas
   {
 
+    constexpr bool grid_stride = false;
+
+    /**
+       @brief Effective work-item unroll for multi-BLAS given the X/Z batch width \a NXZ.
+
+       When \a NXZ > 1, multi-blas uses unroll 1 because the inner batch dimension already provides parallelism;
+       otherwise the compile-time \c QUDA_BLAS_UNROLL_STREAMING value is used.
+
+       @param[in] NXZ Number of X (and Z) vectors in the multi-blas batch.
+
+       @return Unroll factor to pass to \c kernel_param and autotune aux strings (1 or \c QUDA_BLAS_UNROLL_STREAMING).
+     */
+    constexpr unsigned int multi_blas_unroll(int NXZ) { return NXZ > 1 ? 1 : QUDA_BLAS_UNROLL_STREAMING; }
+
 #ifndef QUDA_FAST_COMPILE_REDUCE
     constexpr bool enable_warp_split() { return false; }
 #else
@@ -40,11 +54,12 @@ namespace quda
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
+      static constexpr unsigned int work_item_unroll = multi_blas_unroll(NXZ);
       Functor f;
 
       template <typename V>
       MultiBlasArg(V &x, V &y, V &z, V &w, Functor f, int NYW, int length) :
-        kernel_param(dim3(length * warp_split, NYW, x.SiteSubset())), f(f)
+        kernel_param(dim3(length * warp_split, NYW, x.SiteSubset()), grid_stride ? 1u : work_item_unroll), f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
@@ -70,50 +85,138 @@ namespace quda
       constexpr MultiBlas_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-      __device__ __host__ inline void operator()(int i, int k, int parity, bool alive = true)
+      /**
+         @brief Multi-BLAS body with optional work-item unroll and warp-split indexing.
+
+         @tparam UnrollCount Compile-time unroll width as \c std::integral_constant<int, N> (\c N >= 1).
+         @tparam allthreads If true, all threads in the block enter; out-of-range threads use \a alive to gate loads.
+
+         @param[in] i Base linearized x-domain index before warp layout remapping.
+         @param[in] k Index along the NYW (Y/W) batch dimension.
+         @param[in] parity Parity or site subset index.
+         @param[in] stride Spacing between unrolled indices inside the warp layout: \c i + j*stride for \c j in \c [0, N).
+         @param[in] alive When \a allthreads is true, whether this thread should perform loads/stores.
+
+         @return None.
+       */
+      template <typename UnrollCount = std::integral_constant<int, 1>, bool allthreads = false>
+      __device__ __host__ inline void operator()(int i, int k, int parity, int stride, bool alive)
       {
-        using vec = array<complex<typename Arg::real>, Arg::n/2>;
+        static_assert(std::is_same_v<UnrollCount, std::integral_constant<int, UnrollCount::value>>,
+                      "work-item unroll uses std::integral_constant<int, N> as the template argument");
+        constexpr int n = UnrollCount::value;
+        static_assert(n >= 1, "unroll count must be positive");
+
+        using vec = array<complex<typename Arg::real>, Arg::n / 2>;
 
         // partition the warp between grid points and the NXZ update
         constexpr int warp_size = device::warp_size();
         constexpr int warp_split = Arg::warp_split;
         constexpr int vector_site_width = warp_size / warp_split;
-        const int lane_id = i % warp_size;
-        const int warp_id = i / warp_size;
-        const int idx = warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
-        const int l_idx = lane_id / vector_site_width;
+        int idx[n];
+        int l_idx[n];
 
-        vec x, y, z, w;
+#pragma unroll
+        for (int j = 0; j < n; j++) {
+          const int lane_id = (i + j * stride) % warp_size;
+          const int warp_id = (i + j * stride) / warp_size;
+          idx[j] = warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
+          l_idx[j] = lane_id / vector_site_width;
+        }
+
+        vec y[n], w[n];
         if (!allthreads || alive) {
-          if (l_idx == 0 || warp_split == 1) {
-            if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
-            if (arg.f.read.W) arg.W[k].load(w, idx, parity);
-          } else {
-            y = ::quda::zero<complex<typename Arg::real>, Arg::n / 2>();
-            w = ::quda::zero<complex<typename Arg::real>, Arg::n / 2>();
+#pragma unroll
+          for (int j = 0; j < n; j++) {
+            if (l_idx[j] == 0 || warp_split == 1) {
+              if constexpr (Arg::Functor::read.Y) arg.Y[k].load(y[j], idx[j], parity);
+              if constexpr (Arg::Functor::read.W) arg.W[k].load(w[j], idx[j], parity);
+            } else {
+              y[j] = {};
+              w[j] = {};
+            }
           }
 
 #pragma unroll
           for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
-            const int l = l_ + l_idx;
-            if (l < Arg::NXZ || warp_split == 1) {
-              if (arg.f.read.X) arg.X[l].load(x, idx, parity);
-              if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
+            vec x[n], z[n];
+#pragma unroll
+            for (int j = 0; j < n; j++) {
+              const int l = l_ + l_idx[j];
+              if (l < Arg::NXZ || warp_split == 1) {
+                if constexpr (Arg::Functor::read.X) arg.X[l].load(x[j], idx[j], parity);
+                if constexpr (Arg::Functor::read.Z) arg.Z[l].load(z[j], idx[j], parity);
+              }
+            }
 
-              arg.f(x, y, z, w, k, l);
+#pragma unroll
+            for (int j = 0; j < n; j++) {
+              const int l = l_ + l_idx[j];
+              if (l < Arg::NXZ || warp_split == 1) arg.f(x[j], y[j], z[j], w[j], k, l);
             }
           }
         }
 
         // now combine the results across the warp if needed
-        if (arg.f.write.Y) y = warp_combine<warp_split>(y);
-        if (arg.f.write.W) w = warp_combine<warp_split>(w);
+#pragma unroll
+        for (int j = 0; j < n; j++) {
+          if constexpr (Arg::Functor::write.Y) y[j] = warp_combine<warp_split>(y[j]);
+          if constexpr (Arg::Functor::write.W) w[j] = warp_combine<warp_split>(w[j]);
+        }
 
         if (!allthreads || alive) {
+#pragma unroll
+          for (int j = 0; j < n; j++) {
+            if (l_idx[j] == 0 || warp_split == 1) {
+              if constexpr (Arg::Functor::write.Y) arg.Y[k].save(y[j], idx[j], parity);
+              if constexpr (Arg::Functor::write.W) arg.W[k].save(w[j], idx[j], parity);
+            }
+          }
+        }
+      }
+
+      /**
+         @brief Multi-BLAS entry with default unroll and zero stride (delegates to the unrolled \c operator()).
+
+         @tparam allthreads If true, all threads in the block enter; out-of-range threads use \a alive to gate work.
+
+         @param[in] i Base linearized x-domain index before warp layout remapping.
+         @param[in] k Index along the NYW (Y/W) batch dimension.
+         @param[in] parity Parity or site subset index.
+         @param[in] alive When \a allthreads is true, whether this thread should perform loads/stores.
+
+         @return None.
+       */
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int i, int k, int parity, bool alive = true)
+      {
+        this->operator()<std::integral_constant<int, 1>, allthreads>(i, k, parity, 0, alive);
+      }
+
+      __device__ __host__ inline void prefetch(int i, int j, int k) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          constexpr int warp_size = device::warp_size();
+          constexpr int warp_split = Arg::warp_split;
+          constexpr int vector_site_width = warp_size / warp_split;
+          const int lane_id = i % warp_size;
+          const int warp_id = i / warp_size;
+          const int idx = warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
+          const int l_idx = lane_id / vector_site_width;
+          const int nyw = j;
+          const int parity = k;
+
           if (l_idx == 0 || warp_split == 1) {
-            if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
-            if (arg.f.write.W) arg.W[k].save(w, idx, parity);
+            if constexpr (Arg::Functor::read.Y) arg.Y[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+            if constexpr (Arg::Functor::read.W) arg.W[nyw].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+          }
+#pragma unroll
+          for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
+            const int l = l_ + l_idx;
+            if (l < Arg::NXZ || warp_split == 1) {
+              if constexpr (Arg::Functor::read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+              if constexpr (Arg::Functor::read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(idx, parity);
+            }
           }
         }
       }

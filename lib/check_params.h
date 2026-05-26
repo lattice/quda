@@ -21,9 +21,15 @@
 #elif defined CHECK_PARAM
 #define P(x, val) if (param->x == val) errorQuda("Parameter " #x " undefined")
 #elif defined PRINT_PARAM
-#define P(x, val)							\
-  { if (val == INVALID_DOUBLE) printfQuda(#x " = %g\n", (double)param->x); \
-    else printfQuda(#x " = %d\n", (int)param->x); }
+#include <type_traits>
+#define P(x, val)                                                                                      \
+  do {                                                                                                 \
+    if constexpr (std::is_same_v<std::remove_cvref_t<decltype((val))>, double>) {                       \
+      printfQuda(#x " = %g\n", (double)(param->x));                                                    \
+    } else {                                                                                           \
+      printfQuda(#x " = %d\n", (int)(param->x));                                                       \
+    }                                                                                                  \
+  } while (0)
 #else
 #error INIT_PARAM, CHECK_PARAM, and PRINT_PARAM all undefined in check_params.h
 #endif

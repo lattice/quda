@@ -4,7 +4,7 @@
 #include <atomic_helper.h>
 #include <random_helper.h>
 #include <kernel.h>
-#include <byte_array.h>
+#include <packed_array.h>
 
 namespace quda
 {
@@ -630,7 +630,7 @@ namespace quda
 #pragma unroll
       for (int nu = 0; nu < 4; nu++)
         if (mu != nu) {
-          byte_array dx = {};
+          packed_array<int8_t, 4> dx = {};
           Link link = arg.dataOr(nu, e_cb, parity);
           dx[nu]++;
           U = arg.dataOr(mu, linkIndexShift(x, dx, X), 1 - parity);

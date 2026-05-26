@@ -13,6 +13,8 @@ namespace quda
   namespace blas
   {
 
+    constexpr unsigned int multi_reduce_unroll = QUDA_BLAS_UNROLL_REDUCE;
+
     /**
        @brief Return the batch block size used for multi reductions.
      */
@@ -38,6 +40,7 @@ namespace quda
       using real = real_;
       using Reducer = Reducer_;
       using reduce_t = array<typename Reducer_::reduce_t, NXZ_>;
+      static constexpr unsigned int work_item_unroll = QUDA_BLAS_UNROLL_REDUCE;
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
@@ -99,24 +102,39 @@ namespace quda
         unsigned int i = tid - parity * arg.length_cb;
 
         vec x, y, z, w;
-        if (arg.f.read.Y) arg.Y[k].load(y, i, parity);
-        if (arg.f.read.W) arg.W[k].load(w, i, parity);
+        if constexpr (Arg::Reducer::read.Y) arg.Y[k].load(y, i, parity);
+        if constexpr (Arg::Reducer::read.W) arg.W[k].load(w, i, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < Arg::NXZ; l++) {
-          if (arg.f.read.X) arg.X[l].load(x, i, parity);
-          if (arg.f.read.Z) arg.Z[l].load(z, i, parity);
+          if constexpr (Arg::Reducer::read.X) arg.X[l].load(x, i, parity);
+          if constexpr (Arg::Reducer::read.Z) arg.Z[l].load(z, i, parity);
 
           arg.f(sum[l], x, y, z, w, k, l);
 
         }
-        if (arg.f.write.Y) arg.Y[k].save(y, i, parity);
-        if (arg.f.write.W) arg.W[k].save(w, i, parity);
+        if constexpr (Arg::Reducer::write.Y) arg.Y[k].save(y, i, parity);
+        if constexpr (Arg::Reducer::write.W) arg.W[k].save(w, i, parity);
 
         return sum;
+      }
+
+      __device__ __host__ inline void prefetch(int tid, int, int k) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          const unsigned int parity = tid >= arg.length_cb ? 1u : 0u;
+          const unsigned int i = tid - parity * static_cast<unsigned int>(arg.length_cb);
+          if constexpr (Arg::Reducer::read.Y) arg.Y[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.W) arg.W[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+#pragma unroll
+          for (int l = 0; l < Arg::NXZ; l++) {
+            if constexpr (Arg::Reducer::read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+            if constexpr (Arg::Reducer::read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          }
+        }
       }
     };
 
