@@ -1572,7 +1572,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   void *h_result = (void *)malloc(data_bytes);
 
   double m_l, m_s, m_u, m_d, dl, ds, du, dd;
-  double zscale, zscale2;
+  double zscale = 0.0, zscale2 = 0.0;
 
   // Loop over eigenvectors
   for (int i = 0; i < n_evecs; i++) {
