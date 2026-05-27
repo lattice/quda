@@ -1354,9 +1354,9 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
         preserved_evals_zero_mass[i] = space0->evals[i] - Complex(m2_shift, 0.0);
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Stored zero-mass eigenvalues (back-shifted from mass %e)\n", mass);
+        printfQuda("Stored zero-mass eigenvalues (back-shifted from mass %e)\n", mass);
         for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
-          logQuda(QUDA_DEBUG_VERBOSE, "Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
+          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
                   preserved_evals_zero_mass[i].imag());
       }
     }
@@ -1422,7 +1422,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                                       {space->evecs.begin() + lo, space->evecs.begin() + hi}, n_unit,
                                       {temps.begin(), temps.begin() + bs});
           for (int j = 0; j < bs; j++)
-            logQuda(QUDA_DEBUG_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n", lo + j,
+            printfQuda("Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n", lo + j,
                     space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
         }
       } else {
@@ -1976,10 +1976,10 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
           space->evals[i] = preserved_evals_zero_mass[i] + Complex(m2_shift, 0.0);
 
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-          logQuda(QUDA_DEBUG_VERBOSE, "Shifted eigenvalues (parity %d, mass %e)\n", local_parity, mass);
+          printfQuda("Shifted eigenvalues (parity %d, mass %e)\n", local_parity, mass);
           for (size_t i = 0; i < space->evals.size(); i++)
-            logQuda(QUDA_DEBUG_VERBOSE, "  Eval[%04zu] = (%+.16e,%+.16e) (shifted)\n", i, space->evals[i].real(),
-                    space->evals[i].imag());
+            printfQuda("  Eval[%04zu] = (%+.16e,%+.16e) (shifted)\n", i, space->evals[i].real(),
+                      space->evals[i].imag());
         }
       } else if (qep.preserve_deflation_space != nullptr) {
         // Reusing an existing deflation space at a new mass with no zero-mass
@@ -2029,11 +2029,10 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
         preserved_evals_zero_mass[i] = space->evals[i] - Complex(m2_shift, 0.0);
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Stored zero-mass eigenvalues (back-shifted from parity %d, mass %e)\n",
-                local_parity, mass);
+        printfQuda("Stored zero-mass eigenvalues (back-shifted from parity %d, mass %e)\n", local_parity, mass);
         for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
-          logQuda(QUDA_DEBUG_VERBOSE, "Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
-                  preserved_evals_zero_mass[i].imag());
+          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
+                    preserved_evals_zero_mass[i].imag());
       }
     }
   }
