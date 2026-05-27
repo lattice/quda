@@ -1388,47 +1388,62 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     setDiracEigParam(diracEigParam, &invertParam, true, false);
     Dirac *dEig = Dirac::create(diracEigParam);
 
-    // Temp vector on GPU
+    // Batch of temp vectors on GPU
+    auto batch_size = std::min(eigargs.compute_evals_batch_size, n_evecs);
     gpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField temp(gpuParam);
+    std::vector<ColorSpinorField> temps;
+    resize(temps, batch_size, gpuParam);
 
     Complex n_unit(-1.0, 0.0);
 
-    for (int i = 0; i < n_evecs; i++) {
+    for (int i = 0; i < n_evecs; i += batch_size) {
+      auto lo = i;
+      auto hi = std::min(i + batch_size, n_evecs);
+      auto bs = hi - lo;
 
-      // Compute other parity eigenvector v_o = i*D_oe*v_e/\lambda_e
-      dEig->Dslash(temp, other_parity_space->evecs[i], parity);
-      auto norm2 = blas::norm2(temp);
-      blas::ax(1.0 / sqrt(norm2), temp);
-      space->evecs[i] = temp;
+      // Compute other parity eigenvectors v_o = i*D_oe*v_e/\lambda_e (normalized)
+      dEig->Dslash({temps.begin(), temps.begin() + bs},
+                   {other_parity_space->evecs.begin() + lo, other_parity_space->evecs.begin() + hi}, parity);
+      auto t_norms = blas::norm2({temps.begin(), temps.begin() + bs});
+      quda::vector<Complex> scales(bs);
+      for (int j = 0; j < bs; j++) scales[j] = 1.0 / sqrt(t_norms[j]);
+      blas::axy(scales, {temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
 
       if (!preserved_evals_zero_mass.empty()) {
         // Shift from stored zero-mass eigenvalues; no mat-vec needed.
         assert(preserved_evals_zero_mass.size() >= static_cast<size_t>(n_evecs));
-        space->evals[i] = preserved_evals_zero_mass[i] + Complex(4.0 * mass * mass, 0.0);
+        for (int j = 0; j < bs; j++)
+          space->evals[lo + j] = preserved_evals_zero_mass[lo + j] + Complex(4.0 * mass * mass, 0.0);
 
         // Opt-in residual sanity check
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-          dEig->M(temp, space->evecs[i]);
-          auto res = blas::caxpbyNorm(space->evals[i], space->evecs[i], n_unit, temp);
-          logQuda(QUDA_DEBUG_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n", i,
-                  space->evals[i].real(), space->evals[i].imag(), sqrt(res[0]));
+          dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
+          auto res = blas::caxpbyNorm({space->evals.begin() + lo, space->evals.begin() + hi},
+                                      {space->evecs.begin() + lo, space->evecs.begin() + hi}, n_unit,
+                                      {temps.begin(), temps.begin() + bs});
+          for (int j = 0; j < bs; j++)
+            logQuda(QUDA_DEBUG_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n", lo + j,
+                    space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
         }
       } else {
         // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-        dEig->M(temp, space->evecs[i]);
-        auto eval = other_parity_space->evals[i];       // re-use eigenvalues by default
+        dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
         if (fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
-          auto vtAv = blas::cDotProduct(space->evecs[i], temp);
-          auto v2 = blas::norm2(space->evecs[i]);
-          eval = vtAv / sqrt(v2);
+          auto vtAv = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi},
+                                        {temps.begin(), temps.begin() + bs});
+          auto v2 = blas::norm2({space->evecs.begin() + lo, space->evecs.begin() + hi});
+          for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / sqrt(v2[j]);
+        } else { // re-use other parity eigenvalues by default
+          for (int j = 0; j < bs; j++) space->evals[lo + j] = other_parity_space->evals[lo + j];
         }
-        space->evals[i] = eval;
 
         // res^2 = |\lambda*v - A*v|
-        auto res = blas::caxpbyNorm(eval, space->evecs[i], n_unit, temp);
-        logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(),
-                sqrt(res[0]));
+        auto res = blas::caxpbyNorm({space->evals.begin() + lo, space->evals.begin() + hi},
+                                    {space->evecs.begin() + lo, space->evecs.begin() + hi}, n_unit,
+                                    {temps.begin(), temps.begin() + bs});
+        for (int j = 0; j < bs; j++)
+          logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
+                  space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
       }
     }
     delete dEig;
@@ -1462,9 +1477,11 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     setDiracEigParam(diracEigParam, &invertParam, true, false);
     Dirac *dEig = Dirac::create(diracEigParam);
 
-    // Temp vector on GPU
+    // Batch of temp vectors on GPU
+    auto batch_size = std::min(eigargs.compute_evals_batch_size, n_evecs);
     gpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField temp(gpuParam);
+    std::vector<ColorSpinorField> temps;
+    resize(temps, batch_size, gpuParam);
 
     Complex n_unit(-1.0, 0.0);
 
@@ -1473,25 +1490,33 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     int evec_offset = getColorVectorOffset(parity, false, localDim) * host_precision;
 
     const lat_dim_t dims = {localDim[0], localDim[1], localDim[2], localDim[3]};
-    for (int i = 0; i < n_evecs; i++) {
+    for (int i = 0; i < n_evecs; i += batch_size) {
+      auto lo = i;
+      auto hi = std::min(i + batch_size, n_evecs);
+      auto bs = hi - lo;
 
       // Copy each evec to host-side spinor and then to device-side deflation space
-      void *evec_ptr = static_cast<char *>(evecs[i]) + evec_offset;
-      ColorSpinorParam cpuParam(evec_ptr, invertParam, dims, true, QUDA_CPU_FIELD_LOCATION);
-      ColorSpinorField in_evec(cpuParam);
-      space->evecs[i] = in_evec;
+      for (int j = 0; j < bs; j++) {
+        void *evec_ptr = static_cast<char *>(evecs[lo + j]) + evec_offset;
+        ColorSpinorParam cpuParam(evec_ptr, invertParam, dims, true, QUDA_CPU_FIELD_LOCATION);
+        ColorSpinorField in_evec(cpuParam);
+        space->evecs[lo + j] = in_evec;
+      }
 
-      // Compute eigenvalue, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-      dEig->M(temp, space->evecs[i]);
-      auto vtAv = blas::cDotProduct(space->evecs[i], temp);
-      auto v2 = blas::norm2(space->evecs[i]);
-      auto eval = vtAv / sqrt(v2);
-      space->evals[i] = eval;
+      // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+      dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
+      auto vtAv = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi},
+                                    {temps.begin(), temps.begin() + bs});
+      auto v2 = blas::norm2({space->evecs.begin() + lo, space->evecs.begin() + hi});
+      for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / sqrt(v2[j]);
 
       // Compute residual, res^2 = |\lambda*v - A*v|
-      auto res = blas::caxpbyNorm(eval, space->evecs[i], n_unit, temp);
-      logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(),
-              sqrt(res[0]));
+      auto res = blas::caxpbyNorm({space->evals.begin() + lo, space->evals.begin() + hi},
+                                  {space->evecs.begin() + lo, space->evecs.begin() + hi}, n_unit,
+                                  {temps.begin(), temps.begin() + bs});
+      for (int j = 0; j < bs; j++)
+        logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
+                space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
     }
 
     delete dEig;
