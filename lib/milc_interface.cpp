@@ -1505,8 +1505,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 
       // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
-      auto vtAv = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi},
-                                    {temps.begin(), temps.begin() + bs});
+      auto vtAv
+        = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi}, {temps.begin(), temps.begin() + bs});
       auto v2 = blas::norm2({space->evecs.begin() + lo, space->evecs.begin() + hi});
       for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / sqrt(v2[j]);
 
