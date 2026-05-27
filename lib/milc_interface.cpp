@@ -1636,8 +1636,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
 
       // Do gauge covariant shift and flip sign on ODD sites
       myCovDev.MCD(gr_mu, gr0, mu);
-      blas::copy(gr_mu.Odd(), gr0.Odd());
-      blas::ax(-1.0, gr_mu.Odd());
+      blas::axy(-1.0, gr0.Odd(), gr_mu.Odd());
 
       // Do spin-taste operation
       applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
