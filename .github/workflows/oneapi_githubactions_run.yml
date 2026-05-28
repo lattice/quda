@@ -54,7 +54,7 @@ jobs:
         -DQUDA_TARGET_TYPE=SYCL
         -DQUDA_SYCL_TARGETS=spir64_x86_64
         -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt"
-        -DCMAKE_SYCL_FLAGS="-Xs -march=avx512 -Wno-unsupported-floating-point-opt"
+        -DCMAKE_SYCL_FLAGS="-Wno-unsupported-floating-point-opt"
         -DSYCL_LINK_FLAGS="-Xs -march=avx512 -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=4 -flink-huge-device-code"
         -DQUDA_MULTIGRID=ON
         -DQUDA_FAST_COMPILE_REDUCE=ON
