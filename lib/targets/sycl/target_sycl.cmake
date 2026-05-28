@@ -63,7 +63,7 @@ set(CMAKE_SYCL_FLAGS_DEVEL
     "-O3 -gline-directives-only -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_SYCL_FLAGS_STRICT
-    "-O3 -Wall -Wextra -Werror"
+    "-Os -Wall -Wextra -Werror"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_SYCL_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT}"

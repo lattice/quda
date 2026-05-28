@@ -9,7 +9,7 @@ defaults:
     shell: bash
 
 env:
-  BUILD_TYPE: RELEASE
+  BUILD_TYPE: STRICT
 
 jobs:
   buildrun:

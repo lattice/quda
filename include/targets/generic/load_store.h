@@ -12,20 +12,13 @@ namespace quda
   };
 
   /**
-     @brief Element type used for coalesced storage.
-   */
-  template <typename T>
-  using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
-
-  /**
      @brief Non-specialized load operation
   */
   template <bool is_device> struct vector_load_impl {
     template <typename T, size_t prefetch_size>
     __device__ __host__ inline void operator()(T &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
-      // value = reinterpret_cast<const T *>(ptr)[idx];
-      memcpy(&value, static_cast<const T *>(ptr) + idx, sizeof(value));
+      value = reinterpret_cast<const T *>(ptr)[idx];
     }
   };
 
@@ -60,12 +53,11 @@ namespace quda
   template <bool is_device> struct vector_store_impl {
     template <typename T> __device__ __host__ inline void operator()(void *ptr, int idx, const T &value)
     {
-      // reinterpret_cast<T *>(ptr)[idx] = value;
-      memcpy(static_cast<T *>(ptr) + idx, &value, sizeof(value));
+      reinterpret_cast<T *>(ptr)[idx] = value;
     }
   };
 
-  template <typename vector_t> __device__ __host__ inline void vector_storeV(void *ptr, int idx, const vector_t &value)
+  template <typename vector_t> __device__ __host__ inline void vector_store(void *ptr, int idx, const vector_t &value)
   {
     target::dispatch<vector_store_impl>(ptr, idx, value);
   }
@@ -77,9 +69,7 @@ namespace quda
     vector_t value_v;
     static_assert(sizeof(value_a) == sizeof(value_v), "array type and vector type are different sizes");
     memcpy(&value_v, &value_a, sizeof(vector_t));
-    // vector_storeV<vector_t>(ptr, idx, value_v);
-    scalar_t *a = static_cast<scalar_t *>(ptr) + N * idx;
-    memcpy(a, &value_v, sizeof(value_v));
+    vector_store<vector_t>(ptr, idx, value_v);
   }
 
   template <typename scalar_t, int N>
