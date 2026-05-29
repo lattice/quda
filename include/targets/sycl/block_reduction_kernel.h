@@ -40,12 +40,8 @@ namespace quda
       const int ngrp = groupRangeX;
       const int gridp = ngrp - ngrp % arg.swizzle_factor;
 
-      // block_idx = blockIdx.x;
-      // if (blockIdx.x < gridp) {
       if (block_idx < gridp) {
         // this is the portion of the block that we are going to transpose
-        // const int i = blockIdx.x % arg.swizzle_factor;
-        // const int j = blockIdx.x / arg.swizzle_factor;
         const int i = block_idx % arg.swizzle_factor;
         const int j = block_idx / arg.swizzle_factor;
 
@@ -67,7 +63,6 @@ namespace quda
    */
   template <unsigned int block_size, typename Arg_> struct BlockKernelArg : Arg_ {
     using Arg = Arg_;
-    // static constexpr unsigned int block_size = block_size_;
     static constexpr unsigned int block_size_cxpr = block_size;
     BlockKernelArg(const Arg &arg) : Arg(arg) { }
   };
@@ -95,17 +90,7 @@ namespace quda
     const unsigned int k = globalIdZ;
     if (k >= arg.threads.z) return;
 
-#if 0
-    Functor<Arg> f(arg);
-    if constexpr (hasKernelOps<Functor<Arg>>) {
-      f.setNdItem(ndi);
-    }
-    if constexpr (needsSharedMem<Functor<Arg>>) {
-      f.setSharedMem(smem...);
-    }
-#else
     Ftor<Functor<Arg>> f(arg, ndi, smem...);
-#endif
 
     f(block_idx, thread_idx);
   }
@@ -121,17 +106,7 @@ namespace quda
     const unsigned int k = globalIdZ;
     if (k >= arg.threads.z) active = false;
 
-#if 0
-    Functor<Arg> f(arg);
-    if constexpr (hasKernelOps<Functor<Arg>>) {
-      f.setNdItem(ndi);
-    }
-    if constexpr (needsSharedMem<Functor<Arg>>) {
-      f.setSharedMem(smem...);
-    }
-#else
     Ftor<Functor<Arg>> f(arg, ndi, smem...);
-#endif
 
     f.template operator()<true>(block_idx, thread_idx, active);
   }
@@ -139,11 +114,11 @@ namespace quda
     using KernelOpsT = getKernelOps<Functor<Arg>>;
     template <typename... S> BlockKernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, S... smem)
     {
-#ifdef QUDA_THREADS_BLOCKED
-      BlockKernel2DImpl<Functor, Arg>(arg, ndi);
-#else
+      //#ifdef QUDA_THREADS_BLOCKED
+      //BlockKernel2DImpl<Functor, Arg>(arg, ndi);
+      //#else
       BlockKernel2DImpl<Functor, Arg>(arg, ndi, smem...);
-#endif
+      //#endif
     }
   };
 
@@ -152,12 +127,9 @@ namespace quda
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     auto err = QUDA_SUCCESS;
-    auto globalSize = globalRange(tp);
-    auto localSize = localRange(tp);
-    // if (localSize[RANGE_X] % device::warp_size() != 0) {
-    // return QUDA_ERROR;
-    // }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      auto globalSize = globalRange(tp);
+      auto localSize = localRange(tp);
       printfQuda("BlockKernel2D sizeof(arg): %lu\n", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(), str(localSize).c_str(),
                  str(arg.threads).c_str());
@@ -169,28 +141,7 @@ namespace quda
       printfQuda("  sharedMemSize: %i\n", sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block, arg));
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
-    // if (localSize[RANGE_X] % device::warp_size() != 0) {
-    // if(needsFullBlock<Functor<Arg>>) {
-    // std::ostringstream what;
-    // what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
-    // target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
-    // return QUDA_ERROR;
-    // }
-    // }
-    // if (arg.threads.x%localSize[RANGE_X] != 0) {
-    // warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-    //  return QUDA_ERROR;
-    //}
-    // if (globalSize[RANGE_Y] != arg.threads.y) {
-    // warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
-    //  return QUDA_ERROR;
-    //}
-    // if (globalSize[RANGE_Z] != arg.threads.z) {
-    // warningQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
-    //  return QUDA_ERROR;
-    //}
-    sycl::nd_range<3> ndRange {globalSize, localSize};
-    err = launch<BlockKernel2DS<Functor, Arg>>(stream, ndRange, arg);
+    err = launch<BlockKernel2DS<Functor, Arg>>(tp, stream, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("end BlockKernel2D\n"); }
     return err;
   }

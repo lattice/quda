@@ -5,15 +5,11 @@
 #include <sstream>
 #include <sycl/ext/oneapi/experimental/builtins.hpp>
 
-//using cudaStream_t = int;
-
 #include "shortvec.h"
 
 #define __host__
 #define __device__
 #define __forceinline__ __attribute__((always_inline)) inline
-
-//#define __shared__
 
 #define RANGE_X 2
 #define RANGE_Y 1

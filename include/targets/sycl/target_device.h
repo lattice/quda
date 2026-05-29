@@ -10,27 +10,11 @@
 // #define QUDA_MAX_ARGUMENT_SIZE 2048
 // #endif
 
-// #define HOSTDEVICE __host__ __device__
-// #define HostDevice __host__ __device__
-
 namespace quda
 {
 
   namespace target
   {
-
-#if 0
-    // compile-time dispatch
-    template <template <bool, typename ...> class f, typename ...Args>
-    auto dispatch(Args &&... args)
-    {
-#ifdef __SYCL_DEVICE_ONLY__
-      return f<true>()(args...);
-#else
-      return f<false>()(args...);
-#endif
-    }
-#endif
 
     // compile-time dispatch
     template <template <bool, typename...> class f, auto... Params, typename... Args> auto dispatch(Args &&...args)
@@ -160,11 +144,6 @@ namespace quda
        architecture we are running on.
     */
     constexpr int warp_size() { return QUDA_WARP_SIZE; }
-
-    /**
-       @brief Return the thread mask for a converged warp.
-    */
-    constexpr unsigned int warp_converged_mask() { return 0xffffffff; }
 
     /**
        @brief Helper function that returns the maximum number of threads

@@ -29,12 +29,21 @@ namespace quda
   void Kernel1DImplB(const Arg &arg, const sycl::nd_item<3> &)
   {
     Functor<Arg> f(arg);
+#if 0
     auto tid = globalIdX;
     auto nid = globalRangeX;
     auto n = arg.threads.x;
     auto i0 = (tid * n) / nid;
     auto i1 = ((tid + 1) * n) / nid;
     for (auto i = i0; i < i1; i++) { f(i); }
+#endif
+    // keep warp together
+    auto n = arg.threads.x;
+    auto tid = globalIdX / QUDA_WARP_SIZE;
+    auto nid = globalRangeX / QUDA_WARP_SIZE;
+    auto i0 = (tid * n) / nid + (localIdX % QUDA_WARP_SIZE);
+    auto i1 = ((tid + 1) * n) / nid;
+    for (auto i = i0; i < i1; i+=QUDA_WARP_SIZE) { f(i); }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false> struct Kernel1DS {
     using KernelOpsT = getKernelOps<Functor<Arg>>;
@@ -53,26 +62,9 @@ namespace quda
   {
     static_assert(!hasKernelOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
-    auto globalSize = globalRange(tp);
-    auto localSize = localRange(tp);
-    // if (localSize[RANGE_X] % device::warp_size() != 0) {
-    //   return QUDA_ERROR;
-    // }
-#if 0
-    if (localSize[RANGE_X] > arg.threads.x) {
-      localSize[RANGE_X] = arg.threads.x;
-      globalSize[RANGE_X] = arg.threads.x;
-    } else if (grid_stride) {
-      if (globalSize[RANGE_X] > arg.threads.x) {
-	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
-      }
-    } else {
-      if (globalSize[RANGE_X] != arg.threads.x) {
-	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
-      }
-    }
-#endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      auto globalSize = globalRange(tp);
+      auto localSize = localRange(tp);
       printfQuda("Kernel1D grid_stride: %s  sizeof(arg): %lu\n", grid_stride ? "true" : "false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(), str(localSize).c_str(),
                  str(arg.threads).c_str());
@@ -83,20 +75,6 @@ namespace quda
                  needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
-    // if (localSize[RANGE_X] % device::warp_size() != 0) {
-    // if(needsFullBlock<Functor<Arg>>) {
-    // std::ostringstream what;
-    // what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
-    // target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
-    // return QUDA_ERROR;
-    // }
-    // }
-    // if (arg.threads.x%localSize[RANGE_X] != 0) {
-    // warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-    //  return QUDA_ERROR;
-    //}
-    // sycl::nd_range<3> ndRange{globalSize, localSize};
-    // err = launch<Kernel1DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
     err = launch<Kernel1DS<Functor, Arg, grid_stride>>(tp, stream, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("end Kernel1D\n"); }
     return err;
@@ -108,18 +86,7 @@ namespace quda
   std::enable_if_t<!needsFullBlock<Functor<Arg>>, void> Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi,
                                                                      S... smem)
   {
-#if 0
-    Functor<Arg> f(arg);
-    if constexpr (hasKernelOps<Functor<Arg>>) {
-      f.setNdItem(ndi);
-    }
-    if constexpr (needsSharedMem<Functor<Arg>>) {
-      f.setSharedMem(smem...);
-    }
-#else
-    // Functor<Arg> f(arg, smem...);
     Ftor<Functor<Arg>> f(arg, ndi, smem...);
-#endif
 
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
@@ -135,18 +102,7 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride, typename... S>
   std::enable_if_t<needsFullBlock<Functor<Arg>>, void> Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S... smem)
   {
-#if 0
-    Functor<Arg> f(arg);
-    if constexpr (hasKernelOps<Functor<Arg>>) {
-      f.setNdItem(ndi);
-    }
-    if constexpr (needsSharedMem<Functor<Arg>>) {
-      f.setSharedMem(smem...);
-    }
-#else
-    // Functor<Arg> f(arg, smem...);
     Ftor<Functor<Arg>> f(arg, ndi, smem...);
-#endif
 
     bool active = true;
     auto j = globalIdY;
@@ -162,25 +118,25 @@ namespace quda
     }
   }
 
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  void Kernel2DImplB(const Arg &arg, const sycl::nd_item<3> &)
+  template <template <typename> class Functor, typename Arg, bool grid_stride, typename... S>
+  void Kernel2DImplB(const Arg &arg, const sycl::nd_item<3> &ndi, S... smem)
   {
-    Functor<Arg> f(arg);
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
-    auto tid = globalIdX;
-    auto nid = globalRangeX;
     auto n = arg.threads.x;
-    auto i0 = (tid * n) / nid;
+    auto tid = globalIdX / QUDA_WARP_SIZE;
+    auto nid = globalRangeX / QUDA_WARP_SIZE;
+    auto i0 = (tid * n) / nid + (localIdX % QUDA_WARP_SIZE);
     auto i1 = ((tid + 1) * n) / nid;
-    for (auto i = i0; i < i1; i++) { f(i, j); }
+    for (auto i = i0; i < i1; i+=QUDA_WARP_SIZE) { f(i, j); }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false> struct Kernel2DS {
     using KernelOpsT = getKernelOps<Functor<Arg>>;
     template <typename... S> Kernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, S... smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
-      Kernel2DImplB<Functor, Arg, grid_stride>(arg, ndi);
+      Kernel2DImplB<Functor, Arg, grid_stride>(arg, ndi, smem...);
 #else
       Kernel2DImpl<Functor, Arg, grid_stride>(arg, ndi, smem...);
 #endif
@@ -191,26 +147,9 @@ namespace quda
   qudaError_t Kernel2D(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
     auto err = QUDA_SUCCESS;
-    auto globalSize = globalRange(tp);
-    auto localSize = localRange(tp);
-    // if (localSize[RANGE_X] % device::warp_size() != 0) {
-    //   return QUDA_ERROR;
-    // }
-#if 0
-    if (localSize[RANGE_X] > arg.threads.x) {
-      localSize[RANGE_X] = arg.threads.x;
-      globalSize[RANGE_X] = arg.threads.x;
-    } else if (grid_stride) {
-      if (globalSize[RANGE_X] > arg.threads.x) {
-	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
-      }
-    } else {
-      if (globalSize[RANGE_X] != arg.threads.x) {
-	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
-      }
-    }
-#endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      auto globalSize = globalRange(tp);
+      auto localSize = localRange(tp);
       printfQuda("Kernel2D grid_stride: %s  sizeof(arg): %lu\n", grid_stride ? "true" : "false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(), str(localSize).c_str(),
                  str(arg.threads).c_str());
@@ -221,27 +160,7 @@ namespace quda
                  needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
-    // if (localSize[RANGE_X] % device::warp_size() != 0) {
-    // if(needsFullBlock<Functor<Arg>>) {
-    // std::ostringstream what;
-    // what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
-    // target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
-    // return QUDA_ERROR;
-    // }
-    // }
-    // if (arg.threads.x%localSize[RANGE_X] != 0) {
-    // warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-    //  return QUDA_ERROR;
-    //}
-    // if (globalSize[RANGE_Y] != arg.threads.y) {
-    // warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
-    //  return QUDA_ERROR;
-    //}
-    // auto t0 = __rdtsc();
-    sycl::nd_range<3> ndRange {globalSize, localSize};
-    err = launch<Kernel2DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
-    // auto t1 = __rdtsc();
-    // printf("%llu\n", t1-t0);
+    err = launch<Kernel2DS<Functor, Arg, grid_stride>>(tp, stream, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("end Kernel2D\n"); }
     return err;
   }
@@ -252,18 +171,7 @@ namespace quda
   std::enable_if_t<!needsFullBlock<Functor<Arg>>, void> Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi,
                                                                      S... smem)
   {
-#if 0
-    Functor<Arg> f(arg);
-    if constexpr (hasKernelOps<Functor<Arg>>) {
-      f.setNdItem(ndi);
-    }
-    if constexpr (needsSharedMem<Functor<Arg>>) {
-      f.setSharedMem(smem...);
-    }
-#else
-    // Functor<Arg> f(arg, smem...);
     Ftor<Functor<Arg>> f(arg, ndi, smem...);
-#endif
 
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
@@ -281,18 +189,7 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride, typename... S>
   std::enable_if_t<needsFullBlock<Functor<Arg>>, void> Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S... smem)
   {
-#if 0
-    Functor<Arg> f(arg);
-    if constexpr (hasKernelOps<Functor<Arg>>) {
-      f.setNdItem(ndi);
-    }
-    if constexpr (needsSharedMem<Functor<Arg>>) {
-      f.setSharedMem(smem...);
-    }
-#else
-    // Functor<Arg> f(arg, smem...);
     Ftor<Functor<Arg>> f(arg, ndi, smem...);
-#endif
 
     bool active = true;
     auto j = globalIdY;
@@ -310,28 +207,28 @@ namespace quda
     }
   }
 
-  template <template <typename> class Functor, typename Arg, bool grid_stride>
-  void Kernel3DImplB(const Arg &arg, const sycl::nd_item<3> &)
+  template <template <typename> class Functor, typename Arg, bool grid_stride, typename... S>
+  void Kernel3DImplB(const Arg &arg, const sycl::nd_item<3> &ndi, S... smem)
   {
-    Functor<Arg> f(arg);
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
 
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
     auto k = globalIdZ;
     if (k >= arg.threads.z) return;
-    auto tid = globalIdX;
-    auto nid = globalRangeX;
     auto n = arg.threads.x;
-    auto i0 = (tid * n) / nid;
+    auto tid = globalIdX / QUDA_WARP_SIZE;
+    auto nid = globalRangeX / QUDA_WARP_SIZE;
+    auto i0 = (tid * n) / nid + (localIdX % QUDA_WARP_SIZE);
     auto i1 = ((tid + 1) * n) / nid;
-    for (auto i = i0; i < i1; i++) { f(i, j, k); }
+    for (auto i = i0; i < i1; i+=QUDA_WARP_SIZE) { f(i, j, k); }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false> struct Kernel3DS {
     using KernelOpsT = getKernelOps<Functor<Arg>>;
     template <typename... S> Kernel3DS(const Arg &arg, const sycl::nd_item<3> &ndi, S... smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
-      Kernel3DImplB<Functor, Arg, grid_stride>(arg, ndi);
+      Kernel3DImplB<Functor, Arg, grid_stride>(arg, ndi, smem...);
 #else
       Kernel3DImpl<Functor, Arg, grid_stride>(arg, ndi, smem...);
 #endif
@@ -342,24 +239,9 @@ namespace quda
   qudaError_t Kernel3D(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
     auto err = QUDA_SUCCESS;
-    auto globalSize = globalRange(tp);
-    auto localSize = localRange(tp);
-#if 0
-    if (localSize[RANGE_X] > arg.threads.x) {
-      localSize[RANGE_X] = arg.threads.x;
-      globalSize[RANGE_X] = arg.threads.x;
-    } else if (grid_stride) {
-      if (globalSize[RANGE_X] > arg.threads.x) {
-	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
-      }
-    } else {
-      if (globalSize[RANGE_X] != arg.threads.x) {
-	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
-      }
-    }
-#endif
-    // printfQuda("Kernel3D %s\n", typeid(Functor<Arg>).name());
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      auto globalSize = globalRange(tp);
+      auto localSize = localRange(tp);
       printfQuda("Kernel3D param grid_stride: %s  sizeof(arg): %lu\n", grid_stride ? "true" : "false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(), str(localSize).c_str(),
                  str(arg.threads).c_str());
@@ -369,33 +251,10 @@ namespace quda
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>,
                  needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
-      // fflush(stdout);
     }
-    // if (localSize[RANGE_X] % device::warp_size() != 0) {
-    // if(needsFullBlock<Functor<Arg>>) {
-    // std::ostringstream what;
-    // what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
-    // target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
-    // return QUDA_ERROR;
-    // }
-    // }
-    // if (arg.threads.x%localSize[RANGE_X] != 0) {
-    // warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-    // return QUDA_ERROR;
-    // }
-    // if (globalSize[RANGE_Y] != arg.threads.y) {
-    // warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
-    //  return QUDA_ERROR;
-    //}
-    // if (globalSize[RANGE_Z] != arg.threads.z) {
-    // warningQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
-    //  return QUDA_ERROR;
-    //}
-    sycl::nd_range<3> ndRange {globalSize, localSize};
-    err = launch<Kernel3DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
+    err = launch<Kernel3DS<Functor, Arg, grid_stride>>(tp, stream, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end Kernel3D\n");
-      // fflush(stdout);
     }
     return err;
   }
