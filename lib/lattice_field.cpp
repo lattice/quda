@@ -290,13 +290,13 @@ namespace quda {
           qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
           // pinned buffer used for sending
-          ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
+          ghost_pinned_send_buffer_h[b] = host_pinned_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
           ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
 
           // pinned buffer used for receiving
-          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          ghost_pinned_recv_buffer_h[b] = host_pinned_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
           ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);

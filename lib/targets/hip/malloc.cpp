@@ -15,7 +15,7 @@
 namespace quda
 {
 
-  enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, N_ALLOC_TYPE };
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, N_ALLOC_TYPE };
 
   class MemAlloc
   {
@@ -48,9 +48,7 @@ namespace quda
 
   size_t device_allocated() { return total_bytes[DEVICE]; }
 
-  size_t pinned_allocated() { return total_bytes[PINNED]; }
-
-  size_t mapped_allocated() { return total_bytes[MAPPED]; }
+  size_t host_pinned_allocated() { return total_bytes[HOST_PINNED]; }
 
   size_t managed_allocated() { return total_bytes[MANAGED]; }
 
@@ -58,9 +56,7 @@ namespace quda
 
   size_t device_allocated_peak() { return max_total_bytes[DEVICE]; }
 
-  size_t pinned_allocated_peak() { return max_total_bytes[PINNED]; }
-
-  size_t mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+  size_t host_pinned_allocated_peak() { return max_total_bytes[HOST_PINNED]; }
 
   size_t managed_allocated_peak() { return max_total_bytes[MANAGED]; }
 
@@ -86,7 +82,7 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Host Pinned", "Managed"};
     std::map<void *, MemAlloc>::iterator entry;
 
     for (auto entry : alloc[type]) {
@@ -105,7 +101,7 @@ namespace quda
       total_host_bytes += a.base_size;
       if (total_host_bytes > max_total_host_bytes) { max_total_host_bytes = total_host_bytes; }
     }
-    if (type == PINNED || type == MAPPED) {
+    if (type == HOST_PINNED) {
       total_pinned_bytes += a.base_size;
       if (total_pinned_bytes > max_total_pinned_bytes) { max_total_pinned_bytes = total_pinned_bytes; }
     }
@@ -117,7 +113,7 @@ namespace quda
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
     if (type != DEVICE && type != DEVICE_PINNED) { total_host_bytes -= size; }
-    if (type == PINNED || type == MAPPED) { total_pinned_bytes -= size; }
+    if (type == HOST_PINNED) { total_pinned_bytes -= size; }
     alloc[type].erase(ptr);
   }
 
@@ -125,7 +121,7 @@ namespace quda
    * Under CUDA 4.0, hipHostRegister seems to require that both the
    * beginning and end of the buffer be aligned on page boundaries.
    * This local function takes care of the alignment and gets called
-   * by pinned_malloc_() and mapped_malloc_()
+   * by host_pinned_malloc_()
    */
   static void *aligned_malloc(MemAlloc &a, size_t size)
   {
@@ -273,46 +269,25 @@ namespace quda
   }
 
   /**
-   * Allocate page-locked ("pinned") host memory.  This function
-   * should only be called via the pinned_malloc() macro, defined in
-   * malloc_quda.h
+   * Allocate page-locked host memory mapped into the GPU address space.
+   * This function should only be called via the host_pinned_malloc() macro,
+   * defined in malloc_quda.h
    *
    * Note that we do not rely on hipHostMalloc(), since buffers
    * allocated in this way have been observed to cause problems when
    * shared with MPI via GPU Direct on some systems.
    */
-  void *pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  void *host_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
     void *ptr = aligned_malloc(a, size);
 
-    hipError_t err = hipHostRegister(ptr, a.base_size, hipHostRegisterDefault);
-    if (err != hipSuccess) {
-      errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
-    track_malloc(PINNED, a, ptr);
-#ifdef HOST_DEBUG
-    memset(ptr, 0xff, a.base_size);
-#endif
-    return ptr;
-  }
-
-  /**
-   * Allocate page-locked ("pinned") host memory, and map it into the
-   * GPU address space.  This function should only be called via the
-   * mapped_malloc() macro, defined in malloc_quda.h
-   */
-  void *mapped_malloc_(const char *func, const char *file, int line, size_t size)
-  {
-    MemAlloc a(func, file, line);
-
-    void *ptr = aligned_malloc(a, size);
     hipError_t err = hipHostRegister(ptr, a.base_size, hipHostRegisterMapped | hipHostRegisterPortable);
     if (err != hipSuccess) {
-      errorQuda("Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Failed to register host-pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
 
-    track_malloc(MAPPED, a, ptr);
+    track_malloc(HOST_PINNED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
 #endif
@@ -441,9 +416,8 @@ namespace quda
   }
 
   /**
-   * Free host memory allocated with safe_malloc(), pinned_malloc(),
-   * or mapped_malloc().  This function should only be called via the
-   * host_free() macro, defined in malloc_quda.h
+   * Free host memory allocated with safe_malloc() or host_pinned_malloc().
+   * This function should only be called via the host_free() macro, defined in malloc_quda.h
    */
   void host_free_(const char *func, const char *file, int line, void *ptr)
   {
@@ -451,24 +425,13 @@ namespace quda
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
       free(ptr);
-    } else if (alloc[PINNED].count(ptr)) {
-      hipError_t err = hipHostUnregister(ptr);
-      if (err != hipSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
-      track_free(PINNED, ptr);
-      free(ptr);
-    } else if (alloc[MAPPED].count(ptr)) {
-#ifdef HOST_ALLOC
-      hipError_t err = hipFreeHost(ptr);
-      if (err != hipSuccess) { errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func); }
-      track_free(MAPPED, ptr);
-#else
+    } else if (alloc[HOST_PINNED].count(ptr)) {
       hipError_t err = hipHostUnregister(ptr);
       if (err != hipSuccess) {
-        errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
+        errorQuda("Failed to unregister host-pinned memory (%s:%d in %s())\n", file, line, func);
       }
-      track_free(MAPPED, ptr);
+      track_free(HOST_PINNED, ptr);
       free(ptr);
-#endif
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);
       print_trace();
@@ -501,16 +464,15 @@ namespace quda
 
   void assertAllMemFree()
   {
-    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty() || !alloc[PINNED].empty()
-        || !alloc[MAPPED].empty()) {
+    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty()
+        || !alloc[HOST_PINNED].empty()) {
       warningQuda("The following internal memory allocations were not freed.");
       printfQuda("\n");
       print_alloc_header();
       print_alloc(DEVICE);
       print_alloc(DEVICE_PINNED);
       print_alloc(HOST);
-      print_alloc(PINNED);
-      print_alloc(MAPPED);
+      print_alloc(HOST_PINNED);
       printfQuda("\n");
     }
   }
@@ -630,14 +592,14 @@ namespace quda
       }
     }
 
-    void *pinned_malloc_(const char *func, const char *file, int line, size_t nbytes)
+    void *host_pinned_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
       void *ptr = nullptr;
       if (pinned_memory_pool) {
         std::multimap<size_t, void *>::iterator it;
 
         if (pinnedCache.empty()) {
-          ptr = quda::pinned_malloc_(func, file, line, nbytes);
+          ptr = quda::host_pinned_malloc_(func, file, line, nbytes);
         } else {
           it = pinnedCache.lower_bound(nbytes);
           if (it != pinnedCache.end()) { // sufficiently large allocation found
@@ -649,17 +611,17 @@ namespace quda
             ptr = it->second;
             pinnedCache.erase(it);
             host_free(ptr);
-            ptr = quda::pinned_malloc_(func, file, line, nbytes);
+            ptr = quda::host_pinned_malloc_(func, file, line, nbytes);
           }
         }
         pinnedSize[ptr] = nbytes;
       } else {
-        ptr = quda::pinned_malloc_(func, file, line, nbytes);
+        ptr = quda::host_pinned_malloc_(func, file, line, nbytes);
       }
       return ptr;
     }
 
-    void pinned_free_(const char *func, const char *file, int line, void *ptr)
+    void host_pinned_free_(const char *func, const char *file, int line, void *ptr)
     {
       if (pinned_memory_pool) {
         if (!pinnedSize.count(ptr)) { errorQuda("Attempt to free invalid pointer"); }
@@ -710,7 +672,7 @@ namespace quda
       }
     }
 
-    void flush_pinned()
+    void flush_host_pinned()
     {
       if (pinned_memory_pool) {
         logQuda(QUDA_DEBUG_VERBOSE, "Flushing host pinned memory pool\n");

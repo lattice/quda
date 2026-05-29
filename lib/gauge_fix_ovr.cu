@@ -266,7 +266,7 @@ namespace quda {
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
 
-    int *num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
+    int *num_failures_h = static_cast<int*>(host_pinned_malloc(sizeof(int)));
     int *num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
 
     GaugeFixQualityOVRArg<Float, recon, gauge_dir> argQ(data);
@@ -298,7 +298,7 @@ namespace quda {
         recv_d[d] = device_malloc(bytes[d]);
         sendg_d[d] = device_malloc(bytes[d]);
         recvg_d[d] = device_malloc(bytes[d]);
-        hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
+        hostbuffer_h[d] = (void*)host_pinned_malloc(4 * bytes[d]);
       }
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;

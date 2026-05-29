@@ -17,9 +17,8 @@ namespace quda
       case QUDA_MEMORY_DEVICE: device = pool ? pool_device_malloc(size) : device_malloc(size); break;
       case QUDA_MEMORY_DEVICE_PINNED: device = device_pinned_malloc(size); break;
       case QUDA_MEMORY_HOST: host = safe_malloc(size); break;
-      case QUDA_MEMORY_HOST_PINNED: host = pool ? pool_pinned_malloc(size) : pinned_malloc(size); break;
-      case QUDA_MEMORY_MAPPED:
-        host = mapped_malloc(size);
+      case QUDA_MEMORY_HOST_PINNED:
+        host = pool ? pool_host_pinned_malloc(size) : host_pinned_malloc(size);
         device = get_mapped_device_pointer(host);
         break;
       case QUDA_MEMORY_MANAGED:
@@ -42,9 +41,12 @@ namespace quda
       host = nullptr;
       break;
     case QUDA_MEMORY_HOST:
-    case QUDA_MEMORY_HOST_PINNED:
       device = nullptr;
       host = ptr;
+      break;
+    case QUDA_MEMORY_HOST_PINNED:
+      host = ptr;
+      device = get_mapped_device_pointer(host);
       break;
     case QUDA_MEMORY_MANAGED:
       device = ptr;
@@ -76,8 +78,7 @@ namespace quda
       case QUDA_MEMORY_DEVICE: pool ? pool_device_free(device) : device_free(device); break;
       case QUDA_MEMORY_DEVICE_PINNED: device_pinned_free(device); break;
       case QUDA_MEMORY_HOST: host_free(host); break;
-      case QUDA_MEMORY_HOST_PINNED: pool ? pool_pinned_free(host) : host_free(host); break;
-      case QUDA_MEMORY_MAPPED: host_free(host); break;
+      case QUDA_MEMORY_HOST_PINNED: pool ? pool_host_pinned_free(host) : host_free(host); break;
       default: errorQuda("Unknown memory type %d", type);
       }
       getProfile().TPSTOP(QUDA_PROFILE_FREE);
@@ -105,7 +106,7 @@ namespace quda
     switch (type) {
     case QUDA_MEMORY_DEVICE:
     case QUDA_MEMORY_DEVICE_PINNED:
-    case QUDA_MEMORY_MAPPED:
+    case QUDA_MEMORY_HOST_PINNED:
     case QUDA_MEMORY_MANAGED: return true;
     default: return false;
     }
@@ -128,10 +129,9 @@ namespace quda
     switch (type) {
     case QUDA_MEMORY_DEVICE:
     case QUDA_MEMORY_DEVICE_PINNED:
-    case QUDA_MEMORY_MAPPED:
+    case QUDA_MEMORY_HOST_PINNED:
     case QUDA_MEMORY_MANAGED: ptr = device; break;
-    case QUDA_MEMORY_HOST:
-    case QUDA_MEMORY_HOST_PINNED: ptr = host; break;
+    case QUDA_MEMORY_HOST: ptr = host; break;
     default: errorQuda("Unknown memory type %d", type);
     }
 

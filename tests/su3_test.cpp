@@ -148,7 +148,7 @@ int main(int argc, char **argv)
   // Size of floating point data
   size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * data_size;
-  void *qDensity = pinned_malloc(array_size);
+  void *qDensity = host_pinned_malloc(array_size);
 
   // start the timer
   host_timer.start();
