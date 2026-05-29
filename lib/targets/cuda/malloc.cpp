@@ -20,6 +20,22 @@
 namespace quda
 {
 
+  static void report_cuda_error(const char *api, cudaError_t err)
+  {
+    printfQuda("%s failed. Error code %d, error name %s, error string %s\n", api, static_cast<int>(err),
+               cudaGetErrorName(err), cudaGetErrorString(err));
+  }
+
+  static void report_cu_error(const char *api, CUresult err)
+  {
+    const char *name = nullptr;
+    const char *str = nullptr;
+    cuGetErrorName(err, &name);
+    cuGetErrorString(err, &str);
+    printfQuda("%s failed. Error code %d, error name %s, error string %s\n", api, static_cast<int>(err),
+               name ? name : "unknown", str ? str : "unknown");
+  }
+
   enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, N_ALLOC_TYPE };
 
   class MemAlloc
@@ -229,6 +245,7 @@ namespace quda
 #ifndef USE_QDPJIT
     cudaError_t err = cudaMalloc(&ptr, size);
     if (err != cudaSuccess) {
+      report_cuda_error("cudaMalloc", err);
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
 #else
@@ -262,6 +279,7 @@ namespace quda
 
     CUresult err = cuMemAlloc((CUdeviceptr *)&ptr, size);
     if (err != CUDA_SUCCESS) {
+      report_cu_error("cuMemAlloc", err);
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(DEVICE_PINNED, a, ptr);
@@ -306,6 +324,7 @@ namespace quda
 
     cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped | cudaHostRegisterPortable);
     if (err != cudaSuccess) {
+      report_cuda_error("cudaHostRegister", err);
       errorQuda("Failed to register host-pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(HOST_PINNED, a, ptr);
@@ -329,6 +348,7 @@ namespace quda
 
     cudaError_t err = cudaMallocManaged(&ptr, size);
     if (err != cudaSuccess) {
+      report_cuda_error("cudaMallocManaged", err);
       errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(MANAGED, a, ptr);
@@ -393,7 +413,10 @@ namespace quda
 
 #ifndef USE_QDPJIT
     cudaError_t err = cudaFree(ptr);
-    if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    if (err != cudaSuccess) {
+      report_cuda_error("cudaFree", err);
+      errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func);
+    }
 #else
     // QDPJIT: Barfs if it fails internally
     QDP::QDP_get_global_cache().signoffViaPtr(ptr);
@@ -419,7 +442,10 @@ namespace quda
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
     CUresult err = cuMemFree((CUdeviceptr)ptr);
-    if (err != CUDA_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    if (err != CUDA_SUCCESS) {
+      report_cu_error("cuMemFree", err);
+      errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func);
+    }
     track_free(DEVICE_PINNED, ptr);
   }
 
@@ -435,7 +461,10 @@ namespace quda
       errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
     }
     cudaError_t err = cudaFree(ptr);
-    if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    if (err != cudaSuccess) {
+      report_cuda_error("cudaFree", err);
+      errorQuda("Failed to free managed memory (%s:%d in %s())\n", file, line, func);
+    }
     track_free(MANAGED, ptr);
   }
 
@@ -452,6 +481,7 @@ namespace quda
     } else if (alloc[HOST_PINNED].count(ptr)) {
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) {
+        report_cuda_error("cudaHostUnregister", err);
         errorQuda("Failed to unregister host-pinned memory (%s:%d in %s())\n", file, line, func);
       }
       track_free(HOST_PINNED, ptr);
@@ -528,9 +558,8 @@ namespace quda
     void *data[] = {&mem_type};
     CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));
     if (error != CUDA_SUCCESS) {
-      const char *string;
-      cuGetErrorString(error, &string);
-      errorQuda("cuPointerGetAttributes failed with error %s", string);
+      report_cu_error("cuPointerGetAttributes", error);
+      errorQuda("cuPointerGetAttributes failed");
     }
 
     // catch pointers that have not been created in CUDA
@@ -549,8 +578,8 @@ namespace quda
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line,
-                func);
+      report_cuda_error("cudaHostGetDevicePointer", error);
+      errorQuda("cudaHostGetDevicePointer failed (%s:%d in %s())\n", file, line, func);
     }
     return device;
   }
@@ -559,7 +588,8 @@ namespace quda
   {
     auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line, func);
+      report_cuda_error("cudaHostRegister", error);
+      errorQuda("cudaHostRegister failed (%s:%d in %s())\n", file, line, func);
     }
   }
 
@@ -567,7 +597,8 @@ namespace quda
   {
     auto error = cudaHostUnregister(ptr);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line, func);
+      report_cuda_error("cudaHostUnregister", error);
+      errorQuda("cudaHostUnregister failed (%s:%d in %s())\n", file, line, func);
     }
   }
 
