@@ -53,8 +53,8 @@ jobs:
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         -DQUDA_TARGET_TYPE=SYCL
         -DQUDA_SYCL_TARGETS=spir64_x86_64
-        -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt"
-        -DCMAKE_SYCL_FLAGS="-Wno-unsupported-floating-point-opt -Wno-explicit-specialization-storage-class"
+        -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt -fno-strict-aliasing"
+        -DCMAKE_SYCL_FLAGS="-Wno-unsupported-floating-point-opt -Wno-explicit-specialization-storage-class -fno-strict-aliasing"
         -DSYCL_LINK_FLAGS="-Xs -march=avx512 -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=4 -flink-huge-device-code"
         -DQUDA_MULTIGRID=ON
         -DQUDA_FAST_COMPILE_REDUCE=ON
@@ -75,5 +75,5 @@ jobs:
     - name: Run
       run: |
         cd ${{github.workspace}}/build
-        #ctest
-        ctest -E 'invert_test_asqtad_single|invert_test_splitgrid_asqtad_single|unitarize_link_single'
+        ctest
+        #ctest -E 'invert_test_asqtad_single|invert_test_splitgrid_asqtad_single|unitarize_link_single'
