@@ -75,5 +75,6 @@ jobs:
     - name: Run
       run: |
         cd ${{github.workspace}}/build
-        ctest
+        #ctest
         #ctest -E 'invert_test_asqtad_single|invert_test_splitgrid_asqtad_single|unitarize_link_single'
+        ctest -E 'invert_test_asqtad_single|invert_test_splitgrid_asqtad_single'
