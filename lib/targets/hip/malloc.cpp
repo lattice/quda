@@ -88,7 +88,7 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Host Pinned", "Managed"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host", "Host Pinned", "Managed"};
     std::map<void *, MemAlloc>::iterator entry;
 
     for (auto entry : alloc[type]) {
