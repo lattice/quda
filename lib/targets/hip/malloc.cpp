@@ -139,7 +139,7 @@ namespace quda
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     int align = posix_memalign(&ptr, page_size, a.base_size);
     if (!ptr || align != 0) {
-      errorQuda("Failed to allocate aligned host memory of size %zu (%s:%d in %s())\n", size, a.file.c_str(), a.line,
+      errorQuda("Failed to allocate aligned host memory of size %zu (%s:%d in %s())", size, a.file.c_str(), a.line,
                 a.func.c_str());
     }
     return ptr;
@@ -214,7 +214,7 @@ namespace quda
     hipError_t err = hipMalloc(&ptr, size);
     if (err != hipSuccess) {
       report_hip_error("hipMalloc", err);
-      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())", size, file, line, func);
     }
 #else
     // QDPJIT version
@@ -248,7 +248,7 @@ namespace quda
 
     if (err != hipSuccess) {
       report_hip_error("hipMalloc", err);
-      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())", size, file, line, func);
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
@@ -268,7 +268,7 @@ namespace quda
     a.size = a.base_size = size;
 
     void *ptr = malloc(size);
-    if (!ptr) { errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
+    if (!ptr) { errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())", size, file, line, func); }
     track_malloc(HOST, a, ptr);
 #ifdef HOST_DEBUG
     // memset(ptr, 0xff, size);
@@ -293,7 +293,7 @@ namespace quda
     hipError_t err = hipHostRegister(ptr, a.base_size, hipHostRegisterMapped | hipHostRegisterPortable);
     if (err != hipSuccess) {
       report_hip_error("hipHostRegister", err);
-      errorQuda("Failed to register host-pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Failed to register host-pinned memory of size %zu (%s:%d in %s())", size, file, line, func);
     }
 
     track_malloc(HOST_PINNED, a, ptr);
@@ -318,7 +318,7 @@ namespace quda
     hipError_t err = hipMallocManaged(&ptr, size);
     if (err != hipSuccess) {
       report_hip_error("hipMallocManaged", err);
-      errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())", size, file, line, func);
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
@@ -369,9 +369,9 @@ namespace quda
       return;
     }
 
-    if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
+    if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())", file, line, func); }
     if (!alloc[DEVICE].count(ptr)) {
-      errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Attempt to free invalid device pointer (%s:%d in %s())", file, line, func);
     }
 
 #ifndef USE_QDPJIT
@@ -379,7 +379,7 @@ namespace quda
     hipError_t err = hipFree(ptr);
     if (err != hipSuccess) {
       report_hip_error("hipFree", err);
-      errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func);
+      errorQuda("Failed to free device memory (%s:%d in %s())", file, line, func);
     }
 #else
     // QDPJIT version
@@ -402,15 +402,15 @@ namespace quda
       return;
     }
 
-    if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
+    if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())", file, line, func); }
     if (!alloc[DEVICE_PINNED].count(ptr)) {
-      errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Attempt to free invalid device pointer (%s:%d in %s())", file, line, func);
     }
 
     hipError_t err = hipFree(ptr);
     if (err != hipSuccess) {
       report_hip_error("hipFree", err);
-      errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func);
+      errorQuda("Failed to free device memory (%s:%d in %s())", file, line, func);
     }
     track_free(DEVICE_PINNED, ptr);
   }
@@ -422,14 +422,14 @@ namespace quda
    */
   void managed_free_(const char *func, const char *file, int line, void *ptr)
   {
-    if (!ptr) { errorQuda("Attempt to free NULL managed pointer (%s:%d in %s())\n", file, line, func); }
+    if (!ptr) { errorQuda("Attempt to free NULL managed pointer (%s:%d in %s())", file, line, func); }
     if (!alloc[MANAGED].count(ptr)) {
-      errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())", file, line, func);
     }
     hipError_t err = hipFree(ptr);
     if (err != hipSuccess) {
       report_hip_error("hipFree", err);
-      errorQuda("Failed to free managed memory (%s:%d in %s())\n", file, line, func);
+      errorQuda("Failed to free managed memory (%s:%d in %s())", file, line, func);
     }
     track_free(MANAGED, ptr);
   }
@@ -440,7 +440,7 @@ namespace quda
    */
   void host_free_(const char *func, const char *file, int line, void *ptr)
   {
-    if (!ptr) { errorQuda("Attempt to free NULL host pointer (%s:%d in %s())\n", file, line, func); }
+    if (!ptr) { errorQuda("Attempt to free NULL host pointer (%s:%d in %s())", file, line, func); }
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
       free(ptr);
@@ -448,7 +448,7 @@ namespace quda
       hipError_t err = hipHostUnregister(ptr);
       if (err != hipSuccess) {
         report_hip_error("hipHostUnregister", err);
-        errorQuda("Failed to unregister host-pinned memory (%s:%d in %s())\n", file, line, func);
+        errorQuda("Failed to unregister host-pinned memory (%s:%d in %s())", file, line, func);
       }
       track_free(HOST_PINNED, ptr);
       free(ptr);
@@ -522,9 +522,9 @@ namespace quda
     case hipMemoryTypeArray: return QUDA_CUDA_FIELD_LOCATION;
     case hipMemoryTypeUnified: return QUDA_CUDA_FIELD_LOCATION; ///< Not used currently
 #if HIP_VERSION_MAJOR >= 6
-    default: errorQuda("Unknown memory type %d\n", attr.type); return QUDA_INVALID_FIELD_LOCATION;
+    default: errorQuda("Unknown memory type %d", attr.type); return QUDA_INVALID_FIELD_LOCATION;
 #else
-    default: errorQuda("Unknown memory type %d\n", attr.memoryType); return QUDA_INVALID_FIELD_LOCATION;
+    default: errorQuda("Unknown memory type %d", attr.memoryType); return QUDA_INVALID_FIELD_LOCATION;
 #endif
     }
   }
@@ -535,7 +535,7 @@ namespace quda
     auto error = hipHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != hipSuccess) {
       report_hip_error("hipHostGetDevicePointer", error);
-      errorQuda("hipHostGetDevicePointer failed (%s:%d in %s())\n", file, line, func);
+      errorQuda("hipHostGetDevicePointer failed (%s:%d in %s())", file, line, func);
     }
     return device;
   }
@@ -545,7 +545,7 @@ namespace quda
     auto error = hipHostRegister(ptr, bytes, hipHostRegisterDefault);
     if (error != hipSuccess) {
       report_hip_error("hipHostRegister", error);
-      errorQuda("hipHostRegister failed (%s:%d in %s())\n", file, line, func);
+      errorQuda("hipHostRegister failed (%s:%d in %s())", file, line, func);
     }
   }
 
@@ -554,7 +554,7 @@ namespace quda
     auto error = hipHostUnregister(ptr);
     if (error != hipSuccess) {
       report_hip_error("hipHostUnregister", error);
-      errorQuda("hipHostUnregister failed (%s:%d in %s())\n", file, line, func);
+      errorQuda("hipHostUnregister failed (%s:%d in %s())", file, line, func);
     }
   }
 
