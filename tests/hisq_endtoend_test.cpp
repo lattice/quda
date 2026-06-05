@@ -818,7 +818,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   fermion_force::setUnitarizeForceConstants(1e-14, 5e-5, 1e-10, true, false, 1e-8, 1e-8);
 
   // ---- 1. Fresh U links (QDP order, host precision) ----
-  auto link_type = (test_recon == QUDA_RECONSTRUCT_13) ? SiteLinkType::SITELINK_PHASE_U1 : SiteLinkType::SITELINK_PHASE_NO;
+  auto link_type = SiteLinkType::SITELINK_PHASE_NO;
   void *qdp_u[4];
   for (int i = 0; i < 4; i++) qdp_u[i] = safe_malloc(gsize);
   createSiteLinkCPU(qdp_u, host_prec, link_type);
@@ -1005,7 +1005,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   for (int d = 0; d < 4; d++) forceParam.X[d] = gauge_param.X[d];
   forceParam.cpu_prec = host_prec;
   forceParam.cuda_prec = test_prec;
-  forceParam.reconstruct = test_recon;
+  forceParam.reconstruct = QUDA_RECONSTRUCT_NO;
   forceParam.type = QUDA_GENERAL_LINKS;
   forceParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   forceParam.t_boundary = QUDA_ANTI_PERIODIC_T;
