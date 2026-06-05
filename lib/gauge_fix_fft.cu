@@ -313,7 +313,7 @@ namespace quda {
     setUnitarizeLinksConstants(unitarize_eps, max_error,
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
-    int *num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
+    int *num_failures_h = static_cast<int*>(host_pinned_malloc(sizeof(int)));
     int *num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
 
     *num_failures_h = 0;

@@ -281,7 +281,6 @@ std::unordered_map<std::string, std::string> enum_map
      {"QUDA_MEMORY_DEVICE_PINNED", std::to_string(QUDA_MEMORY_DEVICE_PINNED)},
      {"QUDA_MEMORY_HOST", std::to_string(QUDA_MEMORY_HOST)},
      {"QUDA_MEMORY_HOST_PINNED", std::to_string(QUDA_MEMORY_HOST_PINNED)},
-     {"QUDA_MEMORY_MAPPED", std::to_string(QUDA_MEMORY_MAPPED)},
      {"QUDA_MEMORY_MANAGED", std::to_string(QUDA_MEMORY_MANAGED)},
      {"QUDA_MEMORY_INVALID", std::to_string(QUDA_MEMORY_INVALID)},
      {"QUDA_CUSOLVE_EXTLIB", std::to_string(QUDA_CUSOLVE_EXTLIB)},

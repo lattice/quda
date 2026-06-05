@@ -1017,7 +1017,7 @@ namespace quda {
         if (reorder_location() == QUDA_CPU_FIELD_LOCATION) {
 
           if (!src.isNative()) errorQuda("Only native order is supported");
-          void *buffer = pool_pinned_malloc(src.Bytes());
+          void *buffer = pool_host_pinned_malloc(src.Bytes());
           qudaMemcpy(buffer, src.data(), src.Bytes(), qudaMemcpyDeviceToHost);
 
           if (GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
@@ -1025,7 +1025,7 @@ namespace quda {
           } else {
             copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale, nullptr, buffer);
           }
-          pool_pinned_free(buffer);
+          pool_host_pinned_free(buffer);
 
         } else { // else reorder on the GPU
 
@@ -1080,7 +1080,7 @@ namespace quda {
         copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale);
       } else {
         if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
-          void *buffer = pool_pinned_malloc(bytes);
+          void *buffer = pool_host_pinned_malloc(bytes);
 
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
             // copy field and ghost zone into buffer
@@ -1094,7 +1094,7 @@ namespace quda {
           }
 
           qudaMemcpy(gauge.data(), buffer, bytes, qudaMemcpyDefault);
-          pool_pinned_free(buffer);
+          pool_host_pinned_free(buffer);
         } else { // else on the GPU
 
           if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER || src.Order() == QUDA_BQCD_GAUGE_ORDER

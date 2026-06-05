@@ -61,7 +61,7 @@ namespace quda
         d_reduce = static_cast<device_reduce_t *>(device_malloc(bytes));
 
         if (h_reduce) host_free(h_reduce);
-        h_reduce = static_cast<device_reduce_t *>(mapped_malloc(bytes));
+        h_reduce = static_cast<device_reduce_t *>(host_pinned_malloc(bytes));
         hd_reduce = static_cast<device_reduce_t *>(get_mapped_device_pointer(h_reduce)); // set the matching device pointer
 
         using system_atomic_t = device_reduce_t;
