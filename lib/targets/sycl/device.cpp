@@ -377,7 +377,7 @@ namespace quda
             // if(b.buf!=nullptr) device_free(b.buf);
             // b.buf = device_malloc(size);
             if (b.buf != nullptr) host_free(b.buf);
-            b.buf = pinned_malloc(size);
+            b.buf = host_pinned_malloc(size);
             // if(b.buf!=nullptr) managed_free(b.buf);
             // b.buf = managed_malloc(size);
             b.size = size;
@@ -402,7 +402,7 @@ namespace quda
         a.sync = eventCount[stream.idx];
         a.size = size;
         // buf = device_malloc(size);
-        buf = pinned_malloc(size);
+        buf = host_pinned_malloc(size);
         // buf = managed_malloc(size);
         a.buf = buf;
         argBuf.push_back(a);
