@@ -292,6 +292,24 @@ static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType
   reconstruct_sloppy = reconstruct_sloppy_in;
 }
 
+// qudaMultishiftInvert and qudaInvert convention promotes the outer/fine solve precision to double
+// when single is requested (the sloppy precision stays single, giving a mixed-precision solve). See
+// QUDA PR #1035. Set QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT to a non-zero value to disable the promotion.
+static bool forceOuterDouble()
+{
+  static bool queried = false;
+  static bool force_double = true;
+  if (!queried) {
+    char *env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
+    if (env && strcmp(env, "0") != 0) {
+      force_double = false;
+      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
+    }
+    queried = true;
+  }
+  return force_double;
+}
+
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t, const double act_path_coeff[6], void *inlink, void *fatlink,
                     void *longlink)
 {
@@ -1091,17 +1109,6 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-  static bool force_double_queried = false;
-  static bool do_not_force_double = false;
-  if (!force_double_queried) {
-    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
-    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
-      do_not_force_double = true;
-      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
-    }
-    force_double_queried = true;
-  }
-
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   bool use_mixed_precision = (((quda_precision == 2) && inv_args.mixed_precision)
                               || ((quda_precision == 1) && (inv_args.mixed_precision == 2))) ?
@@ -1115,8 +1122,8 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   default: device_precision_sloppy = device_precision;
   }
 
-  // override fine precision to double, switch to mixed as necessary
-  if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
+  // override fine precision to double, switch to mixed as necessary (see forceOuterDouble)
+  if (forceOuterDouble() && device_precision == QUDA_SINGLE_PRECISION) {
     // force outer double
     device_precision = QUDA_DOUBLE_PRECISION;
     if (device_precision_sloppy == QUDA_SINGLE_PRECISION) use_mixed_precision = true;
@@ -1898,17 +1905,6 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-  static bool force_double_queried = false;
-  static bool do_not_force_double = false;
-  if (!force_double_queried) {
-    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
-    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
-      do_not_force_double = true;
-      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
-    }
-    force_double_queried = true;
-  }
-
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
   QudaPrecision device_precision_sloppy;
@@ -1918,8 +1914,8 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   default: device_precision_sloppy = device_precision;
   }
 
-  // override fine precision to double, switch to mixed as necessary
-  if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
+  // override fine precision to double, switch to mixed as necessary (see forceOuterDouble)
+  if (forceOuterDouble() && device_precision == QUDA_SINGLE_PRECISION) {
     // force outer double
     device_precision = QUDA_DOUBLE_PRECISION;
   }
