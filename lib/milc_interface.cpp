@@ -1561,7 +1561,13 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   qudamilc_called<true>(__func__, verbosity);
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  // The exact current is built entirely from the deflation eigenvectors so the gauge field and the
+  // Dirac/covariant-derivative operators applied to those eigenvectors must match the eigenvector storage
+  // precision, NOT the solve precision (quda_precision). Allows for a double precision eigensolve inside
+  // of a single-precision MILC build.
+  QudaPrecision device_precision = (eigargs.prec_eigensolver != QUDA_INVALID_PRECISION)
+    ? eigargs.prec_eigensolver
+    : ((quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION);
   QudaPrecision device_precision_sloppy = device_precision;
 
   // Load links
