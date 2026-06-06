@@ -1554,8 +1554,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 
 // Compute exact low mode contribution to current
 void qudaExactCurrent(int external_precision, int quda_precision, const void *const fatlink, const void *const longlink,
-                      const void *const links, int nmasses, double *masses, QudaInvertArgs_t inv_args,
-                      QudaEigensolverArgs_t eigargs, double *jlow_mu, double *jlow_mu2, int reload)
+                      const void *const links, int nmasses, const void *masses, QudaInvertArgs_t inv_args,
+                      QudaEigensolverArgs_t eigargs, void *jlow_mu, void *jlow_mu2, int reload)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1575,14 +1575,15 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   const bool host_single = (host_precision == QUDA_SINGLE_PRECISION);
   std::vector<double> mass(nmasses);
   for (int i = 0; i < nmasses; i++)
-    mass[i] = host_single ? static_cast<double>(reinterpret_cast<const float *>(masses)[i]) : masses[i];
+    mass[i] = host_single ? static_cast<double>(reinterpret_cast<const float *>(masses)[i])
+                          : reinterpret_cast<const double *>(masses)[i];
   // Accumulate one result into a host current array at the host precision.
-  auto accumulate = [&](double *arr, size_t idx, double val) {
+  auto accumulate = [&](void *arr, size_t idx, double val) {
     if (!arr) return;
     if (host_single)
       reinterpret_cast<float *>(arr)[idx] += static_cast<float>(val);
     else
-      arr[idx] += val;
+      reinterpret_cast<double *>(arr)[idx] += val;
   };
 
   // Load links

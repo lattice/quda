@@ -438,16 +438,16 @@ extern "C" {
    * @param[in] milc_longlink Long-link field on the host
    * @param[in] milc_shiftlink Regular or APE link field on the host to use with covariant shift
    * @param[in] nmasses The number of quark masses to include
-   * @param[in] masses Quark masses
+   * @param[in] masses Quark masses, at external_precision (float if 1, double if 2)
    * @param[in] invargs Struct containing information for the inverter
    * @param[in] eigargs Struct containing information for the eigensolver
-   * @param[out] jlowmu1 Array to fill with current
-   * @param[out] jlowmu2 Array to fill with second current for the case where two mass differences are taken
+   * @param[out] jlowmu1 Array to fill with current, at external_precision (float if 1, double if 2)
+   * @param[out] jlowmu2 Array to fill with second current for the case where two mass differences are taken, at external_precision
    * @param[in] reload Whether to reload the MILC fields
    */
   void qudaExactCurrent(int external_precision, int quda_precision, const void *const milc_fatlink,
-                        const void *const milc_longlink, const void *const milc_shiftlink, int nmasses, double *masses,
-                        QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eigargs, double *jlowmu1, double *jlowmu2,
+                        const void *const milc_longlink, const void *const milc_shiftlink, int nmasses, const void *masses,
+                        QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eigargs, void *jlowmu1, void *jlowmu2,
                         int reload);
 
   /**
