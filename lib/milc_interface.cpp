@@ -4,7 +4,6 @@
 #include <vector>
 #include <fstream>
 #include <string.h>
-#include <cassert>
 
 #include <quda.h>
 #include <quda_milc_interface.h>
@@ -1428,7 +1427,9 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 
       if (!preserved_evals_zero_mass.empty()) {
         // Shift from stored zero-mass eigenvalues; no mat-vec needed.
-        assert(preserved_evals_zero_mass.size() >= static_cast<size_t>(n_evecs));
+        if (preserved_evals_zero_mass.size() < static_cast<size_t>(n_evecs))
+          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %d",
+                    preserved_evals_zero_mass.size(), n_evecs);
         for (int j = 0; j < bs; j++)
           space->evals[lo + j] = preserved_evals_zero_mass[lo + j] + Complex(4.0 * mass * mass, 0.0);
 
@@ -2037,10 +2038,13 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
       // If not, shift to correct mass using cached zero-mass eigenvalues
       // NAIK CAVEAT: shifted evals are only approximate when inv_args.naik_epsilon != 0
       if (!preserved_evals_zero_mass.empty()) {
-        assert(qep.preserve_deflation_space != nullptr);
+        if (qep.preserve_deflation_space == nullptr)
+          errorQuda("preserve_deflation_space is null while shifting eigenvalues");
         logQuda(QUDA_VERBOSE, "Shifting eigenvalues to mass %e\n", invertParam.mass);
         deflation_space *space = reinterpret_cast<deflation_space *>(qep.preserve_deflation_space);
-        assert(preserved_evals_zero_mass.size() >= space->evals.size());
+        if (preserved_evals_zero_mass.size() < space->evals.size())
+          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %lu",
+                    preserved_evals_zero_mass.size(), space->evals.size());
         double m2_shift = 4.0 * mass * mass;
         for (size_t i = 0; i < space->evals.size(); i++)
           space->evals[i] = preserved_evals_zero_mass[i] + Complex(m2_shift, 0.0);
