@@ -1312,6 +1312,9 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
   default: device_precision_sloppy = device_precision;
   }
+  // Match the deflatable inverter's outer-precision promotion (see forceOuterDouble) so the gauge
+  // load and Dirac operators built here agree with the resident precise gauge field's precision.
+  if (forceOuterDouble() && device_precision == QUDA_SINGLE_PRECISION) device_precision = QUDA_DOUBLE_PRECISION;
   QudaParity parity = inv_args.evenodd;
   if (parity != QUDA_EVEN_PARITY && parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d", parity);
   QudaParity other_parity = parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
@@ -1324,6 +1327,13 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     QudaGaugeParam long_param = newQudaGaugeParam();
     setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
                    inv_args.tadpole, inv_args.naik_epsilon);
+    // Keep the eigensolver gauge at the genuine eigensolver precision even when forceOuterDouble()
+    // has promoted the precise gauge to double. The deflation eigenvectors and every operator that
+    // consumes them downstream run at the eigensolver precision, so the eigensolver gauge must match that.
+    fat_param.cuda_prec_eigensolver = eigargs.prec_eigensolver;
+    fat_param.reconstruct_eigensolver = fat_param.reconstruct;
+    long_param.cuda_prec_eigensolver = eigargs.prec_eigensolver;
+    long_param.reconstruct_eigensolver = long_param.reconstruct;
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -1472,6 +1482,9 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     ColorSpinorParam csParam;
     setColorSpinorParams(localDim, host_precision, &csParam);
     ColorSpinorParam gpuParam(csParam, invertParam, QUDA_CUDA_FIELD_LOCATION);
+    // Store the deflation space at the eigensolver precision rather than the (possibly forceOuterDouble-
+    // promoted) cuda_prec that the ColorSpinorParam(...,invertParam,...) constructor copies
+    gpuParam.setPrecision(invertParam.cuda_prec_eigensolver, invertParam.cuda_prec_eigensolver, true);
 
     // Setup deflation space
     deflation_space *space = new deflation_space;
