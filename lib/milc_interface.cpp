@@ -1570,6 +1570,21 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
     : ((quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION);
   QudaPrecision device_precision_sloppy = device_precision;
 
+  // MILC passes masses, jlow_mu, and jlow_mu2 as its host-precision `Real` type (float in a single-precision
+  // build and double in a double-precision build). Need to interpret them at the host precision.
+  const bool host_single = (host_precision == QUDA_SINGLE_PRECISION);
+  std::vector<double> mass(nmasses);
+  for (int i = 0; i < nmasses; i++)
+    mass[i] = host_single ? static_cast<double>(reinterpret_cast<const float *>(masses)[i]) : masses[i];
+  // Accumulate one result into a host current array at the host precision.
+  auto accumulate = [&](double *arr, size_t idx, double val) {
+    if (!arr) return;
+    if (host_single)
+      reinterpret_cast<float *>(arr)[idx] += static_cast<float>(val);
+    else
+      arr[idx] += val;
+  };
+
   // Load links
   if (reload) invalidateGaugeQuda();
   QudaGaugeParam fat_param = newQudaGaugeParam();
@@ -1622,6 +1637,14 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   void *d_result = pool_device_malloc(data_bytes);
   void *h_result = (void *)malloc(data_bytes);
 
+  // contractQuda writes its result at the device (field) precision. Read the imaginary part at that
+  // precision so a single-precision result isn't misread as double-complex
+  const bool device_single = (gr0.Precision() == QUDA_SINGLE_PRECISION);
+  auto resImag = [&](const void *buf, size_t j) -> double {
+    return device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(buf)[j].imag())
+                         : reinterpret_cast<const Complex *>(buf)[j].imag();
+  };
+
   double m_l, m_s, m_u, m_d, dl, ds, du, dd;
   double zscale = 0.0, zscale2 = 0.0;
 
@@ -1637,18 +1660,18 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
 
     // Scaled eigenvalue
     switch (nmasses) {
-    case (1): zscale = 1.0 / (space_even->evals[i].real() + 4.0 * masses[0] * masses[0]); break;
+    case (1): zscale = 1.0 / (space_even->evals[i].real() + 4.0 * mass[0] * mass[0]); break;
     case (2):
-      m_l = masses[0];
-      m_s = masses[1];
+      m_l = mass[0];
+      m_s = mass[1];
       dl = space_even->evals[i].real() + 4.0 * m_l * m_l;
       ds = space_even->evals[i].real() + 4.0 * m_s * m_s;
       zscale = 4.0 * (m_s * m_s - m_l * m_l) / (dl * ds);
       break;
     case (3):
-      m_u = masses[0];
-      m_d = masses[1];
-      m_s = masses[2];
+      m_u = mass[0];
+      m_d = mass[1];
+      m_s = mass[2];
       du = space_even->evals[i].real() + 4.0 * m_u * m_u;
       dd = space_even->evals[i].real() + 4.0 * m_d * m_d;
       ds = space_even->evals[i].real() + 4.0 * m_s * m_s;
@@ -1672,10 +1695,10 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       contractQuda(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
       // Result is of size Volume*Complex, i.e. one complex number per site
       qudaMemcpy(h_result, d_result, data_bytes / 2, qudaMemcpyDeviceToHost);
-      auto *res = reinterpret_cast<Complex *>(h_result);
       for (size_t j = 0; j < gr0.Volume() / 2; j++) {
-        jlow_mu[4 * j + mu] += -res[j].imag() * zscale;
-        if (nmasses == 3) jlow_mu2[4 * j + mu] += -res[j].imag() * zscale2;
+        double im = resImag(h_result, j);
+        accumulate(jlow_mu, 4 * j + mu, -im * zscale);
+        if (nmasses == 3) accumulate(jlow_mu2, 4 * j + mu, -im * zscale2);
       }
 
       // Do gauge covariant shift and flip sign on ODD sites
@@ -1689,10 +1712,10 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       // Save current for ODD sites
       contractQuda(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
       qudaMemcpy((char *)h_result, (char *)d_result + data_bytes / 2, data_bytes / 2, qudaMemcpyDeviceToHost);
-      auto *res2 = reinterpret_cast<Complex *>(h_result);
       for (size_t j = 0; j < gr0.Volume() / 2; j++) {
-        jlow_mu[4 * j + mu + 2 * gr0.Volume()] += res2[j].imag() * zscale;
-        if (nmasses == 3) jlow_mu2[4 * j + mu + 2 * gr0.Volume()] += res2[j].imag() * zscale2;
+        double im = resImag(h_result, j);
+        accumulate(jlow_mu, 4 * j + mu + 2 * gr0.Volume(), im * zscale);
+        if (nmasses == 3) accumulate(jlow_mu2, 4 * j + mu + 2 * gr0.Volume(), im * zscale2);
       }
     }
   }
