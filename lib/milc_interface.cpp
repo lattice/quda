@@ -1428,8 +1428,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       if (!preserved_evals_zero_mass.empty()) {
         // Shift from stored zero-mass eigenvalues; no mat-vec needed.
         if (preserved_evals_zero_mass.size() < static_cast<size_t>(n_evecs))
-          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %d",
-                    preserved_evals_zero_mass.size(), n_evecs);
+          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %d", preserved_evals_zero_mass.size(),
+                    n_evecs);
         for (int j = 0; j < bs; j++)
           space->evals[lo + j] = preserved_evals_zero_mass[lo + j] + Complex(4.0 * mass * mass, 0.0);
 
@@ -1566,9 +1566,9 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   // Dirac/covariant-derivative operators applied to those eigenvectors must match the eigenvector storage
   // precision, NOT the solve precision (quda_precision). Allows for a double precision eigensolve inside
   // of a single-precision MILC build.
-  QudaPrecision device_precision = (eigargs.prec_eigensolver != QUDA_INVALID_PRECISION)
-    ? eigargs.prec_eigensolver
-    : ((quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION);
+  QudaPrecision device_precision = (eigargs.prec_eigensolver != QUDA_INVALID_PRECISION) ?
+    eigargs.prec_eigensolver :
+    ((quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION);
   QudaPrecision device_precision_sloppy = device_precision;
 
   // MILC passes masses, jlow_mu, and jlow_mu2 as its host-precision `Real` type (float in a single-precision
@@ -1576,8 +1576,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   const bool host_single = (host_precision == QUDA_SINGLE_PRECISION);
   std::vector<double> mass(nmasses);
   for (int i = 0; i < nmasses; i++)
-    mass[i] = host_single ? static_cast<double>(reinterpret_cast<const float *>(masses)[i])
-                          : reinterpret_cast<const double *>(masses)[i];
+    mass[i] = host_single ? static_cast<double>(reinterpret_cast<const float *>(masses)[i]) :
+                            reinterpret_cast<const double *>(masses)[i];
 
   // Load links
   if (reload) invalidateGaugeQuda();
@@ -1734,9 +1734,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
     if (!arr) return;
     qudaMemcpy(h_result, acc.data(), data_bytes / 2, qudaMemcpyDeviceToHost);
     for (size_t x = 0; x < vol_cb; x++) {
-      double im = device_single
-        ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag())
-        : reinterpret_cast<const Complex *>(h_result)[x].imag();
+      double im = device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag()) :
+                                  reinterpret_cast<const Complex *>(h_result)[x].imag();
       if (host_single)
         reinterpret_cast<float *>(arr)[base + 4 * x + mu] += static_cast<float>(im);
       else
@@ -2043,8 +2042,8 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
         logQuda(QUDA_VERBOSE, "Shifting eigenvalues to mass %e\n", invertParam.mass);
         deflation_space *space = reinterpret_cast<deflation_space *>(qep.preserve_deflation_space);
         if (preserved_evals_zero_mass.size() < space->evals.size())
-          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %lu",
-                    preserved_evals_zero_mass.size(), space->evals.size());
+          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %lu", preserved_evals_zero_mass.size(),
+                    space->evals.size());
         double m2_shift = 4.0 * mass * mass;
         for (size_t i = 0; i < space->evals.size(); i++)
           space->evals[i] = preserved_evals_zero_mass[i] + Complex(m2_shift, 0.0);
