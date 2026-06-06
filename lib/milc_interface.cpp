@@ -1577,14 +1577,6 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   for (int i = 0; i < nmasses; i++)
     mass[i] = host_single ? static_cast<double>(reinterpret_cast<const float *>(masses)[i])
                           : reinterpret_cast<const double *>(masses)[i];
-  // Accumulate one result into a host current array at the host precision.
-  auto accumulate = [&](void *arr, size_t idx, double val) {
-    if (!arr) return;
-    if (host_single)
-      reinterpret_cast<float *>(arr)[idx] += static_cast<float>(val);
-    else
-      reinterpret_cast<double *>(arr)[idx] += val;
-  };
 
   // Load links
   if (reload) invalidateGaugeQuda();
@@ -1633,18 +1625,36 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   gpuParam.x[0] *= 2;
   ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam), evec(gpuParam);
 
-  // Device and host space for contractQuda output
+  // Device buffer for contractQuda output: one complex per full-volume site at the device (field)
+  // precision. Even-parity sites occupy the first half [0, V/2), odd-parity the second half [V/2, V).
   size_t data_bytes = 2 * gr0.Volume() * gr0.Precision();
   void *d_result = pool_device_malloc(data_bytes);
-  void *h_result = (void *)malloc(data_bytes);
 
-  // contractQuda writes its result at the device (field) precision. Read the imaginary part at that
-  // precision so a single-precision result isn't misread as double-complex
-  const bool device_single = (gr0.Precision() == QUDA_SINGLE_PRECISION);
-  auto resImag = [&](const void *buf, size_t j) -> double {
-    return device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(buf)[j].imag())
-                         : reinterpret_cast<const Complex *>(buf)[j].imag();
-  };
+  // Wrap the two halves of d_result as single-parity (nColor=1, nSpin=1) fields so each scaled complex
+  // contraction can be summed on the device with blas::axpy
+  ColorSpinorParam resParam(space_even->evecs[0]);
+  resParam.nColor = 1;
+  resParam.nSpin = 1;
+  resParam.pad = 0;
+  resParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  resParam.v = d_result;
+  ColorSpinorField res_even(resParam); // even-parity contraction output (first half of d_result)
+  resParam.v = static_cast<char *>(d_result) + data_bytes / 2;
+  ColorSpinorField res_odd(resParam); // odd-parity contraction output (second half of d_result)
+
+  // Per-direction, per-parity device accumulators with precision inherited from the eigenvectors
+  ColorSpinorParam accParam(space_even->evecs[0]);
+  accParam.nColor = 1;
+  accParam.nSpin = 1;
+  accParam.pad = 0;
+  accParam.create = QUDA_ZERO_FIELD_CREATE;
+  std::vector<ColorSpinorField> acc_even, acc_odd, acc2_even, acc2_odd;
+  resize(acc_even, 4, accParam);
+  resize(acc_odd, 4, accParam);
+  if (nmasses == 3) {
+    resize(acc2_even, 4, accParam);
+    resize(acc2_odd, 4, accParam);
+  }
 
   double m_l, m_s, m_u, m_d, dl, ds, du, dd;
   double zscale = 0.0, zscale2 = 0.0;
@@ -1692,15 +1702,10 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
       applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
 
-      // Save current for EVEN sites
+      // Save current for EVEN sites (first half of d_result) and accumulate on device
       contractQuda(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
-      // Result is of size Volume*Complex, i.e. one complex number per site
-      qudaMemcpy(h_result, d_result, data_bytes / 2, qudaMemcpyDeviceToHost);
-      for (size_t j = 0; j < gr0.Volume() / 2; j++) {
-        double im = resImag(h_result, j);
-        accumulate(jlow_mu, 4 * j + mu, -im * zscale);
-        if (nmasses == 3) accumulate(jlow_mu2, 4 * j + mu, -im * zscale2);
-      }
+      blas::axpy(-zscale, res_even, acc_even[mu]);
+      if (nmasses == 3) blas::axpy(-zscale2, res_even, acc2_even[mu]);
 
       // Do gauge covariant shift and flip sign on ODD sites
       myCovDev.MCD(gr_mu, evec, mu);
@@ -1710,19 +1715,46 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
       applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
 
-      // Save current for ODD sites
+      // Save current for ODD sites (second half of d_result) and accumulate on device
       contractQuda(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
-      qudaMemcpy((char *)h_result, (char *)d_result + data_bytes / 2, data_bytes / 2, qudaMemcpyDeviceToHost);
-      for (size_t j = 0; j < gr0.Volume() / 2; j++) {
-        double im = resImag(h_result, j);
-        accumulate(jlow_mu, 4 * j + mu + 2 * gr0.Volume(), im * zscale);
-        if (nmasses == 3) accumulate(jlow_mu2, 4 * j + mu + 2 * gr0.Volume(), im * zscale2);
-      }
+      blas::axpy(+zscale, res_odd, acc_odd[mu]);
+      if (nmasses == 3) blas::axpy(+zscale2, res_odd, acc2_odd[mu]);
     }
   }
+
+  // Copy each device accumulator (FLOAT2, one contiguous complex per site, at device precision) to a small
+  // host staging buffer and write its imaginary part into MILC's interleaved jlow array. Note: nColor=1
+  // fields are not supported by copyGenericColorSpinor, so read the raw buffer directly rather than assigning
+  // to a host field. Even-parity block -> [0, 2V), odd-parity block -> [2V, 4V).
+  const bool device_single = (gr0.Precision() == QUDA_SINGLE_PRECISION);
+  const size_t vol_cb = gr0.Volume() / 2;
+  void *h_result = malloc(data_bytes / 2);
+  auto store_imag = [&](void *arr, const ColorSpinorField &acc, int mu, size_t base) {
+    if (!arr) return;
+    qudaMemcpy(h_result, acc.data(), data_bytes / 2, qudaMemcpyDeviceToHost);
+    for (size_t x = 0; x < vol_cb; x++) {
+      double im = device_single
+        ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag())
+        : reinterpret_cast<const Complex *>(h_result)[x].imag();
+      if (host_single)
+        reinterpret_cast<float *>(arr)[base + 4 * x + mu] += static_cast<float>(im);
+      else
+        reinterpret_cast<double *>(arr)[base + 4 * x + mu] += im;
+    }
+  };
+
+  for (int mu = 0; mu < 4; mu++) {
+    store_imag(jlow_mu, acc_even[mu], mu, 0);
+    store_imag(jlow_mu, acc_odd[mu], mu, 2 * gr0.Volume());
+    if (nmasses == 3) {
+      store_imag(jlow_mu2, acc2_even[mu], mu, 0);
+      store_imag(jlow_mu2, acc2_odd[mu], mu, 2 * gr0.Volume());
+    }
+  }
+
   // Cleanup
-  pool_device_free(d_result);
   free(h_result);
+  pool_device_free(d_result);
   delete dirac;
 
   qudamilc_called<false>(__func__, verbosity);
