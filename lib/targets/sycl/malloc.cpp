@@ -638,6 +638,7 @@ namespace quda
     void flush_device()
     {
       logQuda(QUDA_DEBUG_VERBOSE, "Flushing device memory pool\n");
+      device::free_arg_buf(); // free kernel arg buffer
       if (device_memory_pool) {
         for (auto it : deviceCache) { device_free(it.second); }
         deviceCache.clear();
