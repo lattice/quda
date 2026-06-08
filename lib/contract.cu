@@ -57,7 +57,7 @@ namespace quda {
       const int nSpinSq = x.Nspin() * x.Nspin();
 
       if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) reduction_dim = 2;
-      std::vector<double> result_local(2 * nSpinSq * x.X()[reduction_dim], 0.0);
+      std::vector<real_t> result_local(2 * nSpinSq * x.X()[reduction_dim], 0.0);
 
       // Pass the integer value of the redection dim as a template arg
       switch (cType) {

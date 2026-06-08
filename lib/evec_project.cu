@@ -11,12 +11,12 @@ namespace quda
   {
     cvector_ref<const ColorSpinorField> &x;
     cvector_ref<const ColorSpinorField> &y;
-    std::vector<double> &result;
+    std::vector<real_t> &result;
     bool tuneSharedBytes() const override { return false; }
 
   public:
     EvecProjectLaplace3D(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
-                         std::vector<double> &result) :
+                         std::vector<real_t> &result) :
       TunableMultiReduction(x[0], 1, x.size() * y.size() * x.X(3), 8), x(x), y(y), result(result)
     {
       strcat(aux, ",nx=");
@@ -56,7 +56,7 @@ namespace quda
         // compute remainder here
         auto tile_x = std::min(max_nx, x.size() - tx);
         auto tile_y = std::min(max_ny, y.size() - ty);
-        std::vector<double> result_tile(2 * x.Nspin() * Lt * tile_x * tile_y);
+        std::vector<real_t> result_tile(2 * x.Nspin() * Lt * tile_x * tile_y);
 
         instantiate<EvecProjectLaplace3D>(cvector_ref<const ColorSpinorField> {x.begin() + tx, x.begin() + tx + tile_x},
                                           cvector_ref<const ColorSpinorField> {y.begin() + ty, y.begin() + ty + tile_y},
