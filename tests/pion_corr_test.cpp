@@ -32,7 +32,7 @@ bool use_multi_src = false;
 int start_seed = 0;
 std::string meas_vec_file_str = "";
 std::string source_vec_file_str = "";
-
+std::string base_io_dir = std::filesystem::current_path().string();
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
 
@@ -109,6 +109,10 @@ void add_meas_io_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option(
       "--start-seed",
       start_seed, "start seed for random sources");
+    opgroup
+    ->add_option(
+      "--base-io-dir",
+      base_io_dir, "base directory to create data directory");
     
 }
 
@@ -171,7 +175,7 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   }
   assert(dirstr_vec.size() >= 2);
   printfQuda(("our deepest dir is " + deepest_dir +"\n").c_str());
-  std::filesystem::path base_output_dir(std::filesystem::current_path().string() + "/data/");
+  std::filesystem::path base_output_dir(base_io_dir + "/data/");
   if (!std::filesystem::is_directory(base_output_dir)){
       std::filesystem::create_directory(base_output_dir);
   } 
@@ -488,6 +492,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
 
   pion_source = {};
   out = {};
+  one_field = {};
 
   if ((quda::comm_rank() == 0) && (latfile.size() > 0 )){
   write_files(ferm_meas);}
