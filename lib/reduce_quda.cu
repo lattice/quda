@@ -14,10 +14,6 @@ namespace quda {
       {
         if constexpr (is_rfa<T>::value) {
           return reduction_to_real(x.conv());
-        } else if constexpr (std::is_same_v<T, doubledouble>) {
-          return static_cast<real_t>(x.head()) + static_cast<real_t>(x.tail());
-        } else if constexpr (std::is_same_v<T, real_t>) {
-          return x;
         } else {
           return static_cast<real_t>(x);
         }
@@ -165,7 +161,12 @@ namespace quda {
       }
     };
 
-    // split the fields and recurse if needed
+    /**
+       Run the reduction kernel and return raw accumulators (device_reduce_t or
+       array<device_reduce_t, N>). Conversion to host real_t (__float128 on quad
+       builds) is done only in the public wrappers below via reduction_to_real /
+       to_real_vector — not here.
+    */
     template <template <typename reduce_t, typename real> class Functor, bool mixed, typename coeff_t, typename X,
               typename Y, typename Z, typename W, typename V>
     auto instantiateReduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, X &x, Y &y, Z &z, W &w, V &v)
