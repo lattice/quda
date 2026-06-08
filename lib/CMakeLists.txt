@@ -437,6 +437,18 @@ set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble __float
 
 if(${QUDA_SCALAR_TYPE} STREQUAL "__float128")
   set(QUDA_USE_QUAD_SCALAR 1)
+elseif(${QUDA_SCALAR_TYPE} STREQUAL "doubledouble")
+  set(QUDA_SCALAR_IS_DOUBLEDOUBLE 1)
+endif()
+
+if(QUDA_USE_QUAD_SCALAR)
+  include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles(
+    "typedef __float128 q; int main() { return q(0) == q(0); }"
+    QUDA_COMPILER_SUPPORTS_FLOAT128)
+  if(NOT QUDA_COMPILER_SUPPORTS_FLOAT128)
+    message(FATAL_ERROR "QUDA_SCALAR_TYPE=__float128 requires compiler support for __float128")
+  endif()
 endif()
 
 # generate a cmake object library for all cpp files first
@@ -586,6 +598,9 @@ target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_link_libraries(quda PRIVATE $<BUILD_INTERFACE:Eigen>)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
+# dbldbl.h includes <math_helper.h> from targets/generic; expose to dependents (tests, etc.)
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/targets/generic>
+                                       $<INSTALL_INTERFACE:include/targets/generic>)
 
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
