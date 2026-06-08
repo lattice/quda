@@ -51,8 +51,8 @@ namespace quda
   */
   inline double fma_rn(double a, double b, double c) { return std::fma(a, b, c); }
 
-  inline float2 fma2(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
-  inline double2 fma2(double2 a, double2 b, double2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
+  inline float2 fma2(float2 a, float2 b, float2 c) { return {std::fmaf(a.x, b.x, c.x), std::fmaf(a.y, b.y, c.y)}; }
+  inline double2 fma2(double2 a, double2 b, double2 c) { return {std::fma(a.x, b.x, c.x), std::fma(a.y, b.y, c.y)}; }
 
   inline float2 mul2(float2 a, float2 b) { return {a.x * b.x, a.y * b.y}; }
   inline double2 mul2(double2 a, double2 b) { return {a.x * b.x, a.y * b.y}; }

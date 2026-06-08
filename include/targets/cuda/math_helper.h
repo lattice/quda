@@ -306,7 +306,10 @@ namespace quda {
   __device__ __host__ inline double fdivide(double a, double b) { return target::dispatch<fdivide_impl>(a, b); }
 
   template <bool is_device> struct ffma2_impl {
-    inline float2 operator()(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
+    inline float2 operator()(float2 a, float2 b, float2 c)
+    {
+      return {std::fmaf(a.x, b.x, c.x), std::fmaf(a.y, b.y, c.y)};
+    }
   };
 
   template <> struct ffma2_impl<true> {
@@ -317,14 +320,29 @@ namespace quda {
         return __ffma2_rn(a, b, c);
       else
 #endif
-        return {a.x * b.x + c.x, a.y * b.y + c.y};
+        return {__fmaf_rn(a.x, b.x, c.x), __fmaf_rn(a.y, b.y, c.y)};
     }
   };
 
   __device__ __host__ inline float2 fma2(float2 a, float2 b, float2 c) { return target::dispatch<ffma2_impl>(a, b, c); }
+
+  template <bool is_device> struct dfma2_impl {
+    inline double2 operator()(double2 a, double2 b, double2 c)
+    {
+      return {std::fma(a.x, b.x, c.x), std::fma(a.y, b.y, c.y)};
+    }
+  };
+
+  template <> struct dfma2_impl<true> {
+    __device__ inline double2 operator()(double2 a, double2 b, double2 c)
+    {
+      return {__fma_rn(a.x, b.x, c.x), __fma_rn(a.y, b.y, c.y)};
+    }
+  };
+
   __device__ __host__ inline double2 fma2(double2 a, double2 b, double2 c)
   {
-    return {a.x * b.x + c.x, a.y * b.y + c.y};
+    return target::dispatch<dfma2_impl>(a, b, c);
   }
 
   template <bool is_device> struct fmul2_impl {
