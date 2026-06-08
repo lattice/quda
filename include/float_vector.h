@@ -34,8 +34,6 @@ namespace quda {
   {
 #if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
     return static_cast<T>(x.conv());
-#elif defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
-    return static_cast<T>(x.head()) + static_cast<T>(x.tail());
 #else
     return static_cast<T>(x);
 #endif
