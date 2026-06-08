@@ -273,6 +273,63 @@ __device__ __host__ __forceinline__ dbldbl rsqrt_dbldbl (dbldbl a)
     return z;
 }
 
+__device__ __host__ __forceinline__ dbldbl abs_dbldbl(dbldbl a)
+{
+  if (a.y < 0.0) return neg_dbldbl(a);
+  return a;
+}
+
+__device__ __host__ __forceinline__ int dbldbl_cmp(dbldbl a, dbldbl b)
+{
+  if (a.y > b.y) return 1;
+  if (a.y < b.y) return -1;
+  if (a.x > b.x) return 1;
+  if (a.x < b.x) return -1;
+  return 0;
+}
+
+/* Scaled hypot: |ax| * sqrt(1 + (|ay|/|ax|)^2) with |ax| >= |ay|, avoiding overflow in squares. */
+__device__ __host__ __forceinline__ dbldbl hypot_dbldbl(dbldbl x, dbldbl y)
+{
+  dbldbl scale = make_dbldbl(1.0, 0.0);
+  dbldbl inv_scale = make_dbldbl(1.0, 0.0);
+
+  dbldbl ax = abs_dbldbl(x);
+  dbldbl ay = abs_dbldbl(y);
+  if (dbldbl_cmp(ay, ax) > 0) {
+    dbldbl t = ax;
+    ax = ay;
+    ay = t;
+  }
+
+  if (ax.y == 0.0 && ax.x == 0.0) return ax;
+
+  if (quda::abs(ax.y) > 0x1.0p510) {
+    scale = make_dbldbl(0x1.0p-256, 0.0);
+    inv_scale = make_dbldbl(0x1.0p256, 0.0);
+  } else if (ax.y > 0.0 && ax.y < 0x1.0p-510) {
+    scale = make_dbldbl(0x1.0p256, 0.0);
+    inv_scale = make_dbldbl(0x1.0p-256, 0.0);
+  }
+
+  if (scale.y != 1.0 || scale.x != 0.0) {
+    x = mul_dbldbl(x, scale);
+    y = mul_dbldbl(y, scale);
+    ax = abs_dbldbl(x);
+    ay = abs_dbldbl(y);
+    if (dbldbl_cmp(ay, ax) > 0) {
+      dbldbl t = ax;
+      ax = ay;
+      ay = t;
+    }
+  }
+
+  const dbldbl r = div_dbldbl(ay, ax);
+  const dbldbl t = add_dbldbl(make_dbldbl(1.0, 0.0), mul_dbldbl(r, r));
+  const dbldbl h = mul_dbldbl(ax, sqrt_dbldbl(t));
+  return mul_dbldbl(h, inv_scale);
+}
+
 #if defined(__cplusplus)
 }
 #endif /* __cplusplus */
@@ -332,7 +389,7 @@ __device__ __host__ inline doubledouble sqrt(const doubledouble &a) { return dou
 
 __device__ __host__ inline doubledouble operator-(const doubledouble &a) { return doubledouble(neg_dbldbl(a.a)); }
 
-__device__ __host__ inline doubledouble abs(const doubledouble &a) { return (a.head() < 0 ? -a : a); }
+__device__ __host__ inline doubledouble abs(const doubledouble &a) { return doubledouble(abs_dbldbl(a.a)); }
 
 __device__ __host__ inline bool isinf(const doubledouble &a) { return isinf(a.head()); }
 
@@ -410,6 +467,11 @@ __device__ __host__ inline doubledouble operator*(const doubledouble &a, const d
 
 __device__ __host__ inline doubledouble operator/(const doubledouble &a, const doubledouble &b) {
   return doubledouble(div_dbldbl(a.a,b.a));
+}
+
+__device__ __host__ inline doubledouble hypot(const doubledouble &x, const doubledouble &y)
+{
+  return doubledouble(hypot_dbldbl(x.a, y.a));
 }
 
 /**
