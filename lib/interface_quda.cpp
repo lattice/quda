@@ -5678,12 +5678,6 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   GaugeField &g_W2 = gaugeW2;
   GaugeField &g_VT = gaugeVT;
 
-  // helper gauge field for Laplace operator
-  GaugeField precise;
-  GaugeFieldParam gParam_helper(*gaugePrecise);
-  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-  precise = GaugeField(gParam_helper);
-
   // spinor fields
   std::vector<ColorSpinorField> fin_h, fin, fout;
   // auxilliary fermion fields [0], [1], [2] and [3]
@@ -5707,15 +5701,16 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   int parity = 0;
 
-  // initialize a and b for Laplace operator
-  double a = 1.;
-  double b = -8.;
-
   int comm_dim[4] = {};
   // Will add fermion measruement utilities later
   // int measurement_n = 0; // The nth measurement to take
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+
+  // fermion-flow generator K_t. Defaults to the 4D Laplacian (a=1, b=-8, dir=4),
+  // reproducing the legacy behavior; opt-in via smear_param->fermion_flow_type.
+  std::unique_ptr<FermionFlowOp> flow_op(
+    createFermionFlowOp(smear_param->fermion_flow_type, *gaugePrecise, comm_dim, parity, profileAdjGFlowSafe));
 
   for (unsigned int j = 0; j < smear_param->n_steps; j++) {
     for (unsigned int i = 0; i < smear_param->n_steps - j; i++) {
@@ -5735,17 +5730,15 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
 
-    copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profileAdjGFlowSafe);
+    flow_op->update(g_W2);
+    flow_op->apply(f_temp4, f_temp0);
 
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
 
     f_temp2 = f_temp4;
 
-    copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profileAdjGFlowSafe);
+    flow_op->update(g_W1);
+    flow_op->apply(f_temp4, f_temp2);
 
     blas::axpy(smear_param->epsilon * 8. / 9., f_temp4, f_temp3);
 
@@ -5754,9 +5747,8 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
     blas::axpy(-8. / 9., f_temp2, f_temp4);
 
-    copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, comm_dim, profileAdjGFlowSafe);
+    flow_op->update(g_W0);
+    flow_op->apply(f_temp0, f_temp4);
 
     blas::ax(smear_param->epsilon * 1. / 4., f_temp0);
     blas::axpy(1., f_temp2, f_temp0);
@@ -5780,7 +5772,7 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
 void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list,
                    std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param,
-                   unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf)
+                   unsigned int ns_safe, FermionFlowOp &flow_op, std::vector<std::reference_wrapper<int>> meas_cinf)
 {
   const GaugeField gin = gf_list[0].get();
   GaugeField &g_W0 = gf_list[0].get();
@@ -5788,7 +5780,6 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   GaugeField &g_W2 = gf_list[2].get();
   GaugeField &g_VT = gf_list[3].get();
   GaugeField &gaugeTemp = gf_list[4].get();
-  GaugeField &precise = gf_list[5].get();
 
   auto &f_temp0 = sf_list[0].get();
   auto &f_temp1 = sf_list[1].get();
@@ -5799,16 +5790,6 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   int &i_glob = meas_cinf[0].get();
   int &measurement_n = meas_cinf[1].get();
   measurement_n = 0;
-
-  int parity = 0;
-
-  // initialize a and b for Laplace operator
-  double a = 1.;
-  double b = -8.;
-
-  int comm_dim[4] = {};
-  // only switch on comms needed for directions with a derivative
-  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
 
   for (unsigned int j = 0; j < ns_safe; j++) {
     for (unsigned int i = 0; i < ns_safe - j; i++) {
@@ -5827,10 +5808,9 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
 
-    // [4] = Lap2 [0]
-    copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profile);
+    // [4] = K_t2 [0]
+    flow_op.update(g_W2);
+    flow_op.apply(f_temp4, f_temp0);
 
     // [4] -> 3/4 eps [4]
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
@@ -5838,10 +5818,9 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     // [2] = [4]
     f_temp2 = f_temp4;
 
-    // [4] = Lap1 [2]
-    copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profile);
+    // [4] = K_t1 [2]
+    flow_op.update(g_W1);
+    flow_op.apply(f_temp4, f_temp2);
 
     // [3] -> [3] + 8/9 eps [4]
     blas::axpy(smear_param->epsilon * 8. / 9., f_temp4, f_temp3);
@@ -5853,10 +5832,9 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     // [4] <- [4] - 8/9 [2]
     blas::axpy(-8. / 9., f_temp2, f_temp4);
 
-    // [0] <- Lap0 [4]
-    copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, comm_dim, profile);
+    // [0] <- K_t0 [4]
+    flow_op.update(g_W0);
+    flow_op.apply(f_temp0, f_temp4);
 
     // [0] <- 1/4 eps [0]; [0] <- [2] + [0]; [0] <- [1] + [0]
     blas::ax(smear_param->epsilon * 1. / 4., f_temp0);
@@ -5965,11 +5943,15 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   GaugeField &gin = *gaugeSmeared;
   GaugeField &gout = gauge_out;
 
-  // helper gauge field for Laplace operator
-  GaugeField precise;
-  GaugeFieldParam gParam_helper(*gaugePrecise);
-  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-  precise = GaugeField(gParam_helper);
+  // fermion-flow generator K_t. Defaults to the 4D Laplacian (legacy behavior);
+  // opt-in via smear_param->fermion_flow_type. Created once and reused across
+  // all adjSafeEvolve calls (it holds the helper gauge field internally,
+  // refreshed each sub-stage via update()).
+  int parity = 0;
+  int comm_dim[4] = {};
+  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+  std::unique_ptr<FermionFlowOp> flow_op(
+    createFermionFlowOp(smear_param->fermion_flow_type, *gaugePrecise, comm_dim, parity, profileAdjGFlowHier));
 
   // spinor fields
   std::vector<ColorSpinorField> fin_h, fin, fout;
@@ -6029,7 +6011,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> gf_list;
-  gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+  gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp};
 
   // first one is global counter, second is meas counter
   int i_glob = 0, measurement_n = 0;
@@ -6040,7 +6022,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     logQuda(QUDA_DEBUG_VERBOSE, "Hier loop count %d has begun \n", hier_loop_counter);
     logQuda(QUDA_DEBUG_VERBOSE, "Starting a hierarchical loop log: \n");
 
-    adjSafeEvolve(sf_list, gf_list, smear_param, hier_list.back(), profileAdjGFlowHier, meas_cinf);
+    adjSafeEvolve(sf_list, gf_list, smear_param, hier_list.back(), *flow_op, meas_cinf);
 
     logQuda(QUDA_DEBUG_VERBOSE, "Previous hier list elements: \n");
     for (int j = 0; j < (int)hier_list.size(); j++) { logQuda(QUDA_DEBUG_VERBOSE, "%d \n", (int)hier_list[j]); }
@@ -6056,7 +6038,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
         gf_list.at(0) = std::ref(gauge_stages[i]);
 
-        adjSafeEvolve(sf_list, gf_list, smear_param, hier_list[i], profileAdjGFlowHier, meas_cinf);
+        adjSafeEvolve(sf_list, gf_list, smear_param, hier_list[i], *flow_op, meas_cinf);
 
         logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
       }
