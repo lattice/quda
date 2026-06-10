@@ -621,6 +621,17 @@ typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
 } QudaGaugeSmearType;
 
+// Selects the generator K_t of the fermion gradient flow in performGFlowQuda.
+typedef enum QudaFermionFlowType_s {
+  QUDA_FERMION_FLOW_LAPLACE_4D = 0, /**< 4D gauge-covariant Laplacian (default, legacy behavior) */
+  QUDA_FERMION_FLOW_LAPLACE_3D,     /**< 3D (spatial) gauge-covariant Laplacian */
+  QUDA_FERMION_FLOW_WILSON,         /**< Wilson -DdagD */
+  QUDA_FERMION_FLOW_STAGGERED,      /**< naive staggered -DdagD */
+  QUDA_FERMION_FLOW_HISQ,           /**< full HISQ -DdagD */
+  QUDA_FERMION_FLOW_HISQ_TRUNCATED, /**< HISQ -DdagD with the Naik (long) term dropped */
+  QUDA_FERMION_FLOW_INVALID = QUDA_INVALID_ENUM
+} QudaFermionFlowType;
+
 typedef enum QudaWFlowType_s {
   QUDA_WFLOW_TYPE_WILSON,
   QUDA_WFLOW_TYPE_SYMANZIK,

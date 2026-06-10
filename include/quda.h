@@ -883,6 +883,8 @@ extern "C" {
     double t0;                     /**< Starting flow time for Wilson flow */
     int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
                                         A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
+    QudaFermionFlowType fermion_flow_type; /**< Generator of the fermion gradient flow in performGFlowQuda.
+                                                Defaults to QUDA_FERMION_FLOW_LAPLACE_4D (legacy behavior). */
   } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {

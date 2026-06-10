@@ -23,6 +23,7 @@
 #include <llfat_quda.h>
 #include <unitarization_links.h>
 #include <algorithm>
+#include <memory>
 #include <staggered_oprod.h>
 #include <spin_taste.h>
 #include <ks_improved_force.h>
@@ -63,6 +64,7 @@ void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
 #undef PRINT_PARAM
 
 #include <gauge_tools.h>
+#include <fermion_flow_op.h>
 #include <contract_quda.h>
 #include <momentum.h>
 
@@ -5511,12 +5513,6 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
   GaugeField &gin = *gaugeSmeared;
   GaugeField &gout = gaugeAux;
 
-  // helper gauge field for Laplace operator
-  GaugeField precise;
-  GaugeFieldParam gParam_helper(*gaugePrecise);
-  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-  precise = GaugeField(gParam_helper);
-
   // spinor fields
   std::vector<ColorSpinorField> fin_h, fin, fout;
   // auxilliary fermion fields [0], [1], [2] and [3]
@@ -5540,13 +5536,14 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
 
   int parity = 0;
 
-  // initialize a and b for Laplace operator
-  double a = 1.;
-  double b = -8.;
-
   int comm_dim[4] = {};
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+
+  // fermion-flow generator K_t. Defaults to the 4D Laplacian (a=1, b=-8,
+  // dir=4), reproducing the legacy behavior exactly
+  std::unique_ptr<FermionFlowOp> flow_op(
+    createFermionFlowOp(smear_param->fermion_flow_type, *gaugePrecise, comm_dim, parity, profileGFlow));
 
   int measurement_n = 0; // The nth measurement to take
 
@@ -5568,10 +5565,9 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
     f_temp2 = f_temp3;
 
     // STEP 1
-    // [4] = Laplace [0]
-    copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profileGFlow);
+    // [4] = K_t [0]
+    flow_op->update(gin);
+    flow_op->apply(f_temp4, f_temp0);
 
     // [0] = [4] = Laplace [0] = Laplace [3]
     f_temp0 = f_temp4;
@@ -5585,10 +5581,9 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
     // [3] <- [1]
     f_temp3 = f_temp1;
 
-    // [4] <- Laplace [1]
-    copyExtendedGauge(precise, gout, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, comm_dim, profileGFlow);
+    // [4] <- K_t [1]
+    flow_op->update(gout);
+    flow_op->apply(f_temp4, f_temp1);
 
     // [1] <- [4]
     f_temp1 = f_temp4;
@@ -5603,12 +5598,11 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
     GFlowStep(gin, gaugeTemp, gout, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
 
     // STEP 3
-    // [4] <- Laplace [2]
-    copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profileGFlow);
+    // [4] <- K_t [2]
+    flow_op->update(gin);
+    flow_op->apply(f_temp4, f_temp2);
 
-    // [2] <- [4] = Laplace [2]
+    // [2] <- [4] = K_t [2]
     f_temp2 = f_temp4;
 
     // [3] <- 3/4 x epsilon x [2] + [3]
