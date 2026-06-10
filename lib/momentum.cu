@@ -57,7 +57,7 @@ namespace quda {
     count++;
   }
 
-  void forceRecord(array<device_reduce_t, 2> &force, double dt, const char *fname)
+  void forceRecord(array<reduction_t, 2> &force, double dt, const char *fname)
   {
     if (comm_rank()==0) {
       force_stream << fname << "\t" << std::setprecision(5) << double(force[0]) << "\t"
@@ -107,7 +107,7 @@ namespace quda {
     const GaugeField &force;
     GaugeField &mom;
     double coeff;
-    array<device_reduce_t, 2> force_max;
+    array<reduction_t, 2> force_max;
 
   public:
     UpdateMom(const GaugeField &force, GaugeField &mom, double coeff, const char *fname) :

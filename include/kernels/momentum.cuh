@@ -56,7 +56,7 @@ namespace quda {
   };
 
   template<typename Float_, int nColor_, QudaReconstructType recon_>
-  struct UpdateMomArg : ReduceArg<array<device_reduce_t, 2>>
+  struct UpdateMomArg : ReduceArg<array<reduction_t, 2>>
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
