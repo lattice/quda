@@ -250,18 +250,27 @@ namespace quda
     get_current_communicator().comm_allreduce_sum_array(data, size);
   }
 
-#if !defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_ALGORITHM_KAHAN)             \
-  || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  template <> void comm_allreduce_sum<std::vector<double>>(std::vector<double> &a)
+  {
+    comm_allreduce_sum_array(a.data(), a.size());
+  }
+
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                 \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
+  // maximum<reduction_t> uses reduction_t (doubledouble), distinct from device_reduce_t wrapper types.
   template <> void comm_allreduce_sum<std::vector<doubledouble>>(std::vector<doubledouble> &a)
   {
     comm_allreduce_sum_array(a.data(), a.size());
   }
 #endif
 
+#if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)         \
+  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE))
   template <> void comm_allreduce_sum<std::vector<device_reduce_t>>(std::vector<device_reduce_t> &a)
   {
     comm_allreduce_sum_array(a.data(), a.size());
   }
+#endif
 
   template <> void comm_allreduce_sum<std::vector<complex_t>>(std::vector<complex_t> &a)
   {
@@ -276,11 +285,6 @@ namespace quda
 #endif
 
 #if defined(QUDA_USE_QUAD_SCALAR)
-  template <> void comm_allreduce_sum<std::vector<double>>(std::vector<double> &a)
-  {
-    comm_allreduce_sum_array(a.data(), a.size());
-  }
-
   template <> void comm_allreduce_sum<std::vector<std::complex<double>>>(std::vector<std::complex<double>> &a)
   {
     comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
@@ -302,18 +306,16 @@ namespace quda
     comm_allreduce_sum_array(reinterpret_cast<device_reduce_t *>(a.data()), 4 * a.size());
   }
 
-#if !defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_ALGORITHM_KAHAN)             \
-  || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
-  template <> void comm_allreduce_sum<doubledouble>(doubledouble &a)
-  {
-    get_current_communicator().comm_allreduce_sum_array(&a, 1);
-  }
-#endif
-
-#if defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_USE_QUAD_SCALAR)
   template <> void comm_allreduce_sum<double>(double &a)
   {
     comm_allreduce_sum_array(&a, 1);
+  }
+
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                 \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
+  template <> void comm_allreduce_sum<doubledouble>(doubledouble &a)
+  {
+    get_current_communicator().comm_allreduce_sum_array(&a, 1);
   }
 #endif
 
@@ -324,10 +326,13 @@ namespace quda
   }
 #endif
 
+#if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)         \
+  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE))
   template <> void comm_allreduce_sum<device_reduce_t>(device_reduce_t &a)
   {
     get_current_communicator().comm_allreduce_sum_array(&a, 1);
   }
+#endif
 
   template <> void comm_allreduce_sum<size_t>(size_t &a)
   {
@@ -340,15 +345,18 @@ namespace quda
     get_current_communicator().comm_allreduce_max_array(data, size);
   }
 
-  template <> void comm_allreduce_max<doubledouble>(doubledouble &a)
-  {
-    comm_allreduce_max_array(&a, 1);
-  }
-
   template <> void comm_allreduce_max<double>(double &a)
   {
     comm_allreduce_max_array(&a, 1);
   }
+
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                 \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
+  template <> void comm_allreduce_max<doubledouble>(doubledouble &a)
+  {
+    comm_allreduce_max_array(&a, 1);
+  }
+#endif
 
 #if defined(QUDA_USE_QUAD_SCALAR)
   template <> void comm_allreduce_max<real_t>(real_t &a)
@@ -364,16 +372,15 @@ namespace quda
     a = a_;
   }
 
-#if !defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_ALGORITHM_KAHAN)             \
-  || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                 \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
   template <> void comm_allreduce_max<std::vector<doubledouble>>(std::vector<doubledouble> &a)
   {
     comm_allreduce_max_array(a.data(), a.size());
   }
 #endif
 
-#if defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_ALGORITHM_KAHAN)             \
-  || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
   template <> void comm_allreduce_max<std::vector<device_reduce_t>>(std::vector<device_reduce_t> &a)
   {
     comm_allreduce_max_array(a.data(), a.size());
@@ -393,9 +400,9 @@ namespace quda
     for (unsigned int i = 0; i < a.size(); i++) a[i] = a_[i];
   }
 
-  template <> void comm_allreduce_max<std::vector<array<device_reduce_t, 2>>>(std::vector<array<device_reduce_t, 2>> &a)
+  template <> void comm_allreduce_max<std::vector<array<reduction_t, 2>>>(std::vector<array<reduction_t, 2>> &a)
   {
-    comm_allreduce_max_array(reinterpret_cast<device_reduce_t *>(a.data()), 2 * a.size());
+    comm_allreduce_max_array(reinterpret_cast<reduction_t *>(a.data()), 2 * a.size());
   }
 
   template <> void comm_allreduce_max<deviation_t<reduction_t>>(deviation_t<reduction_t> &a)
@@ -408,10 +415,12 @@ namespace quda
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }
 
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)
   template <> void comm_allreduce_max<std::vector<deviation_t<doubledouble>>>(std::vector<deviation_t<doubledouble>> &a)
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }
+#endif
 
   void comm_allreduce_min_array(double *data, size_t size)
   {

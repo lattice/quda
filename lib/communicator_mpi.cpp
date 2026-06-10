@@ -275,7 +275,9 @@ namespace quda
     return query;
   }
 
-  void Communicator::comm_allreduce_sum_array(double *data, size_t size)
+  // Fast path / performance metrics (independent of reduction algorithm).
+  template <>
+  void Communicator::comm_allreduce_sum_array<double>(double *data, size_t size)
   {
     if (!comm_deterministic_reduce()) {
       std::vector<double> recvbuf(size);
@@ -291,10 +293,12 @@ namespace quda
         for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
       }
 
-      for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans.data() + i * n, n); }
+      for (size_t i = 0; i < size; i++) { data[i] = deterministic_sum_reduce(recv_trans.data() + i * n, n); }
     }
   }
 
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)
+  // reduction_t when doubledouble; aliases device_reduce_t under QUDA_REDUCTION_ALGORITHM_NAIVE.
   template <>
   void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *data, size_t size)
   {
@@ -309,7 +313,53 @@ namespace quda
 
     for (size_t i = 0; i < size; i++) { data[i] = deterministic_sum_reduce(recv_trans.data() + i * n, n); }
   }
+#endif
 
+#if defined(QUDA_USE_QUAD_SCALAR)
+  template <>
+  void Communicator::comm_allreduce_sum_array<real_t>(real_t *data, size_t size)
+  {
+    static_assert(sizeof(real_t) == 2 * sizeof(double));
+    size_t n = comm_size();
+    std::vector<real_t> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE_COMPLEX, recv_buf.data(), size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<real_t> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) { data[i] = deterministic_sum_reduce(recv_trans.data() + i * n, n); }
+  }
+#endif
+
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  template <>
+  void Communicator::comm_allreduce_sum_array<rfa_t<reduction_t>>(rfa_t<reduction_t> *data, size_t size)
+  {
+    (void)reducer::get_rfa_bins();
+
+    size_t n = comm_size();
+    std::vector<rfa_t<reduction_t>> recv_buf(size * n);
+    static_assert(sizeof(rfa_t<reduction_t>) % (2 * sizeof(double)) == 0);
+    auto gather_size = size * sizeof(rfa_t<reduction_t>) / (2 * sizeof(double));
+    MPI_CHECK(MPI_Allgather(data, gather_size, MPI_DOUBLE_COMPLEX, recv_buf.data(), gather_size, MPI_DOUBLE_COMPLEX,
+                            MPI_COMM_HANDLE));
+
+    std::vector<rfa_t<reduction_t>> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      data[i] = 0.0;
+      for (size_t j = 0; j < n; j++) { data[i] += recv_trans[i * n + j]; }
+    }
+  }
+#endif
+
+#if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  // device_reduce_t is kahan_t<reduction_t> or rfa_t<reduction_t> (sum only; max uses reduction_t).
   template <>
   void Communicator::comm_allreduce_sum_array<device_reduce_t>(device_reduce_t *data, size_t size)
   {
@@ -319,6 +369,7 @@ namespace quda
     comm_allreduce_sum_array<reduction_t>(reinterpret_cast<reduction_t *>(data), size);
 #endif
   }
+#endif
 
   void Communicator::comm_allreduce_sum(size_t &a)
   {
@@ -330,7 +381,16 @@ namespace quda
     a = recv;
   }
 
-  void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t size)
+  template <>
+  void Communicator::comm_allreduce_max_array<double>(double *data, size_t size)
+  {
+    std::vector<double> recvbuf(size);
+    MPI_CHECK(MPI_Allreduce(data, recvbuf.data(), size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
+    memcpy(data, recvbuf.data(), size * sizeof(double));
+  }
+
+  template <>
+  void Communicator::comm_allreduce_max_array<deviation_t<double>>(deviation_t<double> *data, size_t size)
   {
     size_t n = comm_size();
     std::vector<deviation_t<double>> recv_buf(size * n);
@@ -347,14 +407,67 @@ namespace quda
     }
   }
 
-  void Communicator::comm_allreduce_max_array(double *data, size_t size)
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)
+  template <>
+  void Communicator::comm_allreduce_max_array<deviation_t<doubledouble>>(deviation_t<doubledouble> *data, size_t size)
   {
-    std::vector<double> recvbuf(size);
-    MPI_CHECK(MPI_Allreduce(data, recvbuf.data(), size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
-    memcpy(data, recvbuf.data(), size * sizeof(double));
+    size_t n = comm_size();
+    std::vector<deviation_t<doubledouble>> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, 2 * size, MPI_DOUBLE_COMPLEX, recv_buf.data(), 2 * size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<deviation_t<doubledouble>> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      data[i] = recv_trans[i * n];
+      for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+    }
   }
 
-  void Communicator::comm_allreduce_min_array(double *data, size_t size)
+  template <>
+  void Communicator::comm_allreduce_max_array<doubledouble>(doubledouble *data, size_t size)
+  {
+    size_t n = comm_size();
+    std::vector<doubledouble> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE_COMPLEX, recv_buf.data(), size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<doubledouble> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      data[i] = recv_trans[i * n];
+      for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+    }
+  }
+#endif
+
+#if defined(QUDA_USE_QUAD_SCALAR)
+  template <>
+  void Communicator::comm_allreduce_max_array<real_t>(real_t *data, size_t size)
+  {
+    static_assert(sizeof(real_t) == 2 * sizeof(double));
+    size_t n = comm_size();
+    std::vector<real_t> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE_COMPLEX, recv_buf.data(), size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<real_t> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      data[i] = recv_trans[i * n];
+      for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+    }
+  }
+#endif
+
+  template <>
+  void Communicator::comm_allreduce_min_array<double>(double *data, size_t size)
   {
     std::vector<double> recvbuf(size);
     MPI_CHECK(MPI_Allreduce(data, recvbuf.data(), size, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
