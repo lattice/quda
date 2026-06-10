@@ -11,8 +11,8 @@ namespace quda
 {
   static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
 
-  using spinor_array = array<array<device_reduce_t, 2>, max_contract_results>;
-  using staggered_spinor_array = array<device_reduce_t, 2>;
+  template <class T> using spinor_array = array<array<T, 2>, max_contract_results>;
+  template <class T> using staggered_spinor_array = array<T, 2>;
 
   template <int reduction_dim, class T> __device__ void sink_from_t_xyz(int sink[4], int t, int xyz, T X[4])
   {
@@ -32,7 +32,7 @@ namespace quda
     return ((sink[3] * X[2] + sink[2]) * X[1] + sink[1]) * X[0] + sink[0];
   }
 
-  template <typename Float, int nColor_, int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = spinor_array>
+  template <typename Float, int nColor_, int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = spinor_array<device_reduce_t>>
   struct ContractionSummedArg : public ReduceArg<contract_t> {
     using reduce_t = contract_t;
     // This the direction we are performing reduction on. default to 3.
@@ -78,9 +78,9 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
+  template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array<device_reduce_t>> {
 
-    using reduce_t = spinor_array;
+    using reduce_t = spinor_array<device_reduce_t>;
     using plus<reduce_t>::operator();
     static constexpr int reduce_block_dim = 1; //
 
@@ -111,11 +111,11 @@ namespace quda
       sink_from_t_xyz<Arg::reduction_dim>(sink, t, xyz, arg.X);
 
       // Calculate exp(-i * [x dot p])
-      double Sum_dXi_dot_Pi = 0.0;
+      real Sum_dXi_dot_Pi = 0.0;
       for (int i = 0; i < 4; i++)
         Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
 
-      complex<double> phase = {cospi(Sum_dXi_dot_Pi * 2.), -sinpi(Sum_dXi_dot_Pi * 2.)};
+      complex<real> phase = {cospi(Sum_dXi_dot_Pi * 2.), -sinpi(Sum_dXi_dot_Pi * 2.)};
 
       // Collect vector data
       int parity = 0;
@@ -124,8 +124,8 @@ namespace quda
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
-      // loop over channels
-      reduce_t result_all_channels = {};
+      // Thread-local sum in field / reduction precision; RFE only when merged into result
+      spinor_array<reduction_t> site_sum = {};
 #pragma unroll
       for (int G_idx = 0; G_idx < 16; G_idx++) {
 #pragma unroll
@@ -141,15 +141,13 @@ namespace quda
             // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
             // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx
             auto prop_product = g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * g5gm_z[G_idx][b1];
-            result_all_channels[G_idx][0]
-              += to_device_reduce(prop_product.real() * phase.real() - prop_product.imag() * phase.imag());
-            result_all_channels[G_idx][1]
-              += to_device_reduce(prop_product.imag() * phase.real() + prop_product.real() * phase.imag());
+            site_sum[G_idx][0] += prop_product.real() * phase.real() - prop_product.imag() * phase.imag();
+            site_sum[G_idx][1] += prop_product.imag() * phase.real() + prop_product.real() * phase.imag();
           }
         }
       }
 
-      return operator()(result_all_channels, result);
+      return operator()(result, site_sum);
     }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int dummy, int t)
@@ -199,8 +197,8 @@ namespace quda
       complex<real> prop_prod = innerProduct(x, y);
 
       // Fourier phase
-      complex<double> ph;
-      complex<double> phase(1.0, 0.0);
+      complex<real> ph;
+      complex<real> phase(1.0, 0.0);
       // Phase factor for each direction is either the cos, sin, or exp Fourier phase
 #pragma unroll
       for (int dir = 0; dir < 4; dir++) {
@@ -219,11 +217,9 @@ namespace quda
         phase *= ph;
       }
 
-      complex<double> result_all_channels = phase * complex<double> {prop_prod.real(), prop_prod.imag()};
-      staggered_spinor_array local {};
-      local[0] = to_device_reduce(result_all_channels.real());
-      local[1] = to_device_reduce(result_all_channels.imag());
-      return operator()(local, result);
+      complex<real> phased = phase * complex<real> {prop_prod.real(), prop_prod.imag()};
+      const array<reduction_t, 2> local {static_cast<reduction_t>(phased.real()), static_cast<reduction_t>(phased.imag())};
+      return operator()(result, local);
     }
   };
 

@@ -76,8 +76,8 @@ namespace quda {
       case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: {
         constexpr int nSpin = 1;
         constexpr int ft_dir = 3;
-        ContractionSummedArg<Float, nColor, nSpin, ft_dir, staggered_spinor_array> arg(x, y, source_position, mom_mode,
-                                                                                       fft_type, s1, b1);
+        ContractionSummedArg<Float, nColor, nSpin, ft_dir, staggered_spinor_array<device_reduce_t>> arg(
+          x, y, source_position, mom_mode, fft_type, s1, b1);
         launch<StaggeredContractFT>(result_local, tp, stream, arg);
       } break;
       default: errorQuda("Unexpected contraction type %d", cType);

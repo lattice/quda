@@ -267,7 +267,6 @@ namespace quda
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
-      // Per-site contribution in field precision, accumulated with device_reduce_t
       return operator()(result, static_cast<reduction_t>(innerProduct(x, y).real()));
     }
   };
@@ -323,7 +322,7 @@ namespace quda
       const complex<real> res = innerProduct(x, y);
       const array<compute_t, 2> site {static_cast<compute_t>(res.real()), static_cast<compute_t>(res.imag())};
 
-      return plus<reduce_t>::operator()(site, result);
+      return operator()(result, site);
     }
   };
 } // namespace quda

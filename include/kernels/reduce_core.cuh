@@ -519,17 +519,15 @@ namespace quda
 
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &, int)
       {
-        reduce_t aux = {};
+        array<reduction_t, 3> aux = {};
 
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          norm2_<real_reduce_t, real>(aux[0], x[i]);
-          norm2_<real_reduce_t, real>(aux[1], y[i]);
+          norm2_<reduction_t, real>(aux[0], x[i]);
+          norm2_<reduction_t, real>(aux[1], y[i]);
         }
 
-        sum[0] += aux[0];
-        sum[1] += aux[1];
-        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0);
+        sum = reducer::apply(sum, {aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0)});
       }
 
       constexpr int flops() const { return 4; }   //! undercounts since it excludes the per-site division
@@ -556,17 +554,15 @@ namespace quda
 
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int)
       {
-        reduce_t aux = {};
+        array<reduction_t, 3> aux = {};
 
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          norm2_<real_reduce_t, real>(aux[0], x[i] + y[i]);
-          norm2_<real_reduce_t, real>(aux[1], z[i]);
+          norm2_<reduction_t, real>(aux[0], x[i] + y[i]);
+          norm2_<reduction_t, real>(aux[1], z[i]);
         }
 
-        sum[0] += aux[0];
-        sum[1] += aux[1];
-        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0);
+        sum = reducer::apply(sum, {aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0)});
       }
 
       constexpr int flops() const { return 5; }

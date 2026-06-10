@@ -23,10 +23,9 @@ namespace quda {
   using device_reduce_t = kahan_t<reduction_t>;
 #elif defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
   using device_reduce_t = rfa_t<reduction_t>;
+  // nvcc does not match get_scalar through the rfa_t alias template
+  template <> struct get_scalar<device_reduce_t> { using type = device_reduce_t; };
 #endif
-
-  /** Promote a scalar to the device reduction type for sum reductions. */
-  template <typename T> __host__ __device__ inline device_reduce_t to_device_reduce(const T &x) { return device_reduce_t(x); }
 
   /** Convert a device reduction value to a scalar (host or device). */
   template <typename T = real_t>

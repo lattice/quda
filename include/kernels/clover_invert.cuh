@@ -52,7 +52,7 @@ namespace quda
       using real = typename Arg::real;
       constexpr int N = Arg::nColor * Arg::nSpin / 2;
       using Mat = HMatrix<real, N>;
-      device_reduce_t trLogA {};
+      reduction_t trLogA = 0;
 
 #pragma unroll
       for (int ch = 0; ch < 2; ch++) {
@@ -67,8 +67,8 @@ namespace quda
         // compute the Cholesky decomposition
         linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
 
-        // Accumulate trlogA
-        for (int j = 0; j < N; j++) trLogA += to_device_reduce(2.0 * log(cholesky.D(j)));
+        // Accumulate trlogA in plain precision; RFE only when merged into value
+        for (int j = 0; j < N; j++) trLogA += static_cast<reduction_t>(2.0 * log(cholesky.D(j)));
 
         if (!Arg::compute_tr_log) {
           Mat Ainv = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse
@@ -76,9 +76,9 @@ namespace quda
         }
       }
 
-      reduce_t result{};
-      parity ? result[1] = trLogA : result[0] = trLogA;
-      return operator()(result, value);
+      array<reduction_t, 2> site {};
+      parity ? site[1] = trLogA : site[0] = trLogA;
+      return operator()(value, site);
     }
 
   };
