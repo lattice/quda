@@ -312,10 +312,10 @@ namespace quda {
       if (x.Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
         auto n = instantiateReduce<HeavyQuarkResidualNorm_, false>(cvector<real_t>(0.0), cvector<real_t>(0.0),
                                                                    cvector<real_t>(0.0), x, r, x, x, x);
-        const auto scale = reduction_t(1.0) / reduction_t(x.Volume() * comm_size());
+        const auto scale = real_t(1.0) / real_t(x.Volume() * comm_size());
         for (auto i = 0u; i < x.size(); i++) {
           norm[i] = reduction_to_array<3>(n[i]);
-          norm[i][2] = reduction_to_real(n[i][2] * scale);
+          norm[i][2] = reduction_to_real(n[i][2]) * scale;
         }
       }
       return norm;
@@ -329,10 +329,10 @@ namespace quda {
       if (x.Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
         auto n = instantiateReduce<xpyHeavyQuarkResidualNorm_, true>(cvector<real_t>(0.0), cvector<real_t>(0.0),
                                                                      cvector<real_t>(0.0), x, y, r, r, r);
-        const auto scale = reduction_t(1.0) / reduction_t(x.Volume() * comm_size());
+        const auto scale = real_t(1.0) / real_t(x.Volume() * comm_size());
         for (auto i = 0u; i < x.size(); i++) {
           norm[i] = reduction_to_array<3>(n[i]);
-          norm[i][2] = reduction_to_real(n[i][2] * scale);
+          norm[i][2] = reduction_to_real(n[i][2]) * scale;
         }
       }
       return norm;
