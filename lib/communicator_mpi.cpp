@@ -358,16 +358,12 @@ namespace quda
   }
 #endif
 
-#if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
-  // device_reduce_t is kahan_t<reduction_t> or rfa_t<reduction_t> (sum only; max uses reduction_t).
+#if defined(QUDA_REDUCTION_ALGORITHM_KAHAN)
+  // device_reduce_t is kahan_t<reduction_t> (distinct from reduction_t); RFA uses rfa_t specialization above.
   template <>
   void Communicator::comm_allreduce_sum_array<device_reduce_t>(device_reduce_t *data, size_t size)
   {
-#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
-    comm_allreduce_sum_array<rfa_t<reduction_t>>(reinterpret_cast<rfa_t<reduction_t> *>(data), size);
-#else
     comm_allreduce_sum_array<reduction_t>(reinterpret_cast<reduction_t *>(data), size);
-#endif
   }
 #endif
 
