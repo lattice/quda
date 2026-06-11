@@ -5543,7 +5543,8 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
   // fermion-flow generator K_t. Defaults to the 4D Laplacian (a=1, b=-8,
   // dir=4), reproducing the legacy behavior exactly
   std::unique_ptr<FermionFlowOp> flow_op(
-    createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *gaugePrecise, comm_dim, parity, profileGFlow));
+    createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *smear_param, *gaugePrecise, comm_dim, parity,
+                        profileGFlow));
 
   int measurement_n = 0; // The nth measurement to take
 
@@ -5710,7 +5711,7 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   // fermion-flow generator K_t. Defaults to the 4D Laplacian (a=1, b=-8, dir=4),
   // reproducing the legacy behavior; opt-in via smear_param->fermion_flow_type.
   std::unique_ptr<FermionFlowOp> flow_op(
-    createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *gaugePrecise, comm_dim, parity,
+    createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *smear_param, *gaugePrecise, comm_dim, parity,
                         profileAdjGFlowSafe));
 
   for (unsigned int j = 0; j < smear_param->n_steps; j++) {
@@ -5952,7 +5953,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   int comm_dim[4] = {};
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
   std::unique_ptr<FermionFlowOp> flow_op(
-    createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *gaugePrecise, comm_dim, parity,
+    createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *smear_param, *gaugePrecise, comm_dim, parity,
                         profileAdjGFlowHier));
 
   // spinor fields

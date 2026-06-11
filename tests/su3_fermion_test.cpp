@@ -33,12 +33,15 @@ void run(test_t param)
 
   using namespace quda;
 
-  // Staggered-type flow operators act on single-component (nSpin = 1) fields;
-  // the Laplacian and Wilson operators use Wilson-type (nSpin = 4) fields.
-  const bool staggered_flow = (fermion_flow_type == QUDA_FERMION_FLOW_STAGGERED);
-  if (!is_enabled_spin(staggered_flow ? 1 : 4))
+  // Staggered-type flow operators (staggered, HISQ, truncated HISQ) act on
+  // single-component (nSpin = 1) fields; the Laplacian and Wilson operators use
+  // Wilson-type (nSpin = 4) fields.
+  const bool single_component = (fermion_flow_type == QUDA_FERMION_FLOW_STAGGERED
+                                 || fermion_flow_type == QUDA_FERMION_FLOW_HISQ
+                                 || fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED);
+  if (!is_enabled_spin(single_component ? 1 : 4))
     errorQuda("Test requires %s fermion enablement for the selected flow operator",
-              staggered_flow ? "staggered (spin 1)" : "Wilson-type (spin 4)");
+              single_component ? "staggered-type (spin 1)" : "Wilson-type (spin 4)");
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
@@ -124,9 +127,11 @@ void run(test_t param)
 
   quda::ColorSpinorParam cs_param;
 
-  if (staggered_flow) {
-    // nSpin = 1 fields from the staggered dslash type; mass 0 -> pure DdagD generator.
-    invParam.dslash_type = QUDA_STAGGERED_DSLASH;
+  if (single_component) {
+    // nSpin = 1 staggered-type fields; mass 0 -> pure DdagD generator. HISQ variants
+    // use the asqtad dslash type (also nSpin = 1) for the field layout.
+    invParam.dslash_type
+      = (fermion_flow_type == QUDA_FERMION_FLOW_STAGGERED) ? QUDA_STAGGERED_DSLASH : QUDA_ASQTAD_DSLASH;
     invParam.mass = 0.0;
     constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
   } else {

@@ -1197,6 +1197,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha3, 0.0);
   P(dir_ignore, -1);
   P(fermion_flow_type, QUDA_FERMION_FLOW_LAPLACE_4D);
+  P(naik_epsilon, 0.0);
+  P(tadpole, 1.0);
 #else
   P(n_steps, (unsigned int)INVALID_INT);
   P(meas_interval, (unsigned int)INVALID_INT);
@@ -1214,6 +1216,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha3, INVALID_DOUBLE);
   P(dir_ignore, INVALID_INT);
   P(fermion_flow_type, QUDA_FERMION_FLOW_INVALID);
+  P(naik_epsilon, INVALID_DOUBLE);
+  P(tadpole, INVALID_DOUBLE);
 #endif
 
 #ifdef INIT_PARAM

@@ -885,6 +885,8 @@ extern "C" {
                                         A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
     QudaFermionFlowType fermion_flow_type; /**< Generator of the fermion gradient flow in performGFlowQuda.
                                                 Defaults to QUDA_FERMION_FLOW_LAPLACE_4D (legacy behavior). */
+    double naik_epsilon; /**< Naik (eps_N) correction for the HISQ fermion-flow operators. Default 0.0. */
+    double tadpole;      /**< Tadpole factor u0 for the HISQ fermion-flow link construction. Default 1.0. */
   } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {

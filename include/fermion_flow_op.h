@@ -9,6 +9,9 @@
 #include <dslash_quda.h>
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <llfat_quda.h>
+#include <unitarization_links.h>
+#include <malloc_quda.h>
 
 /**
    @file fermion_flow_op.h
@@ -208,10 +211,128 @@ namespace quda
   };
 #endif
 
+#ifdef GPU_STAGGERED_DIRAC
+  /**
+     @brief Truncated-HISQ -DdagD flow generator (Option A): the two-level fat
+     one-link field X (fat7 -> reunitarize -> asqtad), with the Naik three-link
+     term dropped. Built each sub-stage from the flowed thin links:
+       phase(thin) -> extend -> fat7 -> unitarize -> extend -> asqtad-fat = X,
+     then applied with the cheap naive-staggered one-link dslash on X
+     (DiracStaggered, gauge = X). KS phases + anti-periodic T are baked into the
+     thin links before fattening (the MILC HISQ convention), so they propagate
+     into X. K_t = -DdagD = -MdagM. Only eps_N = 0 is supported for now (the
+     eps-correction two-set combination needs a device gauge-field axpy that QUDA
+     does not currently expose).
+  */
+  class HisqFlowOp : public FermionFlowOp
+  {
+    GaugeFieldParam thin_param; // non-extended phased-thin template (MILC + anti-periodic)
+    GaugeFieldParam raw_param;  // fattening output template (GENERAL_LINKS, no halo)
+    GaugeField fat;             // X, dslash-ready (ASQTAD_FAT_LINKS, PAD) -- DiracStaggered gauge
+    std::unique_ptr<Dirac> dirac;
+    double c_fat7[6];   // level-1 fat7 path coefficients
+    double c_asqtad[6]; // level-2 asqtad path coefficients
+
+  public:
+    HisqFlowOp(const GaugeField &gauge_template, const QudaInvertParam &inv_param, const QudaGaugeSmearParam &smear_param,
+               const int *comm_dim, int /* parity */, TimeProfile & /* profile */)
+    {
+      if (smear_param.naik_epsilon != 0.0) errorQuda("HISQ fermion flow with naik_epsilon != 0 is not yet implemented");
+
+      // Path coefficients (Bazavov et al. 2010, Table V), tadpole-scaled.
+      const double u1 = 1.0 / smear_param.tadpole, u2 = u1 * u1, u4 = u2 * u2, u6 = u4 * u2;
+      c_fat7[0] = 1.0 / 8.0;
+      c_fat7[1] = 0.0;
+      c_fat7[2] = u2 * (-1.0 / 8.0) * 0.5;
+      c_fat7[3] = u4 * (1.0 / 8.0) * 0.25 * 0.5;
+      c_fat7[4] = u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+      c_fat7[5] = 0.0;
+      c_asqtad[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0);
+      c_asqtad[1] = -1.0 / 24.0; // Naik (unused by the truncated dslash, but X's one-link includes the 1/8)
+      c_asqtad[2] = (-1.0 / 8.0) * 0.5;
+      c_asqtad[3] = (1.0 / 8.0) * 0.25 * 0.5;
+      c_asqtad[4] = (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+      c_asqtad[5] = -2.0 / 16.0;
+
+      // Phased-thin template: KS phases + anti-periodic T baked into the thin links.
+      thin_param = GaugeFieldParam(gauge_template);
+      thin_param.create = QUDA_NULL_FIELD_CREATE;
+      thin_param.reconstruct = QUDA_RECONSTRUCT_NO;
+      thin_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+      thin_param.staggeredPhaseType = QUDA_STAGGERED_PHASE_MILC;
+
+      // Fattening-output template: general links, explicit storage, no halo.
+      raw_param = GaugeFieldParam(gauge_template);
+      raw_param.create = QUDA_ZERO_FIELD_CREATE;
+      raw_param.reconstruct = QUDA_RECONSTRUCT_NO;
+      raw_param.link_type = QUDA_GENERAL_LINKS;
+      raw_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+      // Dslash-ready fat field X (rebuilt in place each sub-stage).
+      GaugeFieldParam fatParam(gauge_template);
+      fatParam.create = QUDA_NULL_FIELD_CREATE;
+      fatParam.reconstruct = QUDA_RECONSTRUCT_NO;
+      fatParam.link_type = QUDA_ASQTAD_FAT_LINKS;
+      fatParam.t_boundary = QUDA_PERIODIC_T;                   // anti-periodic already baked into the data
+      fatParam.staggeredPhaseType = QUDA_STAGGERED_PHASE_MILC; // phases already baked into the data
+      fat = GaugeField(fatParam);
+
+      setUnitarizeLinksConstants(1e-14, 1e-10, true, false, 1e-6, 1e-6);
+
+      DiracParam diracParam;
+      diracParam.type = QUDA_STAGGERED_DIRAC; // one-link operator on X (no Naik) = truncated HISQ
+      diracParam.mass = inv_param.mass;
+      diracParam.dagger = QUDA_DAG_NO;
+      diracParam.matpcType = QUDA_MATPC_EVEN_EVEN;
+      diracParam.gauge = &fat;
+      for (int i = 0; i < 4; i++) diracParam.commDim[i] = comm_dim[i];
+      dirac.reset(Dirac::create(diracParam));
+    }
+
+    void update(const GaugeField &thin_ext) override
+    {
+      const lat_dim_t &R = thin_ext.R();
+
+      // Phase the (trimmed) thin links, then re-extend so the phases reach the halo.
+      GaugeField thin(thin_param);
+      copyExtendedGauge(thin, thin_ext, QUDA_CUDA_FIELD_LOCATION);
+      thin.exchangeGhost();
+      thin.applyStaggeredPhase();
+      std::unique_ptr<GaugeField> thinEx(createExtendedGauge(thin, R));
+
+      // Level 1: V = fat7(thin); W = unitarize(V).
+      GaugeField V(raw_param), W(raw_param);
+      fatKSLink(V, *thinEx, c_fat7);
+      int *fails_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
+      int *fails_d = static_cast<int *>(get_mapped_device_pointer(fails_h));
+      *fails_h = 0;
+      unitarizeLinks(W, V, fails_d);
+      if (*fails_h > 0) errorQuda("HISQ flow unitarization: %d failures", *fails_h);
+      host_free(fails_h);
+
+      // Level 2: X = asqtad-fat(W).
+      std::unique_ptr<GaugeField> WEx(createExtendedGauge(W, R));
+      GaugeField Xraw(raw_param);
+      fatKSLink(Xraw, *WEx, c_asqtad);
+      fat.copy(Xraw);
+      fat.exchangeGhost();
+
+      dirac->updateFields(&fat, nullptr, nullptr, nullptr);
+    }
+
+    void apply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      dirac->MdagM(out, in); // K_t = -DdagD = -MdagM
+      blas::ax(-1.0, out);
+    }
+  };
+#endif
+
   /**
      @brief Factory: build the fermion-flow generator selected by type.
      @param[in] type The selected generator (default QUDA_FERMION_FLOW_LAPLACE_4D)
-     @param[in] inv_param Spinor/operator parameters (mass etc.) for Dirac-based operators
+     @param[in] inv_param Spinor/operator parameters (mass, kappa) for Dirac-based operators
+     @param[in] smear_param Flow parameters (tadpole, naik_epsilon) for the HISQ operators
      @param[in] gauge_template Field whose params seed any helper gauge field
      @param[in] comm_dim Partitioned-dimension flags (must outlive the op)
      @param[in] parity Destination parity
@@ -219,8 +340,8 @@ namespace quda
      @return Owning pointer to the constructed operator
   */
   inline FermionFlowOp *createFermionFlowOp(QudaFermionFlowType type, const QudaInvertParam &inv_param,
-                                            const GaugeField &gauge_template, const int *comm_dim, int parity,
-                                            TimeProfile &profile)
+                                            const QudaGaugeSmearParam &smear_param, const GaugeField &gauge_template,
+                                            const int *comm_dim, int parity, TimeProfile &profile)
   {
     switch (type) {
     case QUDA_FERMION_FLOW_LAPLACE_4D: return new LaplaceFlowOp(gauge_template, comm_dim, parity, 4, -8.0, profile);
@@ -237,8 +358,13 @@ namespace quda
 #else
       errorQuda("Wilson fermion flow requires QUDA_DIRAC_WILSON to be enabled");
 #endif
-    case QUDA_FERMION_FLOW_HISQ:
-    case QUDA_FERMION_FLOW_HISQ_TRUNCATED: errorQuda("Fermion flow type %d is not yet implemented", type);
+    case QUDA_FERMION_FLOW_HISQ_TRUNCATED:
+#ifdef GPU_STAGGERED_DIRAC
+      return new HisqFlowOp(gauge_template, inv_param, smear_param, comm_dim, parity, profile);
+#else
+      errorQuda("Truncated-HISQ fermion flow requires QUDA_DIRAC_STAGGERED to be enabled");
+#endif
+    case QUDA_FERMION_FLOW_HISQ: errorQuda("Full HISQ fermion flow (with Naik) is not yet implemented");
     default: errorQuda("Unknown fermion flow type %d", type);
     }
     return nullptr;
