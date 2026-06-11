@@ -106,6 +106,8 @@ void run(test_t param)
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
   smear_param.smear_type = gauge_smear_type;
   smear_param.fermion_flow_type = fermion_flow_type;
+  smear_param.naik_epsilon = gauge_smear_naik_epsilon;
+  smear_param.tadpole = gauge_smear_tadpole;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
   smear_param.hier_threshold = hier_threshold;

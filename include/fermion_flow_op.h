@@ -222,8 +222,9 @@ namespace quda
        - with_long = true  : full HISQ -- DiracImprovedStaggered(fat = X, long = L).
        - with_long = false : truncated HISQ (Option A) -- the Naik term dropped,
                              applied with the cheap one-link DiracStaggered(gauge = X).
-     Only eps_N = 0 is supported for now (the eps-correction two-set combination
-     needs a device gauge-field axpy that QUDA does not currently expose).
+     The Naik correction eps_N (smear_param.naik_epsilon) is folded into the
+     level-2 asqtad coefficients (fattening is linear in the path coefficients);
+     it has no effect on the truncated variant, which drops the Naik term.
   */
   class HisqFlowOp : public FermionFlowOp
   {
@@ -241,10 +242,10 @@ namespace quda
                const int *comm_dim, int /* parity */, TimeProfile & /* profile */, bool with_long) :
       with_long(with_long)
     {
-      if (smear_param.naik_epsilon != 0.0) errorQuda("HISQ fermion flow with naik_epsilon != 0 is not yet implemented");
-
       // Path coefficients (Bazavov et al. 2010, Table V); fat7 is tadpole-scaled,
-      // asqtad operates on the reunitarized links W (so no tadpole factor).
+      // asqtad operates on the reunitarized links W (so no tadpole factor). The
+      // Naik correction eps_N folds directly into the level-2 coefficients:
+      const double eps = smear_param.naik_epsilon;
       const double u1 = 1.0 / smear_param.tadpole, u2 = u1 * u1, u4 = u2 * u2, u6 = u4 * u2;
       c_fat7[0] = 1.0 / 8.0;
       c_fat7[1] = 0.0;
@@ -252,8 +253,8 @@ namespace quda
       c_fat7[3] = u4 * (1.0 / 8.0) * 0.25 * 0.5;
       c_fat7[4] = u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
       c_fat7[5] = 0.0;
-      c_asqtad[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0);
-      c_asqtad[1] = -1.0 / 24.0; // Naik (used by longKSLink for full HISQ)
+      c_asqtad[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0) * (1.0 + eps); // one-link (eps_N in last 1/8)
+      c_asqtad[1] = -(1.0 + eps) / 24.0;                                          // Naik, scaled by (1 + eps_N)
       c_asqtad[2] = (-1.0 / 8.0) * 0.5;
       c_asqtad[3] = (1.0 / 8.0) * 0.25 * 0.5;
       c_asqtad[4] = (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);

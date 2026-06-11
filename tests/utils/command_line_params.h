@@ -573,6 +573,8 @@ extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;
 extern QudaFermionFlowType fermion_flow_type;
+extern double gauge_smear_naik_epsilon;
+extern double gauge_smear_tadpole;
 extern bool su_project;
 
 extern double smear_coeff;

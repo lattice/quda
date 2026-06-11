@@ -308,6 +308,8 @@ double eofa_mq3 = 1.0;
 bool gauge_smear = false;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 QudaFermionFlowType fermion_flow_type = QUDA_FERMION_FLOW_LAPLACE_4D;
+double gauge_smear_naik_epsilon = 0.0;
+double gauge_smear_tadpole = 1.0;
 double gauge_smear_rho = 0.1;
 double gauge_smear_epsilon = 0.1;
 double gauge_smear_alpha = 0.6;
@@ -1165,6 +1167,11 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "The generator of the fermion gradient flow in performGFlowQuda. Options: laplace4D "
                  "(default), laplace3D, wilson, staggered, hisq, hisq-truncated")
     ->transform(CLI::QUDACheckedTransformer(fermion_flow_type_map));
+
+  opgroup->add_option("--su3-naik-epsilon", gauge_smear_naik_epsilon,
+                      "Naik epsilon (eps_N) for the HISQ fermion-flow operator (default 0)");
+  opgroup->add_option("--su3-tadpole", gauge_smear_tadpole,
+                      "Tadpole factor u0 for the HISQ fermion-flow link construction (default 1)");
 
   opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
 
