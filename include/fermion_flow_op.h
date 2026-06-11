@@ -1,9 +1,14 @@
 #pragma once
 
+#include <memory>
+
+#include <quda.h>
 #include <enum_quda.h>
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
+#include <dirac_quda.h>
+#include <blas_quda.h>
 
 /**
    @file fermion_flow_op.h
@@ -94,23 +99,90 @@ namespace quda
     { ApplyLaplace(out, in, precise, dir, a, b, in, parity, comm_dim, profile); }
   };
 
+#ifdef GPU_STAGGERED_DIRAC
+  /**
+     @brief Naive (unimproved) staggered -DdagD flow generator, built on the
+     flowed thin links. Unlike the Laplacian, the staggered operator carries KS
+     phases and a temporal boundary condition; these are (re)applied to the
+     helper links each sub-stage, using QUDA's standard staggered convention
+     (MILC phases + anti-periodic temporal BC). With mass 0 this is the pure
+     DdagD, whose free-field limit reduces to the gauge Laplacian on each parity.
+     The generator returned is K_t = -DdagD = -MdagM (negative semi-definite for
+     any mass, so the integrator's smoothing invariant holds).
+  */
+  class StaggeredFlowOp : public FermionFlowOp
+  {
+    GaugeField precise; // staggered-phased helper links fed to the Dirac op
+    std::unique_ptr<Dirac> dirac;
+
+  public:
+    StaggeredFlowOp(const GaugeField &gauge_template, const QudaInvertParam &inv_param, const int *comm_dim,
+                    int /* parity */, TimeProfile & /* profile */)
+    {
+      GaugeFieldParam gParam_helper(gauge_template);
+      gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+      gParam_helper.reconstruct = QUDA_RECONSTRUCT_NO; // phased links: store explicitly
+      gParam_helper.t_boundary = QUDA_ANTI_PERIODIC_T; // standard staggered temporal BC
+      gParam_helper.staggeredPhaseType = QUDA_STAGGERED_PHASE_MILC;
+      precise = GaugeField(gParam_helper);
+
+      DiracParam diracParam;
+      diracParam.type = QUDA_STAGGERED_DIRAC;
+      diracParam.mass = inv_param.mass; // 0 for a pure DdagD flow
+      diracParam.dagger = QUDA_DAG_NO;
+      diracParam.matpcType = QUDA_MATPC_EVEN_EVEN; // full operator; MdagM is parity-independent,
+                                                   // but the Dirac ctor requires a valid matpcType
+      diracParam.gauge = &precise;
+      for (int i = 0; i < 4; i++) diracParam.commDim[i] = comm_dim[i];
+      dirac.reset(Dirac::create(diracParam));
+    }
+
+    void update(const GaugeField &thin_ext) override
+    {
+      // The helper holds phased links from the previous sub-stage; un-phase first
+      // to reset the staggered-phase flag (the data is overwritten next anyway),
+      // copy the freshly flowed thin links, then (re)apply the MILC phases +
+      // temporal BC. dirac reads precise through a stored pointer, so the
+      // in-place refresh is seen on the next apply.
+      if (precise.StaggeredPhaseApplied()) precise.removeStaggeredPhase();
+      copyExtendedGauge(precise, thin_ext, QUDA_CUDA_FIELD_LOCATION);
+      precise.exchangeGhost();
+      precise.applyStaggeredPhase(); // uses staggeredPhaseType (MILC) + t_boundary set above
+      dirac->updateFields(&precise, nullptr, nullptr, nullptr);
+    }
+
+    void apply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      dirac->MdagM(out, in); // MdagM = m^2 - D^2 >= 0; K_t = -DdagD = -MdagM
+      blas::ax(-1.0, out);
+    }
+  };
+#endif
+
   /**
      @brief Factory: build the fermion-flow generator selected by type.
      @param[in] type The selected generator (default QUDA_FERMION_FLOW_LAPLACE_4D)
+     @param[in] inv_param Spinor/operator parameters (mass etc.) for Dirac-based operators
      @param[in] gauge_template Field whose params seed any helper gauge field
      @param[in] comm_dim Partitioned-dimension flags (must outlive the op)
      @param[in] parity Destination parity
      @param[in] profile Time profile for the dslash
      @return Owning pointer to the constructed operator
   */
-  inline FermionFlowOp *createFermionFlowOp(QudaFermionFlowType type, const GaugeField &gauge_template,
-                                            const int *comm_dim, int parity, TimeProfile &profile)
+  inline FermionFlowOp *createFermionFlowOp(QudaFermionFlowType type, const QudaInvertParam &inv_param,
+                                            const GaugeField &gauge_template, const int *comm_dim, int parity,
+                                            TimeProfile &profile)
   {
     switch (type) {
     case QUDA_FERMION_FLOW_LAPLACE_4D: return new LaplaceFlowOp(gauge_template, comm_dim, parity, 4, -8.0, profile);
     case QUDA_FERMION_FLOW_LAPLACE_3D: return new LaplaceFlowOp(gauge_template, comm_dim, parity, 3, -6.0, profile);
-    case QUDA_FERMION_FLOW_WILSON:
     case QUDA_FERMION_FLOW_STAGGERED:
+#ifdef GPU_STAGGERED_DIRAC
+      return new StaggeredFlowOp(gauge_template, inv_param, comm_dim, parity, profile);
+#else
+      errorQuda("Staggered fermion flow requires QUDA_DIRAC_STAGGERED to be enabled");
+#endif
+    case QUDA_FERMION_FLOW_WILSON:
     case QUDA_FERMION_FLOW_HISQ:
     case QUDA_FERMION_FLOW_HISQ_TRUNCATED: errorQuda("Fermion flow type %d is not yet implemented", type);
     default: errorQuda("Unknown fermion flow type %d", type);
