@@ -130,6 +130,12 @@ void run(test_t param)
     invParam.mass = 0.0;
     constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
   } else {
+    // Wilson-type (nSpin = 4). The Laplacian flows ignore inv_param; the Wilson
+    // flow operator uses kappa (-1.0 sentinel -> a sensible default; override with --kappa).
+    if (fermion_flow_type == QUDA_FERMION_FLOW_WILSON) {
+      invParam.dslash_type = QUDA_WILSON_DSLASH;
+      invParam.kappa = (kappa != -1.0) ? kappa : 0.125;
+    }
     constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
   }
 

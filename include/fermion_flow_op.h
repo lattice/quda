@@ -159,6 +159,55 @@ namespace quda
   };
 #endif
 
+#ifdef GPU_WILSON_DIRAC
+  /**
+     @brief Wilson -DdagD flow generator, built on the flowed thin links. The
+     Wilson operator (four-component spinors) uses kappa (inv_param.kappa) and the
+     standard anti-periodic temporal boundary condition; the latter is applied by
+     the gauge accessor at read time from the helper field's t_boundary, so -- unlike
+     staggered -- no phase needs to be baked into the link data. The generator is
+     K_t = -DdagD = -MdagM (negative semi-definite for any kappa).
+  */
+  class WilsonFlowOp : public FermionFlowOp
+  {
+    GaugeField precise; // helper links fed to the Wilson Dirac op
+    std::unique_ptr<Dirac> dirac;
+
+  public:
+    WilsonFlowOp(const GaugeField &gauge_template, const QudaInvertParam &inv_param, const int *comm_dim,
+                 int /* parity */, TimeProfile & /* profile */)
+    {
+      GaugeFieldParam gParam_helper(gauge_template);
+      gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+      gParam_helper.reconstruct = QUDA_RECONSTRUCT_NO;
+      gParam_helper.t_boundary = QUDA_ANTI_PERIODIC_T; // standard Wilson temporal BC (applied by the gauge accessor)
+      precise = GaugeField(gParam_helper);
+
+      DiracParam diracParam;
+      diracParam.type = QUDA_WILSON_DIRAC;
+      diracParam.kappa = inv_param.kappa;
+      diracParam.dagger = QUDA_DAG_NO;
+      diracParam.matpcType = QUDA_MATPC_EVEN_EVEN; // full operator; MdagM is parity-independent
+      diracParam.gauge = &precise;
+      for (int i = 0; i < 4; i++) diracParam.commDim[i] = comm_dim[i];
+      dirac.reset(Dirac::create(diracParam));
+    }
+
+    void update(const GaugeField &thin_ext) override
+    {
+      copyExtendedGauge(precise, thin_ext, QUDA_CUDA_FIELD_LOCATION);
+      precise.exchangeGhost();
+      dirac->updateFields(&precise, nullptr, nullptr, nullptr);
+    }
+
+    void apply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      dirac->MdagM(out, in); // K_t = -DdagD = -MdagM
+      blas::ax(-1.0, out);
+    }
+  };
+#endif
+
   /**
      @brief Factory: build the fermion-flow generator selected by type.
      @param[in] type The selected generator (default QUDA_FERMION_FLOW_LAPLACE_4D)
@@ -183,6 +232,11 @@ namespace quda
       errorQuda("Staggered fermion flow requires QUDA_DIRAC_STAGGERED to be enabled");
 #endif
     case QUDA_FERMION_FLOW_WILSON:
+#ifdef GPU_WILSON_DIRAC
+      return new WilsonFlowOp(gauge_template, inv_param, comm_dim, parity, profile);
+#else
+      errorQuda("Wilson fermion flow requires QUDA_DIRAC_WILSON to be enabled");
+#endif
     case QUDA_FERMION_FLOW_HISQ:
     case QUDA_FERMION_FLOW_HISQ_TRUNCATED: errorQuda("Fermion flow type %d is not yet implemented", type);
     default: errorQuda("Unknown fermion flow type %d", type);
