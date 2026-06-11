@@ -100,9 +100,10 @@ namespace quda
       typename warp_reduce_t::TempStorage dummy_storage;
       warp_reduce_t warp_reduce(dummy_storage);
       T value = {};
-      if constexpr (reducer_t::do_sum) {
+      if constexpr (reducer_t::do_sum && !is_rfa<T>::value) {
         value = warp_reduce.Sum(value_);
       } else {
+        // CUB Sum uses cuda::std::plus; RFA types need quda::plus via Reduce
         value = warp_reduce.Reduce(value_, r);
       }
 

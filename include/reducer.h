@@ -70,6 +70,16 @@ namespace quda
     qudaEvent_t &get_event();
   } // namespace reducer
 
+  /** True when @p Acc and @p Site are matching quda::array types with the same element type. */
+  template <typename, typename, typename = void>
+  struct plus_array_site_compatible : std::false_type {};
+
+  template <typename Acc, typename Site>
+  struct plus_array_site_compatible<Acc, Site,
+                                    std::enable_if_t<std::is_same_v<Acc, array<typename Acc::value_type, Acc::N>>
+                                                     && std::is_same_v<Site, array<typename Site::value_type, Site::N>>>>
+    : std::bool_constant<std::is_same_v<typename Acc::value_type, typename Site::value_type>> {};
+
   /**
      plus reducer, used for conventional sum reductions
    */
@@ -83,14 +93,55 @@ namespace quda
     __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
 
     template <class U>
-    __device__ __host__ static inline std::enable_if_t<std::is_same_v<U, array<typename U::value_type, U::N>>, T> apply(T a, const U &b)
+    __device__ __host__ static inline std::enable_if_t<plus_array_site_compatible<T, U>::value, T> apply(T a, const U &b)
     {
 #pragma unroll
       for (int i = 0; i < T::N; i++) a[i].operator+=(b[i]);
       return a;
     }
     template <class U>
-    __device__ __host__ inline std::enable_if_t<std::is_same_v<U, array<typename U::value_type, U::N>>, T> operator()(T a, const U &b) const { return apply(a, b); }
+    __device__ __host__ inline std::enable_if_t<plus_array_site_compatible<T, U>::value, T> operator()(T a, const U &b) const
+    {
+      return apply(a, b);
+    }
+  };
+
+  /**
+     plus reducer: merge thread-local array<SiteScalar, N> into array<Acc, N> (e.g. double site → doubledouble acc).
+   */
+  template <typename Acc, int N>
+  struct plus<array<Acc, N>, std::enable_if_t<!is_rfa<Acc>::value>>
+  {
+    using reduce_t = array<Acc, N>;
+    using reducer_t = plus<reduce_t>;
+    static constexpr bool do_sum = true;
+    template <typename U> static inline void comm_reduce(std::vector<U> &a) { comm_allreduce_sum(a); }
+    __device__ __host__ static inline reduce_t init() { return reduce_t{}; }
+
+    template <typename SiteScalar>
+    __device__ __host__ static inline std::enable_if_t<!std::is_same_v<Acc, SiteScalar>, reduce_t> apply(reduce_t a,
+                                                                                                        const array<SiteScalar, N> &b)
+    {
+#pragma unroll
+      for (int i = 0; i < N; i++) a[i] = plus<Acc>::apply(a[i], b[i]);
+      return a;
+    }
+
+    template <typename SiteScalar>
+    __device__ __host__ inline std::enable_if_t<!std::is_same_v<Acc, SiteScalar>, reduce_t> operator()(reduce_t a,
+                                                                                                       const array<SiteScalar, N> &b) const
+    {
+      return apply(a, b);
+    }
+
+    __device__ __host__ static inline reduce_t apply(reduce_t a, reduce_t b)
+    {
+#pragma unroll
+      for (int i = 0; i < N; i++) a[i] = plus<Acc>::apply(a[i], b[i]);
+      return a;
+    }
+
+    __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return apply(a, b); }
   };
 
 #ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
