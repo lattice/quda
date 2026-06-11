@@ -176,8 +176,11 @@ namespace quda
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       std::vector<device_t> scalar_result(n_element);
       for (int i = 0; i < n_element; i++) scalar_result[i] = reinterpret_cast<device_t *>(result_h)[i];
-      for (int i = 0; i < n_reduce; i++)
-        memcpy(&result[i], &scalar_result[i * n_element / n_reduce], sizeof(T));
+      for (int i = 0; i < n_reduce; i++) {
+        const auto offset = static_cast<size_t>(i) * n_element / n_reduce;
+        // Deserialize flat atomic words (e.g. double components of RFA / doubledouble)
+        std::memcpy(static_cast<void*>(&result[i]), static_cast<const void*>(&scalar_result[offset]), sizeof(T));
+      }
 
       if (!reset) {
         consumed = true;
