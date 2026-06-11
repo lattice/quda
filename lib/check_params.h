@@ -1197,8 +1197,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha3, 0.0);
   P(dir_ignore, -1);
   P(fermion_flow_type, QUDA_FERMION_FLOW_LAPLACE_4D);
-  P(naik_epsilon, 0.0);
-  P(tadpole, 1.0);
+  P(staggered_phase_type, QUDA_STAGGERED_PHASE_MILC);
 #else
   P(n_steps, (unsigned int)INVALID_INT);
   P(meas_interval, (unsigned int)INVALID_INT);
@@ -1216,8 +1215,20 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha3, INVALID_DOUBLE);
   P(dir_ignore, INVALID_INT);
   P(fermion_flow_type, QUDA_FERMION_FLOW_INVALID);
-  P(naik_epsilon, INVALID_DOUBLE);
-  P(tadpole, INVALID_DOUBLE);
+  P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
+#endif
+
+  // HISQ fermion-flow path coefficients are arrays, so they are handled outside the
+  // scalar P() macro: zeroed on init, printed on print, and not validated on check
+  // (the HISQ flow operator errors if they are required but left unset).
+#if defined INIT_PARAM
+  for (int i = 0; i < 6; i++) {
+    ret.hisq_fat7_coeff[i] = 0.0;
+    ret.hisq_asqtad_coeff[i] = 0.0;
+  }
+#elif defined PRINT_PARAM
+  for (int i = 0; i < 6; i++) printfQuda("hisq_fat7_coeff[%d] = %g\n", i, param->hisq_fat7_coeff[i]);
+  for (int i = 0; i < 6; i++) printfQuda("hisq_asqtad_coeff[%d] = %g\n", i, param->hisq_asqtad_coeff[i]);
 #endif
 
 #ifdef INIT_PARAM

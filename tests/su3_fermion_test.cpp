@@ -26,6 +26,28 @@ public:
 int argc_copy;
 char **argv_copy;
 
+// Standard HISQ action path coefficients (Bazavov et al. 2010, Table V), as the
+// application (e.g. MILC) supplies them to QUDA. fat7 is tadpole-scaled; eps_naik
+// is folded into the level-2 asqtad one-link and Naik terms, so the returned
+// asqtad coefficients are final. Lives here because su3_fermion_test is the only
+// user (hisq_stencil_test_utils.h has its own copy and is intentionally untouched).
+static void computeHISQFlowCoeffs(double tadpole, double eps_naik, double fat7[6], double asqtad[6])
+{
+  const double u1 = 1.0 / tadpole, u2 = u1 * u1, u4 = u2 * u2, u6 = u4 * u2;
+  fat7[0] = 1.0 / 8.0;
+  fat7[1] = 0.0;
+  fat7[2] = u2 * (-1.0 / 8.0) * 0.5;
+  fat7[3] = u4 * (1.0 / 8.0) * 0.25 * 0.5;
+  fat7[4] = u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+  fat7[5] = 0.0;
+  asqtad[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0) * (1.0 + eps_naik); // one-link (eps_N in last 1/8)
+  asqtad[1] = -(1.0 + eps_naik) / 24.0;                                          // Naik, scaled by (1 + eps_N)
+  asqtad[2] = (-1.0 / 8.0) * 0.5;
+  asqtad[3] = (1.0 / 8.0) * 0.25 * 0.5;
+  asqtad[4] = (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+  asqtad[5] = -2.0 / 16.0;
+}
+
 void run(test_t param)
 {
   prec = ::testing::get<0>(param);
@@ -106,8 +128,11 @@ void run(test_t param)
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
   smear_param.smear_type = gauge_smear_type;
   smear_param.fermion_flow_type = fermion_flow_type;
-  smear_param.naik_epsilon = gauge_smear_naik_epsilon;
-  smear_param.tadpole = gauge_smear_tadpole;
+  smear_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  // HISQ flow operators require caller-supplied path coefficients; compute the
+  // standard HISQ action from the existing --tadpole-coeff / --epsilon-naik globals.
+  if (fermion_flow_type == QUDA_FERMION_FLOW_HISQ || fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED)
+    computeHISQFlowCoeffs(tadpole_factor, eps_naik, smear_param.hisq_fat7_coeff, smear_param.hisq_asqtad_coeff);
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
   smear_param.hier_threshold = hier_threshold;

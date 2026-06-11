@@ -107,8 +107,9 @@ namespace quda
      @brief Naive (unimproved) staggered -DdagD flow generator, built on the
      flowed thin links. Unlike the Laplacian, the staggered operator carries KS
      phases and a temporal boundary condition; these are (re)applied to the
-     helper links each sub-stage, using QUDA's standard staggered convention
-     (MILC phases + anti-periodic temporal BC). With mass 0 this is the pure
+     helper links each sub-stage, using the caller-supplied KS phase convention
+     (smear_param.staggered_phase_type, default MILC) and anti-periodic temporal
+     BC. With mass 0 this is the pure
      DdagD, whose free-field limit reduces to the gauge Laplacian on each parity.
      The generator returned is K_t = -DdagD = -MdagM (negative semi-definite for
      any mass, so the integrator's smoothing invariant holds).
@@ -119,14 +120,15 @@ namespace quda
     std::unique_ptr<Dirac> dirac;
 
   public:
-    StaggeredFlowOp(const GaugeField &gauge_template, const QudaInvertParam &inv_param, const int *comm_dim,
-                    int /* parity */, TimeProfile & /* profile */)
+    StaggeredFlowOp(const GaugeField &gauge_template, const QudaInvertParam &inv_param,
+                    const QudaGaugeSmearParam &smear_param, const int *comm_dim, int /* parity */,
+                    TimeProfile & /* profile */)
     {
       GaugeFieldParam gParam_helper(gauge_template);
       gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-      gParam_helper.reconstruct = QUDA_RECONSTRUCT_NO; // phased links: store explicitly
-      gParam_helper.t_boundary = QUDA_ANTI_PERIODIC_T; // standard staggered temporal BC
-      gParam_helper.staggeredPhaseType = QUDA_STAGGERED_PHASE_MILC;
+      gParam_helper.reconstruct = QUDA_RECONSTRUCT_NO;                     // phased links: store explicitly
+      gParam_helper.t_boundary = QUDA_ANTI_PERIODIC_T;                     // standard staggered temporal BC
+      gParam_helper.staggeredPhaseType = smear_param.staggered_phase_type; // caller-supplied KS convention
       precise = GaugeField(gParam_helper);
 
       DiracParam diracParam;
@@ -144,13 +146,13 @@ namespace quda
     {
       // The helper holds phased links from the previous sub-stage; un-phase first
       // to reset the staggered-phase flag (the data is overwritten next anyway),
-      // copy the freshly flowed thin links, then (re)apply the MILC phases +
-      // temporal BC. dirac reads precise through a stored pointer, so the
+      // copy the freshly flowed thin links, then (re)apply the configured KS
+      // phases + temporal BC. dirac reads precise through a stored pointer, so the
       // in-place refresh is seen on the next apply.
       if (precise.StaggeredPhaseApplied()) precise.removeStaggeredPhase();
       copyExtendedGauge(precise, thin_ext, QUDA_CUDA_FIELD_LOCATION);
       precise.exchangeGhost();
-      precise.applyStaggeredPhase(); // uses staggeredPhaseType (MILC) + t_boundary set above
+      precise.applyStaggeredPhase(); // uses staggeredPhaseType (caller-supplied) + t_boundary set above
       dirac->updateFields(&precise, nullptr, nullptr, nullptr);
     }
 
@@ -217,14 +219,16 @@ namespace quda
      two-level fat one-link field X is rebuilt from the flowed thin links:
        phase(thin) -> extend -> fat7 -> unitarize -> extend -> asqtad-fat = X,
      and (for full HISQ) the Naik three-link field L = longKSLink(W). KS phases +
-     anti-periodic T are baked into the thin links before fattening (the MILC HISQ
-     convention), so they propagate into X and L. K_t = -DdagD = -MdagM:
+     anti-periodic T are baked into the thin links before fattening (using the
+     caller-supplied smear_param.staggered_phase_type), so they propagate into X
+     and L. K_t = -DdagD = -MdagM:
        - with_long = true  : full HISQ -- DiracImprovedStaggered(fat = X, long = L).
        - with_long = false : truncated HISQ (Option A) -- the Naik term dropped,
                              applied with the cheap one-link DiracStaggered(gauge = X).
-     The Naik correction eps_N (smear_param.naik_epsilon) is folded into the
-     level-2 asqtad coefficients (fattening is linear in the path coefficients);
-     it has no effect on the truncated variant, which drops the Naik term.
+     The level-1 fat7 and level-2 asqtad path coefficients are caller-supplied
+     (smear_param.hisq_fat7_coeff / hisq_asqtad_coeff), final: tadpole-scaled and,
+     for the asqtad set, with the Naik correction eps_N already folded in (QUDA
+     does not own the HISQ action). They are required when a HISQ flow is selected.
   */
   class HisqFlowOp : public FermionFlowOp
   {
@@ -242,30 +246,23 @@ namespace quda
                const int *comm_dim, int /* parity */, TimeProfile & /* profile */, bool with_long) :
       with_long(with_long)
     {
-      // Path coefficients (Bazavov et al. 2010, Table V); fat7 is tadpole-scaled,
-      // asqtad operates on the reunitarized links W (so no tadpole factor). The
-      // Naik correction eps_N folds directly into the level-2 coefficients:
-      const double eps = smear_param.naik_epsilon;
-      const double u1 = 1.0 / smear_param.tadpole, u2 = u1 * u1, u4 = u2 * u2, u6 = u4 * u2;
-      c_fat7[0] = 1.0 / 8.0;
-      c_fat7[1] = 0.0;
-      c_fat7[2] = u2 * (-1.0 / 8.0) * 0.5;
-      c_fat7[3] = u4 * (1.0 / 8.0) * 0.25 * 0.5;
-      c_fat7[4] = u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
-      c_fat7[5] = 0.0;
-      c_asqtad[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0) * (1.0 + eps); // one-link (eps_N in last 1/8)
-      c_asqtad[1] = -(1.0 + eps) / 24.0;                                          // Naik, scaled by (1 + eps_N)
-      c_asqtad[2] = (-1.0 / 8.0) * 0.5;
-      c_asqtad[3] = (1.0 / 8.0) * 0.25 * 0.5;
-      c_asqtad[4] = (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
-      c_asqtad[5] = -2.0 / 16.0;
+      // HISQ path coefficients are caller-supplied (final: tadpole-scaled and, for
+      // the level-2 asqtad set, eps_N-folded). The application owns the action, so
+      // we do not compute them here. They are required for a HISQ flow.
+      bool coeff_set = false;
+      for (int i = 0; i < 6; i++) {
+        c_fat7[i] = smear_param.hisq_fat7_coeff[i];
+        c_asqtad[i] = smear_param.hisq_asqtad_coeff[i];
+        if (c_fat7[i] != 0.0 || c_asqtad[i] != 0.0) coeff_set = true;
+      }
+      if (!coeff_set) errorQuda("HISQ fermion flow requires smear_param.hisq_fat7_coeff / hisq_asqtad_coeff to be set");
 
       // Phased-thin template: KS phases + anti-periodic T baked into the thin links.
       thin_param = GaugeFieldParam(gauge_template);
       thin_param.create = QUDA_NULL_FIELD_CREATE;
       thin_param.reconstruct = QUDA_RECONSTRUCT_NO;
       thin_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-      thin_param.staggeredPhaseType = QUDA_STAGGERED_PHASE_MILC;
+      thin_param.staggeredPhaseType = smear_param.staggered_phase_type;
 
       // Fattening-output template: general links, explicit storage, no halo.
       raw_param = GaugeFieldParam(gauge_template);
@@ -281,7 +278,7 @@ namespace quda
       fatParam.reconstruct = QUDA_RECONSTRUCT_NO;
       fatParam.link_type = QUDA_ASQTAD_FAT_LINKS;
       fatParam.t_boundary = QUDA_PERIODIC_T;
-      fatParam.staggeredPhaseType = QUDA_STAGGERED_PHASE_MILC;
+      fatParam.staggeredPhaseType = smear_param.staggered_phase_type;
       fat = GaugeField(fatParam);
 
       if (with_long) {
@@ -294,7 +291,7 @@ namespace quda
         lngParam.link_type = QUDA_ASQTAD_LONG_LINKS;
         lngParam.nFace = 3;
         lngParam.t_boundary = QUDA_PERIODIC_T;
-        lngParam.staggeredPhaseType = QUDA_STAGGERED_PHASE_MILC;
+        lngParam.staggeredPhaseType = smear_param.staggered_phase_type;
         lng = GaugeField(lngParam);
       }
 
@@ -373,7 +370,7 @@ namespace quda
      @brief Factory: build the fermion-flow generator selected by type.
      @param[in] type The selected generator (default QUDA_FERMION_FLOW_LAPLACE_4D)
      @param[in] inv_param Spinor/operator parameters (mass, kappa) for Dirac-based operators
-     @param[in] smear_param Flow parameters (tadpole, naik_epsilon) for the HISQ operators
+     @param[in] smear_param Flow parameters (staggered phase convention, HISQ path coefficients)
      @param[in] gauge_template Field whose params seed any helper gauge field
      @param[in] comm_dim Partitioned-dimension flags (must outlive the op)
      @param[in] parity Destination parity
@@ -389,7 +386,7 @@ namespace quda
     case QUDA_FERMION_FLOW_LAPLACE_3D: return new LaplaceFlowOp(gauge_template, comm_dim, parity, 3, -6.0, profile);
     case QUDA_FERMION_FLOW_STAGGERED:
 #ifdef GPU_STAGGERED_DIRAC
-      return new StaggeredFlowOp(gauge_template, inv_param, comm_dim, parity, profile);
+      return new StaggeredFlowOp(gauge_template, inv_param, smear_param, comm_dim, parity, profile);
 #else
       errorQuda("Staggered fermion flow requires QUDA_DIRAC_STAGGERED to be enabled");
 #endif
