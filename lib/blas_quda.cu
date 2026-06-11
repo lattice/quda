@@ -243,6 +243,15 @@ namespace quda {
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
       if (x.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("This kernel cannot be run on CPU fields");
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+      // conv() in caxpyxmazMR_ reads bin_device_buffer; copy host bins on first use in this TU.
+      static bool rfa_device_bins_init = false;
+      if (!rfa_device_bins_init) {
+        cudaMemcpyToSymbol(reproducible::bin_device_buffer, static_cast<void*>(&reducer::get_rfa_bins()),
+                           sizeof(reproducible::RFA_bins<reduction_t>), 0, cudaMemcpyHostToDevice);
+        rfa_device_bins_init = true;
+      }
+#endif
       instantiateBlas<caxpyxmazMR_, false>(a, cvector<real_t>(), cvector<real_t>(), x, y, z, y, y);
     }
 
