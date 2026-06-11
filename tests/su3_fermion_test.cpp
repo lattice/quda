@@ -96,6 +96,7 @@ void run(test_t param)
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
   smear_param.smear_type = gauge_smear_type;
+  smear_param.fermion_flow_type = fermion_flow_type;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
   smear_param.hier_threshold = hier_threshold;
@@ -203,6 +204,15 @@ void run(test_t param)
       "Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e\n",
       method_adj_check);
 
+    // Print adjoint output norms (cheap, high-precision regression anchor)
+    double n_safe = 0., n_hier = 0., n_fwd = 0.;
+    for (int i = 0; i < V * 24; i++) {
+      n_safe += pow(check_safe[j].data<double *>()[i], 2);
+      n_hier += pow(check_hier[j].data<double *>()[i], 2);
+    }
+    printfQuda("adj_safe[%d] norm = %.16e\n", j, n_safe);
+    printfQuda("adj_hier[%d] norm = %.16e\n", j, n_hier);
+
     std::complex<double> trace_fwd, trace_adj;
     trace_fwd
       = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_fwd[j].data<std::complex<double> *>());
@@ -277,7 +287,10 @@ struct su3_fermion_test : quda_test {
       printfQuda(" - alpha3 %f\n", gauge_smear_alpha3);
       break;
     case QUDA_GAUGE_SMEAR_WILSON_FLOW:
-    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: printfQuda(" - epsilon %f\n", gauge_smear_epsilon); break;
+    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
+      printfQuda(" - epsilon %f\n", gauge_smear_epsilon);
+      printfQuda(" - fermion flow operator %s\n", get_fermion_flow_str(fermion_flow_type));
+      break;
     default: errorQuda("Undefined test type %d given", test_type);
     }
     printfQuda(" - smearing steps %d\n", gauge_smear_steps);

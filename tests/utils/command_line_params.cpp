@@ -307,6 +307,7 @@ double eofa_mq3 = 1.0;
 // SU(3) smearing options
 bool gauge_smear = false;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
+QudaFermionFlowType fermion_flow_type = QUDA_FERMION_FLOW_LAPLACE_4D;
 double gauge_smear_rho = 0.1;
 double gauge_smear_epsilon = 0.1;
 double gauge_smear_alpha = 0.6;
@@ -470,6 +471,11 @@ namespace
                                                                 {"hyp", QUDA_GAUGE_SMEAR_HYP},
                                                                 {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW},
                                                                 {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
+
+  CLI::TransformPairs<QudaFermionFlowType> fermion_flow_type_map {
+    {"laplace4D", QUDA_FERMION_FLOW_LAPLACE_4D}, {"laplace3D", QUDA_FERMION_FLOW_LAPLACE_3D},
+    {"wilson", QUDA_FERMION_FLOW_WILSON},        {"staggered", QUDA_FERMION_FLOW_STAGGERED},
+    {"hisq", QUDA_FERMION_FLOW_HISQ},            {"hisq-truncated", QUDA_FERMION_FLOW_HISQ_TRUNCATED}};
 
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
@@ -1153,6 +1159,12 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
       gauge_smear_type, "The type of action to use in the smearing. Options: APE, Stout, Over Improved Stout, HYP, Wilson Flow, Symanzik Flow (default stout)")
     ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
   ;
+
+  opgroup
+    ->add_option("--su3-fermion-flow-type", fermion_flow_type,
+                 "The generator of the fermion gradient flow in performGFlowQuda. Options: laplace4D "
+                 "(default), laplace3D, wilson, staggered, hisq, hisq-truncated")
+    ->transform(CLI::QUDACheckedTransformer(fermion_flow_type_map));
 
   opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
 

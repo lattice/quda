@@ -44,6 +44,7 @@ const char *get_memory_type_str(QudaMemoryType type);
 const char *get_contract_str(QudaContractType type);
 const char *get_dag_str(QudaDagType type);
 const char *get_gauge_smear_str(QudaGaugeSmearType type);
+const char *get_fermion_flow_str(QudaFermionFlowType type);
 std::string get_dilution_type_str(QudaDilutionType type);
 const char *get_blas_type_str(QudaBLASType type);
 const char *get_TwistFlavor_str(QudaTwistFlavorType type);

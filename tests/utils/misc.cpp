@@ -250,6 +250,23 @@ const char *get_gauge_smear_str(QudaGaugeSmearType type)
   return ret;
 }
 
+const char *get_fermion_flow_str(QudaFermionFlowType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_FERMION_FLOW_LAPLACE_4D: ret = "Laplace_4D"; break;
+  case QUDA_FERMION_FLOW_LAPLACE_3D: ret = "Laplace_3D"; break;
+  case QUDA_FERMION_FLOW_WILSON: ret = "Wilson"; break;
+  case QUDA_FERMION_FLOW_STAGGERED: ret = "Staggered"; break;
+  case QUDA_FERMION_FLOW_HISQ: ret = "HISQ"; break;
+  case QUDA_FERMION_FLOW_HISQ_TRUNCATED: ret = "HISQ_truncated"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
 const char *get_mass_normalization_str(QudaMassNormalization type)
 {
   const char *s;

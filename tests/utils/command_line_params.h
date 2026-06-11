@@ -572,6 +572,7 @@ extern int hier_threshold;
 extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;
+extern QudaFermionFlowType fermion_flow_type;
 extern bool su_project;
 
 extern double smear_coeff;
