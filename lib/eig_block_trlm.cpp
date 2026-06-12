@@ -95,7 +95,11 @@ namespace quda
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
 
-      for (int step = num_keep; step < n_kr; step += block_size) blockLanczosStep(kSpace, step);
+      for (int step = num_keep; step < n_kr; step += block_size) {
+        if (((step - num_keep) / block_size) % std::max(1, ((n_kr - num_keep) / block_size) / 10) == 0)
+          logQuda(QUDA_VERBOSE, " starting blockLanczosStep %d\n", step);
+        blockLanczosStep(kSpace, step);
+      }
       iter += (n_kr - num_keep);
 
       // Solve current block tridiag

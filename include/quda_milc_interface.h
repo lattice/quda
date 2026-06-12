@@ -430,6 +430,27 @@ extern "C" {
                               QudaEigensolverArgs_t eigargs, void **evecs, QudaMilcEigLoad loadtype);
 
   /**
+   * Compute exact low mode contribution to the current densities.
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] milc_fatlink Fat-link field on the host
+   * @param[in] milc_longlink Long-link field on the host
+   * @param[in] milc_shiftlink Regular or APE link field on the host to use with covariant shift
+   * @param[in] nmasses The number of quark masses to include
+   * @param[in] masses Quark masses, at external_precision (float if 1, double if 2)
+   * @param[in] invargs Struct containing information for the inverter
+   * @param[in] eigargs Struct containing information for the eigensolver
+   * @param[out] jlowmu1 Array to fill with current, at external_precision (float if 1, double if 2)
+   * @param[out] jlowmu2 Array to fill with second current for the case where two mass differences are taken, at external_precision
+   * @param[in] reload Whether to reload the MILC fields
+   */
+  void qudaExactCurrent(int external_precision, int quda_precision, const void *const milc_fatlink,
+                        const void *const milc_longlink, const void *const milc_shiftlink, int nmasses,
+                        const void *masses, QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eigargs, void *jlowmu1,
+                        void *jlowmu2, int reload);
+
+  /**
    * Solve Ax=b for an improved staggered operator. All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
    * function requires that persistent gauge and clover fields have
