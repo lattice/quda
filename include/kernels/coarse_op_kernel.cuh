@@ -1382,7 +1382,7 @@ namespace quda {
   };
 
   template <bool is_device> struct storeCoarseSharedAtomic_impl {
-    template <typename ...Args> void operator()(Args...)
+    template <bool allthreads, typename... Args> void operator()(Args...)
     {
       errorQuda("Shared-memory atomic aggregation not supported on host");
     }
@@ -1402,9 +1402,9 @@ namespace quda {
     template <typename Arg> using Cache = SharedMemoryCache<CacheT<Arg>, DimsStaticConditional<2, 1, 1>>;
     template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
 
-    template <typename VUV, typename Pack, typename Ftor>
+    template <bool allthreads, typename VUV, typename Pack, typename Ftor>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0,
-                                      int parity, const Pack &pack, const Ftor &ftor)
+                                      int parity, const Pack &pack, const Ftor &ftor, bool alive)
     {
       using Arg = typename Ftor::Arg;
       const Arg &arg = ftor.arg;
@@ -1468,57 +1468,61 @@ namespace quda {
 
       if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
 
+        if (!allthreads || alive) {
 #pragma unroll
-        for (int i = 0; i < TileType::M; i++) {
+          for (int i = 0; i < TileType::M; i++) {
 #pragma unroll
-          for (int j = 0; j < TileType::N; j++) {
-            if (pack.dir == QUDA_IN_PLACE) {
-              // same as dir == QUDA_FORWARDS
-              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                     X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-            } else {
-              arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                     Y[i_block0+i][j_block0+j][x_][s_row][s_col]);
-
-              if (pack.dir == QUDA_BACKWARDS) {
-                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,
-                                       conj(X[i_block0+i][j_block0+j][x_][s_row][s_col]));
+            for (int j = 0; j < TileType::N; j++) {
+              if (pack.dir == QUDA_IN_PLACE) {
+                // same as dir == QUDA_FORWARDS
+                arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                       X[i_block0 + i][j_block0 + j][x_][s_row][s_col]);
               } else {
-                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                       X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-              }
+                arg.Y_atomic.atomicAdd(dim_index, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                       Y[i_block0 + i][j_block0 + j][x_][s_row][s_col]);
 
-              if (!arg.bidirectional) {
-                if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                                                                 X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-                else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                            -X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-              }
-            } // dir == QUDA_IN_PLACE
+                if (pack.dir == QUDA_BACKWARDS) {
+                  arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_col, s_row, j0 + j, i0 + i,
+                                         conj(X[i_block0 + i][j_block0 + j][x_][s_row][s_col]));
+                } else {
+                  arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                         X[i_block0 + i][j_block0 + j][x_][s_row][s_col]);
+                }
+
+                if (!arg.bidirectional) {
+                  if (Arg::fineSpin != 1 && s_row == s_col)
+                    arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                           X[i_block0 + i][j_block0 + j][x_][s_row][s_col]);
+                  else
+                    arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                           -X[i_block0 + i][j_block0 + j][x_][s_row][s_col]);
+                }
+              } // dir == QUDA_IN_PLACE
+            }
           }
         }
       }
     }
   };
 
-  template <typename VUV, typename Ftor>
+  template <bool allthreads, typename VUV, typename Ftor>
   __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity,
-                                                   int i0, int j0, int parity, const Ftor &ftor)
+                                                   int i0, int j0, int parity, const Ftor &ftor, bool alive)
   {
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
     switch (arg.dir) {
     case QUDA_BACKWARDS:
-      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity,
-                                                     Pack<QUDA_BACKWARDS>(), ftor);
+      target::dispatch<storeCoarseSharedAtomic_impl, allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0,
+                                                                 parity, Pack<QUDA_BACKWARDS>(), ftor, alive);
       break;
     case QUDA_FORWARDS:
-      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity,
-                                                     Pack<QUDA_FORWARDS>(), ftor);
+      target::dispatch<storeCoarseSharedAtomic_impl, allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0,
+                                                                 parity, Pack<QUDA_FORWARDS>(), ftor, alive);
       break;
     case QUDA_IN_PLACE:
-      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity,
-                                                     Pack<QUDA_IN_PLACE>(), ftor);
+      target::dispatch<storeCoarseSharedAtomic_impl, allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0,
+                                                                 parity, Pack<QUDA_IN_PLACE>(), ftor, alive);
       break;
     default:
       break;// do nothing
@@ -1605,9 +1609,9 @@ namespace quda {
 
   }
 
-  template <int nFace, typename Ftor>
+  template <int nFace, bool allthreads, typename Ftor>
   __device__ __host__ void computeVUV(const Ftor &ftor, int parity, int x_cb, int i0, int j0, int parity_coarse_,
-                                      int coarse_x_cb_)
+                                      int coarse_x_cb_, bool alive)
   {
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
@@ -1634,7 +1638,7 @@ namespace quda {
 
     using Ctype = decltype(make_tile_C<complex<real>, false>(arg.vuvTile));
     Ctype vuv[Arg::coarseSpin * Arg::coarseSpin];
-    multiplyVUV(vuv, arg, parity, x_cb, i0, j0);
+    if (!allthreads || alive) multiplyVUV(vuv, arg, parity, x_cb, i0, j0);
 
     if (isDiagonal && !isFromCoarseClover) {
 #pragma unroll
@@ -1642,8 +1646,8 @@ namespace quda {
     }
 
     if (arg.shared_atomic)
-      storeCoarseSharedAtomic(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, ftor);
-    else
+      storeCoarseSharedAtomic<allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, ftor, alive);
+    else if (!allthreads || alive)
       storeCoarseGlobalAtomic(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, arg);
   }
 
@@ -1721,17 +1725,26 @@ namespace quda {
        @param[in] parity_c_row parity * output color row
        @param[in] c_col output coarse color column
     */
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
+    template <bool allthreads = false>
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool alive = true)
     {
-      int parity, parity_coarse, x_coarse_cb, c_row;
-      target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
+      int parity = 0, parity_coarse = 0, x_coarse_cb = 0, c_row = 0;
+      if (!allthreads || alive)
+        target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 
-      if (parity > 1) return;
-      if (c_row >= arg.vuvTile.M_tiles) return;
-      if (c_col >= arg.vuvTile.N_tiles) return;
-      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
+      if constexpr (!allthreads) {
+        if (parity > 1) return;
+        if (c_row >= arg.vuvTile.M_tiles) return;
+        if (c_col >= arg.vuvTile.N_tiles) return;
+        if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
+      } else {
+        if ((parity > 1) || (c_row >= arg.vuvTile.M_tiles) || (c_col >= arg.vuvTile.N_tiles)
+            || (!arg.shared_atomic && x_cb >= arg.fineVolumeCB))
+          alive = false;
+      }
 
-      computeVUV<nFace>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
+      computeVUV<nFace, allthreads>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse,
+                                    x_coarse_cb, alive);
     }
   };
 
@@ -1751,17 +1764,26 @@ namespace quda {
        @param[in] parity_c_row parity * output color row
        @param[in] c_col output coarse color column
     */
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
+    template <bool allthreads = false>
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool alive = true)
     {
-      int parity, parity_coarse, x_coarse_cb, c_row;
-      target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
+      int parity = 0, parity_coarse = 0, x_coarse_cb = 0, c_row = 0;
+      if (!allthreads || alive)
+        target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 
-      if (parity > 1) return;
-      if (c_row >= arg.vuvTile.M_tiles) return;
-      if (c_col >= arg.vuvTile.N_tiles) return;
-      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
+      if constexpr (!allthreads) {
+        if (parity > 1) return;
+        if (c_row >= arg.vuvTile.M_tiles) return;
+        if (c_col >= arg.vuvTile.N_tiles) return;
+        if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
+      } else {
+        if ((parity > 1) || (c_row >= arg.vuvTile.M_tiles) || (c_col >= arg.vuvTile.N_tiles)
+            || (!arg.shared_atomic && x_cb >= arg.fineVolumeCB))
+          alive = false;
+      }
 
-      computeVUV<nFace>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
+      computeVUV<nFace, allthreads>(*this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse,
+                                    x_coarse_cb, alive);
     }
   };
 

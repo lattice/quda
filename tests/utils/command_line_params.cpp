@@ -359,6 +359,7 @@ namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
+#if 0
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
                                                        {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
@@ -371,6 +372,7 @@ namespace
                                                        {"mobius", QUDA_MOBIUS_DWF_DSLASH},
                                                        {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
+#endif
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {
     {"singlet", QUDA_TWIST_SINGLET}, {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET}, {"no", QUDA_TWIST_NO}};

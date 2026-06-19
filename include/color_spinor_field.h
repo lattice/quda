@@ -494,7 +494,7 @@ namespace quda
     template <typename T = void *> auto data() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return reinterpret_cast<T>(v.data());
+      return static_cast<T>(v.data());
     }
 
     /**
@@ -641,6 +641,7 @@ namespace quda
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
     int commsQuery(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
+    void commsQuery(int n, int d[], bool done[], bool gdr_send, bool gdr_recv) const;
 
     /**
        @brief Wait on halo communication to complete
@@ -878,7 +879,6 @@ namespace quda
 
     /**
      * @brief Print the site vector
-     * @param[in] a The field we are printing from
      * @param[in] parity Parity index
      * @param[in] x_cb Checkerboard space-time index
      * @param[in] rank The rank we are requesting from (default is rank = 0)
