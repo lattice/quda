@@ -6359,12 +6359,14 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
   else {
       
-    printfQuda("begin initial measurement\n");
-    perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, 0, gaugeTemp, precise);
+    printfQuda("begin initial measurement. Checking if the first flow time is zero:\n");
+    if (meas_int_vec.front() == 0){
+        perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, 0, gaugeTemp, precise);
+    }
     if (n_steps_total != 0)
     // for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
     for (const auto& m : meas_int_vec){
-
+      if (m == 0) {printfQuda("Check: dont do any flow computation for zero FT \n"); continue;}
       smear_param->n_steps = m;
       if (m == 1)
         smear_param->adj_n_save = 1;

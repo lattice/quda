@@ -193,8 +193,8 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   std::vector<std::ofstream> out_ppb_vec, out_ppb_t_vec, out_pion_corr_vec;
   out_ppb_t_vec.reserve(ppb_data->size());
   for (int i = 0; i < ppb_data->size(); i++){
-    std::string flowN_s = (i == 0) ? std::to_string(0) : std::to_string(flow_int_pt->at(i-1));
-    std::string epsF_s =  (i == 0) ? "" : "_epsF" + std::to_string(gauge_smear_epsilon);
+    std::string flowN_s = std::to_string(flow_int_pt->at(i));
+    std::string epsF_s =  (flow_int_pt->at(i) == 0) ? "" : "_epsF" + std::to_string(gauge_smear_epsilon);
     std::string flow_file_name(filename_tslice+"_FT"+flowN_s+epsF_s);
     out_ppb_t_vec.emplace_back(flow_file_name);
     // out_pion_corr_vec.emplace_back(flow_file_name);
