@@ -244,10 +244,10 @@ namespace quda
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-        for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf((norm_t)v[i].real()), fabsf((norm_t)v[i].imag()));
+        for (int i = 0; i < n; i++) max_[i] = quda::max(quda::abs((norm_t)v[i].real()), quda::abs((norm_t)v[i].imag()));
         norm_t scale = 0.0;
 #pragma unroll
-        for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
+        for (int i = 0; i < n; i++) scale = quda::max(max_[i], scale);
         norm = scale * fixedInvMaxValue<store_t>::value;
         return fdivide(fixedMaxValue<store_t>::value, scale);
       }
@@ -426,7 +426,7 @@ namespace quda
           memcpy(&vecTmp[6], &norm, sizeof(norm_t)); // pack the norm
           array<store_t, 6> vecTmp2;
           copy_and_scale<store_t, real, 6>(vecTmp2, &v_[0], scale_inv);
-          std::memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
+          memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }
