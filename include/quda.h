@@ -1562,7 +1562,7 @@ extern "C" {
    * @param detratio if 0 compute the force of a determinant otherwise compute the force from a ratio of determinants
    */
   void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
-                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio);
+                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio, int trlog, int rhmc);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.

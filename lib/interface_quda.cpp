@@ -4804,7 +4804,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   GaugeField &gaugeEx = *extendedGaugeResident;
 
   computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
-                     2.0 * ck * multiplicity * dt, false, *inv_param);
+                     2.0 * ck * multiplicity * dt, false, true, false, *inv_param);
 
   // copy the outer product field back to the host
   if (gauge_param->return_result_mom) cpuMom.copy(cudaMom);
@@ -4815,7 +4815,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 }
 
 void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
-                              QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
+                              QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio, int trlog, int rhmc_flavors)
 {
   using namespace quda;
   auto profile = pushProfile(profileTMCloverForce, inv_param);
@@ -4860,7 +4860,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
     ColorSpinorField cpuQuarkX(cpuParam);
     x[i][parity] = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X
 
-    if (detratio && inv_param->twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) {
+    if (detratio) {
       x0[i] = ColorSpinorField(qParam);
       ColorSpinorParam cpuParam0(h_x0[i], *inv_param, gParamMom.x, true, inv_param->input_location);
       ColorSpinorField cpuQuarkX0(cpuParam0);
@@ -4878,7 +4878,8 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   GaugeField &gaugeEx = *extendedGaugeResident;
 
   computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
-                     k_csw_ov_8 * 32.0, detratio, *inv_param);
+                     k_csw_ov_8 * 4.0 * (rhmc_flavors==1 ? 1 : 8), detratio, trlog, rhmc_flavors, *inv_param);
+  // for the single flavor rhmc case we need a factor 1/8 for the trlog term
 
   if (gauge_param->return_result_mom) cpuMom.copy(gpuMom);
   if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)

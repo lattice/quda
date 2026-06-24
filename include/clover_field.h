@@ -580,12 +580,13 @@ namespace quda {
      parity) for the clover sigma outer product
      @param sigma_coeff[in] Coefficient for the tr log clover force
      @param detratio[in] Whether to compute determinant ratio
+     @param trlog[in] Whether a tr log term is present
      @param parity[in] Which parity do we need compute the tr log clover force
   */
   void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
                           const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
                           const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
-                          double sigma_coeff, bool detratio, QudaInvertParam &param);
+                          double sigma_coeff, bool detratio, bool trlog, bool rhmc, QudaInvertParam &param);
 
   /**
      @brief Compute outer product from the solver solution fields for
