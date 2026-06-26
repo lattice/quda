@@ -964,9 +964,8 @@ namespace quda
       if (!initGhostFaceBuffer || resize) {
         freeGhostBuffer();
         for (int i = 0; i < nDimComms; i++) {
-          // Host communication buffers use host-pinned (registered) memory so that a CUDA-aware
-          // MPI/UCX registration cache does not register these pages itself and leave a stale
-          // mapping behind after they are freed (see cudaErrorHostMemoryAlreadyRegistered with UCX).
+          // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+          // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
           fwdGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
           backGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
           fwdGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);

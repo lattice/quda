@@ -577,9 +577,8 @@ namespace quda {
     } else { // cpu field
       void *send[2 * QUDA_MAX_DIM];
       for (int d = 0; d < nDim; d++) {
-        // Use host-pinned (registered) memory for host communication buffers so that a CUDA-aware
-        // MPI/UCX registration cache does not register these pages itself and leave a stale mapping
-        // behind after they are freed (see cudaErrorHostMemoryAlreadyRegistered with UCX rcache).
+        // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+        // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
         send[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
         if (geometry == QUDA_COARSE_GEOMETRY)
           send[d + 4] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
