@@ -964,10 +964,13 @@ namespace quda
       if (!initGhostFaceBuffer || resize) {
         freeGhostBuffer();
         for (int i = 0; i < nDimComms; i++) {
-          fwdGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          fwdGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+          // Host communication buffers use host-pinned (registered) memory so that a CUDA-aware
+          // MPI/UCX registration cache does not register these pages itself and leave a stale
+          // mapping behind after they are freed (see cudaErrorHostMemoryAlreadyRegistered with UCX).
+          fwdGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          fwdGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
         }
         initGhostFaceBuffer = 1;
       }
