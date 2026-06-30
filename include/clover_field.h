@@ -581,6 +581,7 @@ namespace quda {
      @param sigma_coeff[in] Coefficient for the tr log clover force
      @param detratio[in] Whether to compute determinant ratio
      @param trlog[in] Whether a tr log term is present
+     @param rhmc[in] Whether we are using RHMC
      @param parity[in] Which parity do we need compute the tr log clover force
   */
   void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,

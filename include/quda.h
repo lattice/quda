@@ -1560,9 +1560,11 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param inv_param Dirac and solver meta data
    * @param detratio if 0 compute the force of a determinant otherwise compute the force from a ratio of determinants
+   * @param trlog Whether to compute the trlog term
+   * @param rhmc_flavors Number of flavors used in RHMC, i.e. 0: not using RHMC, 1: single flavor, 2 for e.g. non-degenerate tm doublet
    */
   void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
-                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio, int trlog, int rhmc);
+                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio, bool trlog, int rhmc_flavors);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.

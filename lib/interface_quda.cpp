@@ -4815,7 +4815,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 }
 
 void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
-                              QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio, int trlog, int rhmc_flavors)
+                              QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio, bool trlog, int rhmc_flavors)
 {
   using namespace quda;
   auto profile = pushProfile(profileTMCloverForce, inv_param);

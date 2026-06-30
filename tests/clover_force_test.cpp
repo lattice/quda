@@ -132,14 +132,14 @@ std::tuple<int, double> clover_force_test(test_t param)
 
   if (getTuning())
     computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
-                             detratio, !detratio, false);
+                             detratio, !detratio, 0);
 
   // Multiple execution to exclude warmup time in the first run
   double time_sec = 0.0;
   double gflops = 0.0;
   for (int i = 0; i < niter; i++) {
     computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
-                             detratio, !detratio, false);
+                             detratio, !detratio, 0);
     time_sec += inv_param.secs;
     gflops += inv_param.gflops;
   }

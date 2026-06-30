@@ -15,7 +15,6 @@ namespace quda
   {
     if (inv_param.matpc_type != QUDA_MATPC_EVEN_EVEN_ASYMMETRIC && inv_param.matpc_type != QUDA_MATPC_ODD_ODD_ASYMMETRIC)
       errorQuda("MatPC type %d not supported", inv_param.matpc_type);
-// error fuer trlog + detratio und rhmc vs detratio
     QudaParity parity = inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
     QudaParity other_parity = static_cast<QudaParity>(1 - parity);
     bool dagger = inv_param.dagger;
