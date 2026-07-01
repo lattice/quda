@@ -51,8 +51,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-  //#include <math.h>       /* import sqrt() */
-
 /* The head of a double-double number is stored in the most significant part
    of a double2 (the y-component). The tail is stored in the least significant
    part of the double2 (the x-component). All double-double operands must be

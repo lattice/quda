@@ -8,7 +8,6 @@
 
 #pragma once
 
-//#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -217,7 +216,6 @@ namespace quda
         R v, p, r;
         v = (R)uniform(prn);
         p = (R)uniform(prn) * (R)2.0 * (R)3.141592653589793238462643383279502884;
-        //r = std::sqrt((R)(-2.0) * std::log(v + TINY));
         r = sqrt((R)(-2.0) * log(v + TINY));
         x = r * sin(p);
         y = r * cos(p);
