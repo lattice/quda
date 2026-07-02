@@ -112,7 +112,7 @@ namespace quda {
     */
     inline void xpay(cvector_ref<const ColorSpinorField> &x, cvector<real_t> &a, cvector_ref<ColorSpinorField> &y)
     {
-      axpbyz(real_t(1.0), x, a, y, y);
+      axpbyz(a, y, real_t(1.0), x, y);
     }
 
     /**
@@ -177,23 +177,32 @@ namespace quda {
                 cvector_ref<ColorSpinorField> &y);
 
     /**
-       @brief Apply the operation y += a * x
+       @brief Apply the operation z = a * x + y
        @param[in] a scalar multiplier set
        @param[in] x input vector set
-       @param[in] y update vector set
+       @param[in] y input vector set
+       @param[out] z output vector set
     */
-    void caxpy(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+    void caxpyz(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
+                cvector_ref<ColorSpinorField> &z);
+
+    inline void caxpy(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
+    {
+      caxpyz(a, x, y, y);
+    }
 
     /**
-       @brief Apply the operation z = x + a * y + b * z
-       @param[in] x input vector set
+       @brief Apply the operation w = a * x + b * y + z
        @param[in] a scalar multiplier set
-       @param[in] y input vector set
+       @param[in] x input vector set
        @param[in] b scalar multiplier set
-       @param[in,out] z update vector set
+       @param[in] y input vector set
+       @param[in] z input vector set
+       @param[out] w output vector set
     */
-    void cxpaypbz(cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &y,
-                  cvector<complex_t> &b, cvector_ref<ColorSpinorField> &z);
+    void caxpbypzw(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &b,
+                   cvector_ref<const ColorSpinorField> &y, cvector_ref<const ColorSpinorField> &z,
+                   cvector_ref<ColorSpinorField> &w);
 
     /**
        @brief Apply the operation z += a * x + b * y, y-= b * w

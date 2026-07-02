@@ -243,7 +243,7 @@ namespace quda {
         blas::caxpbypzYmbw(alpha, p, omega, r_sloppy, x_sloppy, t);
         vector<complex_t> beta_omega(b.size());
         for (auto i = 0u; i < b.size(); i++) beta_omega[i] = -beta[i] * omega[i];
-        blas::cxpaypbz(r_sloppy, beta_omega, v, beta, p);
+        blas::caxpbypzw(beta, p, beta_omega, v, r_sloppy, p);
         // tripleBiCGstabUpdate(alpha, p, omega, r_sloppy, x_sloppy, t, -beta*omega, v, beta, p
       } else {
         // x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
@@ -350,7 +350,7 @@ namespace quda {
             beta[i] = (rho[i] / rho0[i]) * (alpha[i] / omega[i]);
           beta_omega[i] = -beta[i] * omega[i];
         }
-        blas::cxpaypbz(r_sloppy, beta_omega, v, beta, p);
+        blas::caxpbypzw(beta, p, beta_omega, v, r_sloppy, p);
       }
     }
 

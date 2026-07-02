@@ -491,7 +491,7 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          auto y_new = y[i] + a[j] * x[i];
+          complex<real> y_new = fma2({a[j], a[j]}, x[i], y[i]);
           sum = reducer::apply(sum, array<compute_t, 2>{norm2_<compute_t>(y_new), dot_<compute_t>(y_new, y_new - y[i])});
           y[i] = y_new;
         }

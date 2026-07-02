@@ -145,7 +145,7 @@ namespace quda
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j) const
       {
 #pragma unroll
-        for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
+        for (int k = 0; k < x.size(); k++) y[k] = fma2({a(j, i), a(j, i)}, x[k], y[k]);
       }
 
       constexpr int flops() const { return 2; }         //! flops per real element
@@ -191,7 +191,7 @@ namespace quda
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
           if (j == 0) w[k] = y[k];
-          w[k] = a(j, i) * x[k] + w[k];
+          w[k] = fma2({a(j, i), a(j, i)}, x[k], w[k]);
         }
       }
 
@@ -245,8 +245,9 @@ namespace quda
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
-          y[k] += a[i] * w[k];
-          w[k] = b[i] * x[k] + c[i] * w[k];
+          y[k] = fma2({a[i], a[i]}, w[k], y[k]);
+          w[k] = c[i] * w[k];
+          w[k] = fma2({b[i], b[i]}, x[k], w[k]);
         }
       }
 

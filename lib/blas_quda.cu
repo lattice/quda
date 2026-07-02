@@ -168,9 +168,10 @@ namespace quda {
       instantiateBlas<axy_, false>(a, cvector<complex_t>(), cvector<complex_t>(), x, y, y, y, y);
     }
 
-    void caxpy(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
+    void caxpyz(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
+                cvector_ref<ColorSpinorField> &z)
     {
-      instantiateBlas<caxpy_, true>(a, cvector<complex_t>(), cvector<complex_t>(), x, y, x, x, y);
+      instantiateBlas<caxpyz_, true>(a, cvector<complex_t>(), cvector<complex_t>(), x, y, x, x, z);
     }
 
     void caxpby(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &b,
@@ -186,10 +187,11 @@ namespace quda {
       instantiateBlas<axpbypczw_, false>(a, b, c, x, y, z, w, y);
     }
 
-    void cxpaypbz(cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &y,
-                  cvector<complex_t> &b, cvector_ref<ColorSpinorField> &z)
+    void caxpbypzw(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &b,
+                   cvector_ref<const ColorSpinorField> &y, cvector_ref<const ColorSpinorField> &z,
+                   cvector_ref<ColorSpinorField> &w)
     {
-      instantiateBlas<cxpaypbz_, false>(a, b, cvector<complex_t>(), x, y, z, x, y);
+      instantiateBlas<caxpbypzw_, false>(a, b, cvector<complex_t>(), x, y, z, x, w);
     }
 
     void axpyBzpcx(cvector<real_t> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
