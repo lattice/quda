@@ -6,20 +6,18 @@ namespace quda
 
   namespace comm_target
   {
-#ifdef QUDA_MNNVL
-    /**
-       @brief Return the NVML-reported GPU Fabric clique ID for the current
-       device.  Informational only on some systems (e.g. Ptyche reports a
-       constant sentinel cluster-wide); use the open/try_import/close
-       primitives below for ground-truth fabric reachability.  Returns 0 if
-       NVML is unavailable or the device has no fabric info.
-     */
-    unsigned int get_fabric_clique_id();
+    // The MNNVL fabric-reachability primitives are declared unconditionally so
+    // target-agnostic code can call them under `if constexpr (comm_build_is_mnnvl())`
+    // (both branches of an if-constexpr in a non-template context must compile).
+    // The implementations live in lib/targets/cuda/comm_target.cpp: real under
+    // QUDA_MNNVL, cheap stubs otherwise (never executed at runtime on non-MNNVL).
+    // All use opaque void*/size_t so this header need not pull in <cuda.h>.
 
     /**
        @brief Size in bytes of the platform's exportable fabric handle
        (CUmemFabricHandle on CUDA).  Use this to size buffers without
-       pulling cuda.h into headers that don't want it.
+       pulling cuda.h into headers that don't want it.  Returns 0 on
+       non-MNNVL builds.
      */
     size_t fabric_handle_size();
 
@@ -27,7 +25,8 @@ namespace quda
        @brief Allocate a small probe buffer suitable for fabric P2P and
        write its local CUmemFabricHandle into `out_handle` (must point at
        at least fabric_handle_size() bytes).  Returns an opaque handle the
-       caller passes to close_fabric_probe() when done.
+       caller passes to close_fabric_probe() when done.  Returns nullptr on
+       non-MNNVL builds.
      */
     void *open_fabric_probe(void *out_handle);
 
@@ -36,15 +35,15 @@ namespace quda
        fabric handle (fabric_handle_size() bytes).  Returns true on success
        (and releases the imported handle), false otherwise.  Safe to call
        on a peer outside this rank's actual fabric reach -- the failed
-       import is the truth signal.
+       import is the truth signal.  Returns false on non-MNNVL builds.
      */
     bool try_import_fabric_handle(const void *peer_handle);
 
     /**
        @brief Release the probe buffer returned by open_fabric_probe().
+       No-op on non-MNNVL builds.
      */
     void close_fabric_probe(void *probe);
-#endif
   } // namespace comm_target
 
   /**

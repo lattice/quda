@@ -4,6 +4,7 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
+#include <comm_target.h> // constexpr comm_build_is_mnnvl()
 
 namespace quda {
 
@@ -620,11 +621,9 @@ namespace quda {
       // recv buffer (no-op in non-NVSHMEM builds).
       comm_create_neighbor_memory_shmem(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
       // get remote events
-#ifndef QUDA_MNNVL
       // cudaIPC events cannot traverse nodes; MNNVL builds skip the event
       // exchange entirely and synchronise via stream-mem-op signalling.
-      comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
-#endif
+      if constexpr (!comm_build_is_mnnvl()) comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
       // NB: the stream-mem-op signal-slot ("flag") buffer is exchanged by
       // comm_create_stream_gated_comms() near the top of createIPCComms (once per
       // communicator, idempotent), NOT in this per-buffer loop -- it stays out of
@@ -669,9 +668,7 @@ namespace quda {
     for (int b = 0; b < 2; b++) {
       comm_destroy_neighbor_memory_p2p(ghost_remote_send_buffer_p2p_d[b]);
       comm_destroy_neighbor_memory_shmem(ghost_remote_send_buffer_d[b]);
-#ifndef QUDA_MNNVL
-      comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
-#endif
+      if constexpr (!comm_build_is_mnnvl()) comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
       // NB: the stream-gated flag buffer is unmapped by
       // comm_destroy_stream_gated_comms() (called from freeGhostBuffer), not here.
     }

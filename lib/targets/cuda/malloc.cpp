@@ -6,6 +6,7 @@
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
 #include <device.h>
+#include <malloc_target.h> // declarations for the CUDA/MNNVL P2P fabric-handle accessors
 #include <shmem_helper.cuh>
 #include "timer.h"
 

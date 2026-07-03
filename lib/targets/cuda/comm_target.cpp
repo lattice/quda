@@ -10,9 +10,9 @@
 #include <map>
 #include <vector>
 #include <shmem_helper.cuh>
+#include <malloc_target.h> // get_p2p_fabric_handle / get_p2p_buffer_size / _generation (CUDA/MNNVL)
 #ifdef QUDA_MNNVL
 #include <cuda.h>
-#include <nvml.h>
 #endif
 
 namespace quda
@@ -21,26 +21,9 @@ namespace quda
 #define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
-#ifdef QUDA_MNNVL
   namespace comm_target
   {
-    unsigned int get_fabric_clique_id()
-    {
-      int dev_id = -1;
-      if (cudaGetDevice(&dev_id) != cudaSuccess) return 0;
-      cudaDeviceProp prop;
-      if (cudaGetDeviceProperties(&prop, dev_id) != cudaSuccess) return 0;
-      char pciBusId[32];
-      snprintf(pciBusId, sizeof(pciBusId), "%08x:%02x:%02x.0", prop.pciDomainID, prop.pciBusID, prop.pciDeviceID);
-      if (nvmlInit() != NVML_SUCCESS) return 0;
-      nvmlDevice_t dev;
-      if (nvmlDeviceGetHandleByPciBusId(pciBusId, &dev) != NVML_SUCCESS) return 0;
-      nvmlGpuFabricInfo_t info = {};
-      if (nvmlDeviceGetGpuFabricInfo(dev, &info) != NVML_SUCCESS) return 0;
-      if (info.status != NVML_SUCCESS) return 0;
-      return info.cliqueId;
-    }
-
+#ifdef QUDA_MNNVL
     size_t fabric_handle_size() { return sizeof(CUmemFabricHandle); }
 
     void *open_fabric_probe(void *out_handle)
@@ -62,8 +45,16 @@ namespace quda
     }
 
     void close_fabric_probe(void *probe) { device_comm_buffer_free(probe); }
-  }    // namespace comm_target
+#else
+    // Non-MNNVL build: fabric P2P is unavailable.  These stubs let target-agnostic
+    // code call the facade under `if constexpr (comm_build_is_mnnvl())` (both
+    // branches must compile) while never executing at runtime.
+    size_t fabric_handle_size() { return 0; }
+    void *open_fabric_probe(void *) { return nullptr; }
+    bool try_import_fabric_handle(const void *) { return false; }
+    void close_fabric_probe(void *) { }
 #endif // QUDA_MNNVL
+  }    // namespace comm_target
 
   bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
   {

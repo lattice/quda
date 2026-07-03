@@ -293,141 +293,142 @@ namespace quda
 
         comm_gather_gpuid(gpuid_recv_buf);
 
-#ifdef QUDA_MNNVL
-        // MNNVL P2P reachability is probed empirically: each rank exports a fabric
-        // handle and every rank tries to import each neighbour's.  A successful import
-        // means the pair can use NVLink-fabric P2P; otherwise the link uses MPI.  (The
-        // NVML clique id is not reliable for this and is not used.)
+        if constexpr (comm_build_is_mnnvl()) {
+          // MNNVL P2P reachability is probed empirically: each rank exports a fabric
+          // handle and every rank tries to import each neighbour's.  A successful import
+          // means the pair can use NVLink-fabric P2P; otherwise the link uses MPI.  (The
+          // NVML clique id is not reliable for this and is not used.)
 
-        // Open a probe buffer + extract our local fabric handle.
-        const size_t fhsz = comm_target::fabric_handle_size();
-        std::vector<unsigned char> local_fh(fhsz);
-        void *probe = comm_target::open_fabric_probe(local_fh.data());
+          // Open a probe buffer + extract our local fabric handle.
+          const size_t fhsz = comm_target::fabric_handle_size();
+          std::vector<unsigned char> local_fh(fhsz);
+          void *probe = comm_target::open_fabric_probe(local_fh.data());
 
-        // Allgather handles via *member* function so we don't hit the comm
-        // stack (this Communicator may not be pushed yet during init).
-        std::vector<unsigned char> all_fh(fhsz * comm_size());
-        this->comm_gather_fabric_handle(local_fh.data(), all_fh.data(), fhsz);
+          // Allgather handles via *member* function so we don't hit the comm
+          // stack (this Communicator may not be pushed yet during init).
+          std::vector<unsigned char> all_fh(fhsz * comm_size());
+          this->comm_gather_fabric_handle(local_fh.data(), all_fh.data(), fhsz);
 
-        // Probe P2P reachability for our (up to) eight face-neighbours only:
-        // P2P is a nearest-neighbour halo exchange, so reachability to
-        // non-neighbour ranks is irrelevant (the old code imported all N peers
-        // but only ever consulted the 8 neighbours).  local_cap[dir][dim] is
-        // this rank's capability toward that neighbour -- true if we can import
-        // its fabric handle (P2P), false otherwise (MPI).  dir==0 is the -1
-        // (backward) neighbour, dir==1 the +1 (forward) neighbour (see
-        // comm_set_neighbor_ranks).
-        //
-        // Study hook: QUDA_P2P_FAKE_CLIQUE=<ranks-per-clique> soft-partitions the ranks
-        // into contiguous cliques (clique = rank / ranks-per-clique).  A neighbour in a
-        // different clique is left unreachable, so the symmetric-AND below downgrades
-        // that link to MPI.  This exercises the hybrid in-clique-P2P + cross-clique
-        // fallback path without a multi-clique allocation.  Off (<=0) by default; both
-        // endpoints apply the same comparison so the partition stays symmetric.
-        int fake_clique = 0;
-        if (const char *e = getenv("QUDA_P2P_FAKE_CLIQUE")) fake_clique = atoi(e);
-        if (fake_clique > 0 && getVerbosity() > QUDA_SILENT && comm_rank() == 0)
-          printf("MNNVL fabric: QUDA_P2P_FAKE_CLIQUE=%d active (soft %d-rank cliques)\n", fake_clique, fake_clique);
+          // Probe P2P reachability for our (up to) eight face-neighbours only:
+          // P2P is a nearest-neighbour halo exchange, so reachability to
+          // non-neighbour ranks is irrelevant (the old code imported all N peers
+          // but only ever consulted the 8 neighbours).  local_cap[dir][dim] is
+          // this rank's capability toward that neighbour -- true if we can import
+          // its fabric handle (P2P), false otherwise (MPI).  dir==0 is the -1
+          // (backward) neighbour, dir==1 the +1 (forward) neighbour (see
+          // comm_set_neighbor_ranks).
+          //
+          // Study hook: QUDA_P2P_FAKE_CLIQUE=<ranks-per-clique> soft-partitions the ranks
+          // into contiguous cliques (clique = rank / ranks-per-clique).  A neighbour in a
+          // different clique is left unreachable, so the symmetric-AND below downgrades
+          // that link to MPI.  This exercises the hybrid in-clique-P2P + cross-clique
+          // fallback path without a multi-clique allocation.  Off (<=0) by default; both
+          // endpoints apply the same comparison so the partition stays symmetric.
+          int fake_clique = 0;
+          if (const char *e = getenv("QUDA_P2P_FAKE_CLIQUE")) fake_clique = atoi(e);
+          if (fake_clique > 0 && getVerbosity() > QUDA_SILENT && comm_rank() == 0)
+            printf("MNNVL fabric: QUDA_P2P_FAKE_CLIQUE=%d active (soft %d-rank cliques)\n", fake_clique, fake_clique);
 
-        bool local_cap[2][4] = {{false, false, false, false}, {false, false, false, false}};
-        for (int dir = 0; dir < 2; ++dir) {
-          for (int dim = 0; dim < 4; ++dim) {
-            if (comm_dim(dim) == 1) continue; // dim not partitioned: no neighbour
-            int R = comm_neighbor_rank(dir, dim);
-            if (R == (int)comm_rank()) continue; // self: no P2P needed
-            if (fake_clique > 0 && R / fake_clique != (int)comm_rank() / fake_clique)
-              continue; // fake cross-clique: leave local_cap false -> MPI
-            local_cap[dir][dim] = comm_target::try_import_fabric_handle(all_fh.data() + R * fhsz);
-          }
-        }
-
-        // Exchange capabilities so both endpoints of every link can agree.  We
-        // only need eight bytes per rank (one capability per face-direction),
-        // so this allgather is O(N) total -- never the old O(N^2) reachability
-        // matrix.  src rank is implied by buffer position and dst is
-        // recomputable from the topology, so neither is sent.  Reuse the
-        // byte-allgather member (this Communicator may not be pushed onto the
-        // stack yet during init).
-        unsigned char my_cap[8];
-        for (int dir = 0; dir < 2; ++dir)
-          for (int dim = 0; dim < 4; ++dim) my_cap[dir * 4 + dim] = local_cap[dir][dim] ? 1 : 0;
-        std::vector<unsigned char> all_cap(8 * comm_size());
-        this->comm_gather_fabric_handle(my_cap, all_cap.data(), sizeof(my_cap));
-
-        // Release the probe buffer only after the allgather above, which is a collective
-        // barrier: every rank has finished importing all peers' handles before any rank
-        // frees, so a peer's import cannot fail on a buffer that was freed too early.
-        comm_target::close_fabric_probe(probe);
-
-        // Enable P2P only where BOTH endpoints are capable (symmetric AND).  An
-        // asymmetric link (one side can import, the other cannot -- degraded
-        // node) is downgraded to MPI on *both* sides; otherwise we would post a
-        // stream-gated P2P send/wait while the peer falls back to MPI and never
-        // writes our slot -> deadlock.  Our (dir,dim) maps to the peer's
-        // reverse direction (1-dir,dim): if R is our +1 neighbour in dim, we
-        // are R's -1 neighbour in dim, so both sides evaluate the same pair and
-        // reach the same verdict.
-        for (int dir = 0; dir < 2; ++dir) {
-          for (int dim = 0; dim < 4; ++dim) {
-            if (comm_dim(dim) == 1) continue;
-            int neighbor_rank = comm_neighbor_rank(dir, dim);
-            if (neighbor_rank == (int)comm_rank()) continue;
-
-            if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
-                && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
-              continue;
-
-            bool peer_cap = all_cap[neighbor_rank * 8 + (1 - dir) * 4 + dim] != 0;
-            if (local_cap[dir][dim] && peer_cap) {
-              peer2peer_enabled[dir][dim] = true;
-              if (getVerbosity() > QUDA_SILENT) {
-                printf("Peer-to-peer (fabric probe) enabled for rank %3d with neighbor %3d "
-                       "dir=%d, dim=%d\n",
-                       comm_rank(), neighbor_rank, dir, dim);
-              }
+          bool local_cap[2][4] = {{false, false, false, false}, {false, false, false, false}};
+          for (int dir = 0; dir < 2; ++dir) {
+            for (int dim = 0; dim < 4; ++dim) {
+              if (comm_dim(dim) == 1) continue; // dim not partitioned: no neighbour
+              int R = comm_neighbor_rank(dir, dim);
+              if (R == (int)comm_rank()) continue; // self: no P2P needed
+              if (fake_clique > 0 && R / fake_clique != (int)comm_rank() / fake_clique)
+                continue; // fake cross-clique: leave local_cap false -> MPI
+              local_cap[dir][dim] = comm_target::try_import_fabric_handle(all_fh.data() + R * fhsz);
             }
-            // else: not mutually importable -- different fabric, MPI only.
           }
-        }
-#else
-        for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
-          for (int dim = 0; dim < 4; ++dim) {
-            int neighbor_rank = comm_neighbor_rank(dir, dim);
-            if (neighbor_rank == comm_rank()) continue;
 
-            // disable peer-to-peer comms in one direction
-            if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
-                && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
-              continue;
+          // Exchange capabilities so both endpoints of every link can agree.  We
+          // only need eight bytes per rank (one capability per face-direction),
+          // so this allgather is O(N) total -- never the old O(N^2) reachability
+          // matrix.  src rank is implied by buffer position and dst is
+          // recomputable from the topology, so neither is sent.  Reuse the
+          // byte-allgather member (this Communicator may not be pushed onto the
+          // stack yet during init).
+          unsigned char my_cap[8];
+          for (int dir = 0; dir < 2; ++dir)
+            for (int dim = 0; dim < 4; ++dim) my_cap[dir * 4 + dim] = local_cap[dir][dim] ? 1 : 0;
+          std::vector<unsigned char> all_cap(8 * comm_size());
+          this->comm_gather_fabric_handle(my_cap, all_cap.data(), sizeof(my_cap));
 
-            // if the neighbors are on the same node
-            if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
-              int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+          // Release the probe buffer only after the allgather above, which is a collective
+          // barrier: every rank has finished importing all peers' handles before any rank
+          // frees, so a peer's import cannot fail on a buffer that was freed too early.
+          comm_target::close_fabric_probe(probe);
 
-              bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
-              int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
+          // Enable P2P only where BOTH endpoints are capable (symmetric AND).  An
+          // asymmetric link (one side can import, the other cannot -- degraded
+          // node) is downgraded to MPI on *both* sides; otherwise we would post a
+          // stream-gated P2P send/wait while the peer falls back to MPI and never
+          // writes our slot -> deadlock.  Our (dir,dim) maps to the peer's
+          // reverse direction (1-dir,dim): if R is our +1 neighbour in dim, we
+          // are R's -1 neighbour in dim, so both sides evaluate the same pair and
+          // reach the same verdict.
+          for (int dir = 0; dir < 2; ++dir) {
+            for (int dim = 0; dim < 4; ++dim) {
+              if (comm_dim(dim) == 1) continue;
+              int neighbor_rank = comm_neighbor_rank(dir, dim);
+              if (neighbor_rank == (int)comm_rank()) continue;
 
-              if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+              if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
+                  && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
+                continue;
+
+              bool peer_cap = all_cap[neighbor_rank * 8 + (1 - dir) * 4 + dim] != 0;
+              if (local_cap[dir][dim] && peer_cap) {
                 peer2peer_enabled[dir][dim] = true;
                 if (getVerbosity() > QUDA_SILENT) {
-                  printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
-                         "access rank = (%3d)\n",
-                         comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
-                }
-              } else {
-                intranode_enabled[dir][dim] = true;
-                if (getVerbosity() > QUDA_SILENT) {
-                  printf(
-                    "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
-                    "dim=%d\n",
-                    comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                  printf("Peer-to-peer (fabric probe) enabled for rank %3d with neighbor %3d "
+                         "dir=%d, dim=%d\n",
+                         comm_rank(), neighbor_rank, dir, dim);
                 }
               }
+              // else: not mutually importable -- different fabric, MPI only.
+            }
+          }
+        } else {
+          for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
+            for (int dim = 0; dim < 4; ++dim) {
+              int neighbor_rank = comm_neighbor_rank(dir, dim);
+              if (neighbor_rank == comm_rank()) continue;
 
-            } // on the same node
-          }   // different dimensions - x, y, z, t
-        }     // different directions - forward/backward
-#endif
+              // disable peer-to-peer comms in one direction
+              if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
+                  && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
+                continue;
+
+              // if the neighbors are on the same node
+              if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank],
+                           QUDA_MAX_HOSTNAME_STRING)) {
+                int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+
+                bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
+                int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
+
+                if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+                  peer2peer_enabled[dir][dim] = true;
+                  if (getVerbosity() > QUDA_SILENT) {
+                    printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                           "access rank = (%3d)\n",
+                           comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+                  }
+                } else {
+                  intranode_enabled[dir][dim] = true;
+                  if (getVerbosity() > QUDA_SILENT) {
+                    printf(
+                      "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
+                      "dim=%d\n",
+                      comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                  }
+                }
+
+              } // on the same node
+            }   // different dimensions - x, y, z, t
+          }     // different directions - forward/backward
+        }
 
         host_free(gpuid_recv_buf);
       }
@@ -853,10 +854,10 @@ namespace quda
   void comm_gather_hostname(char *hostname_recv_buf);
 
   void comm_gather_gpuid(int *gpuid_recv_buf);
-#ifdef QUDA_MNNVL
-  void comm_gather_clique_id(unsigned int *clique_recv_buf);
+  // Byte-allgather of a fabric handle, used by the MNNVL P2P reachability probe.
+  // A plain collective (MPI_Allgather / QMP / single-rank copy) -- backend-generic,
+  // so declared unconditionally; the CUDA/fabric specifics live behind comm_target::.
   void comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size);
-#endif
 
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
 

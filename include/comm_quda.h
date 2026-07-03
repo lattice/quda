@@ -239,24 +239,6 @@ namespace quda
   */
   void comm_gather_gpuid(int *gpuid_recv_buf);
 
-#ifdef QUDA_MNNVL
-  /**
-     @brief Gather every rank's local GPU NVML fabric clique ID into clique_recv_buf
-     (length comm_size()).  Used by comm_peer2peer_init to detect MNNVL reachability
-     across hostnames: ranks with the same clique ID can do NVLink fabric P2P.
-   */
-  void comm_gather_clique_id(unsigned int *clique_recv_buf);
-
-  /**
-     @brief Allgather a CUmemFabricHandle (opaque, size handle_size bytes).
-     Used by the fabric-reachability probe at communicator init to discover
-     which peer ranks can actually be reached via cuMemImportFromShareableHandle
-     (NVML's cliqueId is uninformative on some MNNVL systems, e.g. Ptyche
-     where it returns a constant sentinel).
-   */
-  void comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size);
-#endif
-
   /**
      Enabled peer-to-peer communication.
      @param hostname_buf Array that holds all process hostnames

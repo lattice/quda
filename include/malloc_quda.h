@@ -4,10 +4,6 @@
 #include <cstdint>
 #include <enum_quda.h>
 
-#ifdef QUDA_MNNVL
-#include <cuda.h>
-#endif
-
 namespace quda {
 
   void printPeakMemUsage();
@@ -87,20 +83,10 @@ namespace quda {
   void nvshmem_comm_buffer_free_(const char *func, const char *file, int line, void *ptr);
 #endif
 
-#ifdef QUDA_MNNVL
-  /**
-     @brief Return the CUmemFabricHandle for a P2P comm buffer previously
-     allocated via comm_buffer_malloc_(DeviceCommBuffer, ...).  Used by
-     comm_create_neighbor_memory_p2p to export the local buffer's handle to
-     peer ranks across the MNNVL clique via MPI.  Errors if ptr is not a
-     P2P comm buffer allocated under QUDA_MNNVL.
-   */
-  CUmemFabricHandle get_p2p_fabric_handle(void *ptr);
-  /** @brief Return the exact padded VMM allocation size for @p ptr. */
-  size_t get_p2p_buffer_size(void *ptr);
-  /** @brief Return a process-local identifier for this allocation generation. */
-  uint64_t get_p2p_buffer_generation(void *ptr);
-#endif
+  // The P2P fabric-handle accessors (get_p2p_fabric_handle / get_p2p_buffer_size /
+  // get_p2p_buffer_generation) are CUDA/MNNVL-specific and return a CUmemFabricHandle,
+  // so they live in <malloc_target.h> (targets/cuda) to keep <cuda.h> and the
+  // QUDA_MNNVL #ifdef out of this generic header.
 
   void *safe_malloc_(const char *func, const char *file, int line, size_t size);
   void *host_pinned_malloc_(const char *func, const char *file, int line, size_t size);
