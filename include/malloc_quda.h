@@ -59,7 +59,47 @@ namespace quda {
    */
   void *device_malloc_(const char *func, const char *file, int line, size_t size);
   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size);
-  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size);
+  // Tag-dispatched communication-buffer allocator. The DeviceCommBuffer overload uses the
+  // driver-API cuMemAlloc (avoids the cudaMalloc runtime-API hijack risk and
+  // gives physically-contiguous memory), so the buffer is P2P-capable and
+  // RDMA-ready -- suitable for cudaIPC handle export and, under MNNVL, fabric
+  // export. NVSHMEM overload uses shmem_malloc_. Each allocation is tagged in
+  // the alloc[] tracker so the per-kind *_comm_buffer_free can verify the kind.
+  // (MPI comm buffers share the DeviceCommBuffer kind -- they resolve to the
+  // same primitive -- so there is no separate MPI tag.)
+  namespace comm
+  {
+    struct DeviceCommBuffer {};
+    struct QudaCommTypeNVSHMEM {};
+  } // namespace comm
+
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::DeviceCommBuffer, size_t size);
+#ifdef NVSHMEM_COMMS
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::QudaCommTypeNVSHMEM, size_t size);
+#endif
+  // Per-kind free: each asserts the ptr is in alloc[KIND] and dispatches to
+  // the matching free primitive.  Callers pair their *_comm_buffer_malloc
+  // with the matching *_comm_buffer_free.
+  void device_comm_buffer_free_(const char *func, const char *file, int line, void *ptr);
+#ifdef NVSHMEM_COMMS
+  void nvshmem_comm_buffer_free_(const char *func, const char *file, int line, void *ptr);
+#endif
+
+#ifdef QUDA_MNNVL
+  /**
+     @brief Return the CUmemFabricHandle for a P2P comm buffer previously
+     allocated via comm_buffer_malloc_(DeviceCommBuffer, ...).  Used by
+     comm_create_neighbor_memory_p2p to export the local buffer's handle to
+     peer ranks across the MNNVL clique via MPI.  Errors if ptr is not a
+     P2P comm buffer allocated under QUDA_MNNVL.
+   */
+  CUmemFabricHandle get_p2p_fabric_handle(void *ptr);
+  /** @brief Return the exact padded VMM allocation size for @p ptr. */
+  size_t get_p2p_buffer_size(void *ptr);
+  /** @brief Return a process-local identifier for this allocation generation. */
+  uint64_t get_p2p_buffer_generation(void *ptr);
+#endif
+
   void *safe_malloc_(const char *func, const char *file, int line, size_t size);
   void *host_pinned_malloc_(const char *func, const char *file, int line, size_t size);
   void *managed_malloc_(const char *func, const char *file, int line, size_t size);

@@ -86,9 +86,81 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
+  // Forward (dir 0) and backward (dir 1) neighbours share ONE P2P mapping (alias)
+  // only for a size-2, non-C-star dim with P2P enabled both ways; otherwise each
+  // direction is a distinct mapping.  create and destroy MUST use this identical
+  // predicate -- a size-2 C-star dim opens two mappings, so teardown must free both.
+  inline int comm_neighbor_p2p_num_dir(int dim)
   {
-#ifndef NVSHMEM_COMMS
+    return (!comm_dim_cstar(dim) && comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim)
+            && comm_peer2peer_enabled(1, dim)) ?
+      1 :
+      2;
+  }
+
+  // QUDA-owned P2P neighbour mapping.  Exchanges a SINGLE fabric handle (MNNVL)
+  // or cudaIPC handle (non-IMEX) for the LOCAL contiguous P2P recv buffer and
+  // imports the peer's, so P2P writes target a single-allocation, RDMA-capable
+  // buffer.  Compiled in ALL builds INCLUDING NVSHMEM: under NVSHMEM the
+  // symmetric heap does not give QUDA a reusable single-handle export, so P2P
+  // must own its own DeviceCommBuffer.  The NVSHMEM-transport remote pointer is
+  // handled separately by comm_create_neighbor_memory_shmem.
+#ifdef QUDA_MNNVL
+  struct FabricExport {
+    CUmemFabricHandle handle;
+    uint64_t size;
+    uint64_t generation;
+  };
+
+  struct RemoteFabricMapping {
+    size_t size;
+    uint64_t generation;
+  };
+
+  // Imported peer VMM pointer -> exact mapping metadata.  Recording this at
+  // import avoids querying VMM address ranges during teardown and makes VA
+  // reuse across allocation generations visible in debug logs.
+  static std::map<void *, RemoteFabricMapping> p2p_remote_mappings;
+#endif
+
+  void comm_create_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
+  {
+#ifdef QUDA_MNNVL
+    // MNNVL build: exchange CUmemFabricHandle (from VMM allocator) via MPI.
+    // The peer side will cuMemImportFromShareableHandle + cuMemAddressReserve
+    // + cuMemMap + cuMemSetAccess to map the remote buffer into our address
+    // space.
+    FabricExport remote_export[QUDA_MAX_DIM][2] = {};
+
+    for (int dim = 0; dim < 4; ++dim) {
+      if (comm_dim(dim) == 1) continue;
+      for (int dir = 0; dir < 2; ++dir) {
+        MsgHandle *sendHandle = nullptr;
+        MsgHandle *receiveHandle = nullptr;
+        int disp = (dir == 1) ? +1 : -1;
+
+        if (comm_peer2peer_enabled(1 - dir, dim)) {
+          receiveHandle = comm_declare_receive_relative(&remote_export[dim][1 - dir], dim, -disp,
+                                                        sizeof(FabricExport));
+        }
+        FabricExport local_export = {};
+        if (comm_peer2peer_enabled(dir, dim)) {
+          local_export.handle = get_p2p_fabric_handle(local);
+          local_export.size = get_p2p_buffer_size(local);
+          local_export.generation = get_p2p_buffer_generation(local);
+          sendHandle = comm_declare_send_relative(&local_export, dim, disp, sizeof(local_export));
+        }
+        if (receiveHandle) comm_start(receiveHandle);
+        if (sendHandle) comm_start(sendHandle);
+
+        if (receiveHandle) comm_wait(receiveHandle);
+        if (sendHandle) comm_wait(sendHandle);
+
+        if (sendHandle) comm_free(sendHandle);
+        if (receiveHandle) comm_free(receiveHandle);
+      }
+    }
+#else
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
 
@@ -101,7 +173,8 @@ namespace quda
 
       // first set up receive
       if (comm_peer2peer_enabled(1 - dir, dim)) {
-        receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp, sizeof(remote_handle));
+        receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp,
+                                                      sizeof(remote_handle[dim][1 - dir]));
       }
       // now send
       cudaIpcMemHandle_t local_handle;
@@ -123,18 +196,13 @@ namespace quda
 
   // open the remote memory handles and set the send ghost pointers
   for (int dim = 0; dim < 4; ++dim) {
-#ifndef NVSHMEM_COMMS
     // TODO: We maybe can force loopback comms to use the IB path here
     if (comm_dim(dim) == 1) continue;
-#endif
-    // even if comm_dim(dim) == 2, we might not have p2p enabled in both directions, so check this
-    const int num_dir
-      = (!comm_dim_cstar(dim) && comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ?
-      1 :
-      2;
+    const int num_dir = comm_neighbor_p2p_num_dir(dim);
     for (int dir = 0; dir < num_dir; dir++) {
       remote[dim][dir] = nullptr;
-#ifndef NVSHMEM_COMMS
+#ifdef QUDA_MNNVL
+      // Import peer's fabric handle, reserve a local VA range, map.
       if (!comm_peer2peer_enabled(dir, dim)) continue;
       CUmemGenericAllocationHandle h;
       const auto &peer = remote_export[dim][dir];
@@ -173,15 +241,49 @@ namespace quda
               "MNNVL P2P import: local=%p peer=%p size=%zu generation=%lu dim=%d dir=%d\n", local,
               (void *)peer_ptr, map_size, (unsigned long)peer.generation, dim, dir);
 #else
-      remote[dim][dir] = nvshmem_ptr(static_cast<char *>(local), comm_neighbor_rank(dir, dim));
+      if (!comm_peer2peer_enabled(dir, dim)) continue;
+      CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dim][dir], cudaIpcMemLazyEnablePeerAccess));
 #endif
     }
     if (num_dir == 1) remote[dim][1] = remote[dim][0];
   }
 }
 
-#ifndef NVSHMEM_COMMS
-void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
+  // NVSHMEM-transport neighbour pointer: nvshmem_ptr of the peer's SYMMETRIC
+  // recv buffer (the Shmem direct-NVLink put destination).  No-op when not
+  // built with NVSHMEM.  Kept strictly separate from the P2P import above so a
+  // single pointer family never means both "NVSHMEM symmetric remote" and
+  // "QUDA P2P import".
+  void comm_create_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
+  {
+#ifdef NVSHMEM_COMMS
+    // With NVSHMEM disabled at runtime, `local` is a DeviceCommBuffer (not a
+    // symmetric-heap pointer), so nvshmem_ptr() on it is invalid; the symmetric
+    // remote pointer is unused on the non-shmem transport anyway.  No-op.
+    if (!comm_nvshmem_enabled()) {
+      for (int dim = 0; dim < 4; ++dim)
+        for (int dir = 0; dir < 2; ++dir) remote[dim][dir] = nullptr;
+      return;
+    }
+    for (int dim = 0; dim < 4; ++dim) {
+      const int num_dir = comm_neighbor_p2p_num_dir(dim);
+      for (int dir = 0; dir < num_dir; dir++) {
+        remote[dim][dir] = nvshmem_ptr(static_cast<char *>(local), comm_neighbor_rank(dir, dim));
+      }
+      if (num_dir == 1) remote[dim][1] = remote[dim][0];
+    }
+#else
+    // not an NVSHMEM build -- the symmetric remote pointer is unused.
+    for (int dim = 0; dim < 4; ++dim)
+      for (int dir = 0; dir < 2; ++dir) remote[dim][dir] = nullptr;
+#endif
+  }
+
+// Tear down a QUDA-owned P2P neighbour mapping created by
+// comm_create_neighbor_memory_p2p.  Symmetric with create: compiled in ALL
+// builds (including NVSHMEM) so the P2P imports made under NVSHMEM are released.
+#ifdef QUDA_MNNVL
+void comm_destroy_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
 {
   for (int dim = 0; dim < 4; ++dim) {
     if (comm_dim(dim) == 1) continue;
@@ -218,6 +320,31 @@ void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
 #else
 void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
 #endif
+    return;
+  }
+
+  qudaDeviceSynchronize();
+  comm_barrier();
+  for (int b = 0; b < 2; b++) {
+    comm_destroy_neighbor_memory_p2p(flag_buffer_remote_d[b]);
+    if (flag_buffer_d[b]) {
+      device_comm_buffer_free(flag_buffer_d[b]);
+      flag_buffer_d[b] = nullptr;
+    }
+  }
+  qudaDeviceSynchronize();
+  comm_barrier();
+  stream_gated_comms_init = false;
+
+#ifdef QUDA_MNNVL
+  // This runs right after destroyIPCComms() (ghost P2P imports) + the flag-buffer
+  // teardown above, so every QUDA P2P import for this communicator is released:
+  // the registry must be empty.  A leftover entry is a leaked VMM mapping.
+  if (!p2p_remote_mappings.empty())
+    errorQuda("comm_destroy_stream_gated_comms: %zu imported P2P mapping(s) still outstanding",
+              p2p_remote_mappings.size());
+#endif
+}
 
 void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                 array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)

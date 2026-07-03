@@ -282,24 +282,33 @@ namespace quda
   int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid);
 
   /**
-     @brief Symmetric exchange of local memory addresses between
-     logically neighboring processes on the lattice.  The remote
-     addresses that are returned are directly addressable by the local
-     process and can be read or written to by a kernel, or can be
-     copied to and from.  This exchange is only defined between
-     devices that are peer-to-peer enabled.
-     @param[out] remote Array of remote memory pointers to neighboring
-     pointers
+     @brief QUDA-owned P2P exchange of local memory addresses between
+     logically neighboring processes.  Exchanges a SINGLE fabric (MNNVL) or
+     cudaIPC (non-IMEX) handle for the local contiguous P2P buffer and imports
+     the peer's, so P2P writes target a single-allocation, RDMA-capable buffer.
+     Compiled in ALL builds (including NVSHMEM) -- under NVSHMEM the symmetric
+     heap does not give a reusable single-handle export, so P2P owns its own
+     DeviceCommBuffer.  Only defined between peer-to-peer-enabled devices.
+     @param[out] remote Array of remote memory pointers to neighboring pointers
      @param[in] local The process-local memory pointer to be exchanged
-     from this process
   */
-  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
+  void comm_create_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
   /**
-     @brief Deallocate the remote addresses to logically neighboring
-     processes on the on the lattice.
-     @param[in] remote Array of remote memory pointers to neighboring
-     pointers
+     @brief NVSHMEM-transport neighbor pointer (nvshmem_ptr of the peer's
+     symmetric recv buffer): the Shmem direct-NVLink put destination.  No-op
+     when not built with NVSHMEM.  Kept strictly separate from the P2P import so
+     a single pointer family never means both "NVSHMEM symmetric remote" and
+     "QUDA P2P import".
+     @param[out] remote Array of remote memory pointers to neighboring pointers
+     @param[in] local The process-local symmetric buffer
+  */
+  void comm_create_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
+
+  /**
+     @brief Deallocate the QUDA-owned P2P remote addresses created by
+     comm_create_neighbor_memory_p2p.
+     @param[in] remote Array of remote memory pointers to neighboring pointers
   */
   void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
 

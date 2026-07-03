@@ -32,7 +32,19 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
+  // Forward (dir 0) and backward (dir 1) neighbours share ONE IPC mapping (alias)
+  // only for a size-2, non-C-star dim with P2P enabled both ways; otherwise each
+  // direction is a distinct mapping.  create and destroy MUST use this identical
+  // predicate -- a size-2 C-star dim opens two mappings, so teardown must close both.
+  inline int comm_neighbor_p2p_num_dir(int dim)
+  {
+    return (!comm_dim_cstar(dim) && comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim)
+            && comm_peer2peer_enabled(1, dim)) ?
+      1 :
+      2;
+  }
+
+  void comm_create_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
   {
     // handles for obtained ghost pointers
     hipIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
@@ -70,11 +82,7 @@ namespace quda
     // open the remote memory handles and set the send ghost pointers
     for (int dim = 0; dim < 4; ++dim) {
       if (comm_dim(dim) == 1) continue;
-      // even if comm_dim(dim) == 2, we might not have p2p enabled in both directions, so check this
-      const int num_dir = (!comm_dim_cstar(dim) && comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim)
-                           && comm_peer2peer_enabled(1, dim)) ?
-        1 :
-        2;
+      const int num_dir = comm_neighbor_p2p_num_dir(dim);
       for (int dir = 0; dir < num_dir; ++dir) {
         remote[dim][dir] = nullptr;
         if (!comm_peer2peer_enabled(dir, dim)) continue;
@@ -84,24 +92,39 @@ namespace quda
     }
   }
 
-  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
+  void comm_destroy_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
   {
     for (int dim = 0; dim < 4; ++dim) {
-
       if (comm_dim(dim) == 1) continue;
-      const int num_dir
-        = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
-
-      if (comm_peer2peer_enabled(1, dim)) {
-        // only close this handle if it doesn't alias the back ghost
-        if (num_dir == 2 && remote[dim][1]) CHECK_HIP_ERROR(hipIpcCloseMemHandle(remote[dim][1]));
+      // Same predicate as create: num_dir==1 means [dim][1] aliases [dim][0] (close
+      // once); a size-2 C-star dim gives num_dir==2 (two distinct handles, close both).
+      const int num_dir = comm_neighbor_p2p_num_dir(dim);
+      for (int dir = 0; dir < num_dir; ++dir) {
+        if (!comm_peer2peer_enabled(dir, dim)) continue;
+        if (!remote[dim][dir]) continue;
+        CHECK_HIP_ERROR(hipIpcCloseMemHandle(remote[dim][dir]));
+        remote[dim][dir] = nullptr;
       }
-
-      if (comm_peer2peer_enabled(0, dim)) {
-        if (remote[dim][0]) CHECK_HIP_ERROR(hipIpcCloseMemHandle(remote[dim][0]));
-      }
-    } // iterate over dim
+      if (num_dir == 1) remote[dim][1] = nullptr; // aliased to [dim][0], already closed
+    }
   }
+
+  // HIP keeps the cudaIPC/event protocol and never builds with NVSHMEM, so the
+  // NVSHMEM-transport neighbor pointer functions are no-ops (defined for symmetry
+  // with the unified comm API).
+  void comm_create_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *)
+  {
+    for (int dim = 0; dim < 4; ++dim)
+      for (int dir = 0; dir < 2; ++dir) remote[dim][dir] = nullptr;
+  }
+
+  void comm_destroy_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
+
+  // Stream-gated signalling is not wired on the HIP backend
+  // (comm::p2p_signal_supported(STREAM_GATED) == false), so the resolver never
+  // selects it and these are no-ops.
+  void comm_create_stream_gated_comms() { }
+  void comm_destroy_stream_gated_comms() { }
 
   void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)

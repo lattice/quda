@@ -744,8 +744,29 @@ namespace quda
 
   void *const *ColorSpinorField::Ghost() const { return ghost_buf.data; }
 
-  const void *ColorSpinorField::Ghost2() const
+  const void *ColorSpinorField::Ghost2() const { return Ghost2P2P(); }
+
+  const void *ColorSpinorField::Ghost2P2P() const
   {
+    // Device dslash halo read base for the NON-shmem transports (P2P / GDR /
+    // MPI-host-staged): all of these deposit the halo into the contiguous P2P
+    // recv buffer (peer P2P writes, GDR NIC writes, unpackGhost staging).
+    // Aliases the symmetric buffer in non-NVSHMEM builds.
+    if (Location() == QUDA_CPU_FIELD_LOCATION) {
+      return nullptr;
+    } else {
+      if (bufferIndex < 2) {
+        return ghost_recv_buffer_p2p_d[bufferIndex];
+      } else {
+        return ghost_pinned_recv_buffer_hd[bufferIndex % 2];
+      }
+    }
+  }
+
+  const void *ColorSpinorField::Ghost2Shmem() const
+  {
+    // Device dslash halo read base for the NVSHMEM transport: the halo lands in
+    // the SYMMETRIC recv buffer (nvshmem_putmem destination).
     if (Location() == QUDA_CPU_FIELD_LOCATION) {
       return nullptr;
     } else {
@@ -1024,13 +1045,14 @@ namespace quda
       for (int dir = 0; dir < 2; dir++) {
         switch (location[2 * dim + dir]) {
 
-        case Device: // pack to local device buffer
-          packBuffer[2 * dim + dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+        case Device: // pack to local device buffer (P2P copy-engine / GDR send source)
+          packBuffer[2 * dim + dir] = my_face_dim_dir_p2p_d[bufferIndex][dim][dir];
           packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = nullptr;
           break;
         case Shmem:
-          // this is the remote buffer when using shmem ...
-          // if the ghost_remote_send_buffer_d exists we can directly use it
+          // NVSHMEM transport: stays on the SYMMETRIC buffers (nvshmem_ptr remote,
+          // symmetric recv, symmetric local source) -- never the P2P buffers.
+          // if the (symmetric) nvshmem_ptr remote exists we can directly use it
           // - else we need pack locally and send data to the recv buffer
           packBuffer[2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
             static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
@@ -1042,9 +1064,9 @@ namespace quda
         case Host: // pack to zero-copy memory
           packBuffer[2 * dim + dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
-        case Remote: // pack to remote peer memory
+        case Remote: // pack to remote peer memory (P2P: imported peer contiguous recv)
           packBuffer[2 * dim + dir]
-            = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
+            = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
           break;
         default: errorQuda("Undefined location %d", location[2 * dim + dir]);
         }
@@ -1070,8 +1092,11 @@ namespace quda
                                    const qudaStream_t &stream) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
-    void *gpu_buf
-      = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
+    // Source matches the non-shmem (Device) pack target, which packs into the
+    // contiguous P2P send buffer (packGhost Device case).  Aliases the symmetric
+    // buffer in non-NVSHMEM builds.
+    void *gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_p2p_d[bufferIndex][dim][0] :
+                                              my_face_dim_dir_p2p_d[bufferIndex][dim][1];
     qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], qudaMemcpyDeviceToHost, stream);
   }
 
@@ -1081,7 +1106,11 @@ namespace quda
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     const void *src = ghost_spinor;
     auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
-    void *ghost_dst = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+    // Non-shmem (MPI/host-staged) recv: land in the contiguous P2P recv buffer,
+    // which is where the non-shmem dslash reads its halo (Ghost2P2P / scatter
+    // early-returns for genuine P2P dirs).  Aliases the symmetric buffer in
+    // non-NVSHMEM builds.
+    void *ghost_dst = static_cast<char *>(ghost_recv_buffer_p2p_d[bufferIndex]) + offset;
 
     qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], qudaMemcpyHostToDevice, stream);
   }
@@ -1144,11 +1173,12 @@ namespace quda
 
       // if not using copy engine then the packing kernel will remotely write the halos
       if (!remote_write) {
-        // all goes here
+        // P2P copy-engine: source = local contiguous P2P send buffer, dest =
+        // imported peer contiguous P2P recv buffer.
         void *ghost_dst
-          = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+          = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
 
-        qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
+        qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_p2p_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
       comm_p2p_signal_send_done(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, stream, QudaP2PSignal::REMOTE_IPC);
@@ -1311,11 +1341,14 @@ namespace quda
         void *send[4 * QUDA_MAX_DIM];
         for (int d = 0; d < nDimComms; d++) {
           for (int dir = 0; dir < 2; dir++) {
+            // Non-shmem exchange: device send/recv use the contiguous P2P
+            // buffers (P2P/GDR/MPI-staged); Host stays host-mapped.  Alias the
+            // symmetric buffers in non-NVSHMEM builds.
             send[2 * d + dir] = pack_destination[2 * d + dir] == Host ? my_face_dim_dir_hd[bufferIndex][d][dir] :
-                                                                        my_face_dim_dir_d[bufferIndex][d][dir];
+                                                                        my_face_dim_dir_p2p_d[bufferIndex][d][dir];
             send[2 * QUDA_MAX_DIM + 2 * d + dir] = nullptr;
             ghost_buf[2 * d + dir] = halo_location[2 * d + dir] == Host ? from_face_dim_dir_hd[bufferIndex][d][dir] :
-                                                                          from_face_dim_dir_d[bufferIndex][d][dir];
+                                                                          from_face_dim_dir_p2p_d[bufferIndex][d][dir];
           }
 
           // if doing p2p, then we must pack to and load the halo from device memory
@@ -1356,20 +1389,22 @@ namespace quda
                 if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
                     && // fuse forwards and backwards if possible
                     pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
-                  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
+                  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_p2p_d[bufferIndex][i][0],
                                   2 * ghost_face_bytes_aligned[i], qudaMemcpyDeviceToHost, device::get_default_stream());
                 } else {
                   if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
-                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
+                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_p2p_d[bufferIndex][i][0],
                                     ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
                   if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
+                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_p2p_d[bufferIndex][i][1],
                                     ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
                 }
               }
             }
           } else if (total_bytes && !pack_host) {
-            qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes,
+            // fused D->H of the whole (non-shmem) send buffer -- contiguous P2P
+            // send base (aliases symmetric in non-NVSHMEM builds).
+            qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_p2p_d[bufferIndex], total_bytes,
                             qudaMemcpyDeviceToHost, device::get_default_stream());
           }
         }
@@ -1422,20 +1457,22 @@ namespace quda
                 if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
                     && // fuse forwards and backwards if possible
                     halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
-                  qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+                  qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                                   2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice, device::get_default_stream());
                 } else {
                   if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
-                    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+                    qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                                     ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
                   if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
+                    qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
                                     ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
                 }
               }
             }
           } else if (total_bytes && !halo_host) {
-            qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
+            // fused H->D into the whole (non-shmem) recv buffer -- contiguous
+            // P2P recv base (aliases symmetric in non-NVSHMEM builds).
+            qudaMemcpyAsync(ghost_recv_buffer_p2p_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
                             qudaMemcpyHostToDevice, device::get_default_stream());
           }
         }

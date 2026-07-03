@@ -503,6 +503,62 @@ namespace quda {
     }
   }
 
+  void GaugeField::sendStartStream(int dim, int dir, const qudaStream_t &stream)
+  {
+    if (!comm_dim_partitioned(dim)) return;
+    if (!comm_peer2peer_enabled(dir, dim))
+      errorQuda("sendStartStream requires peer-to-peer enabled for (dir=%d, dim=%d)", dir, dim);
+
+    void *ghost_dst
+      = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+    qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_p2p_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
+    // Diagnostic-only synchronization point for isolating an intermittent MNNVL
+    // hang.  "copy" blocks before the remote doorbell write, while "signal"
+    // blocks after it.  Unset in production, this adds no synchronization.
+    if (gauge_p2p_diagnostic_sync() == GaugeP2PDiagnosticSync::COPY) qudaStreamSynchronize(stream);
+    // Gauge halo exchange is not autotuned, so it takes the globally resolved
+    // signalling transport: event IPC records the CUDA/HIP event and starts
+    // the MPI doorbell; stream-gated writes the peer signal slot.
+    comm_p2p_signal_send_done(FieldKind::GAUGE, bufferIndex, dim, dir, stream, comm::p2p_signal());
+    if (gauge_p2p_diagnostic_sync() == GaugeP2PDiagnosticSync::SIGNAL) qudaStreamSynchronize(stream);
+  }
+
+  void GaugeField::commsWaitStream(int dim, int dir, const qudaStream_t &stream)
+  {
+    if (!comm_dim_partitioned(dim)) return;
+    if (!comm_peer2peer_enabled(1 - dir, dim))
+      errorQuda("commsWaitStream requires peer-to-peer enabled for receive (1-dir=%d, dim=%d)", 1 - dir, dim);
+
+    comm_p2p_wait_recv_signal(FieldKind::GAUGE, bufferIndex, dim, 1 - dir, stream, comm::p2p_signal());
+  }
+
+  // Per-exchange events lazily initialised on first call.  extractEndEvent is
+  // recorded on the default stream after extractGaugeGhost(extract=true).
+  // sendDoneEvent records each P2P copy+signal; the default stream merges them
+  // and records sendEndEvent, which every stream-gated receive waits on before
+  // entering WaitValue.  This CUDA-visible dependency prevents cross-stream
+  // scheduler cycles.  scatterDoneEvent is recorded after the receive wait or
+  // post-recv H2D copy, and the default stream waits on it before injection.
+  namespace {
+    qudaEvent_t gauge_extractEndEvent;
+    qudaEvent_t gauge_extractDoneEvent[QUDA_MAX_DIM];
+    qudaEvent_t gauge_sendDoneEvent[QUDA_MAX_DIM * 2];
+    qudaEvent_t gauge_sendEndEvent;
+    qudaEvent_t gauge_scatterDoneEvent[QUDA_MAX_DIM * 2];
+    bool gauge_exchange_events_initialised = false;
+
+    void ensure_gauge_exchange_events()
+    {
+      if (gauge_exchange_events_initialised) return;
+      gauge_extractEndEvent = qudaEventCreate();
+      for (int i = 0; i < QUDA_MAX_DIM; ++i) gauge_extractDoneEvent[i] = qudaEventCreate();
+      for (int i = 0; i < QUDA_MAX_DIM * 2; ++i) gauge_sendDoneEvent[i] = qudaEventCreate();
+      gauge_sendEndEvent = qudaEventCreate();
+      for (int i = 0; i < QUDA_MAX_DIM * 2; ++i) gauge_scatterDoneEvent[i] = qudaEventCreate();
+      gauge_exchange_events_initialised = true;
+    }
+  }
+
   // This does the exchange of the forwards boundary gauge field ghost zone and places
   // it into the ghost array of the next node
   void GaugeField::exchangeGhost(QudaLinkDirection link_direction)
@@ -533,9 +589,9 @@ namespace quda {
 
         size_t offset = 0;
         for (int d = 0; d < nDim; d++) {
-          recv_d[d] = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+          recv_d[d] = static_cast<char *>(ghost_recv_buffer_p2p_d[bufferIndex]) + offset;
           if (bidir) offset += ghost_face_bytes_aligned[d];
-          send_d[d] = static_cast<char *>(ghost_send_buffer_d[bufferIndex]) + offset;
+          send_d[d] = static_cast<char *>(ghost_send_buffer_p2p_d[bufferIndex]) + offset;
           offset += ghost_face_bytes_aligned[d];
         }
 
@@ -551,10 +607,21 @@ namespace quda {
         // them unconditionally is safe.
         for (int dim = 0; dim < nDim; dim++) {
           if (!comm_dim_partitioned(dim)) continue;
-          recvStart(dim, dir); // prepost the receive
-          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
-            qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-                            ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+
+          qudaStreamWaitEvent(device::get_stream(2 * dim + dir), gauge_extractEndEvent, 0);
+          recvStart(dim, dir); // no-op for P2P recv, MPI/GDR doorbell otherwise
+
+          if (comm_peer2peer_enabled(dir, dim)) {
+            sendStartStream(dim, dir, device::get_stream(2 * dim + dir));
+            if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED)
+              qudaEventRecord(gauge_sendDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
+          } else {
+            if (!comm_gdr_enabled()) {
+              qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_p2p_d[bufferIndex][dim][dir],
+                              ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+              qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+            }
+            sendStart(dim, dir, device::get_stream(2 * dim + dir));
           }
         }
 
@@ -592,7 +659,7 @@ namespace quda {
           }
           commsComplete(dim, dir); // host MPI_Wait for non-P2P sides only
           if (!comm_peer2peer_enabled(1 - dir, dim) && !comm_gdr_enabled()) {
-            qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir],
+            qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][dim][1 - dir],
                             from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
                             qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
           }
@@ -680,10 +747,10 @@ namespace quda {
         size_t offset = 0;
         for (int d = 0; d < nDim; d++) {
           // send backwards is first half of each ghost_send_buffer
-          send_d[d] = static_cast<char *>(ghost_send_buffer_d[bufferIndex]) + offset;
+          send_d[d] = static_cast<char *>(ghost_send_buffer_p2p_d[bufferIndex]) + offset;
           if (bidir) offset += ghost_face_bytes_aligned[d];
           // receive from forwards is the second half of each ghost_recv_buffer
-          recv_d[d] = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+          recv_d[d] = static_cast<char *>(ghost_recv_buffer_p2p_d[bufferIndex]) + offset;
           offset += ghost_face_bytes_aligned[d];
         }
 
@@ -701,10 +768,29 @@ namespace quda {
         // decision (stream-gated for P2P-able, MPI/GDR otherwise).
         for (int dim = 0; dim < nDim; dim++) {
           if (!comm_dim_partitioned(dim)) continue;
-          recvStart(dim, dir); // prepost the receive
-          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
-            qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-                            ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+          qudaStreamWaitEvent(device::get_stream(2 * dim + dir), gauge_extractEndEvent, 0);
+          recvStart(dim, dir);
+
+          if (comm_peer2peer_enabled(dir, dim)) {
+            sendStartStream(dim, dir, device::get_stream(2 * dim + dir));
+            if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED)
+              qudaEventRecord(gauge_sendDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
+          } else {
+            if (!comm_gdr_enabled()) {
+              qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_p2p_d[bufferIndex][dim][dir],
+                              ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+              qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+            }
+            sendStart(dim, dir, device::get_stream(2 * dim + dir));
+          }
+        }
+
+        bool stream_gated_send_barrier = false;
+        if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED) {
+          for (int send_dim = 0; send_dim < nDim; ++send_dim) {
+            if (!comm_dim_partitioned(send_dim) || !comm_peer2peer_enabled(dir, send_dim)) continue;
+            qudaStreamWaitEvent(device::get_default_stream(), gauge_sendDoneEvent[2 * send_dim + dir], 0);
+            stream_gated_send_barrier = true;
           }
           if (stream_gated_send_barrier) qudaEventRecord(gauge_sendEndEvent, device::get_default_stream());
         }
@@ -722,7 +808,7 @@ namespace quda {
           }
           commsComplete(dim, dir);
           if (!comm_peer2peer_enabled(1 - dir, dim) && !comm_gdr_enabled()) {
-            qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir],
+            qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][dim][1 - dir],
                             from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
                             qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
           }
@@ -738,14 +824,10 @@ namespace quda {
             qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
           }
         }
-
-        // get the links into contiguous buffers
         extractGaugeGhost(*this, recv_d, false, link_dir * nDim);
 
         bufferIndex = 1 - bufferIndex;
       } // link_dir
-
-      qudaDeviceSynchronize();
     } else {
       void *recv[QUDA_MAX_DIM];
       for (int d = 0; d < nDim; d++) recv[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
@@ -774,8 +856,8 @@ namespace quda {
       size_t offset = 0;
       for (int dim = 0; dim < nDim; dim++) {
         if (!(comm_dim_partitioned(dim) || (no_comms_fill && R[dim]))) continue;
-        send_d[dim] = static_cast<char *>(ghost_send_buffer_d[b]) + offset;
-        recv_d[dim] = static_cast<char *>(ghost_recv_buffer_d[b]) + offset;
+        send_d[dim] = static_cast<char *>(ghost_send_buffer_p2p_d[b]) + offset;
+        recv_d[dim] = static_cast<char *>(ghost_recv_buffer_p2p_d[b]) + offset;
 
         // silence cuda-memcheck initcheck errors that arise since we
         // have an oversized ghost buffer when doing the extended exchange
@@ -817,7 +899,7 @@ namespace quda {
         } else { // if just doing a local exchange to fill halo then need to swap faces
           qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0], ghost_face_bytes[dim],
                      qudaMemcpyDeviceToDevice);
-          qudaMemcpy(from_face_dim_dir_d[b][dim][0], my_face_dim_dir_d[b][dim][1], ghost_face_bytes[dim],
+          qudaMemcpy(from_face_dim_dir_p2p_d[b][dim][0], my_face_dim_dir_p2p_d[b][dim][1], ghost_face_bytes[dim],
                      qudaMemcpyDeviceToDevice);
         }
 

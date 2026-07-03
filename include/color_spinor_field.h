@@ -735,6 +735,19 @@ namespace quda
     const void *Ghost2() const;
 
     /**
+       @brief Device halo read base for the non-shmem transports (P2P/GDR/
+       MPI-host-staged): the contiguous P2P recv buffer.  Aliases the symmetric
+       buffer in non-NVSHMEM builds.
+     */
+    const void *Ghost2P2P() const;
+
+    /**
+       @brief Device halo read base for the NVSHMEM transport: the symmetric recv
+       buffer (nvshmem_putmem destination).
+     */
+    const void *Ghost2Shmem() const;
+
+    /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */
     void *const *Ghost() const;
