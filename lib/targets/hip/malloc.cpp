@@ -488,16 +488,15 @@ namespace quda
     printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
     printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
     //    printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
-    printfQuda("Device comm buffer memory used = %.1f MiB\n",
-               max_total_bytes[DEVICE_COMM_BUFFER] / (double)(1 << 20));
+    printfQuda("Device comm buffer memory used = %.1f MiB\n", max_total_bytes[DEVICE_COMM_BUFFER] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
     printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
 
   void assertAllMemFree()
   {
-    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty()
-        || !alloc[HOST_PINNED].empty() || !alloc[DEVICE_COMM_BUFFER].empty()) {
+    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty() || !alloc[HOST_PINNED].empty()
+        || !alloc[DEVICE_COMM_BUFFER].empty()) {
       warningQuda("The following internal memory allocations were not freed.");
       printfQuda("\n");
       print_alloc_header();

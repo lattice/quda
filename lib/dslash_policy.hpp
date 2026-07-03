@@ -419,7 +419,9 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -453,7 +455,8 @@ namespace quda
                 if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                   // Stream-mem-op signalling: queues qudaMemcpyP2PAsync + cuStreamWriteValue64
                   // on the per-direction stream.  No cudaIPC event, no MPI doorbell.
-                  PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                  PROFILE(if (dslash_comms)
+                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(
@@ -475,8 +478,8 @@ namespace quda
                 // to commsComplete (MPI) below -- stream-gating only ever applies to genuinely
                 // P2P-enabled directions.
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 // The matching send to "dir" may itself be non-P2P (MPI): poll it to completion
@@ -533,7 +536,6 @@ namespace quda
       PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
-
 
   /**
      Generic shmem dslash
@@ -618,7 +620,9 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -654,7 +658,8 @@ namespace quda
                   // on the per-direction stream 2*i+dir.  issueGather already inserted a
                   // qudaStreamWaitEvent(packEnd) on that stream, so the P2P copy serializes
                   // with the pack output but runs in parallel with the other directions.
-                  PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                  PROFILE(if (dslash_comms)
+                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(
@@ -698,7 +703,7 @@ namespace quda
         if (!dslashParam.commDim[i]) continue;
         const bool has_non_p2p = !comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i);
         const bool has_stream_gated = (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)
-            && (comm_peer2peer_enabled(0, i) || comm_peer2peer_enabled(1, i));
+          && (comm_peer2peer_enabled(0, i) || comm_peer2peer_enabled(1, i));
         if (has_non_p2p || has_stream_gated) {
           PROFILE(qudaEventRecord(scatterEnd[0], device::get_stream(scatterIndex)), profile, QUDA_PROFILE_EVENT_RECORD);
           PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -739,7 +744,9 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, true, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, true,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -763,7 +770,8 @@ namespace quda
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op P2P send on the per-direction stream (packEnd synced above).
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -794,12 +802,12 @@ namespace quda
                 // wait).  Queue ONCE (GPU-side).  Non-P2P receive dirs use device GDR and fall
                 // through to commsComplete; the matching send to "dir" may be non-P2P -> poll it.
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
-                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_EVENT_RECORD);
-                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0),
-                          profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_EVENT_RECORD);
+                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
+                          QUDA_PROFILE_STREAM_WAIT_EVENT);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, true)) {
@@ -853,7 +861,9 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, true, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, true,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -879,7 +889,8 @@ namespace quda
                 // Stream-mem-op P2P send on per-direction stream so memcpyP2Ps
                 // across directions run in parallel.  Host already synced packEnd
                 // above so the per-dir stream's buffer is ready.
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -914,12 +925,12 @@ namespace quda
                 // receive neighbour is (1 - dir) so non-P2P receive dirs fall through to
                 // commsComplete (MPI) below.
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
-                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_EVENT_RECORD);
-                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0),
-                          profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_EVENT_RECORD);
+                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
+                          QUDA_PROFILE_STREAM_WAIT_EVENT);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 // The matching send to "dir" may be non-P2P (GDR/MPI): poll it to completion as
@@ -969,7 +980,9 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, true, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, true,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -1001,7 +1014,8 @@ namespace quda
                 pattern.completeSum++;
                 if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                   // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
-                  PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                  PROFILE(if (dslash_comms)
+                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(
@@ -1020,12 +1034,12 @@ namespace quda
                 // ipcRemoteCopyEvent wait).  Queue ONCE.  Non-P2P recv dirs use device GDR and
                 // fall through to commsComplete; the matching non-P2P send is polled (gdr=false).
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
-                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_EVENT_RECORD);
-                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0),
-                          profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_EVENT_RECORD);
+                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
+                          QUDA_PROFILE_STREAM_WAIT_EVENT);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -1079,7 +1093,9 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, true, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, true,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -1111,7 +1127,8 @@ namespace quda
                 pattern.completeSum++;
                 if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                   // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
-                  PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                  PROFILE(if (dslash_comms)
+                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(2 * i + dir,
@@ -1131,12 +1148,12 @@ namespace quda
                 // Queue ONCE.  Non-P2P recv dirs use device GDR and fall through to commsComplete;
                 // the matching non-P2P send is polled (gdr=false).
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
-                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_EVENT_RECORD);
-                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0),
-                          profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_EVENT_RECORD);
+                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
+                          QUDA_PROFILE_STREAM_WAIT_EVENT);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -1189,7 +1206,9 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[halo.bufferIndex], device::get_default_stream()), profile,
               QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[halo.bufferIndex], 0), profile,
@@ -1217,7 +1236,8 @@ namespace quda
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1249,8 +1269,8 @@ namespace quda
                 // send to "dir" may be non-P2P (MPI) on a partitioned dim, so poll it to drain
                 // its persistent request.
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -1330,7 +1350,9 @@ namespace quda
       issuePack(halo, in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
                 packScatterIndex);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(device::get_default_stream());
@@ -1351,7 +1373,8 @@ namespace quda
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1406,7 +1429,7 @@ namespace quda
         if (!dslashParam.commDim[i]) continue;
         const bool has_non_p2p = !comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i);
         const bool has_stream_gated = (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)
-            && (comm_peer2peer_enabled(0, i) || comm_peer2peer_enabled(1, i));
+          && (comm_peer2peer_enabled(0, i) || comm_peer2peer_enabled(1, i));
         if (has_non_p2p || has_stream_gated) {
           // post an event in the scatter stream and wait on that
           PROFILE(qudaEventRecord(scatterEnd[0], device::get_stream(packScatterIndex)), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1450,7 +1473,9 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[halo.bufferIndex], device::get_default_stream()), profile,
               QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(halo, dslash, true, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, true,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[halo.bufferIndex], 0), profile,
@@ -1478,7 +1503,8 @@ namespace quda
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1510,12 +1536,12 @@ namespace quda
                 // ipcRemoteCopyEvent wait).  Queue ONCE.  Non-P2P recv dirs use device GDR and
                 // fall through to commsComplete; the matching non-P2P send is polled (gdr=false).
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
-                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_EVENT_RECORD);
-                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0),
-                          profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_EVENT_RECORD);
+                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
+                          QUDA_PROFILE_STREAM_WAIT_EVENT);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -1581,7 +1607,9 @@ namespace quda
       issuePack(halo, in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
                 packIndex);
 
-      issueRecv(halo, dslash, true, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, true,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(device::get_default_stream());
@@ -1602,7 +1630,8 @@ namespace quda
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1634,12 +1663,12 @@ namespace quda
                 // Queue ONCE.  Non-P2P recv dirs use device GDR and fall through to commsComplete;
                 // the matching non-P2P send is polled (gdr=false).
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
-                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_EVENT_RECORD);
-                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0),
-                          profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_EVENT_RECORD);
+                  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
+                          QUDA_PROFILE_STREAM_WAIT_EVENT);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -1692,7 +1721,9 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[halo.bufferIndex], device::get_default_stream()), profile,
               QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[halo.bufferIndex], 0), profile,
@@ -1720,7 +1751,8 @@ namespace quda
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1753,8 +1785,8 @@ namespace quda
                 // its persistent request.  For P2P dirs the recv data lands in the DEVICE ghost
                 // (pack() forces device for P2P dirs); only non-P2P dirs read the mapped host ghost.
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -1779,9 +1811,10 @@ namespace quda
               const bool peer_dir = comm_peer2peer_enabled(1 - dir, i);
               const bool need_merge = (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && peer_dir;
               if (need_merge) {
-                PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile, QUDA_PROFILE_EVENT_RECORD);
+                PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                        QUDA_PROFILE_EVENT_RECORD);
                 PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
-                    QUDA_PROFILE_STREAM_WAIT_EVENT);
+                        QUDA_PROFILE_STREAM_WAIT_EVENT);
               }
             }
 
@@ -1799,8 +1832,7 @@ namespace quda
 
       // Stream-gated P2P has no ipcCopyEvent; drain the per-dir P2P streams into the
       // compute stream so buffer reuse next apply can't race this apply's traffic.
-      if (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)
-        completeDslashStreamGated(halo, dslashParam);
+      if (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) completeDslashStreamGated(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
       PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
@@ -1826,7 +1858,9 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[halo.bufferIndex], device::get_default_stream()), profile,
               QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[halo.bufferIndex], 0), profile,
@@ -1854,7 +1888,8 @@ namespace quda
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                PROFILE(if (dslash_comms)
+                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1886,8 +1921,8 @@ namespace quda
                 // dirs the recv data lands in the DEVICE ghost (pack() forces device for P2P dirs);
                 // non-P2P receive dirs read the mapped host ghost and fall through to commsComplete.
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(packIndex)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(packIndex)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -1909,10 +1944,11 @@ namespace quda
       for (int i = 3; i >= 0; i--) {
         if (!dslashParam.commDim[i]) continue;
         const bool has_stream_gated = (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)
-            && (comm_peer2peer_enabled(0, i) || comm_peer2peer_enabled(1, i));
+          && (comm_peer2peer_enabled(0, i) || comm_peer2peer_enabled(1, i));
         if (has_stream_gated) {
           PROFILE(qudaEventRecord(scatterEnd[0], device::get_stream(packIndex)), profile, QUDA_PROFILE_EVENT_RECORD);
-          PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+          PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[0], 0), profile,
+                  QUDA_PROFILE_STREAM_WAIT_EVENT);
           break;
         }
       }
@@ -1955,7 +1991,9 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[halo.bufferIndex], device::get_default_stream()), profile,
               QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       MemoryLocation location = static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
       dslash.setPack(true, location); // enable fused kernel packing
@@ -1984,10 +2022,10 @@ namespace quda
                 // remote_write the signal goes on the default stream (ordered after the write);
                 // for copy-engine it goes on the per-dir stream (the default stream was synced
                 // above so the memcpy source is ready).  No cudaIPC event / MPI doorbell.
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir,
-                                                               dslashParam.remote_write ? device::get_default_stream() :
-                                                                                          device::get_stream(2 * i + dir),
-                                                               dslashParam.remote_write),
+                PROFILE(if (dslash_comms) halo.sendStartStream(
+                          2 * i + dir,
+                          dslashParam.remote_write ? device::get_default_stream() : device::get_stream(2 * i + dir),
+                          dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(2 * i + dir,
@@ -2020,8 +2058,8 @@ namespace quda
                 // recv data lands in the DEVICE ghost (pack() forces device for P2P dirs); only
                 // non-P2P dirs read the mapped host ghost (and fall through to commsComplete).
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -2046,9 +2084,10 @@ namespace quda
               const bool peer_dir = comm_peer2peer_enabled(1 - dir, i);
               const bool need_merge = (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && peer_dir;
               if (need_merge) {
-                PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile, QUDA_PROFILE_EVENT_RECORD);
+                PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                        QUDA_PROFILE_EVENT_RECORD);
                 PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
-                    QUDA_PROFILE_STREAM_WAIT_EVENT);
+                        QUDA_PROFILE_STREAM_WAIT_EVENT);
               }
             }
 
@@ -2091,7 +2130,9 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[halo.bufferIndex], device::get_default_stream()), profile,
               QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
+      issueRecv(halo, dslash, false,
+                (dslashParam.p2p_signal
+                 == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       MemoryLocation location = static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
       dslash.setPack(true, location); // enable fused kernel packing
@@ -2120,10 +2161,10 @@ namespace quda
                 // remote_write the signal goes on the default stream (ordered after the write);
                 // for copy-engine it goes on the per-dir stream (the default stream was synced
                 // above so the memcpy source is ready).  No cudaIPC event / MPI doorbell.
-                PROFILE(if (dslash_comms) halo.sendStartStream(2 * i + dir,
-                                                               dslashParam.remote_write ? device::get_default_stream() :
-                                                                                          device::get_stream(2 * i + dir),
-                                                               dslashParam.remote_write),
+                PROFILE(if (dslash_comms) halo.sendStartStream(
+                          2 * i + dir,
+                          dslashParam.remote_write ? device::get_default_stream() : device::get_stream(2 * i + dir),
+                          dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(2 * i + dir,
@@ -2156,8 +2197,8 @@ namespace quda
                 // P2P dirs the recv data lands in the DEVICE ghost (pack() forces device for P2P
                 // dirs); non-P2P dirs read the mapped host ghost and fall through to commsComplete.
                 if (!stream_recv_queued[2 * i + dir]) {
-                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)),
-                          profile, QUDA_PROFILE_COMMS_QUERY);
+                  PROFILE(if (dslash_comms) halo.commsWaitStream(2 * i + dir, device::get_stream(2 * i + dir)), profile,
+                          QUDA_PROFILE_COMMS_QUERY);
                   stream_recv_queued[2 * i + dir] = true;
                 }
                 if (halo.commsQuerySend(2 * i + dir, false)) {
@@ -2181,9 +2222,10 @@ namespace quda
           if (!dslashParam.commDim[i]) continue;
           for (int dir = 1; dir >= 0; dir--) {
             if (comm_peer2peer_enabled(1 - dir, i)) {
-              PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile, QUDA_PROFILE_EVENT_RECORD);
+              PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile,
+                      QUDA_PROFILE_EVENT_RECORD);
               PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
-                  QUDA_PROFILE_STREAM_WAIT_EVENT);
+                      QUDA_PROFILE_STREAM_WAIT_EVENT);
             }
           }
         }
@@ -2356,7 +2398,8 @@ namespace quda
         // the receiver-side flush guard (CU_STREAM_WAIT_VALUE_FLUSH) is not available on
         // all hardware, so comm_p2p_remote_write_supported() drops REMOTE_WRITE where it
         // would be unsafe and the tuner falls back to the copy engine.
-        if ((comm_peer2peer_enabled_global() & 2) && comm_p2p_remote_write_supported()) { // bit 1: remote-write (direct store) policy tuning
+        if ((comm_peer2peer_enabled_global() & 2)
+            && comm_p2p_remote_write_supported()) { // bit 1: remote-write (direct store) policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)]
               = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);

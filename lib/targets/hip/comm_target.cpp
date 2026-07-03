@@ -262,31 +262,25 @@ namespace quda
   // picking it.
   // ============================================================================
 
-  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir,
-                                  const qudaStream_t &stream, QudaP2PSignal signal)
+  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream,
+                                 QudaP2PSignal signal)
   {
     switch (signal) {
-    case QudaP2PSignal::REMOTE_IPC:
-      comm_p2p_signal_send_done(kind, buf, dim, dir, stream);
-      return;
-    case QudaP2PSignal::STREAM_GATED:
-      comm_p2p_stream_signal_send_done(kind, buf, dim, dir, stream);
-      return;
+    case QudaP2PSignal::REMOTE_IPC: comm_p2p_signal_send_done(kind, buf, dim, dir, stream); return;
+    case QudaP2PSignal::STREAM_GATED: comm_p2p_stream_signal_send_done(kind, buf, dim, dir, stream); return;
     }
     errorQuda("comm_p2p_signal_send_done: unknown QudaP2PSignal %d", static_cast<int>(signal));
   }
 
-  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir,
-                                  const qudaStream_t &stream, QudaP2PSignal signal)
+  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream,
+                                 QudaP2PSignal signal)
   {
     switch (signal) {
     case QudaP2PSignal::REMOTE_IPC:
       (void)stream;
       comm_p2p_wait_recv_signal(kind, buf, dim, dir);
       return;
-    case QudaP2PSignal::STREAM_GATED:
-      comm_p2p_stream_wait_recv_signal(kind, buf, dim, dir, stream);
-      return;
+    case QudaP2PSignal::STREAM_GATED: comm_p2p_stream_wait_recv_signal(kind, buf, dim, dir, stream); return;
     }
     errorQuda("comm_p2p_wait_recv_signal: unknown QudaP2PSignal %d", static_cast<int>(signal));
   }
@@ -294,9 +288,7 @@ namespace quda
   void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir, QudaP2PSignal signal)
   {
     switch (signal) {
-    case QudaP2PSignal::REMOTE_IPC:
-      comm_p2p_wait_send_drained(kind, buf, dim, dir);
-      return;
+    case QudaP2PSignal::REMOTE_IPC: comm_p2p_wait_send_drained(kind, buf, dim, dir); return;
     case QudaP2PSignal::STREAM_GATED:
       // STREAM_GATED has no separate "send drained" concept: stream ordering
       // guarantees that subsequent ops on the same stream observe the prior

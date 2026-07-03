@@ -26,8 +26,7 @@ namespace quda::comm
 #else
       return true;
 #endif
-    case QudaP2PSignal::STREAM_GATED:
-      return true;
+    case QudaP2PSignal::STREAM_GATED: return true;
     }
     return false;
   }

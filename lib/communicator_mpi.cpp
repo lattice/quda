@@ -116,8 +116,8 @@ namespace quda
 
   void Communicator::comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size)
   {
-    MPI_CHECK(MPI_Allgather(send_handle, (int)handle_size, MPI_BYTE,
-                            recv_buf, (int)handle_size, MPI_BYTE, MPI_COMM_HANDLE));
+    MPI_CHECK(
+      MPI_Allgather(send_handle, (int)handle_size, MPI_BYTE, recv_buf, (int)handle_size, MPI_BYTE, MPI_COMM_HANDLE));
   }
 #endif
 

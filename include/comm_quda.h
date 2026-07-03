@@ -518,10 +518,7 @@ namespace quda
                      MNNVL NVLink fabric.  HIP requires hipStreamWriteValue64
                      (not confirmed yet -- backend allow-list filters this).
   */
-  enum class QudaP2PSignal {
-    REMOTE_IPC,
-    STREAM_GATED
-  };
+  enum class QudaP2PSignal { REMOTE_IPC, STREAM_GATED };
 
   namespace comm
   {
@@ -582,12 +579,11 @@ namespace quda
      visible (above) for the few remaining direct callers but new code should
      use the QudaP2PSignal overloads.
   */
-  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir,
-                                  const qudaStream_t &stream, QudaP2PSignal signal);
-  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir,
-                                  const qudaStream_t &stream, QudaP2PSignal signal);
-  void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir,
-                                   QudaP2PSignal signal);
+  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream,
+                                 QudaP2PSignal signal);
+  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream,
+                                 QudaP2PSignal signal);
+  void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir, QudaP2PSignal signal);
 
   template <typename T> void comm_allreduce_sum(T &v);
   template <typename T> void comm_allreduce_max(T &v);

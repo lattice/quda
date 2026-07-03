@@ -16,8 +16,8 @@ namespace quda::comm
   bool p2p_signal_supported(QudaP2PSignal kind)
   {
     switch (kind) {
-    case QudaP2PSignal::REMOTE_IPC:    return true;
-    case QudaP2PSignal::STREAM_GATED:  return false;  // not yet wired on HIP
+    case QudaP2PSignal::REMOTE_IPC: return true;
+    case QudaP2PSignal::STREAM_GATED: return false; // not yet wired on HIP
     }
     return false;
   }
@@ -27,7 +27,6 @@ namespace quda::comm
     // Same clamping rule as the CUDA backend: prefer events, fall back to
     // stream-gated only where events are unsupported.  On HIP events are
     // always supported, so this is REMOTE_IPC.
-    return p2p_signal_supported(QudaP2PSignal::REMOTE_IPC) ? QudaP2PSignal::REMOTE_IPC
-                                                           : QudaP2PSignal::STREAM_GATED;
+    return p2p_signal_supported(QudaP2PSignal::REMOTE_IPC) ? QudaP2PSignal::REMOTE_IPC : QudaP2PSignal::STREAM_GATED;
   }
 } // namespace quda::comm

@@ -502,7 +502,6 @@ namespace quda {
     // (lib/targets/cuda/comm_target.cpp) -- only that TU touches it.
 
   protected:
-
     /**
        Whether we have initialized communication for this field
     */

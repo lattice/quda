@@ -287,7 +287,10 @@ namespace quda {
   static inline void ghost_comm_buffer_free_(void *ptr)
   {
 #ifdef NVSHMEM_COMMS
-    if (comm_nvshmem_enabled()) { nvshmem_comm_buffer_free(ptr); return; }
+    if (comm_nvshmem_enabled()) {
+      nvshmem_comm_buffer_free(ptr);
+      return;
+    }
 #endif
     device_comm_buffer_free(ptr);
   }
@@ -521,8 +524,9 @@ namespace quda {
           // alias the symmetric caches in non-NVSHMEM builds.
           mh_send_rdma[b][i][dir]
             = gdr ? comm_declare_send_relative(my_face_dim_dir_p2p_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
-          mh_recv_rdma[b][i][dir]
-            = gdr ? comm_declare_receive_relative(from_face_dim_dir_p2p_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
+          mh_recv_rdma[b][i][dir] = gdr ?
+            comm_declare_receive_relative(from_face_dim_dir_p2p_d[b][i][dir], i, hop, ghost_face_bytes[i]) :
+            nullptr;
         }
       } // loop over b
 

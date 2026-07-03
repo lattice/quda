@@ -443,8 +443,8 @@ namespace quda
         const char *p2p_mask_env = getenv("QUDA_DEBUG_P2P_MASK");
         int p2p_mask = p2p_mask_env ? atoi(p2p_mask_env) : 0xF;
         if (p2p_mask != 0xF && rank == 0 && getVerbosity() > QUDA_SILENT)
-          printf("QUDA_DEBUG_P2P_MASK=%d in effect (X=%d Y=%d Z=%d T=%d)\n",
-                 p2p_mask, !!(p2p_mask & 1), !!(p2p_mask & 2), !!(p2p_mask & 4), !!(p2p_mask & 8));
+          printf("QUDA_DEBUG_P2P_MASK=%d in effect (X=%d Y=%d Z=%d T=%d)\n", p2p_mask, !!(p2p_mask & 1),
+                 !!(p2p_mask & 2), !!(p2p_mask & 4), !!(p2p_mask & 8));
         for (int dim = 0; dim < 4; dim++) {
           if (!(p2p_mask & (1 << dim))) {
             for (int dir = 0; dir < 2; dir++) {

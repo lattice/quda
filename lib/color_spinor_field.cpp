@@ -1175,8 +1175,8 @@ namespace quda
       if (!remote_write) {
         // P2P copy-engine: source = local contiguous P2P send buffer, dest =
         // imported peer contiguous P2P recv buffer.
-        void *ghost_dst
-          = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+        void *ghost_dst = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir])
+          + ghost_offset[dim][(dir + 1) % 2];
 
         qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_p2p_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
@@ -1213,7 +1213,8 @@ namespace quda
       // Stream-gated P2P sends are stream-ordered (cuStreamWriteValue64) -- there is
       // no MPI send doorbell to poll, so treat the send as complete here.  (The
       // event/cudaIPC path still polls mh_send_p2p.)
-      if (stream_gated) complete_send[dim][dir] = true;
+      if (stream_gated)
+        complete_send[dim][dir] = true;
       else if (!complete_send[dim][dir])
         complete_send[dim][dir] = comm_p2p_query_send_drained(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir);
     } else if (gdr_send) {
@@ -1226,7 +1227,8 @@ namespace quda
     if (comm_peer2peer_enabled(1 - dir, dim)) {
       // Stream-gated P2P receives are gated via commsWaitStream (cuStreamWaitValue64)
       // on the stream -- no MPI recv doorbell to poll, so treat as complete here.
-      if (stream_gated) complete_recv[dim][1 - dir] = true;
+      if (stream_gated)
+        complete_recv[dim][1 - dir] = true;
       else if (!complete_recv[dim][1 - dir])
         complete_recv[dim][1 - dir] = comm_p2p_query_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir);
     } else if (gdr_recv) {
@@ -1512,8 +1514,7 @@ namespace quda
         if (stream_gated) {
           for (int dim = 0; dim < nDimComms; dim++)
             for (int dir = 0; dir < 2; dir++)
-              if (comm_peer2peer_enabled(1 - dir, dim))
-                commsWaitStream(2 * dim + dir, device::get_default_stream());
+              if (comm_peer2peer_enabled(1 - dir, dim)) commsWaitStream(2 * dim + dir, device::get_default_stream());
         }
 
         bool comms_complete[2 * QUDA_MAX_DIM] = {};

@@ -69,8 +69,10 @@ namespace quda {
   // same primitive -- so there is no separate MPI tag.)
   namespace comm
   {
-    struct DeviceCommBuffer {};
-    struct QudaCommTypeNVSHMEM {};
+    struct DeviceCommBuffer {
+    };
+    struct QudaCommTypeNVSHMEM {
+    };
   } // namespace comm
 
   void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::DeviceCommBuffer, size_t size);
@@ -135,11 +137,12 @@ namespace quda {
 #define device_free(ptr) quda::device_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define device_pinned_free(ptr) quda::device_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define device_comm_buffer_malloc(size)                                                                                \
-  quda::comm_buffer_malloc_(__func__, quda::file_name(__FILE__), __LINE__, quda::comm::DeviceCommBuffer{}, size)
+  quda::comm_buffer_malloc_(__func__, quda::file_name(__FILE__), __LINE__, quda::comm::DeviceCommBuffer {}, size)
 #define nvshmem_comm_buffer_malloc(size)                                                                               \
-  quda::comm_buffer_malloc_(__func__, quda::file_name(__FILE__), __LINE__, quda::comm::QudaCommTypeNVSHMEM{}, size)
-#define device_comm_buffer_free(ptr)  quda::device_comm_buffer_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-#define nvshmem_comm_buffer_free(ptr) quda::nvshmem_comm_buffer_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+  quda::comm_buffer_malloc_(__func__, quda::file_name(__FILE__), __LINE__, quda::comm::QudaCommTypeNVSHMEM {}, size)
+#define device_comm_buffer_free(ptr) quda::device_comm_buffer_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define nvshmem_comm_buffer_free(ptr)                                                                                  \
+  quda::nvshmem_comm_buffer_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define get_mapped_device_pointer(ptr)                                                                                 \

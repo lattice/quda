@@ -112,8 +112,7 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[]
-      = {"Device", "Device Pinned", "Host  ", "Host Pinned", "Managed", "Shmem ", "Comm  "};
+    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Host Pinned", "Managed", "Shmem ", "Comm  "};
 
     for (auto entry : alloc[type]) {
       void *ptr = entry.first;
@@ -434,8 +433,7 @@ namespace quda
 
     size_t granularity = 0;
     CUresult err = cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_RECOMMENDED);
-    if (err != CUDA_SUCCESS)
-      errorQuda("cuMemGetAllocationGranularity failed (%s:%d in %s())", file, line, func);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemGetAllocationGranularity failed (%s:%d in %s())", file, line, func);
     size_t padded = ((size + granularity - 1) / granularity) * granularity;
 
     CUmemGenericAllocationHandle h;
@@ -458,8 +456,7 @@ namespace quda
 
     CUmemFabricHandle fh;
     err = cuMemExportToShareableHandle(&fh, h, CU_MEM_HANDLE_TYPE_FABRIC, 0);
-    if (err != CUDA_SUCCESS)
-      errorQuda("cuMemExportToShareableHandle FABRIC failed (%s:%d in %s())", file, line, func);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemExportToShareableHandle FABRIC failed (%s:%d in %s())", file, line, func);
 
     void *ptr = (void *)ptr_d;
     const uint64_t generation = p2p_next_generation++;
@@ -510,24 +507,21 @@ namespace quda
   CUmemFabricHandle get_p2p_fabric_handle(void *ptr)
   {
     auto it = p2p_fabric_handles.find(ptr);
-    if (it == p2p_fabric_handles.end())
-      errorQuda("get_p2p_fabric_handle: no fabric handle for pointer %p", ptr);
+    if (it == p2p_fabric_handles.end()) errorQuda("get_p2p_fabric_handle: no fabric handle for pointer %p", ptr);
     return it->second;
   }
 
   size_t get_p2p_buffer_size(void *ptr)
   {
     auto it = p2p_buffer_sizes.find(ptr);
-    if (it == p2p_buffer_sizes.end())
-      errorQuda("get_p2p_buffer_size: no size for pointer %p", ptr);
+    if (it == p2p_buffer_sizes.end()) errorQuda("get_p2p_buffer_size: no size for pointer %p", ptr);
     return it->second;
   }
 
   uint64_t get_p2p_buffer_generation(void *ptr)
   {
     auto it = p2p_buffer_generations.find(ptr);
-    if (it == p2p_buffer_generations.end())
-      errorQuda("get_p2p_buffer_generation: no generation for pointer %p", ptr);
+    if (it == p2p_buffer_generations.end()) errorQuda("get_p2p_buffer_generation: no generation for pointer %p", ptr);
     return it->second;
   }
 #endif // QUDA_MNNVL
@@ -710,16 +704,15 @@ namespace quda
     printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
     printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
     printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
-    printfQuda("Device comm buffer memory used = %.1f MiB\n",
-               max_total_bytes[DEVICE_COMM_BUFFER] / (double)(1 << 20));
+    printfQuda("Device comm buffer memory used = %.1f MiB\n", max_total_bytes[DEVICE_COMM_BUFFER] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
     printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
 
   void assertAllMemFree()
   {
-    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty()
-        || !alloc[HOST_PINNED].empty() || !alloc[DEVICE_COMM_BUFFER].empty()) {
+    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty() || !alloc[HOST_PINNED].empty()
+        || !alloc[DEVICE_COMM_BUFFER].empty()) {
       warningQuda("The following internal memory allocations were not freed.");
       printfQuda("\n");
       print_alloc_header();

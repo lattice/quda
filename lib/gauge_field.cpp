@@ -7,7 +7,8 @@
 
 namespace quda {
 
-  namespace {
+  namespace
+  {
     enum class GaugeP2PDiagnosticSync { NONE, COPY, SIGNAL };
 
     GaugeP2PDiagnosticSync gauge_p2p_diagnostic_sync()
@@ -452,8 +453,7 @@ namespace quda {
     // Event IPC still uses an MPI doorbell, so its persistent receive must be
     // preposted. Stream-gated signalling has no MPI receive to post.
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      if (comm::p2p_signal() == QudaP2PSignal::REMOTE_IPC)
-        comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      if (comm::p2p_signal() == QudaP2PSignal::REMOTE_IPC) comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
       return;
     }
     if (comm_gdr_enabled()) {
@@ -539,7 +539,8 @@ namespace quda {
   // entering WaitValue.  This CUDA-visible dependency prevents cross-stream
   // scheduler cycles.  scatterDoneEvent is recorded after the receive wait or
   // post-recv H2D copy, and the default stream waits on it before injection.
-  namespace {
+  namespace
+  {
     qudaEvent_t gauge_extractEndEvent;
     qudaEvent_t gauge_extractDoneEvent[QUDA_MAX_DIM];
     qudaEvent_t gauge_sendDoneEvent[QUDA_MAX_DIM * 2];
@@ -557,7 +558,7 @@ namespace quda {
       for (int i = 0; i < QUDA_MAX_DIM * 2; ++i) gauge_scatterDoneEvent[i] = qudaEventCreate();
       gauge_exchange_events_initialised = true;
     }
-  }
+  } // namespace
 
   // This does the exchange of the forwards boundary gauge field ghost zone and places
   // it into the ghost array of the next node
