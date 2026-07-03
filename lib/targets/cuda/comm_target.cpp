@@ -109,7 +109,8 @@ void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
     if (comm_peer2peer_enabled(0, dim)) {
       if (remote[dim][0]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][0]));
     }
-  } // iterate over dim
+  }
+  stream_gated_comms_init = true;
 }
 #else
 void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }

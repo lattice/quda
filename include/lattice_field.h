@@ -430,6 +430,12 @@ namespace quda {
     */
     inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcRemoteCopyEvent = {};
 
+    // Stream-mem-op signalling state (flag_buffer_d / flag_buffer_remote_d /
+    // flag_send_counter / flag_recv_counter) lives in the CUDA backend TU
+    // (lib/targets/cuda/comm_target.cpp) -- only that TU touches it.
+
+  protected:
+
     /**
        Whether we have initialized communication for this field
     */

@@ -373,7 +373,7 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, false); // Prepost receives
+      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -531,7 +531,7 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, false); // Prepost receives
+      issueRecv(halo, dslash, false, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -697,7 +697,7 @@ namespace quda
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(halo, dslash, true); // Prepost receives
+      issueRecv(halo, dslash, true, (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)); // Prepost receives (skip P2P doorbell when stream-gating)
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -1680,6 +1680,12 @@ namespace quda
   // string used as a tunekey to ensure we retune if the dslash policy env changes
   extern char policy_string[TuneKey::aux_n];
 
+  // P2P DATA-MOVEMENT policies (tuned on aux.y).  The completion-SIGNALLING
+  // mechanism (event vs stream-mem-op) is orthogonal and is NOT a policy here:
+  // it is resolved globally by comm::p2p_signal() and applied via
+  // dslashParam.p2p_signal.  (Historically STREAM_GATED was a 4th policy that
+  // conflated copy-engine movement with stream-gated signalling; that has been
+  // split out -- see QUDA_P2P_TRANSPORT.)
   enum class QudaP2PPolicy {
     QUDA_P2P_DEFAULT,         // no special hanlding for p2p
     QUDA_P2P_COPY_ENGINE,     // use copy engine for p2p traffic
@@ -1784,13 +1790,13 @@ namespace quda
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);
         }
 
-        if (comm_peer2peer_enabled_global() & 1) { // enable/disable p2p direct store policy tuning
+        if (comm_peer2peer_enabled_global() & 1) { // bit 0: copy-engine policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)]
               = QudaP2PPolicy::QUDA_P2P_COPY_ENGINE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE);
         }
 
-        if (!(comm_peer2peer_enabled_global() & 4)) { // enable/disable non-p2p policy tuning
+        if (!(comm_peer2peer_enabled_global() & 4)) { // bit 2: enable non-p2p (DEFAULT) policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT);
         }
@@ -1920,6 +1926,9 @@ namespace quda
           if (p2p == QudaP2PPolicy::QUDA_P2P_DEFAULT)
             comm_enable_peer2peer(false); // disable p2p if using default policy
           dslashParam.remote_write = (p2p == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0);
+          // Signalling mechanism is orthogonal to the data-movement policy:
+          // resolved once globally (QUDA_P2P_TRANSPORT / backend default).
+          dslashParam.p2p_signal = comm::p2p_signal();
 
           for (auto &i : policies) {
 
@@ -1990,6 +1999,9 @@ namespace quda
      bool p2p_enabled = comm_peer2peer_enabled_global();
      if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
      dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
+     // Signalling mechanism is orthogonal to the data-movement policy: resolved
+     // once globally via comm::p2p_signal() (QUDA_P2P_TRANSPORT / backend default).
+     dslashParam.p2p_signal = comm::p2p_signal();
 
      auto dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
      (*dslashImp)(dslash, in, halo, profile);

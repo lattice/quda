@@ -1,9 +1,28 @@
+#include <cstdlib>
+#include <cstring>
 #include <typeinfo>
 #include <gauge_field.h>
 #include <blas_quda.h>
 #include <timer.h>
 
 namespace quda {
+
+  namespace {
+    enum class GaugeP2PDiagnosticSync { NONE, COPY, SIGNAL };
+
+    GaugeP2PDiagnosticSync gauge_p2p_diagnostic_sync()
+    {
+      static const GaugeP2PDiagnosticSync mode = [] {
+        const char *value = std::getenv("QUDA_P2P_DIAGNOSTIC_SYNC");
+        if (!value || !value[0]) return GaugeP2PDiagnosticSync::NONE;
+        if (std::strcmp(value, "copy") == 0) return GaugeP2PDiagnosticSync::COPY;
+        if (std::strcmp(value, "signal") == 0) return GaugeP2PDiagnosticSync::SIGNAL;
+        errorQuda("Invalid QUDA_P2P_DIAGNOSTIC_SYNC='%s' (expected copy or signal)", value);
+        return GaugeP2PDiagnosticSync::NONE;
+      }();
+      return mode;
+    }
+  } // namespace
 
   GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u) { u.fill(*this); }
 
@@ -430,7 +449,8 @@ namespace quda {
   {
     if (!comm_dim_partitioned(dim)) return;
 
-    // receive from neighboring the processor
+    // Event IPC still uses an MPI doorbell, so its persistent receive must be
+    // preposted. Stream-gated signalling has no MPI receive to post.
     if (comm_peer2peer_enabled(1 - dir, dim)) {
       comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
     } else if (comm_gdr_enabled()) {
@@ -478,8 +498,9 @@ namespace quda {
     }
 
     if (comm_peer2peer_enabled(dir, dim)) {
-      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
-      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+      // Event IPC has an outgoing MPI doorbell and local event to drain.
+      // Stream-gated has no separate host-side send completion.
+      comm_p2p_wait_send_drained(FieldKind::GAUGE, bufferIndex, dim, dir, comm::p2p_signal());
     } else if (comm_gdr_enabled()) {
       comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {

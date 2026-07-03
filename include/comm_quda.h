@@ -423,6 +423,103 @@ namespace quda
   void comm_wait(MsgHandle *mh);
   int comm_query(MsgHandle *mh);
 
+  /**
+     Backend-substitutable layer for peer-to-peer halo signalling.
+
+     Wraps the per-(buf, dim, dir) "I'm done writing your buffer" /
+     "wait for peer to be done writing mine" sequence.  Dispatches on the
+     resolved QudaP2PSignal: REMOTE_IPC uses cudaIpcEvent + MPI doorbell;
+     STREAM_GATED uses cuStreamWriteValue64 / cuStreamWaitValue64 on
+     fabric-mapped signal slots.  Keyed by FieldKind so COLOR_SPINOR and
+     GAUGE signals never alias.
+  */
+  enum class FieldKind { COLOR_SPINOR, GAUGE };
+  static constexpr int N_FIELD_KINDS = 2; // keep in sync with FieldKind
+
+  /**
+     P2P signalling mechanism (used by the comm_p2p_signal_* unified API
+     below to dispatch to the appropriate per-kind implementation inside the
+     backend).
+
+     - REMOTE_IPC  : cudaIPC event record/wait + MPI doorbell.  Single-node
+                     only -- the IPC event handle does not cross the MNNVL
+                     fabric.  HIP backend uses hipIpc analogues.
+     - STREAM_GATED: cuStreamWriteValue64 / cuStreamWaitValue64 on a slot in
+                     a peer-mapped flag buffer.  Works cross-clique within an
+                     MNNVL NVLink fabric.  HIP requires hipStreamWriteValue64
+                     (not confirmed yet -- backend allow-list filters this).
+  */
+  enum class QudaP2PSignal {
+    REMOTE_IPC,
+    STREAM_GATED
+  };
+
+  namespace comm
+  {
+    /** Does the active backend (and build) support the given P2P signalling kind?
+        Backend-provided allow-list: CUDA non-MNNVL supports both; CUDA MNNVL supports
+        STREAM_GATED only; HIP supports REMOTE_IPC only.  Implementation lives in
+        lib/targets/<backend>/p2p_signal_defaults.cpp. */
+    bool p2p_signal_supported(QudaP2PSignal kind);
+
+    /** Backend/build default signalling kind when QUDA_P2P_TRANSPORT is unset.
+        Policy: prefer REMOTE_IPC (events) -- matches develop behaviour, least
+        surprise -- but clamp to the supported set, so CUDA-MNNVL (where
+        REMOTE_IPC is unsupported) falls back to STREAM_GATED.  Implemented
+        per-backend in lib/targets/<backend>/p2p_signal_defaults.cpp. */
+    QudaP2PSignal p2p_signal_default();
+
+    /** Resolve the active P2P signalling transport for this run (cached).
+        Reads the QUDA_P2P_TRANSPORT env var (string, case-insensitive:
+        "stream_gated" | "events"); if set it must be supported by this
+        backend/build or we errorQuda (an explicit request is never silently
+        substituted).  If unset, returns p2p_signal_default().  This is the
+        single source of truth for both the autotuned (dslash) and the
+        non-autotuned (gauge) P2P consumers. */
+    QudaP2PSignal p2p_signal();
+  } // namespace comm
+
+  /** Sender: P2P write into peer's recv buffer is complete; peer may now read. */
+  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream);
+
+  /** Sender: non-blocking query — has the local send been drained? */
+  int comm_p2p_query_send_drained(FieldKind kind, int buf, int dim, int dir);
+
+  /** Sender: block host until local send is drained AND own copy event has fired. */
+  void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir);
+
+  /** Receiver: non-blocking query — has the peer signalled completion? */
+  int comm_p2p_query_recv_signal(FieldKind kind, int buf, int dim, int dir);
+
+  /** Receiver: block host until peer signal arrives AND peer's copy event has fired. */
+  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir);
+
+  // Stream-mem-op signalling primitives (Phase 5).  Forward-only protocol:
+  // sender writes a monotonic uint64_t counter to the peer's slot via
+  // cuStreamWriteValue64; receiver stream-waits via cuStreamWaitValue64 with
+  // GEQ and, where supported by the device, a remote-write visibility flush.
+  // No MPI doorbell, no IPC event, no host poll.  Slot storage lives
+  // in the CUDA backend TU (lib/targets/cuda/comm_target.cpp).  This is the
+  // protocol the future MNNVL fabric backend will use; on the current setup
+  // it operates on cuMemAlloc-backed cudaIPC-shared memory.
+
+  /**
+     Unified P2P signal API.  Dispatches internally on QudaP2PSignal to the
+     appropriate per-kind implementation inside the backend (event-based via
+     cudaIPC + MPI doorbell, or stream-mem-op via cuStreamWriteValue64 /
+     WaitValue64).  The per-kind functions are no longer part of the public
+     header -- the stream-mem-op variants are file-private to the CUDA
+     backend's comm_target.cpp; the event-based variants remain externally
+     visible (above) for the few remaining direct callers but new code should
+     use the QudaP2PSignal overloads.
+  */
+  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir,
+                                  const qudaStream_t &stream, QudaP2PSignal signal);
+  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir,
+                                  const qudaStream_t &stream, QudaP2PSignal signal);
+  void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir,
+                                   QudaP2PSignal signal);
+
   template <typename T> void comm_allreduce_sum(T &v);
   template <typename T> void comm_allreduce_max(T &v);
   template <typename T> void comm_allreduce_min(T &v);

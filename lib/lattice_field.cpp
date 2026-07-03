@@ -467,6 +467,13 @@ namespace quda {
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
       errorQuda("ghost_field appears not to be allocated");
 
+    // Set up the stream-gated signal-slot ("flag") buffers here -- this is the
+    // first device-ready point past comm/peer2peer init (comm_init is too early:
+    // no CUDA context yet for cuMemAlloc).  Once-guarded and no-op unless
+    // stream-gating is the resolved transport.  Deliberately NOT torn down on
+    // ghost_field_reset (stable address); freed only in freeGhostBuffer.
+    comm_create_stream_gated_comms();
+
     for (int b=0; b<2; b++) {
       // set remote send buffer to ghost receive buffers on neighboring processes
       comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);

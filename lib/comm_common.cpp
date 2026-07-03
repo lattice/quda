@@ -1,6 +1,8 @@
 #include <unistd.h> // for gethostname()
 #include <assert.h>
 #include <limits>
+#include <cstdlib> // for getenv()
+#include <strings.h> // for strcasecmp()
 
 #include <quda_internal.h>
 #include <communicator_quda.h>
@@ -150,5 +152,46 @@ namespace quda
 #endif
   comm_abort_(status);
 }
+
+  namespace comm
+  {
+    QudaP2PSignal p2p_signal()
+    {
+      static bool cached = false;
+      static QudaP2PSignal resolved = QudaP2PSignal::REMOTE_IPC;
+      if (cached) return resolved;
+
+      // Default (env unset): backend/build default -- events where supported,
+      // clamped to stream-gated under MNNVL.  An explicit env request is
+      // validated against the allow-list and never silently substituted.
+      QudaP2PSignal choice = p2p_signal_default();
+
+      const char *env = getenv("QUDA_P2P_TRANSPORT");
+      if (env) {
+        QudaP2PSignal requested;
+        if (strcasecmp(env, "stream_gated") == 0 || strcasecmp(env, "stream-gated") == 0) {
+          requested = QudaP2PSignal::STREAM_GATED;
+        } else if (strcasecmp(env, "events") == 0 || strcasecmp(env, "event") == 0
+                   || strcasecmp(env, "remote_ipc") == 0) {
+          requested = QudaP2PSignal::REMOTE_IPC;
+        } else {
+          errorQuda("Unrecognised QUDA_P2P_TRANSPORT='%s' (expected 'stream_gated' or 'events')", env);
+        }
+        if (!p2p_signal_supported(requested))
+          errorQuda("QUDA_P2P_TRANSPORT='%s' is not supported by this backend/build "
+                    "(e.g. events are unavailable under QUDA_MNNVL, stream-gated under HIP)",
+                    env);
+        choice = requested;
+      }
+
+      if (getVerbosity() > QUDA_SILENT && comm_rank() == 0)
+        printfQuda("P2P signalling transport: %s\n",
+                   choice == QudaP2PSignal::STREAM_GATED ? "stream_gated" : "events");
+
+      resolved = choice;
+      cached = true;
+      return resolved;
+    }
+  } // namespace comm
 
 } // namespace quda
