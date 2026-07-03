@@ -152,7 +152,7 @@ namespace quda {
       dslashStart[i] = qudaEventCreate();
     }
 #ifdef NVSHMEM_COMMS
-    sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(4 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
+    sync_arr = static_cast<shmem_sync_t *>(nvshmem_comm_buffer_malloc(4 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
 
     // initialize to 9 here so where we need to do tuning we can skip
     // the wait if necessary by using smaller values
@@ -211,7 +211,7 @@ namespace quda {
       qudaEventDestroy(dslashStart[i]);
     }
 #ifdef NVSHMEM_COMMS
-    device_comms_pinned_free(sync_arr);
+    nvshmem_comm_buffer_free(sync_arr);
     device_pinned_free(_retcount_intra);
     device_pinned_free(_retcount_inter);
     device_pinned_free(_interior_done);

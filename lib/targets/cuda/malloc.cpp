@@ -36,7 +36,9 @@ namespace quda
                name ? name : "unknown", str ? str : "unknown");
   }
 
-  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, N_ALLOC_TYPE };
+  // DEVICE_COMM_BUFFER: device-side communication buffer -- P2P-capable and
+  // RDMA-ready (cuMemAlloc'd, physically contiguous, cudaIPC/fabric-exportable).
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, DEVICE_COMM_BUFFER, N_ALLOC_TYPE };
 
   class MemAlloc
   {
@@ -110,7 +112,8 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host", "Host Pinned", "Managed", "Shmem"};
+    const char *type_str[]
+      = {"Device", "Device Pinned", "Host  ", "Host Pinned", "Managed", "Shmem ", "Comm  "};
 
     for (auto entry : alloc[type]) {
       void *ptr = entry.first;
@@ -130,7 +133,7 @@ namespace quda
   {
     total_bytes[type] += a.base_size;
     if (total_bytes[type] > max_total_bytes[type]) { max_total_bytes[type] = total_bytes[type]; }
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) {
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != DEVICE_COMM_BUFFER) {
       total_host_bytes += a.base_size;
       if (total_host_bytes > max_total_host_bytes) { max_total_host_bytes = total_host_bytes; }
     }
@@ -145,7 +148,9 @@ namespace quda
   {
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) { total_host_bytes -= size; }
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != DEVICE_COMM_BUFFER) {
+      total_host_bytes -= size;
+    }
     if (type == HOST_PINNED) { total_pinned_bytes -= size; }
     alloc[type].erase(ptr);
   }
@@ -358,8 +363,9 @@ namespace quda
     return ptr;
   }
   /**
-   * Allocate shemm device memory. This function should only be called via
-   * device_comms_pinned_malloc_()
+   * Allocate symmetric (shmem) device memory. Called from
+   * comm_buffer_malloc_(QudaCommTypeNVSHMEM, ...) and any other NVSHMEM-
+   * specific allocation point that needs symmetric-heap memory.
    */
 #ifdef NVSHMEM_COMMS
   void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
@@ -388,11 +394,23 @@ namespace quda
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
 #ifdef NVSHMEM_COMMS
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::QudaCommTypeNVSHMEM, size_t size)
+  {
     return shmem_malloc_(func, file, line, size);
 #else
-    return device_pinned_malloc_(func, file, line, size);
+    CUresult err = cuMemFree((CUdeviceptr)ptr);
+    if (err != CUDA_SUCCESS) { printfQuda("Failed to free device comm buffer (%s:%d in %s())\n", file, line, func); }
+    track_free(DEVICE_COMM_BUFFER, ptr);
 #endif
   }
+
+#ifdef NVSHMEM_COMMS
+  void nvshmem_comm_buffer_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    // shmem_free_ already asserts ptr is in alloc[SHMEM] and calls track_free(SHMEM, ...)
+    shmem_free_(func, file, line, ptr);
+  }
+#endif
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -512,18 +530,6 @@ namespace quda
   }
 #endif
 
-  /**
-   * Free device comms memory allocated with device_comms_pinned_malloc(). This function should only be
-   * called via the device_comms_pinned_free() macro, defined in malloc_quda.h
-   */
-  void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
-  {
-#ifdef NVSHMEM_COMMS
-    shmem_free_(func, file, line, ptr);
-#else
-    device_pinned_free_(func, file, line, ptr);
-#endif
-  }
 
   void printPeakMemUsage()
   {
@@ -531,6 +537,8 @@ namespace quda
     printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
     printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
     printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
+    printfQuda("Device comm buffer memory used = %.1f MiB\n",
+               max_total_bytes[DEVICE_COMM_BUFFER] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
     printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
@@ -538,13 +546,14 @@ namespace quda
   void assertAllMemFree()
   {
     if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty()
-        || !alloc[HOST_PINNED].empty()) {
+        || !alloc[HOST_PINNED].empty() || !alloc[DEVICE_COMM_BUFFER].empty()) {
       warningQuda("The following internal memory allocations were not freed.");
       printfQuda("\n");
       print_alloc_header();
       print_alloc(DEVICE);
       print_alloc(DEVICE_PINNED);
       print_alloc(SHMEM);
+      print_alloc(DEVICE_COMM_BUFFER);
       print_alloc(HOST);
       print_alloc(HOST_PINNED);
       printfQuda("\n");
