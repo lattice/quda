@@ -1,4 +1,5 @@
 #include <comm_quda.h>
+#include <lattice_field.h>
 #include <quda_api.h>
 #include <quda_hip_api.h>
 #include <algorithm>

@@ -395,6 +395,11 @@ namespace quda {
     */
     mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma = {};
 
+  public:
+    // P2P per-(buf,dim,dir) sync state.  These are inline-static global arrays
+    // (already process-shared) read by the backend-substitutable comm_p2p_* layer
+    // (comm_quda.h), which lives outside this class, so access is public.
+
     /**
        Message handles for receiving
     */

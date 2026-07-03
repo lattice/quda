@@ -65,6 +65,12 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 enable_language(CUDA)
 message(STATUS "CUDA Compiler is " ${CMAKE_CUDA_COMPILER})
+
+# MNNVL fabric P2P needs CU_MEM_HANDLE_TYPE_FABRIC, documented as supported in CUDA 12.4+.
+if(QUDA_MNNVL AND CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.4)
+  message(FATAL_ERROR "QUDA_MNNVL=ON requires CUDA >= 12.4 for CU_MEM_HANDLE_TYPE_FABRIC "
+                      "(found ${CMAKE_CUDA_COMPILER_VERSION}).")
+endif()
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 # TODO: Do we stil use that?
 if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
