@@ -751,6 +751,26 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     },
     "Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)");
 
+  // Debug hook: per-dim P2P mask applied during comm_peer2peer_init.  CLI ->
+  // setenv(QUDA_DEBUG_P2P_MASK), library reads getenv() once at init time.
+  // Bitmask matching --partition (X=1, Y=2, Z=4, T=8, OR'd; default 0xF = all dims
+  // as detected by hardware).  Exercises the hybrid stream-gated + MPI-fallback
+  // path on a single-node system where every direction would otherwise be P2P.
+  quda_app->add_option(
+    "--p2p-mask",
+    [](CLI::results_t res) {
+      int m;
+      auto retval = CLI::detail::lexical_cast(res[0], m);
+      char buf[16];
+      snprintf(buf, sizeof(buf), "%d", m);
+      setenv("QUDA_DEBUG_P2P_MASK", buf, 1);
+      return retval;
+    },
+    "Per-dim P2P mask (X=1, Y=2, Z=4, T=8, OR'd; default 0xF = all dims).  "
+    "Set before QUDA init via setenv(QUDA_DEBUG_P2P_MASK); read once by "
+    "comm_peer2peer_init, which then force-disables peer2peer_enabled for "
+    "masked dims even when hardware supports P2P.");
+
   auto gridsizeopt
     = quda_app
         ->add_option("--gridsize", gridsize_from_cmdline, "Set the grid size in all four dimension (default 1 1 1 1)")

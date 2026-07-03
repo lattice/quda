@@ -125,11 +125,17 @@ namespace quda
      @param[in] stream Stream were the receive is being posted (effectively ignored)
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
-    template <typename Dslash> inline void issueRecv(const ColorSpinorField &halo, const Dslash &dslash, bool gdr)
+    template <typename Dslash>
+    inline void issueRecv(const ColorSpinorField &halo, const Dslash &dslash, bool gdr, bool skip_p2p_recv = false)
     {
       for (int i = 3; i >= 0; i--) {
         if (!dslash.dslashParam.commDim[i]) continue;
         for (int dir = 1; dir >= 0; dir--) {
+          // When the caller (DslashBasic w/ stream-gated P2P) handles the P2P-able
+          // directions via stream-mem-op signalling, skip the MPI recv doorbell post
+          // here.  Posting it without a matching MPI_Wait would leave the request
+          // active and trigger MPI_ERR_REQUEST on the next iteration.
+          if (skip_p2p_recv && comm_peer2peer_enabled(1 - dir, i)) continue;
           PROFILE(if (dslash_comms) halo.recvStart(2 * i + dir, device::get_stream(2 * i + dir), gdr), profile,
                   QUDA_PROFILE_COMMS_START);
         }
@@ -421,9 +427,13 @@ namespace quda
               && pattern.commsCompleted[2 * i] && pattern.commsCompleted[2 * i + 1]) {
 
             for (int dir = 1; dir >= 0; dir--) {
-              if (!comm_peer2peer_enabled(
-                      1 - dir, i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
-                // Record the end of the scattering
+              const bool peer_dir = comm_peer2peer_enabled(1 - dir, i);
+              // Merge per-direction stream into the default stream for:
+              //   - non-P2P dirs (scatter copy must finish before exterior dslash)
+              //   - stream-gated P2P dirs (cuStreamWaitValue64 sits on the per-dir
+              //     stream and must drain before the exterior dslash reads halo)
+              const bool need_merge = !peer_dir || ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && peer_dir);
+              if (need_merge) {
                 PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile, QUDA_PROFILE_EVENT_RECORD);
                 // wait for scattering to finish and then launch dslash
                 PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
@@ -447,6 +457,7 @@ namespace quda
       PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
+
 
   /**
      Generic shmem dslash
@@ -577,11 +588,14 @@ namespace quda
         }   // i
       }     // while(pattern.completeSum < commDimTotal)
 
+      // Merge scatterIndex stream into default for: any non-P2P dir (scatter copy
+      // must finish) OR any stream-gated P2P dir (cuStreamWaitValue64 must drain).
       for (int i = 3; i >= 0; i--) {
-        if (dslashParam.commDim[i]
-            && (!comm_peer2peer_enabled(0, i)
-                || !comm_peer2peer_enabled(
-                    1, i))) { // if not peer-to-peer we post an event in the scatter stream and wait on that
+        if (!dslashParam.commDim[i]) continue;
+        const bool has_non_p2p = !comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i);
+        const bool has_stream_gated = (dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED)
+            && (comm_peer2peer_enabled(0, i) || comm_peer2peer_enabled(1, i));
+        if (has_non_p2p || has_stream_gated) {
           PROFILE(qudaEventRecord(scatterEnd[0], device::get_stream(scatterIndex)), profile, QUDA_PROFILE_EVENT_RECORD);
           PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
           break;

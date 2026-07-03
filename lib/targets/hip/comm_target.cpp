@@ -183,4 +183,104 @@ namespace quda
     } // iterate over dim
   }
 
+  // -------------------------------------------------------------------------
+  // comm_p2p_* (HIP target backend): identical shape to the CUDA target since
+  // the bodies use only platform-neutral qudaEvent / comm wrappers. See
+  // lib/targets/cuda/comm_target.cpp for the rationale.
+
+  void comm_p2p_signal_send_done(FieldKind, int buf, int dim, int dir, const qudaStream_t &stream)
+  {
+    qudaEventRecord(LatticeField::ipcCopyEvent[buf][dim][dir], stream);
+    comm_start(LatticeField::mh_send_p2p[buf][dim][dir]);
+  }
+
+  int comm_p2p_query_send_drained(FieldKind, int buf, int dim, int dir)
+  {
+    return comm_query(LatticeField::mh_send_p2p[buf][dim][dir]);
+  }
+
+  void comm_p2p_wait_send_drained(FieldKind, int buf, int dim, int dir)
+  {
+    comm_wait(LatticeField::mh_send_p2p[buf][dim][dir]);
+    qudaEventSynchronize(LatticeField::ipcCopyEvent[buf][dim][dir]);
+  }
+
+  int comm_p2p_query_recv_signal(FieldKind, int buf, int dim, int dir)
+  {
+    return comm_query(LatticeField::mh_recv_p2p[buf][dim][dir]);
+  }
+
+  void comm_p2p_wait_recv_signal(FieldKind, int buf, int dim, int dir)
+  {
+    comm_wait(LatticeField::mh_recv_p2p[buf][dim][dir]);
+    qudaEventSynchronize(LatticeField::ipcRemoteCopyEvent[buf][dim][dir]);
+  }
+
+  // Stream-mem-op signalling primitives (Phase 5).  HIP equivalent is
+  // hipStreamWriteValue64 / hipStreamWaitValue64 but we have no HIP test
+  // machine yet; left as errorQuda stubs so the QUDA_P2P_STREAM_GATED
+  // sub-policy errors loudly on HIP if it's ever selected; the tuner will
+  // never pick it because the body never returns successfully.
+  void comm_p2p_stream_signal_send_done(FieldKind, int, int, int, const qudaStream_t &)
+  {
+    errorQuda("comm_p2p_stream_signal_send_done not yet implemented on the HIP target");
+  }
+
+  void comm_p2p_stream_wait_recv_signal(FieldKind, int, int, int, const qudaStream_t &)
+  {
+    errorQuda("comm_p2p_stream_wait_recv_signal not yet implemented on the HIP target");
+  }
+
+  // ============================================================================
+  // Unified P2P signal API (Phase B/C of TransportContext refactor).  Dispatches
+  // to the per-kind implementations.  STREAM_GATED calls will errorQuda until a
+  // HIP implementation lands -- so the HIP backend's p2p_signal_supported()
+  // (when added) must return false for STREAM_GATED to keep the tuner from
+  // picking it.
+  // ============================================================================
+
+  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir,
+                                  const qudaStream_t &stream, QudaP2PSignal signal)
+  {
+    switch (signal) {
+    case QudaP2PSignal::REMOTE_IPC:
+      comm_p2p_signal_send_done(kind, buf, dim, dir, stream);
+      return;
+    case QudaP2PSignal::STREAM_GATED:
+      comm_p2p_stream_signal_send_done(kind, buf, dim, dir, stream);
+      return;
+    }
+    errorQuda("comm_p2p_signal_send_done: unknown QudaP2PSignal %d", static_cast<int>(signal));
+  }
+
+  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir,
+                                  const qudaStream_t &stream, QudaP2PSignal signal)
+  {
+    switch (signal) {
+    case QudaP2PSignal::REMOTE_IPC:
+      (void)stream;
+      comm_p2p_wait_recv_signal(kind, buf, dim, dir);
+      return;
+    case QudaP2PSignal::STREAM_GATED:
+      comm_p2p_stream_wait_recv_signal(kind, buf, dim, dir, stream);
+      return;
+    }
+    errorQuda("comm_p2p_wait_recv_signal: unknown QudaP2PSignal %d", static_cast<int>(signal));
+  }
+
+  void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir, QudaP2PSignal signal)
+  {
+    switch (signal) {
+    case QudaP2PSignal::REMOTE_IPC:
+      comm_p2p_wait_send_drained(kind, buf, dim, dir);
+      return;
+    case QudaP2PSignal::STREAM_GATED:
+      // STREAM_GATED has no separate "send drained" concept: stream ordering
+      // guarantees that subsequent ops on the same stream observe the prior
+      // hipStreamWriteValue64 having completed.
+      return;
+    }
+    errorQuda("comm_p2p_wait_send_drained: unknown QudaP2PSignal %d", static_cast<int>(signal));
+  }
+
 } // namespace quda

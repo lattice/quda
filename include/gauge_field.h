@@ -344,6 +344,22 @@ namespace quda {
     void commsComplete(int dim, int dir);
 
     /**
+       @brief Queue a peer-to-peer ghost send via stream-mem-op signalling
+       (qudaMemcpyP2PAsync + cuStreamWriteValue64).  No MPI request posted;
+       the peer learns of arrival via the signal memory cell.  Caller must
+       ensure peer-to-peer is enabled for (dir, dim).
+    */
+    void sendStartStream(int dim, int dir, const qudaStream_t &stream);
+
+    /**
+       @brief Queue a peer-to-peer recv wait via stream-mem-op signalling
+       (cuStreamWaitValue64).  No MPI wait; the signal is captured on the
+       GPU stream so downstream consumers gate on the stream / events.
+       Caller must ensure peer-to-peer is enabled for (1-dir, dim).
+    */
+    void commsWaitStream(int dim, int dir, const qudaStream_t &stream);
+
+    /**
        @brief Exchange the ghost and store store in the padded region
        @param[in] link_direction Which links are we exchanging: this
        flag only applies to bi-directional coarse-link fields

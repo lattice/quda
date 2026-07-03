@@ -214,35 +214,34 @@ namespace quda
       if (enable_peer_to_peer_env) {
         enable_peer_to_peer = atoi(enable_peer_to_peer_env);
 
-        switch (std::abs(enable_peer_to_peer)) {
-        case 0:
-          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
-          break;
-        case 1:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
-          break;
-        case 2:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
-          break;
-        case 3:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access\n");
-          break;
-        case 5:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n");
-          break;
-        case 6:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n");
-          break;
-        case 7:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n");
-          break;
-        default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
+        // Bit semantics (QUDA_ENABLE_P2P, magnitude) -- these select the P2P
+        // DATA-MOVEMENT policies the dslash autotuner considers:
+        //   bit 0 (1): copy-engine p2p
+        //   bit 1 (2): direct-load/store p2p
+        //   bit 2 (4): disable non-p2p policies (inverse — set => DEFAULT excluded)
+        //   bit 3 (8): DEPRECATED, ignored.  The completion-signalling
+        //              mechanism (event vs stream-mem-op gated) is no longer a
+        //              P2P policy; choose it with QUDA_P2P_TRANSPORT instead.
+        // Illegal: disable non-p2p (bit 2) without enabling any p2p data-movement
+        // policy (bit 0 or 1) -- that leaves no policy at all.  Catches 4 and,
+        // now that bit 3 is ignored, 12 (=4|8) which previously meant
+        // "stream-gated only".  Stream-gated is selected via QUDA_P2P_TRANSPORT.
+        const int abs_p2p = std::abs(enable_peer_to_peer);
+        if (abs_p2p > 15 || ((abs_p2p & 4) && !(abs_p2p & 3)))
+          errorQuda("Unexpected value QUDA_ENABLE_P2P=%d (bit 2 disables non-p2p but no p2p "
+                    "data-movement policy is enabled; bit 3 is deprecated -- use QUDA_P2P_TRANSPORT)\n",
+                    enable_peer_to_peer);
+        if (getVerbosity() > QUDA_SILENT && rank == 0) {
+          if (abs_p2p == 0) {
+            printf("Disabling peer-to-peer access\n");
+          } else {
+            if (abs_p2p & 1) printf("Enabling peer-to-peer copy engine access\n");
+            if (abs_p2p & 2) printf("Enabling peer-to-peer direct load/store access\n");
+            if (abs_p2p & 4) printf("Disabling non-p2p policies\n");
+            if (abs_p2p & 8)
+              printf("Warning: QUDA_ENABLE_P2P bit 3 (stream-mem-op gated) is deprecated and ignored; "
+                     "use QUDA_P2P_TRANSPORT=stream_gated|events instead\n");
+          }
         }
 
         if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
@@ -321,6 +320,32 @@ namespace quda
         }     // different directions - forward/backward
 
         host_free(gpuid_recv_buf);
+      }
+
+      // Apply QUDA_DEBUG_P2P_MASK (settable via the test CLI flag --p2p-mask, which
+      // setenvs it before QUDA init).  Bitmask: X=1, Y=2, Z=4, T=8 (OR'd; default 0xF
+      // = all dims as detected by hardware).  For dims whose bit is unset,
+      // peer2peer_enabled is forced to false here, so comm_peer2peer_enabled returns
+      // false even on hardware that supports P2P.  Exercises the hybrid stream-gated +
+      // MPI-fallback path on a single-node system where every direction would
+      // otherwise be intra-node P2P.
+      {
+        const char *p2p_mask_env = getenv("QUDA_DEBUG_P2P_MASK");
+        int p2p_mask = p2p_mask_env ? atoi(p2p_mask_env) : 0xF;
+        if (p2p_mask != 0xF && rank == 0 && getVerbosity() > QUDA_SILENT)
+          printf("QUDA_DEBUG_P2P_MASK=%d in effect (X=%d Y=%d Z=%d T=%d)\n",
+                 p2p_mask, !!(p2p_mask & 1), !!(p2p_mask & 2), !!(p2p_mask & 4), !!(p2p_mask & 8));
+        for (int dim = 0; dim < 4; dim++) {
+          if (!(p2p_mask & (1 << dim))) {
+            for (int dir = 0; dir < 2; dir++) {
+              if (peer2peer_enabled[dir][dim]) {
+                if (getVerbosity() > QUDA_SILENT && rank == 0)
+                  printf("P2P force-disabled for dim=%d dir=%d via QUDA_DEBUG_P2P_MASK\n", dim, dir);
+                peer2peer_enabled[dir][dim] = false;
+              }
+            }
+          }
+        }
       }
 
       peer2peer_init = true;

@@ -452,35 +452,28 @@ namespace quda {
     // Event IPC still uses an MPI doorbell, so its persistent receive must be
     // preposted. Stream-gated signalling has no MPI receive to post.
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
-    } else if (comm_gdr_enabled()) {
+      if (comm::p2p_signal() == QudaP2PSignal::REMOTE_IPC)
+        comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      return;
+    }
+    if (comm_gdr_enabled()) {
       comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
       comm_start(mh_recv[bufferIndex][dim][1 - dir]);
     }
   }
 
-  void GaugeField::sendStart(int dim, int dir, const qudaStream_t &stream)
+  void GaugeField::sendStart(int dim, int dir, const qudaStream_t &)
   {
     if (!comm_dim_partitioned(dim)) return;
 
-    if (!comm_peer2peer_enabled(dir, dim)) {
-      if (comm_gdr_enabled()) {
-        comm_start(mh_send_rdma[bufferIndex][dim][dir]);
-      } else {
-        comm_start(mh_send[bufferIndex][dim][dir]);
-      }
-    } else { // doing peer-to-peer
-
-      void *ghost_dst
-        = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
-
-      qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
-
-      // record the event
-      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
-      // send to the neighboring processor
-      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+    // P2P-able sends are handled by sendStartStream, which dispatches to the
+    // selected signal transport.
+    if (comm_peer2peer_enabled(dir, dim)) return;
+    if (comm_gdr_enabled()) {
+      comm_start(mh_send_rdma[bufferIndex][dim][dir]);
+    } else {
+      comm_start(mh_send[bufferIndex][dim][dir]);
     }
   }
 
@@ -488,13 +481,15 @@ namespace quda {
   {
     if (!comm_dim_partitioned(dim)) return;
 
-    if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
-      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
-    } else if (comm_gdr_enabled()) {
-      comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
-    } else {
-      comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
+    // P2P receives are completed by commsWaitStream below. In event mode that
+    // waits the preposted MPI doorbell and imported event; in stream-gated mode
+    // it queues a stream wait on the signal slot.
+    if (!comm_peer2peer_enabled(1 - dir, dim)) {
+      if (comm_gdr_enabled()) {
+        comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+      } else {
+        comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
+      }
     }
 
     if (comm_peer2peer_enabled(dir, dim)) {
@@ -544,10 +539,16 @@ namespace quda {
           offset += ghost_face_bytes_aligned[d];
         }
 
-        extractGaugeGhost(*this, send_d, true, link_dir * nDim); // get the links into contiguous buffers
-        qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
+        ensure_gauge_exchange_events();
 
-        // issue receive preposts and host-to-device copies if needed
+        extractGaugeGhost(*this, send_d, true, link_dir * nDim); // get the links into contiguous buffers
+        // Replace the old qudaDeviceSynchronize with an event so per-dir streams gate on the extract.
+        qudaEventRecord(gauge_extractEndEvent, device::get_default_stream());
+
+        // Per-(dim, dir=1) send dispatch.  Per-direction transport choice
+        // independently selects stream-gated (P2P-able) or MPI/GDR.  The
+        // stripped recvStart/sendStart are no-ops for P2P sides so calling
+        // them unconditionally is safe.
         for (int dim = 0; dim < nDim; dim++) {
           if (!comm_dim_partitioned(dim)) continue;
           recvStart(dim, dir); // prepost the receive
@@ -557,29 +558,49 @@ namespace quda {
           }
         }
 
-        // if gdr enabled then synchronize
-        if (comm_gdr_enabled()) qudaDeviceSynchronize();
-
-        // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
-        for (int dim = 0; dim < nDim; dim++) {
-          if (!comm_dim_partitioned(dim)) continue;
-          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled())
-            qudaStreamSynchronize(device::get_stream(2 * dim + dir));
-          sendStart(dim, dir, device::get_stream(2 * dim + dir)); // start sending
+        // Stream-memory waits are not visible to the CUDA scheduler as a
+        // cross-device dependency.  Merge every local P2P copy+signal onto the
+        // default stream before allowing any per-dimension stream to enter a
+        // blocking remote wait.  Without this CUDA-visible edge, one dimension
+        // can occupy scheduler resources in WaitValue while another dimension's
+        // signal has not run yet, forming an intermittent cross-rank cycle.
+        bool stream_gated_send_barrier = false;
+        if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED) {
+          for (int send_dim = 0; send_dim < nDim; ++send_dim) {
+            if (!comm_dim_partitioned(send_dim) || !comm_peer2peer_enabled(dir, send_dim)) continue;
+            qudaStreamWaitEvent(device::get_default_stream(), gauge_sendDoneEvent[2 * send_dim + dir], 0);
+            stream_gated_send_barrier = true;
+          }
+          if (stream_gated_send_barrier) qudaEventRecord(gauge_sendEndEvent, device::get_default_stream());
         }
 
-        // complete communication and issue host-to-device copies if needed
+        // If GDR is in use, we still need a device sync before GDR sends fire from device memory.
+        // (Stream-gated P2P paths above already had qudaStreamWaitEvent(extractEnd) so they don't
+        // need this.)  This branch only matters when GDR is the chosen transport.
+        if (comm_gdr_enabled()) qudaDeviceSynchronize();
+
+        // Wait / merge: per-direction transport choice mirrors the send phase.
+        // commsWaitStream gates the P2P recv; commsComplete only blocks on MPI
+        // for non-P2P sides.
         for (int dim = 0; dim < nDim; dim++) {
           if (!comm_dim_partitioned(dim)) continue;
-          commsComplete(dim, dir);
+
+          if (comm_peer2peer_enabled(1 - dir, dim)) {
+            if (stream_gated_send_barrier)
+              qudaStreamWaitEvent(device::get_stream(2 * dim + dir), gauge_sendEndEvent, 0);
+            commsWaitStream(dim, dir, device::get_stream(2 * dim + dir));
+          }
+          commsComplete(dim, dir); // host MPI_Wait for non-P2P sides only
           if (!comm_peer2peer_enabled(1 - dir, dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir],
                             from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
                             qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
           }
+          qudaEventRecord(gauge_scatterDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
+          qudaStreamWaitEvent(device::get_default_stream(), gauge_scatterDoneEvent[2 * dim + dir], 0);
         }
-
-        qudaDeviceSynchronize(); // synchronize before issuing kernels / copies in default stream - could replace with event post and wait
+        // No qudaDeviceSynchronize here — per-dir scatterDone events captured into default_stream
+        // gate the inject kernel below.
 
         // fill in the halos for non-partitioned dimensions
         for (int dim = 0; dim < nDim; dim++) {
@@ -666,11 +687,18 @@ namespace quda {
           offset += ghost_face_bytes_aligned[d];
         }
 
-        for (int dim = 0; dim < nDim; dim++)
-          qudaMemcpy(send_d[dim], ghost[dim + link_dir * nDim].data(), ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
-        qudaDeviceSynchronize(); // need to synchronize before issueing copies in different streams - could replace with event post and wait
+        ensure_gauge_exchange_events();
 
-        // issue receive preposts and host-to-device copies if needed
+        // Phase 1: pack send buffers from existing ghost storage on default,
+        // record the extract-end event for per-dir stream gating.
+        for (int dim = 0; dim < nDim; dim++) {
+          qudaMemcpyAsync(send_d[dim], ghost[dim + link_dir * nDim].data(), ghost_face_bytes[dim],
+                          qudaMemcpyDeviceToDevice, device::get_default_stream());
+        }
+        qudaEventRecord(gauge_extractEndEvent, device::get_default_stream());
+
+        // Phase 2: dispatch per-(dim, dir=0) sends.  Per-direction transport
+        // decision (stream-gated for P2P-able, MPI/GDR otherwise).
         for (int dim = 0; dim < nDim; dim++) {
           if (!comm_dim_partitioned(dim)) continue;
           recvStart(dim, dir); // prepost the receive
@@ -678,33 +706,33 @@ namespace quda {
             qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
                             ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
           }
+          if (stream_gated_send_barrier) qudaEventRecord(gauge_sendEndEvent, device::get_default_stream());
         }
 
-        // if gdr enabled then synchronize
         if (comm_gdr_enabled()) qudaDeviceSynchronize();
 
-        // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
+        // Phase 3: wait + merge per (dim, dir=0).
         for (int dim = 0; dim < nDim; dim++) {
           if (!comm_dim_partitioned(dim)) continue;
-          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled())
-            qudaStreamSynchronize(device::get_stream(2 * dim + dir));
-          sendStart(dim, dir, device::get_stream(2 * dim + dir)); // start sending
-        }
 
-        // complete communication and issue host-to-device copies if needed
-        for (int dim = 0; dim < nDim; dim++) {
-          if (!comm_dim_partitioned(dim)) continue;
+          if (comm_peer2peer_enabled(1 - dir, dim)) {
+            if (stream_gated_send_barrier)
+              qudaStreamWaitEvent(device::get_stream(2 * dim + dir), gauge_sendEndEvent, 0);
+            commsWaitStream(dim, dir, device::get_stream(2 * dim + dir));
+          }
           commsComplete(dim, dir);
           if (!comm_peer2peer_enabled(1 - dir, dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir],
                             from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
                             qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
           }
+          qudaEventRecord(gauge_scatterDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
+          qudaStreamWaitEvent(device::get_default_stream(), gauge_scatterDoneEvent[2 * dim + dir], 0);
         }
 
-        qudaDeviceSynchronize(); // synchronize before issuing kernel / copies in default stream - could replace with event post and wait
-
-        // fill in the halos for non-partitioned dimensions
+        // Phase 4: non-partitioned fill (when no_comms_fill, which injectGhost
+        // never sets) then inject on default.  Partitioned-dim inject is
+        // gated by scatterDone events queued above.
         for (int dim = 0; dim < nDim; dim++) {
           if (!comm_dim_partitioned(dim) && no_comms_fill) {
             qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
@@ -762,9 +790,7 @@ namespace quda {
         extractExtendedGaugeGhost(*this, dim, R, send_d, true);
 
         if (comm_dim_partitioned(dim)) {
-          qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
-
-          for (int dir = 0; dir < 2; dir++) recvStart(dim, dir);
+          qudaEventRecord(gauge_extractDoneEvent[dim], device::get_default_stream());
 
           for (int dir = 0; dir < 2; dir++) {
             // issue host-to-device copies if needed
