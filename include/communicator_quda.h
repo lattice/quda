@@ -7,6 +7,7 @@
 #include <stack>
 #include <algorithm>
 #include <numeric>
+#include <vector>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -289,15 +290,13 @@ namespace quda
                 && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
               continue;
 
-            // if the neighbors are on the same
+            // if the neighbors are on the same node
             if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
               int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 
               bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
               int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
 
-              // enable P2P if we can access the peer or if peer is self
-              // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
               if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
                 peer2peer_enabled[dir][dim] = true;
                 if (getVerbosity() > QUDA_SILENT) {
@@ -318,6 +317,7 @@ namespace quda
             } // on the same node
           }   // different dimensions - x, y, z, t
         }     // different directions - forward/backward
+#endif
 
         host_free(gpuid_recv_buf);
       }
@@ -743,6 +743,10 @@ namespace quda
   void comm_gather_hostname(char *hostname_recv_buf);
 
   void comm_gather_gpuid(int *gpuid_recv_buf);
+#ifdef QUDA_MNNVL
+  void comm_gather_clique_id(unsigned int *clique_recv_buf);
+  void comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size);
+#endif
 
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
 

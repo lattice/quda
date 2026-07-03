@@ -3,9 +3,13 @@
  */
 
 #include <stdlib.h>
+#include <device.h>
 #include <string.h>
 
 #include <communicator_quda.h>
+#ifdef QUDA_MNNVL
+#include <comm_target.h>
+#endif
 
 namespace quda
 {
@@ -54,6 +58,18 @@ namespace quda
   void Communicator::comm_gather_hostname(char *hostname_recv_buf) { strncpy(hostname_recv_buf, comm_hostname(), QUDA_MAX_HOSTNAME_STRING); }
 
   void Communicator::comm_gather_gpuid(int *gpuid_recv_buf) { gpuid_recv_buf[0] = comm_gpuid(); }
+#ifdef QUDA_MNNVL
+  void Communicator::comm_gather_clique_id(unsigned int *clique_recv_buf)
+  {
+    clique_recv_buf[0] = comm_target::get_fabric_clique_id();
+  }
+
+  void Communicator::comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size)
+  {
+    // single-process backend: just copy local to slot 0
+    memcpy(recv_buf, send_handle, handle_size);
+  }
+#endif
 
   MsgHandle *Communicator::comm_declare_send_rank(void *, int, int, size_t) { return nullptr; }
 

@@ -387,16 +387,184 @@ namespace quda
   }
 #endif
 
+  // Tag-dispatched comm-buffer allocator. The P2P body uses the driver
+  // API (cuMemAlloc) directly so the resulting memory is suitable for
+  // cudaIpc handle export (P2P) and avoids the cudaMalloc-runtime-API
+  // hijack risk. NVSHMEM body delegates to shmem_malloc_ (the existing
+  // nvshmem_malloc wrapper).
+
+#ifdef QUDA_MNNVL
+  // Fabric-handle registry for P2P comm buffers allocated via VMM.  Populated
+  // by vmm_alloc_p2p_fabric; queried by comm_create_neighbor_memory when it
+  // exports the local buffer's handle to peer ranks via MPI.
+  static std::map<void *, CUmemFabricHandle> p2p_fabric_handles;
+  static std::map<void *, size_t> p2p_buffer_sizes; // padded base_size per buffer
+  static std::map<void *, CUmemGenericAllocationHandle> p2p_allocation_handles;
+  static std::map<void *, uint64_t> p2p_buffer_generations;
+  static uint64_t p2p_next_generation = 1;
+
   /**
-   * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
-   * device_comms_pinned_malloc macro, defined in malloc_quda.h
+     VMM-backed P2P comm buffer suitable for cross-node P2P within an MNNVL
+     clique.  Properties required by the IMEX path:
+       - CU_MEM_HANDLE_TYPE_FABRIC: the resulting allocation handle can be
+         exported as a CUmemFabricHandle that peer ranks (possibly on other
+         nodes within the clique) import via cuMemImportFromShareableHandle.
+       - gpuDirectRDMACapable: the NIC can DMA into this memory, needed for
+         any non-P2P fallback that routes through MPI/UCX.
+       - Single contiguous virtual mapping (cuMemAddressReserve + cuMemMap
+         of one generic allocation handle).
    */
-  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  static void *vmm_alloc_p2p_fabric(const char *func, const char *file, int line, size_t size)
   {
+    MemAlloc a(func, file, line);
+    int device_id;
+    if (cudaGetDevice(&device_id) != cudaSuccess) errorQuda("cudaGetDevice failed");
+
+    CUmemAllocationProp prop = {};
+    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.location.id = device_id;
+    prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
+    prop.allocFlags.gpuDirectRDMACapable = 1;
+
+    size_t granularity = 0;
+    CUresult err = cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_RECOMMENDED);
+    if (err != CUDA_SUCCESS)
+      errorQuda("cuMemGetAllocationGranularity failed (%s:%d in %s())", file, line, func);
+    size_t padded = ((size + granularity - 1) / granularity) * granularity;
+
+    CUmemGenericAllocationHandle h;
+    err = cuMemCreate(&h, padded, &prop, 0);
+    if (err != CUDA_SUCCESS)
+      errorQuda("cuMemCreate (FABRIC, size=%zu padded=%zu) failed (%s:%d in %s())", size, padded, file, line, func);
+
+    CUdeviceptr ptr_d = 0;
+    err = cuMemAddressReserve(&ptr_d, padded, granularity, 0, 0);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemAddressReserve failed (%s:%d in %s())", file, line, func);
+    err = cuMemMap(ptr_d, padded, 0, h, 0);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemMap failed (%s:%d in %s())", file, line, func);
+
+    CUmemAccessDesc access = {};
+    access.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    access.location.id = device_id;
+    access.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    err = cuMemSetAccess(ptr_d, padded, &access, 1);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemSetAccess failed (%s:%d in %s())", file, line, func);
+
+    CUmemFabricHandle fh;
+    err = cuMemExportToShareableHandle(&fh, h, CU_MEM_HANDLE_TYPE_FABRIC, 0);
+    if (err != CUDA_SUCCESS)
+      errorQuda("cuMemExportToShareableHandle FABRIC failed (%s:%d in %s())", file, line, func);
+
+    void *ptr = (void *)ptr_d;
+    const uint64_t generation = p2p_next_generation++;
+    p2p_fabric_handles[ptr] = fh;
+    p2p_buffer_sizes[ptr] = padded;
+    p2p_allocation_handles[ptr] = h;
+    p2p_buffer_generations[ptr] = generation;
+    logQuda(QUDA_DEBUG_VERBOSE, "MNNVL P2P allocate: ptr=%p requested=%zu padded=%zu generation=%lu\n", ptr, size,
+            padded, (unsigned long)generation);
+
+    a.size = size;
+    a.base_size = padded;
+    track_malloc(DEVICE_COMM_BUFFER, a, ptr);
+    return ptr;
+  }
+
+  static void vmm_free_p2p_fabric(const char *func, const char *file, int line, void *ptr)
+  {
+    auto it = alloc[DEVICE_COMM_BUFFER].find(ptr);
+    if (it == alloc[DEVICE_COMM_BUFFER].end())
+      errorQuda("vmm_free_p2p_fabric: pointer %p not tracked (%s:%d in %s())", ptr, file, line, func);
+    size_t size = it->second.base_size;
+
+    auto handle_it = p2p_allocation_handles.find(ptr);
+    if (handle_it == p2p_allocation_handles.end())
+      errorQuda("vmm_free_p2p_fabric: no allocation handle for pointer %p (%s:%d in %s())", ptr, file, line, func);
+    auto generation_it = p2p_buffer_generations.find(ptr);
+    if (generation_it == p2p_buffer_generations.end())
+      errorQuda("vmm_free_p2p_fabric: no generation for pointer %p (%s:%d in %s())", ptr, file, line, func);
+
+    logQuda(QUDA_DEBUG_VERBOSE, "MNNVL P2P free: ptr=%p padded=%zu generation=%lu\n", ptr, size,
+            (unsigned long)generation_it->second);
+
+    CUresult err = cuMemUnmap((CUdeviceptr)ptr, size);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemUnmap failed for P2P buffer (%s:%d in %s())", file, line, func);
+    err = cuMemRelease(handle_it->second);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemRelease failed for P2P buffer (%s:%d in %s())", file, line, func);
+    err = cuMemAddressFree((CUdeviceptr)ptr, size);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemAddressFree failed for P2P buffer (%s:%d in %s())", file, line, func);
+
+    p2p_allocation_handles.erase(handle_it);
+    p2p_fabric_handles.erase(ptr);
+    p2p_buffer_sizes.erase(ptr);
+    p2p_buffer_generations.erase(generation_it);
+    track_free(DEVICE_COMM_BUFFER, ptr);
+  }
+
+  CUmemFabricHandle get_p2p_fabric_handle(void *ptr)
+  {
+    auto it = p2p_fabric_handles.find(ptr);
+    if (it == p2p_fabric_handles.end())
+      errorQuda("get_p2p_fabric_handle: no fabric handle for pointer %p", ptr);
+    return it->second;
+  }
+
+  size_t get_p2p_buffer_size(void *ptr)
+  {
+    auto it = p2p_buffer_sizes.find(ptr);
+    if (it == p2p_buffer_sizes.end())
+      errorQuda("get_p2p_buffer_size: no size for pointer %p", ptr);
+    return it->second;
+  }
+
+  uint64_t get_p2p_buffer_generation(void *ptr)
+  {
+    auto it = p2p_buffer_generations.find(ptr);
+    if (it == p2p_buffer_generations.end())
+      errorQuda("get_p2p_buffer_generation: no generation for pointer %p", ptr);
+    return it->second;
+  }
+#endif // QUDA_MNNVL
+
+  static void *cumemalloc_tracked(const char *func, const char *file, int line, size_t size, AllocType kind)
+  {
+    MemAlloc a(func, file, line);
+    void *ptr = nullptr;
+    a.size = a.base_size = size;
+    CUresult err = cuMemAlloc((CUdeviceptr *)&ptr, size);
+    if (err != CUDA_SUCCESS) {
+      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+    }
+    track_malloc(kind, a, ptr);
+    return ptr;
+  }
+
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::DeviceCommBuffer, size_t size)
+  {
+#ifdef QUDA_MNNVL
+    return vmm_alloc_p2p_fabric(func, file, line, size);
+#else
+    return cumemalloc_tracked(func, file, line, size, DEVICE_COMM_BUFFER);
+#endif
+  }
+
 #ifdef NVSHMEM_COMMS
   void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::QudaCommTypeNVSHMEM, size_t size)
   {
     return shmem_malloc_(func, file, line, size);
+  }
+#endif
+
+  void device_comm_buffer_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) { errorQuda("Attempt to free NULL device comm buffer (%s:%d in %s())\n", file, line, func); }
+    if (!alloc[DEVICE_COMM_BUFFER].count(ptr)) {
+      errorQuda("Attempt to free non-comm-buffer pointer with device_comm_buffer_free (%s:%d in %s())\n", file, line,
+                func);
+    }
+#ifdef QUDA_MNNVL
+    vmm_free_p2p_fabric(func, file, line, ptr);
 #else
     CUresult err = cuMemFree((CUdeviceptr)ptr);
     if (err != CUDA_SUCCESS) { printfQuda("Failed to free device comm buffer (%s:%d in %s())\n", file, line, func); }

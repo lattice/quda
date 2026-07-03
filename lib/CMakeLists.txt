@@ -664,6 +664,10 @@ if(QUDA_MPI)
   target_link_libraries(quda PUBLIC MPI::MPI_CXX)
 endif()
 
+if(QUDA_MNNVL)
+  add_compile_definitions(QUDA_MNNVL)
+endif()
+
 if(QUDA_QMP)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC QMP::qmp)

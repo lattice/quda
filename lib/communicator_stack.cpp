@@ -167,6 +167,17 @@ namespace quda
   }
 
   void comm_gather_gpuid(int *gpuid_recv_buf) { get_current_communicator().comm_gather_gpuid(gpuid_recv_buf); }
+#ifdef QUDA_MNNVL
+  void comm_gather_clique_id(unsigned int *clique_recv_buf)
+  {
+    get_current_communicator().comm_gather_clique_id(clique_recv_buf);
+  }
+
+  void comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size)
+  {
+    get_current_communicator().comm_gather_fabric_handle(send_handle, recv_buf, handle_size);
+  }
+#endif
 
   void comm_peer2peer_init(const char *hostname_recv_buf)
   {

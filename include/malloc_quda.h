@@ -4,6 +4,10 @@
 #include <cstdint>
 #include <enum_quda.h>
 
+#ifdef QUDA_MNNVL
+#include <cuda.h>
+#endif
+
 namespace quda {
 
   void printPeakMemUsage();
