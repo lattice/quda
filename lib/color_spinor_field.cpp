@@ -1206,9 +1206,16 @@ namespace quda
     if (!commDimPartitioned(dim)) return 1;
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
+    const bool stream_gated = comm::p2p_signal() == QudaP2PSignal::STREAM_GATED;
+
     // first query send to backwards
     if (comm_peer2peer_enabled(dir, dim)) {
-      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_p2p[bufferIndex][dim][dir]);
+      // Stream-gated P2P sends are stream-ordered (cuStreamWriteValue64) -- there is
+      // no MPI send doorbell to poll, so treat the send as complete here.  (The
+      // event/cudaIPC path still polls mh_send_p2p.)
+      if (stream_gated) complete_send[dim][dir] = true;
+      else if (!complete_send[dim][dir])
+        complete_send[dim][dir] = comm_p2p_query_send_drained(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir);
     } else if (gdr_send) {
       if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1217,8 +1224,11 @@ namespace quda
 
     // second query receive from forwards
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      if (!complete_recv[dim][1 - dir])
-        complete_recv[dim][1 - dir] = comm_query(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      // Stream-gated P2P receives are gated via commsWaitStream (cuStreamWaitValue64)
+      // on the stream -- no MPI recv doorbell to poll, so treat as complete here.
+      if (stream_gated) complete_recv[dim][1 - dir] = true;
+      else if (!complete_recv[dim][1 - dir])
+        complete_recv[dim][1 - dir] = comm_p2p_query_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir);
     } else if (gdr_recv) {
       if (!complete_recv[dim][1 - dir])
         complete_recv[dim][1 - dir] = comm_query(mh_recv_rdma[bufferIndex][dim][1 - dir]);
@@ -1264,6 +1274,56 @@ namespace quda
     } else {
       comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
     }
+  }
+
+  void ColorSpinorField::sendStartStream(int d, const qudaStream_t &stream, bool remote_write) const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return;
+    if (!comm_peer2peer_enabled(dir, dim))
+      errorQuda("sendStartStream requires peer-to-peer enabled for (dir=%d, dim=%d)", dir, dim);
+
+    // With remote_write the packing kernel has already written the halo straight
+    // into the peer's buffer, so the copy-engine transfer must be skipped (doing it
+    // would clobber the remote-written data with the unpacked local send buffer) --
+    // mirrors sendStart's `if (!remote_write)` guard.  The signal still goes on this
+    // per-direction stream: issueGather inserts a qudaStreamWaitEvent(.., packEnd) on
+    // it, so the cuStreamWriteValue64 is correctly ordered after the remote write.
+    if (!remote_write) {
+      // P2P copy-engine (stream-gated): contiguous P2P send -> imported peer P2P recv.
+      void *ghost_dst
+        = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+      qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_p2p_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
+    }
+    comm_p2p_signal_send_done(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, stream, QudaP2PSignal::STREAM_GATED);
+  }
+
+  void ColorSpinorField::commsWaitStream(int d, const qudaStream_t &stream) const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return;
+    if (!comm_peer2peer_enabled(1 - dir, dim))
+      errorQuda("commsWaitStream requires peer-to-peer enabled for receive (1-dir=%d, dim=%d)", 1 - dir, dim);
+
+    comm_p2p_wait_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir, stream, QudaP2PSignal::STREAM_GATED);
+  }
+
+  bool ColorSpinorField::commsQuerySend(int d, bool gdr) const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return true;
+    // P2P sends are completed via their own signalling (stream merge / copy event),
+    // not the MPI request, so report them drained here.  Only the non-P2P (MPI/IB)
+    // send needs an explicit MPI_Test, mirroring commsQuery's send half.
+    if (comm_peer2peer_enabled(dir, dim)) return true;
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
+    return gdr ? comm_query(mh_send_rdma[bufferIndex][dim][dir]) : comm_query(mh_send[bufferIndex][dim][dir]);
   }
 
   void ColorSpinorField::scatter(int dim_dir, const qudaStream_t &stream) const
@@ -1409,8 +1469,19 @@ namespace quda
           }
         }
 
-        // prepost receive
-        for (int i = 0; i < 2 * nDimComms; i++) recvStart(i, device::get_default_stream(), gdr_recv);
+        // Under stream-gating the P2P halo exchange uses stream-mem-op signalling
+        // (cuStreamWriteValue64/WaitValue64) instead of IPC events + MPI doorbells.
+        // The per-kind ipcCopyEvents are compiled out on MNNVL builds, so the event
+        // path (recvStart P2P doorbell / sendStart event record / ipcRemoteCopyEvent
+        // stream-wait) must be replaced by sendStartStream + commsWaitStream here.
+        const bool stream_gated = comm::p2p_signal() == QudaP2PSignal::STREAM_GATED;
+
+        // prepost receive (skip the stream-gated P2P MPI doorbell -- the stream-gated
+        // sender posts no MPI send, so this recv would never complete).
+        for (int i = 0; i < 2 * nDimComms; i++) {
+          if (stream_gated && comm_peer2peer_enabled(1 - (i % 2), i / 2)) continue;
+          recvStart(i, device::get_default_stream(), gdr_recv);
+        }
 
         // FIXME use events to properly synchronize streams, logic below failed when using p2p in all 4 dimensions (DGX2)
         bool sync = true;
@@ -1426,10 +1497,23 @@ namespace quda
           for (int dim = 0; dim < nDimComms; dim++) {
             for (int dir = 0; dir < 2; dir++) {
               if ((comm_peer2peer_enabled(dir, dim) + p2p) % 2 == 0) { // issue non-p2p transfers first
-                sendStart(2 * dim + dir, device::get_stream(2 * dim + dir), gdr_send);
+                if (stream_gated && comm_peer2peer_enabled(dir, dim))
+                  // stream-gated P2P: copy-engine memcpy + cuStreamWriteValue64 on the per-dir stream
+                  sendStartStream(2 * dim + dir, device::get_stream(2 * dim + dir));
+                else
+                  sendStart(2 * dim + dir, device::get_stream(2 * dim + dir), gdr_send);
               }
             }
           }
+        }
+
+        // stream-gated P2P receive waits: gate the default stream on each peer's flag
+        // (cuStreamWaitValue64) so the received halo is visible to downstream work.
+        if (stream_gated) {
+          for (int dim = 0; dim < nDimComms; dim++)
+            for (int dir = 0; dir < 2; dir++)
+              if (comm_peer2peer_enabled(1 - dir, dim))
+                commsWaitStream(2 * dim + dir, device::get_default_stream());
         }
 
         bool comms_complete[2 * QUDA_MAX_DIM] = {};
@@ -1442,7 +1526,10 @@ namespace quda
                   = commsQuery(2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
                 if (comms_complete[2 * dim + dir]) {
                   comms_done++;
-                  if (comm_peer2peer_enabled(1 - dir, dim))
+                  // Event path only: order the received P2P halo on the default stream.
+                  // Stream-gated already did this via commsWaitStream above (the
+                  // ipcRemoteCopyEvents don't exist on MNNVL builds).
+                  if (!stream_gated && comm_peer2peer_enabled(1 - dir, dim))
                     qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][dim][1 - dir], 0);
                 }
               }
@@ -1478,11 +1565,20 @@ namespace quda
         }
 
         // ensure that the p2p sending is completed before returning
-        for (int dim = 0; dim < nDimComms; dim++) {
-          if (!comm_dim_partitioned(dim)) continue;
-          for (int dir = 0; dir < 2; dir++) {
-            if (comm_peer2peer_enabled(dir, dim))
-              qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
+        if (stream_gated) {
+          // Stream-gated P2P sends (memcpy + cuStreamWriteValue64) live on the per-dir
+          // streams and record no ipcCopyEvent.  Hard-drain the device so the send
+          // memcpys finish (send buffer safe to reuse) and the queued default-stream
+          // receive waits resolve before the halo is consumed -- matching the event
+          // path's per-send-completion guarantee.  exchangeGhost is not a hot path.
+          qudaDeviceSynchronize();
+        } else {
+          for (int dim = 0; dim < nDimComms; dim++) {
+            if (!comm_dim_partitioned(dim)) continue;
+            for (int dir = 0; dir < 2; dir++) {
+              if (comm_peer2peer_enabled(dir, dim))
+                qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
+            }
           }
         }
       } else {

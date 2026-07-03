@@ -865,52 +865,95 @@ namespace quda {
         offset += 2 * ghost_face_bytes_aligned[dim]; // factor of two from fwd/back
       }
 
+      ensure_gauge_exchange_events();
+
+      // Extended (R-halo) exchange MUST proceed one dimension at a time: the halo
+      // received (and injected) for dimension d has to be in place BEFORE dimension
+      // d+1 is extracted, because d+1's face includes d's halo region -- that is how
+      // the corner/edge terms that the HISQ staples (and the improved gauge force)
+      // depend on get built up.  A batched schedule (extract-all dims, then comms-all,
+      // then inject-all) silently corrupts those corners as soon as >=2 dimensions
+      // are partitioned (single-dim topologies have no corners, so they looked fine).
+      // Within one dimension the two directions still overlap on their own streams;
+      // only the cross-dimension overlap is given up, and correctness requires it.
+      // Ascending dim order is deliberate and matches the reference (develop) path.
       for (int dim = 0; dim < nDim; dim++) {
         if (!(comm_dim_partitioned(dim) || (no_comms_fill && R[dim]))) continue;
 
-        // extract into a contiguous buffer
+        // extract this dim's faces (both directions) on the default stream
         extractExtendedGaugeGhost(*this, dim, R, send_d, true);
 
         if (comm_dim_partitioned(dim)) {
           qudaEventRecord(gauge_extractDoneEvent[dim], device::get_default_stream());
 
+          // dispatch comms for both directions.  Per direction we choose stream-gated
+          // (P2P-able) or non-P2P (MPI/GDR) transport independently so the MNNVL
+          // hybrid case just works.  The two directions run on their own streams.
           for (int dir = 0; dir < 2; dir++) {
-            // issue host-to-device copies if needed
-            if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
-              qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-                              ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(dir));
+            qudaStreamWaitEvent(device::get_stream(2 * dim + dir), gauge_extractDoneEvent[dim], 0);
+            recvStart(dim, dir); // no-op for P2P recv, posts MPI/GDR doorbell otherwise
+
+            if (comm_peer2peer_enabled(dir, dim)) {
+              sendStartStream(dim, dir, device::get_stream(2 * dim + dir));
+              if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED)
+                qudaEventRecord(gauge_sendDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
+            } else {
+              if (!comm_gdr_enabled()) {
+                qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_p2p_d[bufferIndex][dim][dir],
+                                ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+                qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+              }
+              sendStart(dim, dir, device::get_stream(2 * dim + dir));
             }
           }
 
-          // if either direction is not peer-to-peer then we need to synchronize
-          if (!comm_peer2peer_enabled(0, dim) || !comm_peer2peer_enabled(1, dim)) qudaDeviceSynchronize();
-
-          for (int dir = 0; dir < 2; dir++) sendStart(dim, dir, device::get_stream(dir));
-          for (int dir = 0; dir < 2; dir++) commsComplete(dim, dir);
-
-          for (int dir = 0; dir < 2; dir++) {
-            // issue host-to-device copies if needed
-            if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
-              qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
-                              ghost_face_bytes[dim], qudaMemcpyHostToDevice, device::get_stream(dir));
+          // Stream-gated send barrier: merge this dim's local P2P copy+signal onto
+          // the default stream before any receive stream enters a blocking remote
+          // wait, so the CUDA scheduler sees a cross-device edge (avoids the
+          // intermittent WaitValue cross-rank cycle).
+          bool stream_gated_send_barrier = false;
+          if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED) {
+            for (int dir = 0; dir < 2; ++dir) {
+              if (!comm_peer2peer_enabled(dir, dim)) continue;
+              qudaStreamWaitEvent(device::get_default_stream(), gauge_sendDoneEvent[2 * dim + dir], 0);
+              stream_gated_send_barrier = true;
             }
+            if (stream_gated_send_barrier) qudaEventRecord(gauge_sendEndEvent, device::get_default_stream());
           }
 
-        } else { // if just doing a local exchange to fill halo then need to swap faces
-          qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0], ghost_face_bytes[dim],
+          if (comm_gdr_enabled()) qudaDeviceSynchronize();
+
+          // wait + merge both directions, gating the default stream on scatterDone
+          for (int dir = 0; dir < 2; dir++) {
+            if (comm_peer2peer_enabled(1 - dir, dim)) {
+              if (stream_gated_send_barrier)
+                qudaStreamWaitEvent(device::get_stream(2 * dim + dir), gauge_sendEndEvent, 0);
+              commsWaitStream(dim, dir, device::get_stream(2 * dim + dir));
+            }
+            commsComplete(dim, dir); // host MPI_Wait for non-P2P sides only
+            if (!comm_peer2peer_enabled(1 - dir, dim) && !comm_gdr_enabled()) {
+              qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][dim][1 - dir],
+                              from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
+                              qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
+            }
+            qudaEventRecord(gauge_scatterDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
+            qudaStreamWaitEvent(device::get_default_stream(), gauge_scatterDoneEvent[2 * dim + dir], 0);
+          }
+        } else {
+          // non-partitioned dim with R>0: local periodic swap (no comms) on default
+          qudaMemcpy(from_face_dim_dir_p2p_d[b][dim][1], my_face_dim_dir_p2p_d[b][dim][0], ghost_face_bytes[dim],
                      qudaMemcpyDeviceToDevice);
           qudaMemcpy(from_face_dim_dir_p2p_d[b][dim][0], my_face_dim_dir_p2p_d[b][dim][1], ghost_face_bytes[dim],
                      qudaMemcpyDeviceToDevice);
         }
 
-        // inject back into the gauge field
-        // need to synchronize the copy streams before rejoining the compute stream - could replace with event post and wait
-        qudaDeviceSynchronize();
+        // Inject this dim's halo on the default stream (gated by the scatterDone
+        // events queued above) BEFORE the next dim is extracted, so its corners
+        // feed dim+1's extraction.
         extractExtendedGaugeGhost(*this, dim, R, recv_d, false);
       }
 
       bufferIndex = 1 - bufferIndex;
-      qudaDeviceSynchronize();
     } else {
       void *send[QUDA_MAX_DIM];
       void *recv[QUDA_MAX_DIM];

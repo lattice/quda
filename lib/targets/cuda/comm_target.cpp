@@ -5,6 +5,10 @@
 #include <quda_api.h>
 #include <quda_cuda_api.h>
 #include <algorithm>
+#include <cstring>
+#include <cstdlib> // getenv/atoi for QUDA_P2P_FORCE_FLUSH override
+#include <map>
+#include <vector>
 #include <shmem_helper.cuh>
 #ifdef QUDA_MNNVL
 #include <cuda.h>
@@ -310,15 +314,170 @@ void comm_destroy_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
       p2p_remote_mappings.erase(it);
       remote[dim][dir] = nullptr;
     }
+    if (num_dir == 1) remote[dim][1] = nullptr; // aliased to [dim][0], already freed
+  }
+}
+#else
+void comm_destroy_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
+{
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    // Same predicate as create: num_dir==1 means [dim][1] aliases [dim][0] (close
+    // once); a size-2 C-star dim gives num_dir==2 (two distinct handles, close both).
+    const int num_dir = comm_neighbor_p2p_num_dir(dim);
+    for (int dir = 0; dir < num_dir; ++dir) {
+      if (!comm_peer2peer_enabled(dir, dim)) continue;
+      if (!remote[dim][dir]) continue;
+      CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][dir]));
+      remote[dim][dir] = nullptr;
+    }
+    if (num_dir == 1) remote[dim][1] = nullptr; // aliased to [dim][0], already closed
+  }
+}
+#endif
 
-    if (comm_peer2peer_enabled(0, dim)) {
-      if (remote[dim][0]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][0]));
+// The NVSHMEM-transport remote pointer is owned by NVSHMEM (nvshmem_ptr); there
+// is nothing for QUDA to unmap.  No-op (defined for symmetry with create).
+void comm_destroy_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
+
+// ---------------------------------------------------------------------------
+// Stream-gated signal-slot ("flag") buffer lifecycle.  Allocated from
+// LatticeField::createIPCComms() and torn down from freeGhostBuffer(), so it
+// tracks the communicator and is recreated after a push_communicator() switch;
+// idempotent via stream_gated_comms_init.  Created only when stream-gating is
+// the resolved transport.  Kept OUT of the per-field ghost-buffer realloc churn
+// so the (constant-size) buffer's address is stable and its handle is opened
+// exactly once -- re-opening a same-address handle after free+realloc is what
+// CUDA 12.x rejects with "invalid argument".  Compiled in all builds (incl.
+// NVSHMEM): stream-gating can be the resolved transport regardless of NVSHMEM.
+namespace
+{
+  bool stream_gated_comms_init = false;
+
+  // Whether the device advertises CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES,
+  // i.e. whether CU_STREAM_WAIT_VALUE_FLUSH is accepted by the driver.  GB200
+  // reports 0 and rejects the flag (CUDA_ERROR_NOT_SUPPORTED), so the receiver
+  // wait must stay plain GEQ there.  Set in comm_create_stream_gated_comms().
+  bool stream_gated_remote_flush_supported = false;
+
+  // Whether the REMOTE_WRITE P2P policy is safe to offer (see
+  // comm_p2p_remote_write_supported).  Default true (correct for non-MNNVL,
+  // which needs no flush); on MNNVL builds it is tied to the remote-write flush
+  // capability in comm_create_stream_gated_comms() below.
+  bool remote_write_p2p_supported = true;
+
+  // Stream-mem-op signalling state.  Only this TU (the CUDA stream-gated
+  // backend) touches it.  Forward-only protocol; slots dimensioned per
+  // FieldKind so COLOR_SPINOR and GAUGE signals never alias.
+  // Layout in flag_buffer_d[buf]: a uint64_t array of size
+  // N_FIELD_KINDS * QUDA_MAX_DIM * 2, slot (kind,dim,dir) at byte offset
+  // ((int(kind) * QUDA_MAX_DIM + dim) * 2 + dir) * sizeof(uint64_t).
+  array<void *, 2> flag_buffer_d = {};                            // local slot buffer, per bufferIndex
+  array_3d<void *, 2, QUDA_MAX_DIM, 2> flag_buffer_remote_d = {}; // peer's flag_buffer_d, cudaIPC-mapped
+  // Monotonic host-side counters [kind][buf][dim][dir]: sender increments before
+  // writing the peer's slot, receiver before waiting on its local slot.
+  uint64_t flag_send_counter[N_FIELD_KINDS][2][QUDA_MAX_DIM][2] = {};
+  uint64_t flag_recv_counter[N_FIELD_KINDS][2][QUDA_MAX_DIM][2] = {};
+}
+
+void comm_create_stream_gated_comms()
+{
+  if (stream_gated_comms_init) return;
+  if (comm::p2p_signal() != QudaP2PSignal::STREAM_GATED) return;
+
+  bool has_p2p_neighbor = false;
+  for (int dim = 0; dim < 4; ++dim)
+    for (int dir = 0; dir < 2; ++dir) has_p2p_neighbor = has_p2p_neighbor || comm_peer2peer_enabled(dir, dim);
+  if (!has_p2p_neighbor) return;
+
+  CUdevice device;
+  CUresult err = cuCtxGetDevice(&device);
+  if (err != CUDA_SUCCESS) errorQuda("cuCtxGetDevice failed while initializing stream-gated P2P");
+  int supported = 0;
+  err = cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS, device);
+  if (err != CUDA_SUCCESS || !supported)
+    errorQuda("STREAM_GATED requires 64-bit CUDA stream memory operations");
+  // Raw device capability: does the driver accept CU_STREAM_WAIT_VALUE_FLUSH
+  // (CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES)?  GB200 reports 0 and rejects
+  // the flag (CUDA_ERROR_NOT_SUPPORTED).
+  bool flush_capable = false;
+  err = cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES, device);
+  if (err == CUDA_SUCCESS && supported) flush_capable = true;
+
+  // Defaults hold on non-MNNVL builds (the block below is compiled out): the
+  // REMOTE_WRITE policy stays offered (gated only by QUDA_ENABLE_P2P bit 1 in the
+  // tuner) and the flush is never armed -- that path is correct without a flush.
+  stream_gated_remote_flush_supported = false;
+  remote_write_p2p_supported = true;
+
+#ifdef QUDA_MNNVL
+  // On MNNVL a REMOTE_WRITE halo lands in the peer's imported fabric-VMM mapping
+  // as SM stores over many transactions; the doorbell can be observed before the
+  // last data transaction commits, corrupting an iterative solve.  The only guard
+  // is a receiver-side CU_STREAM_WAIT_VALUE_FLUSH.  Flush and remote-write are a
+  // SINGLE knob here: remote-write is safe iff the flush is armed, and the flush
+  // is only useful when remote-write is on.  Enable the pair iff bit 1 is set AND
+  // (the device can flush OR the user forces it with QUDA_P2P_FORCE_FLUSH=1).
+  const bool remote_write_requested = comm_peer2peer_enabled_global() & 2; // QUDA_ENABLE_P2P bit 1
+  const char *force_env = getenv("QUDA_P2P_FORCE_FLUSH");
+  const bool force_flush = force_env && atoi(force_env) == 1;
+  if (remote_write_requested && !flush_capable) {
+    if (force_flush)
+      warningQuda("STREAM_GATED: remote-write requested but device does not report remote-write flush; "
+                  "forcing CU_STREAM_WAIT_VALUE_FLUSH (QUDA_P2P_FORCE_FLUSH=1) -- the driver may reject it.");
+    else
+      warningQuda("STREAM_GATED: remote-write requested (QUDA_ENABLE_P2P bit 1) but device does not report "
+                  "remote-write flush; disabling remote-write. Set QUDA_P2P_FORCE_FLUSH=1 to force it.");
+  }
+  const bool use_remote_write = remote_write_requested && (flush_capable || force_flush);
+  stream_gated_remote_flush_supported = use_remote_write; // arm flush iff remote-write is enabled
+  remote_write_p2p_supported = use_remote_write;          // offer the REMOTE_WRITE policy iff so
+#endif
+
+  const size_t bytes = N_FIELD_KINDS * QUDA_MAX_DIM * 2 * sizeof(uint64_t);
+  // Re-zero the host signal counters in lock-step with the (re)zeroed device slots
+  // below.  On a communicator switch push_communicator() -> freeGhostBuffer() frees this
+  // buffer and a later createIPCComms() re-allocates it against the new communicator's
+  // neighbours; the expected/written counter values must restart from 0 to stay paired
+  // with the fresh, zeroed slots (otherwise the GEQ wait carries stale counts across the
+  // switch and can pass prematurely or hang).  All ranks reach here collectively.
+  std::memset(flag_send_counter, 0, sizeof(flag_send_counter));
+  std::memset(flag_recv_counter, 0, sizeof(flag_recv_counter));
+  for (int b = 0; b < 2; b++) {
+    flag_buffer_d[b] = device_comm_buffer_malloc(bytes);
+    qudaMemset(flag_buffer_d[b], 0, bytes);
+    comm_create_neighbor_memory_p2p(flag_buffer_remote_d[b], flag_buffer_d[b]);
+  }
+
+  // Invariant: with stream-gating active, every enabled P2P direction must have a
+  // valid local slot buffer and remote slot mapping.  A null here would make the
+  // signal/wait primitives no-ops and silently expose stale halos.
+  for (int b = 0; b < 2; b++) {
+    if (!flag_buffer_d[b]) errorQuda("stream-gated flag buffer null after creation (buf=%d)", b);
+    for (int dim = 0; dim < 4; ++dim) {
+      if (comm_dim(dim) == 1) continue;
+      for (int dir = 0; dir < 2; ++dir) {
+        if (!comm_peer2peer_enabled(dir, dim)) continue;
+        if (!flag_buffer_remote_d[b][dim][dir])
+          errorQuda("stream-gated remote flag mapping null for enabled P2P dir (buf=%d dim=%d dir=%d)", b, dim, dir);
+      }
     }
   }
   stream_gated_comms_init = true;
 }
-#else
-void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
+
+bool comm_p2p_remote_write_supported() { return remote_write_p2p_supported; }
+
+void comm_destroy_stream_gated_comms()
+{
+  if (!stream_gated_comms_init) {
+#ifdef QUDA_MNNVL
+    // freeGhostBuffer() calls this immediately after destroyIPCComms(), even on
+    // communicators with no P2P neighbours.  The remote-map registry must be
+    // empty regardless of whether flag buffers were needed.
+    if (!p2p_remote_mappings.empty())
+      errorQuda("comm_destroy_stream_gated_comms: %zu imported P2P mapping(s) remain without flag-buffer state",
+                p2p_remote_mappings.size());
 #endif
     return;
   }
@@ -424,6 +583,172 @@ void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
       }
     }
   } // iterate over dim
+}
+
+// ---------------------------------------------------------------------------
+// comm_p2p_* (CUDA target backend): IPC-event + MPI-doorbell. Bodies are
+// 1:1 with the direct calls color_spinor_field.cpp and gauge_field.cpp made
+// before this refactor; FieldKind is accepted but unused here (the stream-gated
+// backend uses it for per-kind slot dimensioning so COLOR_SPINOR and GAUGE
+// signals never alias).
+
+void comm_p2p_signal_send_done(FieldKind, int buf, int dim, int dir, const qudaStream_t &stream)
+{
+  qudaEventRecord(LatticeField::ipcCopyEvent[buf][dim][dir], stream);
+  comm_start(LatticeField::mh_send_p2p[buf][dim][dir]);
+}
+
+int comm_p2p_query_send_drained(FieldKind, int buf, int dim, int dir)
+{
+  return comm_query(LatticeField::mh_send_p2p[buf][dim][dir]);
+}
+
+void comm_p2p_wait_send_drained(FieldKind, int buf, int dim, int dir)
+{
+  comm_wait(LatticeField::mh_send_p2p[buf][dim][dir]);
+  qudaEventSynchronize(LatticeField::ipcCopyEvent[buf][dim][dir]);
+}
+
+int comm_p2p_query_recv_signal(FieldKind, int buf, int dim, int dir)
+{
+  return comm_query(LatticeField::mh_recv_p2p[buf][dim][dir]);
+}
+
+void comm_p2p_wait_recv_signal(FieldKind, int buf, int dim, int dir)
+{
+  comm_wait(LatticeField::mh_recv_p2p[buf][dim][dir]);
+  qudaEventSynchronize(LatticeField::ipcRemoteCopyEvent[buf][dim][dir]);
+}
+
+// ---------------------------------------------------------------------------
+// Stream-mem-op signalling primitives.
+// Forward-only protocol: sender writes a monotonic uint64_t counter to peer's
+// slot via cuStreamWriteValue64; receiver stream-waits via cuStreamWaitValue64
+// with GEQ and CU_STREAM_WAIT_VALUE_FLUSH so the preceding remote halo write is
+// visible to downstream device work.  Slots are dimensioned per FieldKind so
+// COLOR_SPINOR and GAUGE signals never alias; the protocol is one-way (no
+// acknowledgement back-edge).
+
+namespace
+{
+  inline CUdeviceptr slot_dev_addr(void *base, FieldKind kind, int dim, int dir)
+  {
+    return reinterpret_cast<CUdeviceptr>(reinterpret_cast<uint64_t *>(base)
+                                         + (static_cast<int>(kind) * QUDA_MAX_DIM + dim) * 2 + dir);
+  }
+} // anonymous namespace
+
+void comm_p2p_stream_signal_send_done(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream)
+{
+  if (!comm_peer2peer_enabled(dir, dim)) return;
+  // P2P is enabled for this direction and stream-gating is the resolved transport,
+  // so the remote flag mapping must exist -- a null means lifecycle setup was
+  // skipped, which would silently drop the halo signal.
+  if (!flag_buffer_remote_d[buf][dim][dir])
+    errorQuda("stream-gated signal: remote flag mapping null (buf=%d dim=%d dir=%d)", buf, dim, dir);
+
+  // Peer-at-(dim, dir) sees us as their (dim, 1-dir) neighbour, so we write
+  // their slot at (kind, dim, 1-dir).
+  CUdeviceptr peer = slot_dev_addr(flag_buffer_remote_d[buf][dim][dir], kind, dim, 1 - dir);
+  uint64_t value = ++flag_send_counter[static_cast<int>(kind)][buf][dim][dir];
+
+  logQuda(QUDA_DEBUG_VERBOSE, "comm_p2p_stream_signal_send_done: k=%d buf=%d dim=%d dir=%d -> "
+                              "peer_slot(kind=%d,dim=%d,dir=%d) val=%lu\n",
+          static_cast<int>(kind), buf, dim, dir, static_cast<int>(kind), dim, 1 - dir, (unsigned long)value);
+
+  CUresult err
+    = cuStreamWriteValue64(target::cuda::get_stream(stream), peer, value, CU_STREAM_WRITE_VALUE_DEFAULT);
+  if (err != CUDA_SUCCESS) {
+    target::cuda::set_driver_error(err, "cuStreamWriteValue64", __func__, __FILE__, __STRINGIFY__(__LINE__));
+  }
+}
+
+void comm_p2p_stream_wait_recv_signal(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream)
+{
+  if (!comm_peer2peer_enabled(dir, dim)) return;
+  // As above: an enabled P2P direction under stream-gating must have a local slot
+  // buffer; a null would make the wait a no-op and expose a stale halo.
+  if (!flag_buffer_d[buf]) errorQuda("stream-gated wait: local flag buffer null (buf=%d dim=%d dir=%d)", buf, dim, dir);
+
+  CUdeviceptr local = slot_dev_addr(flag_buffer_d[buf], kind, dim, dir);
+  uint64_t expected = ++flag_recv_counter[static_cast<int>(kind)][buf][dim][dir];
+
+  logQuda(QUDA_DEBUG_VERBOSE, "comm_p2p_stream_wait_recv_signal: k=%d buf=%d dim=%d dir=%d "
+                              "local_slot(kind=%d,dim=%d,dir=%d) expected=%lu\n",
+          static_cast<int>(kind), buf, dim, dir, static_cast<int>(kind), dim, dir, (unsigned long)expected);
+
+  // Receiver-side ordering for REMOTE_WRITE halos: add CU_STREAM_WAIT_VALUE_FLUSH
+  // so the wait drains outstanding remote writes to us before it is satisfied.
+  // Only where the device supports it (stream_gated_remote_flush_supported); on
+  // devices that reject the flag (GB200, CUDA_ERROR_NOT_SUPPORTED) remote-write is
+  // not offered as a policy (comm_p2p_remote_write_supported), so plain GEQ is
+  // correct here.
+  unsigned int wait_flags = CU_STREAM_WAIT_VALUE_GEQ;
+  if (stream_gated_remote_flush_supported) wait_flags |= CU_STREAM_WAIT_VALUE_FLUSH;
+  CUresult err = cuStreamWaitValue64(target::cuda::get_stream(stream), local, expected, wait_flags);
+  if (err != CUDA_SUCCESS) {
+    target::cuda::set_driver_error(err, "cuStreamWaitValue64", __func__, __FILE__, __STRINGIFY__(__LINE__));
+  }
+}
+
+// ============================================================================
+// Unified P2P signal API (Phase B of the TransportContext refactor).
+// These overloads take a QudaP2PSignal and dispatch to the appropriate
+// per-kind implementation defined above.  Subsequent phases will migrate the
+// dslash + gauge call sites to use these signatures, after which the per-kind
+// functions can become file-static.
+// ============================================================================
+
+void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir,
+                                const qudaStream_t &stream, QudaP2PSignal signal)
+{
+  switch (signal) {
+  case QudaP2PSignal::REMOTE_IPC:
+    comm_p2p_signal_send_done(kind, buf, dim, dir, stream);
+    return;
+  case QudaP2PSignal::STREAM_GATED:
+    comm_p2p_stream_signal_send_done(kind, buf, dim, dir, stream);
+    return;
+  }
+  errorQuda("comm_p2p_signal_send_done: unknown QudaP2PSignal %d", static_cast<int>(signal));
+}
+
+void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir,
+                                const qudaStream_t &stream, QudaP2PSignal signal)
+{
+  switch (signal) {
+  case QudaP2PSignal::REMOTE_IPC:
+    // Legacy path is host-blocking (synchronizes on ipcRemoteCopyEvent).  For
+    // stream-ordered REMOTE_IPC behavior under this unified API we'd want
+    // cudaStreamWaitEvent instead -- but no existing call site uses that
+    // pattern, and current callers that need host-blocking will migrate to
+    // the legacy 4-arg comm_p2p_wait_recv_signal directly.  For now, dispatch
+    // to host-blocking (matches semantics of the existing 4-arg variant);
+    // callers that pass a stream and care about stream-ordering on REMOTE_IPC
+    // should use stream wait events explicitly.
+    (void)stream;
+    comm_p2p_wait_recv_signal(kind, buf, dim, dir);
+    return;
+  case QudaP2PSignal::STREAM_GATED:
+    comm_p2p_stream_wait_recv_signal(kind, buf, dim, dir, stream);
+    return;
+  }
+  errorQuda("comm_p2p_wait_recv_signal: unknown QudaP2PSignal %d", static_cast<int>(signal));
+}
+
+void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir, QudaP2PSignal signal)
+{
+  switch (signal) {
+  case QudaP2PSignal::REMOTE_IPC:
+    comm_p2p_wait_send_drained(kind, buf, dim, dir);
+    return;
+  case QudaP2PSignal::STREAM_GATED:
+    // STREAM_GATED has no separate "send drained" concept: stream ordering
+    // guarantees that any subsequent op enqueued on the same stream will
+    // observe the prior cuStreamWriteValue64 completed.  Nothing to wait for.
+    return;
+  }
+  errorQuda("comm_p2p_wait_send_drained: unknown QudaP2PSignal %d", static_cast<int>(signal));
 }
 
 } // namespace quda

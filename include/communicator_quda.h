@@ -15,6 +15,7 @@
 #include <field_cache.h>
 #include <comm_key.h>
 #include <float_vector.h>
+#include <comm_target.h> // target-resolved; provides constexpr comm_build_is_mnnvl()
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
@@ -253,8 +254,20 @@ namespace quda
         enable_peer_to_peer = std::abs(enable_peer_to_peer);
 
       } else { // !enable_peer_to_peer_env
-        if (getVerbosity() > QUDA_SILENT && rank == 0)
-          printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+        // On MNNVL the direct-load/store (remote-write) P2P policy is unsafe
+        // without a receiver-side flush this device does not provide (see
+        // comm_p2p_remote_write_supported); default the remote-write bit OFF so
+        // the tuner uses the copy-engine path and no spurious "remote-write
+        // requested but no flush" warning is emitted.  Turns the default 7
+        // (3 base + 4 GDR) into 5 (or 1 GDR-off).  An explicit QUDA_ENABLE_P2P
+        // still overrides this.  No-op on non-MNNVL builds (predicate is false).
+        if constexpr (comm_build_is_mnnvl()) enable_peer_to_peer &= ~2; // clear bit 1 (remote-write)
+        if (getVerbosity() > QUDA_SILENT && rank == 0) {
+          if (enable_peer_to_peer & 2)
+            printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+          else
+            printf("Enabling peer-to-peer copy engine access\n");
+        }
       }
 
       if (!peer2peer_init && enable_peer_to_peer) {

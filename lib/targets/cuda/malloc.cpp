@@ -385,6 +385,11 @@ namespace quda
 #endif
     return ptr;
   }
+
+  // shmem_free_ is defined further down (next to the other comms-memory frees);
+  // forward-declare it here so the NVSHMEM tag-dispatch free below (which sits
+  // above that definition) has it in scope.
+  void shmem_free_(const char *func, const char *file, int line, void *ptr);
 #endif
 
   // Tag-dispatched comm-buffer allocator. The P2P body uses the driver

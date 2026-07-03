@@ -261,6 +261,37 @@ namespace quda {
     param.scale = scale;
   }
 
+  // Ghost/comm buffers live in the NVSHMEM symmetric heap when built with
+  // NVSHMEM (the NVSHMEM dslash does nvshmem_ptr/put on them, so they must be
+  // symmetric), and in the DeviceCommBuffer (cuMemAlloc, P2P/MPI-shared) kind
+  // otherwise.  This keeps NVSHMEM allocations separate from P2P/MPI -- the
+  // reason the comm-buffer tags exist -- and restores the routing develop did
+  // via device_comms_pinned_malloc before the Phase-3 tag refactor.  (A future
+  // refinement, deferred to the fabric/NVSHMEM coexistence work, gives P2P a
+  // separate contiguous buffer alongside the symmetric ghosts.)
+  static inline void *ghost_comm_buffer_malloc_(size_t bytes)
+  {
+    // The symmetric ghost buffers come from the NVSHMEM symmetric heap ONLY when
+    // NVSHMEM is enabled at runtime.  With QUDA_ENABLE_NVSHMEM=0 (a first-class
+    // config) we take the DeviceCommBuffer path -- byte-identical to a
+    // non-NVSHMEM build -- so the ghost/P2P path never touches the NVSHMEM
+    // allocator (whose collectives don't track a split sub-communicator).  The
+    // #ifdef is still required: the nvshmem_comm_buffer_malloc overload only
+    // exists under NVSHMEM_COMMS.  comm_nvshmem_enabled() is latched once, so
+    // alloc and free always agree.
+#ifdef NVSHMEM_COMMS
+    if (comm_nvshmem_enabled()) return nvshmem_comm_buffer_malloc(bytes);
+#endif
+    return device_comm_buffer_malloc(bytes);
+  }
+  static inline void ghost_comm_buffer_free_(void *ptr)
+  {
+#ifdef NVSHMEM_COMMS
+    if (comm_nvshmem_enabled()) { nvshmem_comm_buffer_free(ptr); return; }
+#endif
+    device_comm_buffer_free(ptr);
+  }
+
   void LatticeField::allocateGhostBuffer(size_t ghost_bytes) const
   {
     // only allocate if not already allocated or buffer required is bigger than previously
@@ -281,8 +312,20 @@ namespace quda {
           // hipErrorInvalidValue.
           destroyIPCComms();
           for (int b=0; b<2; b++) {
-            device_comms_pinned_free(ghost_recv_buffer_d[b]);
-            device_comms_pinned_free(ghost_send_buffer_d[b]);
+            ghost_comm_buffer_free_(ghost_recv_buffer_d[b]);
+            ghost_comm_buffer_free_(ghost_send_buffer_d[b]);
+#ifdef NVSHMEM_COMMS
+            // P2P buffers are a SEPARATE contiguous DeviceCommBuffer allocation
+            // only when NVSHMEM is enabled at runtime; free them too.  (NVSHMEM
+            // off, or non-NVSHMEM build: they alias the symmetric buffers just
+            // freed -- do not double-free.)
+            if (comm_nvshmem_enabled()) {
+              device_comm_buffer_free(ghost_recv_buffer_p2p_d[b]);
+              device_comm_buffer_free(ghost_send_buffer_p2p_d[b]);
+            }
+#endif
+            ghost_recv_buffer_p2p_d[b] = nullptr;
+            ghost_send_buffer_p2p_d[b] = nullptr;
             host_free(ghost_pinned_send_buffer_h[b]);
             host_free(ghost_pinned_recv_buffer_h[b]);
           }
@@ -292,12 +335,12 @@ namespace quda {
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          ghost_recv_buffer_d[b] = ghost_comm_buffer_malloc_(ghost_bytes);
           // silence any false cuda-memcheck initcheck errors
           qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          ghost_send_buffer_d[b] = ghost_comm_buffer_malloc_(ghost_bytes);
           // silence any false cuda-memcheck initcheck errors
           qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
@@ -358,16 +401,31 @@ namespace quda {
   void LatticeField::freeGhostBuffer(void)
   {
     destroyIPCComms();
+    // Tear down the stream-gated flag buffers right after the ghost P2P imports
+    // (still device-ready here).  No-op if stream-gating wasn't set up.  This runs
+    // on every freeGhostBuffer, i.e. communicator changes (push_communicator) and
+    // final teardown, so the flag buffers are destroyed/recreated with the comms.
+    comm_destroy_stream_gated_comms();
+
+    // Re-sync the shared double-buffer index on every communicator switch.  bufferIndex is
+    // a single global static toggled by ALL field exchanges (gauge AND color-spinor); split-
+    // grid sub-communicator work can advance it a different number of times on different
+    // ranks, so a collective gauge exchange after a push/pop ends up with sender and receiver
+    // on DIFFERENT flag/ghost buffers -> stream-gated signal deadlock (or wrong-halo).  Comms
+    // are torn down + barriered above, so no exchange is in flight; resetting to 0 here re-
+    // synchronises all ranks.  (Proper fix: give each multi-buffered resource its own index /
+    // bundle a buffer's data + signalling together.)
+    bufferIndex = 0;
 
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
       // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
+      if (ghost_recv_buffer_d[b]) ghost_comm_buffer_free_(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) ghost_comm_buffer_free_(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
 #ifdef NVSHMEM_COMMS

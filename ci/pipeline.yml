@@ -1,6 +1,11 @@
 include:
   - remote: "https://gitlab.com/cscs-ci/recipes/-/raw/master/templates/v2/.ci-ext.yml"
 
+# Future work: the stream-gated P2P regression (ctest -L stream_gated) needs an
+# NVSHMEM-compiled build and is intentionally NOT wired in here -- the public CSCS
+# pipeline has no NVSHMEM/MNNVL-capable image. Enable it once such an image/runner
+# exists; until then validate it directly under srun. See ci/stream-gated-regression.md.
+
 stages:
   - build
   - test

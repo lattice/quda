@@ -653,6 +653,42 @@ namespace quda
     void commsWait(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
 
     /**
+       @brief Stream-gated send: enqueue qudaMemcpyP2PAsync into peer's recv
+       buffer followed by comm_p2p_signal_send_done(.., STREAM_GATED) on the
+       same stream (which writes peer's signal slot via cuStreamWriteValue64).
+       No MPI doorbell, no IPC event. Used by the QUDA_P2P_STREAM_GATED
+       sub-policy. Requires the direction to be peer-to-peer enabled;
+       errors out otherwise.
+       @param[in] d d=[2*dim+dir]
+       @param[in] stream stream to enqueue the copy + signal on
+    */
+    void sendStartStream(int d, const qudaStream_t &stream, bool remote_write = false) const;
+
+    /**
+       @brief Stream-gated wait: enqueue comm_p2p_wait_recv_signal(.., STREAM_GATED)
+       (cuStreamWaitValue64 GEQ) on the stream where the consumer kernel
+       will run. No host poll. Requires the direction to be peer-to-peer
+       enabled; errors out otherwise.
+       @param[in] d d=[2*dim+dir]
+       @param[in] stream consumer stream to gate
+    */
+    void commsWaitStream(int d, const qudaStream_t &stream) const;
+
+    /**
+       @brief Non-blocking drain of the *send* to direction "dir" (d=2*dim+dir).
+       Used by the stream-gated policies in the hybrid case where the matching
+       receive (1-dir) is P2P (handled by a queued stream wait) but this send
+       direction is non-P2P (MPI/IB): the persistent send request must still be
+       polled to completion, exactly as the message-passing path does, or the
+       next iteration's MPI_Start hits MPI_ERR_REQUEST. P2P sends are drained via
+       their own signalling, so this reports them complete immediately.
+       @param[in] d d=[2*dim+dir]
+       @param[in] gdr whether the non-P2P send used the RDMA (GDR) handle
+       @return true once the send is drained (or the dir is P2P / not partitioned)
+    */
+    bool commsQuerySend(int d, bool gdr = false) const;
+
+    /**
        @brief Unpacks the ghost from host to device after
        communication has finished.
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is

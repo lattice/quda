@@ -1,5 +1,6 @@
 #include "command_line_params.h"
 #include <comm_quda.h>
+#include <util_quda.h>
 
 // parameters parsed from the command line
 
@@ -352,6 +353,8 @@ bool   smear_compute_two_link = true;
 bool   smear_delete_two_link  = true;
 
 bool enable_testing = false;
+
+bool require_p2p = false;
 
 bool detratio = false;
 
@@ -1332,6 +1335,20 @@ void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameters");
   opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
+  opgroup->add_option("--require-p2p", require_p2p,
+                      "Abort if no peer-to-peer neighbour is enabled (default false). Used by the "
+                      "stream-gated P2P regression so it cannot pass vacuously without exercising P2P.");
+}
+
+void check_require_p2p()
+{
+  // --require-p2p makes the stream-gated P2P regression non-vacuous: without an
+  // enabled P2P neighbour no stream-gated signal primitive runs, so a suppressed
+  // flag-buffer lifecycle would go undetected. Fail loudly rather than pass empty.
+  // comm_peer2peer_enabled_global() is allreduce-backed, so all ranks decide alike.
+  if (require_p2p && !quda::comm_peer2peer_enabled_global())
+    errorQuda("--require-p2p set but no peer-to-peer neighbour is enabled; this run cannot exercise "
+              "the stream-gated P2P path (need >1 rank on P2P-connected GPUs)");
 }
 
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app)

@@ -310,7 +310,49 @@ namespace quda
      comm_create_neighbor_memory_p2p.
      @param[in] remote Array of remote memory pointers to neighboring pointers
   */
-  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+  void comm_destroy_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+
+  /**
+     @brief Tear down the NVSHMEM-transport neighbor pointers (no-op: owned by
+     NVSHMEM).
+     @param[in] remote Array of remote memory pointers to neighboring pointers
+  */
+  void comm_destroy_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+
+  /**
+     @brief Allocate and IPC-exchange the stream-mem-op signal-slot ("flag")
+     buffers used by the stream-gated P2P signalling path.  No-op unless
+     stream-gating is the resolved transport (comm::p2p_signal() ==
+     STREAM_GATED), so events-only / HIP builds never allocate it.  The flag
+     buffer is constant-size and is created from createIPCComms() (once per
+     communicator, idempotent).  It is deliberately kept out of the per-field
+     ghost-buffer create/destroy churn -- stable across ordinary ghost-buffer
+     resizing -- so its address does not move and its IPC handle never needs
+     re-opening (which CUDA rejects on same-address reuse).
+  */
+  void comm_create_stream_gated_comms();
+
+  /**
+     @brief Whether the REMOTE_WRITE P2P policy (the packing kernel stores halos
+     directly into the peer's buffer) is safe to offer to the dslash policy
+     tuner on this build/device.  On MNNVL/fabric builds remote-write halos land
+     in the peer's imported VMM buffer across multiple transactions and the
+     doorbell can be observed before the last data transaction commits; the only
+     safe guard is a receiver-side flush (CU_STREAM_WAIT_VALUE_FLUSH).  GB200
+     reports CAN_FLUSH_REMOTE_WRITES=0 and rejects that flag (CUDA_ERROR_NOT_
+     SUPPORTED), so remote-write is dropped from the policy list there and the
+     copy-engine path is used instead.  Always true on non-MNNVL builds (that
+     path is correct without a flush).  Resolved at P2P setup
+     (comm_create_stream_gated_comms).
+  */
+  bool comm_p2p_remote_write_supported();
+
+  /**
+     @brief Tear down the stream-gated signal-slot buffers created by
+     comm_create_stream_gated_comms.  Called from freeGhostBuffer(), so the
+     buffers are destroyed (and later recreated) across communicator changes.
+  */
+  void comm_destroy_stream_gated_comms();
 
   /**
      @brief Create unique events shared between each logical pair of
