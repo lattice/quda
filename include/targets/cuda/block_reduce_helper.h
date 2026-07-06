@@ -129,6 +129,20 @@ namespace quda
   template <typename T, typename U> constexpr auto get_cg_reducer(const minimum<U> &) { return cg::less<T>(); }
 
   /**
+     @brief Trait that detects a quda::array reduction type.  Used to
+     choose a semantically-correct decomposition of large reduction
+     types (splitting on the array element boundary) rather than the
+     raw atomic-word boundary, which would break compound accumulators
+     such as doubledouble.
+  */
+  template <typename T, typename Enable = void> struct is_reduce_array : std::false_type {
+  };
+  template <typename T>
+  struct is_reduce_array<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> :
+    std::true_type {
+  };
+
+  /**
      @brief CUDA specialization of warp_reduce, utilizing cooperative groups
   */
   template <> struct warp_reduce<true> {
@@ -164,9 +178,40 @@ namespace quda
     }
 
     /**
+       @brief Perform a warp-wide reduction using cooperative groups
+       for a large array reduction type.  We split on the array element
+       boundary and reduce each element with the element-wise reducer,
+       so compound accumulators (e.g. doubledouble) retain their
+       arithmetic semantics.  This is required for correctness: naively
+       splitting into atomic words would sum the head/tail components of
+       a doubledouble as independent doubles, degrading the result to
+       plain double precision.
+       @param[in] value_ thread-local value to be reduced
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       warp (all = false).
+       @param[in] r The reduction operation we want to apply
+       @return The warp-wide reduced value
+     */
+    template <typename T, typename reducer_t, typename param_t>
+    std::enable_if_t<(sizeof(T) > 32) && is_reduce_array<T>::value, T> __device__ inline
+    operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
+    {
+      using Acc = typename T::value_type;
+      T value;
+#pragma unroll
+      for (int i = 0; i < T::N; i++) value[i] = operator()(value_[i], all, get_reducer<Acc>(r), param_t());
+      return value;
+    }
+
+    /**
        @brief Perform a warp-wide reduction using cooperative groups.
        This is a wrapper that split up large values into atomic-size
-       pieces, since cg doens't support > 32 byte types.
+       pieces, since cg doens't support > 32 byte types.  This path is
+       only valid for reduction types whose atomic-word decomposition is
+       also arithmetically valid (i.e. not compound accumulators such as
+       doubledouble); array reduction types are handled by the overload
+       above.
        @param[in] value_ thread-local value to be reduced
        @param[in] all Whether we want all threads to have visibility
        to the result (all = true) or just the first thread in the
@@ -175,8 +220,8 @@ namespace quda
        @return The warp-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
-    std::enable_if_t<(sizeof(T) > 32), T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r,
-                                                                       const param_t &)
+    std::enable_if_t<(sizeof(T) > 32) && !is_reduce_array<T>::value, T> __device__ inline
+    operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
       using atomic_t = typename atomic_type<T>::type;
       constexpr size_t n = sizeof(T) / sizeof(atomic_t);
