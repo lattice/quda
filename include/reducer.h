@@ -192,7 +192,26 @@ namespace quda
       return a;
     }
 
-    __device__ __host__ inline T operator()(T a, const array<typename T::value_type::ftype, T::N> &b) const { return apply(a, b); }
+    __device__ __host__ inline T operator()(T a, const array<typename T::value_type::ftype, T::N> &b) const
+    {
+      return apply(a, b);
+    }
+
+    template <typename SiteScalar>
+    __device__ __host__ static inline std::enable_if_t<!std::is_same_v<typename T::value_type, SiteScalar>, T>
+    apply(T a, const array<SiteScalar, T::N> &b)
+    {
+#pragma unroll
+      for (int i = 0; i < T::N; i++) a[i].operator+=(b[i]);
+      return a;
+    }
+
+    template <typename SiteScalar>
+    __device__ __host__ inline std::enable_if_t<!std::is_same_v<typename T::value_type, SiteScalar>, T>
+    operator()(T a, const array<SiteScalar, T::N> &b) const
+    {
+      return apply(a, b);
+    }
   };
 #endif
 
