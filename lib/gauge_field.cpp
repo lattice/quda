@@ -577,8 +577,11 @@ namespace quda {
     } else { // cpu field
       void *send[2 * QUDA_MAX_DIM];
       for (int d = 0; d < nDim; d++) {
-        send[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
-        if (geometry == QUDA_COARSE_GEOMETRY) send[d + 4] = safe_malloc(nFace * surface[d] * nInternal * precision);
+        // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+        // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
+        send[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
+        if (geometry == QUDA_COARSE_GEOMETRY)
+          send[d + 4] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
       }
 
       void *ghost_[2 * QUDA_MAX_DIM];
@@ -696,7 +699,7 @@ namespace quda {
       qudaDeviceSynchronize();
     } else {
       void *recv[QUDA_MAX_DIM];
-      for (int d = 0; d < nDim; d++) recv[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
+      for (int d = 0; d < nDim; d++) recv[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
 
       void *ghost_[] = {ghost[0].data(), ghost[1].data(), ghost[2].data(), ghost[3].data(),
                         ghost[4].data(), ghost[5].data(), ghost[6].data(), ghost[7].data()};
@@ -787,8 +790,8 @@ namespace quda {
       for (int d = 0; d < nDim; d++) {
         if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d]))) continue;
         bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-        send[d] = safe_malloc(2 * bytes[d]);
-        recv[d] = safe_malloc(2 * bytes[d]);
+        send[d] = host_pinned_malloc(2 * bytes[d]);
+        recv[d] = host_pinned_malloc(2 * bytes[d]);
       }
 
       for (int d = 0; d < nDim; d++) {
