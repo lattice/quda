@@ -242,7 +242,7 @@ namespace quda
         for (int i = 0; i < x.size(); i++) {
           y[i] = fma2({a[j], a[j]}, x[i], y[i]);
           x[i] = c[j] * x[i];
-          x[i] = fma2({b[i], b[i]}, z[i], x[i]);
+          x[i] = fma2({b[j], b[j]}, z[i], x[i]);
         }
       }
       constexpr int flops() const { return 5; }   //! flops per element
@@ -290,7 +290,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           w[i] = cmac(a[j], x[i], z[i]);
-          w[i] = cmac(b[j], y[j], w[i]);
+          w[i] = cmac(b[j], y[i], w[i]);
         }
       }
       constexpr int flops() const { return 9; }   //! flops per element
