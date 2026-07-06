@@ -30,7 +30,6 @@ namespace quda
     constexpr bool enable_warp_split() { return false; }
 #else
     constexpr bool enable_warp_split() { return true; }
-    //constexpr bool enable_warp_split() { return false; }
 #endif
 
     /**

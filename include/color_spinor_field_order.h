@@ -241,10 +241,6 @@ namespace quda
         constexpr int M = nSpinBlock * nColor * nVec;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          // vec_t tmp
-          //   = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
-          // vec_t tmp = vector_load<vec_t>(in + parity * offset_cb, x_cb * N + chi * M + i);
-          // memcpy(&out[i], &tmp, sizeof(vec_t));
           auto tmp
             = vector_load<Float, 2>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
           memcpy(&out[i], &tmp, sizeof(tmp));
