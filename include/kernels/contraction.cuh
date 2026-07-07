@@ -9,10 +9,9 @@
 
 namespace quda
 {
-  static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
+  template <class T> using spinor_array = array<T, 2>;
 
-  template <class T> using spinor_array = array<array<T, 2>, max_contract_results>;
-  template <class T> using staggered_spinor_array = array<T, 2>;
+  inline int nSpinSq(const ColorSpinorField &x) { return x.Nspin() * x.Nspin(); }
 
   template <int reduction_dim, class T> __device__ void sink_from_t_xyz(int sink[4], int t, int xyz, T X[4])
   {
@@ -32,7 +31,7 @@ namespace quda
     return ((sink[3] * X[2] + sink[2]) * X[1] + sink[1]) * X[0] + sink[0];
   }
 
-  template <typename Float, int nColor_, int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = spinor_array<device_reduce_t>>
+  template <typename Float, int nColor_, int nSpin_, int reduction_dim_, typename contract_t = spinor_array<device_reduce_t>>
   struct ContractionSummedArg : public ReduceArg<contract_t> {
     using reduce_t = contract_t;
     // This the direction we are performing reduction on. default to 3.
@@ -41,6 +40,7 @@ namespace quda
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
+    static constexpr unsigned int max_n_batch_block = nSpin * nSpin;
     static constexpr bool spin_project = nSpin_ == 1 ? false : true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
@@ -60,12 +60,13 @@ namespace quda
 
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y, const int source_position_in[4],
                          const int mom_mode_in[4], const QudaFFTSymmType fft_type_in[4], const int s1, const int b1) :
-      ReduceArg<reduce_t>(dim3(x.Volume() / x.X()[reduction_dim], 1, x.X()[reduction_dim]), x.X()[reduction_dim]),
+      ReduceArg<reduce_t>(dim3(x.Volume() / x.X()[reduction_dim], 1, nSpinSq(x) * x.X()[reduction_dim]),
+                          nSpinSq(x) * x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
       b1(b1)
-    // Launch xyz threads per t, t times.
+    // Launch xyz threads per t, t times
     {
       for (int i = 0; i < 4; i++) {
         X[i] = x.X()[i];
@@ -92,19 +93,22 @@ namespace quda
     template <typename U> static inline void comm_reduce(U &) { }
 
     // Final param is unused in the MultiReduce functor in this use case.
-    template <int s1>
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
+    template <int s1> __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int G_idx_t)
     {
       constexpr int nSpin = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
+      constexpr int nSpinSq = nSpin * nSpin;
 
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
-      constexpr array<array<int, nSpin>, nSpin * nSpin> gm_i = get_dr_gm_i();
-      constexpr array<array<complex<real>, nSpin>, nSpin * nSpin> g5gm_z = get_dr_g5gm_z<real>();
-
       int b1 = arg.b1;
+
+      int t = G_idx_t / nSpinSq;
+      int G_idx = G_idx_t % nSpinSq;
+
+      auto gm = get_dr_gm(G_idx);
+      auto g5gm = get_dr_g5gm<real>(G_idx);
 
       // The coordinate of the sink
       int sink[4];
@@ -124,26 +128,33 @@ namespace quda
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
+      auto get_g5gm = [&](int i) {
+        switch (i) {
+        case 0: return g5gm[0];
+        case 1: return g5gm[1];
+        case 2: return g5gm[2];
+        case 3:
+        default: return g5gm[3];
+        }
+      };
+
       // Thread-local sum in field / reduction precision; RFE only when merged into result
       spinor_array<reduction_t> site_sum = {};
 #pragma unroll
-      for (int G_idx = 0; G_idx < 16; G_idx++) {
-#pragma unroll
-        for (int s2 = 0; s2 < nSpin; s2++) {
+      for (int s2 = 0; s2 < nSpin; s2++) {
 
-          // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
-          int b2 = gm_i[G_idx][s2];
-          // get non-zero column index for current s1
-          int b1_tmp = gm_i[G_idx][s1];
+        // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
+        int b2 = gm[s2];
+        // get non-zero column index for current s1
+        int b1_tmp = gm[s1];
 
-          // only contributes if we're at the correct b1 from the outer loop FIXME
-          if (b1_tmp == b1) {
-            // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
-            // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx
-            auto prop_product = g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * g5gm_z[G_idx][b1];
-            site_sum[G_idx][0] += prop_product.real() * phase.real() - prop_product.imag() * phase.imag();
-            site_sum[G_idx][1] += prop_product.imag() * phase.real() + prop_product.real() * phase.imag();
-          }
+        // only contributes if we're at the correct b1 from the outer loop FIXME
+        if (b1_tmp == b1) {
+          // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
+          // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx
+          auto prop_product = get_g5gm(b2) * innerProduct(x, y, b2, s2) * get_g5gm(b1);
+          site_sum[0] += prop_product.real() * phase.real() - prop_product.imag() * phase.imag();
+          site_sum[1] += prop_product.imag() * phase.real() + prop_product.real() * phase.imag();
         }
       }
 
