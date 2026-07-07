@@ -270,7 +270,7 @@ namespace quda {
   // via device_comms_pinned_malloc before the Phase-3 tag refactor.  (A future
   // refinement, deferred to the fabric/NVSHMEM coexistence work, gives P2P a
   // separate contiguous buffer alongside the symmetric ghosts.)
-  static inline void *ghost_comm_buffer_malloc_(size_t bytes)
+  static inline void *ghost_comm_buffer_malloc(size_t bytes)
   {
     // The symmetric ghost buffers come from the NVSHMEM symmetric heap ONLY when
     // NVSHMEM is enabled at runtime.  With QUDA_ENABLE_NVSHMEM=0 (a first-class
@@ -285,7 +285,7 @@ namespace quda {
 #endif
     return device_comm_buffer_malloc(bytes);
   }
-  static inline void ghost_comm_buffer_free_(void *ptr)
+  static inline void ghost_comm_buffer_free(void *ptr)
   {
 #ifdef NVSHMEM_COMMS
     if (comm_nvshmem_enabled()) {
@@ -316,8 +316,8 @@ namespace quda {
           // hipErrorInvalidValue.
           destroyIPCComms();
           for (int b=0; b<2; b++) {
-            ghost_comm_buffer_free_(ghost_recv_buffer_d[b]);
-            ghost_comm_buffer_free_(ghost_send_buffer_d[b]);
+            ghost_comm_buffer_free(ghost_recv_buffer_d[b]);
+            ghost_comm_buffer_free(ghost_send_buffer_d[b]);
 #ifdef NVSHMEM_COMMS
             // P2P buffers are a SEPARATE contiguous DeviceCommBuffer allocation
             // only when NVSHMEM is enabled at runtime; free them too.  (NVSHMEM
@@ -339,12 +339,12 @@ namespace quda {
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_recv_buffer_d[b] = ghost_comm_buffer_malloc_(ghost_bytes);
+          ghost_recv_buffer_d[b] = ghost_comm_buffer_malloc(ghost_bytes);
           // silence any false cuda-memcheck initcheck errors
           qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_send_buffer_d[b] = ghost_comm_buffer_malloc_(ghost_bytes);
+          ghost_send_buffer_d[b] = ghost_comm_buffer_malloc(ghost_bytes);
           // silence any false cuda-memcheck initcheck errors
           qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
@@ -425,11 +425,11 @@ namespace quda {
 
     for (int b=0; b<2; b++) {
       // free receive buffer
-      if (ghost_recv_buffer_d[b]) ghost_comm_buffer_free_(ghost_recv_buffer_d[b]);
+      if (ghost_recv_buffer_d[b]) ghost_comm_buffer_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) ghost_comm_buffer_free_(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) ghost_comm_buffer_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
 #ifdef NVSHMEM_COMMS

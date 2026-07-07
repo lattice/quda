@@ -1,5 +1,4 @@
 #include <communicator_quda.h>
-#include <device.h>
 
 #define MPI_CHECK(mpi_call)                                                                                            \
   do {                                                                                                                 \

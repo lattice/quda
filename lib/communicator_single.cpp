@@ -3,7 +3,6 @@
  */
 
 #include <stdlib.h>
-#include <device.h>
 #include <string.h>
 
 #include <communicator_quda.h>

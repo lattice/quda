@@ -264,25 +264,18 @@ namespace quda
   int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid);
 
   /**
-     @brief QUDA-owned P2P exchange of local memory addresses between
-     logically neighboring processes.  Exchanges a SINGLE fabric (MNNVL) or
-     cudaIPC (non-IMEX) handle for the local contiguous P2P buffer and imports
-     the peer's, so P2P writes target a single-allocation, RDMA-capable buffer.
-     Compiled in ALL builds (including NVSHMEM) -- under NVSHMEM the symmetric
-     heap does not give a reusable single-handle export, so P2P owns its own
-     DeviceCommBuffer.  Only defined between peer-to-peer-enabled devices.
+     @brief P2P exchange of local memory addresses between logically neighboring processes.  
+     Exchanges a SINGLE fabric (MNNVL) or cudaIPC (non-IMEX) handle for the local contiguous 
+     P2P buffer and imports the peer's, so P2P writes target a single-allocation, RDMA-capable buffer.
+     Only defined between peer-to-peer-enabled devices.
      @param[out] remote Array of remote memory pointers to neighboring pointers
      @param[in] local The process-local memory pointer to be exchanged
   */
   void comm_create_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
   /**
-     @brief NVSHMEM-transport neighbor pointer (nvshmem_ptr of the peer's
-     symmetric recv buffer): the Shmem direct-NVLink put destination.  No-op
-     when not built with NVSHMEM.  Kept strictly separate from the P2P import so
-     a single pointer family never means both "NVSHMEM symmetric remote" and
-     "QUDA P2P import".
-     @param[out] remote Array of remote memory pointers to neighboring pointers
+     @brief Create local array of remote memory pointers to buffers on neighboring ranks, for NVSHMEM use.
+     @param[out] remote Array of remote memory pointers to buffers on neighboring ranks
      @param[in] local The process-local symmetric buffer
   */
   void comm_create_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
@@ -306,11 +299,7 @@ namespace quda
      buffers used by the stream-gated P2P signalling path.  No-op unless
      stream-gating is the resolved transport (comm::p2p_signal() ==
      STREAM_GATED), so events-only / HIP builds never allocate it.  The flag
-     buffer is constant-size and is created from createIPCComms() (once per
-     communicator, idempotent).  It is deliberately kept out of the per-field
-     ghost-buffer create/destroy churn -- stable across ordinary ghost-buffer
-     resizing -- so its address does not move and its IPC handle never needs
-     re-opening (which CUDA rejects on same-address reuse).
+     buffer is constant-size and is created from createIPCComms() 
   */
   void comm_create_stream_gated_comms();
 
@@ -320,19 +309,17 @@ namespace quda
      tuner on this build/device.  On MNNVL/fabric builds remote-write halos land
      in the peer's imported VMM buffer across multiple transactions and the
      doorbell can be observed before the last data transaction commits; the only
-     safe guard is a receiver-side flush (CU_STREAM_WAIT_VALUE_FLUSH).  GB200
-     reports CAN_FLUSH_REMOTE_WRITES=0 and rejects that flag (CUDA_ERROR_NOT_
-     SUPPORTED), so remote-write is dropped from the policy list there and the
-     copy-engine path is used instead.  Always true on non-MNNVL builds (that
+     safe guard is a receiver-side flush (CU_STREAM_WAIT_VALUE_FLUSH). Some hardware
+     can report CAN_FLUSH_REMOTE_WRITES=0. In those casesr emote-write is dropped from the 
+     policy list there and only thecopy-engine path is used.  Always true on non-MNNVL builds (that
      path is correct without a flush).  Resolved at P2P setup
      (comm_create_stream_gated_comms).
   */
   bool comm_p2p_remote_write_supported();
 
   /**
-     @brief Tear down the stream-gated signal-slot buffers created by
-     comm_create_stream_gated_comms.  Called from freeGhostBuffer(), so the
-     buffers are destroyed (and later recreated) across communicator changes.
+     @brief Destroy the stream-gated signal-slot buffers created by
+     comm_create_stream_gated_comms.
   */
   void comm_destroy_stream_gated_comms();
 
@@ -497,8 +484,7 @@ namespace quda
                      fabric.  HIP backend uses hipIpc analogues.
      - STREAM_GATED: cuStreamWriteValue64 / cuStreamWaitValue64 on a slot in
                      a peer-mapped flag buffer.  Works cross-clique within an
-                     MNNVL NVLink fabric.  HIP requires hipStreamWriteValue64
-                     (not confirmed yet -- backend allow-list filters this).
+                     MNNVL NVLink fabric.
   */
   enum class QudaP2PSignal { REMOTE_IPC, STREAM_GATED };
 
@@ -506,14 +492,13 @@ namespace quda
   {
     /** Does the active backend (and build) support the given P2P signalling kind?
         Backend-provided allow-list: CUDA non-MNNVL supports both; CUDA MNNVL supports
-        STREAM_GATED only; HIP supports REMOTE_IPC only.  Implementation lives in
+        STREAM_GATED only; HIP currently supports REMOTE_IPC only.  Implementation lives in
         lib/targets/<backend>/p2p_signal_defaults.cpp. */
     bool p2p_signal_supported(QudaP2PSignal kind);
 
     /** Backend/build default signalling kind when QUDA_P2P_TRANSPORT is unset.
-        Policy: prefer REMOTE_IPC (events) -- matches develop behaviour, least
-        surprise -- but clamp to the supported set, so CUDA-MNNVL (where
-        REMOTE_IPC is unsupported) falls back to STREAM_GATED.  Implemented
+        Non-MNNVL: prefer REMOTE_IPC (events) to match legacy behavior. 
+        MNNVL: (REMOTE_IPC is unsupported) defaults to STREAM_GATED.  Implemented
         per-backend in lib/targets/<backend>/p2p_signal_defaults.cpp. */
     QudaP2PSignal p2p_signal_default();
 
@@ -542,22 +527,11 @@ namespace quda
   /** Receiver: block host until peer signal arrives AND peer's copy event has fired. */
   void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir);
 
-  // Stream-mem-op signalling primitives (Phase 5).  Forward-only protocol:
-  // sender writes a monotonic uint64_t counter to the peer's slot via
-  // cuStreamWriteValue64; receiver stream-waits via cuStreamWaitValue64 with
-  // GEQ and, where supported by the device, a remote-write visibility flush.
-  // No MPI doorbell, no IPC event, no host poll.  Slot storage lives
-  // in the CUDA backend TU (lib/targets/cuda/comm_target.cpp).  This is the
-  // protocol the future MNNVL fabric backend will use; on the current setup
-  // it operates on cuMemAlloc-backed cudaIPC-shared memory.
-
   /**
      Unified P2P signal API.  Dispatches internally on QudaP2PSignal to the
      appropriate per-kind implementation inside the backend (event-based via
      cudaIPC + MPI doorbell, or stream-mem-op via cuStreamWriteValue64 /
-     WaitValue64).  The per-kind functions are no longer part of the public
-     header -- the stream-mem-op variants are file-private to the CUDA
-     backend's comm_target.cpp; the event-based variants remain externally
+     WaitValue64). The event-based variants remain externally
      visible (above) for the few remaining direct callers but new code should
      use the QudaP2PSignal overloads.
   */

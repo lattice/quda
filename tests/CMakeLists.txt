@@ -1143,7 +1143,7 @@ if(QUDA_NVSHMEM AND QUDA_DIRAC_STAGGERED AND (QUDA_MPI OR QUDA_QMP))
     add_test(NAME staggered_dslash_stream_gated_p2p
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type staggered
-                     --test MatPC
+                     --test Dslash
                      --require-p2p true
                      --dim 4 4 6 8
                      --gtest_output=xml:staggered_dslash_stream_gated_p2p.xml)
@@ -1157,7 +1157,7 @@ if(QUDA_NVSHMEM AND QUDA_DIRAC_STAGGERED AND (QUDA_MPI OR QUDA_QMP))
     add_test(NAME staggered_dslash_stream_gated_p2p_splitgrid
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type staggered
-                     --test MatPC
+                     --test Dslash
                      --require-p2p true
                      --grid-partition ${SG_GRID_PARTITION}
                      --dim 4 4 6 8

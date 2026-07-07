@@ -1,5 +1,4 @@
 #include <communicator_quda.h>
-#include <device.h>
 #include <mpi_comm_handle.h>
 
 // While we can emulate an all-gather using QMP reductions, this
@@ -144,6 +143,7 @@ void Communicator::comm_gather_fabric_handle(void *send_handle, void *recv_buf, 
   MPI_CHECK(MPI_Allgather(send_handle, (int)handle_size, MPI_BYTE, recv_buf, (int)handle_size, MPI_BYTE, MPI_COMM_HANDLE));
 #else
   // QMP fallback: byte-wise emulation via reductions.
+  // FIXME: We should optimize this to use a multi-reduction.
   unsigned char *send_bytes = (unsigned char *)send_handle;
   unsigned char *recv_bytes = (unsigned char *)recv_buf;
   for (int i = 0; i < comm_size(); ++i) {
