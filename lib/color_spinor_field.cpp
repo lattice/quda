@@ -744,12 +744,10 @@ namespace quda
 
   void *const *ColorSpinorField::Ghost() const { return ghost_buf.data; }
 
-  const void *ColorSpinorField::Ghost2() const { return Ghost2P2P(); }
-
-  const void *ColorSpinorField::Ghost2P2P() const
+  const void *ColorSpinorField::Ghost2() const
   {
     // Device dslash halo read base for the NON-shmem transports (P2P / GDR /
-    // MPI-host-staged): all of these deposit the halo into the contiguous P2P
+    // MPI-host-staged): all of these deposit the halo into the contiguous
     // recv buffer (peer P2P writes, GDR NIC writes, unpackGhost staging).
     // Aliases the symmetric buffer in non-NVSHMEM builds.
     if (Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -1106,10 +1104,10 @@ namespace quda
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     const void *src = ghost_spinor;
     auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
-    // Non-shmem (MPI/host-staged) recv: land in the contiguous P2P recv buffer,
-    // which is where the non-shmem dslash reads its halo (Ghost2P2P / scatter
-    // early-returns for genuine P2P dirs).  Aliases the symmetric buffer in
-    // non-NVSHMEM builds.
+    // Non-shmem (MPI/host-staged) recv: land in the contiguous non-shmem recv
+    // buffer, which is where the non-shmem dslash reads its halo (Ghost2 /
+    // scatter early-returns for genuine P2P dirs).  Aliases the symmetric buffer
+    // in non-NVSHMEM builds.
     void *ghost_dst = static_cast<char *>(ghost_recv_buffer_p2p_d[bufferIndex]) + offset;
 
     qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], qudaMemcpyHostToDevice, stream);

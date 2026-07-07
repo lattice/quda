@@ -155,11 +155,11 @@ namespace quda
       static void *ghost[8] = {}; // needs to be persistent across interior and exterior calls
       // Halo read base depends on the transport: the NVSHMEM (shmem) dslash
       // reads the SYMMETRIC recv buffer (nvshmem_putmem destination), while the
-      // P2P/GDR/MPI dslash reads the contiguous P2P recv buffer (where peer P2P
-      // writes, GDR NIC writes and unpackGhost staging land).  arg.shmem is a
-      // compile-time 0 in non-NVSHMEM builds, so this collapses to Ghost2P2P
+      // P2P/GDR/MPI dslash reads the contiguous non-shmem recv buffer (where
+      // peer P2P writes, GDR NIC writes and unpackGhost staging land).  arg.shmem
+      // is a compile-time 0 in non-NVSHMEM builds, so this collapses to Ghost2
       // (which itself aliases the symmetric buffer there).
-      const char *ghost_base = static_cast<const char *>(arg.shmem > 0 ? halo.Ghost2Shmem() : halo.Ghost2P2P());
+      const char *ghost_base = static_cast<const char *>(arg.shmem > 0 ? halo.Ghost2Shmem() : halo.Ghost2());
       for (int dim = 0; dim < 4; dim++) {
 
         for (int dir = 0; dir < 2; dir++) {

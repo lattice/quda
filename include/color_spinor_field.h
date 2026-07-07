@@ -768,14 +768,12 @@ namespace quda
      */
     size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
-    const void *Ghost2() const;
-
     /**
        @brief Device halo read base for the non-shmem transports (P2P/GDR/
-       MPI-host-staged): the contiguous P2P recv buffer.  Aliases the symmetric
-       buffer in non-NVSHMEM builds.
+       MPI-host-staged): the contiguous recv buffer that all of these deposit
+       into.  Aliases the symmetric buffer in non-NVSHMEM builds.
      */
-    const void *Ghost2P2P() const;
+    const void *Ghost2() const;
 
     /**
        @brief Device halo read base for the NVSHMEM transport: the symmetric recv
