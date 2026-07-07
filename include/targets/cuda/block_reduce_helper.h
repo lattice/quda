@@ -224,6 +224,16 @@ namespace quda
     operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
       using atomic_t = typename atomic_type<T>::type;
+      // This path sums each atomic word independently, which is only
+      // arithmetically valid when the reduction's fundamental scalar IS
+      // the atomic word.  Compound accumulators (e.g. doubledouble,
+      // rfa_t) have a scalar wider than their atomic word: summing the
+      // words independently discards the coupling between them and
+      // silently degrades precision / breaks reproducibility.  Such
+      // types must be split on their semantic element boundary instead.
+      static_assert(sizeof(get_scalar_t<T>) == sizeof(atomic_t) && !is_rfa<get_scalar_t<T>>::value,
+                    "atomic-word warp reduction is invalid for compound accumulators; "
+                    "provide a semantic-element split (see is_reduce_array overload)");
       constexpr size_t n = sizeof(T) / sizeof(atomic_t);
       static_assert(sizeof(T) == n * sizeof(atomic_t));
       atomic_t sum_tmp[n];
