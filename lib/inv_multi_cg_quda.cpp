@@ -465,8 +465,8 @@ namespace quda {
           param.true_res_offset[i] = sqrt(true_res / b2);
           param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(x[i], r)[2]);
         } else {
-          param.true_res_offset[i] = std::numeric_limits<double>::infinity();
-          param.true_res_hq_offset[i] = std::numeric_limits<double>::infinity();
+          param.true_res_offset[i] = std::numeric_limits<real_t>::infinity();
+          param.true_res_hq_offset[i] = std::numeric_limits<real_t>::infinity();
         }
         param.iter_res_offset[i] = sqrt(r2[i] / b2);
       }

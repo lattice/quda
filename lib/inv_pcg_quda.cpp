@@ -347,7 +347,7 @@ namespace quda
         zero(x_sloppy);
 
         bool L2breakdown = false;
-        double L2breakdown_eps = 0;
+        real_t L2breakdown_eps = 0;
         if (ru.reliable_break(r2[0], stop[0], L2breakdown, L2breakdown_eps)) { break; }
 
         ru.update_norm(r2[0], y[0]);
