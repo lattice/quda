@@ -598,7 +598,7 @@ namespace quda {
 
     // Various variables related to reliable updates.
     int rUpdate = 0; // count reliable updates.
-    double delta = param.delta; // delta for reliable updates.
+    real_t delta = param.delta; // delta for reliable updates.
     real_t rNorm = sqrt(r2[0]); // The current residual norm.
     real_t maxrr = rNorm; // The maximum residual norm since the last reliable update.
     real_t maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.

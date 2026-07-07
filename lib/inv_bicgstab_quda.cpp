@@ -163,7 +163,7 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double delta = param.delta;
+    real_t delta = param.delta;
 
     int k = 0;
     int rUpdate = 0;

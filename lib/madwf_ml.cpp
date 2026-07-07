@@ -110,7 +110,7 @@ namespace quda
     ColorSpinorField lambda(csParam);
     ColorSpinorField Mchi(csParam);
 
-    double residual = 0.0;
+    real_t residual = 0.0;
     int count = 0;
     for (auto &phi : B) {
       residual += blas::norm2(phi);
@@ -119,7 +119,7 @@ namespace quda
       }
       count++;
     }
-    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("reference dslash norm = %8.4e\n", residual); }
+    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("reference dslash norm = %8.4e\n", QUDA_REAL(residual)); }
 
     csParam.x[4] = Ls_base;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -143,7 +143,7 @@ namespace quda
     device_container P(param_size);
     device_container D_old(param_size);
 
-    double pmu = 0.0;
+    real_t pmu = 0.0;
 
     transfer_float alpha;
     transfer_float b = 0.8;
@@ -158,8 +158,8 @@ namespace quda
     for (int iteration = 0; iteration < param.madwf_train_maxiter; iteration++) {
 
       device_container D(param_size);
-      double dmu = 0.0;
-      double chi2 = 0.0;
+      real_t dmu = 0.0;
+      real_t chi2 = 0.0;
       std::array<real_t, 5> a = {};
 
       for (auto &phi : B) {
@@ -190,7 +190,7 @@ namespace quda
       // line search
       for (auto &phi : B) {
 
-        double ind_chi2 = cost(ref, base, chi, phi);
+        real_t ind_chi2 = cost(ref, base, chi, phi);
         chi2 += ind_chi2;
 
         // ATx(ATphi, phi, T);
@@ -231,9 +231,9 @@ namespace quda
       auto rs = cubic_formula(coeffs);
 
       alpha = 0;
-      double root_min = poly4(a, 0);
+      real_t root_min = poly4(a, 0);
       for (auto r : rs) {
-        double eval = poly4(a, r);
+        real_t eval = poly4(a, r);
         if (root_min > eval) {
           root_min = eval;
           alpha = r;
@@ -245,7 +245,7 @@ namespace quda
 
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("grad min iter %05d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
-                   iteration, chi2, chi2 / residual, QUDA_REAL(alpha), QUDA_REAL(mu));
+                   iteration, QUDA_REAL(chi2), QUDA_REAL(chi2 / residual), QUDA_REAL(alpha), QUDA_REAL(mu));
       }
     }
 
@@ -254,10 +254,10 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training finished ...\n"); }
     count = 0;
     for (auto &phi : B) {
-      double ind_chi2 = cost(ref, base, chi, phi);
-      double phi2 = blas::norm2(phi);
+      real_t ind_chi2 = cost(ref, base, chi, phi);
+      real_t phi2 = blas::norm2(phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, QUDA_REAL(phi2));
+        printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, QUDA_REAL(ind_chi2 / phi2), QUDA_REAL(phi2));
       }
       count++;
     }

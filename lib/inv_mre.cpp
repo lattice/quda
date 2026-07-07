@@ -87,7 +87,7 @@ namespace quda
     // Orthonormalise the vector basis
     if (orthogonal) {
       for (int i = 0; i < N; i++) {
-        double p2 = blas::norm2(p[i]);
+        real_t p2 = blas::norm2(p[i]);
         blas::ax(1 / sqrt(p2), p[i]);
         if (!apply_mat) blas::ax(1 / sqrt(p2), q[i]);
 

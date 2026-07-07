@@ -347,7 +347,7 @@ namespace quda {
       args.H(j + 1, j) = complex_t(sqrt(norm2(Vm->Component(j + 1))), 0.0);
       blas::ax(1.0 / args.H(j + 1, j).real(), Vm->Component(j + 1));
       if (do_givens) {
-        double inv_denom = 1.0 / sqrt(norm(h0) + norm(args.H(j + 1, j)));
+        real_t inv_denom = 1.0 / sqrt(norm(h0) + norm(args.H(j + 1, j)));
         cn[j] = h0 * inv_denom;
         sn[j] = args.H(j + 1, j).real() * inv_denom;
         givensH[j * (args.m + 1) + j] = conj(cn[j]) * h0 + sn[j] * args.H(j + 1, j);
@@ -441,13 +441,13 @@ namespace quda {
 
     int tot_iters = 0;
 
-    double normb = norm2( b );
-    double stop  = param.tol*param.tol* normb;  
+    real_t normb = norm2(b);
+    real_t stop = param.tol * param.tol * normb;
 
     mat(r, x);
-    
-    double r2 = xmyNorm(b, r);
-    double b2 = r2;
+
+    real_t r2 = xmyNorm(b, r);
+    real_t b2 = r2;
     args.c[0] = complex_t(sqrt(r2), 0.0);
 
     printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", QUDA_REAL(r2),
@@ -468,7 +468,7 @@ namespace quda {
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
-    double heavy_quark_res = 0.0;  
+    real_t heavy_quark_res = 0.0;
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
 
@@ -483,7 +483,7 @@ namespace quda {
       r2 = norm2(rSloppy);
 
       bool do_clean_restart = false;
-      double ext_r2 = 1.0;
+      real_t ext_r2 = 1.0;
 
       if ((restart_idx + 1) % check_interval) {
         mat(y, e);

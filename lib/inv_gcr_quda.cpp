@@ -289,7 +289,7 @@ namespace quda {
     int total_iter = 0;
     int restart = 0;
     auto r2_old = r2;
-    double maxr_deflate = sqrt(r2[0]);
+    real_t maxr_deflate = sqrt(r2[0]);
     bool l2_converge = false;
 
     int pipeline = param.pipeline;

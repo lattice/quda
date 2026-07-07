@@ -134,7 +134,7 @@ namespace quda
       }
     }
 
-    double Anorm = 0.0;
+    real_t Anorm = 0.0;
 
     // for alternative reliable updates
     if (alternative_reliable) {

@@ -377,10 +377,10 @@ namespace quda
 
     // Various variables related to reliable updates.
     int rUpdate = 0;             // count reliable updates.
-    double delta = param.delta;  // delta for reliable updates.
+    real_t delta = param.delta;  // delta for reliable updates.
     real_t rNorm = sqrt(r2[0]);  // The current residual norm.
     real_t maxrr = rNorm;        // The maximum residual norm since the last reliable update.
-    double maxr_deflate = rNorm; // The maximum residual since the last deflation
+    real_t maxr_deflate = rNorm; // The maximum residual since the last deflation
 
     // Factors which map linear operator onto [-1,1]
     double m_map = 2. / (lambda_max - lambda_min);

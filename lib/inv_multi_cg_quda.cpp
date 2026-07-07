@@ -196,7 +196,7 @@ namespace quda {
 
     auto &offset = param.offset;
 
-    const double b2 = blas::norm2(b);
+    const real_t b2 = blas::norm2(b);
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       warningQuda("inverting on zero-field source");
@@ -245,15 +245,15 @@ namespace quda {
     std::vector<int> iter(num_offset + 1, 0); // record how many iterations for each shift
     iter[num_offset] = 1;                     // this initial condition ensures that the heaviest shift can be removed
 
-    double r2_old;
-    double pAp;
+    real_t r2_old;
+    real_t pAp;
 
     std::vector<real_t> rNorm(num_offset);
     for (int i = 0; i < num_offset; i++) rNorm[i] = sqrt(r2[i]);
     std::vector<real_t> r0Norm(rNorm);
     std::vector<real_t> maxrx(rNorm);
     std::vector<real_t> maxrr(rNorm);
-    double delta = param.delta;
+    real_t delta = param.delta;
 
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
@@ -302,7 +302,7 @@ namespace quda {
 
       array<real_t, 2> cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
       r2[0] = cg_norm[0];
-      double zn = cg_norm[1];
+      real_t zn = cg_norm[1];
 
       // reliable update conditions
       rNorm[0] = sqrt(r2[0]);
@@ -461,7 +461,7 @@ namespace quda {
           } else if (i != 0) {
             blas::axpy(offset[i] - offset[0], x[i], r); // Offset it.
           }
-          double true_res = blas::xmyNorm(b, r);
+          real_t true_res = blas::xmyNorm(b, r);
           param.true_res_offset[i] = sqrt(true_res / b2);
           param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(x[i], r)[2]);
         } else {

@@ -129,7 +129,7 @@ namespace quda {
     const double u = precisionEpsilon(param.precision_sloppy);
     const double uhigh = precisionEpsilon(); // solver precision
 
-    double Anorm = 0.0;
+    real_t Anorm = 0.0;
     vector<real_t> beta(b.size(), 0.0);
 
     // for alternative reliable updates
@@ -542,8 +542,8 @@ namespace quda {
 
     // If the computed |r| goes above r0Norm between reliable updates,
     // update this ceiling. This goes into "R" type reliable updates.
-    double maxrx = L2breakdown ? hq_res[0] : rNorm;
-    double maxrr = L2breakdown ? hq_res[0] : rNorm;
+    real_t maxrx = L2breakdown ? hq_res[0] : rNorm;
+    real_t maxrr = L2breakdown ? hq_res[0] : rNorm;
 
     // Triggers for explicitly counting residual updates and checking for L2breakdown.
     // * updateX broadly maps to if the iterated residual has dropped by a factor of delta

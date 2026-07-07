@@ -122,11 +122,11 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     auto r2_old = r2;
-    double rNorm = sqrt(r2[0]);
-    double r0Norm = rNorm;
-    double maxrx  = rNorm;
-    double maxrr  = rNorm;
-    double delta  = param.delta;
+    real_t rNorm = sqrt(r2[0]);
+    real_t r0Norm = rNorm;
+    real_t maxrx = rNorm;
+    real_t maxrr = rNorm;
+    real_t delta = param.delta;
     bool restart = false;
 
     int k = 0;
