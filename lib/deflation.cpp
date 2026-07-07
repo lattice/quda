@@ -305,7 +305,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
         auto eval = dotnorm[0] / dotnorm[2];
         blas::xpay(*Av_sloppy, -eval, *r_sloppy);
         relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
-        logQuda(QUDA_VERBOSE, "Eigenvalue: %1.12e Residual: %1.12e\n", double(eval), double(relerr));
+        logQuda(QUDA_VERBOSE, "Eigenvalue: %1.12e Residual: %1.12e\n", QUDA_REAL(eval), QUDA_REAL(relerr));
       }
 
       idx++;

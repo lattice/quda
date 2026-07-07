@@ -104,24 +104,27 @@ namespace quda
 
     double tol_ = eig_param->tol;
 
-    // ARPACK workspace
-    complex_t I(0.0, 1.0);
-    std::vector<complex_t> resid_(ldv_);
+    // ARPACK workspace.  ARPACK is a double-precision library (the eigensolver
+    // cross-check requires double-precision fields), so all buffers handed to
+    // its Fortran routines must be std::complex<double> / double, independent of
+    // the host scalar type (which may be quad in a reproducible build).
+    std::complex<double> I(0.0, 1.0);
+    std::vector<std::complex<double>> resid_(ldv_);
 
     // Use initial guess?
     if (info_ > 0) {
       for (int a = 0; a < ldv_; a++) resid_[a] = drand48();
     }
 
-    complex_t sigma_ = 0.0;
-    std::vector<complex_t> w_workd_(3 * ldv_);
-    std::vector<complex_t> w_workl_(lworkl_);
-    std::vector<complex_t> w_workev_(2 * n_kr_);
-    std::vector<real_t> w_rwork_(n_kr_);
+    std::complex<double> sigma_ = 0.0;
+    std::vector<std::complex<double>> w_workd_(3 * ldv_);
+    std::vector<std::complex<double>> w_workl_(lworkl_);
+    std::vector<std::complex<double>> w_workev_(2 * n_kr_);
+    std::vector<double> w_rwork_(n_kr_);
     std::vector<int> select_(n_kr_);
 
-    std::vector<complex_t> h_evecs_(n_kr_ * ldv_);
-    std::vector<complex_t> h_evals_(n_ev_);
+    std::vector<std::complex<double>> h_evecs_(n_kr_ * ldv_);
+    std::vector<std::complex<double>> h_evals_(n_ev_);
 
     // create container wrapping the vectors returned from ARPACK
     ColorSpinorParam param(h_evecs[0]);
@@ -362,8 +365,8 @@ namespace quda
     // print out the computed Ritz values and their error estimates
     for (int i = 0; i < nconv; i++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", i, evals[i].real(), evals[i].imag(),
-		   std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[i])));
+        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", i, QUDA_REAL(evals[i].real()),
+		   QUDA_REAL(evals[i].imag()), QUDA_REAL(std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[i]))));
     }
 
     // Compute singular/eigenvalues values from eigenvectors.
@@ -390,14 +393,14 @@ namespace quda
         // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
 	mat.Expose()->M(d_v2, d_v);
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-	double sigma_tmp = sqrt(blas::norm2(d_v2));
+	real_t sigma_tmp = sqrt(blas::norm2(d_v2));
 	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
 	blas::ax(1.0 / sigma_tmp, d_v2);
         getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
         if (getVerbosity() >= QUDA_SUMMARIZE)
-	  printfQuda("Sval[%04d] = %+.16e sigma - to_double(sqrt(|lambda|)) = %+.16e\n", i, sigma_tmp,
-		     sigma_tmp - sqrt(abs(evals[i].real())));
+	  printfQuda("Sval[%04d] = %+.16e sigma - to_double(sqrt(|lambda|)) = %+.16e\n", i, QUDA_REAL(sigma_tmp),
+		     QUDA_REAL(sigma_tmp - sqrt(fabs(evals[i].real()))));
       }
     } else {
       printfQuda("Computing Eigenvalues\n");
@@ -412,12 +415,12 @@ namespace quda
 	mat(d_v2, d_v);
 	// d_v = ||lambda_measured*v - lambda_arpack*v||
 	blas::caxpby(complex_t {1.0, 0.0}, d_v2, -evals[i], d_v);
-	double L2norm = blas::norm2(d_v);
+	real_t L2norm = blas::norm2(d_v);
         getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
         if (getVerbosity() >= QUDA_SUMMARIZE)
-	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, static_cast<double>(evals[i].real()),
-		     static_cast<double>(evals[i].imag()), static_cast<double>(abs(evals[i])), sqrt(L2norm));
+	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, QUDA_REAL(evals[i].real()),
+		     QUDA_REAL(evals[i].imag()), QUDA_REAL(abs(evals[i])), QUDA_REAL(sqrt(L2norm)));
       }
     }
 
@@ -433,7 +436,7 @@ namespace quda
 	mat.Expose()->M(d_v2, d_v);
 
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-	double sigma_tmp = sqrt(blas::norm2(d_v2));
+	real_t sigma_tmp = sqrt(blas::norm2(d_v2));
 
 	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
 	blas::ax(1.0 / sigma_tmp, d_v2);
