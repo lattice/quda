@@ -433,8 +433,12 @@ namespace quda
         int dim = n_kr - num_locked_3D[t];
         int arrow_pos = num_keep_3D[t] - num_locked_3D[t];
 
-        // Eigen objects
-        MatrixX A = MatrixX::Zero(dim, dim);
+        // Eigen objects. Solve the arrow matrix in double precision: Eigen's
+        // dense eigensolvers compute incorrect eigenvectors for extended (quad)
+        // precision (see eigen_helper.h), and this projected matrix carries
+        // only <= double precision.
+        using SolveMatrix = Matrix<eig_solve_real_t, Dynamic, Dynamic>;
+        SolveMatrix A = SolveMatrix::Zero(dim, dim);
         ritz_mat_3D[t].resize(dim * dim);
         for (int i = 0; i < dim * dim; i++) ritz_mat_3D[t][i] = 0.0;
 
@@ -451,35 +455,37 @@ namespace quda
         for (int i = 0; i < dim; i++) {
 
           // alpha_3D populates the diagonal
-          A(i, i) = alpha_3D[t][i + num_locked_3D[t]];
+          A(i, i) = static_cast<eig_solve_real_t>(alpha_3D[t][i + num_locked_3D[t]]);
         }
 
         for (int i = 0; i < arrow_pos; i++) {
 
           // beta_3D populates the arrow
-          A(i, arrow_pos) = beta_3D[t][i + num_locked_3D[t]];
-          A(arrow_pos, i) = beta_3D[t][i + num_locked_3D[t]];
+          A(i, arrow_pos) = static_cast<eig_solve_real_t>(beta_3D[t][i + num_locked_3D[t]]);
+          A(arrow_pos, i) = static_cast<eig_solve_real_t>(beta_3D[t][i + num_locked_3D[t]]);
         }
 
         for (int i = arrow_pos; i < dim - 1; i++) {
 
           // beta_3D populates the sub-diagonal
-          A(i, i + 1) = beta_3D[t][i + num_locked_3D[t]];
-          A(i + 1, i) = beta_3D[t][i + num_locked_3D[t]];
+          A(i, i + 1) = static_cast<eig_solve_real_t>(beta_3D[t][i + num_locked_3D[t]]);
+          A(i + 1, i) = static_cast<eig_solve_real_t>(beta_3D[t][i + num_locked_3D[t]]);
         }
 
         // Eigensolve the arrow matrix
-        SelfAdjointEigenSolver<MatrixX> eigensolver;
+        SelfAdjointEigenSolver<SolveMatrix> eigensolver;
         eigensolver.compute(A);
 
         // repopulate ritz matrix
         for (int i = 0; i < dim; i++)
-          for (int j = 0; j < dim; j++) ritz_mat_3D[t][dim * i + j] = eigensolver.eigenvectors().col(i)[j];
+          for (int j = 0; j < dim; j++)
+            ritz_mat_3D[t][dim * i + j] = static_cast<real_t>(eigensolver.eigenvectors().col(i)[j]);
 
         for (int i = 0; i < dim; i++) {
-          residua_3D[t][i + num_locked_3D[t]] = quda::fabs(beta_3D[t][n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
+          residua_3D[t][i + num_locked_3D[t]]
+            = quda::fabs(beta_3D[t][n_kr - 1] * static_cast<real_t>(eigensolver.eigenvectors().col(i)[dim - 1]));
           // Update the alpha_3D array
-          alpha_3D[t][i + num_locked_3D[t]] = eigensolver.eigenvalues()[i];
+          alpha_3D[t][i + num_locked_3D[t]] = static_cast<real_t>(eigensolver.eigenvalues()[i]);
         }
 
         // Put spectrum back in order

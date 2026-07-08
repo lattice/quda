@@ -226,8 +226,13 @@ namespace quda
       blas::block::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
     }
 
-    // Orthogonalise r against the Krylov space
-    for (int k = 0; k < 1; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + 1);
+    // Orthogonalise r against the Krylov space. Two Gram-Schmidt passes
+    // ("twice is enough"): a single pass is only marginally stable and, for
+    // ill-conditioned operators (e.g. twisted-mass norm-op), loses orthogonality
+    // and lets the Chebyshev recurrence blow up. This is precision sensitive and
+    // surfaced in the quad build, where the (more accurate) reductions follow a
+    // trajectory the single-pass scheme could not keep orthogonal.
+    for (int k = 0; k < 2; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + 1);
 
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(r[0]));
@@ -270,8 +275,12 @@ namespace quda
     int dim = n_kr - num_locked;
     int arrow_pos = num_keep - num_locked;
 
-    // Eigen objects
-    MatrixX A = MatrixX::Zero(dim, dim);
+    // Eigen objects. The arrow matrix is solved in double precision: Eigen's
+    // dense eigensolvers compute incorrect eigenvectors for extended (quad)
+    // precision (see eigen_helper.h), and this projected matrix carries only
+    // <= double precision.
+    using SolveMatrix = Matrix<eig_solve_real_t, Dynamic, Dynamic>;
+    SolveMatrix A = SolveMatrix::Zero(dim, dim);
     ritz_mat.resize(dim * dim, real_t(0.0));
 
     // Invert the spectrum due to chebyshev
@@ -287,21 +296,21 @@ namespace quda
     for (int i = 0; i < dim; i++) {
 
       // alpha populates the diagonal
-      A(i, i) = alpha[i + num_locked];
+      A(i, i) = static_cast<eig_solve_real_t>(alpha[i + num_locked]);
     }
 
     for (int i = 0; i < arrow_pos; i++) {
 
       // beta populates the arrow
-      A(i, arrow_pos) = beta[i + num_locked];
-      A(arrow_pos, i) = beta[i + num_locked];
+      A(i, arrow_pos) = static_cast<eig_solve_real_t>(beta[i + num_locked]);
+      A(arrow_pos, i) = static_cast<eig_solve_real_t>(beta[i + num_locked]);
     }
 
     for (int i = arrow_pos; i < dim - 1; i++) {
 
       // beta populates the sub-diagonal
-      A(i, i + 1) = beta[i + num_locked];
-      A(i + 1, i) = beta[i + num_locked];
+      A(i, i + 1) = static_cast<eig_solve_real_t>(beta[i + num_locked]);
+      A(i + 1, i) = static_cast<eig_solve_real_t>(beta[i + num_locked]);
     }
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
@@ -316,7 +325,7 @@ namespace quda
     }
 
     // Eigensolve the arrow matrix
-    SelfAdjointEigenSolver<MatrixX> eigensolver;
+    SelfAdjointEigenSolver<SolveMatrix> eigensolver;
     eigensolver.compute(A);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
@@ -326,12 +335,14 @@ namespace quda
 
     // repopulate ritz matrix
     for (int i = 0; i < dim; i++)
-      for (int j = 0; j < dim; j++) ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
+      for (int j = 0; j < dim; j++)
+        ritz_mat[dim * i + j] = static_cast<real_t>(eigensolver.eigenvectors().col(i)[j]);
 
     for (int i = 0; i < dim; i++) {
-      residua[i + num_locked] = quda::fabs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
+      residua[i + num_locked]
+        = quda::fabs(beta[n_kr - 1] * static_cast<real_t>(eigensolver.eigenvectors().col(i)[dim - 1]));
       // Update the alpha array
-      alpha[i + num_locked] = eigensolver.eigenvalues()[i];
+      alpha[i + num_locked] = static_cast<real_t>(eigensolver.eigenvalues()[i]);
     }
 
     // Put spectrum back in order

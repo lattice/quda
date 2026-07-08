@@ -808,6 +808,32 @@ namespace quda
   template <> struct eigen_matrix_map<complex_t> { using type = MatrixXc; };
   template <class T> using eigen_matrix_t = typename eigen_matrix_map<T>::type;
 
+  /**
+     Template helper selecting the double-precision Eigen matrix type used for
+     the dense LU factorization of the Ritz rotation matrix. As with the
+     arrow-matrix eigensolve, this decomposition is done in double: Eigen's
+     dense factorizations misbehave in extended (__float128) precision, and the
+     rotation coefficients are truncated to device precision before use anyway.
+     In the non-quad build the solve type equals T, so this is a no-op.
+   */
+  template <class T> struct eigen_solve_matrix_map;
+  template <> struct eigen_solve_matrix_map<real_t> {
+    using type = Matrix<eig_solve_real_t, Dynamic, Dynamic>;
+  };
+  template <> struct eigen_solve_matrix_map<complex_t> {
+    using type = Matrix<eig_solve_complex_t, Dynamic, Dynamic>;
+  };
+  template <class T> using eigen_solve_matrix_t = typename eigen_solve_matrix_map<T>::type;
+
+  // Scalar conversions between the compute type (real_t/complex_t) and the
+  // double solve type. std::complex has no converting constructor between
+  // complex<__float128> and complex<double>, so route through the component-wise
+  // helpers in eigen_helper.h.
+  inline eig_solve_real_t to_solve_scalar(const real_t &x) { return static_cast<eig_solve_real_t>(x); }
+  inline real_t from_solve_scalar(const eig_solve_real_t &x) { return static_cast<real_t>(x); }
+  inline eig_solve_complex_t to_solve_scalar(const complex_t &z) { return to_eig_solve(z); }
+  inline complex_t from_solve_scalar(const eig_solve_complex_t &z) { return from_eig_solve<real_t>(z); }
+
   template <typename T>
   void EigenSolver::rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array, int offset,
                                int dim, int keep, int locked)
@@ -849,26 +875,39 @@ namespace quda
       }
 
       getProfile().TPSTART(QUDA_PROFILE_EIGENLU);
-      matrix_t mat = matrix_t::Zero(dim, keep);
+      // Factorize in double precision (see eigen_solve_matrix_t): Eigen's dense
+      // LU misbehaves in __float128, corrupting the rotated Krylov basis.
+      using solve_matrix_t = eigen_solve_matrix_t<T>;
+      solve_matrix_t mat = solve_matrix_t::Zero(dim, keep);
       for (int j = 0; j < keep; j++)
-        for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
+        for (int i = 0; i < dim; i++) mat(i, j) = to_solve_scalar(rot_array[i * keep + j]);
 
-      FullPivLU<matrix_t> matLU(mat);
+      FullPivLU<solve_matrix_t> matLU(mat);
 
       // Extract the upper triangular matrix
-      matrix_t matUpper = matLU.matrixLU().template triangularView<Eigen::Upper>();
-      matUpper.conservativeResize(keep, keep);
+      solve_matrix_t matUpper_d = matLU.matrixLU().template triangularView<Eigen::Upper>();
+      matUpper_d.conservativeResize(keep, keep);
 
       // Extract the lower triangular matrix
-      matrix_t matLower = matrix_t::Identity(dim, dim);
-      matLower.block(0, 0, dim, keep).template triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
-      matLower.conservativeResize(dim, keep);
+      solve_matrix_t matLower_d = solve_matrix_t::Identity(dim, dim);
+      matLower_d.block(0, 0, dim, keep).template triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      matLower_d.conservativeResize(dim, keep);
 
-      // Extract the desired permutation matrices
+      // Extract the desired permutation matrices (integer-valued, precision agnostic)
       MatrixXi matP = MatrixXi::Zero(dim, dim);
       MatrixXi matQ = MatrixXi::Zero(keep, keep);
       matP = matLU.permutationP().inverse();
       matQ = matLU.permutationQ().inverse();
+
+      // Cast the triangular factors back to the compute type for the multi-blas
+      // application (coefficients are truncated to device precision inside the
+      // kernels regardless).
+      matrix_t matUpper(keep, keep);
+      for (int b = 0; b < keep; b++)
+        for (int c = 0; c < keep; c++) matUpper(b, c) = from_solve_scalar(matUpper_d(b, c));
+      matrix_t matLower(dim, keep);
+      for (int b = 0; b < dim; b++)
+        for (int c = 0; c < keep; c++) matLower(b, c) = from_solve_scalar(matLower_d(b, c));
       getProfile().TPSTOP(QUDA_PROFILE_EIGENLU);
 
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);

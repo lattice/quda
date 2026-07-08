@@ -502,16 +502,24 @@ namespace quda
       }
     }
 
-    // Eigensolve the arrow matrix (MatrixXc = Matrix<complex_t>)
-    SelfAdjointEigenSolver<MatrixXc> eigensolver;
-    eigensolver.compute(T);
+    // Eigensolve the arrow matrix in double precision: Eigen's dense
+    // eigensolvers compute incorrect eigenvectors for extended (quad) precision
+    // (see eigen_helper.h), and this projected matrix carries only <= double
+    // precision.
+    using SolveMatrixc = Matrix<eig_solve_complex_t, Dynamic, Dynamic>;
+    SolveMatrixc Td(dim, dim);
+    for (int a = 0; a < dim; a++)
+      for (int b = 0; b < dim; b++) Td(a, b) = to_eig_solve(T(a, b));
+    SelfAdjointEigenSolver<SolveMatrixc> eigensolver;
+    eigensolver.compute(Td);
 
     // Populate the alpha array with eigenvalues
-    for (int i = 0; i < dim; i++) alpha[i + num_locked] = eigensolver.eigenvalues()[i];
+    for (int i = 0; i < dim; i++) alpha[i + num_locked] = static_cast<real_t>(eigensolver.eigenvalues()[i]);
 
     // Repopulate ritz matrix: COLUMN major
     for (int i = 0; i < dim; i++)
-      for (int j = 0; j < dim; j++) block_ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
+      for (int j = 0; j < dim; j++)
+        block_ritz_mat[dim * i + j] = from_eig_solve<real_t>(eigensolver.eigenvectors().col(i)[j]);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
       for (int i = 0; i < std::min(dim, 4); i++)
