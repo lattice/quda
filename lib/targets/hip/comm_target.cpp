@@ -126,6 +126,11 @@ namespace quda
   void comm_create_stream_gated_comms() { }
   void comm_destroy_stream_gated_comms() { }
 
+  // REMOTE_WRITE (direct-store halo packing) is safety-gated only under MNNVL, where a
+  // receiver-side flush guard is required.  HIP has no MNNVL path, so -- as on non-MNNVL
+  // CUDA -- the policy is always offered (its bit-1 enable is still honoured by the tuner).
+  bool comm_p2p_remote_write_supported() { return true; }
+
   void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
   {
