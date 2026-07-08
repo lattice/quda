@@ -47,9 +47,7 @@ namespace quda
        @param[in] n_reduce The number of reductions
     */
     ReduceArg(dim3 threads, int n_reduce = 1, bool = false, unsigned work_unroll = 1u) :
-      kernel_param<use_kernel_arg>(threads, work_unroll),
-      launch_error(QUDA_ERROR_UNINITIALIZED),
-      n_reduce(n_reduce)
+      kernel_param<use_kernel_arg>(threads, work_unroll), launch_error(QUDA_ERROR_UNINITIALIZED), n_reduce(n_reduce)
     {
       reducer::init(n_reduce, sizeof(*partial));
       // these buffers may be allocated in init, so we can't set the local copies until now

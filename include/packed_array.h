@@ -43,34 +43,30 @@ namespace quda
     constexpr explicit packed_array(storage_t packed) : data(packed) { }
 
     /** Constructor from individual elements (N == 2) */
-    constexpr packed_array(T v0, T v1)
-      : data(lane_to_storage(to_lane(v0), 0) | lane_to_storage(to_lane(v1), 1))
+    constexpr packed_array(T v0, T v1) : data(lane_to_storage(to_lane(v0), 0) | lane_to_storage(to_lane(v1), 1))
     {
       static_assert(N == 2, "packed_array: 2 constructor arguments require N == 2");
     }
 
     /** Constructor from individual elements (N == 4) */
-    constexpr packed_array(T v0, T v1, T v2, T v3)
-      : data(lane_to_storage(to_lane(v0), 0) | lane_to_storage(to_lane(v1), 1) | lane_to_storage(to_lane(v2), 2)
-             | lane_to_storage(to_lane(v3), 3))
+    constexpr packed_array(T v0, T v1, T v2, T v3) :
+      data(lane_to_storage(to_lane(v0), 0) | lane_to_storage(to_lane(v1), 1) | lane_to_storage(to_lane(v2), 2)
+           | lane_to_storage(to_lane(v3), 3))
     {
       static_assert(N == 4, "packed_array: 4 constructor arguments require N == 4");
     }
 
     /** Constructor from individual elements (N == 8) */
-    constexpr packed_array(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7)
-      : data(lane_to_storage(to_lane(v0), 0) | lane_to_storage(to_lane(v1), 1) | lane_to_storage(to_lane(v2), 2)
-             | lane_to_storage(to_lane(v3), 3) | lane_to_storage(to_lane(v4), 4) | lane_to_storage(to_lane(v5), 5)
-             | lane_to_storage(to_lane(v6), 6) | lane_to_storage(to_lane(v7), 7))
+    constexpr packed_array(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7) :
+      data(lane_to_storage(to_lane(v0), 0) | lane_to_storage(to_lane(v1), 1) | lane_to_storage(to_lane(v2), 2)
+           | lane_to_storage(to_lane(v3), 3) | lane_to_storage(to_lane(v4), 4) | lane_to_storage(to_lane(v5), 5)
+           | lane_to_storage(to_lane(v6), 6) | lane_to_storage(to_lane(v7), 7))
     {
       static_assert(N == 8, "packed_array: 8 constructor arguments require N == 8");
     }
 
     /** Get at index */
-    constexpr T get(int index) const
-    {
-      return static_cast<T>((data >> (index * element_bits)) & lane_mask);
-    }
+    constexpr T get(int index) const { return static_cast<T>((data >> (index * element_bits)) & lane_mask); }
 
     /** Set at index */
     constexpr void set(int index, T value)

@@ -983,7 +983,7 @@ namespace quda
         double delta_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
         if (fabs(delta_factor) > tol) {
           double delta_a = delta_factor * 2.0 * diracResidual->Kappa() * diracResidual->Mu()
-                           * static_cast<double>(transfer->Vectors().TwistFlavor());
+            * static_cast<double>(transfer->Vectors().TwistFlavor());
           l2_deviation -= fabs(delta_a) * sqrt(norm2(tmp_coarse) / norm2(x_coarse[0]));
           l2_deviation = fabs(l2_deviation);
           max_deviation[0] -= fabs(delta_a);

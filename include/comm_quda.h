@@ -264,8 +264,8 @@ namespace quda
   int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid);
 
   /**
-     @brief P2P exchange of local memory addresses between logically neighboring processes.  
-     Exchanges a SINGLE fabric (MNNVL) or cudaIPC (non-IMEX) handle for the local contiguous 
+     @brief P2P exchange of local memory addresses between logically neighboring processes.
+     Exchanges a SINGLE fabric (MNNVL) or cudaIPC (non-IMEX) handle for the local contiguous
      P2P buffer and imports the peer's, so P2P writes target a single-allocation, RDMA-capable buffer.
      Only defined between peer-to-peer-enabled devices.
      @param[out] remote Array of remote memory pointers to neighboring pointers
@@ -299,7 +299,7 @@ namespace quda
      buffers used by the stream-gated P2P signalling path.  No-op unless
      stream-gating is the resolved transport (comm::p2p_signal() ==
      STREAM_GATED), so events-only / HIP builds never allocate it.  The flag
-     buffer is constant-size and is created from createIPCComms() 
+     buffer is constant-size and is created from createIPCComms()
   */
   void comm_create_stream_gated_comms();
 
@@ -310,7 +310,7 @@ namespace quda
      in the peer's imported VMM buffer across multiple transactions and the
      doorbell can be observed before the last data transaction commits; the only
      safe guard is a receiver-side flush (CU_STREAM_WAIT_VALUE_FLUSH). Some hardware
-     can report CAN_FLUSH_REMOTE_WRITES=0. In those casesr emote-write is dropped from the 
+     can report CAN_FLUSH_REMOTE_WRITES=0. In those casesr emote-write is dropped from the
      policy list there and only thecopy-engine path is used.  Always true on non-MNNVL builds (that
      path is correct without a flush).  Resolved at P2P setup
      (comm_create_stream_gated_comms).
@@ -497,7 +497,7 @@ namespace quda
     bool p2p_signal_supported(QudaP2PSignal kind);
 
     /** Backend/build default signalling kind when QUDA_P2P_TRANSPORT is unset.
-        Non-MNNVL: prefer REMOTE_IPC (events) to match legacy behavior. 
+        Non-MNNVL: prefer REMOTE_IPC (events) to match legacy behavior.
         MNNVL: (REMOTE_IPC is unsupported) defaults to STREAM_GATED.  Implemented
         per-backend in lib/targets/<backend>/p2p_signal_defaults.cpp. */
     QudaP2PSignal p2p_signal_default();

@@ -93,14 +93,14 @@ namespace quda
 #ifdef _DEBUG
         // Debug code: Copy original A matrix to host
         if (prec == QUDA_SINGLE_PRECISION) {
-          std::complex<float> *A_h
-            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_host_pinned_malloc(size)) :
-                                                      static_cast<std::complex<float> *>(A_d));
+          std::complex<float> *A_h = (location == QUDA_CUDA_FIELD_LOCATION ?
+                                        static_cast<std::complex<float> *>(pool_host_pinned_malloc(size)) :
+                                        static_cast<std::complex<float> *>(A_d));
           if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
         } else if (prec == QUDA_DOUBLE_PRECISION) {
-          std::complex<double> *A_h
-            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<double> *>(pool_host_pinned_malloc(size)) :
-                                                      static_cast<std::complex<double> *>(A_d));
+          std::complex<double> *A_h = (location == QUDA_CUDA_FIELD_LOCATION ?
+                                         static_cast<std::complex<double> *>(pool_host_pinned_malloc(size)) :
+                                         static_cast<std::complex<double> *>(A_d));
           if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
         } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);

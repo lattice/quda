@@ -17,17 +17,20 @@ namespace quda
   namespace kernel_prefetch
   {
     template <template <typename> class Functor, typename Arg>
-    inline constexpr bool kernel_functor_prefetch_1d_v = requires(Functor<Arg> &f) {
+    inline constexpr bool kernel_functor_prefetch_1d_v = requires(Functor<Arg> &f)
+    {
       f.prefetch(0);
     };
 
     template <template <typename> class Functor, typename Arg>
-    inline constexpr bool kernel_functor_prefetch_2d_v = requires(Functor<Arg> &f) {
+    inline constexpr bool kernel_functor_prefetch_2d_v = requires(Functor<Arg> &f)
+    {
       f.prefetch(0, 0);
     };
 
     template <template <typename> class Functor, typename Arg>
-    inline constexpr bool kernel_functor_prefetch_3d_v = requires(Functor<Arg> &f) {
+    inline constexpr bool kernel_functor_prefetch_3d_v = requires(Functor<Arg> &f)
+    {
       f.prefetch(0, 0, 0);
     };
   } // namespace kernel_prefetch
@@ -111,8 +114,8 @@ namespace quda
           }
         }
       }
-      constexpr bool scalar_tail = grid_stride || (Arg::work_item_unroll <= 1u)
-        || !kernel_unroll::kernel_functor_unroll_1d_v<Functor, Arg>;
+      constexpr bool scalar_tail
+        = grid_stride || (Arg::work_item_unroll <= 1u) || !kernel_unroll::kernel_functor_unroll_1d_v<Functor, Arg>;
       if constexpr (scalar_tail) {
         while (i < arg.threads.x) {
           f(i);
@@ -252,8 +255,8 @@ namespace quda
           }
         }
       }
-      constexpr bool scalar_tail = grid_stride || (Arg::work_item_unroll <= 1u)
-        || !kernel_unroll::kernel_functor_unroll_2d_v<Functor, Arg>;
+      constexpr bool scalar_tail
+        = grid_stride || (Arg::work_item_unroll <= 1u) || !kernel_unroll::kernel_functor_unroll_2d_v<Functor, Arg>;
       if constexpr (scalar_tail) {
         while (i < arg.threads.x) {
           f(i, j);
@@ -395,8 +398,8 @@ namespace quda
           }
         }
       }
-      constexpr bool scalar_tail = grid_stride || (Arg::work_item_unroll <= 1u)
-        || !kernel_unroll::kernel_functor_unroll_3d_v<Functor, Arg>;
+      constexpr bool scalar_tail
+        = grid_stride || (Arg::work_item_unroll <= 1u) || !kernel_unroll::kernel_functor_unroll_3d_v<Functor, Arg>;
       if constexpr (scalar_tail) {
         while (i < arg.threads.x) {
           f(i, j, k);

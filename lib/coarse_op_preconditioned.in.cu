@@ -41,7 +41,7 @@ namespace quda
       Xinv(Xinv)
     {
       if (Arg::compute_max) {
-        arg.max_h = static_cast<Float*>(pool_host_pinned_malloc(sizeof(Float)));
+        arg.max_h = static_cast<Float *>(pool_host_pinned_malloc(sizeof(Float)));
         if (location == QUDA_CUDA_FIELD_LOCATION) arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
         arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
       }

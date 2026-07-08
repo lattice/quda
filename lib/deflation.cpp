@@ -10,8 +10,8 @@ namespace quda
   using namespace blas;
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
-  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<Complex*>(pool_host_pinned_malloc(bytes)); };
-  static auto pinned_deleter   = [] (Complex *hptr) { pool_host_pinned_free(hptr); };
+  static auto pinned_allocator = [](size_t bytes) { return static_cast<Complex *>(pool_host_pinned_malloc(bytes)); };
+  static auto pinned_deleter = [](Complex *hptr) { pool_host_pinned_free(hptr); };
 
   Deflation::Deflation(DeflationParam &param, TimeProfile &profile) :
     param(param),
