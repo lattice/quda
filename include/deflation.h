@@ -56,7 +56,7 @@ namespace quda {
         tot_dim      = param.np;
         ld           = ((tot_dim+15) / 16) * tot_dim;
         //allocate deflation resources:
-        matProj = static_cast<Complex *>(pool_pinned_malloc(ld * tot_dim * sizeof(Complex)));
+        matProj = static_cast<Complex *>(pool_host_pinned_malloc(ld * tot_dim * sizeof(Complex)));
         invRitzVals  = new double[tot_dim];
 
         //Check that RV is a composite field:
@@ -64,7 +64,7 @@ namespace quda {
      }
 
      ~DeflationParam(){
-       pool_pinned_free(matProj);
+       pool_host_pinned_free(matProj);
        if (invRitzVals) delete[] invRitzVals;
      }
   };

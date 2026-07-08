@@ -863,12 +863,12 @@ namespace quda {
                       type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString() : V.VolString();
 
       if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_COARSE_CLOVER) {
-	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
+	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_HOST_PINNED) ? ",GPU-mapped," :
                location == QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
 	strcat(Aux,"coarse_vol=");
 	strcat(Aux, X.VolString().c_str());
       } else {
-	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped" :
+	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_HOST_PINNED) ? ",GPU-mapped" :
                location == QUDA_CUDA_FIELD_LOCATION ? ",GPU-device" : ",CPU");
       }
 
@@ -1045,7 +1045,7 @@ namespace quda {
     using Arg = CalculateYArg<from_coarse, Float, store_t, fineSpin, coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, v, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
+    arg.max_h = static_cast<Float*>(pool_host_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 
     CalculateY<use_mma, location, Arg> y(arg, v, uv, av, Y_, X_, Y_atomic_, X_atomic_, nFace);
@@ -1459,7 +1459,7 @@ namespace quda {
     logQuda(QUDA_VERBOSE, "X2 = %e\n", X_.norm2(0));
 
     pool_device_free(arg.max_d);
-    pool_pinned_free(arg.max_h);
+    pool_host_pinned_free(arg.max_h);
   }
 
 } // namespace quda

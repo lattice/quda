@@ -93,7 +93,7 @@ static int unitarize_link_test(int &test_rc)
   void *fatlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
 
   void *sitelink[4];
-  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
+  for (int i = 0; i < 4; i++) sitelink[i] = host_pinned_malloc(V * gauge_site_size * cpu_prec);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, SiteLinkType::SITELINK_PHASE_MILC);
 
@@ -154,7 +154,7 @@ static int unitarize_link_test(int &test_rc)
   quda::setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
                                    svd_abs_error);
 
-  int *num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  int *num_failures_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
   int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
   *num_failures_h = 0;
 

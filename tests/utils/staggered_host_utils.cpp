@@ -344,7 +344,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   ///////////////////////////////
 
   void *sitelink_ex[4];
-  for (int i = 0; i < 4; i++) sitelink_ex[i] = pinned_malloc(V_ex * gauge_site_size * gSize);
+  for (int i = 0; i < 4; i++) sitelink_ex[i] = host_pinned_malloc(V_ex * gauge_site_size * gSize);
 
 #ifdef MULTI_GPU
   void *ghost_sitelink[4];
@@ -413,7 +413,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
 #endif
 
   // Copy of V link needed for CPU unitarization routines
-  void *v_sitelink = pinned_malloc(4 * V * gauge_site_size * gSize);
+  void *v_sitelink = host_pinned_malloc(4 * V * gauge_site_size * gSize);
 
   // FIXME: we have this complication because references takes coeff as float/double
   //        depending on the precision while the GPU code aways take coeff as double

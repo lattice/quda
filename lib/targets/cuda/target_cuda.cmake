@@ -34,7 +34,7 @@ mark_as_advanced(CMAKE_CUDA_ARCHITECTURES)
 set(CMAKE_CUDA_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
     CACHE FILEPATH "Host compiler to be used by nvcc")
-set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
@@ -168,7 +168,7 @@ mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
 
 # single-precision vectorization presently disabled by default
 cmake_dependent_option(QUDA_VECTORIZE_SINGLE "use vector instructions for single precision device code" ON
-  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 99.0 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.2 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
   OFF)
 message(STATUS "Single-precision vectorization support: ${QUDA_VECTORIZE_SINGLE}")
 mark_as_advanced(QUDA_VECTORIZE_SINGLE)
@@ -268,6 +268,10 @@ if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
   message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
 endif()
 
+# BLAS bulk prefetch uses cp.async.bulk on CUDA Hopper+
+if(QUDA_BLAS_PREFETCH_TYPE STREQUAL "BULK" AND QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})

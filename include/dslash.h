@@ -581,7 +581,7 @@ namespace quda
 
     virtual long long bytes() const override
     {
-      int gauge_bytes = arg.reconstruct * in.Precision();
+      int gauge_bytes = static_cast<int>(arg.reconstruct) * static_cast<int>(in.Precision());
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;

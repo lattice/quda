@@ -281,12 +281,12 @@ namespace quda {
       if (src.Location() == QUDA_CUDA_FIELD_LOCATION) {
         copyGenericClover(*this, src, is_inverse, QUDA_CUDA_FIELD_LOCATION, 0, src_v);
       } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
-        void *packClover = pool_pinned_malloc(bytes);
+        void *packClover = pool_host_pinned_malloc(bytes);
 
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, packClover, src_v);
         qudaMemcpy(data(is_inverse), packClover, bytes, qudaMemcpyHostToDevice);
 
-        pool_pinned_free(packClover);
+        pool_host_pinned_free(packClover);
       } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
         void *packClover = pool_device_malloc(src.Bytes());
 
@@ -299,12 +299,12 @@ namespace quda {
       if (src.Location() == QUDA_CPU_FIELD_LOCATION) {
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, 0, src_v);
       } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        void *packClover = pool_pinned_malloc(src.Bytes());
+        void *packClover = pool_host_pinned_malloc(src.Bytes());
 
         qudaMemcpy(packClover, src_v, src.Bytes(), qudaMemcpyDeviceToHost);
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, 0, packClover);
 
-        pool_pinned_free(packClover);
+        pool_host_pinned_free(packClover);
       } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) {
         void *packClover = pool_device_malloc(bytes);
 

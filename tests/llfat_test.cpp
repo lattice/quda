@@ -54,14 +54,14 @@ static void llfat_test()
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  void *fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  void *longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *fatlink = host_pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *longlink = host_pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   void *sitelink[4];
-  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) sitelink[i] = host_pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
   void *sitelink_ex[4];
-  for (int i = 0; i < 4; i++) sitelink_ex[i] = pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) sitelink_ex[i] = host_pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
 
   void *milc_sitelink;
   milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);

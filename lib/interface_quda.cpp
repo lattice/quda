@@ -555,7 +555,7 @@ void initQudaMemory(void)
 
   blas_lapack::native::init();
 
-  num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  num_failures_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
   num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
@@ -1512,7 +1512,7 @@ void flushPoolQuda(QudaMemoryType type)
     pool::flush_device();
     break;
   case QUDA_MEMORY_HOST_PINNED:
-    pool::flush_pinned();
+    pool::flush_host_pinned();
     break;
   default:
     errorQuda("MemoryType %d not supported", type);
@@ -1551,7 +1551,7 @@ void endQuda(void)
     blas_lapack::native::destroy();
     reducer::destroy();
 
-    pool::flush_pinned();
+    pool::flush_host_pinned();
     pool::flush_device();
 
     host_free(num_failures_h);
@@ -3151,8 +3151,8 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
     printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)", byte_estimate, ritzVolume, ritzParam.Precision());
     if (ritzParam.mem_type == QUDA_MEMORY_DEVICE)
       printfQuda("Using device memory type.\n");
-    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED)
-      printfQuda("Using mapped memory type.\n");
+    else if (ritzParam.mem_type == QUDA_MEMORY_HOST_PINNED)
+      printfQuda("Using host-pinned (GPU-mapped) memory type.\n");
   }
 
   RV = ColorSpinorField::Create(ritzParam);

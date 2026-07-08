@@ -261,6 +261,13 @@ namespace quda {
           // before we free any comms buffers
           qudaDeviceSynchronize();
           comm_barrier();
+          // Tear down any existing IPC comms before freeing the ghost
+          // buffers.  Otherwise a peer rank can still hold an
+          // hipIpcOpenMemHandle mapping of a buffer we are about to
+          // hipFree, and a subsequent hipMalloc that lands at the same
+          // virtual address can then fail hipIpcGetMemHandle with
+          // hipErrorInvalidValue.
+          destroyIPCComms();
           for (int b=0; b<2; b++) {
             device_comms_pinned_free(ghost_recv_buffer_d[b]);
             device_comms_pinned_free(ghost_send_buffer_d[b]);
@@ -283,13 +290,13 @@ namespace quda {
           qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
           // pinned buffer used for sending
-          ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
+          ghost_pinned_send_buffer_h[b] = host_pinned_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
           ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
 
           // pinned buffer used for receiving
-          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          ghost_pinned_recv_buffer_h[b] = host_pinned_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
           ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
@@ -448,6 +455,13 @@ namespace quda {
   void LatticeField::createIPCComms() const
   {
     if ( initIPCComms && !ghost_field_reset ) return;
+
+    // If we already have IPC state and the ghost field has been reset,
+    // tear it down before recreating; otherwise the IPC mem/event handle
+    // arrays would be silently overwritten and the previous events
+    // (created with hipEventCreateWithFlags) and imported handles would
+    // leak.
+    if (initIPCComms && ghost_field_reset) destroyIPCComms();
 
     if (!initComms) errorQuda("Can only be called after create comms");
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)

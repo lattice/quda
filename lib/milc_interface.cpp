@@ -14,6 +14,8 @@
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
+#include <spin_taste.h>
+#include <contract_quda.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -66,8 +68,11 @@ static bool invalidate_quda_mg = true;
 
 static void *df_preconditioner = nullptr;
 
+// Cache both parity deflation spaces
 static void *preserved_deflation_space[2] = {nullptr, nullptr};
 static double preserved_evals_mass[2] = {-1.0, -1.0};
+// Cache zero-mass eigenvalues instead of recomputing every time the mass is changed
+static std::vector<quda::Complex> preserved_evals_zero_mass;
 
 using namespace quda;
 using namespace quda::fermion_force;
@@ -126,6 +131,7 @@ void qudaCleanUpDeflationSpace()
       preserved_evals_mass[p] = -1.0;
     }
   }
+  preserved_evals_zero_mass.clear();
   qudamilc_called<false>(__func__);
 }
 
@@ -183,9 +189,9 @@ void qudaSetLayout(QudaLayout_t input)
   initQuda(device);
 }
 
-void *qudaAllocatePinned(size_t bytes) { return pool_pinned_malloc(bytes); }
+void *qudaAllocatePinned(size_t bytes) { return pool_host_pinned_malloc(bytes); }
 
-void qudaFreePinned(void *ptr) { pool_pinned_free(ptr); }
+void qudaFreePinned(void *ptr) { pool_host_pinned_free(ptr); }
 
 void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
 
@@ -283,6 +289,24 @@ static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType
   }
   reconstruct = reconstruct_in;
   reconstruct_sloppy = reconstruct_sloppy_in;
+}
+
+// qudaMultishiftInvert and qudaInvert convention promotes the outer/fine solve precision to double
+// when single is requested (the sloppy precision stays single, giving a mixed-precision solve). See
+// QUDA PR #1035. Set QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT to a non-zero value to disable the promotion.
+static bool forceOuterDouble()
+{
+  static bool queried = false;
+  static bool force_double = true;
+  if (!queried) {
+    char *env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
+    if (env && strcmp(env, "0") != 0) {
+      force_double = false;
+      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
+    }
+    queried = true;
+  }
+  return force_double;
 }
 
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t, const double act_path_coeff[6], void *inlink, void *fatlink,
@@ -1084,17 +1108,6 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-  static bool force_double_queried = false;
-  static bool do_not_force_double = false;
-  if (!force_double_queried) {
-    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
-    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
-      do_not_force_double = true;
-      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
-    }
-    force_double_queried = true;
-  }
-
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   bool use_mixed_precision = (((quda_precision == 2) && inv_args.mixed_precision)
                               || ((quda_precision == 1) && (inv_args.mixed_precision == 2))) ?
@@ -1108,8 +1121,8 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   default: device_precision_sloppy = device_precision;
   }
 
-  // override fine precision to double, switch to mixed as necessary
-  if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
+  // override fine precision to double, switch to mixed as necessary (see forceOuterDouble)
+  if (forceOuterDouble() && device_precision == QUDA_SINGLE_PRECISION) {
     // force outer double
     device_precision = QUDA_DOUBLE_PRECISION;
     if (device_precision_sloppy == QUDA_SINGLE_PRECISION) use_mixed_precision = true;
@@ -1298,6 +1311,9 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
   default: device_precision_sloppy = device_precision;
   }
+  // Match the deflatable inverter's outer-precision promotion (see forceOuterDouble) so the gauge
+  // load and Dirac operators built here agree with the resident precise gauge field's precision.
+  if (forceOuterDouble() && device_precision == QUDA_SINGLE_PRECISION) device_precision = QUDA_DOUBLE_PRECISION;
   QudaParity parity = inv_args.evenodd;
   if (parity != QUDA_EVEN_PARITY && parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d", parity);
   QudaParity other_parity = parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
@@ -1310,6 +1326,13 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     QudaGaugeParam long_param = newQudaGaugeParam();
     setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
                    inv_args.tadpole, inv_args.naik_epsilon);
+    // Keep the eigensolver gauge at the genuine eigensolver precision even when forceOuterDouble()
+    // has promoted the precise gauge to double. The deflation eigenvectors and every operator that
+    // consumes them downstream run at the eigensolver precision, so the eigensolver gauge must match that.
+    fat_param.cuda_prec_eigensolver = eigargs.prec_eigensolver;
+    fat_param.reconstruct_eigensolver = fat_param.reconstruct;
+    long_param.cuda_prec_eigensolver = eigargs.prec_eigensolver;
+    long_param.reconstruct_eigensolver = long_param.reconstruct;
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -1336,6 +1359,23 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     qudaInvertDeflatable(external_precision, quda_precision, mass, inv_args, eigargs, 1.0, 0.0, fatlink, longlink,
                          static_cast<void *>(source.data()), static_cast<void *>(solution.data()), &final_residual,
                          &final_fermilab_residual, &num_iters);
+
+    // Cache zero-mass eigenvalues (lambda_0 = lambda_m - 4*m^2); valid for any mass.
+    // Unconditional overwrite is intentional: a fresh COMPUTE invalidates any prior cached zero-mass evals.
+    {
+      deflation_space *space0 = reinterpret_cast<deflation_space *>(preserved_deflation_space[parity]);
+      preserved_evals_zero_mass.resize(space0->evals.size());
+      double m2_shift = 4.0 * mass * mass;
+      for (size_t i = 0; i < space0->evals.size(); i++)
+        preserved_evals_zero_mass[i] = space0->evals[i] - Complex(m2_shift, 0.0);
+
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Stored zero-mass eigenvalues (back-shifted from mass %e)\n", mass);
+        for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
+          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
+                     preserved_evals_zero_mass[i].imag());
+      }
+    }
 
   } else if (load_type == QUDA_MILC_EIG_FROM_OTHER_PARITY) {
     logQuda(QUDA_VERBOSE, "Computing deflation space for parity %d from parity %d\n", parity, other_parity);
@@ -1364,34 +1404,65 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     setDiracEigParam(diracEigParam, &invertParam, true, false);
     Dirac *dEig = Dirac::create(diracEigParam);
 
-    // Temp vector on GPU
+    // Batch of temp vectors on GPU
+    auto batch_size = std::min(eigargs.compute_evals_batch_size, n_evecs);
     gpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField temp(gpuParam);
+    std::vector<ColorSpinorField> temps;
+    resize(temps, batch_size, gpuParam);
 
     Complex n_unit(-1.0, 0.0);
 
-    for (int i = 0; i < n_evecs; i++) {
+    for (int i = 0; i < n_evecs; i += batch_size) {
+      auto lo = i;
+      auto hi = std::min(i + batch_size, n_evecs);
+      auto bs = hi - lo;
 
-      // Compute other parity eigenvector v_o = i*D_oe*v_e/\lambda_e
-      dEig->Dslash(temp, other_parity_space->evecs[i], parity);
-      auto norm2 = blas::norm2(temp);
-      blas::ax(1.0 / sqrt(norm2), temp);
-      space->evecs[i] = temp;
+      // Compute other parity eigenvectors v_o = i*D_oe*v_e/\lambda_e (normalized)
+      dEig->Dslash({temps.begin(), temps.begin() + bs},
+                   {other_parity_space->evecs.begin() + lo, other_parity_space->evecs.begin() + hi}, parity);
+      auto t_norms = blas::norm2({temps.begin(), temps.begin() + bs});
+      quda::vector<Complex> scales(bs);
+      for (int j = 0; j < bs; j++) scales[j] = 1.0 / sqrt(t_norms[j]);
+      blas::axy(scales, {temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
 
-      // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-      dEig->M(temp, space->evecs[i]);
-      auto eval = other_parity_space->evals[i];       // re-use eigenvalues by default
-      if (fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
-        auto vtAv = blas::cDotProduct(space->evecs[i], temp);
-        auto v2 = blas::norm2(space->evecs[i]);
-        eval = vtAv / sqrt(v2);
+      if (!preserved_evals_zero_mass.empty()) {
+        // Shift from stored zero-mass eigenvalues; no mat-vec needed.
+        if (preserved_evals_zero_mass.size() < static_cast<size_t>(n_evecs))
+          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %d", preserved_evals_zero_mass.size(),
+                    n_evecs);
+        for (int j = 0; j < bs; j++)
+          space->evals[lo + j] = preserved_evals_zero_mass[lo + j] + Complex(4.0 * mass * mass, 0.0);
+
+        // Opt-in residual sanity check
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+          dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
+          auto res = blas::caxpbyNorm({space->evals.begin() + lo, space->evals.begin() + hi},
+                                      {space->evecs.begin() + lo, space->evecs.begin() + hi}, n_unit,
+                                      {temps.begin(), temps.begin() + bs});
+          for (int j = 0; j < bs; j++)
+            printfQuda("Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n", lo + j,
+                       space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
+        }
+      } else {
+        // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+        dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
+        if (fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
+          auto vtAv = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi},
+                                        {temps.begin(), temps.begin() + bs});
+          auto v2 = blas::norm2({space->evecs.begin() + lo, space->evecs.begin() + hi});
+          for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / sqrt(v2[j]);
+        } else { // re-use other parity eigenvalues by default
+          for (int j = 0; j < bs; j++) space->evals[lo + j] = other_parity_space->evals[lo + j];
+        }
+
+        // res^2 = |\lambda*v - A*v|
+        auto res = blas::caxpbyNorm({space->evals.begin() + lo, space->evals.begin() + hi},
+                                    {space->evecs.begin() + lo, space->evecs.begin() + hi}, n_unit,
+                                    {temps.begin(), temps.begin() + bs});
+        for (int j = 0; j < bs; j++)
+          logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
+                  space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
       }
-      space->evals[i] = eval;
-
-      // res^2 = |\lambda*v - A*v|
-      auto res = blas::caxpbyNorm(eval, space->evecs[i], n_unit, temp);
-      logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(),
-              sqrt(res[0]));
     }
     delete dEig;
 
@@ -1412,6 +1483,9 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     ColorSpinorParam csParam;
     setColorSpinorParams(localDim, host_precision, &csParam);
     ColorSpinorParam gpuParam(csParam, invertParam, QUDA_CUDA_FIELD_LOCATION);
+    // Store the deflation space at the eigensolver precision rather than the (possibly forceOuterDouble-
+    // promoted) cuda_prec that the ColorSpinorParam(...,invertParam,...) constructor copies
+    gpuParam.setPrecision(invertParam.cuda_prec_eigensolver, invertParam.cuda_prec_eigensolver, true);
 
     // Setup deflation space
     deflation_space *space = new deflation_space;
@@ -1424,9 +1498,11 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     setDiracEigParam(diracEigParam, &invertParam, true, false);
     Dirac *dEig = Dirac::create(diracEigParam);
 
-    // Temp vector on GPU
+    // Batch of temp vectors on GPU
+    auto batch_size = std::min(eigargs.compute_evals_batch_size, n_evecs);
     gpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField temp(gpuParam);
+    std::vector<ColorSpinorField> temps;
+    resize(temps, batch_size, gpuParam);
 
     Complex n_unit(-1.0, 0.0);
 
@@ -1435,25 +1511,33 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     int evec_offset = getColorVectorOffset(parity, false, localDim) * host_precision;
 
     const lat_dim_t dims = {localDim[0], localDim[1], localDim[2], localDim[3]};
-    for (int i = 0; i < n_evecs; i++) {
+    for (int i = 0; i < n_evecs; i += batch_size) {
+      auto lo = i;
+      auto hi = std::min(i + batch_size, n_evecs);
+      auto bs = hi - lo;
 
       // Copy each evec to host-side spinor and then to device-side deflation space
-      void *evec_ptr = static_cast<char *>(evecs[i]) + evec_offset;
-      ColorSpinorParam cpuParam(evec_ptr, invertParam, dims, true, QUDA_CPU_FIELD_LOCATION);
-      ColorSpinorField in_evec(cpuParam);
-      space->evecs[i] = in_evec;
+      for (int j = 0; j < bs; j++) {
+        void *evec_ptr = static_cast<char *>(evecs[lo + j]) + evec_offset;
+        ColorSpinorParam cpuParam(evec_ptr, invertParam, dims, true, QUDA_CPU_FIELD_LOCATION);
+        ColorSpinorField in_evec(cpuParam);
+        space->evecs[lo + j] = in_evec;
+      }
 
-      // Compute eigenvalue, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-      dEig->M(temp, space->evecs[i]);
-      auto vtAv = blas::cDotProduct(space->evecs[i], temp);
-      auto v2 = blas::norm2(space->evecs[i]);
-      auto eval = vtAv / sqrt(v2);
-      space->evals[i] = eval;
+      // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+      dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
+      auto vtAv
+        = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi}, {temps.begin(), temps.begin() + bs});
+      auto v2 = blas::norm2({space->evecs.begin() + lo, space->evecs.begin() + hi});
+      for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / sqrt(v2[j]);
 
       // Compute residual, res^2 = |\lambda*v - A*v|
-      auto res = blas::caxpbyNorm(eval, space->evecs[i], n_unit, temp);
-      logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(),
-              sqrt(res[0]));
+      auto res = blas::caxpbyNorm({space->evals.begin() + lo, space->evals.begin() + hi},
+                                  {space->evecs.begin() + lo, space->evecs.begin() + hi}, n_unit,
+                                  {temps.begin(), temps.begin() + bs});
+      for (int j = 0; j < bs; j++)
+        logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
+                space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
     }
 
     delete dEig;
@@ -1468,6 +1552,213 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaLoadDeflationSpace
+
+// Compute exact low mode contribution to current
+void qudaExactCurrent(int external_precision, int quda_precision, const void *const fatlink, const void *const longlink,
+                      const void *const links, int nmasses, const void *masses, QudaInvertArgs_t inv_args,
+                      QudaEigensolverArgs_t eigargs, void *jlow_mu, void *jlow_mu2, int reload)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  // The exact current is built entirely from the deflation eigenvectors so the gauge field and the
+  // Dirac/covariant-derivative operators applied to those eigenvectors must match the eigenvector storage
+  // precision, NOT the solve precision (quda_precision). Allows for a double precision eigensolve inside
+  // of a single-precision MILC build.
+  QudaPrecision device_precision = (eigargs.prec_eigensolver != QUDA_INVALID_PRECISION) ?
+    eigargs.prec_eigensolver :
+    ((quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION);
+  QudaPrecision device_precision_sloppy = device_precision;
+
+  // MILC passes masses, jlow_mu, and jlow_mu2 as its host-precision `Real` type (float in a single-precision
+  // build and double in a double-precision build). Need to interpret them at the host precision.
+  const bool host_single = (host_precision == QUDA_SINGLE_PRECISION);
+  std::vector<double> mass(nmasses);
+  for (int i = 0; i < nmasses; i++)
+    mass[i] = host_single ? static_cast<double>(reinterpret_cast<const float *>(masses)[i]) :
+                            reinterpret_cast<const double *>(masses)[i];
+
+  // Load links
+  if (reload) invalidateGaugeQuda();
+  QudaGaugeParam fat_param = newQudaGaugeParam();
+  QudaGaugeParam long_param = newQudaGaugeParam();
+  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
+                 inv_args.tadpole, inv_args.naik_epsilon);
+  if (invalidate_quda_gauge || !create_quda_gauge) {
+    loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
+    if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
+    invalidate_quda_gauge = false;
+  }
+  fat_param.type = QUDA_WILSON_LINKS;
+  fat_param.make_resident_gauge = true;
+  if (links == nullptr) {
+    errorQuda("Can't offload a null gauge field\n");
+    exit(1);
+  }
+  loadGaugeQuda(const_cast<void *>(links), &fat_param);
+
+  // Get deflation spaces
+  deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_deflation_space[0]);
+  deflation_space *space_odd = reinterpret_cast<deflation_space *>(preserved_deflation_space[1]);
+  if (!space_even || !space_odd) errorQuda("One or both deflation spaces is not loaded!");
+  if (preserved_evals_mass[0] != 0.0 || preserved_evals_mass[1] != 0.0)
+    errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
+  int n_evecs = eigargs.n_ev;
+
+  // Create Dslash operator
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 1.0, 0.0, inv_args.max_iter, 1e-1,
+                  QUDA_ODD_PARITY, verbosity, QUDA_CG_INVERTER, &invertParam);
+  DiracParam diracParam;
+  setDiracParam(diracParam, &invertParam, true);
+  Dirac *dirac = Dirac::create(diracParam);
+
+  // Create Gauge Covariant Derivative Operator
+  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
+  DiracParam cDParam;
+  setDiracParam(cDParam, &invertParam, false);
+  GaugeCovDev myCovDev(cDParam);
+
+  // Full parity vectors on GPU
+  ColorSpinorParam gpuParam(space_even->evecs[0]);
+  gpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  gpuParam.x[0] *= 2;
+  ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam), evec(gpuParam);
+
+  // Device buffer for contractQuda output: one complex per full-volume site at the device (field)
+  // precision. Even-parity sites occupy the first half [0, V/2), odd-parity the second half [V/2, V).
+  size_t data_bytes = 2 * gr0.Volume() * gr0.Precision();
+  void *d_result = pool_device_malloc(data_bytes);
+
+  // Wrap the two halves of d_result as single-parity (nColor=1, nSpin=1) fields so each scaled complex
+  // contraction can be summed on the device with blas::axpy
+  ColorSpinorParam resParam(space_even->evecs[0]);
+  resParam.nColor = 1;
+  resParam.nSpin = 1;
+  resParam.pad = 0;
+  resParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  resParam.v = d_result;
+  ColorSpinorField res_even(resParam); // even-parity contraction output (first half of d_result)
+  resParam.v = static_cast<char *>(d_result) + data_bytes / 2;
+  ColorSpinorField res_odd(resParam); // odd-parity contraction output (second half of d_result)
+
+  // Per-direction, per-parity device accumulators with precision inherited from the eigenvectors
+  ColorSpinorParam accParam(space_even->evecs[0]);
+  accParam.nColor = 1;
+  accParam.nSpin = 1;
+  accParam.pad = 0;
+  accParam.create = QUDA_ZERO_FIELD_CREATE;
+  std::vector<ColorSpinorField> acc_even, acc_odd, acc2_even, acc2_odd;
+  resize(acc_even, 4, accParam);
+  resize(acc_odd, 4, accParam);
+  if (nmasses == 3) {
+    resize(acc2_even, 4, accParam);
+    resize(acc2_odd, 4, accParam);
+  }
+
+  double m_l, m_s, m_u, m_d, dl, ds, du, dd;
+  double zscale = 0.0, zscale2 = 0.0;
+
+  // Loop over eigenvectors
+  for (int i = 0; i < n_evecs; i++) {
+
+    // Compute Dslash of eigenvector
+    dirac->Dslash(gr0.Odd(), space_even->evecs[i], QUDA_ODD_PARITY);
+
+    // Construct full parity eigenvector
+    blas::copy(evec.Even(), space_even->evecs[i]);
+    blas::copy(evec.Odd(), space_odd->evecs[i]);
+
+    // Scaled eigenvalue
+    switch (nmasses) {
+    case (1): zscale = 1.0 / (space_even->evals[i].real() + 4.0 * mass[0] * mass[0]); break;
+    case (2):
+      m_l = mass[0];
+      m_s = mass[1];
+      dl = space_even->evals[i].real() + 4.0 * m_l * m_l;
+      ds = space_even->evals[i].real() + 4.0 * m_s * m_s;
+      zscale = 4.0 * (m_s * m_s - m_l * m_l) / (dl * ds);
+      break;
+    case (3):
+      m_u = mass[0];
+      m_d = mass[1];
+      m_s = mass[2];
+      du = space_even->evals[i].real() + 4.0 * m_u * m_u;
+      dd = space_even->evals[i].real() + 4.0 * m_d * m_d;
+      ds = space_even->evals[i].real() + 4.0 * m_s * m_s;
+      zscale = 4.0 * (m_d * m_d - m_u * m_u) / (du * dd);
+      zscale2 = 4.0 * (m_s * m_s - m_u * m_u) / (du * ds);
+      break;
+    default: errorQuda("Wrong number of masses %d!", nmasses);
+    }
+
+    for (int mu = 0; mu < 4; mu++) {
+
+      // Do gauge covariant shift and flip sign on ODD sites
+      myCovDev.MCD(gr_mu, gr0, mu);
+      blas::axy(-1.0, gr0.Odd(), gr_mu.Odd());
+
+      // Do spin-taste operation
+      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
+      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
+
+      // Save current for EVEN sites (first half of d_result) and accumulate on device
+      contractQuda(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      blas::axpy(-zscale, res_even, acc_even[mu]);
+      if (nmasses == 3) blas::axpy(-zscale2, res_even, acc2_even[mu]);
+
+      // Do gauge covariant shift and flip sign on ODD sites
+      myCovDev.MCD(gr_mu, evec, mu);
+      blas::ax(-1.0, gr_mu.Odd());
+
+      // Do spin-taste operation
+      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
+      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
+
+      // Save current for ODD sites (second half of d_result) and accumulate on device
+      contractQuda(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      blas::axpy(+zscale, res_odd, acc_odd[mu]);
+      if (nmasses == 3) blas::axpy(+zscale2, res_odd, acc2_odd[mu]);
+    }
+  }
+
+  // Copy each device accumulator (FLOAT2, one contiguous complex per site, at device precision) to a small
+  // host staging buffer and write its imaginary part into MILC's interleaved jlow array. Note: nColor=1
+  // fields are not supported by copyGenericColorSpinor, so read the raw buffer directly rather than assigning
+  // to a host field. Even-parity block -> [0, 2V), odd-parity block -> [2V, 4V).
+  const bool device_single = (gr0.Precision() == QUDA_SINGLE_PRECISION);
+  const size_t vol_cb = gr0.Volume() / 2;
+  void *h_result = malloc(data_bytes / 2);
+  auto store_imag = [&](void *arr, const ColorSpinorField &acc, int mu, size_t base) {
+    if (!arr) return;
+    qudaMemcpy(h_result, acc.data(), data_bytes / 2, qudaMemcpyDeviceToHost);
+    for (size_t x = 0; x < vol_cb; x++) {
+      double im = device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag()) :
+                                  reinterpret_cast<const Complex *>(h_result)[x].imag();
+      if (host_single)
+        reinterpret_cast<float *>(arr)[base + 4 * x + mu] += static_cast<float>(im);
+      else
+        reinterpret_cast<double *>(arr)[base + 4 * x + mu] += im;
+    }
+  };
+
+  for (int mu = 0; mu < 4; mu++) {
+    store_imag(jlow_mu, acc_even[mu], mu, 0);
+    store_imag(jlow_mu, acc_odd[mu], mu, 2 * gr0.Volume());
+    if (nmasses == 3) {
+      store_imag(jlow_mu2, acc2_even[mu], mu, 0);
+      store_imag(jlow_mu2, acc2_odd[mu], mu, 2 * gr0.Volume());
+    }
+  }
+
+  // Cleanup
+  free(h_result);
+  pool_device_free(d_result);
+  delete dirac;
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaExactCurrent
 
 // Wrapper function for qudaInvertDeflatable to maintain backward compatibility with old(er) MILC
 void qudaInvert(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
@@ -1689,17 +1980,6 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-  static bool force_double_queried = false;
-  static bool do_not_force_double = false;
-  if (!force_double_queried) {
-    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
-    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
-      do_not_force_double = true;
-      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
-    }
-    force_double_queried = true;
-  }
-
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
   QudaPrecision device_precision_sloppy;
@@ -1709,8 +1989,8 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   default: device_precision_sloppy = device_precision;
   }
 
-  // override fine precision to double, switch to mixed as necessary
-  if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
+  // override fine precision to double, switch to mixed as necessary (see forceOuterDouble)
+  if (forceOuterDouble() && device_precision == QUDA_SINGLE_PRECISION) {
     // force outer double
     device_precision = QUDA_DOUBLE_PRECISION;
   }
@@ -1754,8 +2034,33 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
     // Check that preserved eigenvalues are for this mass
     double epsilon = device_precision == QUDA_DOUBLE_PRECISION ? __DBL_EPSILON__ : __FLT_EPSILON__;
     if (fabs(mass - preserved_evals_mass[local_parity]) > epsilon) {
-      logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
-      qep.preserve_evals = QUDA_BOOLEAN_FALSE;
+      // If not, shift to correct mass using cached zero-mass eigenvalues
+      // NAIK CAVEAT: shifted evals are only approximate when inv_args.naik_epsilon != 0
+      if (!preserved_evals_zero_mass.empty()) {
+        if (qep.preserve_deflation_space == nullptr)
+          errorQuda("preserve_deflation_space is null while shifting eigenvalues");
+        logQuda(QUDA_VERBOSE, "Shifting eigenvalues to mass %e\n", invertParam.mass);
+        deflation_space *space = reinterpret_cast<deflation_space *>(qep.preserve_deflation_space);
+        if (preserved_evals_zero_mass.size() < space->evals.size())
+          errorQuda("preserved_evals_zero_mass has %lu entries, need at least %lu", preserved_evals_zero_mass.size(),
+                    space->evals.size());
+        double m2_shift = 4.0 * mass * mass;
+        for (size_t i = 0; i < space->evals.size(); i++)
+          space->evals[i] = preserved_evals_zero_mass[i] + Complex(m2_shift, 0.0);
+
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+          printfQuda("Shifted eigenvalues (parity %d, mass %e)\n", local_parity, mass);
+          for (size_t i = 0; i < space->evals.size(); i++)
+            printfQuda("  Eval[%04zu] = (%+.16e,%+.16e) (shifted)\n", i, space->evals[i].real(), space->evals[i].imag());
+        }
+      } else if (qep.preserve_deflation_space != nullptr) {
+        // Reusing an existing deflation space at a new mass with no zero-mass
+        // snapshot to shift from -- QUDA must recompute the evals for this mass.
+        logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
+        qep.preserve_evals = QUDA_BOOLEAN_FALSE;
+      }
+      // else: no preserved space this call -- the eigensolver (or vec_infile
+      // load) computes eigenvalues at the solve mass
     }
   }
 
@@ -1786,6 +2091,22 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   if (invertParam.eig_param && qep.preserve_deflation) {
     preserved_deflation_space[local_parity] = qep.preserve_deflation_space;
     preserved_evals_mass[local_parity] = mass;
+    // Snapshot zero-mass eigenvalues the first time any space is set.
+    // The empty() guard ensures we never overwrite an earlier snapshot from a different (or fresher) source.
+    if (preserved_evals_zero_mass.empty()) {
+      deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space[local_parity]);
+      preserved_evals_zero_mass.resize(space->evals.size());
+      double m2_shift = 4.0 * mass * mass;
+      for (size_t i = 0; i < space->evals.size(); i++)
+        preserved_evals_zero_mass[i] = space->evals[i] - Complex(m2_shift, 0.0);
+
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Stored zero-mass eigenvalues (back-shifted from parity %d, mass %e)\n", local_parity, mass);
+        for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
+          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
+                     preserved_evals_zero_mass[i].imag());
+      }
+    }
   }
 
   // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
