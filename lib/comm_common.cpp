@@ -168,7 +168,7 @@ namespace comm
 
     const char *env = getenv("QUDA_P2P_TRANSPORT");
     if (env) {
-      QudaP2PSignal requested;
+      QudaP2PSignal requested = choice; // satisfies compilers uninitialized use error
       if (strcasecmp(env, "stream_gated") == 0 || strcasecmp(env, "stream-gated") == 0) {
         requested = QudaP2PSignal::STREAM_GATED;
       } else if (strcasecmp(env, "events") == 0 || strcasecmp(env, "event") == 0 || strcasecmp(env, "remote_ipc") == 0) {
