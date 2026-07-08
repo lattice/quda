@@ -245,7 +245,12 @@ namespace quda
   // built with NVSHMEM.  Kept strictly separate from the P2P import above so a
   // single pointer family never means both "NVSHMEM symmetric remote" and
   // "QUDA P2P import".
+#ifdef NVSHMEM_COMMS
   void comm_create_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
+#else
+  // `local` is unused without NVSHMEM -- leave it unnamed so -Werror=unused-parameter is happy.
+  void comm_create_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *)
+#endif
   {
 #ifdef NVSHMEM_COMMS
     // With NVSHMEM disabled at runtime, `local` is a DeviceCommBuffer (not a
@@ -383,12 +388,6 @@ namespace quda
     int supported = 0;
     err = cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS, device);
     if (err != CUDA_SUCCESS || !supported) errorQuda("STREAM_GATED requires 64-bit CUDA stream memory operations");
-    // Raw device capability: does the driver accept CU_STREAM_WAIT_VALUE_FLUSH
-    // (CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES)?  GB200 reports 0 and rejects
-    // the flag (CUDA_ERROR_NOT_SUPPORTED).
-    bool flush_capable = false;
-    err = cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES, device);
-    if (err == CUDA_SUCCESS && supported) flush_capable = true;
 
     // Defaults hold on non-MNNVL builds (the block below is compiled out): the
     // REMOTE_WRITE policy stays offered (gated only by QUDA_ENABLE_P2P bit 1 in the
@@ -404,6 +403,14 @@ namespace quda
     // SINGLE knob here: remote-write is safe iff the flush is armed, and the flush
     // is only useful when remote-write is on.  Enable the pair iff bit 1 is set AND
     // (the device can flush OR the user forces it with QUDA_P2P_FORCE_FLUSH=1).
+    //
+    // Raw device capability: does the driver accept CU_STREAM_WAIT_VALUE_FLUSH
+    // (CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES)?  GB200 reports 0 and rejects
+    // the flag (CUDA_ERROR_NOT_SUPPORTED).
+    bool flush_capable = false;
+    err = cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES, device);
+    if (err == CUDA_SUCCESS && supported) flush_capable = true;
+
     const bool remote_write_requested = comm_peer2peer_enabled_global() & 2; // QUDA_ENABLE_P2P bit 1
     const char *force_env = getenv("QUDA_P2P_FORCE_FLUSH");
     const bool force_flush = force_env && atoi(force_env) == 1;
