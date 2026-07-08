@@ -931,8 +931,8 @@ namespace quda
     if (can_verify) {
 
       if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-        double kappa = diracResidual->Kappa();
-        double mass = diracResidual->Mass();
+        real_t kappa = diracResidual->Kappa();
+        real_t mass = diracResidual->Mass();
         if (param.level == 0) {
           if (tmp1.Nspin() == 4) {
             diracSmoother->DslashXpay(tmp2.Even(), tmp1.Odd(), QUDA_EVEN_PARITY, tmp1.Even(), -kappa);
@@ -985,7 +985,7 @@ namespace quda
         //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
         double delta_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
         if (quda::fabs(delta_factor) > tol) {
-          double delta_a
+          real_t delta_a
             = delta_factor * 2.0 * diracResidual->Kappa() * diracResidual->Mu() * transfer->Vectors().TwistFlavor();
           l2_deviation -= quda::fabs(delta_a) * sqrt(norm2(tmp_coarse) / norm2(x_coarse[0]));
           l2_deviation = quda::fabs(l2_deviation);

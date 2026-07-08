@@ -563,7 +563,7 @@ namespace quda {
    */
   template <bool dagger, int coarseColor, int nVec>
   void ApplyCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                      cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                      cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                       int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
 
   /**

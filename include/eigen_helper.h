@@ -27,10 +27,13 @@ using namespace Eigen;
 #include <eigen_quad_scalar.h>
 #include <quda_internal.h>
 
-using EigMatrixXcd = Matrix<quda::complex_t, Dynamic, Dynamic>;
-using EigVectorXcd = Matrix<quda::complex_t, Dynamic, 1>;
-using EigMatrixXd = Matrix<quda::real_t, Dynamic, Dynamic>;
-using EigVectorXd = Matrix<quda::real_t, Dynamic, 1>;
+// Fully qualify Eigen::Matrix / Eigen::Dynamic here: in translation units that
+// also pull in quda's own Matrix type (e.g. multigrid block orthogonalization),
+// unqualified Matrix<...> is ambiguous between Eigen::Matrix and quda::Matrix.
+using EigMatrixXcd = Eigen::Matrix<quda::complex_t, Eigen::Dynamic, Eigen::Dynamic>;
+using EigVectorXcd = Eigen::Matrix<quda::complex_t, Eigen::Dynamic, 1>;
+using EigMatrixXd = Eigen::Matrix<quda::real_t, Eigen::Dynamic, Eigen::Dynamic>;
+using EigVectorXd = Eigen::Matrix<quda::real_t, Eigen::Dynamic, 1>;
 
 #else
 

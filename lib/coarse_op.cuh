@@ -1094,8 +1094,8 @@ namespace quda {
 	complex_t fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
 	real_t max = std::max({abs(fp.real()), abs(fp.imag()), abs(fm.real()), abs(fm.imag())}) * v.Scale();
 	logQuda(QUDA_DEBUG_VERBOSE, "tm max %e\n", double(max));
-	av.Scale(double(max));
-	arg.AV.resetScale(double(max));
+	av.Scale(max);
+	arg.AV.resetScale(max);
       }
 
       y.setComputeType(COMPUTE_TMAV);
@@ -1231,8 +1231,8 @@ namespace quda {
             real_t y_max = Y_atomic_.abs_max((4+d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
 
             if (!set_scale) {
-              Y_.Scale(double(1.1*y_max)); // slightly oversize to avoid unnecessary rescaling
-              arg.Y.resetScale(double(Y_.Scale()));
+              Y_.Scale(static_cast<real_t>(1.1) * y_max); // slightly oversize to avoid unnecessary rescaling
+              arg.Y.resetScale(Y_.Scale());
               set_scale = true;
             } else if (y_max > Y_.Scale()) {
               // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
@@ -1245,8 +1245,8 @@ namespace quda {
               }
 
               y.setDimension(d);
-              Y_.Scale(double(y_max));
-              arg.Y.resetScale(double(Y_.Scale()));
+              Y_.Scale(y_max);
+              arg.Y.resetScale(Y_.Scale());
             }
             logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, double(y_max), 4+d, double(Y_.Scale()));
           }
@@ -1333,8 +1333,8 @@ namespace quda {
           real_t y_max = Y_atomic_.abs_max(d % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
 
           if (!set_scale) {
-            Y_.Scale(double(1.1*y_max)); // slightly oversize to avoid unnecessary rescaling
-            arg.Y.resetScale(double(Y_.Scale()));
+            Y_.Scale(static_cast<real_t>(1.1) * y_max); // slightly oversize to avoid unnecessary rescaling
+            arg.Y.resetScale(Y_.Scale());
             set_scale = true;
           } else if (y_max > Y_.Scale()) {
             // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
@@ -1357,8 +1357,8 @@ namespace quda {
             }
 
             y.setDimension(d);
-            Y_.Scale(double(y_max));
-            arg.Y.resetScale(double(Y_.Scale()));
+            Y_.Scale(y_max);
+            arg.Y.resetScale(Y_.Scale());
           }
           logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, double(y_max), d, double(Y_.Scale()));
         }
@@ -1448,7 +1448,7 @@ namespace quda {
 
       if (coarseGauge::fixedPoint()) {
         real_t x_max = X_atomic_.abs_max(0, coarseGaugeAtomic::fixedPoint());
-        arg.X.resetScale(double(x_max));
+        arg.X.resetScale(x_max);
         X_.Scale(x_max);
       }
 

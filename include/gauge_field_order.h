@@ -342,7 +342,7 @@ namespace quda {
         errorQuda("Not implemented for order=%d", order);
       }
 
-      void resetScale(Float) { }
+      void resetScale(real_t) { }
 
       __device__ __host__ complex<Float> &operator()(int, int, int, int, int) const { return dummy; }
     };
@@ -355,7 +355,7 @@ namespace quda {
         errorQuda("Not implemented for order=%d", order);
       }
 
-      void resetScale(Float) { }
+      void resetScale(real_t) { }
 
       __device__ __host__ complex<Float> &operator()(int, int, int, int, int) const { return dummy; }
     };
@@ -382,8 +382,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -464,8 +465,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -497,8 +499,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -586,8 +589,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -678,8 +682,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
 	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -764,10 +769,11 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
-        accessor.resetScale(max);
+        accessor.resetScale(max_);
         if (fixed) {
+          const Float max = static_cast<Float>(max_);
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -853,7 +859,7 @@ namespace quda {
         if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("GaugeField ordering not supported with reconstruction");
 	}
 
-	void resetScale(double max) {
+	void resetScale(real_t max) {
 	  accessor.resetScale(max);
 	  ghostAccessor.resetScale(max);
 	}

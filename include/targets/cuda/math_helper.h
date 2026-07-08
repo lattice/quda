@@ -439,6 +439,7 @@ namespace quda {
     __device__ __float128 operator()(__float128 a) { return __nv_fp128_fabs(a); }
   };
   inline __host__ __device__ __float128 fabs(__float128 a) { return target::dispatch<fabs_fp128_impl>(a); }
+  inline __host__ __device__ __float128 abs(__float128 a) { return target::dispatch<fabs_fp128_impl>(a); }
 
   template <bool is_device> struct sqrt_fp128_impl;
   template <> struct sqrt_fp128_impl<false> {

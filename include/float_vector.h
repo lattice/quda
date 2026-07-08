@@ -73,6 +73,22 @@ namespace quda {
     return c;
   }
 
+  template <typename T, int n>
+  __device__ __host__ inline array<T, n> &operator+=(array<T, n> &a, const array<T, n> &b)
+  {
+#pragma unroll
+    for (int i = 0; i < n; i++) a[i] += b[i];
+    return a;
+  }
+
+  template <typename T, int n, typename S>
+  __device__ __host__ inline array<T, n> &operator*=(array<T, n> &a, const S &b)
+  {
+#pragma unroll
+    for (int i = 0; i < n; i++) a[i] *= b;
+    return a;
+  }
+
   template <typename T> constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> zero() { return static_cast<T>(0); }
   template <typename T> constexpr std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>, T> zero()
   {

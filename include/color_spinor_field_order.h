@@ -617,15 +617,16 @@ namespace quda
         nParity(field.SiteSubset()), ghostAccessor(field, nFace)
       {
         resetGhost(ghost_ ? ghost_ : field.Ghost());
-        resetScale(double(field.Scale()));
+        resetScale(field.Scale());
       }
 
       GhostOrder &operator=(const GhostOrder &) = default;
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (block_float_ghost && max != static_cast<Float>(1.0))
-          errorQuda("Block-float accessor requires max=1.0 not max=%e", max);
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", QUDA_REAL(max_));
         if constexpr (ghost_fixed && !block_float_ghost) {
           ghost.scale = static_cast<Float>(std::numeric_limits<ghostFloat>::max() / max);
           ghost.scale_inv = static_cast<Float>(max / std::numeric_limits<ghostFloat>::max());
@@ -794,7 +795,7 @@ namespace quda
         GhostOrder(field, nFace, ghost_), volumeCB(field.VolumeCB()), accessor(field)
       {
         v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) : field.data<complex<storeFloat> *>();
-        resetScale(double(field.Scale()));
+        resetScale(field.Scale());
 
         if constexpr (fixed && block_float) {
           if constexpr (nColor == 3 && nSpin == 1 && nVec == 1 && order == 2)
@@ -808,15 +809,16 @@ namespace quda
 
       FieldOrderCB &operator=(const FieldOrderCB &) = default;
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (block_float && max != static_cast<Float>(1.0))
-          errorQuda("Block-float accessor requires max=1.0 not max=%e", max);
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", QUDA_REAL(max_));
         if constexpr (fixed && !block_float) {
           v.scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
           v.scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
         }
-        if constexpr (GhostOrder::supports_ghost_zone) GhostOrder::resetScale(max);
+        if constexpr (GhostOrder::supports_ghost_zone) GhostOrder::resetScale(max_);
       }
 
       /**
