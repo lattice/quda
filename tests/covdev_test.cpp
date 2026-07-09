@@ -172,7 +172,7 @@ std::array<double, 2> covdev_test(test_t param)
   printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muQuda, double(spinor_ref_norm2),
              double(cuda_spinor_out_norm2), double(spinor_out_norm2));
 
-  auto deviation = pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
+  auto deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
   double tol = getTolerance(test_prec);
 
   return std::array<double, 2> {deviation, tol};

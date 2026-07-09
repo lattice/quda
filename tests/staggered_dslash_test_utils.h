@@ -557,7 +557,7 @@ struct StaggeredDslashTestWrapper {
         auto rel_dev = real_t(1.0) - quda::sqrt(spinor_out_norm / spinor_ref_norm);
         printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
                    double(spinor_ref_norm), double(spinor_out_norm), double(rel_dev), double(max_deviation[0]));
-        deviation = pow(10, -(double)(ColorSpinorField::Compare(spinorRef[i], spinorOut[i])));
+        deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[i], spinorOut[i])));
         if (failed) { deviation = 1.0; }
       }
     }
