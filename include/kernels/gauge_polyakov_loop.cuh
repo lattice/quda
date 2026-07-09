@@ -212,7 +212,6 @@ namespace quda {
       using HighPrecLink = typename Arg::HighPrecLink;
 
       HighPrecLink polyloop;
-      reduce_t ploop {};
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

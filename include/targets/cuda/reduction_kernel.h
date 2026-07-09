@@ -71,7 +71,6 @@ namespace quda
 #ifdef QUDA_SHARED_MEMORY_SPILL
     if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
 #endif
-    using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -207,7 +206,6 @@ namespace quda
 #ifdef QUDA_SHARED_MEMORY_SPILL
     if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
 #endif
-    using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
