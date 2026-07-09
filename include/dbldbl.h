@@ -45,6 +45,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <math_helper.h>
 
 #if defined(__cplusplus)
@@ -342,6 +343,7 @@ struct doubledouble {
 
   doubledouble() = default;
   constexpr doubledouble(const doubledouble &a) = default;
+  constexpr doubledouble &operator=(const doubledouble &a) = default;
   constexpr doubledouble(const dbldbl &b) : a(b) { }
   constexpr doubledouble(const double &head, const double &tail) : a{tail, head} { }
   constexpr doubledouble(const double &head) : a{0.0, head} { }
@@ -389,11 +391,11 @@ __device__ __host__ inline doubledouble operator-(const doubledouble &a) { retur
 
 __device__ __host__ inline doubledouble abs(const doubledouble &a) { return doubledouble(abs_dbldbl(a.a)); }
 
-__device__ __host__ inline bool isinf(const doubledouble &a) { return isinf(a.head()); }
+__device__ __host__ inline bool isinf(const doubledouble &a) { return std::isinf(a.head()); }
 
-__device__ __host__ inline bool isnan(const doubledouble &a) { return isnan(a.head()); }
+__device__ __host__ inline bool isnan(const doubledouble &a) { return std::isnan(a.head()); }
 
-__device__ __host__ inline bool isfinite(const doubledouble &a) { return isfinite(a.head()); }
+__device__ __host__ inline bool isfinite(const doubledouble &a) { return std::isfinite(a.head()); }
 
 __device__ __host__  inline bool operator>(const doubledouble &a, const doubledouble &b)
 {
@@ -485,6 +487,7 @@ struct doubledouble2 {
 
   doubledouble2() = default;
   constexpr doubledouble2(const doubledouble2 &a) = default;
+  constexpr doubledouble2 &operator=(const doubledouble2 &a) = default;
   constexpr doubledouble2(const double2 &a) : x(a.x), y(a.y) { }
   constexpr doubledouble2(const doubledouble &x, const doubledouble &y) : x(x), y(y) { }
 
