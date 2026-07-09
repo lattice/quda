@@ -13,17 +13,12 @@
 #include <limits>
 #include <type_traits>
 #include "dbldbl.h"
+#include "rfa_traits.h"
 #if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
 #include "reproducible_floating_accumulator.hpp"
 #endif
 
 namespace quda {
-
-#if !defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
-  template <class T, class Enable = void> struct is_rfa {
-    static constexpr bool value = false;
-  };
-#endif
 
 #if defined(QUDA_REDUCTION_ALGORITHM_NAIVE)
   using device_reduce_t = reduction_t;

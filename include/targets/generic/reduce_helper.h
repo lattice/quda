@@ -58,13 +58,7 @@ namespace quda
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
 
-      if constexpr (is_rfa<get_scalar_t<T>>::value) {
-        static bool init = false;
-        if (!init) {
-          cudaMemcpyToSymbol(reproducible::bin_device_buffer, static_cast<void*>(&reducer::get_rfa_bins()),
-                             sizeof(reproducible::RFA_bins<reduction_t>), 0, cudaMemcpyHostToDevice);
-        }
-      }
+      reducer::init_rfa_device_bins<T>();
 
       if (commAsyncReduction()) result_d = partial;
     }

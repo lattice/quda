@@ -906,15 +906,22 @@ private:
     using type = rfa_t<T>;
   };
 
-  template <class T, class Enable = void>
-  struct is_rfa {
-    static constexpr bool value = false;
-  };
-
   template <class T>
   struct is_rfa<T, typename std::enable_if_t<std::is_same_v<T, rfa_t<typename T::ftype>>>> {
     static constexpr bool value = true;
   };
+
+  template <typename T> void reducer::init_rfa_device_bins_impl()
+  {
+    if constexpr (is_rfa<get_scalar_t<T>>::value) {
+      static bool init = false;
+      if (!init) {
+        cudaMemcpyToSymbol(reproducible::bin_device_buffer, static_cast<void *>(&reducer::get_rfa_bins()),
+                           sizeof(reproducible::RFA_bins<reduction_t>), 0, cudaMemcpyHostToDevice);
+        init = true;
+      }
+    }
+  }
 
   template <class T> __host__ __device__ inline rfa_t<T> operator+(const rfa_t<T> &x, const rfa_t<T> &y)
   {
