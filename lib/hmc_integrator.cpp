@@ -342,6 +342,18 @@ namespace quda
     }
 
     // Solve x = (M†M)⁻¹ b
+    // Twisted actions: γ₅-hermiticity is M̂(μ)† = γ₅M̂(-μ)γ₅, so pass 1 of the
+    // two-pass below must solve M(-μ) (see computeFermionAction for the
+    // derivation; μ-symmetric actions alias the flipped set to the direct one).
+    const bool kick_twisted
+      = (ip.dslash_type == QUDA_TWISTED_MASS_DSLASH || ip.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
+    Dirac *dirac_m = nullptr, *diracSloppy_m = nullptr, *diracPre_m = nullptr, *diracEig_m = nullptr;
+    if (kick_twisted && ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
+      QudaInvertParam ip_minus = ip;
+      ip_minus.mu = -ip.mu;
+      createDiracWithEig(dirac_m, diracSloppy_m, diracPre_m, diracEig_m, ip_minus, pc_solve, false);
+    }
+
     if (ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
       // MG two-pass γ₅ trick: M† = γ₅ M γ₅, so (M†M)⁻¹ = M⁻¹ (γ₅ M γ₅)⁻¹ = M⁻¹ γ₅ M⁻¹ γ₅
       // Step 1: z = γ₅ b
@@ -370,11 +382,13 @@ namespace quda
       GCRTracker gcrTracker(gcrResCap, ip.cuda_prec);
       std::vector<ColorSpinorField> krylovVecs;
 
-      // Step 2: Solve M w = z
+      // Step 2: Solve M(-μ) w = z (equals M for μ-symmetric actions)
+      DiracM mMinus(dirac_m ? *dirac_m : *dirac), mMinusSloppy(diracSloppy_m ? *diracSloppy_m : *diracSloppy),
+        mMinusPre(diracPre_m ? *diracPre_m : *diracPre), mMinusEig(diracEig_m ? *diracEig_m : *diracEig);
       std::vector<ColorSpinorField> w(1, csParam);
       {
         TrackerScope<GCRTracker> scope(activeGCRTracker, gcrTracker.isActive() ? &gcrTracker : nullptr);
-        Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+        Solver *s = Solver::create(solverParam, mMinus, mMinusSloppy, mMinusPre, mMinusEig);
         (*s)(w, z);
         delete s;
         g_traj_cg_iters += solverParam.iter;
@@ -455,6 +469,12 @@ namespace quda
     delete diracSloppy;
     if (diracPre != diracSloppy) delete diracPre;
     if (diracEig != diracPre) delete diracEig;
+    if (dirac_m) {
+      delete dirac_m;
+      if (diracSloppy_m && diracSloppy_m != dirac_m) delete diracSloppy_m;
+      if (diracPre_m && diracPre_m != dirac_m && diracPre_m != diracSloppy_m) delete diracPre_m;
+      if (diracEig_m && diracEig_m != dirac_m && diracEig_m != diracPre_m) delete diracEig_m;
+    }
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
@@ -483,16 +503,20 @@ namespace quda
     lat_dim_t R = hmcExtendedGaugeShell();
     updateExtendedGaugeResident(true, R, getProfile());
 
-    // Rebuild clover from updated gauge if this is a Wilson-clover action.
-    // loadCloverQuda alone would no-op here: its recompute trigger is a
-    // parameter change or the invalidate_clover flag (set only by
-    // loadGaugeQuda), neither of which fires after a device-side gauge
-    // update. Free first so the recompute is unconditional; it reads the
-    // extended gauge refreshed above with new_gauge = true.
+    // Rebuild clover from the updated gauge if this is a clover-type action.
+    // Must be IN PLACE (createCloverQuda: Fmunu from the extended gauge
+    // refreshed above with new_gauge = true, computeClover + cloverInvert/
+    // TrLog into the existing field): a free + reload would reallocate the
+    // clover and dangle the pointers an MG hierarchy captured at setup
+    // (observed as garbage "checkerboard volume" / "diagonal appears unset"
+    // aborts inside MG smoothers). Plain loadCloverQuda would no-op instead
+    // (its recompute triggers are parameter changes or loadGaugeQuda's
+    // invalidate_clover flag). Sloppy clover copies alias cloverPrecise at
+    // uniform precision; mixed-precision clover-sloppy refresh is a known
+    // gap shared with the pre-existing code.
     if (cloverPrecise
         && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
-      freeCloverQuda();
-      loadCloverQuda(nullptr, nullptr, &inv_param);
+      createCloverQuda(&inv_param);
     }
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
@@ -641,12 +665,24 @@ namespace quda
     GaugeField u_out(gParam);
     updateGaugeField(u_out, dt, *gaugePrecise, momResident, false, true);
     gaugePrecise->copy(u_out);
+    // Refresh the ghost pads: copy() updates only the local volume, and the
+    // Dirac operators read the pads (same staleness class as the base-class
+    // drift — a mongrel evolved-bulk/stale-boundary operator otherwise).
+    gaugePrecise->exchangeGhost();
 
     if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
     if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
       gaugePrecondition->copy(*gaugePrecise);
 
-    if (cloverPrecise) createCloverQuda(&inv_param);
+    // Clover rebuild: createCloverQuda computes from the cached
+    // extendedGaugeResident, so refresh it first (new_gauge = true). The
+    // recompute is IN PLACE — a free + reload would dangle the clover
+    // pointers held by the MG hierarchy (see drift()).
+    if (cloverPrecise) {
+      lat_dim_t R = hmcExtendedGaugeShell();
+      updateExtendedGaugeResident(true, R, getProfile());
+      createCloverQuda(&inv_param);
+    }
   }
 
   /**
@@ -677,64 +713,72 @@ namespace quda
 
     QudaInvertParam ip = inv_param;
 
-    if (ip.dslash_type == QUDA_WILSON_DSLASH) {
-      ColorSpinorParam csParam(phi);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      std::vector<ColorSpinorField> x(1, csParam);
-      std::vector<ColorSpinorField> b(1, ColorSpinorField(phi));
+    // Action-generic fermion force: solve x = (M̂†M̂)⁻¹φ, then
+    // computeEOFermionForce assembles the hopping (+ clover sigma/TrLog,
+    // + twisted variants) force under the validated F = -2·∂S/∂u
+    // convention. This replaced a per-action branch whose clover leg
+    // called the tmLQCD-convention computeCloverForceQuda (which has no
+    // twist term and different normalizations).
+    ColorSpinorParam csParam(phi);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    std::vector<ColorSpinorField> x(1, csParam);
+    std::vector<ColorSpinorField> b(1, ColorSpinorField(phi));
 
-      bool pc_solve = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
-      Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
-      createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, pc_solve, false);
+    bool pc_solve = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+    Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
+    createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, pc_solve, false);
 
-      if (ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
-        DiracM m(*dirac), mSloppy(*diracSloppy), mPre(*diracPre), mEig(*diracEig);
-        SolverParam solverParam(ip);
-        std::vector<ColorSpinorField> z(1, csParam);
-        gamma5(z, b);
-        std::vector<ColorSpinorField> w(1, csParam);
-        {
-          Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-          (*s)(w, z);
-          delete s;
-          solverParam.iter = 0;
-        }
-        std::vector<ColorSpinorField> y(1, csParam);
-        gamma5(y, w);
-        {
-          Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-          (*s)(x, y);
-          delete s;
-        }
-      } else {
-        solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
+    // For twisted actions γ₅-hermiticity reads M̂(μ)† = γ₅M̂(-μ)γ₅, so the
+    // two-pass below must solve M(-μ) in its FIRST pass:
+    // x = M(+μ)⁻¹ γ₅ M(-μ)⁻¹ γ₅ φ = (M̂†M̂)⁻¹φ. The +μ MG hierarchy remains
+    // a valid preconditioner for M(-μ) (small diagonal shift — iteration
+    // counts, never the converged solution). μ-symmetric actions reduce to
+    // the standard two-pass (the flipped set aliases the direct one).
+    const bool twisted
+      = (ip.dslash_type == QUDA_TWISTED_MASS_DSLASH || ip.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
+    Dirac *dirac_m = nullptr, *diracSloppy_m = nullptr, *diracPre_m = nullptr, *diracEig_m = nullptr;
+    if (twisted && ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
+      QudaInvertParam ip_minus = ip;
+      ip_minus.mu = -ip.mu;
+      createDiracWithEig(dirac_m, diracSloppy_m, diracPre_m, diracEig_m, ip_minus, pc_solve, false);
+    }
+
+    if (ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
+      DiracM m(*dirac), mSloppy(*diracSloppy), mPre(*diracPre), mEig(*diracEig);
+      DiracM mMinus(dirac_m ? *dirac_m : *dirac), mMinusSloppy(diracSloppy_m ? *diracSloppy_m : *diracSloppy),
+        mMinusPre(diracPre_m ? *diracPre_m : *diracPre), mMinusEig(diracEig_m ? *diracEig_m : *diracEig);
+      SolverParam solverParam(ip);
+      std::vector<ColorSpinorField> z(1, csParam);
+      gamma5(z, b);
+      std::vector<ColorSpinorField> w(1, csParam);
+      {
+        Solver *s = Solver::create(solverParam, mMinus, mMinusSloppy, mMinusPre, mMinusEig);
+        (*s)(w, z);
+        delete s;
+        solverParam.iter = 0;
       }
-
-      computeEOFermionForce(momResident, x[0], ip, coeff);
-
-      delete dirac;
-      delete diracSloppy;
-      if (diracPre != diracSloppy) delete diracPre;
-      if (diracEig != diracPre) delete diracEig;
+      std::vector<ColorSpinorField> y(1, csParam);
+      gamma5(y, w);
+      {
+        Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+        (*s)(x, y);
+        delete s;
+      }
     } else {
-      ip.use_resident_solution = 1;
-      ip.make_resident_solution = 1;
+      solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, ip);
+    }
 
-      ColorSpinorParam cpuParam(nullptr, ip, gaugePrecise->X(), true, QUDA_CPU_FIELD_LOCATION);
-      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-      ColorSpinorField h_x(cpuParam);
-      ColorSpinorField h_b(cpuParam);
-      h_b = phi;
+    computeEOFermionForce(momResident, x[0], ip, coeff);
 
-      invertQuda(h_x.data(), h_b.data(), &ip);
-
-      double fCoeff = 1.0;
-      double kappa2 = ip.kappa * ip.kappa;
-      double ck = ip.clover_csw * ip.kappa;
-      ip.use_resident_solution = 1;
-      gp.overwrite_mom = 0;
-      computeCloverForceQuda(nullptr, coeff, nullptr, nullptr, &fCoeff, kappa2, ck, 1, 1.0, nullptr, &gp, &ip);
-      solutionResident.clear();
+    delete dirac;
+    delete diracSloppy;
+    if (diracPre != diracSloppy) delete diracPre;
+    if (diracEig != diracPre) delete diracEig;
+    if (dirac_m) {
+      delete dirac_m;
+      if (diracSloppy_m && diracSloppy_m != dirac_m) delete diracSloppy_m;
+      if (diracPre_m && diracPre_m != dirac_m && diracPre_m != diracSloppy_m) delete diracPre_m;
+      if (diracEig_m && diracEig_m != dirac_m && diracEig_m != diracPre_m) delete diracEig_m;
     }
 
     // Subtract low-mode force so outer + inner = total

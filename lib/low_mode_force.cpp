@@ -135,8 +135,8 @@ namespace quda
     }
   }
 
-  void LowModeForce::computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &gauge,
-                                   const CloverField *clover, QudaGaugeParam &, QudaInvertParam &invParam)
+  void LowModeForce::computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &,
+                                   const CloverField *, QudaGaugeParam &, QudaInvertParam &invParam)
   {
     auto profile = pushProfile(getEigenTrackProfile());
     ScopedComputePhase _scope_;
@@ -150,27 +150,18 @@ namespace quda
     // Project source onto low modes
     projectLowModes(fineSol, src);
 
-    // Compute fermion force using the projected solution. The low-mode fine-grid
-    // vector is the approximate (D†D)^{-1} φ, structurally equivalent to the CG
-    // solution used by the standard fermion force kernel.
-    if (invParam.dslash_type == QUDA_WILSON_DSLASH) {
-      // Wilson: internal EO force (matches the other integrators' convention).
-      computeEOFermionForce(mom, fineSol, invParam, coeff);
-    } else {
-      // Clover: preserve the established computeCloverForce call path.
-      std::vector<ColorSpinorField> xVec = {fineSol};
-      std::vector<ColorSpinorField> x0Vec(1);
-      std::vector<double> forceCoeff = {coeff};
-      std::vector<array<double, 2>> fermEpsilon = {{0.0, 0.0}};
-
-      lat_dim_t R;
-      for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * commDimPartitioned(d);
-      GaugeField *gaugeEx = createExtendedGauge(gauge, R, getProfile());
-
-      computeCloverForce(mom, *gaugeEx, gauge, *clover, xVec, x0Vec, forceCoeff, fermEpsilon, 0.0, false, invParam);
-
-      delete gaugeEx;
-    }
+    // Compute the fermion force from the projected solution via the
+    // action-generic internal EO force (Wilson, clover, twisted mass,
+    // twisted clover — all under the validated F = -2·∂S/∂u convention).
+    // The low-mode fine-grid vector is the approximate (M̂†M̂)⁻¹φ,
+    // structurally equivalent to the CG solution the force expects. The
+    // nested-FGI split only requires that the inner-added and
+    // outer-subtracted low-mode forces be the SAME functional — using the
+    // same convention as the outer full force additionally maximizes the
+    // high/low-mode cancellation. (This replaced a clover-only branch that
+    // called the tmLQCD-convention computeCloverForce with a parity field
+    // and a null clover for twisted mass.)
+    computeEOFermionForce(mom, fineSol, invParam, coeff);
   }
 
 } // namespace quda

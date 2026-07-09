@@ -389,12 +389,29 @@ namespace quda
     if (ip.preconditioner) {
       // MG γ₅ two-pass: (M†M)⁻¹ = M⁻¹ γ₅ M⁻¹ γ₅. Both passes are fast
       // because they're MG-preconditioned solves of M (not M†M).
+      //
+      // For twisted actions γ₅-hermiticity reads M̂(μ)† = γ₅M̂(-μ)γ₅, so the
+      // FIRST pass must solve M(-μ): x = M(+μ)⁻¹ γ₅ M(-μ)⁻¹ γ₅ φ = (M̂†M̂)⁻¹φ.
+      // The MG hierarchy (set up at +μ) remains a valid right-preconditioner
+      // for M(-μ) — the twist is a small diagonal shift, so only iteration
+      // counts are affected, never the converged solution. For μ-symmetric
+      // actions the flipped operator coincides with M and this reduces to
+      // the standard two-pass.
       ip.solve_type = QUDA_DIRECT_PC_SOLVE;
       bool pc_solve = true;
       Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
       createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, pc_solve, false);
 
+      const bool twisted
+        = (ip.dslash_type == QUDA_TWISTED_MASS_DSLASH || ip.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
+      QudaInvertParam ip_minus = ip;
+      ip_minus.mu = -ip.mu;
+      Dirac *dirac_m = nullptr, *diracSloppy_m = nullptr, *diracPre_m = nullptr, *diracEig_m = nullptr;
+      if (twisted) createDiracWithEig(dirac_m, diracSloppy_m, diracPre_m, diracEig_m, ip_minus, pc_solve, false);
+
       DiracM m(*dirac), mSloppy(*diracSloppy), mPre(*diracPre), mEig(*diracEig);
+      DiracM mMinus(twisted ? *dirac_m : *dirac), mMinusSloppy(twisted ? *diracSloppy_m : *diracSloppy),
+        mMinusPre(twisted ? *diracPre_m : *diracPre), mMinusEig(twisted ? *diracEig_m : *diracEig);
       SolverParam solverParam(ip);
 
       // GCR-Krylov-residual capture, mirrors NestedFGI::computeOuterForce.
@@ -410,11 +427,11 @@ namespace quda
       std::vector<ColorSpinorField> b_vec(1, ColorSpinorField(phi));
       gamma5(z, b_vec);
 
-      // Step 2: solve M w = z
+      // Step 2: solve M(-μ) w = z (equals M for μ-symmetric actions)
       std::vector<ColorSpinorField> w(1, csParam);
       {
         TrackerScope<GCRTracker> scope(activeGCRTracker, gcrTracker.isActive() ? &gcrTracker : nullptr);
-        Solver *s = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+        Solver *s = Solver::create(solverParam, mMinus, mMinusSloppy, mMinusPre, mMinusEig);
         (*s)(w, z);
         delete s;
         integratorBumpCGStats(solverParam.iter);
@@ -458,6 +475,12 @@ namespace quda
       if (diracSloppy && diracSloppy != dirac) delete diracSloppy;
       if (diracPre && diracPre != dirac && diracPre != diracSloppy) delete diracPre;
       if (diracEig && diracEig != dirac && diracEig != diracPre) delete diracEig;
+      if (twisted) {
+        delete dirac_m;
+        if (diracSloppy_m && diracSloppy_m != dirac_m) delete diracSloppy_m;
+        if (diracPre_m && diracPre_m != dirac_m && diracPre_m != diracSloppy_m) delete diracPre_m;
+        if (diracEig_m && diracEig_m != dirac_m && diracEig_m != diracPre_m) delete diracEig_m;
+      }
     } else {
       // Standard host-side path via invertQuda (no MG preconditioner).
       // Without MG the inv_type is typically CG / CGNE / CGNR, which
