@@ -109,10 +109,19 @@ namespace quda
      phases and a temporal boundary condition; these are (re)applied to the
      helper links each sub-stage, using the caller-supplied KS phase convention
      (smear_param.staggered_phase_type, default MILC) and anti-periodic temporal
-     BC. With mass 0 this is the pure
-     DdagD, whose free-field limit reduces to the gauge Laplacian on each parity.
-     The generator returned is K_t = -DdagD = -MdagM (negative semi-definite for
+     BC. The generator returned is K_t = -1/4 MdagM (negative semi-definite for
      any mass, so the integrator's smoothing invariant holds).
+
+     The 1/4 is a normalization, not a convention choice. QUDA's staggered Dirac
+     operator uses the MILC "2m" convention, M = 2m + Dhop (so MdagM = 4m^2 - Dhop^2);
+     that convention is correct for solvers but is twice the operator whose free-field
+     limit is the covariant Laplacian. The fermion gradient flow (Luescher,
+     arXiv:1302.5246) is d_t chi = Delta chi with Delta the covariant Laplacian,
+     fixed by the heat-kernel smearing radius sqrt(8t): free-field eigenvalue ~ -p^2.
+     -1/4 MdagM has free-field eigenvalue -sum_mu sin^2(p_mu) ~ -p^2, matching
+     LaplaceFlowOp (and QEX's staggered -DdagD flow); the bare -MdagM would be 4x too
+     strong (~ -4p^2), giving the wrong smearing radius. With mass 0 this reduces to
+     1/4 Dhop^2, whose free-field limit is the gauge Laplacian on each parity.
   */
   class StaggeredFlowOp : public FermionFlowOp
   {
@@ -158,8 +167,8 @@ namespace quda
 
     void apply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
-      dirac->MdagM(out, in); // MdagM = m^2 - D^2 >= 0; K_t = -DdagD = -MdagM
-      blas::ax(-1.0, out);
+      dirac->MdagM(out, in);  // MdagM = 4m^2 - D^2 >= 0 (QUDA staggered M = 2m + Dhop)
+      blas::ax(-0.25, out);   // K_t = -1/4 MdagM = -m^2 + 1/4 Dhop^2; see class note
     }
   };
 #endif
@@ -209,6 +218,10 @@ namespace quda
     {
       dirac->MdagM(out, in); // K_t = -DdagD = -MdagM
       blas::ax(-1.0, out);
+      // NOTE: unlike the staggered/HISQ ops, the Wilson generator's normalization has
+      // not been reconciled to the covariant-Laplacian (sqrt(8t)) flow convention. The
+      // kappa normalization differs from the staggered "2m" case, so the staggered 1/4
+      // does NOT carry over -- resolve separately before trusting Wilson flow times.
     }
   };
 #endif
@@ -221,7 +234,7 @@ namespace quda
      and (for full HISQ) the Naik three-link field L = longKSLink(W). KS phases +
      anti-periodic T are baked into the thin links before fattening (using the
      caller-supplied smear_param.staggered_phase_type), so they propagate into X
-     and L. K_t = -DdagD = -MdagM:
+     and L. K_t = -1/4 MdagM (see StaggeredFlowOp for why the 1/4 is required):
        - with_long = true  : full HISQ -- DiracImprovedStaggered(fat = X, long = L).
        - with_long = false : truncated HISQ (Option A) -- the Naik term dropped,
                              applied with the cheap one-link DiracStaggered(gauge = X).
@@ -360,8 +373,8 @@ namespace quda
 
     void apply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
-      dirac->MdagM(out, in); // K_t = -DdagD = -MdagM
-      blas::ax(-1.0, out);
+      dirac->MdagM(out, in);  // MdagM = 4m^2 - D^2 (QUDA staggered/HISQ M = 2m + Dhop)
+      blas::ax(-0.25, out);   // K_t = -1/4 MdagM; see StaggeredFlowOp note on the 1/4
     }
   };
 #endif
