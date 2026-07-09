@@ -31,7 +31,6 @@
 #include <inv_tracker.h>
 #include <eigen_tracking_state.h>
 #include <eigensolve_quda.h>
-#include <multigrid.h>
 #include <qio_field.h>
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -2239,12 +2238,7 @@ TEST(HMC, Production)
   QudaHMCParam hmc_param = makeHMCParam();
   // Resolve eigentracking 0-defaults from MG nvec (or standalone defaults)
   if (hmc_param.eigentracking_enabled) {
-    int mg_nvec = 0;
-    if (mg_preconditioner) {
-      auto *mg_s = static_cast<quda::multigrid_solver *>(mg_preconditioner);
-      mg_nvec = static_cast<int>(mg_s->B.size());
-    }
-    resolveEigenTrackingDefaults(hmc_param, mg_nvec);
+    resolveEigenTrackingDefaults(hmc_param, quda::getMGNullVectorCount(mg_preconditioner));
   }
   hmc_param.n_trajectories = hmc_n_trajectories;
   hmc_param.n_thermalization = hmc_n_thermalization;

@@ -180,4 +180,14 @@ namespace quda
    */
   void seedEigenTrackingFromMG(void *mg_instance, QudaHMCParam *hmc_param, QudaInvertParam *inv_param);
 
+  /**
+     @brief Return the number of null-space vectors held by an MG instance.
+     Lets test code size eigentracking pools from MG nvec without including
+     the internal multigrid.h (whose header chain requires target-specific
+     include paths that test executables do not have).
+     @param mg_instance Opaque multigrid_solver pointer (may be null)
+     @return Null-vector count, or 0 if mg_instance is null
+  */
+  int getMGNullVectorCount(void *mg_instance);
+
 } // namespace quda

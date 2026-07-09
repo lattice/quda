@@ -139,6 +139,12 @@ namespace quda
 
   void releaseStoredPhi() { g_storedPhi.reset(); }
 
+  int getMGNullVectorCount(void *mg_instance)
+  {
+    if (!mg_instance) return 0;
+    return static_cast<int>(static_cast<multigrid_solver *>(mg_instance)->B.size());
+  }
+
   void seedEigenTrackingFromMG(void *mg_instance, QudaHMCParam *hmc_param, QudaInvertParam *inv_param)
   {
     if (!mg_instance || !hmc_param->eigentracking_enabled) return;
