@@ -20,6 +20,7 @@
 #include <dslash_quda.h>
 #include <gauge_field.h>
 #include <gauge_path_quda.h>
+#include <gauge_tools.h>
 #include <gauge_update_quda.h>
 #include <invert_quda.h>
 #include <malloc_quda.h>
@@ -220,6 +221,65 @@ namespace quda
       lat_dim_t R;
       for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * commDimPartitioned(d);
       return R;
+    }
+
+    /**
+     * @brief Recompute the resident clover (+ inverse metadata + TrLog)
+     *        from the current extendedGaugeResident, IN PLACE.
+     *
+     * In place is mandatory: reallocating (freeCloverQuda + loadCloverQuda)
+     * dangles the clover pointers an MG hierarchy captured at setup.
+     *
+     * The compute must run at double and demote into the resident field —
+     * mirroring loadCloverQuda, which creates at clover_cpu_prec (double),
+     * computes, then demotes. Direct single-precision computeClover +
+     * cloverInvert is a path loadCloverQuda never exercises and yields a
+     * corrupt clover (NaN / systematically wrong TrLog, "diagonal appears
+     * unset" reads downstream).
+     */
+    void recomputeResidentClover(QudaInvertParam &inv_param)
+    {
+      if (!cloverPrecise) errorQuda("No resident clover field to recompute");
+
+      if (cloverPrecise->Precision() >= QUDA_DOUBLE_PRECISION) {
+        // createCloverQuda computes at the field precision (double): safe.
+        createCloverQuda(&inv_param);
+        return;
+      }
+
+      if (!extendedGaugeResident) errorQuda("No extended gauge field for clover recompute");
+      GaugeField *gauge = extendedGaugeResident;
+
+      // Promote the extended gauge to double for the compute
+      GaugeField *ex = gauge;
+      if (gauge->Precision() < QUDA_DOUBLE_PRECISION) {
+        GaugeFieldParam param(*gauge);
+        param.setPrecision(QUDA_DOUBLE_PRECISION, true);
+        param.create = QUDA_NULL_FIELD_CREATE;
+        ex = GaugeField::Create(param);
+        ex->copy(*gauge);
+      }
+
+      GaugeFieldParam tensorParam(gaugePrecise->X(), QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, 0,
+                                  QUDA_TENSOR_GEOMETRY);
+      tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
+      tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+      tensorParam.setPrecision(tensorParam.Precision(), true);
+      tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      GaugeField Fmunu(tensorParam);
+      computeFmunu(Fmunu, *ex);
+
+      CloverFieldParam cParam(*cloverPrecise);
+      cParam.create = QUDA_NULL_FIELD_CREATE;
+      cParam.setPrecision(QUDA_DOUBLE_PRECISION, true);
+      CloverField tmp(cParam);
+      computeClover(tmp, Fmunu, inv_param.clover_coeff);
+      cloverInvert(tmp, tmp.Reconstruct());
+
+      // Demote into the resident field in place (copies TrLog + metadata)
+      cloverPrecise->copy(tmp);
+
+      if (ex != gauge) delete ex;
     }
 
     /**
@@ -516,7 +576,7 @@ namespace quda
     // gap shared with the pre-existing code.
     if (cloverPrecise
         && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
-      createCloverQuda(&inv_param);
+      recomputeResidentClover(inv_param);
     }
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
@@ -565,6 +625,13 @@ namespace quda
     // instead of 4th — visible as p≈2 in HMC.dHScaling).
     lat_dim_t R = hmcExtendedGaugeShell();
     updateExtendedGaugeResident(true, R, getProfile());
+    // Recompute the clover at the displaced gauge (in place — see drift()):
+    // without this the excursion's force evaluation uses the pre-displacement
+    // clover, degrading the FG correction for clover-type actions.
+    if (cloverPrecise
+        && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+      recomputeResidentClover(inv_param);
+    }
 
     // Restore momentum, compute full kick at displaced gauge
     momResident.copy(momSaved);
@@ -573,8 +640,13 @@ namespace quda
     // Restore gauge — and rebuild extended at the original gauge so the
     // outer schedule's subsequent kick sees a consistent halo.
     gaugePrecise->copy(gaugeSaved);
+    gaugePrecise->exchangeGhost();
     syncGaugeHierarchyFromPrecise();
     updateExtendedGaugeResident(true, R, getProfile());
+    if (cloverPrecise
+        && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+      recomputeResidentClover(inv_param);
+    }
   }
 
   // --------------------------------------------------------------------
@@ -681,7 +753,7 @@ namespace quda
     if (cloverPrecise) {
       lat_dim_t R = hmcExtendedGaugeShell();
       updateExtendedGaugeResident(true, R, getProfile());
-      createCloverQuda(&inv_param);
+      recomputeResidentClover(inv_param);
     }
   }
 
