@@ -36,8 +36,8 @@ namespace quda
   template <typename T> inline __host__ __device__ T acosh(const T a) { return ::acosh(a); }
   template <typename T> inline __host__ __device__ T asinh(const T a) { return ::asinh(a); }
   template <typename T> inline __host__ __device__ T cbrt(const T a) { return ::cbrt(a); }
-  inline __host__ __device__ bool isnan(float a) { return ::isnan(a); }
-  inline __host__ __device__ bool isnan(double a) { return ::isnan(a); }
+  inline __host__ __device__ bool isnan(float a) { return std::isnan(a); }
+  inline __host__ __device__ bool isnan(double a) { return std::isnan(a); }
   template <typename T> inline __host__ __device__ T pow(const T a, const int b) { return ::pow(a, b); }
   template <typename T> inline __host__ __device__ T pow(const T a, const T b) { return ::pow(a, b); }
   template <typename T> inline __host__ __device__ T fmod(const T a, const T b) { return ::fmod(a, b); }
