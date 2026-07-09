@@ -3,6 +3,7 @@
 #if defined(__HIP__)
 
 #include <cmath>
+#include <type_traits>
 #include <target_device.h>
 #include <hip/math_functions.h>
 
@@ -11,6 +12,18 @@ namespace quda
 
   inline __host__ __device__ float abs(const float a) { return fabs(a); }
   inline __host__ __device__ double abs(const double a) { return fabs(a); }
+
+  template <typename T>
+  __host__ __device__ inline std::enable_if_t<std::is_same_v<T, float>, float> fabs(const T a)
+  {
+    return fabsf(a);
+  }
+
+  template <typename T>
+  __host__ __device__ inline std::enable_if_t<std::is_same_v<T, double>, double> fabs(const T a)
+  {
+    return ::fabs(a);
+  }
 
   template <typename T> inline __host__ __device__ T sqrt(const T a) { return ::sqrt(a); }
   template <typename T> inline __host__ __device__ T exp(const T a) { return ::exp(a); }

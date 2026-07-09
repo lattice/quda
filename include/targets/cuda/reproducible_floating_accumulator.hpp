@@ -59,7 +59,7 @@ namespace quda {
 
   namespace reproducible {
 
-template <class T> auto abs_max(const T&);
+template <class T> __host__ __device__ auto abs_max(const T&);
 
 template <> __host__ __device__ inline auto abs_max(const float4 &x)
 {
