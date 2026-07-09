@@ -119,7 +119,8 @@ namespace quda
       for (int i = 0; i < 4; i++)
         Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
 
-      complex<real> phase = {cospi(Sum_dXi_dot_Pi * 2.), -sinpi(Sum_dXi_dot_Pi * 2.)};
+      complex<real> phase = {static_cast<real>(cospi(Sum_dXi_dot_Pi * 2.)),
+                             static_cast<real>(-sinpi(Sum_dXi_dot_Pi * 2.))};
 
       // Collect vector data
       int parity = 0;
@@ -217,13 +218,13 @@ namespace quda
           = 2.0 * (sink[dir] + arg.offsets[dir] - arg.source_position[dir]) * arg.mom_mode[dir] / arg.NxNyNzNt[dir];
         if (arg.fft_type[dir] == QUDA_FFT_SYMM_EO) {
           // exp(+i k.x) case
-          ph = {cospi(dXi_dot_Pi), sinpi(dXi_dot_Pi)};
+          ph = {static_cast<real>(cospi(dXi_dot_Pi)), static_cast<real>(sinpi(dXi_dot_Pi))};
         } else if (arg.fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
           // cos(k.x) case
-          ph = {cospi(dXi_dot_Pi), 0.0};
+          ph = {static_cast<real>(cospi(dXi_dot_Pi)), 0.0};
         } else if (arg.fft_type[dir] == QUDA_FFT_SYMM_ODD) {
           // sin(k.x) case
-          ph = {0.0, sinpi(dXi_dot_Pi)};
+          ph = {0.0, static_cast<real>(sinpi(dXi_dot_Pi))};
         }
         phase *= ph;
       }
