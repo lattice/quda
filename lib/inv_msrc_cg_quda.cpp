@@ -238,7 +238,7 @@ namespace quda {
 	  resIncrease++;
 	  resIncreaseTotal++;
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-		      QUDA_REAL(sqrt(r2)), QUDA_REAL(r0Norm), resIncreaseTotal);
+		      sqrt(r2), r0Norm, resIncreaseTotal);
 	  if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
 	      L2breakdown = true;
@@ -258,7 +258,7 @@ namespace quda {
 	  if (heavy_quark_res > heavy_quark_res_old) {
 	    hqresIncrease++;
 	    warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
-                        QUDA_REAL(heavy_quark_res), QUDA_REAL(heavy_quark_res_old));
+                        heavy_quark_res, heavy_quark_res_old);
 	    // break out if we do not improve here anymore
 	    if (hqresIncrease > hqmaxresIncrease) {
 	      warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");

@@ -26,11 +26,11 @@ namespace quda
       kappa5 :
       param.kappa;
 
-    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: Kappa is: %g\n", QUDA_REAL(kappa));
+    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: Kappa is: %g\n", kappa);
     logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: mass normalization: %d\n", param.mass_normalization);
     if (getVerbosity() > QUDA_DEBUG_VERBOSE) {
       auto b2 = blas::norm2(b);
-      for (auto &b2i : b2) printfQuda("Mass rescale: norm of source in = %g\n", QUDA_REAL(b2i));
+      for (auto &b2i : b2) printfQuda("Mass rescale: norm of source in = %g\n", b2i);
     }
 
     // staggered dslash uses mass normalization internally
@@ -95,7 +95,7 @@ namespace quda
 
     if (getVerbosity() > QUDA_DEBUG_VERBOSE) {
       auto b2 = blas::norm2(b);
-      for (auto &b2i : b2) printfQuda("Mass rescale: norm of source out = %g\n", QUDA_REAL(b2i));
+      for (auto &b2i : b2) printfQuda("Mass rescale: norm of source out = %g\n", b2i);
     }
   }
 
@@ -137,11 +137,11 @@ namespace quda
     auto nb = blas::norm2(b);
     for (auto &bi : nb) {
       if (bi == 0.0) errorQuda("Source has zero norm");
-      logQuda(QUDA_VERBOSE, "Source: %g\n", QUDA_REAL(bi));
+      logQuda(QUDA_VERBOSE, "Source: %g\n", bi);
     }
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       auto x_norm = blas::norm2(x);
-      for (auto &xi : x_norm) logQuda(QUDA_VERBOSE, "Initial guess: %g\n", QUDA_REAL(xi));
+      for (auto &xi : x_norm) logQuda(QUDA_VERBOSE, "Initial guess: %g\n", xi);
     }
     // rescale the source and solution vectors to help prevent the onset of underflow
     if (param.solver_normalization == QUDA_SOURCE_NORMALIZATION) {
@@ -172,7 +172,7 @@ namespace quda
       auto in_norm = blas::norm2(in);
       auto out_norm = blas::norm2(out);
       for (auto i = 0u; i < in.size(); i++)
-        logQuda(QUDA_VERBOSE, "Prepared: source = %g, solution = %g\n", QUDA_REAL(in_norm[i]), QUDA_REAL(out_norm[i]));
+        logQuda(QUDA_VERBOSE, "Prepared: source = %g, solution = %g\n", in_norm[i], out_norm[i]);
     }
 
     // solution_type specifies *what* system is to be solved.
@@ -264,7 +264,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       auto x_norm = blas::norm2(out);
-      for (auto i = 0u; i < x.size(); i++) printfQuda("Solution = %g\n", QUDA_REAL(x_norm[i]));
+      for (auto i = 0u; i < x.size(); i++) printfQuda("Solution = %g\n", x_norm[i]);
     }
 
     getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -305,7 +305,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       auto x_norm = blas::norm2(x);
-      for (auto i = 0u; i < x.size(); i++) printfQuda("Reconstructed Solution = %g\n", QUDA_REAL(x_norm[i]));
+      for (auto i = 0u; i < x.size(); i++) printfQuda("Reconstructed Solution = %g\n", x_norm[i]);
     }
 
     if (param.compute_action) {

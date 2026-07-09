@@ -1926,7 +1926,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(in_h)), QUDA_REAL(blas::norm2(in)));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   if (inv_param->mass_normalization == QUDA_KAPPA_NORMALIZATION &&
       (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
@@ -1962,7 +1962,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   out_h = out;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(out_h)), QUDA_REAL(blas::norm2(out)));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
 
   delete dirac; // clean up
 
@@ -2001,7 +2001,7 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
   tmp = in;
 
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(in_h)), QUDA_REAL(blas::norm2(in)));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
   DiracParam diracParam;
@@ -2029,7 +2029,7 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
 
   out_h = out;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(out_h)), QUDA_REAL(blas::norm2(out)));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }
 
@@ -2065,7 +2065,7 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
 
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(in_h)), QUDA_REAL(blas::norm2(in)));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
   DiracParam diracParam;
@@ -2330,7 +2330,7 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
 
   out_h = out;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(out_h)), QUDA_REAL(blas::norm2(out)));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }
 
@@ -2415,7 +2415,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(in_h)), QUDA_REAL(blas::norm2(in)));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -2451,7 +2451,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(out_h)), QUDA_REAL(blas::norm2(out)));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }
 
@@ -2479,7 +2479,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(in_h)), QUDA_REAL(blas::norm2(in)));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField out(cudaParam);
@@ -2517,7 +2517,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(out_h)), QUDA_REAL(blas::norm2(out)));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }
 
@@ -2653,7 +2653,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(in_h)), QUDA_REAL(blas::norm2(in)));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField out(cudaParam);
@@ -2680,7 +2680,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(out_h)), QUDA_REAL(blas::norm2(out)));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }
 
@@ -3774,7 +3774,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   // Check source norms
   real_t nb = blas::norm2(b);
   if (nb == 0.0) errorQuda("Source has zero norm");
-  logQuda(QUDA_VERBOSE, "Source: %g\n", QUDA_REAL(nb));
+  logQuda(QUDA_VERBOSE, "Source: %g\n", nb);
 
   // rescale the source vector to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { blas::ax(1.0 / quda::sqrt(nb), b); }
@@ -3940,7 +3940,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
       blas::ax(quda::sqrt(nb), x[i]);
     }
 
-    logQuda(QUDA_VERBOSE, "Solution %d = %g\n", i, QUDA_REAL(blas::norm2(x[i])));
+    logQuda(QUDA_VERBOSE, "Solution %d = %g\n", i, blas::norm2(x[i]));
     if (!param->make_resident_solution) h_x[i] = x[i];
   }
 
@@ -5171,7 +5171,7 @@ void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_p
     in.push_back(ColorSpinorField(cudaParam));
     in[i] = in_h[i];
 
-    logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(in_h[i])), QUDA_REAL(blas::norm2(in[i])));
+    logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h[i]), blas::norm2(in[i]));
 
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
     out.push_back(ColorSpinorField(cudaParam));
@@ -5194,7 +5194,7 @@ void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_p
     if (i) std::swap(in, out);
     ApplyLaplace(out, in, *precise, 3, a, b, in, parity, comm_dim, profileWuppertal);
     for (size_t j = 0; j < nSpinors; j++)
-      logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector %lu norm %e\n", i, j, QUDA_REAL(blas::norm2(out[j])));
+      logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector %lu norm %e\n", i, j, blas::norm2(out[j]));
   }
 
   // copy out to h_out
@@ -5203,7 +5203,7 @@ void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_p
     ColorSpinorField out_h(cpuParam);
     out_h = out[i];
 
-    logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", QUDA_REAL(blas::norm2(out_h)), QUDA_REAL(blas::norm2(out[i])));
+    logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out[i]));
   }
 
   if (gaugeSmeared != nullptr) delete precise;
@@ -5317,7 +5317,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     if (i > 0) std::swap(in, out);
 
     qsmear_op.Expose()->SmearOp(out, in, a, 0.0, smear_param->t0, parity);
-    logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, QUDA_REAL(blas::norm2(out)));
+    logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
     blas::axpby(a * ftmp, in, -ftmp, out);
   }
 
@@ -5561,7 +5561,7 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
   logQuda(QUDA_SUMMARIZE, "flow_t = %le \n", smear_param->t0);
   logQuda(QUDA_SUMMARIZE, "plaquette = %.16e \n", obs_param[0].plaquette[0]);
   for (size_t i = 0; i < nSpinors; i++) {
-    logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", i, QUDA_REAL(blas::norm2(fin[i])));
+    logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", i, blas::norm2(fin[i]));
   }
 
   // loop, iterations of gf
@@ -5632,7 +5632,7 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
       logQuda(QUDA_SUMMARIZE, "flow_t = %le \n", smear_param->t0 + smear_param->epsilon * (i + 1));
       logQuda(QUDA_SUMMARIZE, "plaquette = %.16e \n", obs_param[measurement_n].plaquette[0]);
       for (size_t j = 0; j < nSpinors; j++) {
-        logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", j, QUDA_REAL(blas::norm2(fout[j])));
+        logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", j, blas::norm2(fout[j]));
       }
     }
   } /* end of one iteration of GF application */

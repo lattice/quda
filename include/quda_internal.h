@@ -78,11 +78,6 @@ namespace quda {
   inline double to_double(real_t x) { return x; }
 #endif
 
-  /** Use with fprintf/printf %e, %g, %le when the value has type real_t. */
-  inline double printf_real(real_t x) { return to_double(x); }
-
-#define QUDA_REAL(x) (quda::printf_real(x))
-
   /**
      Underlying type to use for reductions
   */

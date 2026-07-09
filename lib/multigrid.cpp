@@ -798,12 +798,12 @@ namespace quda
         auto l2_deviation = sqrt(deviation[i]) / B_norm[i];
         logQuda(
           QUDA_VERBOSE, "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
-          i, QUDA_REAL(B_norm[i]), QUDA_REAL(coarse_norm[i]), QUDA_REAL(fine_norm[i]), QUDA_REAL(l2_deviation),
-          QUDA_REAL(max_deviation[i][0]));
+          i, B_norm[i], coarse_norm[i], fine_norm[i], l2_deviation,
+          max_deviation[i][0]);
         if (check_deviation(l2_deviation, tol))
-          errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, QUDA_REAL(l2_deviation), tol);
+          errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, l2_deviation, tol);
         if (check_deviation(max_deviation[i][0], tol))
-          errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, QUDA_REAL(max_deviation[i][0]), tol);
+          errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, max_deviation[i][0], tol);
       }
       for (auto &f : fine_tmp) f.GammaBasis(basis); // restore basis
 
@@ -823,9 +823,9 @@ namespace quda
           transfer->P(tmp2, x_coarse[0]);
           (*param.matResidual)(tmp1, tmp2);
           tmp2 = param.B[i];
-          logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, QUDA_REAL(B_norm[i]), QUDA_REAL(norm2(tmp1)));
+          logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, B_norm[i], norm2(tmp1));
           logQuda(QUDA_SUMMARIZE, "relative residual = %e\n",
-                  QUDA_REAL(sqrt(xmyNorm(tmp2, tmp1) / B_norm[i])));
+                  sqrt(xmyNorm(tmp2, tmp1) / B_norm[i]));
         }
 
         sprintf(prefix, "MG level %d (%s): ", param.level + 1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -844,8 +844,8 @@ namespace quda
       transfer->P(tmp2, x_coarse[0]);
       param.matResidual(tmp1, tmp2);
       tmp2 = param.B[i];
-      logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e ", i, QUDA_REAL(B_norm[i]), QUDA_REAL(norm2(tmp1)));
-      logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", QUDA_REAL(sqrt(xmyNorm(tmp2, tmp1) / B_norm[i])));
+      logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e ", i, B_norm[i], norm2(tmp1));
+      logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / B_norm[i]));
     }
 #endif
 
@@ -875,12 +875,12 @@ namespace quda
       auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
       auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
       logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
-              QUDA_REAL(norm2(x_coarse[0])), QUDA_REAL(r2), QUDA_REAL(norm2(tmp2)), QUDA_REAL(l2_deviation),
-              QUDA_REAL(max_deviation[0]));
+              norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation,
+              max_deviation[0]);
       if (check_deviation(l2_deviation, tol))
-        errorQuda("coarse span failed: L2 relative deviation = %e > %e", QUDA_REAL(l2_deviation), tol);
+        errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
       if (check_deviation(max_deviation[0], tol))
-        errorQuda("coarse span failed: max deviation = %e > %e", QUDA_REAL(max_deviation[0]), tol);
+        errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     logQuda(QUDA_SUMMARIZE, "Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
@@ -993,12 +993,12 @@ namespace quda
         }
       }
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
-              QUDA_REAL(norm2(x_coarse[0])), QUDA_REAL(r_nrm), QUDA_REAL(l2_deviation), QUDA_REAL(max_deviation[0]));
+              norm2(x_coarse[0]), r_nrm, l2_deviation, max_deviation[0]);
 
       if (check_deviation(l2_deviation, tol))
-        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", QUDA_REAL(l2_deviation), tol);
+        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
       if (check_deviation(max_deviation[0], tol))
-        warningQuda("Coarse operator failed: max deviation = %e > %e", QUDA_REAL(max_deviation[0]), tol);
+        warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     // check the preconditioned operator construction on the lower level if applicable
@@ -1014,11 +1014,11 @@ namespace quda
       auto max_deviation = blas::max_deviation(r_coarse[0].Even(), x_coarse[0].Even());
       auto l2_deviation = sqrt(xmyNorm(x_coarse[0].Even(), r_coarse[0].Even()) / norm2(x_coarse[0].Even()));
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
-              QUDA_REAL(norm2(x_coarse[0].Even())), QUDA_REAL(r_nrm), QUDA_REAL(l2_deviation), QUDA_REAL(max_deviation[0]));
+              norm2(x_coarse[0].Even()), r_nrm, l2_deviation, max_deviation[0]);
       if (check_deviation(l2_deviation, tol))
-        errorQuda("Preconditioned Deo failed: L2 relative deviation = %e > %e", QUDA_REAL(l2_deviation), tol);
+        errorQuda("Preconditioned Deo failed: L2 relative deviation = %e > %e", l2_deviation, tol);
       if (check_deviation(max_deviation[0], tol))
-        errorQuda("Preconditioned Deo failed: max deviation = %e > %e", QUDA_REAL(max_deviation[0]), tol);
+        errorQuda("Preconditioned Deo failed: max deviation = %e > %e", max_deviation[0], tol);
 
       // check Doe
       logQuda(QUDA_SUMMARIZE, "Checking Doe of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
@@ -1029,11 +1029,11 @@ namespace quda
       max_deviation = blas::max_deviation(r_coarse[0].Odd(), x_coarse[0].Odd());
       l2_deviation = sqrt(xmyNorm(x_coarse[0].Odd(), r_coarse[0].Odd()) / norm2(x_coarse[0].Odd()));
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
-              QUDA_REAL(norm2(x_coarse[0].Odd())), QUDA_REAL(r_nrm), QUDA_REAL(l2_deviation), QUDA_REAL(max_deviation[0]));
+              norm2(x_coarse[0].Odd()), r_nrm, l2_deviation, max_deviation[0]);
       if (check_deviation(l2_deviation, tol))
-        errorQuda("Preconditioned Doe failed: L2 relative deviation = %e > %e", QUDA_REAL(l2_deviation), tol);
+        errorQuda("Preconditioned Doe failed: L2 relative deviation = %e > %e", l2_deviation, tol);
       if (check_deviation(max_deviation[0], tol))
-        errorQuda("Preconditioned Doe failed: max deviation = %e > %e", QUDA_REAL(max_deviation[0]), tol);
+        errorQuda("Preconditioned Doe failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     // here we check that the Hermitian conjugate operator is working
@@ -1049,9 +1049,9 @@ namespace quda
       real_t deviation = quda::fabs(dot.imag()) / quda::fabs(dot.real());
       logQuda(QUDA_VERBOSE,
               "Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-              QUDA_REAL(real(dot)), QUDA_REAL(imag(dot)), QUDA_REAL(deviation));
+              real(dot), imag(dot), deviation);
       if (check_deviation(deviation, tol))
-        errorQuda("Smoother operator normality failed: deviation = %e > %e", QUDA_REAL(deviation), tol);
+        errorQuda("Smoother operator normality failed: deviation = %e > %e", deviation, tol);
     }
 
     { // normal operator check for residual operator
@@ -1066,9 +1066,9 @@ namespace quda
       real_t deviation = quda::fabs(dot.imag()) / quda::fabs(dot.real());
       logQuda(QUDA_VERBOSE,
               "Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-              QUDA_REAL(real(dot)), QUDA_REAL(imag(dot)), QUDA_REAL(deviation));
+              real(dot), imag(dot), deviation);
       if (check_deviation(deviation, tol))
-        errorQuda("Residual operator normality failed: deviation = %e > %e", QUDA_REAL(deviation), tol);
+        errorQuda("Residual operator normality failed: deviation = %e > %e", deviation, tol);
     }
 
     // Not useful for staggered op since it's a unitary transform
@@ -1090,13 +1090,13 @@ namespace quda
           // Prolong r_coarse, place result in tmp2
           transfer->P(tmp2, r_coarse[0]);
 
-          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, QUDA_REAL(B_norm[i]),
-                     QUDA_REAL(norm2(r_coarse[0])), QUDA_REAL(norm2(tmp2)));
+          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, B_norm[i],
+                     norm2(r_coarse[0]), norm2(tmp2));
 
           // Compare v_k and PP^dag v_k.
           auto max_deviation = blas::max_deviation(tmp2, param.B[i]);
           auto l2_deviation = sqrt(xmyNorm(param.B[i], tmp2) / B_norm[i]);
-          printfQuda("L2 relative deviation = %e max deviation = %e\n", QUDA_REAL(l2_deviation), QUDA_REAL(max_deviation[0]));
+          printfQuda("L2 relative deviation = %e max deviation = %e\n", l2_deviation, max_deviation[0]);
 
           if (param.mg_global.run_oblique_proj_check) {
 
@@ -1113,11 +1113,11 @@ namespace quda
             transfer->P(tmp2, x_coarse[0]);
             (*param.matResidual)(tmp1, tmp2);
 
-            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, QUDA_REAL(B_norm[i]),
-                    QUDA_REAL(norm2(tmp1)));
+            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, B_norm[i],
+                    norm2(tmp1));
             max_deviation = blas::max_deviation(tmp1, param.B[i]);
             logQuda(QUDA_SUMMARIZE, "L2 relative deviation = %e, max deviation = %e\n",
-                    QUDA_REAL(sqrt(xmyNorm(param.B[i], tmp1) / B_norm[i])), QUDA_REAL(max_deviation[0]));
+                    sqrt(xmyNorm(param.B[i], tmp1) / B_norm[i]), max_deviation[0]);
           }
 
           sprintf(prefix, "MG level %d (%s): ", param.level + 1,
@@ -1400,7 +1400,7 @@ namespace quda
           auto nrm2 = norm2(x);
           auto b2 = norm2(b);
           for (auto j = 0; j < param.n_vec_batch; j++)
-            printfQuda("%d Initial guess = %g, Initial rhs = %g\n", i + j, QUDA_REAL(nrm2[j]), QUDA_REAL(b2[j]));
+            printfQuda("%d Initial guess = %g, Initial rhs = %g\n", i + j, nrm2[j], b2[j]);
         }
 
         std::vector<ColorSpinorField> out(param.n_vec_batch), in(param.n_vec_batch);
@@ -1410,7 +1410,7 @@ namespace quda
 
         if (getVerbosity() >= QUDA_VERBOSE) {
           auto nrm2 = norm2(x);
-          for (auto j = 0; j < param.n_vec_batch; j++) printfQuda("%d Solution = %g\n", i + j, QUDA_REAL(nrm2[j]));
+          for (auto j = 0; j < param.n_vec_batch; j++) printfQuda("%d Solution = %g\n", i + j, nrm2[j]);
         }
 
         copy({B.begin() + i, B.begin() + i + param.n_vec_batch}, {x.begin(), x.begin() + param.n_vec_batch});
@@ -1426,7 +1426,7 @@ namespace quda
           real_t nrm2 = norm2(B[i]);
           if (sqrt(nrm2) > 1e-16)
             ax(1.0 / sqrt(nrm2), B[i]); // i/<i,i>
-          else errorQuda("\nCannot normalize %u vector (nrm=%e)\n", i, QUDA_REAL(sqrt(nrm2)));
+          else errorQuda("\nCannot normalize %u vector (nrm=%e)\n", i, sqrt(nrm2));
         }
       }
 

@@ -1372,8 +1372,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Stored zero-mass eigenvalues (back-shifted from mass %e)\n", mass);
         for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
-          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, QUDA_REAL(preserved_evals_zero_mass[i].real()),
-                     QUDA_REAL(preserved_evals_zero_mass[i].imag()));
+          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
+                     preserved_evals_zero_mass[i].imag());
       }
     }
 
@@ -1441,8 +1441,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                                       {temps.begin(), temps.begin() + bs});
           for (int j = 0; j < bs; j++)
             printfQuda("Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n", lo + j,
-                       QUDA_REAL(space->evals[lo + j].real()), QUDA_REAL(space->evals[lo + j].imag()),
-                       QUDA_REAL(quda::sqrt(res[j])));
+                       space->evals[lo + j].real(), space->evals[lo + j].imag(),
+                       quda::sqrt(res[j]));
         }
       } else {
         // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
@@ -1462,8 +1462,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                                     {temps.begin(), temps.begin() + bs});
         for (int j = 0; j < bs; j++)
           logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
-                  QUDA_REAL(space->evals[lo + j].real()), QUDA_REAL(space->evals[lo + j].imag()),
-                  QUDA_REAL(quda::sqrt(res[j])));
+                  space->evals[lo + j].real(), space->evals[lo + j].imag(),
+                  quda::sqrt(res[j]));
       }
     }
     delete dEig;
@@ -1539,8 +1539,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                                   {temps.begin(), temps.begin() + bs});
       for (int j = 0; j < bs; j++)
         logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
-                QUDA_REAL(space->evals[lo + j].real()), QUDA_REAL(space->evals[lo + j].imag()),
-                QUDA_REAL(quda::sqrt(res[j])));
+                space->evals[lo + j].real(), space->evals[lo + j].imag(),
+                quda::sqrt(res[j]));
     }
 
     delete dEig;
@@ -2054,8 +2054,8 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
           printfQuda("Shifted eigenvalues (parity %d, mass %e)\n", local_parity, mass);
           for (size_t i = 0; i < space->evals.size(); i++)
-            printfQuda("  Eval[%04zu] = (%+.16e,%+.16e) (shifted)\n", i, QUDA_REAL(space->evals[i].real()),
-                       QUDA_REAL(space->evals[i].imag()));
+            printfQuda("  Eval[%04zu] = (%+.16e,%+.16e) (shifted)\n", i, space->evals[i].real(),
+                       space->evals[i].imag());
         }
       } else if (qep.preserve_deflation_space != nullptr) {
         // Reusing an existing deflation space at a new mass with no zero-mass
@@ -2107,8 +2107,8 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Stored zero-mass eigenvalues (back-shifted from parity %d, mass %e)\n", local_parity, mass);
         for (size_t i = 0; i < preserved_evals_zero_mass.size(); i++)
-          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, QUDA_REAL(preserved_evals_zero_mass[i].real()),
-                     QUDA_REAL(preserved_evals_zero_mass[i].imag()));
+          printfQuda("Eval[%04zu] = (%+.16e,%+.16e)\n", i, preserved_evals_zero_mass[i].real(),
+                     preserved_evals_zero_mass[i].imag());
       }
     }
   }

@@ -337,7 +337,7 @@ namespace quda
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r as an initial seed
       // and Q[0]/AQ[0] as temporaries for the power iterations
       lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r[0], Q[0][0], AQ[0][0], 100, 10);
-      logQuda(QUDA_SUMMARIZE, "CA-CG Approximate lambda max = 1.1 x %e\n", QUDA_REAL(lambda_max / 1.1));
+      logQuda(QUDA_SUMMARIZE, "CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;
 
@@ -537,7 +537,7 @@ namespace quda
           resIncreaseTotal++;
           warningQuda(
             "CA-CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            QUDA_REAL(sqrt(r2[0])), QUDA_REAL(sqrt(r2_old[0])), resIncreaseTotal);
+            sqrt(r2[0]), sqrt(r2_old[0]), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CA-CG: solver exiting due to too many true residual norm increases");
             break;

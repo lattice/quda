@@ -274,7 +274,7 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, QUDA_REAL(r2[0]), QUDA_REAL(sqrt(r2[0] / b2)));
+    logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0] / b2));
 
     while ( !convergence(r2, stop, num_offset_now) &&  !exit_early && k < param.maxiter) {
 
@@ -361,7 +361,7 @@ namespace quda {
 	  resIncrease++;
 	  resIncreaseTotal[reliable_shift]++;
           warningQuda("Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)",
-                      reliable_shift, QUDA_REAL(sqrt(r2[reliable_shift])), QUDA_REAL(r0Norm[reliable_shift]),
+                      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift],
                       resIncreaseTotal[reliable_shift]);
 
           if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) {
@@ -433,7 +433,7 @@ namespace quda {
         for (int j = 0; j < num_offset_now; j++) iter[j] = k;
       }
 
-      logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, QUDA_REAL(r2[0]), QUDA_REAL(sqrt(r2[0] / b2)));
+      logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0] / b2));
     }
 
     for (int i=0; i<num_offset; i++) {
@@ -475,10 +475,10 @@ namespace quda {
       for (int i = 0; i < num_offset; i++) {
         if (std::isinf(param.true_res_offset[i])) {
           logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e\n", i, iter[i],
-                  QUDA_REAL(param.iter_res_offset[i]));
+                  param.iter_res_offset[i]);
         } else {
           logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n", i, iter[i],
-                  QUDA_REAL(param.iter_res_offset[i]), QUDA_REAL(param.true_res_offset[i]));
+                  param.iter_res_offset[i], param.true_res_offset[i]);
         }
       }
 
@@ -487,7 +487,7 @@ namespace quda {
       for (int i = 0; i < num_offset; i++) {
         param.iter_res_offset[i] = sqrt(r2[i] / b2);
         logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e\n", i, iter[i],
-                QUDA_REAL(param.iter_res_offset[i]));
+                param.iter_res_offset[i]);
       }
     }
 

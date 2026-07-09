@@ -284,7 +284,7 @@ namespace quda
 
       if (collect > 0 && k > collect_miniter && r2[0] < collect_tol * collect_tol * b2[0]) {
         blas::copy(v_r[v_r.size() - collect], r_sloppy);
-        logQuda(QUDA_VERBOSE, "Collecting r %2d: r2 / b2 = %12.8e, k = %5d\n", collect, QUDA_REAL(sqrt(r2[0] / b2[0])), k);
+        logQuda(QUDA_VERBOSE, "Collecting r %2d: r2 / b2 = %12.8e, k = %5d\n", collect, sqrt(r2[0] / b2[0]), k);
         collect--;
       }
 

@@ -737,7 +737,7 @@ namespace quda {
           // ...tell the world about it too.
           warningQuda(
             "new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            QUDA_REAL(sqrt(r2[0])), QUDA_REAL(r0Norm), resIncreaseTotal);
+            sqrt(r2[0]), r0Norm, resIncreaseTotal);
 
           // If the norm is ridiculously small in magnitude, we've exceeded the maximums on various
           // ways we keep track of residual increases, or the L2 norm converged, we say "we're good here"
@@ -745,7 +745,7 @@ namespace quda {
           if (rNorm < L2breakdown_eps || resIncrease > param.max_res_increase
               || resIncreaseTotal > param.max_res_increase_total || r2 < stop) {
             L2breakdown = true;
-            warningQuda("L2 breakdown %e, %e", QUDA_REAL(rNorm), QUDA_REAL(L2breakdown_eps));
+            warningQuda("L2 breakdown %e, %e", rNorm, L2breakdown_eps);
 
             // We also have to do a logic correction, switching the reliable update baselines we set above
             // from the L2 norm over to the HQ residual.
@@ -766,7 +766,7 @@ namespace quda {
 
           // Tell the world about it
           warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
-                      QUDA_REAL(hq_res[0]), QUDA_REAL(hq0Res[0]));
+                      hq_res[0], hq0Res[0]);
 
           // And if it's increased too many times in a row, flunk out of the solve.
           if (hqresIncrease > param.max_hq_res_increase) {
@@ -934,7 +934,7 @@ namespace quda {
       mat(r.Component(i), x.Component(i));
       r2(i, i) = blas::xmyNorm(b.Component(i), r.Component(i));
       r2avg += r2(i, i).real();
-      printfQuda("r2[%i] %e\n", i, QUDA_REAL(r2(i, i).real()));
+      printfQuda("r2[%i] %e\n", i, r2(i, i).real());
     }
     for (int i = 0; i < param.num_src; i++) {
       for (int j = i + 1; j < param.num_src; j++) {
@@ -1270,7 +1270,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd r2(param.num_src,param.num_src);
   for(int i=0; i<param.num_src; i++){
     r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
-    printfQuda("r2[%i] %e\n", i, QUDA_REAL(r2(i, i).real()));
+    printfQuda("r2[%i] %e\n", i, r2(i, i).real());
   }
   if(use_block){
     // MW need to initalize the full r2 matrix here
@@ -1608,7 +1608,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           resIncrease++;
           resIncreaseTotal++;
           warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      QUDA_REAL(sqrt(r2(i, i).real())), QUDA_REAL(r0Norm[i]), resIncreaseTotal);
+                      sqrt(r2(i, i).real()), r0Norm[i], resIncreaseTotal);
           if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
@@ -1630,7 +1630,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           if (heavy_quark_res[i] > heavy_quark_res_old[i]) {
             hqresIncrease++;
             warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
-                        QUDA_REAL(heavy_quark_res[i]), QUDA_REAL(heavy_quark_res_old[i]));
+                        heavy_quark_res[i], heavy_quark_res_old[i]);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
               warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");

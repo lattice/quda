@@ -200,8 +200,8 @@ namespace quda
     logQuda(QUDA_SUMMARIZE, "********************************\n");
 
     logQuda(QUDA_VERBOSE, "spectrum %s\n", spectrum.c_str());
-    logQuda(QUDA_VERBOSE, "tol %.4e\n", QUDA_REAL(tol));
-    if (qr_tol != 0) logQuda(QUDA_VERBOSE, "qr_tol %.4e\n", QUDA_REAL(qr_tol));
+    logQuda(QUDA_VERBOSE, "tol %.4e\n", tol);
+    if (qr_tol != 0) logQuda(QUDA_VERBOSE, "qr_tol %.4e\n", qr_tol);
     logQuda(QUDA_VERBOSE, "n_conv %d\n", n_conv);
     logQuda(QUDA_VERBOSE, "n_ev %d\n", n_ev);
     logQuda(QUDA_VERBOSE, "n_kr %d\n", n_kr);
@@ -364,14 +364,14 @@ namespace quda
         auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
-            logQuda(QUDA_SUMMARIZE, "Norm <%d|%d>^2 = ||(%e,%e)|| = %e\n", i, j, QUDA_REAL(cnorm.real()),
-                    QUDA_REAL(cnorm.imag()), QUDA_REAL(abs(cnorm)));
+            logQuda(QUDA_SUMMARIZE, "Norm <%d|%d>^2 = ||(%e,%e)|| = %e\n", i, j, cnorm.real(),
+                    cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
           if (abs(Unit - cnorm) > 5.0 * epsilon) {
-            logQuda(QUDA_SUMMARIZE, "1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, QUDA_REAL(cnorm.real()),
-                    QUDA_REAL(cnorm.imag()), QUDA_REAL(abs(Unit - cnorm)));
+            logQuda(QUDA_SUMMARIZE, "1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(),
+                    cnorm.imag(), abs(Unit - cnorm));
             orthed = false;
           }
         }
@@ -550,8 +550,8 @@ namespace quda
       blas::ax(sigma_inv, {evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper});
 
       for (auto j = 0u; j < sigma.size(); j++) {
-        logQuda(QUDA_SUMMARIZE, "Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i + j, QUDA_REAL(sigma[j]),
-                QUDA_REAL(sigma[j] - sqrt(std::abs(evals[i + j].real()))));
+        logQuda(QUDA_SUMMARIZE, "Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i + j, sigma[j],
+                sigma[j] - sqrt(std::abs(evals[i + j].real())));
         evals[i + j] = sigma[j];
       }
     }
@@ -634,8 +634,8 @@ namespace quda
       if (size == n_conv) {
         for (int j = lower; j < upper; j++) {
           logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", j,
-                  QUDA_REAL(evals[j].real()), QUDA_REAL(evals[j].imag()), QUDA_REAL(abs(evals[j])),
-                  QUDA_REAL(residua[j]));
+                  evals[j].real(), evals[j].imag(), abs(evals[j]),
+                  residua[j]);
         }
       }
     }

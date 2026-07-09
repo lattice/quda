@@ -118,13 +118,13 @@ namespace quda
                 "BLKTRLM scalar coeffs: restart=%d num_locked=%d num_keep=%d n_kr=%d block_size=%d\n", restart_iter,
                 num_locked, num_keep, n_kr, block_size);
         for (int i = num_locked; i < std::min(n_kr, num_locked + 8); i++) {
-          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, QUDA_REAL(alpha[i]), i,
-                  QUDA_REAL(beta[i]));
+          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, alpha[i], i,
+                  beta[i]);
           if (block_size == 1) {
             const int ba = (i / block_size) * block_data_length;
             logQuda(QUDA_DEBUG_VERBOSE, "  block_alpha[%d] = (%+.16e,%+.16e) block_beta[%d] = (%+.16e,%+.16e)\n", i,
-                    QUDA_REAL(block_alpha[ba].real()), QUDA_REAL(block_alpha[ba].imag()), i,
-                    QUDA_REAL(block_beta[ba].real()), QUDA_REAL(block_beta[ba].imag()));
+                    block_alpha[ba].real(), block_alpha[ba].imag(), i,
+                    block_beta[ba].real(), block_beta[ba].imag());
           }
         }
       }
@@ -149,7 +149,7 @@ namespace quda
       for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i,
-                  QUDA_REAL(residua[i + num_locked]), QUDA_REAL(epsilon * check_norm(alpha[i + num_locked])));
+                  residua[i + num_locked], epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -162,7 +162,7 @@ namespace quda
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i,
-                  QUDA_REAL(residua[i + num_locked]), QUDA_REAL(tol * check_norm(alpha[i + num_locked])));
+                  residua[i + num_locked], tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -197,8 +197,8 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
       logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
       for (int i = 0; i < n_kr; i++) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, QUDA_REAL(alpha[i]), i,
-                QUDA_REAL(residua[i]));
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i,
+                residua[i]);
       }
 
       // Check for convergence
@@ -228,8 +228,8 @@ namespace quda
 
       // Dump all Ritz values and residua
       for (int i = 0; i < n_conv; i++) {
-        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, QUDA_REAL(alpha[i]), 0.0,
-                QUDA_REAL(residua[i]));
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0,
+                residua[i]);
       }
 
       // Compute eigenvalues
@@ -254,8 +254,8 @@ namespace quda
       for (int b = 0; b < block_size; b++) {
         for (int c = 0; c < block_size; c++) {
           const int idx = blk * block_data_length + b * block_size + c;
-          logQuda(QUDA_DEBUG_VERBOSE, "    (%d,%d) = (%+.16e,%+.16e)\n", b, c, QUDA_REAL(block_alpha[idx].real()),
-                  QUDA_REAL(block_alpha[idx].imag()));
+          logQuda(QUDA_DEBUG_VERBOSE, "    (%d,%d) = (%+.16e,%+.16e)\n", b, c, block_alpha[idx].real(),
+                  block_alpha[idx].imag());
         }
       }
     }
@@ -266,8 +266,8 @@ namespace quda
         for (int c = 0; c < block_size; c++) {
           const int idx = blk * block_data_length + b * block_size + c;
           if (c <= b) {
-            logQuda(QUDA_DEBUG_VERBOSE, "    (%d,%d) = (%+.16e,%+.16e)\n", b, c, QUDA_REAL(block_beta[idx].real()),
-                    QUDA_REAL(block_beta[idx].imag()));
+            logQuda(QUDA_DEBUG_VERBOSE, "    (%d,%d) = (%+.16e,%+.16e)\n", b, c, block_beta[idx].real(),
+                    block_beta[idx].imag());
           }
         }
       }
@@ -276,7 +276,7 @@ namespace quda
     real_t beta_sum = 0;
     const int beta_tail = n_kr * block_size - block_data_length;
     for (int i = 0; i < block_data_length; i++) beta_sum += abs(block_beta[beta_tail + i]);
-    logQuda(QUDA_DEBUG_VERBOSE, "  beta_sum (tail block at offset %d) = %.16e\n", beta_tail, QUDA_REAL(beta_sum));
+    logQuda(QUDA_DEBUG_VERBOSE, "  beta_sum (tail block at offset %d) = %.16e\n", beta_tail, beta_sum);
   }
 
   void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField> &v, int j)
@@ -498,8 +498,8 @@ namespace quda
               blocks, arrow_pos, block_arrow_pos, num_locked_offset);
       for (int b = 0; b < std::min(dim, 4); b++) {
         for (int c = 0; c < std::min(dim, 4); c++) {
-          logQuda(QUDA_DEBUG_VERBOSE, "  T(%d,%d) = (%+.16e,%+.16e)\n", b, c, QUDA_REAL(T(b, c).real()),
-                  QUDA_REAL(T(b, c).imag()));
+          logQuda(QUDA_DEBUG_VERBOSE, "  T(%d,%d) = (%+.16e,%+.16e)\n", b, c, T(b, c).real(),
+                  T(b, c).imag());
         }
       }
     }
@@ -525,7 +525,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
       for (int i = 0; i < std::min(dim, 4); i++)
-        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, QUDA_REAL(eigensolver.eigenvalues()[i]));
+        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, eigensolver.eigenvalues()[i]);
     }
 
     // Use Sum of all beta values in the final block for
@@ -541,8 +541,8 @@ namespace quda
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2 && i < 2 && b < 2) {
           logQuda(QUDA_DEBUG_VERBOSE,
                   "  resid estimate i=%d b=%d: beta_sum=%.16e ritz[%d]=(%+.16e,%+.16e) resid=%.16e\n", i, b,
-                  QUDA_REAL(beta_sum), ritz_idx, QUDA_REAL(block_ritz_mat[ritz_idx].real()),
-                  QUDA_REAL(block_ritz_mat[ritz_idx].imag()), QUDA_REAL(residua[i * block_size + b + num_locked]));
+                  beta_sum, ritz_idx, block_ritz_mat[ritz_idx].real(),
+                  block_ritz_mat[ritz_idx].imag(), residua[i * block_size + b + num_locked]);
         }
       }
     }

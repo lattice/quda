@@ -450,8 +450,8 @@ namespace quda {
     real_t b2 = r2;
     args.c[0] = complex_t(sqrt(r2), 0.0);
 
-    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", QUDA_REAL(r2),
-               QUDA_REAL(sqrt(normb)), QUDA_REAL(param.tol));
+    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2,
+               sqrt(normb), param.tol);
 
     rSloppy = r;
 
@@ -505,8 +505,8 @@ namespace quda {
         complex_t detGm = Gm.determinant();
 
         PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
-        printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, QUDA_REAL(ext_r2),
-                   QUDA_REAL(detGm.real()), QUDA_REAL(detGm.imag()));
+        printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2,
+                   detGm.real(), detGm.imag());
 
         Gm.setZero();
 
@@ -520,7 +520,7 @@ namespace quda {
 
       } else {
 
-        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, QUDA_REAL(ext_r2));
+        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
         args.ResetArgs();
 
         // update solution:

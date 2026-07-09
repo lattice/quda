@@ -153,8 +153,8 @@ namespace quda
           for (int i = 0; i < (n_kr - num_locked_3D[t]); i++) {
             if (residua_3D[t][i + num_locked_3D[t]] < epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
               logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i,
-                      QUDA_REAL(residua_3D[t][i + num_locked_3D[t]]),
-                      QUDA_REAL(epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)));
+                      residua_3D[t][i + num_locked_3D[t]],
+                      epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
               iter_locked_3D[t] = i + 1;
             } else {
               // Unlikely to find new locked pairs
@@ -171,8 +171,8 @@ namespace quda
           for (int i = iter_locked_3D[t]; i < n_kr - num_locked_3D[t]; i++) {
             if (residua_3D[t][i + num_locked_3D[t]] < tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
               logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i,
-                      QUDA_REAL(residua_3D[t][i + num_locked_3D[t]]),
-                      QUDA_REAL(tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)));
+                      residua_3D[t][i + num_locked_3D[t]],
+                      tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
               iter_converged_3D[t] = i + 1;
             } else {
               // Unlikely to find new converged pairs
@@ -217,8 +217,8 @@ namespace quda
             printf("num_keep[%d] = %d\n", t_offset + t, num_keep_3D[t]);
             printf("num_locked[%d] = %d\n", t_offset + t, num_locked_3D[t]);
             for (int i = 0; i < n_kr; i++) {
-              printf("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t_offset + t, i, QUDA_REAL(alpha_3D[t][i]), i,
-                     QUDA_REAL(residua_3D[t][i]));
+              printf("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t_offset + t, i, to_double(alpha_3D[t][i]), i,
+                     to_double(residua_3D[t][i]));
             }
           }
         }
@@ -277,8 +277,8 @@ namespace quda
           if (eig_param->use_poly_acc) {
             for (int t = 0; t < ortho_dim_size; t++) {
               for (int i = 0; i < n_conv; i++) {
-                printf("RitzValue[%d][%04d]: (%+.16e, %+.16e) residual %.16e\n", t, i, QUDA_REAL(alpha_3D[t][i]), 0.0,
-                       QUDA_REAL(residua_3D[t][i]));
+                printf("RitzValue[%d][%04d]: (%+.16e, %+.16e) residual %.16e\n", t, i, to_double(alpha_3D[t][i]), 0.0,
+                       to_double(residua_3D[t][i]));
               }
             }
           }
@@ -619,7 +619,7 @@ namespace quda
     auto result = *std::max_element(inner_products.begin(), inner_products.end());
     comm_allreduce_max(result);
     if (verbose_rank && getVerbosity() >= QUDA_VERBOSE)
-      printf("Chebyshev max = %e (rank = %d)\n", QUDA_REAL(result), comm_rank_global());
+      printf("Chebyshev max = %e (rank = %d)\n", to_double(result), comm_rank_global());
 
     // Increase final result by 10% for safety
     return result * 1.10;
@@ -669,7 +669,7 @@ namespace quda
             // Use printf to get data from t dim only
             if (getVerbosity() >= QUDA_VERBOSE) {
               printf("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n", t_offset + t, i,
-                     QUDA_REAL(evals_t[i][t].real()), QUDA_REAL(evals_t[i][t].imag()), QUDA_REAL(residua_3D[t][i]));
+                     to_double(evals_t[i][t].real()), to_double(evals_t[i][t].imag()), to_double(residua_3D[t][i]));
             }
 
             // Transfer evals to eval array

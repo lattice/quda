@@ -705,7 +705,7 @@ namespace quda {
        Vm = nullptr;
 
        const int max_n_ev = defl.size(); // param.m;
-       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_n_ev, QUDA_REAL(param.eigenval_tol));
+       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_n_ev, param.eigenval_tol);
        defl.reduce(param.eigenval_tol, max_n_ev);
      }
      return;

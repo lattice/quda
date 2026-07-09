@@ -40,7 +40,7 @@ namespace quda
     if (qr_tol > tol * 1e-3) {
       warningQuda("QR tolerances greater than eig_tol * 1e-3 can cause instability in IRAM, please revise this option "
                   "if instability is observed (eig_tol = %e, qr_tol = %e)",
-                  QUDA_REAL(tol), QUDA_REAL(qr_tol));
+                  tol, qr_tol);
     }
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
@@ -99,8 +99,8 @@ namespace quda
     beta = sqrt(blas::norm2(r[0]));
     while (beta < 0.717 * beta_pre && orth_iter < orth_iter_max) {
 
-      logQuda(QUDA_DEBUG_VERBOSE, "beta = %e > 0.717*beta_pre = %e: Reorthogonalise at step %d, iter %d\n", QUDA_REAL(beta),
-              QUDA_REAL(0.717 * beta_pre), j, orth_iter);
+      logQuda(QUDA_DEBUG_VERBOSE, "beta = %e > 0.717*beta_pre = %e: Reorthogonalise at step %d, iter %d\n", beta,
+              0.717 * beta_pre, j, orth_iter);
 
       beta_pre = beta;
 
@@ -496,8 +496,8 @@ namespace quda
         real_t rtemp = std::max(epsilon23, abs(evals[idx]));
         if (residua[idx] < tol * rtemp) {
           iter_converged++;
-          logQuda(QUDA_DEBUG_VERBOSE, "residuum[%d] = %e, condition = %e\n", i, QUDA_REAL(residua[idx]),
-                  QUDA_REAL(tol * abs(evals[idx])));
+          logQuda(QUDA_DEBUG_VERBOSE, "residuum[%d] = %e, condition = %e\n", i, residua[idx],
+                  tol * abs(evals[idx]));
         } else {
           // Unlikely to find new converged eigenvalues
           break;

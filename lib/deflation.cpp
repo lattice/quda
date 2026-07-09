@@ -111,7 +111,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       auto eval = dotnorm[0] / dotnorm[2];
       blas::xpay(*Av_sloppy, -eval, *r_sloppy);
       auto relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
-      printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i + 1, QUDA_REAL(eval), QUDA_REAL(relerr));
+      printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i + 1, eval, relerr);
     }
   }
 
@@ -127,7 +127,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
 
     auto check_nrm2 = norm2(b);
 
-    printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", QUDA_REAL(sqrt(check_nrm2)), param.cur_dim);
+    printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", sqrt(check_nrm2), param.cur_dim);
 
     ColorSpinorField *b_sloppy = param.RV->Precision() != b.Precision() ? r_sloppy : &b;
     *b_sloppy = b;
@@ -160,7 +160,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     blas::legacy::caxpy(vec.get(), rv_, out_); // multiblas
 
     check_nrm2 = norm2(x);
-    printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", QUDA_REAL(sqrt(check_nrm2)));
+    printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
   }
 
   void Deflation::increment(ColorSpinorField &Vm, int n_ev)
@@ -305,7 +305,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
         auto eval = dotnorm[0] / dotnorm[2];
         blas::xpay(*Av_sloppy, -eval, *r_sloppy);
         relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
-        logQuda(QUDA_VERBOSE, "Eigenvalue: %1.12e Residual: %1.12e\n", QUDA_REAL(eval), QUDA_REAL(relerr));
+        logQuda(QUDA_VERBOSE, "Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
       }
 
       idx++;

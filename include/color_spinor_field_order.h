@@ -626,7 +626,7 @@ namespace quda
       {
         const Float max = static_cast<Float>(max_);
         if (block_float_ghost && max != static_cast<Float>(1.0))
-          errorQuda("Block-float accessor requires max=1.0 not max=%e", QUDA_REAL(max_));
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", max_);
         if constexpr (ghost_fixed && !block_float_ghost) {
           ghost.scale = static_cast<Float>(std::numeric_limits<ghostFloat>::max() / max);
           ghost.scale_inv = static_cast<Float>(max / std::numeric_limits<ghostFloat>::max());
@@ -813,7 +813,7 @@ namespace quda
       {
         const Float max = static_cast<Float>(max_);
         if (block_float && max != static_cast<Float>(1.0))
-          errorQuda("Block-float accessor requires max=1.0 not max=%e", QUDA_REAL(max_));
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", max_);
         if constexpr (fixed && !block_float) {
           v.scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
           v.scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());

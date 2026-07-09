@@ -11,10 +11,10 @@ namespace quda
   {
     logQuda(QUDA_VERBOSE, "Launching MADWF accelerator ... \n");
     logQuda(QUDA_VERBOSE, "madwf_mu (low modes suppressor)                   = %.4f\n",
-            QUDA_REAL(param.madwf_diagonal_suppressor));
+            param.madwf_diagonal_suppressor);
     logQuda(QUDA_VERBOSE, "madwf_ls (cheap Ls)                               = %d\n", param.madwf_ls);
     logQuda(QUDA_VERBOSE, "madwf_null_miniter                                = %d\n", param.madwf_null_miniter);
-    logQuda(QUDA_VERBOSE, "madwf_null_tol                                    = %4.2e\n", QUDA_REAL(param.madwf_null_tol));
+    logQuda(QUDA_VERBOSE, "madwf_null_tol                                    = %4.2e\n", param.madwf_null_tol);
     logQuda(QUDA_VERBOSE, "madwf_train_maxiter (max # of iters for training) = %d\n", param.madwf_train_maxiter);
   }
 
@@ -115,11 +115,11 @@ namespace quda
     for (auto &phi : B) {
       residual += blas::norm2(phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("reference dslash norm %03d = %8.4e\n", count, QUDA_REAL(blas::norm2(phi)));
+        printfQuda("reference dslash norm %03d = %8.4e\n", count, blas::norm2(phi));
       }
       count++;
     }
-    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("reference dslash norm = %8.4e\n", QUDA_REAL(residual)); }
+    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("reference dslash norm = %8.4e\n", residual); }
 
     csParam.x[4] = Ls_base;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -149,7 +149,7 @@ namespace quda
     transfer_float b = 0.8;
     if (getVerbosity() >= QUDA_VERBOSE) {
       printfQuda("beta          = %.3f\n", b);
-      printfQuda("training mu   = %.3f\n", QUDA_REAL(mu));
+      printfQuda("training mu   = %.3f\n", mu);
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
@@ -245,7 +245,7 @@ namespace quda
 
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("grad min iter %05d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
-                   iteration, QUDA_REAL(chi2), QUDA_REAL(chi2 / residual), QUDA_REAL(alpha), QUDA_REAL(mu));
+                   iteration, chi2, chi2 / residual, alpha, mu);
       }
     }
 
@@ -257,7 +257,7 @@ namespace quda
       real_t ind_chi2 = cost(ref, base, chi, phi);
       real_t phi2 = blas::norm2(phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, QUDA_REAL(ind_chi2 / phi2), QUDA_REAL(phi2));
+        printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, phi2);
       }
       count++;
     }
@@ -285,7 +285,7 @@ namespace quda
 
     std::string save_param_path(param.madwf_param_outfile);
     char cstring[512];
-    sprintf(cstring, "/madwf_trained_param_ls_%02d_%02d_mu_%.3f.dat", Ls, Ls_base, QUDA_REAL(mu));
+    sprintfQuda(cstring, "/madwf_trained_param_ls_%02d_%02d_mu_%.3f.dat", Ls, Ls_base, mu);
     save_param_path += std::string(cstring);
     FILE *fp = fopen(save_param_path.c_str(), "w");
     if (!fp) { errorQuda("Unable to open file %s\n", save_param_path.c_str()); }
@@ -306,7 +306,7 @@ namespace quda
 
     char param_file_name[512];
     // Note that all ranks load from the same file.
-    sprintf(param_file_name, "/madwf_trained_param_ls_%02d_%02d_mu_%.3f.dat", Ls, Ls_base, QUDA_REAL(mu));
+    sprintfQuda(param_file_name, "/madwf_trained_param_ls_%02d_%02d_mu_%.3f.dat", Ls, Ls_base, mu);
     std::string param_file_name_str(param_file_name);
     auto search_cache = host_training_param_cache.find(param_file_name_str);
     if (search_cache != host_training_param_cache.end()) {

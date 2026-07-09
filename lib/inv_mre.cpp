@@ -129,7 +129,7 @@ namespace quda
       for (auto &a : alpha) a = -a;
       blas::block::caxpy(alpha, q, r);
       printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N,
-                 QUDA_REAL(sqrt(blas::norm2(r) / blas::norm2(b))));
+                 sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_CHRONO);

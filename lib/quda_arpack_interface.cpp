@@ -365,8 +365,8 @@ namespace quda
     // print out the computed Ritz values and their error estimates
     for (int i = 0; i < nconv; i++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", i, QUDA_REAL(evals[i].real()),
-		   QUDA_REAL(evals[i].imag()), QUDA_REAL(std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[i]))));
+        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", i, evals[i].real(),
+		   evals[i].imag(), std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[i])));
     }
 
     // Compute singular/eigenvalues values from eigenvectors.
@@ -399,8 +399,8 @@ namespace quda
         getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
         if (getVerbosity() >= QUDA_SUMMARIZE)
-	  printfQuda("Sval[%04d] = %+.16e sigma - to_double(sqrt(|lambda|)) = %+.16e\n", i, QUDA_REAL(sigma_tmp),
-		     QUDA_REAL(sigma_tmp - sqrt(fabs(evals[i].real()))));
+	  printfQuda("Sval[%04d] = %+.16e sigma - to_double(sqrt(|lambda|)) = %+.16e\n", i, sigma_tmp,
+		     sigma_tmp - sqrt(fabs(evals[i].real())));
       }
     } else {
       printfQuda("Computing Eigenvalues\n");
@@ -419,8 +419,8 @@ namespace quda
         getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
         if (getVerbosity() >= QUDA_SUMMARIZE)
-	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, QUDA_REAL(evals[i].real()),
-		     QUDA_REAL(evals[i].imag()), QUDA_REAL(abs(evals[i])), QUDA_REAL(sqrt(L2norm)));
+	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, evals[i].real(),
+		     evals[i].imag(), abs(evals[i]), sqrt(L2norm));
       }
     }
 

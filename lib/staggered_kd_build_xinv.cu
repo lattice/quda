@@ -48,7 +48,7 @@ namespace quda
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
-        logQuda(QUDA_VERBOSE, "Global U_max = %e\n", QUDA_REAL(max_scale));
+        logQuda(QUDA_VERBOSE, "Global U_max = %e\n", max_scale);
         X.Scale(max_scale > 2.0 * mass ? max_scale : 2.0 * mass);
       }
 
@@ -203,7 +203,7 @@ namespace quda
 
     calculateStaggeredKDBlock(X, U, mass);
 
-    logQuda(QUDA_VERBOSE, "X2 = %e\n", QUDA_REAL(X.norm2(0)));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", X.norm2(0));
 
     // Step 5: Calculate Xinv
     if (dagger_approximation) {
@@ -229,7 +229,7 @@ namespace quda
                               + Tunable::flops_global());
       }
 
-      logQuda(QUDA_VERBOSE, "xInvMilcOrder = %e\n", QUDA_REAL(xInvMilcOrder->norm2(0)));
+      logQuda(QUDA_VERBOSE, "xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
     }
 
     // Step 6: reorder the KD inverse into a "gauge field" with a QUDA_KDINVERSE_GEOMETRY
@@ -237,7 +237,7 @@ namespace quda
     ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);
 
     if (dagger_approximation) logQuda(QUDA_VERBOSE, "Using the dagger approximation to Xinv\n");
-    logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", QUDA_REAL(Xinv.norm2()));
+    logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", Xinv.norm2());
   }
 
   // Allocates and calculates the inverse KD block, returning Xinv
