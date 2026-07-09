@@ -2,7 +2,7 @@
  * Dummy communications layer for single-GPU backend.
  */
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <string.h>
 
 #include <communicator_quda.h>
@@ -135,7 +135,7 @@ namespace quda
 
   void Communicator::comm_barrier(void) { }
 
-  void Communicator::comm_abort_(int status) { exit(status); }
+  [[noreturn]] void Communicator::comm_abort_(int status) { std::exit(status); }
 
   int Communicator::comm_rank_global() { return 0; }
 

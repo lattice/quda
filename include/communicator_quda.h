@@ -801,7 +801,7 @@ namespace quda
 
   void comm_barrier(void);
 
-  static void comm_abort_(int status);
+  [[noreturn]] static void comm_abort_(int status);
 
   static int comm_rank_global();
 };

@@ -1,5 +1,7 @@
 #include <communicator_quda.h>
 
+#include <cstdlib>
+
 #define MPI_CHECK(mpi_call)                                                                                            \
   do {                                                                                                                 \
     int status = mpi_call;                                                                                             \
@@ -493,7 +495,11 @@ namespace quda
 
   void Communicator::comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
 
-  void Communicator::comm_abort_(int status) { MPI_Abort(MPI_COMM_WORLD, status); }
+  [[noreturn]] void Communicator::comm_abort_(int status)
+  {
+    MPI_Abort(MPI_COMM_WORLD, status);
+    std::abort();
+  }
 
   int Communicator::comm_rank_global()
   {

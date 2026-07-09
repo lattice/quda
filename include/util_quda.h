@@ -87,7 +87,7 @@ char *getPrintBuffer();
 */
 const char *getOmpThreadStr();
 
-void errorQuda_(const char *func, const char *file, int line);
+[[noreturn]] void errorQuda_(const char *func, const char *file, int line);
 
 namespace quda
 {
@@ -152,7 +152,8 @@ namespace quda
     }
 
     template <typename... Args>
-    inline void errorQudaImpl(const char *func, const char *file, int line, const char *fmt, Args &&...args)
+    [[noreturn]] inline void errorQudaImpl(const char *func, const char *file, int line, const char *fmt,
+                                           Args &&...args)
     {
       fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());
       if constexpr (sizeof...(Args) == 0) {

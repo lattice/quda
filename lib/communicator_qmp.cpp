@@ -1,6 +1,8 @@
 #include <communicator_quda.h>
 #include <mpi_comm_handle.h>
 
+#include <cstdlib>
+
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
 // performance we just call MPI directly
@@ -511,7 +513,11 @@ void Communicator::comm_broadcast(void *data, size_t nbytes, int root)
 
 void Communicator::comm_barrier(void) { QMP_CHECK(QMP_comm_barrier(QMP_COMM_HANDLE)); }
 
-void Communicator::comm_abort_(int status) { QMP_abort(status); }
+[[noreturn]] void Communicator::comm_abort_(int status)
+{
+  QMP_abort(status);
+  std::abort();
+}
 
 int Communicator::comm_rank_global() { return QMP_get_node_number(); }
 

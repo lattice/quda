@@ -472,7 +472,7 @@ namespace quda
 
   void comm_barrier_global(void) { get_default_communicator().comm_barrier(); }
 
-  void comm_abort_(int status) { Communicator::comm_abort_(status); };
+  [[noreturn]] void comm_abort_(int status) { Communicator::comm_abort_(status); };
 
   int commDim(int dim) { return get_current_communicator().commDim(dim); }
 
