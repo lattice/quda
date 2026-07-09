@@ -293,7 +293,10 @@ namespace quda
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, true);
     Dirac *dirac = Dirac::create(diracParam);
-    dirac->M(phi, eta);
+    // Heatbath: phi = M^dag eta so that S_f = phi^dag (M^dag M)^{-1} phi
+    // = |eta|^2 exactly (phi = M eta is wrong for non-normal M; verified
+    // by HMC.HeatbathActionIdentity)
+    dirac->Mdag(phi, eta);
     delete dirac;
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -312,7 +315,10 @@ namespace quda
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, true);
     Dirac *dirac = Dirac::create(diracParam);
-    dirac->M(phi, eta);
+    // Heatbath: phi = M^dag eta so that S_f = phi^dag (M^dag M)^{-1} phi
+    // = |eta|^2 exactly (phi = M eta is wrong for non-normal M; verified
+    // by HMC.HeatbathActionIdentity)
+    dirac->Mdag(phi, eta);
     delete dirac;
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -343,6 +349,19 @@ namespace quda
     if (diracEig != diracPre) delete diracEig;
 
     double sf = dot.real();
+
+    // Clover EO with EVEN_EVEN(_ASYMMETRIC) matpc: the odd-site clover
+    // determinant contributes S ⊃ -2 TrLog[C_oo]. Must accompany the TrLog
+    // force in computeEOFermionForce so the force oracles compare against
+    // the same action the force derives from.
+    if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH && cloverPrecise) {
+      sf -= 2.0 * cloverPrecise->TrLog()[1]; // odd parity
+    } else if (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH && cloverPrecise) {
+      // Twisted TrLog stores log det(A² + μ̃²)_oo = log[det Ã(μ) det Ã(-μ)],
+      // i.e. both flavor determinant factors at once — coefficient 1, not 2.
+      sf -= cloverPrecise->TrLog()[1];
+    }
+
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     return sf;
@@ -475,6 +494,8 @@ namespace quda
     // SYMMETRIC and gives the same solution, but the log-det differs.
     if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH && cloverPrecise) {
       sf -= 2.0 * cloverPrecise->TrLog()[1]; // odd parity only
+    } else if (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH && cloverPrecise) {
+      sf -= cloverPrecise->TrLog()[1]; // stores log det(A² + μ̃²): both flavor factors
     }
 
     solutionResident.clear();
@@ -506,19 +527,34 @@ namespace quda
     setDiracParam(diracParam, &force_ip, true);
     Dirac *dirac = Dirac::create(diracParam);
 
+    // Operators with a site-diagonal term A (clover C, twisted 1 + i2κμγ₅)
+    // require ASYMMETRIC matpc here: with dagger, only the asymmetric PC
+    // kernel path applies the daggered diagonal inverse on the OUTPUT (odd)
+    // parity; the symmetric path fuses the twist into the even input, which
+    // yields the wrong chi_odd below.
+    if (inv_param.dslash_type != QUDA_WILSON_DSLASH && inv_param.matpc_type != QUDA_MATPC_EVEN_EVEN_ASYMMETRIC)
+      errorQuda("EO fermion force requires QUDA_MATPC_EVEN_EVEN_ASYMMETRIC for dslash type %d (got matpc %d)",
+                inv_param.dslash_type, inv_param.matpc_type);
+
     // --- Common fields: y = M̂x, psi_odd, chi_odd ---
     ColorSpinorField y_even = createParityField(x_even);
     dirac->M(y_even, x_even);
 
+    // psi_odd = A(+μ)_oo⁻¹ D_oe x
     ColorSpinorField psi_odd = createParityField(x_even);
     dirac->Dslash(psi_odd, x_even, QUDA_ODD_PARITY);
 
-    ColorSpinorField g5y = createParityField(x_even);
-    gamma5(g5y, y_even);
-    ColorSpinorField tmp = createParityField(x_even);
-    dirac->Dslash(tmp, g5y, QUDA_ODD_PARITY);
+    // chi_odd = A(-μ)_oo⁻¹ D_eo† y, built dagger-explicitly. This replaces
+    // the earlier γ₅·Dslash(γ₅y) sandwich, which is only correct when
+    // A† = A: the twisted term commutes with γ₅ but Ã(μ)† = Ã(-μ), so the
+    // sandwich fails to flip the twist sign. The PC Dslash under
+    // (dagger, asymmetric matpc) applies the daggered diagonal inverse on
+    // the output parity for Wilson (trivially), clover (C† = C), twisted
+    // mass and twisted clover (μ → -μ flipped inside the kernels).
     ColorSpinorField chi_odd = createParityField(x_even);
-    gamma5(chi_odd, tmp);
+    dirac->Dagger(QUDA_DAG_YES);
+    dirac->Dslash(chi_odd, y_even, QUDA_ODD_PARITY);
+    dirac->Dagger(QUDA_DAG_NO);
 
     // Hopping fields (Schwinger reconstruction, same as Wilson)
     ColorSpinorField psi_full = createFullField(x_even);
@@ -528,9 +564,71 @@ namespace quda
     chi_full[QUDA_EVEN_PARITY] = y_even;
     chi_full[QUDA_ODD_PARITY] = chi_odd;
 
-    // --- Hopping force: coeff = 2κ² (verified for Wilson) ---
+    // --- Hopping force: coeff = 2κ² ---
+    // QUDA momentum convention: with T = momAction = ¼Σ_a p_a² (Gell-Mann
+    // components p_a of the stored anti-Hermitian momentum) and the MD flow
+    // U' = exp(dt·P)U, conservation of H = T + S requires the stored force
+    // to be F_a = -2·∂S/∂u_a — twice the naive generator gradient. The
+    // production gauge force obeys the same convention (dS/dε = -2T in
+    // HMC.GaugeForceActionConsistency solves to p_a = -2 ∂S/∂u_a).
+    // Empirically (full-lattice 8192-component per-link sweep) coeff κ²
+    // yields stored F_a = -∂S/∂u_a exactly, hence 2κ² here. The dynamical
+    // arbiter is HMC.dHScaling: with κ² dH plateaus (dt⁰ — non-symplectic);
+    // with 2κ² it scales as dt².
     GaugeField force = createForceField(mom);
     computeCloverOprod(force, *gaugePrecise, {chi_full}, {psi_full}, {2.0 * kappa2});
+
+    // --- Clover sigma force (T1 even diagonal + T3 odd clover-inverse) ---
+    // With C = 1 + c Σ_{μ>ν} σ(ν,μ) F_μν (the operator DiracClover applies,
+    // c = csw·κ = cloverPrecise->Coeff()) and δS = -2Re[y†δM̂x]:
+    //   T1 (even): δS ⊃ -2 Re[y† δC x]
+    //   T3 (odd):  δS ⊃ -2κ² Re[χ_odd† δC ψ_odd]   (+κ² from the two minus
+    //              signs in δ(C⁻¹) = -C⁻¹ δC C⁻¹ against -κ² D C⁻¹ D)
+    // The odd fields are exactly the hopping fields ψ_odd = C⁻¹D_oe x,
+    // χ_odd = C⁻¹D_eo†y, so the same full-site fields serve both terms with
+    // parity coefficient ratio ε_odd/ε_even = κ². computeCloverSigmaOprod
+    // supplies the (Q - Q†) antisymmetrization; cloverDerivative inserts the
+    // oprod into all eight leaf corners of dQ/dU with external coefficient
+    // c/8 (the 1/8 from the F_μν = (Q - Q†)/8 storage convention). ε = {1, κ²}
+    // yields F_a = -∂S_σ/∂u_a; the overall 2 (ε = {2, 2κ²}) matches the
+    // hopping coefficient's F = -2·∂S convention above. Full factor
+    // accounting is cross-checked against computeCloverForceQuda's
+    // coefficient ratios.
+    if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      if (!cloverPrecise) errorQuda("No resident clover field for clover sigma force");
+
+      GaugeFieldParam oParam(force);
+      oParam.geometry = QUDA_TENSOR_GEOMETRY;
+      oParam.create = QUDA_ZERO_FIELD_CREATE;
+      GaugeField oprod(oParam);
+
+      // TrLog force first: the trace kernel ASSIGNS its parity plane (the
+      // sigma oprod below accumulates). Action term S ⊃ -2 TrLog[C_oo]
+      // (clover) or -TrLog[(C² + μ̃²)_oo] (twisted clover); in both cases
+      // δS = -2 Tr[W δC] with W = C⁻¹ resp. C(C² + μ̃²)⁻¹. The coefficient
+      // composes to 2.0 under F_a = -∂S/∂u_a — doubled to 4.0 for the
+      // F_a = -2·∂S/∂u_a momentum convention (same ×2 as the hopping and
+      // sigma coefficients).
+      //
+      // Kernel normalization (clover_trace.cuh, branch selected from the
+      // clover field's TwistFlavor): the untwisted branch restores the ×2
+      // QUDA storage factor and yields exactly W = C⁻¹. The twist branch
+      // multiplies the UNRESTORED stored field (C/2) by an explicit 0.5,
+      // so it yields ¼·W — a fixed normalization inherited by production
+      // callers (computeTMCloverForceQuda compensates in its own
+      // coefficients, so the kernel cannot be changed without breaking
+      // upstream). Compensate here: 4.0 × 4 = 16.0 for twisted clover.
+      const bool tc = (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
+      computeCloverSigmaTrace(oprod, *cloverPrecise, tc ? 16.0 : 4.0, QUDA_ODD_PARITY);
+
+      computeCloverSigmaOprod(oprod, {psi_full}, {chi_full}, {{2.0, 2.0 * kappa2}});
+
+      lat_dim_t R;
+      for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * commDimPartitioned(d);
+      GaugeField *gaugeEx = createExtendedGauge(*gaugePrecise, R, getProfile());
+      cloverDerivative(force, *gaugeEx, oprod, cloverPrecise->Coeff() / 8.0);
+      delete gaugeEx;
+    }
 
     // Momentum update: p += dt × TA(force)
     updateMomentum(mom, dt, force, "eo_fermion");

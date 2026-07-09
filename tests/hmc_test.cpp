@@ -53,9 +53,8 @@ namespace quda
 extern quda::GaugeField *gaugePrecise;
 extern quda::GaugeField *gaugeSloppy;
 extern quda::GaugeField *gaugePrecondition;
-extern quda::CloverField *cloverPrecise;
-extern quda::GaugeField *gaugeSloppy;
-extern quda::GaugeField *gaugePrecondition;
+extern quda::GaugeField *gaugeRefinement;
+extern quda::GaugeField *gaugeEigensolver;
 extern quda::GaugeField momResident;
 extern quda::CloverField *cloverPrecise;
 #include "momentum_utils.h"
@@ -86,11 +85,12 @@ void initHMCTest(int argc, char **argv)
   setInvertParam(inv_param);
   inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-  // Asymmetric PC for clover (needed for clover force), symmetric for Wilson
-  inv_param.matpc_type
-    = (dslash_type == QUDA_CLOVER_WILSON_DSLASH) ? QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : QUDA_MATPC_EVEN_EVEN;
+  // Asymmetric PC wherever the action has a site-diagonal term whose force
+  // derivation needs the A_oo^-1 insertion (clover, twisted, twisted-clover);
+  // symmetric for plain Wilson.
+  inv_param.matpc_type = (dslash_type == QUDA_WILSON_DSLASH) ? QUDA_MATPC_EVEN_EVEN : QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   // Set clover coefficients based on dslash type (from --dslash-type CLI option)
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_csw = clover_csw; // from --clover-csw CLI (default 1.0)
     inv_param.clover_coeff = inv_param.clover_csw * inv_param.kappa;
   } else {
@@ -429,7 +429,7 @@ TEST(HMC, MGPreconditionedRun)
   // field loaded here matches the precision at which MG sees the gauge —
   // otherwise calculateY() and the Wilson-clover preconditioned arg packer
   // will hit "Precisions 4 8 do not match" errors.
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
     inv_param.clover_cuda_prec = inv_param.cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = inv_param.cuda_prec_precondition;
@@ -524,7 +524,7 @@ TEST(HMC, DirectionalForceTest)
 
   printfQuda("\n=== Directional fermion force test (eps=%e) ===\n", eps);
 
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
     loadCloverQuda(nullptr, nullptr, &inv_param);
   }
 
@@ -564,15 +564,32 @@ TEST(HMC, DirectionalForceTest)
   gfParam.create = QUDA_NULL_FIELD_CREATE;
   GaugeField u_out(gfParam);
   updateGaugeField(u_out, eps, *gaugePrecise, momResident, false, true);
-  gaugePrecise->copy(u_out);
 
-  if (cloverPrecise) loadCloverQuda(nullptr, nullptr, &inv_param);
+  // Round-trip the perturbed gauge through loadGaugeQuda rather than a bare
+  // device copy: createCloverQuda computes the clover from the cached
+  // extendedGaugeResident, which only loadGaugeQuda invalidates. A device
+  // copy into gaugePrecise (even followed by freeCloverQuda +
+  // loadCloverQuda) rebuilds the clover from the STALE extended gauge, so
+  // the numerical action would silently miss the entire dA/dU response.
+  auto reloadGauge = [&](GaugeField &src) {
+    gaugePrecise->copy(src);
+    gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
+    auto saved_order = gauge_param.gauge_order;
+    gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    saveGaugeQuda(hostGauge, &gauge_param);
+    gauge_param.use_resident_gauge = 0;
+    gauge_param.make_resident_gauge = 1;
+    loadGaugeQuda(hostGauge, &gauge_param);
+    gauge_param.use_resident_gauge = 1;
+    gauge_param.gauge_order = saved_order;
+    if (cloverPrecise) loadCloverQuda(nullptr, nullptr, &inv_param);
+  };
+  reloadGauge(u_out);
 
   double Sf1 = computeEOFermionAction(phi, inv_param);
 
   // Restore
-  gaugePrecise->copy(gaugeSaved);
-  if (cloverPrecise) loadCloverQuda(nullptr, nullptr, &inv_param);
+  reloadGauge(gaugeSaved);
 
   double dSf_deps = (Sf1 - Sf0) / eps;
 
@@ -645,7 +662,7 @@ TEST(HMC, PerLinkForceTest)
   const double saved_tol = inv_param.tol;
   inv_param.tol = 1e-10;
 
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
     loadCloverQuda(nullptr, nullptr, &inv_param);
   }
 
@@ -704,8 +721,12 @@ TEST(HMC, PerLinkForceTest)
   int nPass = 0, nFail = 0;
 
   for (int link = 0; link < nTestLinks; link++) {
+    // Decouple direction from site: site advances once per 4 links so every
+    // site is eventually tested in all four directions ((37*link+13) % V with
+    // mu = link % 4 is commensurate for V divisible by 4 — each site would
+    // only ever be paired with one fixed mu, leaving 3/4 of links unreachable).
     int mu = link % 4;
-    int site = (link * 37 + 13) % V;
+    int site = ((link / 4) * 37 + 13) % V;
     int x_coords[4];
     x_coords[3] = site / (gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2]);
     int rem = site % (gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2]);
@@ -742,15 +763,20 @@ TEST(HMC, PerLinkForceTest)
     for (int a = 0; a < 8; a++) {
       // Extract analytical force component: p^a = 2 Re Tr((iT^a)^dag P)
       // (iT^a)^dag = -iT^a (anti-hermitian), so p^a = -2 Re Tr(iT^a P)
-      // The momentum stores P = dt * coeff * TA(force) where coeff includes a factor
-      // of 2 from the gauge update convention (exp(dt*P)*U with H_kin = -1/2 Tr(P^2)).
-      // To compare with -dS/dU, divide by 2: F_analytical = p^a / 2.
+      // QUDA momentum convention: with T = momAction = (1/4) sum_a p_a^2 and
+      // the MD flow U' = exp(dt*P)U, conservation of H = T + S requires the
+      // stored force to satisfy p_a = -2 dS/du_a (the production gauge force
+      // obeys the same convention — GaugeForceActionConsistency's -2T
+      // expectation solves to exactly this). Hence divide by 2 to compare
+      // against the numerical -dS/du_a. The dynamical cross-check is
+      // HMC.dHScaling: a force stored as -dS/du_a (no factor 2) makes dH
+      // plateau at dt^0 instead of scaling as dt^2.
       std::complex<double> trace(0, 0);
       for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
           trace += iT[a][j][i] * P[i][j]; // Tr(iT^a P) = sum_ij (iT^a)_ji P_ij
       double p_a = -2.0 * trace.real();
-      double F_analytical = p_a / 2.0; // divide by 2 for gauge update convention
+      double F_analytical = p_a / 2.0;
 
       // Compute numerical derivative
       std::complex<double> U_plus[3][3], U_minus[3][3];
@@ -774,7 +800,7 @@ TEST(HMC, PerLinkForceTest)
       gauge_param.use_resident_gauge = 0;
       gauge_param.make_resident_gauge = 1;
       loadGaugeQuda(hostGauge, &gauge_param);
-      if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
         freeCloverQuda(); // force fresh clover+TrLog recomputation
         loadCloverQuda(nullptr, nullptr, &inv_param);
       }
@@ -787,7 +813,7 @@ TEST(HMC, PerLinkForceTest)
           linkData[2*(3*i+j)+1] = U_minus[i][j].imag();
         }
       loadGaugeQuda(hostGauge, &gauge_param);
-      if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
         freeCloverQuda();
         loadCloverQuda(nullptr, nullptr, &inv_param);
       }
@@ -817,10 +843,11 @@ TEST(HMC, PerLinkForceTest)
 
   // Restore original gauge and clover
   gaugePrecise->copy(gaugeSaved);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   for (int i = 0; i < 3; i++) // restore hostGauge from gaugeSaved
     for (int j = 0; j < 3; j++) {}
   loadGaugeQuda(hostGauge, &gauge_param);
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
     freeCloverQuda();
     loadCloverQuda(nullptr, nullptr, &inv_param);
   }
@@ -920,11 +947,13 @@ TEST(HMC, GaugeForceActionConsistency)
   GaugeField u_out(gfParam);
   updateGaugeField(u_out, eps, *gaugePrecise, momResident, false, true);
   gaugePrecise->copy(u_out);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
 
   double Sg1 = computeGaugeActionHMC(hmc_beta);
 
   // Restore
   gaugePrecise->copy(gaugeSaved);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
 
   double dSg_deps = (Sg1 - Sg0) / eps;
   double dSg_expected = -2.0 * T_physical;
@@ -947,6 +976,64 @@ TEST(HMC, GaugeForceActionConsistency)
   delete[] path_coeff;
 
   momResident = GaugeField();
+}
+
+/**
+ * Test: Heatbath/action adjointness identity.
+ *
+ * For the pseudofermion action S_f = φ†(M̂†M̂)⁻¹φ, the heatbath must sample
+ * φ = M̂†η with Gaussian η, so that S_f = ‖η‖² holds exactly per
+ * configuration (φ = M̂η instead gives S_f = ‖M̂⁻†M̂η‖², which differs
+ * whenever M̂ is non-normal). Unlike dH or reversibility tests — which hold
+ * φ fixed and therefore cannot see a mis-sampled distribution — this
+ * identity directly probes the heatbath. The TrLog term is excluded on both
+ * sides (computeEOFermionAction is the pure bilinear), so the identity is
+ * exact for every action type including clover and twisted variants.
+ */
+TEST(HMC, HeatbathActionIdentity)
+{
+  using namespace quda;
+
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
+
+  // Tighten the solver tolerance: the identity is exact, so the only error
+  // floor is the residual of the (M̂†M̂)⁻¹ solve inside the action.
+  const double saved_tol = inv_param.tol;
+  inv_param.tol = 1e-10;
+
+  const unsigned long long seed = 424242ULL;
+  ColorSpinorField phi = generateEOPseudofermion(inv_param, seed);
+
+  // Regenerate the same Gaussian noise η (same seed, same field metadata)
+  // to obtain ‖η‖² independently of the heatbath implementation.
+  ColorSpinorParam csParam(phi);
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  ColorSpinorField eta(csParam);
+  spinorNoise(eta, seed, QUDA_NOISE_GAUSS);
+  double eta2 = blas::norm2(eta);
+
+  double sf = computeEOFermionAction(phi, inv_param);
+
+  // The identity is exact for the BILINEAR part only: computeEOFermionAction
+  // includes the -2 TrLog[C_oo] determinant term for clover, which the
+  // pseudofermion heatbath does not sample. Add it back before comparing.
+  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH && cloverPrecise) {
+    sf += 2.0 * cloverPrecise->TrLog()[1];
+  } else if (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH && cloverPrecise) {
+    sf += cloverPrecise->TrLog()[1]; // twisted TrLog holds both flavor factors
+  }
+  double ratio = sf / eta2;
+
+  printfQuda("\n=== Heatbath/action identity test ===\n");
+  printfQuda("  S_f(bilin) = %.15e\n", sf);
+  printfQuda("  |eta|^2    = %.15e\n", eta2);
+  printfQuda("  ratio      = %.10f  (should be 1.0)\n", ratio);
+
+  EXPECT_NEAR(ratio, 1.0, 1e-6) << "Heatbath does not sample the pseudofermion action: phi must be M^dag eta";
+
+  inv_param.tol = saved_tol;
 }
 
 /**
@@ -978,6 +1065,7 @@ TEST(HMC, dHStatistics)
     // Restore starting gauge each iteration so we sample fresh momenta from
     // the same configuration, not from a drifting Markov chain.
     gaugePrecise->copy(gaugeU0);
+    gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
     if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
     if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
       gaugePrecondition->copy(*gaugePrecise);
@@ -1009,6 +1097,7 @@ TEST(HMC, dHStatistics)
 
   // Restore
   gaugePrecise->copy(gaugeU0);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   destroyHMCQuda();
 
   // Loose-but-real bound: ⟨exp(-dH)⟩ within 50% of 1 means no order-unity bias.
@@ -1063,6 +1152,7 @@ TEST(HMC, dHScaling)
     double dt = tau / n;
 
     gaugePrecise->copy(gaugeU0);
+    gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
     if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
     if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
       gaugePrecondition->copy(*gaugePrecise);
@@ -1093,6 +1183,7 @@ TEST(HMC, dHScaling)
   printfQuda("  fitted exponent p = %.3f  (expected %.1f for %s)\n", p_fit, expected_p, iname);
 
   gaugePrecise->copy(gaugeU0);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   destroyHMCQuda();
 
   // Loose bound: scaling within ±0.5 of expected. Plateau (force-action
@@ -1146,7 +1237,7 @@ TEST(HMC, dHScalingNestedFGI)
   mg_ip.clover_cuda_prec_precondition = prec_precondition;
   mg_ip.clover_cuda_prec_eigensolver = prec_precondition;
   configureHMCTestMG(mg_param, mg_ip, prec_precondition);
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(nullptr, nullptr, &inv_param);
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) loadCloverQuda(nullptr, nullptr, &inv_param);
   void *mg_prec = newMultigridQuda(&mg_param);
 
   // Outer inverter: plain CG, no MG preconditioner on the outer (MG is
@@ -1164,6 +1255,7 @@ TEST(HMC, dHScalingNestedFGI)
     double dt = tau / n;
 
     gaugePrecise->copy(gaugeU0);
+    gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
     if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
     if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
       gaugePrecondition->copy(*gaugePrecise);
@@ -1203,6 +1295,7 @@ TEST(HMC, dHScalingNestedFGI)
   inv_param = saved_ip;
   destroyMultigridQuda(mg_prec);
   gaugePrecise->copy(gaugeU0);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   destroyHMCQuda();
 
   // Inner leapfrog/Omelyan limits the overall convergence to 2nd order.
@@ -1357,6 +1450,7 @@ TEST(HMC, ReversibilityAllIntegrators)
 
     // Reset gauge to U_0 before this integrator's trial.
     gaugePrecise->copy(gaugeU0);
+    gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
     if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
     if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
       gaugePrecondition->copy(*gaugePrecise);
@@ -1386,7 +1480,7 @@ TEST(HMC, ReversibilityAllIntegrators)
       mg_ip.clover_cuda_prec_precondition = prec_precondition;
       mg_ip.clover_cuda_prec_eigensolver = prec_precondition;
       configureHMCTestMG(mg_param, mg_ip, prec_precondition);
-      if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(nullptr, nullptr, &inv_param);
+      if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) loadCloverQuda(nullptr, nullptr, &inv_param);
       mg_prec = newMultigridQuda(&mg_param);
     }
 
@@ -1449,6 +1543,7 @@ TEST(HMC, ReversibilityAllIntegrators)
 
   // Final reset: restore starting gauge and free any persistent HMC state.
   gaugePrecise->copy(gaugeU0);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   destroyHMCQuda();
 
   printfQuda("\n=== Reversibility summary: %d/%d integrators passed ===\n", n_pass, n_total);
@@ -1558,7 +1653,7 @@ TEST(EigenTracking, PoolInitAndCompress)
 {
   using namespace quda;
 
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
 
   QudaInvertParam ip = inv_param;
   Dirac *dirac = nullptr;
@@ -1617,7 +1712,7 @@ TEST(EigenTracking, ForceUpdate)
 {
   using namespace quda;
 
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
 
   QudaInvertParam ip = inv_param;
   Dirac *dirac = nullptr;
@@ -1665,6 +1760,7 @@ TEST(EigenTracking, ForceUpdate)
   GaugeField u_out(gfParam);
   updateGaugeField(u_out, eps, *gaugePrecise, randMom, false, true);
   gaugePrecise->copy(u_out);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
   if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
     gaugePrecondition->copy(*gaugePrecise);
@@ -1687,6 +1783,7 @@ TEST(EigenTracking, ForceUpdate)
 
   // Restore gauge
   gaugePrecise->copy(gaugeSaved);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
   if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
     gaugePrecondition->copy(*gaugePrecise);
@@ -1700,7 +1797,7 @@ TEST(EigenTracking, RayleighRitzEvolve)
 {
   using namespace quda;
 
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
 
   QudaInvertParam ip = inv_param;
   Dirac *dirac = nullptr;
@@ -1750,6 +1847,7 @@ TEST(EigenTracking, RayleighRitzEvolve)
     GaugeField u_out(gfParam);
     updateGaugeField(u_out, eps, *gaugePrecise, randMom, false, true);
     gaugePrecise->copy(u_out);
+    gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
     if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
     if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
       gaugePrecondition->copy(*gaugePrecise);
@@ -1772,6 +1870,7 @@ TEST(EigenTracking, RayleighRitzEvolve)
 
   // Restore gauge
   gaugePrecise->copy(gaugeSaved);
+  gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
   if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
   if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
     gaugePrecondition->copy(*gaugePrecise);
@@ -1825,7 +1924,7 @@ TEST(EigenTracking, CGRitzExtraction)
 {
   using namespace quda;
 
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
 
   QudaInvertParam ip = inv_param;
   ip.solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -2005,7 +2104,7 @@ TEST(HMC, Production)
     }
 
     // For Wilson with anisotropy, skip clover. For clover, load it.
-    if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
       loadCloverQuda(nullptr, nullptr, &inv_param);
     }
 
@@ -2372,7 +2471,7 @@ TEST(HMC, EigenTrackerCapEnrichesPool)
   using namespace quda;
 
   // Force MG-aligned clover precisions if needed (same as MGPreconditionedRun).
-  if (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
     inv_param.clover_cuda_prec = inv_param.cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = inv_param.cuda_prec_precondition;

@@ -1686,6 +1686,72 @@ if(QUDA_DIRAC_CLOVER)
     --gtest_filter=HMC.PerLinkForceTest
     --gtest_output=xml:hmc_per_link_force.xml)
 
+  add_test(NAME hmc_heatbath_identity
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC}
+    --gtest_filter=HMC.HeatbathActionIdentity
+    --gtest_output=xml:hmc_heatbath_identity.xml)
+
+  # --- Per-action force/heatbath oracles ---
+  # Each action runs the same three oracles: per-link (force vs numerical
+  # dS/dU, the sharpest static test), directional (global consistency with
+  # momAction), and the exact heatbath identity. Degenerate-limit entries
+  # (mu -> 0, csw -> 0) are the cheapest structural cross-action regressions.
+  set(HMC_CLOVER_PREC --dslash-type clover --compute-clover true --clover-csw 1.0 --mass 0.5
+                      --prec double --prec-sloppy double --prec-precondition double)
+  set(HMC_ORACLES --gtest_filter=HMC.DirectionalForceTest:HMC.PerLinkForceTest:HMC.HeatbathActionIdentity)
+
+  add_test(NAME hmc_force_oracles_clover
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_CLOVER_PREC} ${HMC_ORACLES}
+    --gtest_output=xml:hmc_force_oracles_clover.xml)
+
+  if(QUDA_DIRAC_TWISTED_MASS)
+    set(HMC_TM_PREC --dslash-type twisted-mass --mu 0.1 --flavor singlet --mass 0.5
+                    --prec double --prec-sloppy double --prec-precondition double)
+
+    add_test(NAME hmc_force_oracles_twisted_mass
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} ${HMC_TM_PREC} ${HMC_ORACLES}
+      --gtest_output=xml:hmc_force_oracles_twisted_mass.xml)
+
+    # mu -> 0 must reproduce the Wilson force (twist-dagger structural check)
+    add_test(NAME hmc_per_link_force_tm_mu0
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} --dslash-type twisted-mass --mu 1e-10 --flavor singlet --mass 0.5
+      --prec double --prec-sloppy double --prec-precondition double
+      --gtest_filter=HMC.PerLinkForceTest
+      --gtest_output=xml:hmc_per_link_force_tm_mu0.xml)
+  endif()
+
+  if(QUDA_DIRAC_TWISTED_CLOVER)
+    set(HMC_TMC_PREC --dslash-type twisted-clover --mu 0.1 --flavor singlet
+                     --compute-clover true --clover-csw 1.0 --mass 0.5
+                     --prec double --prec-sloppy double --prec-precondition double)
+
+    add_test(NAME hmc_force_oracles_twisted_clover
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} ${HMC_TMC_PREC} ${HMC_ORACLES}
+      --gtest_output=xml:hmc_force_oracles_twisted_clover.xml)
+
+    # mu -> 0 must reproduce clover; csw -> 0 must reproduce twisted mass
+    add_test(NAME hmc_per_link_force_tmc_mu0
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} --dslash-type twisted-clover --mu 1e-10 --flavor singlet
+      --compute-clover true --clover-csw 1.0 --mass 0.5
+      --prec double --prec-sloppy double --prec-precondition double
+      --gtest_filter=HMC.PerLinkForceTest
+      --gtest_output=xml:hmc_per_link_force_tmc_mu0.xml)
+
+    add_test(NAME hmc_per_link_force_tmc_csw0
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} --dslash-type twisted-clover --mu 0.1 --flavor singlet
+      --compute-clover true --clover-csw 1e-8 --mass 0.5
+      --prec double --prec-sloppy double --prec-precondition double
+      --gtest_filter=HMC.PerLinkForceTest
+      --gtest_output=xml:hmc_per_link_force_tmc_csw0.xml)
+  endif()
+
   # --- Multi-trajectory driver ---
   add_test(NAME hmc_multi_trajectory_run
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}

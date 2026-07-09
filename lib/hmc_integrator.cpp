@@ -471,6 +471,12 @@ namespace quda
     updateGaugeField(u_out, dt, *gaugePrecise, momResident, false, true);
 
     gaugePrecise->copy(u_out);
+    // Refresh the ghost pads: copy() updates only the local volume, but
+    // gaugePrecise is a GHOST_EXCHANGE_PAD field whose pads loadGaugeQuda
+    // filled from the ORIGINAL gauge. Stale pads make the Dirac operator a
+    // mongrel of evolved bulk + initial-gauge boundary, i.e. a non-gradient
+    // force that grows along the trajectory (dt-independent dH plateau).
+    gaugePrecise->exchangeGhost();
     syncGaugeHierarchyFromPrecise();
 
     // Rebuild extended gauge (handles ghost exchange internally)
@@ -478,7 +484,14 @@ namespace quda
     updateExtendedGaugeResident(true, R, getProfile());
 
     // Rebuild clover from updated gauge if this is a Wilson-clover action.
-    if (cloverPrecise && inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    // loadCloverQuda alone would no-op here: its recompute trigger is a
+    // parameter change or the invalidate_clover flag (set only by
+    // loadGaugeQuda), neither of which fires after a device-side gauge
+    // update. Free first so the recompute is unconditional; it reads the
+    // extended gauge refreshed above with new_gauge = true.
+    if (cloverPrecise
+        && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+      freeCloverQuda();
       loadCloverQuda(nullptr, nullptr, &inv_param);
     }
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -515,6 +528,12 @@ namespace quda
     GaugeField u_out(gfParam);
     updateGaugeField(u_out, 1.0, *gaugePrecise, momResident, false, true);
     gaugePrecise->copy(u_out);
+    // Refresh the ghost pads: copy() updates only the local volume, but
+    // gaugePrecise is a GHOST_EXCHANGE_PAD field whose pads loadGaugeQuda
+    // filled from the ORIGINAL gauge. Stale pads make the Dirac operator a
+    // mongrel of evolved bulk + initial-gauge boundary, i.e. a non-gradient
+    // force that grows along the trajectory (dt-independent dH plateau).
+    gaugePrecise->exchangeGhost();
     syncGaugeHierarchyFromPrecise();
     // Force-rebuild extended halo at the displaced gauge. Without this,
     // the next kick consumes the pre-displacement halo and the FG
