@@ -321,6 +321,13 @@
 #cmakedefine QUDA_VECTORIZE_SINGLE
 
 /**
+ * @def QUDA_BLAS_PREFETCH_TYPE
+ * @brief BLAS prefetch mode set by CMake (\c QUDA_BLAS_PREFETCH_TYPE): expands to one of
+ * \c QUDA_BLAS_PREFETCH_TYPE_NONE, \c QUDA_BLAS_PREFETCH_TYPE_THREAD, \c QUDA_BLAS_PREFETCH_TYPE_BULK.
+ */
+#define QUDA_BLAS_PREFETCH_TYPE_@QUDA_BLAS_PREFETCH_TYPE@
+
+/**
  * @def QUDA_BUILD_NATIVE_FFT
  * @brief This macro is set by CMake if the native FFT library is used
  */

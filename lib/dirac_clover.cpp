@@ -98,7 +98,7 @@ namespace quda {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
-    real_t a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    real_t a = 2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
     CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
@@ -266,7 +266,7 @@ namespace quda {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
-    real_t a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    real_t a = -2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
     CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 

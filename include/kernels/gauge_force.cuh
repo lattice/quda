@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <byte_array.h>
+#include <packed_array.h>
 #include <kernel.h>
 #include <gauge_path_helper.cuh>
 
@@ -63,7 +63,7 @@ namespace quda {
       // prod: current matrix product
       // accum: accumulator matrix
       Link link_prod, accum;
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
 
       for (int i=0; i<arg.p.num_paths; i++) {
         real coeff = arg.p.path_coeff[i];

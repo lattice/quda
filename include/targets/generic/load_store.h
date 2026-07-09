@@ -1,5 +1,6 @@
 #pragma once
 
+#include <register_traits.h>
 #include <target_device.h>
 #include <tma_helper.hpp>
 

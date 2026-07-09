@@ -1,5 +1,8 @@
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 #include <blas_helper.cuh>
 #include <reducer.h>
 #include <array.h>
@@ -10,6 +13,10 @@ namespace quda
 
   namespace blas
   {
+
+    constexpr bool grid_stride = false;
+
+    constexpr unsigned int blas_unroll = QUDA_BLAS_UNROLL_STREAMING;
 
     /**
        Parameter struct for generic blas kernel
@@ -25,6 +32,7 @@ namespace quda
     struct BlasArg : kernel_param<> {
       using real = real_;
       using Functor = Functor_;
+      static constexpr unsigned int work_item_unroll = blas_unroll;
       static constexpr int n = n_;
       Spinor<store_t, N> X[MAX_MULTI_RHS];
       Spinor<y_store_t, Ny> Y[MAX_MULTI_RHS];
@@ -36,7 +44,7 @@ namespace quda
       const int nParity;
       BlasArg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
               cvector_ref<ColorSpinorField> &w, cvector_ref<ColorSpinorField> &v, Functor f, int length, int nParity) :
-        kernel_param(dim3(length, x.size(), nParity)), f(f), nParity(nParity)
+        kernel_param(dim3(length, x.size(), nParity), grid_stride ? 1u : work_item_unroll), f(f), nParity(nParity)
       {
         for (auto i = 0u; i < x.size(); i++) {
           X[i] = x[i];
@@ -58,26 +66,73 @@ namespace quda
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int i, int src_idx, int parity) const
+      /**
+         @brief Device/host entry point for generic BLAS with optional work-item unroll over the x index.
+
+         \a UnrollCount must be \c std::integral_constant<int, N> (not a bare \c int template parameter) so it cannot
+         collide with other \c operator() template overloads. For \c Kernel3D launches, \a stride is
+         \c gridDim.x * blockDim.x when grid-stride unroll is active, or \c arg.item_stride for non-grid-stride
+         work-item unroll.
+
+         @tparam UnrollCount Compile-time unroll width as \c std::integral_constant<int, N> (\c N >= 1).
+
+         @param[in] i Base x-domain index for this thread.
+         @param[in] src_idx Right-hand-side / vector index within the batch (second kernel dimension).
+         @param[in] parity Parity or site subset index (third kernel dimension).
+         @param[in] stride Spacing between unrolled x indices: \c i + j*stride for \c j in \c [0, N).
+
+         @return None.
+       */
+      template <typename UnrollCount = std::integral_constant<int, 1>>
+      __device__ __host__ inline void operator()(int i, int src_idx, int parity, int stride = 0) const
       {
+        static_assert(std::is_same_v<UnrollCount, std::integral_constant<int, UnrollCount::value>>,
+                      "work-item unroll uses std::integral_constant<int, N> as the template argument");
+        constexpr int n = UnrollCount::value;
+        static_assert(n >= 1, "unroll count must be positive");
+
         using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         arg.f.init(src_idx);
 
-        vec x, y, z, w, v;
-        if (arg.f.read.X) arg.X[src_idx].load(x, i, parity);
-        if (arg.f.read.Y) arg.Y[src_idx].load(y, i, parity);
-        if (arg.f.read.Z) arg.Z[src_idx].load(z, i, parity);
-        if (arg.f.read.W) arg.W[src_idx].load(w, i, parity);
-        if (arg.f.read.V) arg.V[src_idx].load(v, i, parity);
+        vec x[n], y[n], z[n], w[n], v[n];
 
-        arg.f(x, y, z, w, v, src_idx);
+#pragma unroll
+        for (int j = 0; j < n; j++) {
+          if constexpr (Arg::Functor::read.X) arg.X[src_idx].load(x[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.Y) arg.Y[src_idx].load(y[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.Z) arg.Z[src_idx].load(z[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.W) arg.W[src_idx].load(w[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::read.V) arg.V[src_idx].load(v[j], i + j * stride, parity);
+        }
 
-        if (arg.f.write.X) arg.X[src_idx].save(x, i, parity);
-        if (arg.f.write.Y) arg.Y[src_idx].save(y, i, parity);
-        if (arg.f.write.Z) arg.Z[src_idx].save(z, i, parity);
-        if (arg.f.write.W) arg.W[src_idx].save(w, i, parity);
-        if (arg.f.write.V) arg.V[src_idx].save(v, i, parity);
+#pragma unroll
+        for (int j = 0; j < n; j++) arg.f(x[j], y[j], z[j], w[j], v[j], src_idx);
+
+#pragma unroll
+        for (int j = 0; j < n; j++) {
+          if constexpr (Arg::Functor::write.X) arg.X[src_idx].save(x[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.Y) arg.Y[src_idx].save(y[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.Z) arg.Z[src_idx].save(z[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.W) arg.W[src_idx].save(w[j], i + j * stride, parity);
+          if constexpr (Arg::Functor::write.V) arg.V[src_idx].save(v[j], i + j * stride, parity);
+        }
+      }
+
+      __device__ __host__ inline void prefetch(int i, int src_idx, int parity) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          if constexpr (Arg::Functor::read.X)
+            arg.X[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Functor::read.Y)
+            arg.Y[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Functor::read.Z)
+            arg.Z[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Functor::read.W)
+            arg.W[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Functor::read.V)
+            arg.V[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+        }
       }
     };
 

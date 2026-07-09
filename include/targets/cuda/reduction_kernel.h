@@ -1,11 +1,55 @@
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 #include <target_device.h>
 #include <constant_kernel_arg.h>
 #include <reduce_helper.h>
 
 namespace quda
 {
+
+  /**
+     Capability traits for transformer \c prefetch methods. The reduction drivers do not
+     invoke prefetch today; functors may still implement \c prefetch for future wiring.
+   */
+  namespace reduction_prefetch
+  {
+    template <template <typename> class Transformer, typename Arg>
+    inline constexpr bool reduction_functor_prefetch_2d_v = requires(Transformer<Arg> &t) {
+      t.prefetch(0, 0);
+    };
+
+    template <template <typename> class Functor, typename Arg>
+    inline constexpr bool reduction_functor_prefetch_3d_v = requires(Functor<Arg> &t) {
+      t.prefetch(0, 0, 0);
+    };
+  } // namespace reduction_prefetch
+
+  namespace reduction_unroll
+  {
+    template <typename Arg>
+    using work_item_unroll_t = std::integral_constant<int, static_cast<int>(Arg::work_item_unroll)>;
+
+    /**
+       True if Transformer<Arg> supports a single batched grid-stride call with
+       \c std::integral_constant<int, U> and runtime \c (sum, tid, k, src_idx, stride)
+       as in \c Reduce_::operator() (reduce_core.cuh). Reduction2D maps the y thread
+       index to \c k and passes \c src_idx = 0 when there is no batch dimension.
+     */
+    template <template <typename> class Transformer, typename Arg>
+    inline constexpr bool reduction_functor_unroll_2d_v = requires(Transformer<Arg> &t)
+    {
+      t.template operator()<work_item_unroll_t<Arg>>(std::declval<typename Transformer<Arg>::reduce_t &>(), 0, 0, 0, 0);
+    };
+
+    template <template <typename> class Functor, typename Arg>
+    inline constexpr bool reduction_functor_unroll_3d_v = requires(Functor<Arg> &t)
+    {
+      t.template operator()<work_item_unroll_t<Arg>>(std::declval<typename Functor<Arg>::reduce_t &>(), 0, 0, 0, 0);
+    };
+  } // namespace reduction_unroll
 
   /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
@@ -35,11 +79,28 @@ namespace quda
 
     auto value = t.init();
 
+    const auto stride = blockDim.x * gridDim.x;
+    if constexpr (grid_stride) {
+      if constexpr (Arg::work_item_unroll > 1u) {
+        while (idx + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
+          if constexpr (reduction_unroll::reduction_functor_unroll_2d_v<Transformer, Arg>) {
+            value = t.template operator()<reduction_unroll::work_item_unroll_t<Arg>>(value, idx, j, 0, stride);
+            idx += Arg::work_item_unroll * stride;
+          } else {
+#pragma unroll
+            for (unsigned e = 0; e < Arg::work_item_unroll; e++) {
+              value = t(value, idx + e * stride, j);
+            }
+            idx += Arg::work_item_unroll * stride;
+          }
+        }
+      }
+    }
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
-      if (grid_stride)
-        idx += blockDim.x * gridDim.x;
-      else
+      if constexpr (grid_stride) {
+        idx += stride;
+      } else
         break;
     }
 
@@ -157,11 +218,28 @@ namespace quda
 
     auto value = t.init();
 
+    const auto stride = blockDim.x * gridDim.x;
+    if constexpr (grid_stride) {
+      if constexpr (Arg::work_item_unroll > 1u) {
+        while (idx + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
+          if constexpr (reduction_unroll::reduction_functor_unroll_3d_v<Functor, Arg>) {
+            value = t.template operator()<reduction_unroll::work_item_unroll_t<Arg>>(value, idx, k, j, stride);
+            idx += Arg::work_item_unroll * stride;
+          } else {
+#pragma unroll
+            for (unsigned e = 0; e < Arg::work_item_unroll; e++) {
+              value = t(value, idx + e * stride, k, j);
+            }
+            idx += Arg::work_item_unroll * stride;
+          }
+        }
+      }
+    }
     while (idx < arg.threads.x) {
       value = t(value, idx, k, j);
-      if (grid_stride)
-        idx += blockDim.x * gridDim.x;
-      else
+      if constexpr (grid_stride) {
+        idx += stride;
+      } else
         break;
     }
 

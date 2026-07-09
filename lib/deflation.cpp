@@ -13,8 +13,8 @@ namespace quda
   using VectorXc = Matrix<complex_t, Dynamic, 1>;
   using VectorX = Matrix<real_t, Dynamic, 1>;
 
-  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<complex_t*>(pool_pinned_malloc(bytes)); };
-  static auto pinned_deleter   = [] (complex_t *hptr) { pool_pinned_free(hptr); };
+  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<complex_t*>(pool_host_pinned_malloc(bytes)); };
+  static auto pinned_deleter   = [] (complex_t *hptr) { pool_host_pinned_free(hptr); };
 
   Deflation::Deflation(DeflationParam &param, TimeProfile &profile) :
     param(param),
@@ -282,7 +282,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     csParam.is_composite = true;
     csParam.composite_dim = max_n_ev;
 
-    csParam.mem_type = QUDA_MEMORY_MAPPED;
+    csParam.mem_type = QUDA_MEMORY_HOST_PINNED;
     std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
 
     int idx = 0;

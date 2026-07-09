@@ -169,9 +169,9 @@ namespace quda {
         for (int d=0; d<4; d++) {
           E[d] = link.X()[d];
           border[d] = link.R()[d];
-          X[d] = E[d] - 2*border[d];
-          D[d] = comm_dim_partitioned(d) ? X[d]+overlap*2 : int(X[d]);
-          base_idx[d] = comm_dim_partitioned(d) ? border[d]-overlap : 0;
+          X[d] = E[d] - 2 * border[d];
+          D[d] = comm_dim_partitioned(d) ? X[d] + overlap * 2 : int(X[d]);
+          base_idx[d] = comm_dim_partitioned(d) ? border[d] - overlap : 0;
           this->threads.x *= D[d];
         }
         this->threads.x /= 2;

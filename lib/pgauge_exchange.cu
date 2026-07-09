@@ -89,7 +89,7 @@ namespace quda {
           recv_d[d] = device_malloc(bytes[d]);
           sendg_d[d] = device_malloc(bytes[d]);
           recvg_d[d] = device_malloc(bytes[d]);
-          hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
+          hostbuffer_h[d] = (void*)host_pinned_malloc(4 * bytes[d]);
           recv[d] = hostbuffer_h[d];
           send[d] = static_cast<char*>(hostbuffer_h[d]) + bytes[d];
           recvg[d] = static_cast<char*>(hostbuffer_h[d]) + 3 * bytes[d];
@@ -179,7 +179,11 @@ namespace quda {
       launch<unpacker>(tp, stream, arg);
     }
 
-    long long bytes() const override { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
+    long long bytes() const override
+    {
+      return 2LL * U.SurfaceCB(arg.face) * static_cast<long long>(static_cast<int>(U.Reconstruct()))
+             * static_cast<int>(U.Precision());
+    }
   };
 
   void PGaugeExchange(GaugeField& U, const int dir, const int parity)

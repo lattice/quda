@@ -577,8 +577,11 @@ namespace quda {
     } else { // cpu field
       void *send[2 * QUDA_MAX_DIM];
       for (int d = 0; d < nDim; d++) {
-        send[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
-        if (geometry == QUDA_COARSE_GEOMETRY) send[d + 4] = safe_malloc(nFace * surface[d] * nInternal * precision);
+        // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+        // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
+        send[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
+        if (geometry == QUDA_COARSE_GEOMETRY)
+          send[d + 4] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
       }
 
       void *ghost_[2 * QUDA_MAX_DIM];
@@ -696,7 +699,7 @@ namespace quda {
       qudaDeviceSynchronize();
     } else {
       void *recv[QUDA_MAX_DIM];
-      for (int d = 0; d < nDim; d++) recv[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
+      for (int d = 0; d < nDim; d++) recv[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
 
       void *ghost_[] = {ghost[0].data(), ghost[1].data(), ghost[2].data(), ghost[3].data(),
                         ghost[4].data(), ghost[5].data(), ghost[6].data(), ghost[7].data()};
@@ -787,8 +790,8 @@ namespace quda {
       for (int d = 0; d < nDim; d++) {
         if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d]))) continue;
         bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-        send[d] = safe_malloc(2 * bytes[d]);
-        recv[d] = safe_malloc(2 * bytes[d]);
+        send[d] = host_pinned_malloc(2 * bytes[d]);
+        recv[d] = host_pinned_malloc(2 * bytes[d]);
       }
 
       for (int d = 0; d < nDim; d++) {
@@ -1017,7 +1020,7 @@ namespace quda {
         if (reorder_location() == QUDA_CPU_FIELD_LOCATION) {
 
           if (!src.isNative()) errorQuda("Only native order is supported");
-          void *buffer = pool_pinned_malloc(src.Bytes());
+          void *buffer = pool_host_pinned_malloc(src.Bytes());
           qudaMemcpy(buffer, src.data(), src.Bytes(), qudaMemcpyDeviceToHost);
 
           if (GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
@@ -1025,7 +1028,7 @@ namespace quda {
           } else {
             copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale, nullptr, buffer);
           }
-          pool_pinned_free(buffer);
+          pool_host_pinned_free(buffer);
 
         } else { // else reorder on the GPU
 
@@ -1080,7 +1083,7 @@ namespace quda {
         copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, scale);
       } else {
         if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
-          void *buffer = pool_pinned_malloc(bytes);
+          void *buffer = pool_host_pinned_malloc(bytes);
 
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
             // copy field and ghost zone into buffer
@@ -1094,7 +1097,7 @@ namespace quda {
           }
 
           qudaMemcpy(gauge.data(), buffer, bytes, qudaMemcpyDefault);
-          pool_pinned_free(buffer);
+          pool_host_pinned_free(buffer);
         } else { // else on the GPU
 
           if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER || src.Order() == QUDA_BQCD_GAUGE_ORDER
@@ -1235,7 +1238,7 @@ namespace quda {
       errorQuda("Casting a GaugeField into ColorSpinorField not possible in half or quarter precision");
 
     ColorSpinorParam spinor_param;
-    spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;
+    spinor_param.nColor = static_cast<int>(a.Geometry()) * static_cast<int>(a.Reconstruct()) / 2;
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     spinor_param.pc_type = QUDA_4D_PC;

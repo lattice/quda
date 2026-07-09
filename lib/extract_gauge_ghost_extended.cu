@@ -52,7 +52,11 @@ namespace quda {
 
     long long flops() const { return 0; }
     // 2 for i/o, 2 for direction, size/2 for number of active threads
-    long long bytes() const { return 2 * 2 * (size/2) * u.Reconstruct() * u.Precision(); }
+    long long bytes() const
+    {
+      return 2LL * 2 * (size / 2) * static_cast<long long>(static_cast<int>(u.Reconstruct()))
+             * static_cast<int>(u.Precision());
+    }
   };
 
   /** This is the template driver for extractGhost */

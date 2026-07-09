@@ -4,7 +4,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <array.h>
-#include <byte_array.h>
+#include <packed_array.h>
 #include <reduction_kernel.h>
 
 namespace quda
@@ -51,7 +51,7 @@ namespace quda
     // There are 10 unique links to be fetched, with two of the links
     // being common to all three objects.
     double plaq, rect;
-    byte_array<int8_t, 4> dx = {};
+    packed_array<int8_t, 4> dx = {};
 
     // Accumulate the two common links U_mu(x) and U_nu(x) in U1
     Link U1 = arg.U(mu, linkIndexShift(x, dx, arg.E), parity);                          // U_mu(x)

@@ -339,7 +339,8 @@ namespace quda {
     }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd)
+    template <bool allthreads = false>
+    __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd, bool alive = true)
     {
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
@@ -368,11 +369,16 @@ namespace quda {
       typename CoarseDslashParams<Arg>::array_t out {};
 
       if (Arg::dslash) {
-        applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        if (!allthreads || alive) {
+          applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        }
         target::dispatch<dim_collapse>(out, dir, dim, *this);
       }
 
-      if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+      if (!allthreads || alive) {
+        if (doBulk<Arg::type>() && Arg::clover && dir == 0 && dim == 0)
+          applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+      }
 
       if (dir==0 && dim==0) {
         const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -380,13 +386,17 @@ namespace quda {
         // reduce down to the first group of column-split threads
         out = warp_combine<Arg::color_stride>(out);
 
+        if (!allthreads || alive) {
 #pragma unroll
-        for (int color_local=0; color_local<Mc; color_local++) {
-          int c = color_block + color_local; // global color index
-          if (color_offset == 0) {
-            // if not halo we just store, else we accumulate
-            if (doBulk<Arg::type>()) arg.out[src_idx](my_spinor_parity, x_cb, s, c) = out[color_local];
-            else arg.out[src_idx](my_spinor_parity, x_cb, s, c) += out[color_local];
+          for (int color_local = 0; color_local < Mc; color_local++) {
+            int c = color_block + color_local; // global color index
+            if (color_offset == 0) {
+              // if not halo we just store, else we accumulate
+              if (doBulk<Arg::type>())
+                arg.out[src_idx](my_spinor_parity, x_cb, s, c) = out[color_local];
+              else
+                arg.out[src_idx](my_spinor_parity, x_cb, s, c) += out[color_local];
+            }
           }
         }
       }

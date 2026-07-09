@@ -110,7 +110,8 @@ namespace quda
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity)
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity, bool alive = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -121,7 +122,7 @@ namespace quda
         SharedMemoryCache<Vector> cache {*this};
 
         Vector out;
-        cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
+        if (!allthreads || alive) { cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity)); }
         cache.sync();
 
         auto Ls = arg.Ls;
@@ -165,11 +166,13 @@ namespace quda
           }
 
           if (Arg::xpay) { // really axpy
-            Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
-            out = arg.a * x + out;
+            if (!allthreads || alive) {
+              Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+              out = arg.a * x + out;
+            }
           }
         }
-        arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
+        if (!allthreads || alive) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
       }
     };
 
@@ -196,7 +199,8 @@ namespace quda
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity)
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity, bool alive = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -206,7 +210,7 @@ namespace quda
 
         const auto sherman_morrison = arg.sherman_morrison;
         SharedMemoryCache<Vector> cache {*this};
-        cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
+        if (!allthreads || alive) { cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity)); }
         cache.sync();
 
         Vector out;
@@ -233,10 +237,12 @@ namespace quda
           }
         }
         if (Arg::xpay) { // really axpy
-          Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
-          out = x + arg.a * out;
+          if (!allthreads || alive) {
+            Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+            out = x + arg.a * out;
+          }
         }
-        arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
+        if (!allthreads || alive) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
       }
     };
 

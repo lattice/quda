@@ -4,7 +4,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <kernel.h>
-#include <byte_array.h>
+#include <packed_array.h>
 #include <array.h>
 #include <reduce_helper.h>
 #include <reduction_kernel.h>
@@ -67,7 +67,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
 
       auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return value;

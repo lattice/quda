@@ -348,10 +348,10 @@ void exchange_llfat_init(QudaPrecision prec)
 
     size_t packet_size = Vs[i] * gauge_site_size * prec;
 
-    fwd_nbr_staple[i] = pinned_malloc(packet_size);
-    back_nbr_staple[i] = pinned_malloc(packet_size);
-    fwd_nbr_staple_sendbuf[i] = pinned_malloc(packet_size);
-    back_nbr_staple_sendbuf[i] = pinned_malloc(packet_size);
+    fwd_nbr_staple[i] = host_pinned_malloc(packet_size);
+    back_nbr_staple[i] = host_pinned_malloc(packet_size);
+    fwd_nbr_staple_sendbuf[i] = host_pinned_malloc(packet_size);
+    back_nbr_staple_sendbuf[i] = host_pinned_malloc(packet_size);
   }
 }
 
@@ -386,7 +386,7 @@ void exchange_sitelink_diag(lat_dim_t &X, Float **sitelink, Float **ghost_siteli
 
       if (dir1 == 4 || dir2 == 4) { errorQuda("Invalid dir1/dir2"); }
       int len = X[dir1] * X[dir2] * gauge_site_size * sizeof(Float);
-      void *sendbuf = safe_malloc(len);
+      void *sendbuf = host_pinned_malloc(len);
 
       pack_gauge_diag(sendbuf, X, (void **)sitelink, nu, mu, dir1, dir2, (QudaPrecision)sizeof(Float));
 
@@ -471,8 +471,8 @@ void exchange_cpu_sitelink(lat_dim_t &X, void **sitelink, void **ghost_sitelink,
 
   for (int i = 0; i < 4; i++) {
     int nbytes = 4 * Vs[i] * gauge_site_size * gPrecision;
-    sitelink_fwd_sendbuf[i] = safe_malloc(nbytes);
-    sitelink_back_sendbuf[i] = safe_malloc(nbytes);
+    sitelink_fwd_sendbuf[i] = host_pinned_malloc(nbytes);
+    sitelink_back_sendbuf[i] = host_pinned_malloc(nbytes);
     memset(sitelink_fwd_sendbuf[i], 0, nbytes);
     memset(sitelink_back_sendbuf[i], 0, nbytes);
   }
@@ -633,10 +633,10 @@ void exchange_cpu_sitelink_ex(lat_dim_t &X, lat_dim_t &R, void **sitelink, QudaG
 
   for (int i = 0; i < 4; i++) {
     if (!commDimPartitioned(i)) continue;
-    ghost_sitelink_fwd_sendbuf[i] = safe_malloc(len[i]);
-    ghost_sitelink_back_sendbuf[i] = safe_malloc(len[i]);
-    ghost_sitelink_fwd[i] = safe_malloc(len[i]);
-    ghost_sitelink_back[i] = safe_malloc(len[i]);
+    ghost_sitelink_fwd_sendbuf[i] = host_pinned_malloc(len[i]);
+    ghost_sitelink_back_sendbuf[i] = host_pinned_malloc(len[i]);
+    ghost_sitelink_fwd[i] = host_pinned_malloc(len[i]);
+    ghost_sitelink_back[i] = host_pinned_malloc(len[i]);
   }
 
   int gaugebytes = gauge_site_size * gPrecision;
@@ -938,8 +938,8 @@ void exchange_cpu_staple(lat_dim_t &X, void *staple, void **ghost_staple, QudaPr
   void *staple_back_sendbuf[4];
 
   for (int i = 0; i < 4; i++) {
-    staple_fwd_sendbuf[i] = safe_malloc(Vs[i] * gauge_site_size * gPrecision);
-    staple_back_sendbuf[i] = safe_malloc(Vs[i] * gauge_site_size * gPrecision);
+    staple_fwd_sendbuf[i] = host_pinned_malloc(Vs[i] * gauge_site_size * gPrecision);
+    staple_back_sendbuf[i] = host_pinned_malloc(Vs[i] * gauge_site_size * gPrecision);
   }
 
   if (gPrecision == QUDA_DOUBLE_PRECISION) {

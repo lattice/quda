@@ -63,7 +63,7 @@ namespace quda
   template <typename Arg>
   __host__ __device__ inline Matrix<complex<typename Arg::real>, Arg::nColor>
   accumulateStaple(const Arg &arg, const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[],
-                   byte_array<int8_t, 4> &dx, int parity, int2 tensor_arg, int2 shifts)
+                   packed_array<int8_t, 4> &dx, int parity, int2 tensor_arg, int2 shifts)
   {
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     Link staple;
@@ -124,7 +124,7 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, int x[], byte_array<int8_t, 4> &dx, int parity,
+  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
                                                       int mu, Matrix<complex<typename Arg::real>, Arg::nColor> staple[3])
   {
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
@@ -146,7 +146,7 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, int x[], byte_array<int8_t, 4> &dx, int parity,
+  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
                                                       int mu, Matrix<complex<typename Arg::real>, Arg::nColor> staple[3])
   {
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
@@ -181,7 +181,7 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], byte_array<int8_t, 4> &dx, int parity,
+  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
                                                       int mu, Matrix<complex<typename Arg::real>, Arg::nColor> &staple)
   {
 #pragma unroll
@@ -213,7 +213,7 @@ namespace quda
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
 
       Link U, Stap[3], TestU, I;
 
@@ -251,7 +251,7 @@ namespace quda
 
   template <typename Arg>
   __host__ __device__ inline void
-  computeStaple3DLevel1(const Arg &arg, int x[], byte_array<int8_t, 4> &dx, int parity, int mu,
+  computeStaple3DLevel1(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity, int mu,
                         Matrix<complex<typename Arg::real>, Arg::nColor> staple[2], const int dir_ignore)
   {
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
@@ -274,7 +274,7 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], byte_array<int8_t, 4> &dx, int parity,
+  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
                                                         int mu, Matrix<complex<typename Arg::real>, Arg::nColor> &staple,
                                                         int dir_ignore)
   {
@@ -317,7 +317,7 @@ namespace quda
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
 
       int dir_ = dir;
       dir = dir + (dir >= arg.dir_ignore);

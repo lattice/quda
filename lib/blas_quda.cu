@@ -8,7 +8,7 @@ namespace quda {
   namespace blas {
 
     template <template <typename real> class Functor, typename store_t, typename y_store_t, int nSpin, typename coeff_t>
-    class Blas : public TunableGridStrideKernel3D
+    class Blas : public TunableKernel3D_base<grid_stride>
     {
       using real = typename mapper<y_store_t>::type;
       Functor<real> f;
@@ -21,10 +21,44 @@ namespace quda {
       // for these streaming kernels, there is no need to tune the grid size, just use max
       unsigned int minGridSize() const override { return maxGridSize(); }
 
+      /**
+         @brief Minimum x-domain length (in sites) required for one active thread per logical work item.
+
+         Derived from field length, parity count, spin/site unroll, and device vector widths so tuning does not
+         under-provision threads relative to the packed workload.
+
+         @return Minimum \c threads.x for the 3D launch (length along the primary BLAS dimension).
+       */
+      unsigned minThreads() const override
+      {
+        using device_store_t = typename device_type_mapper<store_t>::type;
+        using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+        constexpr bool site_unroll
+          = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
+        constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
+        constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+        return x.Length() / (nParity * M);
+      }
+
     public:
+      /**
+         @brief Construct a tunable single-BLAS launcher, validate fields, extend scalar coeffs, and enqueue the kernel.
+
+         @param[in] a Per-RHS or broadcast coefficients for the x-like combination (type \c coeff_t).
+         @param[in] b Per-RHS or broadcast coefficients for the y-like combination.
+         @param[in] c Per-RHS or broadcast coefficients for the z-like combination.
+         @param[in] x Reference to a vector of X (and matching Z/W) fields.
+         @param[in] y Reference to a vector of Y (and matching V) fields.
+         @param[in] z Reference to a vector of Z fields.
+         @param[in] w Reference to a vector of W fields.
+         @param[in] v Reference to a vector of V fields.
+
+         @return None.
+       */
       template <typename Vx, typename Vy, typename Vz, typename Vw, typename Vv>
       Blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, Vx &x, Vy &y, Vz &z, Vw &w, Vv &v) :
-        TunableGridStrideKernel3D(x[0], x.size(), (x[0].IsComposite() ? x[0].CompositeDim() : 1) * x.SiteSubset()),
+        TunableKernel3D_base<grid_stride>(x[0], x.size(),
+                                          (x[0].IsComposite() ? x[0].CompositeDim() : 1) * x.SiteSubset()),
         f(a, b, c),
         nParity(vector_length_z),
         a(a),
@@ -55,6 +89,11 @@ namespace quda {
           strcat(aux, y.AuxString().c_str());
         }
         setRHSstring(aux, x.size());
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, blas_unroll);
+          if constexpr (grid_stride) { strcat(aux, ",grid_stride"); }
+        }
 
         apply(device::get_default_stream());
       }

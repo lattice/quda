@@ -41,12 +41,13 @@ namespace quda
       Xinv(Xinv)
     {
       if (Arg::compute_max) {
-        arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
+        arg.max_h = static_cast<Float*>(pool_host_pinned_malloc(sizeof(Float)));
         if (location == QUDA_CUDA_FIELD_LOCATION) arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
         arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
       }
 
-      if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
+      if (location == QUDA_CUDA_FIELD_LOCATION)
+        strcat(aux, Y.MemType() == QUDA_MEMORY_HOST_PINNED ? ",GPU-mapped" : ",GPU-device");
       strcat(aux, comm_dim_partitioned_string());
       if constexpr (use_mma) {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -71,7 +72,7 @@ namespace quda
     {
       if (Arg::compute_max) {
         if (location == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
-        pool_pinned_free(arg.max_h);
+        pool_host_pinned_free(arg.max_h);
       }
     }
 
