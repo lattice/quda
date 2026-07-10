@@ -22,7 +22,8 @@ namespace quda
    * the best nRitz Ritz pairs. Much cheaper than a full TRLM because
    * the starting vector already approximates the low-mode subspace.
    */
-  class CGRitzExtractor {
+  class CGRitzExtractor
+  {
   public:
     /**
      * @brief Extract Ritz pairs from a CG solution.
@@ -42,8 +43,8 @@ namespace quda
      */
     static void extract(std::vector<ColorSpinorField> &ritzVecs, std::vector<Complex> &ritzVals,
                         const ColorSpinorField &sol, const DiracMatrix &mat, int nRitz, int nKr = 0,
-                        int maxRestarts = 5, double tol = 1e-4,
-                        bool usePolyAcc = false, int polyDeg = 50, double aMin = 0.0, double aMax = 0.0);
+                        int maxRestarts = 5, double tol = 1e-4, bool usePolyAcc = false, int polyDeg = 50,
+                        double aMin = 0.0, double aMax = 0.0);
   };
 
 } // namespace quda

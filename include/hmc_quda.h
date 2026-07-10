@@ -148,8 +148,7 @@ namespace quda
    * @param tracking   Optional eigentracking state; if non-null and active,
    *                   the normalized solution is stashed for absorption.
    */
-  double computeFermionAction(ColorSpinorField &phi, QudaInvertParam &inv_param,
-                              EigenTrackingState *tracking = nullptr);
+  double computeFermionAction(ColorSpinorField &phi, QudaInvertParam &inv_param, EigenTrackingState *tracking = nullptr);
 
   /**
    * @brief EO fermion force: accumulates dS_eo/dU into momentum.
@@ -164,8 +163,7 @@ namespace quda
    * @param inv_param Inverter parameters (provides kappa, dslash type)
    * @param dt       Integration step size
    */
-  void computeEOFermionForce(GaugeField &mom, ColorSpinorField &x_even,
-                             QudaInvertParam &inv_param, double dt);
+  void computeEOFermionForce(GaugeField &mom, ColorSpinorField &x_even, QudaInvertParam &inv_param, double dt);
 
   /**
    * @brief Seed the eigentracker from MG null-space vectors.

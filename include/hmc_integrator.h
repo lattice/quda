@@ -52,10 +52,8 @@ namespace quda
      * @param mg_instance  Required for QUDA_NESTED_FGI_INTEGRATOR; ignored
      *                     otherwise
      */
-    static Integrator *create(QudaHMCParam &hmc_param, QudaGaugeParam &gauge_param,
-                              QudaInvertParam &inv_param,
-                              EigenTrackingState *tracking = nullptr,
-                              void *mg_instance = nullptr);
+    static Integrator *create(QudaHMCParam &hmc_param, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
+                              EigenTrackingState *tracking = nullptr, void *mg_instance = nullptr);
 
     /**
      * @brief Which integrator this instance implements (for caching and
@@ -268,7 +266,7 @@ namespace quda
    * across trajectories. Caller does not own the returned reference.
    */
   Integrator &getOrCreateIntegrator(QudaHMCParam &hmc_param, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
-                                     EigenTrackingState *tracking, void *mg_instance);
+                                    EigenTrackingState *tracking, void *mg_instance);
 
   /**
    * @brief Pointer to the cached Integrator, or nullptr if none.

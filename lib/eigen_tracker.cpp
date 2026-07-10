@@ -18,8 +18,8 @@ namespace quda
 
   EigenTracker::EigenTracker() : nEv_(0), poolCapacity_(0), initialized_(false) { }
 
-  void EigenTracker::init(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
-                          const DiracMatrix &mat, int nEv, int capacity)
+  void EigenTracker::init(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals, const DiracMatrix &mat,
+                          int nEv, int capacity)
   {
     auto profile = pushProfile(getEigenTrackProfile());
     ScopedComputePhase _scope_;
@@ -155,9 +155,9 @@ namespace quda
       double ortho_tol;
       switch (v.Precision()) {
       case QUDA_DOUBLE_PRECISION: ortho_tol = 1e-12; break;
-      case QUDA_SINGLE_PRECISION: ortho_tol = 1e-6;  break;
-      case QUDA_HALF_PRECISION:   ortho_tol = 1e-3;  break;
-      default:                    ortho_tol = 1e-2;  break; // quarter / unknown
+      case QUDA_SINGLE_PRECISION: ortho_tol = 1e-6; break;
+      case QUDA_HALF_PRECISION: ortho_tol = 1e-3; break;
+      default: ortho_tol = 1e-2; break; // quarter / unknown
       }
       const int max_attempts = 4;
       int poolSz = static_cast<int>(pool_.size());

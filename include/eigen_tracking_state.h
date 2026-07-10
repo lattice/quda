@@ -30,13 +30,13 @@ namespace quda
    * when CLI flags are left at their "0 = derive" sentinel.
    */
   struct EigenTrackingParam {
-    bool enabled = false;          /**< Master enable/disable switch */
-    int nEv = 8;                   /**< Number of tracked eigenpairs */
-    int poolCapacity = 32;         /**< Maximum pool size */
-    int nRitz = 4;                 /**< Ritz pairs to extract per CG solve */
-    int forecastOrder = 1;         /**< Generator forecast order (0/1/2) */
-    int freshTRLMInterval = 10;    /**< Trajectories between fresh TRLM (0=disabled) */
-    int solutionHistoryDepth = 3;  /**< Number of previous solutions to store */
+    bool enabled = false;         /**< Master enable/disable switch */
+    int nEv = 8;                  /**< Number of tracked eigenpairs */
+    int poolCapacity = 32;        /**< Maximum pool size */
+    int nRitz = 4;                /**< Ritz pairs to extract per CG solve */
+    int forecastOrder = 1;        /**< Generator forecast order (0/1/2) */
+    int freshTRLMInterval = 10;   /**< Trajectories between fresh TRLM (0=disabled) */
+    int solutionHistoryDepth = 3; /**< Number of previous solutions to store */
     /** When false, stashRitzVectors becomes a no-op so the pool stays as
      *  the (RR-evolved) original MG null vectors. Mirrors the Schwinger
      *  pattern where MG-null-vector store is kept separate from any
@@ -59,26 +59,26 @@ namespace quda
      *  QudaHMCParam::eigentracking_residual_cap. */
     int residualCap = 0;
     /** Initial TRLM convergence knobs (also used for fresh-TRLM refreshes). */
-    double trlmTol = 1e-6;         /**< TRLM convergence tolerance */
-    int trlmMaxRestarts = 100;     /**< TRLM maximum restarts */
-    int trlmCheckInterval = 10;    /**< TRLM iterations between convergence checks */
+    double trlmTol = 1e-6;      /**< TRLM convergence tolerance */
+    int trlmMaxRestarts = 100;  /**< TRLM maximum restarts */
+    int trlmCheckInterval = 10; /**< TRLM iterations between convergence checks */
     /** Eigensolver to use for the initial / fresh-TRLM solves. Defaults to
      *  standard TRLM. BLKTRLM operates on multiple Lanczos vectors per
      *  step (larger arithmetic intensity per kernel; n_kr and n_ev must be
      *  multiples of blockSize — auto-rounded if not).
      *  Other QudaEigType values flow through unchanged for advanced users. */
     QudaEigType eigType = QUDA_EIG_TR_LANCZOS;
-    int blockSize = 4;             /**< Block size for block solvers (BLKTRLM/BLKIRAM) */
+    int blockSize = 4; /**< Block size for block solvers (BLKTRLM/BLKIRAM) */
     /** @name Initial TRLM polynomial acceleration (Chebyshev filter)
      *  For clustered or near-zero M^dag M spectra (hot-start gauges,
      *  critical-mass runs without MG), Chebyshev acceleration is needed
      *  to resolve the low modes reliably. Set a_min ~1 order of magnitude
      *  above the smallest target eigenvalue; a_max = 0 triggers QUDA's
      *  power-iteration auto-estimate. See QUDA eigensolver wiki. */
-    bool usePolyAcc = false;       /**< Enable Chebyshev acceleration in initial TRLM */
-    int polyDeg = 50;              /**< Chebyshev polynomial degree */
-    double aMin = 0.0;             /**< Lower suppression boundary (must be set when usePolyAcc) */
-    double aMax = 0.0;             /**< Upper boundary; 0 => auto-estimate */
+    bool usePolyAcc = false; /**< Enable Chebyshev acceleration in initial TRLM */
+    int polyDeg = 50;        /**< Chebyshev polynomial degree */
+    double aMin = 0.0;       /**< Lower suppression boundary (must be set when usePolyAcc) */
+    double aMax = 0.0;       /**< Upper boundary; 0 => auto-estimate */
   };
 
   /**
@@ -89,7 +89,8 @@ namespace quda
    * guess extrapolation. Provides clean interface for HMC integrator
    * hooks at the appropriate points in the trajectory.
    */
-  class EigenTrackingState {
+  class EigenTrackingState
+  {
   private:
     EigenTracker tracker_;
     EigenForecast forecast_;
@@ -203,8 +204,8 @@ namespace quda
      */
     bool shouldRefresh() const
     {
-      return tracker_.isInitialized() && param_.freshTRLMInterval > 0
-        && trajectoryCount_ > 0 && trajectoryCount_ % param_.freshTRLMInterval == 0;
+      return tracker_.isInitialized() && param_.freshTRLMInterval > 0 && trajectoryCount_ > 0
+        && trajectoryCount_ % param_.freshTRLMInterval == 0;
     }
 
     /**
@@ -238,7 +239,7 @@ namespace quda
      * @param inv_param Inverter params (cached for potential re-init)
      */
     void seedFromMGNullVectors(std::vector<ColorSpinorField> &evenVecs, const DiracMatrix &matHalf,
-                                QudaInvertParam &inv_param);
+                               QudaInvertParam &inv_param);
 
     /** @brief Access parameters */
     const EigenTrackingParam &getParam() const { return param_; }

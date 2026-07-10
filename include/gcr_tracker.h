@@ -95,11 +95,11 @@ namespace quda
   class GCRTracker
   {
   private:
-    int maxVecs_;                                /**< Cap on stored residuals */
-    QudaPrecision targetPrecision_;              /**< Precision to promote stored residuals to */
-    std::vector<ColorSpinorField> residuals_;    /**< Normalised residuals at targetPrecision_ */
-    int totalIterations_;                        /**< Bookkeeping; total record() calls */
-    bool active_;                                /**< Whether tracking is enabled */
+    int maxVecs_;                             /**< Cap on stored residuals */
+    QudaPrecision targetPrecision_;           /**< Precision to promote stored residuals to */
+    std::vector<ColorSpinorField> residuals_; /**< Normalised residuals at targetPrecision_ */
+    int totalIterations_;                     /**< Bookkeeping; total record() calls */
+    bool active_;                             /**< Whether tracking is enabled */
 
   public:
     /**

@@ -116,9 +116,7 @@ namespace quda
     SelfAdjointEigenSolver<MatrixXcd> eigH(H_pred);
     // R = V diag(exp(i θ)) V†
     VectorXcd expTheta(k_);
-    for (int j = 0; j < k_; j++) {
-      expTheta(j) = std::exp(std::complex<double>(0.0, eigH.eigenvalues()(j)));
-    }
+    for (int j = 0; j < k_; j++) { expTheta(j) = std::exp(std::complex<double>(0.0, eigH.eigenvalues()(j))); }
     MatrixXcd R = eigH.eigenvectors() * expTheta.asDiagonal() * eigH.eigenvectors().adjoint();
 
     // Convert to column-major layout
@@ -130,8 +128,7 @@ namespace quda
     return result;
   }
 
-  void EigenForecast::applyRotation(std::vector<ColorSpinorField> &vecs,
-                                     const std::vector<Complex> &rotation, int k)
+  void EigenForecast::applyRotation(std::vector<ColorSpinorField> &vecs, const std::vector<Complex> &rotation, int k)
   {
     if (k <= 0 || static_cast<int>(rotation.size()) != k * k) return;
     if (static_cast<int>(vecs.size()) < k) return;

@@ -20,8 +20,10 @@ extern quda::GaugeField *gaugePrecise;
 namespace quda
 {
 
-
-  EigenTrackingState::EigenTrackingState() : invParamSet_(false), trajectoryCount_(0), totalRitzAbsorbed_(0), totalCGSolves_(0) { }
+  EigenTrackingState::EigenTrackingState() :
+    invParamSet_(false), trajectoryCount_(0), totalRitzAbsorbed_(0), totalCGSolves_(0)
+  {
+  }
 
   void EigenTrackingState::configure(const EigenTrackingParam &p)
   {
@@ -32,8 +34,7 @@ namespace quda
             p.nEv, p.poolCapacity, p.nRitz, p.forecastOrder, p.freshTRLMInterval, p.solutionHistoryDepth);
   }
 
-  void EigenTrackingState::maybeInit(const DiracMatrix &mat, const DiracMatrix &matHalf,
-                                     QudaInvertParam &inv_param)
+  void EigenTrackingState::maybeInit(const DiracMatrix &mat, const DiracMatrix &matHalf, QudaInvertParam &inv_param)
   {
     // Fast no-op path: don't push the profile or it'd inflate the setup
     // call count with zero-cost re-entries from per-trajectory hooks.
@@ -53,14 +54,13 @@ namespace quda
     // Configure the (block) Lanczos eigensolver. Block variants
     // (BLKTRLM / BLKIRAM) require n_ev and n_kr to be exact multiples of
     // block_size; non-block variants accept block_size=1 transparently.
-    const bool isBlock
-      = (param_.eigType == QUDA_EIG_BLK_TR_LANCZOS) || (param_.eigType == QUDA_EIG_BLK_IR_ARNOLDI);
+    const bool isBlock = (param_.eigType == QUDA_EIG_BLK_TR_LANCZOS) || (param_.eigType == QUDA_EIG_BLK_IR_ARNOLDI);
     int nEvUsed = param_.nEv;
     int blkSize = isBlock ? std::max(1, param_.blockSize) : 1;
     if (isBlock && nEvUsed % blkSize != 0) {
       int rounded = ((nEvUsed + blkSize - 1) / blkSize) * blkSize;
-      logQuda(QUDA_SUMMARIZE, "EigenTrackingState: nEv=%d not divisible by block_size=%d; rounding up to %d\n",
-              nEvUsed, blkSize, rounded);
+      logQuda(QUDA_SUMMARIZE, "EigenTrackingState: nEv=%d not divisible by block_size=%d; rounding up to %d\n", nEvUsed,
+              blkSize, rounded);
       nEvUsed = rounded;
     }
     int nKr = 3 * nEvUsed;
@@ -126,8 +126,8 @@ namespace quda
     logQuda(QUDA_SUMMARIZE, "EigenTrackingState: initialized. Smallest eval = %e\n", evals[0].real());
   }
 
-  void EigenTrackingState::seedFromMGNullVectors(std::vector<ColorSpinorField> &evenVecs,
-                                                   const DiracMatrix &matHalf, QudaInvertParam &inv_param)
+  void EigenTrackingState::seedFromMGNullVectors(std::vector<ColorSpinorField> &evenVecs, const DiracMatrix &matHalf,
+                                                 QudaInvertParam &inv_param)
   {
     // Fast no-op path: don't inflate the setup call count if already seeded.
     if (tracker_.isInitialized()) {

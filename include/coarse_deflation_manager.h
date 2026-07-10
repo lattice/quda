@@ -29,13 +29,14 @@ namespace quda
    *     Cost: k fine matvecs per refresh (k = number of MG null vectors).
    *   Tier 3 (solve): Full TRLM re-eigensolve on the coarse operator.
    */
-  class CoarseDeflationManager {
+  class CoarseDeflationManager
+  {
   private:
     std::vector<ColorSpinorField> coarseEvecs;
     std::vector<Complex> coarseEvals;
 
-    const DiracMatrix *matCoarse;    /**< M wrapper for RR updates */
-    const Dirac *diracCoarse;        /**< Raw Dirac for creating MdagM wrapper */
+    const DiracMatrix *matCoarse; /**< M wrapper for RR updates */
+    const Dirac *diracCoarse;     /**< Raw Dirac for creating MdagM wrapper */
     const Transfer *transfer;
 
     int nDefl;
@@ -52,14 +53,15 @@ namespace quda
      * @brief Construct the deflation manager.
      * @param transfer   Transfer operator (restrict/prolong) from MG level
      * @param matCoarse  Coarse Dirac matrix wrapper from MG
+       @param diracCoarse Coarse Dirac operator used to build the M†M wrapper for TRLM
      * @param nDefl      Number of deflation eigenvectors
      * @param eigTol     TRLM convergence tolerance
      * @param nKr        Krylov space size (default 3*nDefl)
      * @param maxRestarts TRLM max restarts
      * @param refreshInterval Inner steps between Tier 2 refresh (0 = frozen)
      */
-    CoarseDeflationManager(const Transfer &transfer, const DiracMatrix &matCoarse, const Dirac &diracCoarse,
-                           int nDefl, double eigTol, int nKr = 0, int maxRestarts = 100, int refreshInterval = 0);
+    CoarseDeflationManager(const Transfer &transfer, const DiracMatrix &matCoarse, const Dirac &diracCoarse, int nDefl,
+                           double eigTol, int nKr = 0, int maxRestarts = 100, int refreshInterval = 0);
 
     ~CoarseDeflationManager() = default;
 

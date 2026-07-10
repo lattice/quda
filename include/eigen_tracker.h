@@ -26,14 +26,15 @@ namespace quda
    * so that the projected matrix v_i^dag M v_j = Dv_i^dag Dv_j can be
    * computed without any M matvecs (zero-matvec compress).
    */
-  class EigenTracker {
+  class EigenTracker
+  {
   private:
-    std::vector<ColorSpinorField> pool_;   /**< Pool vectors (orthonormal, Ritz-ordered) */
-    std::vector<ColorSpinorField> Dpool_;  /**< D_hat applied to each pool vector */
-    std::vector<Complex> eigvals_;         /**< nEv eigenvalue estimates */
-    int nEv_;                              /**< Number of wanted eigenpairs */
-    int poolCapacity_;                     /**< Maximum pool size */
-    bool initialized_;                     /**< Whether tracker has been seeded */
+    std::vector<ColorSpinorField> pool_;  /**< Pool vectors (orthonormal, Ritz-ordered) */
+    std::vector<ColorSpinorField> Dpool_; /**< D_hat applied to each pool vector */
+    std::vector<Complex> eigvals_;        /**< nEv eigenvalue estimates */
+    int nEv_;                             /**< Number of wanted eigenpairs */
+    int poolCapacity_;                    /**< Maximum pool size */
+    bool initialized_;                    /**< Whether tracker has been seeded */
 
   public:
     EigenTracker();
@@ -52,8 +53,8 @@ namespace quda
      * @param nEv     Number of wanted eigenpairs to track
      * @param capacity Maximum pool size (must be >= nEv)
      */
-    void init(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
-              const DiracMatrix &mat, int nEv, int capacity);
+    void init(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals, const DiracMatrix &mat, int nEv,
+              int capacity);
 
     /**
      * @brief Compress pool via RR projection using cached Dpool.

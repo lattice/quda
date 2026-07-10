@@ -41,14 +41,15 @@ namespace quda
    * After convergence, builds the Lanczos tridiagonal T_m from alpha/beta,
    * eigendecomposes T_m, and reconstructs Ritz vectors v_p = Q_m u_p.
    */
-  class CGTracker {
+  class CGTracker
+  {
   private:
-    int nRitz_;                                  /**< Number of Ritz pairs to extract */
-    int maxLanczos_;                             /**< Max Lanczos vectors to store (3*nRitz) */
-    std::vector<double> alphas_;                 /**< CG alpha coefficients */
-    std::vector<double> betas_;                  /**< CG beta coefficients */
-    std::vector<ColorSpinorField> lanczosVecs_;  /**< Normalized residuals q_k */
-    bool active_;                                /**< Whether tracking is enabled */
+    int nRitz_;                                 /**< Number of Ritz pairs to extract */
+    int maxLanczos_;                            /**< Max Lanczos vectors to store (3*nRitz) */
+    std::vector<double> alphas_;                /**< CG alpha coefficients */
+    std::vector<double> betas_;                 /**< CG beta coefficients */
+    std::vector<ColorSpinorField> lanczosVecs_; /**< Normalized residuals q_k */
+    bool active_;                               /**< Whether tracking is enabled */
 
   public:
     CGTracker(int nRitz = 0, int maxLanczos = 0);

@@ -23,12 +23,13 @@ namespace quda
    * trajectories. Extrapolates H to predict the next rotation, enabling
    * pre-rotation of eigenvectors before RR to improve tracking accuracy.
    */
-  class EigenForecast {
+  class EigenForecast
+  {
   private:
-    int k_;                                      /**< Eigenvector count (matrix dimension) */
-    int forecastOrder_;                           /**< 0=constant, 1=linear, 2=quadratic */
-    static constexpr int maxHistory_ = 3;        /**< Max generators stored (quadratic needs 3) */
-    std::vector<MatrixXcd> generatorHistory_;    /**< Circular buffer of k x k Hermitian generators */
+    int k_;                                   /**< Eigenvector count (matrix dimension) */
+    int forecastOrder_;                       /**< 0=constant, 1=linear, 2=quadratic */
+    static constexpr int maxHistory_ = 3;     /**< Max generators stored (quadratic needs 3) */
+    std::vector<MatrixXcd> generatorHistory_; /**< Circular buffer of k x k Hermitian generators */
 
   public:
     /**
@@ -72,8 +73,7 @@ namespace quda
      * @param rotation k x k matrix in column-major layout
      * @param k        Dimension (number of vectors to rotate, may be <= vecs.size())
      */
-    static void applyRotation(std::vector<ColorSpinorField> &vecs,
-                               const std::vector<Complex> &rotation, int k);
+    static void applyRotation(std::vector<ColorSpinorField> &vecs, const std::vector<Complex> &rotation, int k);
 
     /** @brief Reset history */
     void reset();

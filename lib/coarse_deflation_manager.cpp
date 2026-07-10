@@ -65,8 +65,8 @@ namespace quda
     int nKr = ep.n_kr;
     if (coarseEvecs.empty()) {
       ColorSpinorField V(transfer->Vectors()); // non-const copy for create_coarse
-      auto coarseRef = V.create_coarse(transfer->Geo_bs(), transfer->Spin_bs(), transfer->nvec(),
-                                        V.Precision(), QUDA_CUDA_FIELD_LOCATION);
+      auto coarseRef = V.create_coarse(transfer->Geo_bs(), transfer->Spin_bs(), transfer->nvec(), V.Precision(),
+                                       QUDA_CUDA_FIELD_LOCATION);
       ColorSpinorParam csParam(coarseRef);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       coarseEvecs.resize(nKr, csParam);

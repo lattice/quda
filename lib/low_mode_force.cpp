@@ -22,10 +22,8 @@
 namespace quda
 {
 
-  
-
   LowModeForce::LowModeForce(CoarseDeflationManager &deflManager_, const DiracMatrix &matFine_, int nMRSmooth_,
-                              double mrOmega_) :
+                             double mrOmega_) :
     deflManager(deflManager_), nMRSmooth(nMRSmooth_), mrOmega(mrOmega_), matFine(&matFine_)
   {
   }
@@ -41,7 +39,7 @@ namespace quda
 
     // Lazily allocate coarse workspace fields from the first eigenvector's metadata
     if (coarseTmp.empty()) {
-      ColorSpinorParam csParam{evecs[0]};
+      ColorSpinorParam csParam {evecs[0]};
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       coarseTmp = ColorSpinorField(csParam);
       coarseSol = ColorSpinorField(csParam);
@@ -95,7 +93,7 @@ namespace quda
     if (nMRSmooth > 0) {
       // Lazily allocate fine workspace
       if (fineSol.empty()) {
-        ColorSpinorParam fineParam{xLow};
+        ColorSpinorParam fineParam {xLow};
         fineParam.create = QUDA_ZERO_FIELD_CREATE;
         fineSol = ColorSpinorField(fineParam);
       }
@@ -105,7 +103,7 @@ namespace quda
 
       // Lazily allocate MR workspace
       if (mrResid.empty()) {
-        ColorSpinorParam tmpParam{xLow};
+        ColorSpinorParam tmpParam {xLow};
         tmpParam.create = QUDA_ZERO_FIELD_CREATE;
         mrResid = ColorSpinorField(tmpParam);
         mrAr = ColorSpinorField(tmpParam);
@@ -136,13 +134,13 @@ namespace quda
   }
 
   void LowModeForce::computeForce(GaugeField &mom, const ColorSpinorField &src, double coeff, GaugeField &,
-                                   const CloverField *, QudaGaugeParam &, QudaInvertParam &invParam)
+                                  const CloverField *, QudaGaugeParam &, QudaInvertParam &invParam)
   {
     auto profile = pushProfile(getEigenTrackProfile());
     ScopedComputePhase _scope_;
     // Lazily allocate fine solution workspace
     if (fineSol.empty()) {
-      ColorSpinorParam fineParam{src};
+      ColorSpinorParam fineParam {src};
       fineParam.create = QUDA_ZERO_FIELD_CREATE;
       fineSol = ColorSpinorField(fineParam);
     }

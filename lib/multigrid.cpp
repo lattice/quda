@@ -581,13 +581,13 @@ namespace quda
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
       // Coarse level deflation is triggered if the eig param structure exists
       // on the coarsest level, and we are on the next to coarsest level.
-      logQuda(QUDA_SUMMARIZE, "createCoarseSolver: level=%d, Nlevel=%d, use_eig[%d]=%d, eig_param[%d]=%p\n",
+      logQuda(QUDA_DEBUG_VERBOSE, "createCoarseSolver: level=%d, Nlevel=%d, use_eig[%d]=%d, eig_param[%d]=%p\n",
               param.level, param.Nlevel, param.Nlevel - 1, param.mg_global.use_eig_solver[param.Nlevel - 1],
               param.Nlevel - 1, (void *)param.mg_global.eig_param[param.Nlevel - 1]);
       if (param.mg_global.use_eig_solver[param.Nlevel - 1] && (param.level == param.Nlevel - 2)) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_TRUE;
-        logQuda(QUDA_SUMMARIZE, "createCoarseSolver: DEFLATION ENABLED on coarse solver\n");
+        logQuda(QUDA_DEBUG_VERBOSE, "createCoarseSolver: DEFLATION ENABLED on coarse solver\n");
         // Due to coherence between these levels, an initial guess
         // might be beneficial.
         if (param.mg_global.coarse_guess == QUDA_BOOLEAN_TRUE) {

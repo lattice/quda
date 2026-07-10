@@ -1681,24 +1681,24 @@ public:
  */
  void joinInvertParam(QudaInvertParam &out, const QudaInvertParam &in, const CommKey &comm_key, int split_rank);
 
-  /**
-   * @brief Internal device-side solver entry point.
-   *
-   * Runs a Solver on device-resident fields, honouring the solve_type /
-   * solution_type / inv_type / preconditioner configuration carried in
-   * QudaInvertParam. Used by the HMC trajectory code (hmc.cpp,
-   * nested_fgi_integrator.cpp, interface_quda.cpp) to avoid the host-bridging
-   * and resident-field book-keeping of the public invertQuda.
-   *
-   * @param[in,out] x         Solution vector(s) (device-resident)
-   * @param[in,out] b         Source vector(s) (device-resident)
-   * @param[in]     dirac     Dirac operator
-   * @param[in]     diracSloppy Sloppy Dirac operator
-   * @param[in]     diracPre  Precondition Dirac operator
-   * @param[in]     diracEig  Eigen-preconditioner Dirac operator
-   * @param[in]     param     Inverter parameters
-   */
-  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
-             Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param);
+ /**
+  * @brief Internal device-side solver entry point.
+  *
+  * Runs a Solver on device-resident fields, honouring the solve_type /
+  * solution_type / inv_type / preconditioner configuration carried in
+  * QudaInvertParam. Used by the HMC trajectory code (hmc.cpp,
+  * nested_fgi_integrator.cpp, interface_quda.cpp) to avoid the host-bridging
+  * and resident-field book-keeping of the public invertQuda.
+  *
+  * @param[in,out] x         Solution vector(s) (device-resident)
+  * @param[in,out] b         Source vector(s) (device-resident)
+  * @param[in]     dirac     Dirac operator
+  * @param[in]     diracSloppy Sloppy Dirac operator
+  * @param[in]     diracPre  Precondition Dirac operator
+  * @param[in]     diracEig  Eigen-preconditioner Dirac operator
+  * @param[in]     param     Inverter parameters
+  */
+ void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
+            Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param);
 
 } // namespace quda

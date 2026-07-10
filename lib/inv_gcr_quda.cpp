@@ -347,9 +347,7 @@ namespace quda {
       // by the cabxpyzAxNorm above lives in r_sloppy when we have a
       // preconditioner and in p[k+1] otherwise; mirror the same
       // conditional the GCR loop uses elsewhere.
-      if (activeGCRTracker && b.size() == 1) {
-        activeGCRTracker->recordIteration(K ? r_sloppy[0] : p[k + 1][0]);
-      }
+      if (activeGCRTracker && b.size() == 1) { activeGCRTracker->recordIteration(K ? r_sloppy[0] : p[k + 1][0]); }
 
       k++;
       total_iter++;

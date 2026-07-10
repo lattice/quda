@@ -101,8 +101,7 @@ namespace quda
 
   double hmcMetropolisUniform()
   {
-    if (!hmcMetropolisRNG)
-      errorQuda("hmcMetropolisUniform called before setHMCBaseSeed");
+    if (!hmcMetropolisRNG) errorQuda("hmcMetropolisUniform called before setHMCBaseSeed");
     std::uniform_real_distribution<double> dist(0.0, 1.0);
     return dist(*hmcMetropolisRNG);
   }
@@ -221,8 +220,7 @@ namespace quda
      @param ref Reference field whose metadata is copied
      @param create Field creation type (default: null allocation)
   */
-  static ColorSpinorField createParityField(const ColorSpinorField &ref,
-                                            QudaFieldCreate create = QUDA_NULL_FIELD_CREATE)
+  static ColorSpinorField createParityField(const ColorSpinorField &ref, QudaFieldCreate create = QUDA_NULL_FIELD_CREATE)
   {
     ColorSpinorParam param(ref);
     param.create = create;
@@ -284,7 +282,7 @@ namespace quda
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       return csParam;
     }
-  }
+  } // namespace
 
   ColorSpinorField generateEOPseudofermion(QudaInvertParam &inv_param, unsigned long long seed)
   {
@@ -402,8 +400,7 @@ namespace quda
       Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
       createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, ip, pc_solve, false);
 
-      const bool twisted
-        = (ip.dslash_type == QUDA_TWISTED_MASS_DSLASH || ip.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
+      const bool twisted = (ip.dslash_type == QUDA_TWISTED_MASS_DSLASH || ip.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
       QudaInvertParam ip_minus = ip;
       ip_minus.mu = -ip.mu;
       Dirac *dirac_m = nullptr, *diracSloppy_m = nullptr, *diracPre_m = nullptr, *diracEig_m = nullptr;
@@ -543,8 +540,7 @@ namespace quda
      @param inv_param Inverter parameters (provides kappa, dslash type)
      @param dt        Integration step size
   */
-  void computeEOFermionForce(GaugeField &mom, ColorSpinorField &x_even,
-                             QudaInvertParam &inv_param, double dt)
+  void computeEOFermionForce(GaugeField &mom, ColorSpinorField &x_even, QudaInvertParam &inv_param, double dt)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 

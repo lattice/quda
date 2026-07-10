@@ -2659,8 +2659,8 @@ public:
    * @param[in]  pc_solve          Whether or not to use even/odd preconditioning
    * @param[in]  use_smeared_gauge If true, build dEig from the smeared gauge
    */
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
-                          bool pc_solve, bool use_smeared_gauge);
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param, bool pc_solve,
+                          bool use_smeared_gauge);
 
 } // namespace quda
 

@@ -34,8 +34,8 @@ namespace quda {
       printfQuda("        delegated to child profiles:\n");
       for (const auto &[name, val] : child_times) {
         const auto &[t, n] = val;
-        printfQuda("     %20s     = %9.3f secs (%7.3f%%),\t with %8d calls at %6.3e us per call\n",
-                   name.c_str(), t, 100 * t / profile[QUDA_PROFILE_TOTAL].time, n, 1e6 * t / n);
+        printfQuda("     %20s     = %9.3f secs (%7.3f%%),\t with %8d calls at %6.3e us per call\n", name.c_str(), t,
+                   100 * t / profile[QUDA_PROFILE_TOTAL].time, n, 1e6 * t / n);
         accounted += t;
       }
     }

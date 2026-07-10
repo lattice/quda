@@ -311,7 +311,10 @@ namespace quda {
         // predict-not-taken and effectively free for users who don't use
         // eigentracking. The global is only READ here; the tracker itself is
         // thread-safe for the single-writer single-reader pattern used by HMC.
-        if (activeCGTracker) {
+        // Guard against multi-RHS solves: the Lanczos recurrence records
+        // per-iteration scalars for a single system only (mirrors the GCR
+        // tracker's b.size() == 1 guard).
+        if (activeCGTracker && b.size() == 1) {
           activeCGTracker->recordIteration(x_update_batch[0].get_current_alpha(), beta[0], r_sloppy[0]);
         }
 

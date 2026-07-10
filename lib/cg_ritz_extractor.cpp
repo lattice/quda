@@ -20,8 +20,6 @@
 namespace quda
 {
 
-  
-
   // Global active tracker pointer (set before solve, read by CG, cleared after)
   CGTracker *activeCGTracker = nullptr;
 
@@ -83,9 +81,7 @@ namespace quda
     MatrixXd T = MatrixXd::Zero(m, m);
 
     T(0, 0) = 1.0 / alphas_[0];
-    for (int k = 1; k < m; k++) {
-      T(k, k) = 1.0 / alphas_[k] + betas_[k - 1] / alphas_[k - 1];
-    }
+    for (int k = 1; k < m; k++) { T(k, k) = 1.0 / alphas_[k] + betas_[k - 1] / alphas_[k - 1]; }
     for (int k = 0; k < m - 1; k++) {
       double gamma = sqrt(std::max(betas_[k], 0.0)) / alphas_[k];
       T(k + 1, k) = gamma;
@@ -127,8 +123,7 @@ namespace quda
 
   void CGRitzExtractor::extract(std::vector<ColorSpinorField> &ritzVecs, std::vector<Complex> &ritzVals,
                                 const ColorSpinorField &sol, const DiracMatrix &mat, int nRitz, int nKr,
-                                int maxRestarts, double tol, bool usePolyAcc, int polyDeg, double aMin,
-                                double aMax)
+                                int maxRestarts, double tol, bool usePolyAcc, int polyDeg, double aMin, double aMax)
   {
     auto profile = pushProfile(getEigenTrackProfile());
     ScopedComputePhase _scope_;

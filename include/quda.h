@@ -839,44 +839,44 @@ extern "C" {
     size_t struct_size; /**< Size of this struct in bytes. Used to ensure that the host application and QUDA see the same struct */
 
     /** Trajectory control */
-    double tau;                       /**< Trajectory length */
-    int n_steps;                      /**< Outer integration steps (n_outer for nested) */
-    QudaIntegratorType integrator;    /**< Which integrator to use */
-    double beta;                      /**< Gauge coupling constant */
+    double tau;                    /**< Trajectory length */
+    int n_steps;                   /**< Outer integration steps (n_outer for nested) */
+    QudaIntegratorType integrator; /**< Which integrator to use */
+    double beta;                   /**< Gauge coupling constant */
 
     /** Momentum generation */
     int generate_momentum;            /**< If 1, generate Gaussian momentum internally; if 0, use caller-supplied */
     unsigned long long momentum_seed; /**< RNG seed for momentum generation (ignored if generate_momentum=0) */
-    int reuse_pseudofermion;          /**< If 1, reuse pseudofermion from previous trajectory (for reversibility tests) */
+    int reuse_pseudofermion; /**< If 1, reuse pseudofermion from previous trajectory (for reversibility tests) */
 
     /** Omelyan parameter */
-    double omelyan_lambda;            /**< Omelyan-Mryglod-Folk lambda (default 0.1932) */
+    double omelyan_lambda; /**< Omelyan-Mryglod-Folk lambda (default 0.1932) */
 
     /** Force-gradient parameters (FGI and nested FGI) */
-    double fgi_lambda;                /**< PQPQP lambda (default 1/6) */
-    double fgi_xi;                    /**< PQPQP xi (default 1/72) */
+    double fgi_lambda; /**< PQPQP lambda (default 1/6) */
+    double fgi_xi;     /**< PQPQP xi (default 1/72) */
 
     /** Inner integrator (nested FGI only) */
-    int n_inner_steps;                /**< Sub-steps per inner half-step */
+    int n_inner_steps;                   /**< Sub-steps per inner half-step */
     QudaIntegratorType inner_integrator; /**< Inner sub-integrator type (leapfrog or Omelyan) */
-    double inner_omelyan_lambda;      /**< Omelyan lambda for inner integrator (default 0.1932) */
+    double inner_omelyan_lambda;         /**< Omelyan lambda for inner integrator (default 0.1932) */
 
     /** Coarse deflation (nested FGI only) */
-    int n_defl;                       /**< Number of coarse-grid deflation eigenvectors */
-    double eig_tol;                   /**< TRLM convergence tolerance */
-    int eig_n_kr;                     /**< Krylov space size (default 3*n_defl) */
-    int eig_max_restarts;             /**< TRLM max restarts (default 100) */
-    int defl_refresh_interval;        /**< Inner steps between eigenspace refresh (0=frozen) */
-    int coarse_level;                 /**< Which MG level provides coarse grid (default 1) */
+    int n_defl;                /**< Number of coarse-grid deflation eigenvectors */
+    double eig_tol;            /**< TRLM convergence tolerance */
+    int eig_n_kr;              /**< Krylov space size (default 3*n_defl) */
+    int eig_max_restarts;      /**< TRLM max restarts (default 100) */
+    int defl_refresh_interval; /**< Inner steps between eigenspace refresh (0=frozen) */
+    int coarse_level;          /**< Which MG level provides coarse grid (default 1) */
 
     /** MR smoothing (nested FGI only) */
-    int n_mr_smooth;                  /**< MR smoothing iterations (0=off) */
-    double mr_omega;                  /**< MR relaxation parameter */
+    int n_mr_smooth; /**< MR smoothing iterations (0=off) */
+    double mr_omega; /**< MR relaxation parameter */
 
     /** Multi-trajectory control (used by hmcRunQuda) */
-    int n_trajectories;               /**< Total number of MD trajectories to run */
-    int n_thermalization;             /**< Number of thermalisation trajectories (no measurements) */
-    int mg_setup_interval;            /**< Full MG re-setup every N trajectories (0=thin update only) */
+    int n_trajectories;    /**< Total number of MD trajectories to run */
+    int n_thermalization;  /**< Number of thermalisation trajectories (no measurements) */
+    int mg_setup_interval; /**< Full MG re-setup every N trajectories (0=thin update only) */
     /** Adaptive MG re-setup trigger: refresh when current per-trajectory
      *  iters-per-solve exceeds this ratio times the baseline iters-per-solve.
      *  0.0 disables the adaptive trigger. Recommended 2.0 for double-precision
@@ -888,35 +888,35 @@ extern "C" {
     int mg_setup_iter_baseline_traj;
 
     /** Checkpointing */
-    int checkpoint_interval;          /**< Save gauge every N accepted trajectories (0=disabled) */
-    char checkpoint_prefix[256];      /**< Filename prefix for checkpoints (e.g. "ckpt_") */
+    int checkpoint_interval;     /**< Save gauge every N accepted trajectories (0=disabled) */
+    char checkpoint_prefix[256]; /**< Filename prefix for checkpoints (e.g. "ckpt_") */
 
     /** Gauge I/O */
-    char gauge_infile[256];           /**< Load initial gauge from file (empty = use host pointer) */
-    char gauge_outfile[256];          /**< Save final gauge to file (empty = no save) */
+    char gauge_infile[256];  /**< Load initial gauge from file (empty = use host pointer) */
+    char gauge_outfile[256]; /**< Save final gauge to file (empty = no save) */
 
     /** Field management flags (standard QUDA pattern) */
-    int use_resident_gauge;           /**< Use existing resident gauge as input */
-    int make_resident_gauge;          /**< Store result gauge as resident */
-    int return_result_gauge;          /**< Copy result gauge back to host */
-    int use_resident_mom;             /**< Use existing resident momentum */
-    int make_resident_mom;            /**< Store result momentum as resident */
-    int return_result_mom;            /**< Copy result momentum back to host */
+    int use_resident_gauge;  /**< Use existing resident gauge as input */
+    int make_resident_gauge; /**< Store result gauge as resident */
+    int return_result_gauge; /**< Copy result gauge back to host */
+    int use_resident_mom;    /**< Use existing resident momentum */
+    int make_resident_mom;   /**< Store result momentum as resident */
+    int return_result_mom;   /**< Copy result momentum back to host */
 
     /** Eigenspace tracking during HMC */
-    int eigentracking_enabled;              /**< 1=enable eigentracking, 0=disabled (default 0) */
-    int eigentracking_n_ev;                 /**< Number of tracked eigenpairs (default 8) */
-    int eigentracking_pool_capacity;        /**< Maximum pool size (default 32) */
-    int eigentracking_n_ritz;               /**< Ritz pairs to extract per CG solve (default 4) */
-    int eigentracking_forecast_order;       /**< Generator forecast order: 0/1/2 (default 1) */
-    int eigentracking_fresh_trlm_interval;  /**< Trajectories between fresh TRLM (0=disabled, default 10) */
-    int eigentracking_solution_history;     /**< Chronological solution history depth (default 3) */
+    int eigentracking_enabled;             /**< 1=enable eigentracking, 0=disabled (default 0) */
+    int eigentracking_n_ev;                /**< Number of tracked eigenpairs (default 8) */
+    int eigentracking_pool_capacity;       /**< Maximum pool size (default 32) */
+    int eigentracking_n_ritz;              /**< Ritz pairs to extract per CG solve (default 4) */
+    int eigentracking_forecast_order;      /**< Generator forecast order: 0/1/2 (default 1) */
+    int eigentracking_fresh_trlm_interval; /**< Trajectories between fresh TRLM (0=disabled, default 10) */
+    int eigentracking_solution_history;    /**< Chronological solution history depth (default 3) */
     /** Whether to absorb CG-extracted Ritz vectors into the tracker pool.
      *  When true (default), the pool drifts toward exact D†D eigenvectors,
      *  which is good for deflation but degrades MG-null-vector quality at
      *  light mass. Set to 0 to keep the pool as RR-evolved MG null vectors
      *  only (Schwinger-style: smoother-aware structure preserved). */
-    int eigentracking_absorb_ritz;          /**< 1=absorb Ritz vectors into pool, 0=skip (default 1) */
+    int eigentracking_absorb_ritz; /**< 1=absorb Ritz vectors into pool, 0=skip (default 1) */
     /** Pool-driven MG null-vector refresh ("Fix 2: hybrid pool + CG").
      *
      * On accepted-trajectory MG re-setup, copy the eigentracker pool into the
@@ -958,18 +958,18 @@ extern "C" {
      *  EigenTrackingParam::residualCap. */
     int eigentracking_residual_cap;
     /** Initial TRLM convergence knobs (also applied to fresh-TRLM refreshes) */
-    double eigentracking_trlm_tol;          /**< TRLM convergence tolerance (default 1e-6) */
-    int eigentracking_trlm_max_restarts;    /**< TRLM maximum restarts (default 100) */
-    int eigentracking_trlm_check_interval;  /**< TRLM iterations between convergence checks (default 10) */
+    double eigentracking_trlm_tol;         /**< TRLM convergence tolerance (default 1e-6) */
+    int eigentracking_trlm_max_restarts;   /**< TRLM maximum restarts (default 100) */
+    int eigentracking_trlm_check_interval; /**< TRLM iterations between convergence checks (default 10) */
     /** Eigensolver to use for the initial / fresh-TRLM solves
      *  (TRLM, BLKTRLM, IRAM, BLKIRAM, ...). Default QUDA_EIG_TR_LANCZOS. */
     QudaEigType eigentracking_eig_type;
-    int eigentracking_blk_size;             /**< Block size for block solvers; n_ev rounded up (default 4) */
+    int eigentracking_blk_size; /**< Block size for block solvers; n_ev rounded up (default 4) */
     /** Chebyshev acceleration for the initial TRLM (ill-conditioned M^dag M) */
-    int eigentracking_use_poly_acc;         /**< 1=Chebyshev poly acceleration on, 0=off (default 0) */
-    int eigentracking_poly_deg;             /**< Chebyshev polynomial degree (default 50) */
-    double eigentracking_a_min;             /**< Suppression lower bound ~10x smallest target eigenvalue */
-    double eigentracking_a_max;             /**< Upper bound; 0 => QUDA power-iteration auto-estimate */
+    int eigentracking_use_poly_acc; /**< 1=Chebyshev poly acceleration on, 0=off (default 0) */
+    int eigentracking_poly_deg;     /**< Chebyshev polynomial degree (default 50) */
+    double eigentracking_a_min;     /**< Suppression lower bound ~10x smallest target eigenvalue */
+    double eigentracking_a_max;     /**< Upper bound; 0 => QUDA power-iteration auto-estimate */
   } QudaHMCParam;
 
   typedef struct QudaGaugeObservableParam_s {
@@ -1455,8 +1455,8 @@ extern "C" {
    * @param[in]     mg_instance MG preconditioner (from newMultigridQuda, or nullptr)
    * @return dH = H_final - H_initial for the Metropolis accept/reject test
    */
-  double hmcTrajectoryQuda(void *gauge, void *momentum, QudaHMCParam *hmc_param,
-                           QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, void *mg_instance);
+  double hmcTrajectoryQuda(void *gauge, void *momentum, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param,
+                           QudaInvertParam *inv_param, void *mg_instance);
 
   /**
    * @brief Run a complete HMC simulation with Metropolis accept/reject.

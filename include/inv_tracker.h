@@ -47,8 +47,7 @@ namespace quda
    * surface and its own extern global, without sharing virtual-call
    * overhead in the solver hot path.
    */
-  template<typename T>
-  class TrackerScope
+  template <typename T> class TrackerScope
   {
   private:
     T *&slot_;

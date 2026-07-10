@@ -453,12 +453,19 @@ else()
 endif()
 add_library(QUDA::quda ALIAS quda)
 
-# Disable LTO for QUDA to avoid fatbinData symbol collisions when MPI is built with -flto
-set_target_properties(quda PROPERTIES INTERPROCEDURAL_OPTIMIZATION FALSE)
-set_target_properties(quda_cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION FALSE)
-target_compile_options(quda PRIVATE -fno-lto)
-target_link_options(quda PRIVATE -fno-lto)
-target_compile_options(quda_cpp PRIVATE -fno-lto)
+# Optionally disable LTO for QUDA: some MPI installations built with -flto
+# provoke fatbinData symbol collisions at link time. On by default (QUDA does
+# not itself enable IPO, so this only strips LTO flags injected by compiler
+# wrappers); disable with -DQUDA_DISABLE_LTO=OFF to allow such flags through.
+option(QUDA_DISABLE_LTO "Disable link-time optimization for the QUDA targets (workaround for MPI built with -flto)" ON)
+mark_as_advanced(QUDA_DISABLE_LTO)
+if(QUDA_DISABLE_LTO)
+  set_target_properties(quda PROPERTIES INTERPROCEDURAL_OPTIMIZATION FALSE)
+  set_target_properties(quda_cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION FALSE)
+  target_compile_options(quda PRIVATE -fno-lto)
+  target_link_options(quda PRIVATE -fno-lto)
+  target_compile_options(quda_cpp PRIVATE -fno-lto)
+endif()
 
 # add target specific files
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")

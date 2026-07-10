@@ -21,31 +21,31 @@ namespace quda {
    * otherwise in the constructor.
    */
   template <bool device = false> struct Timer {
-    /**< The cumulative sum of time */
+    /** The cumulative sum of time */
     double time;
 
-    /**< The last recorded time interval */
+    /** The last recorded time interval */
     double last_interval;
 
-    /**< Used to store when the timer was last started */
+    /** Used to store when the timer was last started */
     timeval host_start;
 
-    /**< Used to store when the timer was last stopped */
+    /** Used to store when the timer was last stopped */
     timeval host_stop;
 
-    /**< Used to store when the timer was last started */
+    /** Used to store when the timer was last started */
     qudaEvent_t device_start;
 
-    /**< Used to store when the timer was last stopped */
+    /** Used to store when the timer was last stopped */
     qudaEvent_t device_stop;
 
-    /**< Which stream are we recording on */
+    /** Which stream are we recording on */
     qudaStream_t stream;
 
-    /**< Are we currently timing? */
+    /** Are we currently timing? */
     bool running;
 
-    /**< Keep track of number of calls */
+    /** Keep track of number of calls */
     int count;
 
     Timer(qudaStream_t stream = device::get_default_stream()) :
@@ -141,7 +141,7 @@ namespace quda {
   using device_timer_t = Timer<true>;
   using host_timer_t = Timer<false>;
 
-  /**< Enumeration type used for writing a simple but extensible profiling framework. */
+  /** Enumeration type used for writing a simple but extensible profiling framework. */
   enum QudaProfileType {
     QUDA_PROFILE_H2D,          /**< host -> device transfers */
     QUDA_PROFILE_D2H,          /**< The time in seconds for device -> host transfers */
@@ -207,7 +207,7 @@ namespace quda {
 
     std::stack<QudaProfileType> pt_stack; /**< A stack used for recursive profiling */
 
-    /**< Per-child-profile delegated time, populated by pushProfile when
+    /** Per-child-profile delegated time, populated by pushProfile when
        a nested child profile pops. Each entry is (cumulative seconds,
        call count). Lets compound operations like hmcTrajectoryQuda show
        a per-child-profile breakdown in their per-profile Print output. */
@@ -293,12 +293,12 @@ namespace quda {
     size_t monitor_start;
     size_t monitor_end;
 
-    /**< Parent profile whose sub-phases were paused on push (nullptr if
+    /** Parent profile whose sub-phases were paused on push (nullptr if
        no pause was performed, e.g. when the new profile equals the
        current top of the profile stack). */
     TimeProfile *parent_profile = nullptr;
 
-    /**< Sub-phases on @p parent_profile that were running at push time
+    /** Sub-phases on @p parent_profile that were running at push time
        and must be resumed on pop. Owned by this pushProfile instance so
        that nested pushes don't interfere. */
     std::vector<QudaProfileType> parent_paused;
