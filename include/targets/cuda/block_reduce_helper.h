@@ -24,8 +24,6 @@
 #define CUB_USE_COOPERATIVE_GROUPS
 #endif
 
-using namespace quda;
-
 #include <cub/block/block_reduce.cuh>
 #include <cub/block/block_scan.cuh>
 

@@ -4,16 +4,16 @@
 #include <tunable_nd.h>
 #include <kernels/reduce_init.cuh>
 
-// These are used for reduction kernels
-static device_reduce_t *d_reduce = nullptr;
-static device_reduce_t *h_reduce = nullptr;
-static device_reduce_t *hd_reduce = nullptr;
-
-static count_t *reduce_count = nullptr;
-static qudaEvent_t reduceEnd;
-
 namespace quda
 {
+
+  // These are used for reduction kernels
+  static device_reduce_t *d_reduce = nullptr;
+  static device_reduce_t *h_reduce = nullptr;
+  static device_reduce_t *hd_reduce = nullptr;
+
+  static count_t *reduce_count = nullptr;
+  static qudaEvent_t reduceEnd;
 
   namespace reducer
   {

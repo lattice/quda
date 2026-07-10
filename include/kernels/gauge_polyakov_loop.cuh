@@ -10,7 +10,7 @@ namespace quda {
 
   template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct GaugeInsertTimesliceArg : public kernel_param<> {
-    using real = typename::mapper<store_t>::type;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
