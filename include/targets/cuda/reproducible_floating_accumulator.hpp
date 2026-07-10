@@ -913,6 +913,7 @@ private:
 
   template <typename T> void reducer::init_rfa_device_bins_impl()
   {
+#ifdef __CUDACC__
     if constexpr (is_rfa<get_scalar_t<T>>::value) {
       static bool init = false;
       if (!init) {
@@ -921,6 +922,7 @@ private:
         init = true;
       }
     }
+#endif
   }
 
   template <class T> __host__ __device__ inline rfa_t<T> operator+(const rfa_t<T> &x, const rfa_t<T> &y)
