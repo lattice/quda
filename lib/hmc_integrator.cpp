@@ -699,7 +699,6 @@ namespace quda
   NestedFGIIntegrator::NestedFGIIntegrator(QudaHMCParam &hmcParam, MG &mg, const DiracMatrix &matFine, void *mgPrec,
                                            QudaGaugeParam &gaugeParam_, QudaInvertParam &invParam_,
                                            EigenTrackingState *tracking_, GaugeField *&gaugePrecise_,
-                                           GaugeField *&gaugeSloppy_, GaugeField *&gaugePrecondition_,
                                            GaugeField &momResident_, CloverField *&cloverPrecise_) :
     Integrator(hmcParam, gaugeParam_, invParam_, tracking_),
     deflManager(*mg.getTransfer(), *mg.getMatCoarseResidual(), *mg.getDiracCoarseResidual(), hmcParam.n_defl,
@@ -713,8 +712,6 @@ namespace quda
     innerIntegrator(hmcParam.inner_integrator),
     innerOmelyanLambda(hmcParam.inner_omelyan_lambda),
     gaugePrecise(gaugePrecise_),
-    gaugeSloppy(gaugeSloppy_),
-    gaugePrecondition(gaugePrecondition_),
     momResident(momResident_),
     cloverPrecise(cloverPrecise_),
     mgPreconditioner(mgPrec)
@@ -995,7 +992,7 @@ namespace quda
       auto *mg_solver = static_cast<multigrid_solver *>(mg_instance);
       MG *mg = mg_solver->mg;
       return new NestedFGIIntegrator(hmc_param, *mg, *mg_solver->m, mg_instance, gauge_param, inv_param, tracking,
-                                     ::gaugePrecise, ::gaugeSloppy, ::gaugePrecondition, ::momResident, ::cloverPrecise);
+                                     ::gaugePrecise, ::momResident, ::cloverPrecise);
     }
     default: errorQuda("Unknown integrator type %d", hmc_param.integrator);
     }

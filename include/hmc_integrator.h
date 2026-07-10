@@ -186,19 +186,13 @@ namespace quda
     QudaIntegratorType innerIntegrator;
     double innerOmelyanLambda;
 
-    /** External references for gauge/momentum/clover management.
-     *  The gauge-hierarchy entries at refinement / eigensolver / extended
-     *  precisions and the extendedGaugeResident halo are accessed by the
-     *  integrator's force code through file-scope externs in
-     *  hmc_integrator.cpp (see the `extern quda::GaugeField *gauge*;`
-     *  block at the top of that file). They were originally captured as
-     *  members for symmetry with the precise/sloppy/precondition entries
-     *  but never read through the member references — clang -Werror
-     *  -Wunused-private-field flags that. Members removed; the externs
-     *  are the single source of truth. */
+    /** External references for gauge/momentum/clover management. Only the
+     *  fields the nested integrator reads directly are captured as members;
+     *  the sloppy/precondition/refinement/eigensolver copies and the
+     *  extendedGaugeResident halo are maintained through
+     *  hmcRefreshResidentGaugeState and the file-scope externs in
+     *  hmc_integrator.cpp — the externs are the single source of truth. */
     GaugeField *&gaugePrecise;
-    GaugeField *&gaugeSloppy;
-    GaugeField *&gaugePrecondition;
     GaugeField &momResident;
     CloverField *&cloverPrecise;
 
@@ -230,8 +224,7 @@ namespace quda
   public:
     NestedFGIIntegrator(QudaHMCParam &hmcParam, MG &mg, const DiracMatrix &matFine, void *mgPrec,
                         QudaGaugeParam &gaugeParam, QudaInvertParam &invParam, EigenTrackingState *tracking,
-                        GaugeField *&gaugePrecise, GaugeField *&gaugeSloppy, GaugeField *&gaugePrecondition,
-                        GaugeField &momResident, CloverField *&cloverPrecise);
+                        GaugeField *&gaugePrecise, GaugeField &momResident, CloverField *&cloverPrecise);
 
     ~NestedFGIIntegrator();
 
