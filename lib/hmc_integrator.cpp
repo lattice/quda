@@ -179,13 +179,11 @@ namespace quda
   } // namespace
 
   Integrator &getOrCreateIntegrator(QudaHMCParam &hmc_param, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
-                                     EigenTrackingState *tracking, void *mg_instance)
+                                    EigenTrackingState *tracking, void *mg_instance)
   {
-    bool needs_rebuild = !g_currentIntegrator
-      || g_currentIntegratorType != hmc_param.integrator
+    bool needs_rebuild = !g_currentIntegrator || g_currentIntegratorType != hmc_param.integrator
       || g_currentHmcParamAddr != static_cast<const void *>(&hmc_param)
-      || g_currentInvParamAddr != static_cast<const void *>(&inv_param)
-      || g_currentMGInstance != mg_instance;
+      || g_currentInvParamAddr != static_cast<const void *>(&inv_param) || g_currentMGInstance != mg_instance;
 
     if (needs_rebuild) {
       g_currentIntegrator.reset(Integrator::create(hmc_param, gauge_param, inv_param, tracking, mg_instance));
@@ -267,8 +265,7 @@ namespace quda
         ex->copy(*gauge);
       }
 
-      GaugeFieldParam tensorParam(gaugePrecise->X(), QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, 0,
-                                  QUDA_TENSOR_GEOMETRY);
+      GaugeFieldParam tensorParam(gaugePrecise->X(), QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
       tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
       tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       tensorParam.setPrecision(tensorParam.Precision(), true);
@@ -664,8 +661,7 @@ namespace quda
     const double lam = hmc_param.omelyan_lambda;
     logQuda(QUDA_SUMMARIZE, "OmelyanIntegrator: tau=%e, n_steps=%d, h=%e, lambda=%e\n", tau, nSteps, tau / nSteps, lam);
     runOmelyanSchedule(
-      tau, nSteps, lam, [this](double dt, ColorSpinorField &p) { kick(dt, p); }, [this](double dt) { drift(dt); },
-      phi);
+      tau, nSteps, lam, [this](double dt, ColorSpinorField &p) { kick(dt, p); }, [this](double dt) { drift(dt); }, phi);
   }
 
   void FGIntegrator::operator()(double tau, int nSteps, ColorSpinorField &phi)
@@ -788,8 +784,7 @@ namespace quda
     // a valid preconditioner for M(-μ) (small diagonal shift — iteration
     // counts, never the converged solution). μ-symmetric actions reduce to
     // the standard two-pass (the flipped set aliases the direct one).
-    const bool twisted
-      = (ip.dslash_type == QUDA_TWISTED_MASS_DSLASH || ip.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
+    const bool twisted = (ip.dslash_type == QUDA_TWISTED_MASS_DSLASH || ip.dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
     Dirac *dirac_m = nullptr, *diracSloppy_m = nullptr, *diracPre_m = nullptr, *diracEig_m = nullptr;
     if (twisted && ip.preconditioner && ip.solve_type == QUDA_DIRECT_PC_SOLVE) {
       QudaInvertParam ip_minus = ip;
@@ -868,8 +863,7 @@ namespace quda
   // runOmelyanSchedule docstrings for the full convention.
   void NestedFGIIntegrator::innerLeapfrog(double dt, ColorSpinorField &phi)
   {
-    logQuda(QUDA_VERBOSE, "NestedFGIIntegrator: innerLeapfrog dt=%e, dti=%e, n=%d\n", dt, dt / nInnerSteps,
-            nInnerSteps);
+    logQuda(QUDA_VERBOSE, "NestedFGIIntegrator: innerLeapfrog dt=%e, dti=%e, n=%d\n", dt, dt / nInnerSteps, nInnerSteps);
     runLeapfrogSchedule(
       dt, nInnerSteps, [this](double t, ColorSpinorField &p) { computeInnerForce(t, p); },
       [this](double t) { gaugeStep(t); }, phi);
@@ -911,29 +905,20 @@ namespace quda
       updateGaugeField(u_out, 1.0, *gaugePrecise, momResident, false, true);
       gaugePrecise->copy(u_out);
     }
-    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
-      gaugePrecondition->copy(*gaugePrecise);
-    // Rebuild extended halo at the displaced gauge so the kick below uses a
-    // consistent halo. Without this, the central kick reads pre-displacement
-    // ghost zones and the FG correction silently degenerates to plain Omelyan.
-    {
-      lat_dim_t R = hmcExtendedGaugeShell();
-      updateExtendedGaugeResident(true, R, getProfile());
-    }
+    // Full refresh at the displaced gauge (ghost exchange + gauge hierarchy +
+    // extended halo + clover recompute), as in Integrator::fgStep. The manual
+    // copy/extended-rebuild sequence previously used here skipped the ghost
+    // exchange, so the central kick's solves read pre-displacement pads and
+    // the FG correction degenerated to 2nd order (m-independent h² term in
+    // the nested (h, m) theory grid).
+    hmcRefreshResidentGaugeState(inv_param);
 
     momResident.copy(momSaved);
 
     computeOuterForce(one_m_2lam * h, phi);
 
     gaugePrecise->copy(gaugeSaved);
-    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
-      gaugePrecondition->copy(*gaugePrecise);
-    {
-      lat_dim_t R = hmcExtendedGaugeShell();
-      updateExtendedGaugeResident(true, R, getProfile());
-    }
+    hmcRefreshResidentGaugeState(inv_param);
   }
 
   void NestedFGIIntegrator::operator()(double tau, int nSteps, ColorSpinorField &phi)
@@ -999,7 +984,7 @@ namespace quda
   // by reference; the externs at the top of this file resolve to
   // interface_quda.cpp's file-scope globals.
   Integrator *Integrator::create(QudaHMCParam &hmc_param, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
-                                  EigenTrackingState *tracking, void *mg_instance)
+                                 EigenTrackingState *tracking, void *mg_instance)
   {
     switch (hmc_param.integrator) {
     case QUDA_LEAPFROG_INTEGRATOR: return new LeapfrogIntegrator(hmc_param, gauge_param, inv_param, tracking);
@@ -1010,8 +995,7 @@ namespace quda
       auto *mg_solver = static_cast<multigrid_solver *>(mg_instance);
       MG *mg = mg_solver->mg;
       return new NestedFGIIntegrator(hmc_param, *mg, *mg_solver->m, mg_instance, gauge_param, inv_param, tracking,
-                                     ::gaugePrecise, ::gaugeSloppy, ::gaugePrecondition, ::momResident,
-                                     ::cloverPrecise);
+                                     ::gaugePrecise, ::gaugeSloppy, ::gaugePrecondition, ::momResident, ::cloverPrecise);
     }
     default: errorQuda("Unknown integrator type %d", hmc_param.integrator);
     }

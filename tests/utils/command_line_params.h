@@ -547,6 +547,7 @@ extern bool heatbath_initialize_on_host;
 extern double hmc_beta;
 extern double hmc_tau;
 extern int hmc_n_steps;
+extern int hmc_n_inner_steps;
 extern int hmc_integrator;
 extern int hmc_n_trajectories;
 extern int hmc_n_thermalization;

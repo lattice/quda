@@ -291,6 +291,7 @@ bool heatbath_initialize_on_host = true;
 double hmc_beta = 6.0;
 double hmc_tau = 1.0;
 int hmc_n_steps = 10;
+int hmc_n_inner_steps = 3;
 int hmc_integrator = 0; // 0=leapfrog, 1=omelyan, 2=FGI, 3=nested FGI
 int hmc_n_trajectories = 10;
 int hmc_n_thermalization = 5;
@@ -308,24 +309,25 @@ int hmc_momentum_seed = 12345;
 double hmc_force_eps = 1e-4;
 int hmc_reversibility_interval = 10;
 double hmc_reversibility_tol = 1e-6;
-double hmc_reversibility_tol_mg = 1e-5;       // looser tol for MG-using integrators (e.g. nested FGI)
-int hmc_per_link_test_links = 2;              // SU(3) test links to perturb in PerLinkForceTest
-double eigentracking_trlm_tol = 1e-6;         // TRLM convergence tolerance for eigentracking initial solve
-int eigentracking_trlm_max_restarts = 100;    // TRLM maximum restarts for eigentracking initial solve
-int eigentracking_trlm_check_interval = 10;   // TRLM iterations between convergence checks
+double hmc_reversibility_tol_mg = 1e-5;                   // looser tol for MG-using integrators (e.g. nested FGI)
+int hmc_per_link_test_links = 2;                          // SU(3) test links to perturb in PerLinkForceTest
+double eigentracking_trlm_tol = 1e-6;                     // TRLM convergence tolerance for eigentracking initial solve
+int eigentracking_trlm_max_restarts = 100;                // TRLM maximum restarts for eigentracking initial solve
+int eigentracking_trlm_check_interval = 10;               // TRLM iterations between convergence checks
 QudaEigType eigentracking_eig_type = QUDA_EIG_TR_LANCZOS; // Lanczos variant for eigentracking
-int eigentracking_blk_size = 4;               // Block size for block solvers (n_ev rounded up)
+int eigentracking_blk_size = 4;                           // Block size for block solvers (n_ev rounded up)
 
 bool eigentracking_enabled = false;
-int eigentracking_n_ev = 0;              // 0 = derive from MG nvec, or default 8
-int eigentracking_pool_capacity = 0;     // 0 = derive from nEv, or default 2*nEv
-int eigentracking_n_ritz = 0;            // 0 = derive from nEv, or default nEv/2
+int eigentracking_n_ev = 0;          // 0 = derive from MG nvec, or default 8
+int eigentracking_pool_capacity = 0; // 0 = derive from nEv, or default 2*nEv
+int eigentracking_n_ritz = 0;        // 0 = derive from nEv, or default nEv/2
 int eigentracking_forecast_order = 1;
-int eigentracking_fresh_interval = 0;    // 0 = disabled (MG seeding replaces TRLM)
+int eigentracking_fresh_interval = 0; // 0 = disabled (MG seeding replaces TRLM)
 int eigentracking_solution_history = 3;
 bool eigentracking_absorb_ritz = true;   // false = pool stays as RR-evolved MG null vectors only
 int eigentracking_mg_refresh_iters = -1; // -1=disabled, 0=pure pool, N>0=pool+N CG polish iters (Fix 2)
-int eigentracking_residual_cap = 0;      // Per-solve cap on extra ET-pool candidates from CG/GCR Krylov (cg_tracker.h, gcr_tracker.h); 0=off, opt-in for light-mass regimes
+int eigentracking_residual_cap = 0;      // Per-solve cap on extra ET-pool candidates from CG/GCR Krylov (cg_tracker.h,
+                                         // gcr_tracker.h); 0=off, opt-in for light-mass regimes
 bool eigentracking_use_poly_acc = false; // Chebyshev acceleration for initial TRLM
 int eigentracking_poly_deg = 50;         // Chebyshev polynomial degree
 double eigentracking_a_min = 0.0;        // ~10x smallest target eval; 0 => caller fills
@@ -1264,10 +1266,11 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--hmc-beta", hmc_beta, "Gauge coupling beta (default 6.0)");
   opgroup->add_option("--hmc-tau", hmc_tau, "MD trajectory length (default 1.0)");
   opgroup->add_option("--hmc-n-steps", hmc_n_steps, "Number of outer integration steps (default 10)");
+  opgroup->add_option("--hmc-n-inner-steps", hmc_n_inner_steps,
+                      "Number of inner (fast timescale) steps per outer step for nested integrators (default 3)");
   opgroup->add_option("--hmc-integrator", hmc_integrator,
                       "Integrator type: 0=leapfrog, 1=Omelyan, 2=FGI, 3=nested FGI (default 0)");
-  opgroup->add_option("--hmc-n-trajectories", hmc_n_trajectories,
-                      "Total number of HMC trajectories to run (default 10)");
+  opgroup->add_option("--hmc-n-trajectories", hmc_n_trajectories, "Total number of HMC trajectories to run (default 10)");
   opgroup->add_option("--hmc-thermalization", hmc_n_thermalization,
                       "Number of thermalisation trajectories before measurements (default 5)");
   opgroup->add_option("--hmc-checkpoint", hmc_checkpoint_interval,
@@ -1286,17 +1289,12 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "baseline for the adaptive trigger (default 5).");
   opgroup->add_option("--hmc-gauge-infile", hmc_gauge_infile,
                       "Load initial gauge configuration from file (requires QIO)");
-  opgroup->add_option("--hmc-gauge-outfile", hmc_gauge_outfile,
-                      "Save final gauge configuration to file (requires QIO)");
+  opgroup->add_option("--hmc-gauge-outfile", hmc_gauge_outfile, "Save final gauge configuration to file (requires QIO)");
 
-  opgroup->add_option("--hmc-omelyan-lambda", hmc_omelyan_lambda,
-                      "Omelyan integrator lambda parameter (default 0.1932)");
-  opgroup->add_option("--hmc-fgi-lambda", hmc_fgi_lambda,
-                      "Force-gradient integrator lambda parameter (default 1/6)");
-  opgroup->add_option("--hmc-fgi-xi", hmc_fgi_xi,
-                      "Force-gradient integrator xi parameter (default 1/72)");
-  opgroup->add_option("--hmc-momentum-seed", hmc_momentum_seed,
-                      "Base seed for momentum generation (default 12345)");
+  opgroup->add_option("--hmc-omelyan-lambda", hmc_omelyan_lambda, "Omelyan integrator lambda parameter (default 0.1932)");
+  opgroup->add_option("--hmc-fgi-lambda", hmc_fgi_lambda, "Force-gradient integrator lambda parameter (default 1/6)");
+  opgroup->add_option("--hmc-fgi-xi", hmc_fgi_xi, "Force-gradient integrator xi parameter (default 1/72)");
+  opgroup->add_option("--hmc-momentum-seed", hmc_momentum_seed, "Base seed for momentum generation (default 12345)");
   opgroup->add_option("--hmc-force-eps", hmc_force_eps,
                       "Perturbation size for numerical force calibration (default 1e-4)");
   opgroup->add_option("--hmc-reversibility-interval", hmc_reversibility_interval,
@@ -1313,14 +1311,14 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "TRLM maximum restarts for eigentracking initial solve (default 100)");
   opgroup->add_option("--eigentracking-trlm-check-interval", eigentracking_trlm_check_interval,
                       "TRLM iterations between convergence checks (default 10)");
-  opgroup->add_option("--eigentracking-eig-type", eigentracking_eig_type,
-                      "Eigensolver for eigentracking (trlm, blktrlm, trlm-3d, iram, blkiram; default trlm)")
+  opgroup
+    ->add_option("--eigentracking-eig-type", eigentracking_eig_type,
+                 "Eigensolver for eigentracking (trlm, blktrlm, trlm-3d, iram, blkiram; default trlm)")
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
   opgroup->add_option("--eigentracking-blk-size", eigentracking_blk_size,
                       "Block size for block solvers; n_ev rounded up to a multiple (default 4)");
 
-  opgroup->add_option("--eigentracking", eigentracking_enabled,
-                      "Enable eigenspace tracking during HMC (default false)");
+  opgroup->add_option("--eigentracking", eigentracking_enabled, "Enable eigenspace tracking during HMC (default false)");
   opgroup->add_option("--eigentracking-n-ev", eigentracking_n_ev,
                       "Number of tracked eigenpairs (0=derive from MG nvec, default 0)");
   opgroup->add_option("--eigentracking-pool-capacity", eigentracking_pool_capacity,
@@ -1354,8 +1352,7 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "the preconditioner's stuck modes need explicit capture.");
   opgroup->add_option("--eigentracking-use-poly-acc", eigentracking_use_poly_acc,
                       "Enable Chebyshev polynomial acceleration in initial TRLM (default false)");
-  opgroup->add_option("--eigentracking-poly-deg", eigentracking_poly_deg,
-                      "Chebyshev polynomial degree (default 50)");
+  opgroup->add_option("--eigentracking-poly-deg", eigentracking_poly_deg, "Chebyshev polynomial degree (default 50)");
   opgroup->add_option("--eigentracking-a-min", eigentracking_a_min,
                       "Poly-acc lower suppression bound, ~10x smallest target eigenvalue");
   opgroup->add_option("--eigentracking-a-max", eigentracking_a_max,

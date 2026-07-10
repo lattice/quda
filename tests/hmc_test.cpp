@@ -31,6 +31,7 @@
 #include <inv_tracker.h>
 #include <eigen_tracking_state.h>
 #include <eigensolve_quda.h>
+#include <invert_quda.h>
 #include <qio_field.h>
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -38,15 +39,6 @@
 #include "command_line_params.h"
 #include "gauge_utils.h"
 #include "host_utils.h"
-
-// Forward declarations for QUDA internal functions used in numerical force test
-namespace quda
-{
-  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
-             Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param);
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
-                          bool pc_solve, bool use_smeared_gauge = false);
-} // namespace quda
 
 // These globals are in file scope (not quda namespace) in interface_quda.cpp
 extern quda::GaugeField *gaugePrecise;
@@ -155,12 +147,13 @@ static QudaHMCParam makeHMCParam(QudaIntegratorType integrator_override = static
 {
   QudaHMCParam p = newQudaHMCParam();
 
-  p.integrator = (integrator_override != static_cast<QudaIntegratorType>(-1))
-    ? integrator_override
-    : static_cast<QudaIntegratorType>(hmc_integrator);
+  p.integrator = (integrator_override != static_cast<QudaIntegratorType>(-1)) ?
+    integrator_override :
+    static_cast<QudaIntegratorType>(hmc_integrator);
   p.beta = hmc_beta;
   p.tau = hmc_tau;
   p.n_steps = hmc_n_steps;
+  p.n_inner_steps = hmc_n_inner_steps;
   p.omelyan_lambda = hmc_omelyan_lambda;
   p.fgi_lambda = hmc_fgi_lambda;
   p.fgi_xi = hmc_fgi_xi;
@@ -230,8 +223,7 @@ static void resolveEigenTrackingDefaults(QudaHMCParam &p, int mg_nvec)
  * HMC.Production (which runs through setQudaDefaultMgTestParams +
  * setMultigridParam with the full snapshot/restore CLI override pattern).
  */
-static void configureHMCTestMG(QudaMultigridParam &mg_param, QudaInvertParam &mg_inv_param,
-                               QudaPrecision precision_null)
+static void configureHMCTestMG(QudaMultigridParam &mg_param, QudaInvertParam &mg_inv_param, QudaPrecision precision_null)
 {
   mg_param.invert_param = &mg_inv_param;
   mg_param.n_level = 2;
@@ -440,8 +432,7 @@ TEST(HMC, MGPreconditionedRun)
   // MG internal precision must match the null-vector precision below, otherwise
   // the Y-matrix construction (coarse_op_*.cu:calculateY) and the smoother
   // Wilson-clover argument packer will hit "Precisions 4 8 do not match" errors.
-  QudaPrecision mg_prec =
-    (prec_precondition != QUDA_INVALID_PRECISION) ? prec_precondition : QUDA_SINGLE_PRECISION;
+  QudaPrecision mg_prec = (prec_precondition != QUDA_INVALID_PRECISION) ? prec_precondition : QUDA_SINGLE_PRECISION;
   QudaInvertParam mg_inv_param = inv_param;
   mg_inv_param.solve_type = QUDA_DIRECT_SOLVE;
   mg_inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -706,15 +697,24 @@ TEST(HMC, PerLinkForceTest)
   // Gell-Mann generators: iT^a = i lambda^a / 2
   std::complex<double> iT[8][3][3] = {};
   std::complex<double> Im(0, 1);
-  iT[0][0][1] = Im*0.5; iT[0][1][0] = Im*0.5;
-  iT[1][0][1] = 0.5;    iT[1][1][0] = -0.5;
-  iT[2][0][0] = Im*0.5; iT[2][1][1] = -Im*0.5;
-  iT[3][0][2] = Im*0.5; iT[3][2][0] = Im*0.5;
-  iT[4][0][2] = 0.5;    iT[4][2][0] = -0.5;
-  iT[5][1][2] = Im*0.5; iT[5][2][1] = Im*0.5;
-  iT[6][1][2] = 0.5;    iT[6][2][1] = -0.5;
+  iT[0][0][1] = Im * 0.5;
+  iT[0][1][0] = Im * 0.5;
+  iT[1][0][1] = 0.5;
+  iT[1][1][0] = -0.5;
+  iT[2][0][0] = Im * 0.5;
+  iT[2][1][1] = -Im * 0.5;
+  iT[3][0][2] = Im * 0.5;
+  iT[3][2][0] = Im * 0.5;
+  iT[4][0][2] = 0.5;
+  iT[4][2][0] = -0.5;
+  iT[5][1][2] = Im * 0.5;
+  iT[5][2][1] = Im * 0.5;
+  iT[6][1][2] = 0.5;
+  iT[6][2][1] = -0.5;
   double r3 = 1.0 / std::sqrt(3.0);
-  iT[7][0][0] = Im*0.5*r3; iT[7][1][1] = Im*0.5*r3; iT[7][2][2] = -Im*r3;
+  iT[7][0][0] = Im * 0.5 * r3;
+  iT[7][1][1] = Im * 0.5 * r3;
+  iT[7][2][2] = -Im * r3;
 
   double maxRelErr = 0;
   int nPass = 0, nFail = 0;
@@ -755,7 +755,7 @@ TEST(HMC, PerLinkForceTest)
     std::complex<double> U_orig[3][3];
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
-        U_orig[i][j] = std::complex<double>(linkData[2*(3*i+j)], linkData[2*(3*i+j)+1]);
+        U_orig[i][j] = std::complex<double>(linkData[2 * (3 * i + j)], linkData[2 * (3 * i + j) + 1]);
 
     printfQuda("  Link (%d, %d, parity=%d):\n", mu, site, parity);
 
@@ -772,8 +772,7 @@ TEST(HMC, PerLinkForceTest)
       // plateau at dt^0 instead of scaling as dt^2.
       std::complex<double> trace(0, 0);
       for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-          trace += iT[a][j][i] * P[i][j]; // Tr(iT^a P) = sum_ij (iT^a)_ji P_ij
+        for (int j = 0; j < 3; j++) trace += iT[a][j][i] * P[i][j]; // Tr(iT^a P) = sum_ij (iT^a)_ji P_ij
       double p_a = -2.0 * trace.real();
       double F_analytical = p_a / 2.0;
 
@@ -793,8 +792,8 @@ TEST(HMC, PerLinkForceTest)
       // Perturb +eps
       for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++) {
-          linkData[2*(3*i+j)]   = U_plus[i][j].real();
-          linkData[2*(3*i+j)+1] = U_plus[i][j].imag();
+          linkData[2 * (3 * i + j)] = U_plus[i][j].real();
+          linkData[2 * (3 * i + j) + 1] = U_plus[i][j].imag();
         }
       gauge_param.use_resident_gauge = 0;
       gauge_param.make_resident_gauge = 1;
@@ -808,8 +807,8 @@ TEST(HMC, PerLinkForceTest)
       // Perturb -eps
       for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++) {
-          linkData[2*(3*i+j)]   = U_minus[i][j].real();
-          linkData[2*(3*i+j)+1] = U_minus[i][j].imag();
+          linkData[2 * (3 * i + j)] = U_minus[i][j].real();
+          linkData[2 * (3 * i + j) + 1] = U_minus[i][j].imag();
         }
       loadGaugeQuda(hostGauge, &gauge_param);
       if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
@@ -821,30 +820,31 @@ TEST(HMC, PerLinkForceTest)
       // Restore
       for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++) {
-          linkData[2*(3*i+j)]   = U_orig[i][j].real();
-          linkData[2*(3*i+j)+1] = U_orig[i][j].imag();
+          linkData[2 * (3 * i + j)] = U_orig[i][j].real();
+          linkData[2 * (3 * i + j) + 1] = U_orig[i][j].imag();
         }
 
       double F_numerical = -(Sf_plus - Sf_minus) / (2.0 * eps);
 
-      double relErr = (std::abs(F_numerical) > 1e-12)
-        ? std::abs(F_analytical - F_numerical) / std::abs(F_numerical)
-        : std::abs(F_analytical - F_numerical);
+      double relErr = (std::abs(F_numerical) > 1e-12) ? std::abs(F_analytical - F_numerical) / std::abs(F_numerical) :
+                                                        std::abs(F_analytical - F_numerical);
       maxRelErr = std::max(maxRelErr, relErr);
 
-      if (relErr > 1e-3) nFail++;
-      else nPass++;
+      if (relErr > 1e-3)
+        nFail++;
+      else
+        nPass++;
 
-      printfQuda("    gen %d: ana=%+.6e  num=%+.6e  rel_err=%.2e %s\n",
-                 a, F_analytical, F_numerical, relErr, relErr > 1e-3 ? "FAIL" : "ok");
+      printfQuda("    gen %d: ana=%+.6e  num=%+.6e  rel_err=%.2e %s\n", a, F_analytical, F_numerical, relErr,
+                 relErr > 1e-3 ? "FAIL" : "ok");
     }
   }
 
   // Restore original gauge and clover
   gaugePrecise->copy(gaugeSaved);
   gaugePrecise->exchangeGhost(); // pads: Dirac ops read them; copy() fills only the local volume
-  for (int i = 0; i < 3; i++) // restore hostGauge from gaugeSaved
-    for (int j = 0; j < 3; j++) {}
+  for (int i = 0; i < 3; i++)    // restore hostGauge from gaugeSaved
+    for (int j = 0; j < 3; j++) { }
   loadGaugeQuda(hostGauge, &gauge_param);
   if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
     freeCloverQuda();
@@ -856,7 +856,8 @@ TEST(HMC, PerLinkForceTest)
   printfQuda("\n  Results: %d pass, %d fail, max_rel_err = %.2e\n", nPass, nFail, maxRelErr);
   EXPECT_EQ(nFail, 0) << "Per-link force test failed: analytical force does not match numerical derivative";
 
-  delete d; delete dS;
+  delete d;
+  delete dS;
   if (dP != dS) delete dP;
   if (dE != dP) delete dE;
   momResident = GaugeField();
@@ -895,7 +896,10 @@ TEST(HMC, GaugeForceActionConsistency)
   // in lib/hmc_integrator.cpp so the test is self-contained.
   int *path_length = new int[6];
   double *path_coeff = new double[6];
-  for (int i = 0; i < 6; i++) { path_length[i] = 3; path_coeff[i] = 1.0; }
+  for (int i = 0; i < 6; i++) {
+    path_length[i] = 3;
+    path_coeff[i] = 1.0;
+  }
 
   int ***input_path = new int **[4];
   for (int dir = 0; dir < 4; dir++) {
@@ -905,8 +909,8 @@ TEST(HMC, GaugeForceActionConsistency)
       if (i == dir) continue;
       int opp_dir = 7 - dir;
       int opp_i = 7 - i;
-      input_path[dir][idx]    = new int[3]{i, opp_dir, opp_i};
-      input_path[dir][idx+1]  = new int[3]{opp_i, opp_dir, i};
+      input_path[dir][idx] = new int[3] {i, opp_dir, opp_i};
+      input_path[dir][idx + 1] = new int[3] {opp_i, opp_dir, i};
       idx += 2;
     }
   }
@@ -1080,8 +1084,12 @@ TEST(HMC, dHStatistics)
   }
 
   double mean = 0, exp_mean = 0;
-  for (double dH : dHs) { mean += dH; exp_mean += std::exp(-dH); }
-  mean /= N; exp_mean /= N;
+  for (double dH : dHs) {
+    mean += dH;
+    exp_mean += std::exp(-dH);
+  }
+  mean /= N;
+  exp_mean /= N;
   double var = 0;
   for (double dH : dHs) var += (dH - mean) * (dH - mean);
   var /= std::max(1, N - 1);
@@ -1132,10 +1140,10 @@ TEST(HMC, dHScaling)
   const int n_dt = 4;
   double tau = hmc_tau;
 
-  const char *iname = (itype == QUDA_LEAPFROG_INTEGRATOR) ? "Leapfrog"
-                    : (itype == QUDA_OMELYAN_INTEGRATOR)  ? "Omelyan"
-                    : (itype == QUDA_FORCE_GRADIENT_INTEGRATOR) ? "ForceGradient"
-                    : "Unknown";
+  const char *iname = (itype == QUDA_LEAPFROG_INTEGRATOR) ? "Leapfrog" :
+    (itype == QUDA_OMELYAN_INTEGRATOR)                    ? "Omelyan" :
+    (itype == QUDA_FORCE_GRADIENT_INTEGRATOR)             ? "ForceGradient" :
+                                                            "Unknown";
   // Leapfrog and the 2nd-order Omelyan PQPQP minimum-norm scheme both have
   // dH ∝ dt². Force-gradient (PQPQP_FG with the Hessian-free trick) is 4th
   // order.
@@ -1175,7 +1183,10 @@ TEST(HMC, dHScaling)
   for (int k = 0; k < n_dt; k++) {
     double x = std::log(dts[k]);
     double y = std::log(std::max(dHs[k], 1e-30));
-    sx += x; sy += y; sxx += x * x; sxy += x * y;
+    sx += x;
+    sy += y;
+    sxx += x * x;
+    sxy += x * y;
   }
   double p_fit = (n_dt * sxy - sx * sy) / (n_dt * sxx - sx * sx);
 
@@ -1187,8 +1198,8 @@ TEST(HMC, dHScaling)
 
   // Loose bound: scaling within ±0.5 of expected. Plateau (force-action
   // mismatch) shows up as p ≈ 0; wrong order shows as different exponent.
-  EXPECT_NEAR(p_fit, expected_p, 0.5) << iname << ": dH does not scale as dt^" << expected_p
-                                      << " (fitted " << p_fit << ") — possible integrator bug";
+  EXPECT_NEAR(p_fit, expected_p, 0.5) << iname << ": dH does not scale as dt^" << expected_p << " (fitted " << p_fit
+                                      << ") — possible integrator bug";
 }
 
 /**
@@ -1236,7 +1247,8 @@ TEST(HMC, dHScalingNestedFGI)
   mg_ip.clover_cuda_prec_precondition = prec_precondition;
   mg_ip.clover_cuda_prec_eigensolver = prec_precondition;
   configureHMCTestMG(mg_param, mg_ip, prec_precondition);
-  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) loadCloverQuda(nullptr, nullptr, &inv_param);
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH))
+    loadCloverQuda(nullptr, nullptr, &inv_param);
   void *mg_prec = newMultigridQuda(&mg_param);
 
   // Outer inverter: plain CG, no MG preconditioner on the outer (MG is
@@ -1278,7 +1290,10 @@ TEST(HMC, dHScalingNestedFGI)
   for (int k = 0; k < n_dt; k++) {
     double x = std::log(dts[k]);
     double y = std::log(std::max(dHs[k], 1e-30));
-    sx += x; sy += y; sxx += x * x; sxy += x * y;
+    sx += x;
+    sy += y;
+    sxx += x * x;
+    sxy += x * y;
   }
   double p_fit = (n_dt * sxy - sx * sy) / (n_dt * sxx - sx * sx);
 
@@ -1382,8 +1397,7 @@ TEST(HMC, ReversibilityTest)
       double sum_dH = dH_fwd + dH_bwd;
 
       printfQuda("  dH_fwd = %+.6e, dH_bwd = %+.6e, dH_fwd + dH_bwd = %+.6e\n", dH_fwd, dH_bwd, sum_dH);
-      printfQuda("  plaq_before = %.15e, plaq_after = %.15e, delta = %.6e\n", plaq_before[0], plaq_after[0],
-                 delta_plaq);
+      printfQuda("  plaq_before = %.15e, plaq_after = %.15e, delta = %.6e\n", plaq_before[0], plaq_after[0], delta_plaq);
 
       bool pass = (delta_plaq < rev_tol);
       if (pass) {
@@ -1430,10 +1444,10 @@ TEST(HMC, ReversibilityAllIntegrators)
   // MG-using integrators (nested FGI) run with single-precision transfer so the
   // tolerance is looser (use --hmc-reversibility-tol-mg). Both are CLI-driven.
   const Case cases[] = {
-    {"Leapfrog",      QUDA_LEAPFROG_INTEGRATOR,       false, hmc_reversibility_tol},
-    {"Omelyan",       QUDA_OMELYAN_INTEGRATOR,        false, hmc_reversibility_tol},
+    {"Leapfrog", QUDA_LEAPFROG_INTEGRATOR, false, hmc_reversibility_tol},
+    {"Omelyan", QUDA_OMELYAN_INTEGRATOR, false, hmc_reversibility_tol},
     {"ForceGradient", QUDA_FORCE_GRADIENT_INTEGRATOR, false, hmc_reversibility_tol},
-    {"NestedFGI",     QUDA_NESTED_FGI_INTEGRATOR,     true,  hmc_reversibility_tol_mg},
+    {"NestedFGI", QUDA_NESTED_FGI_INTEGRATOR, true, hmc_reversibility_tol_mg},
   };
 
   // Save the starting gauge so every integrator starts from the same U_0.
@@ -1479,7 +1493,8 @@ TEST(HMC, ReversibilityAllIntegrators)
       mg_ip.clover_cuda_prec_precondition = prec_precondition;
       mg_ip.clover_cuda_prec_eigensolver = prec_precondition;
       configureHMCTestMG(mg_param, mg_ip, prec_precondition);
-      if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) loadCloverQuda(nullptr, nullptr, &inv_param);
+      if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH))
+        loadCloverQuda(nullptr, nullptr, &inv_param);
       mg_prec = newMultigridQuda(&mg_param);
     }
 
@@ -1584,7 +1599,7 @@ static QudaEigParam makeEigentestEigParam(int nEv)
   ep.eig_type = QUDA_EIG_TR_LANCZOS;
   ep.spectrum = QUDA_SPECTRUM_SR_EIG;
   ep.n_ev = nEv;
-  ep.n_kr = 3 * nEv;          // QUDA wiki rule of thumb
+  ep.n_kr = 3 * nEv; // QUDA wiki rule of thumb
   ep.n_conv = nEv;
   ep.n_ev_deflate = nEv;
   ep.tol = eigentracking_trlm_tol;
@@ -1652,7 +1667,9 @@ TEST(EigenTracking, PoolInitAndCompress)
 {
   using namespace quda;
 
-  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
 
   QudaInvertParam ip = inv_param;
   Dirac *dirac = nullptr;
@@ -1711,7 +1728,9 @@ TEST(EigenTracking, ForceUpdate)
 {
   using namespace quda;
 
-  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
 
   QudaInvertParam ip = inv_param;
   Dirac *dirac = nullptr;
@@ -1796,7 +1815,9 @@ TEST(EigenTracking, RayleighRitzEvolve)
 {
   using namespace quda;
 
-  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
 
   QudaInvertParam ip = inv_param;
   Dirac *dirac = nullptr;
@@ -1923,7 +1944,9 @@ TEST(EigenTracking, CGRitzExtraction)
 {
   using namespace quda;
 
-  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) { loadCloverQuda(nullptr, nullptr, &inv_param); }
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
 
   QudaInvertParam ip = inv_param;
   ip.solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -2035,7 +2058,7 @@ TEST(EigenTracking, ThermalizeAndTrack)
   QudaHMCParam therm_param = makeHMCParam();
   therm_param.n_trajectories = hmc_n_thermalization;
   therm_param.n_thermalization = hmc_n_thermalization; // all forced-accept
-  therm_param.eigentracking_enabled = 0; // always off during thermalization
+  therm_param.eigentracking_enabled = 0;               // always off during thermalization
   therm_param.checkpoint_interval = hmc_checkpoint_interval;
 
   printfQuda("\n========================================\n");
@@ -2115,7 +2138,7 @@ TEST(HMC, Production)
     mg_inv_param.solution_type = QUDA_MAT_SOLUTION;
     mg_inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     // MG inv_param: precise matches gauge (double), sloppy/precondition in mg_prec (single)
-    mg_inv_param.cuda_prec = gauge_param.cuda_prec;           // must match gauge
+    mg_inv_param.cuda_prec = gauge_param.cuda_prec; // must match gauge
     mg_inv_param.cuda_prec_sloppy = mg_prec;
     mg_inv_param.cuda_prec_precondition = mg_prec;
     mg_inv_param.cuda_prec_eigensolver = mg_prec;
@@ -2135,32 +2158,64 @@ TEST(HMC, Production)
     // We use a lambda to save/restore any mgarray: if the CLI set a non-default value,
     // it wins over the test default.
     struct MgSnapshot {
-      decltype(mg_eig) eig; decltype(mg_eig_n_ev) eig_n_ev; decltype(mg_eig_n_kr) eig_n_kr;
-      decltype(mg_eig_use_normop) eig_normop; decltype(mg_eig_use_poly_acc) eig_poly;
-      decltype(mg_eig_poly_deg) eig_poly_deg; decltype(mg_eig_amin) eig_amin;
-      decltype(setup_inv) sinv; decltype(setup_maxiter) smax; decltype(setup_maxiter_refresh) srefresh;
-      decltype(setup_tol) stol; decltype(num_setup_iter) siter;
-      decltype(nu_pre) npre; decltype(nu_post) npost;
-      decltype(smoother_type) sm; decltype(smoother_tol) smtol;
-      decltype(coarse_solver) cs; decltype(coarse_solver_tol) cstol; decltype(coarse_solver_maxiter) csmax;
-      decltype(mg_verbosity) verb; decltype(nvec) nv; decltype(geo_block_size) gbs;
-    } snap = {mg_eig, mg_eig_n_ev, mg_eig_n_kr, mg_eig_use_normop, mg_eig_use_poly_acc,
-              mg_eig_poly_deg, mg_eig_amin, setup_inv, setup_maxiter, setup_maxiter_refresh,
-              setup_tol, num_setup_iter, nu_pre, nu_post, smoother_type, smoother_tol,
-              coarse_solver, coarse_solver_tol, coarse_solver_maxiter, mg_verbosity, nvec, geo_block_size};
+      decltype(mg_eig) eig;
+      decltype(mg_eig_n_ev) eig_n_ev;
+      decltype(mg_eig_n_kr) eig_n_kr;
+      decltype(mg_eig_use_normop) eig_normop;
+      decltype(mg_eig_use_poly_acc) eig_poly;
+      decltype(mg_eig_poly_deg) eig_poly_deg;
+      decltype(mg_eig_amin) eig_amin;
+      decltype(setup_inv) sinv;
+      decltype(setup_maxiter) smax;
+      decltype(setup_maxiter_refresh) srefresh;
+      decltype(setup_tol) stol;
+      decltype(num_setup_iter) siter;
+      decltype(nu_pre) npre;
+      decltype(nu_post) npost;
+      decltype(smoother_type) sm;
+      decltype(smoother_tol) smtol;
+      decltype(coarse_solver) cs;
+      decltype(coarse_solver_tol) cstol;
+      decltype(coarse_solver_maxiter) csmax;
+      decltype(mg_verbosity) verb;
+      decltype(nvec) nv;
+      decltype(geo_block_size) gbs;
+    } snap = {mg_eig,
+              mg_eig_n_ev,
+              mg_eig_n_kr,
+              mg_eig_use_normop,
+              mg_eig_use_poly_acc,
+              mg_eig_poly_deg,
+              mg_eig_amin,
+              setup_inv,
+              setup_maxiter,
+              setup_maxiter_refresh,
+              setup_tol,
+              num_setup_iter,
+              nu_pre,
+              nu_post,
+              smoother_type,
+              smoother_tol,
+              coarse_solver,
+              coarse_solver_tol,
+              coarse_solver_maxiter,
+              mg_verbosity,
+              nvec,
+              geo_block_size};
 
     setQudaDefaultMgTestParams();
 
     // Restore: CLI values that differ from zero-init win over test defaults.
     // Bool arrays always restore (zero-init == false is a valid CLI value).
-    mg_eig = snap.eig; mg_eig_use_normop = snap.eig_normop;
+    mg_eig = snap.eig;
+    mg_eig_use_normop = snap.eig_normop;
     mg_eig_use_poly_acc = snap.eig_poly;
     for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
       if (snap.eig_n_ev[i]) mg_eig_n_ev[i] = snap.eig_n_ev[i];
       if (snap.eig_n_kr[i]) mg_eig_n_kr[i] = snap.eig_n_kr[i];
       if (snap.eig_poly_deg[i]) mg_eig_poly_deg[i] = snap.eig_poly_deg[i];
       if (snap.eig_amin[i] != 0) mg_eig_amin[i] = snap.eig_amin[i];
-      if (snap.sinv[i] != 0) setup_inv[i] = snap.sinv[i];  // 0 = CG, also valid
+      if (snap.sinv[i] != 0) setup_inv[i] = snap.sinv[i]; // 0 = CG, also valid
       if (snap.smax[i]) setup_maxiter[i] = snap.smax[i];
       if (snap.srefresh[i]) setup_maxiter_refresh[i] = snap.srefresh[i];
       if (snap.stol[i] != 0) setup_tol[i] = snap.stol[i];
@@ -2174,7 +2229,8 @@ TEST(HMC, Production)
       if (snap.csmax[i]) coarse_solver_maxiter[i] = snap.csmax[i];
       if (snap.verb[i] != 0) mg_verbosity[i] = snap.verb[i];
       if (snap.nv[i]) nvec[i] = snap.nv[i];
-      for (int j = 0; j < 4; j++) if (snap.gbs[i][j]) geo_block_size[i][j] = snap.gbs[i][j];
+      for (int j = 0; j < 4; j++)
+        if (snap.gbs[i][j]) geo_block_size[i][j] = snap.gbs[i][j];
     }
 
     // Override solve_type for MG (must be DIRECT_PC for outer HMC solve).
@@ -2208,8 +2264,8 @@ TEST(HMC, Production)
 
     // Debug: verify deflation configuration
     for (int i = 0; i < mg_param.n_level; i++) {
-      printfQuda("MG level %d: use_eig_solver=%d, eig_param=%p\n", i,
-                 mg_param.use_eig_solver[i], (void *)mg_param.eig_param[i]);
+      printfQuda("MG level %d: use_eig_solver=%d, eig_param=%p\n", i, mg_param.use_eig_solver[i],
+                 (void *)mg_param.eig_param[i]);
       if (mg_param.eig_param[i]) {
         printfQuda("  eig: n_ev=%d, n_kr=%d, n_conv=%d, use_norm_op=%d, use_poly_acc=%d, poly_deg=%d\n",
                    mg_param.eig_param[i]->n_ev, mg_param.eig_param[i]->n_kr, mg_param.eig_param[i]->n_conv,
@@ -2262,17 +2318,13 @@ TEST(HMC, Production)
 
   printfQuda("\n========================================\n");
   printfQuda("HMC Production: %d trajectories (%d therm)\n", hmc_n_trajectories, hmc_n_thermalization);
-  printfQuda("  MG=%s, eigentracking=%d\n", mg_preconditioner ? "enabled" : "disabled",
-             hmc_param.eigentracking_enabled);
+  printfQuda("  MG=%s, eigentracking=%d\n", mg_preconditioner ? "enabled" : "disabled", hmc_param.eigentracking_enabled);
   printfQuda("========================================\n");
 
-  hmcRunQuda(nullptr, &hmc_param, &gauge_param, &inv_param, mg_preconditioner,
-             mg_preconditioner ? &mg_param : nullptr);
+  hmcRunQuda(nullptr, &hmc_param, &gauge_param, &inv_param, mg_preconditioner, mg_preconditioner ? &mg_param : nullptr);
 
   // Cleanup MG and fully restore inv_param so the next test starts clean.
-  if (mg_preconditioner) {
-    destroyMultigridQuda(mg_preconditioner);
-  }
+  if (mg_preconditioner) { destroyMultigridQuda(mg_preconditioner); }
   inv_param.preconditioner = const_cast<void *>(saved_preconditioner);
   inv_param.inv_type = saved_inv_type;
   inv_param.inv_type_precondition = saved_inv_type_precondition;
@@ -2307,11 +2359,10 @@ namespace
   {
     // ColorSpinorParam wants lat_dim_t (quda::array<int, QUDA_MAX_DIM>);
     // gauge_param.X is plain int[4]. Promote.
-    quda::lat_dim_t X{};
+    quda::lat_dim_t X {};
     for (int i = 0; i < 4; i++) X[i] = gauge_param.X[i];
     quda::ColorSpinorParam csParam(nullptr, inv_param, X,
-                                   /*pc_solution=*/(siteSubset == QUDA_PARITY_SITE_SUBSET),
-                                   QUDA_CUDA_FIELD_LOCATION);
+                                   /*pc_solution=*/(siteSubset == QUDA_PARITY_SITE_SUBSET), QUDA_CUDA_FIELD_LOCATION);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(prec_);
     csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
@@ -2328,8 +2379,8 @@ namespace
   {
     auto fine = makeFineSpinor(QUDA_DOUBLE_PRECISION, QUDA_FULL_SITE_SUBSET);
     const int blockSize[4] = {2, 2, 2, 2};
-    return fine.create_coarse(blockSize, /*spinBlockSize=*/2, /*Nvec=*/24,
-                               QUDA_DOUBLE_PRECISION, QUDA_CUDA_FIELD_LOCATION);
+    return fine.create_coarse(blockSize, /*spinBlockSize=*/2, /*Nvec=*/24, QUDA_DOUBLE_PRECISION,
+                              QUDA_CUDA_FIELD_LOCATION);
   }
 
 } // namespace
@@ -2402,8 +2453,8 @@ TEST(HMC, GCRTrackerPrecisionPromotion)
   ASSERT_EQ(stored.size(), 1u);
 
   EXPECT_EQ(stored[0].Precision(), QUDA_DOUBLE_PRECISION) << "stored field not promoted";
-  EXPECT_EQ(stored[0].Nspin(),    4);
-  EXPECT_EQ(stored[0].Ncolor(),   3);
+  EXPECT_EQ(stored[0].Nspin(), 4);
+  EXPECT_EQ(stored[0].Ncolor(), 3);
 
   // recordIteration normalises: stored field should have unit L2 norm.
   EXPECT_NEAR(blas::norm2(stored[0]), 1.0, 1e-10);
@@ -2441,7 +2492,7 @@ TEST(HMC, GCRTrackerSiteSubsetPreserved)
   ASSERT_EQ(stored.size(), 1u);
 
   EXPECT_EQ(stored[0].SiteSubset(), QUDA_PARITY_SITE_SUBSET) << "half-site residual was embedded into full-site";
-  EXPECT_EQ(stored[0].Precision(),  QUDA_DOUBLE_PRECISION)   << "precision promotion still required";
+  EXPECT_EQ(stored[0].Precision(), QUDA_DOUBLE_PRECISION) << "precision promotion still required";
   EXPECT_NEAR(blas::norm2(stored[0]), 1.0, 1e-10);
 }
 
@@ -2474,8 +2525,7 @@ TEST(HMC, EigenTrackerCapEnrichesPool)
   }
 
   // Reuse the known-good 4^4 MG configuration from HMC.MGPreconditionedRun.
-  QudaPrecision mg_prec =
-    (prec_precondition != QUDA_INVALID_PRECISION) ? prec_precondition : QUDA_SINGLE_PRECISION;
+  QudaPrecision mg_prec = (prec_precondition != QUDA_INVALID_PRECISION) ? prec_precondition : QUDA_SINGLE_PRECISION;
   QudaInvertParam mg_inv_param = inv_param;
   mg_inv_param.solve_type = QUDA_DIRECT_SOLVE;
   mg_inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -2527,9 +2577,9 @@ TEST(HMC, EigenTrackerCapEnrichesPool)
   ASSERT_NE(et, nullptr) << "EigenTrackingState was not constructed during HMC";
 
   EXPECT_GE(et->getTrajectoryCount(), 1);
-  EXPECT_GT(et->getTotalRitzAbsorbed(), 0)
-      << "per-solve Krylov capture (cap=4) failed to feed the pool: "
-         "got " << et->getTotalRitzAbsorbed() << " absorbed";
+  EXPECT_GT(et->getTotalRitzAbsorbed(), 0) << "per-solve Krylov capture (cap=4) failed to feed the pool: "
+                                              "got "
+                                           << et->getTotalRitzAbsorbed() << " absorbed";
 
   // Restore HMC + ET state.
   destroyMultigridQuda(mg_preconditioner);
