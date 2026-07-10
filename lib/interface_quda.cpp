@@ -5052,7 +5052,20 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
   // For clover actions: compute from gauge. For pure Wilson: no clover needed.
   bool use_clover = (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH
                      || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH);
-  if (use_clover) { loadCloverQuda(nullptr, nullptr, inv_param); }
+  if (use_clover) {
+    // Only (re)load when the clover is absent or its parameters changed.
+    // loadCloverQuda unconditionally frees and recreates the SLOPPY clover
+    // family even when the precise field is untouched — at mixed precision
+    // (distinct sloppy objects) that dangles the pointers an MG hierarchy
+    // captured at setup, corrupting the smoother from the second trajectory
+    // on. Within a run the HMC path keeps the clover current itself
+    // (hmcRefreshResidentGaugeState after every gauge update/restore).
+    double coeff = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);
+    double mu2 = 4.0 * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu;
+    bool clover_current = cloverPrecise && cloverPrecise->Coeff() == coeff && cloverPrecise->Csw() == inv_param->clover_csw
+      && cloverPrecise->Mu2() == mu2 && cloverPrecise->Rho() == inv_param->clover_rho;
+    if (!clover_current) { loadCloverQuda(nullptr, nullptr, inv_param); }
+  }
 
   // --- 3. Momentum: load from host, use resident, or generate ---
   if (hmc_param->generate_momentum) {
@@ -5536,15 +5549,15 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
         if (et_dE && et_dE != et_d && et_dE != et_dP) delete et_dE;
       }
     } else {
-      // Reject: restore gauge from backup
+      // Reject: restore gauge from backup, then run the FULL state-refresh
+      // discipline. The previous code skipped the ghost-pad exchange (the
+      // Dirac operators then read restored bulk links against the rejected
+      // trajectory's boundary links — a broken operator that showed up as a
+      // systematic O(500) dH offset on every post-rejection trajectory) and
+      // called createCloverQuda directly (corrupt single-precision TrLog
+      // path, no sloppy-clover refresh).
       gaugePrecise->copy(gaugeBkup);
-      if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-      if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
-        gaugePrecondition->copy(*gaugePrecise);
-
-      // Rebuild clover and extended gauge after restoring
-      updateExtendedGaugeResident(true, R, getProfile());
-      if (cloverPrecise) createCloverQuda(inv_param);
+      quda::hmcRefreshResidentGaugeState(*inv_param);
 
       // Verify restore
       {

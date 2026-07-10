@@ -190,4 +190,15 @@ namespace quda
   */
   int getMGNullVectorCount(void *mg_instance);
 
+  /**
+     @brief Full state-refresh discipline after any device-side write to
+     gaugePrecise: ghost pads, sloppy gauge copies, extended gauge, and (for
+     clover-type actions) the in-place clover recompute at double precision
+     plus the in-place sloppy-clover family refresh. Preserves all field
+     object identities (MG hierarchies hold pointers). Must be called after
+     every gauge update, restore, or displacement in the HMC path.
+     @param inv_param Inverter parameters (dslash type, clover coefficient)
+  */
+  void hmcRefreshResidentGaugeState(QudaInvertParam &inv_param);
+
 } // namespace quda

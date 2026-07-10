@@ -54,6 +54,10 @@ extern quda::GaugeField *gaugeExtended;
 extern quda::GaugeField *extendedGaugeResident;
 extern quda::GaugeField momResident;
 extern quda::CloverField *cloverPrecise;
+extern quda::CloverField *cloverSloppy;
+extern quda::CloverField *cloverPrecondition;
+extern quda::CloverField *cloverRefinement;
+extern quda::CloverField *cloverEigensolver;
 
 void updateExtendedGaugeResident(bool new_gauge, const quda::lat_dim_t &R, quda::TimeProfile &profile,
                                  bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
@@ -237,6 +241,8 @@ namespace quda
      * corrupt clover (NaN / systematically wrong TrLog, "diagonal appears
      * unset" reads downstream).
      */
+    void refreshSloppyCloverFamily();
+
     void recomputeResidentClover(QudaInvertParam &inv_param)
     {
       if (!cloverPrecise) errorQuda("No resident clover field to recompute");
@@ -244,6 +250,7 @@ namespace quda
       if (cloverPrecise->Precision() >= QUDA_DOUBLE_PRECISION) {
         // createCloverQuda computes at the field precision (double): safe.
         createCloverQuda(&inv_param);
+        refreshSloppyCloverFamily();
         return;
       }
 
@@ -278,19 +285,34 @@ namespace quda
 
       // Demote into the resident field in place (copies TrLog + metadata)
       cloverPrecise->copy(tmp);
+      refreshSloppyCloverFamily();
 
       if (ex != gauge) delete ex;
     }
 
     /**
-     * @brief Sync sloppy/precondition copies from gaugePrecise after any
-     *        in-place gauge mutation.
+     * @brief In-place refresh of the sloppy clover family after a
+     *        cloverPrecise recompute.
+     *
+     * When the sloppy/precondition/refinement/eigensolver clovers are
+     * distinct objects (mixed precision), they hold now-stale copies. They
+     * must be refreshed IN PLACE — reallocation (freeSloppyCloverQuda +
+     * loadSloppyCloverQuda) would dangle the pointers an MG hierarchy
+     * captured at setup. CloverField::copy performs the precision-demoting
+     * conversion and refreshes the metadata (Diagonal, max) the compressed
+     * accessors require.
      */
-    void syncGaugeHierarchyFromPrecise()
+    void refreshSloppyCloverFamily()
     {
-      if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-      if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
-        gaugePrecondition->copy(*gaugePrecise);
+      if (cloverSloppy && cloverSloppy != cloverPrecise) cloverSloppy->copy(*cloverPrecise);
+      if (cloverPrecondition && cloverPrecondition != cloverPrecise && cloverPrecondition != cloverSloppy)
+        cloverPrecondition->copy(*cloverPrecise);
+      if (cloverRefinement && cloverRefinement != cloverPrecise && cloverRefinement != cloverSloppy
+          && cloverRefinement != cloverPrecondition)
+        cloverRefinement->copy(*cloverPrecise);
+      if (cloverEigensolver && cloverEigensolver != cloverPrecise && cloverEigensolver != cloverSloppy
+          && cloverEigensolver != cloverPrecondition && cloverEigensolver != cloverRefinement)
+        cloverEigensolver->copy(*cloverPrecise);
     }
 
     /**
@@ -348,6 +370,31 @@ namespace quda
       }
     }
   } // namespace
+
+  void hmcRefreshResidentGaugeState(QudaInvertParam &inv_param)
+  {
+    // Full state-refresh discipline after ANY device-side write to
+    // gaugePrecise. Each element guards against a distinct staleness bug
+    // observed in this codebase (see the ghost-pad / clover findings):
+    // 1. ghost pads: copy() fills only the local volume, the Dirac
+    //    operators read the pads;
+    gaugePrecise->exchangeGhost();
+    // 2. sloppy/precondition gauge copies (aliased at uniform precision);
+    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
+    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+      gaugePrecondition->copy(*gaugePrecise);
+    // 3. the cached extended gauge (createCloverQuda and the gauge force
+    //    read it; new_gauge = true forces the rebuild);
+    lat_dim_t R;
+    for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * commDimPartitioned(d);
+    updateExtendedGaugeResident(true, R, getProfile());
+    // 4. clover-type actions: in-place recompute at double + demote, plus
+    //    the in-place sloppy-clover family refresh (mixed precision).
+    if (cloverPrecise
+        && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+      recomputeResidentClover(inv_param);
+    }
+  }
 
   // --------------------------------------------------------------------
   // Primitive operations.
@@ -551,33 +598,7 @@ namespace quda
     updateGaugeField(u_out, dt, *gaugePrecise, momResident, false, true);
 
     gaugePrecise->copy(u_out);
-    // Refresh the ghost pads: copy() updates only the local volume, but
-    // gaugePrecise is a GHOST_EXCHANGE_PAD field whose pads loadGaugeQuda
-    // filled from the ORIGINAL gauge. Stale pads make the Dirac operator a
-    // mongrel of evolved bulk + initial-gauge boundary, i.e. a non-gradient
-    // force that grows along the trajectory (dt-independent dH plateau).
-    gaugePrecise->exchangeGhost();
-    syncGaugeHierarchyFromPrecise();
-
-    // Rebuild extended gauge (handles ghost exchange internally)
-    lat_dim_t R = hmcExtendedGaugeShell();
-    updateExtendedGaugeResident(true, R, getProfile());
-
-    // Rebuild clover from the updated gauge if this is a clover-type action.
-    // Must be IN PLACE (createCloverQuda: Fmunu from the extended gauge
-    // refreshed above with new_gauge = true, computeClover + cloverInvert/
-    // TrLog into the existing field): a free + reload would reallocate the
-    // clover and dangle the pointers an MG hierarchy captured at setup
-    // (observed as garbage "checkerboard volume" / "diagonal appears unset"
-    // aborts inside MG smoothers). Plain loadCloverQuda would no-op instead
-    // (its recompute triggers are parameter changes or loadGaugeQuda's
-    // invalidate_clover flag). Sloppy clover copies alias cloverPrecise at
-    // uniform precision; mixed-precision clover-sloppy refresh is a known
-    // gap shared with the pre-existing code.
-    if (cloverPrecise
-        && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
-      recomputeResidentClover(inv_param);
-    }
+    hmcRefreshResidentGaugeState(inv_param);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
@@ -612,26 +633,10 @@ namespace quda
     GaugeField u_out(gfParam);
     updateGaugeField(u_out, 1.0, *gaugePrecise, momResident, false, true);
     gaugePrecise->copy(u_out);
-    // Refresh the ghost pads: copy() updates only the local volume, but
-    // gaugePrecise is a GHOST_EXCHANGE_PAD field whose pads loadGaugeQuda
-    // filled from the ORIGINAL gauge. Stale pads make the Dirac operator a
-    // mongrel of evolved bulk + initial-gauge boundary, i.e. a non-gradient
-    // force that grows along the trajectory (dt-independent dH plateau).
-    gaugePrecise->exchangeGhost();
-    syncGaugeHierarchyFromPrecise();
-    // Force-rebuild extended halo at the displaced gauge. Without this,
-    // the next kick consumes the pre-displacement halo and the FG
-    // correction silently degenerates to a plain Omelyan step (2nd-order
-    // instead of 4th — visible as p≈2 in HMC.dHScaling).
-    lat_dim_t R = hmcExtendedGaugeShell();
-    updateExtendedGaugeResident(true, R, getProfile());
-    // Recompute the clover at the displaced gauge (in place — see drift()):
-    // without this the excursion's force evaluation uses the pre-displacement
-    // clover, degrading the FG correction for clover-type actions.
-    if (cloverPrecise
-        && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
-      recomputeResidentClover(inv_param);
-    }
+    // Full refresh at the displaced gauge: without it the excursion's force
+    // evaluation uses the pre-displacement halo/clover and the FG correction
+    // silently degenerates to 2nd order (p≈2 instead of 4 in HMC.dHScaling).
+    hmcRefreshResidentGaugeState(inv_param);
 
     // Restore momentum, compute full kick at displaced gauge
     momResident.copy(momSaved);
@@ -640,13 +645,7 @@ namespace quda
     // Restore gauge — and rebuild extended at the original gauge so the
     // outer schedule's subsequent kick sees a consistent halo.
     gaugePrecise->copy(gaugeSaved);
-    gaugePrecise->exchangeGhost();
-    syncGaugeHierarchyFromPrecise();
-    updateExtendedGaugeResident(true, R, getProfile());
-    if (cloverPrecise
-        && (inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
-      recomputeResidentClover(inv_param);
-    }
+    hmcRefreshResidentGaugeState(inv_param);
   }
 
   // --------------------------------------------------------------------
@@ -737,24 +736,7 @@ namespace quda
     GaugeField u_out(gParam);
     updateGaugeField(u_out, dt, *gaugePrecise, momResident, false, true);
     gaugePrecise->copy(u_out);
-    // Refresh the ghost pads: copy() updates only the local volume, and the
-    // Dirac operators read the pads (same staleness class as the base-class
-    // drift — a mongrel evolved-bulk/stale-boundary operator otherwise).
-    gaugePrecise->exchangeGhost();
-
-    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
-      gaugePrecondition->copy(*gaugePrecise);
-
-    // Clover rebuild: createCloverQuda computes from the cached
-    // extendedGaugeResident, so refresh it first (new_gauge = true). The
-    // recompute is IN PLACE — a free + reload would dangle the clover
-    // pointers held by the MG hierarchy (see drift()).
-    if (cloverPrecise) {
-      lat_dim_t R = hmcExtendedGaugeShell();
-      updateExtendedGaugeResident(true, R, getProfile());
-      recomputeResidentClover(inv_param);
-    }
+    hmcRefreshResidentGaugeState(inv_param);
   }
 
   /**
