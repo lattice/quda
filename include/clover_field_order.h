@@ -498,7 +498,8 @@ namespace quda {
         auto norm1(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          real_t nrm1 = real_t(accessor.scale() * accessor.template transform_reduce<plus<device_reduce_t>>(location, abs_<double, Float>()));
+          real_t nrm1 = real_t(accessor.scale())
+            * reduction_to_real(accessor.template transform_reduce<plus<device_reduce_t>>(location, abs_<double, Float>()));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -511,8 +512,8 @@ namespace quda {
         auto norm2(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          real_t nrm2 = real_t(accessor.scale() * accessor.scale()
-                               * accessor.template transform_reduce<plus<device_reduce_t>>(location, square_<double, Float>()));
+          real_t nrm2 = real_t(accessor.scale()) * real_t(accessor.scale())
+            * reduction_to_real(accessor.template transform_reduce<plus<device_reduce_t>>(location, square_<double, Float>()));
           commGlobalReductionPop();
           return nrm2;
         }
