@@ -516,11 +516,11 @@ if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
 
-CPMAddPackage(
-    NAME CCCL
-    GITHUB_REPOSITORY nvidia/cccl
-    GIT_TAG v3.1.4 # Fetches this tagged commit
-)
+# QUDA/NCI patch: use the CUDA toolkit's CCCL (the one NVSHMEM 3.x links) rather
+# than CPM-downloading a second CCCL, so there is ONE consistent CCCL. QUDA
+# requires CUDAToolkit, so CUDAToolkit_LIBRARY_ROOT points at the toolkit here.
+find_package(CCCL REQUIRED CONFIG
+    HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl")
 target_link_libraries(quda PRIVATE CCCL::CCCL)
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
@@ -576,10 +576,13 @@ if(QUDA_NVSHMEM)
     if("${QUDA_NVSHMEM_HOME}" STREQUAL "")
       message(FATAL_ERROR "QUDA_NVSHMEM_HOME must be defined if QUDA_NVSHMEM is set")
     endif()
-    find_library(
-      NVSHMEM_LIBS
-      NAMES nvshmem
-      PATHS "${QUDA_NVSHMEM_HOME}/lib/")
+    # NVSHMEM 3.x config-package linking (QUDA/NCI patch)
+    # NVSHMEM 3.x ships split host/device libs + a CMake config package. Its
+    # NVSHMEMConfig.cmake does find_dependency(CCCL); QUDA is built against the
+    # SAME (CUDA toolkit) CCCL just above (see the CCCL find_package patch), so
+    # this reuses it -> one consistent CCCL, no version clash.
+    find_package(NVSHMEM REQUIRED CONFIG
+      HINTS "${QUDA_NVSHMEM_HOME}/lib/cmake/nvshmem")
     find_path(
       NVSHMEM_INCLUDE
       NAMES nvshmem.h
@@ -588,11 +591,20 @@ if(QUDA_NVSHMEM)
 
   mark_as_advanced(NVSHMEM_LIBS)
   mark_as_advanced(NVSHMEM_INCLUDE)
-  add_library(nvshmem_lib STATIC IMPORTED)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LOCATION ${NVSHMEM_LIBS})
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
+  # Resolve NVSHMEM device/host targets across NVSHMEM 3.x config layouts.
+  if(TARGET nvshmem::nvshmem_device)
+    set(QUDA_NVSHMEM_DEVICE_TGT nvshmem::nvshmem_device)
+  elseif(TARGET nvshmem::nvshmem)
+    set(QUDA_NVSHMEM_DEVICE_TGT nvshmem::nvshmem)
+  else()
+    message(FATAL_ERROR "NVSHMEM config package found but no device target "
+                        "(nvshmem::nvshmem_device) is defined")
+  endif()
+  if(TARGET nvshmem::nvshmem_host)
+    set(QUDA_NVSHMEM_HOST_TGT nvshmem::nvshmem_host)
+  else()
+    set(QUDA_NVSHMEM_HOST_TGT ${QUDA_NVSHMEM_DEVICE_TGT})
+  endif()
 
   # set_target_properties(quda_pack PROPERTIES CUDA_ARCHITECTURES ${QUDA_COMPUTE_CAPABILITY})
   target_include_directories(quda_pack PRIVATE dslash_core)
@@ -614,8 +626,14 @@ if(QUDA_NVSHMEM)
     add_dependencies(quda_cpp NVSHMEM)
     add_dependencies(quda_pack NVSHMEM)
   endif()
-  get_filename_component(NVSHMEM_LIBPATH ${NVSHMEM_LIBS} DIRECTORY)
-  target_link_libraries(quda PUBLIC -L${NVSHMEM_LIBPATH} -lnvshmem)
+  # Device lib into quda_pack (device code) AND quda (device link); host into quda.
+  # PRIVATE, not PUBLIC: libquda.so is shared and fully absorbs the nvshmem
+  # device symbols + gets a DT_NEEDED on libnvshmem_host, so consumers (MILC via
+  # find_package(QUDA)) must NOT see nvshmem::* in QUDA's exported interface
+  # (PUBLIC leaked nvshmem::nvshmem_host into QUDATargets.cmake -> MILC configure
+  # failed: "target nvshmem::nvshmem_host not found").
+  target_link_libraries(quda_pack PRIVATE ${QUDA_NVSHMEM_DEVICE_TGT})
+  target_link_libraries(quda PRIVATE ${QUDA_NVSHMEM_HOST_TGT} ${QUDA_NVSHMEM_DEVICE_TGT})
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${NVSHMEM_INCLUDE}>)
 endif()
 
