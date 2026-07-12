@@ -26,8 +26,7 @@ namespace quda
   // runtime API so we don't repeat `if (err != CUDA_SUCCESS) errorQuda(...)` at
   // every driver call.  The argument is evaluated exactly once.  Sites that add
   // per-direction (dim/dir) context keep an explicit errorQuda instead.
-#define CHECK_CU_DRIVER(call)                                                                                          \
-  target::cuda::set_driver_error(call, #call, __func__, __FILE__, __STRINGIFY__(__LINE__));
+#define CHECK_CU_DRIVER(call) target::cuda::set_driver_error(call, #call, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
   namespace comm_target
   {
