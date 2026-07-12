@@ -349,7 +349,7 @@ namespace quda {
        the peer learns of arrival via the signal memory cell.  Caller must
        ensure peer-to-peer is enabled for (dir, dim).
     */
-    void sendStartStream(int dim, int dir, const qudaStream_t &stream);
+    void sendStartStreamGated(int dim, int dir, const qudaStream_t &stream);
 
     /**
        @brief Queue a peer-to-peer recv wait via stream-mem-op signalling

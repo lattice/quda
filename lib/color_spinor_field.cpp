@@ -1276,14 +1276,14 @@ namespace quda
     }
   }
 
-  void ColorSpinorField::sendStartStream(int d, const qudaStream_t &stream, bool remote_write) const
+  void ColorSpinorField::sendStartStreamGated(int d, const qudaStream_t &stream, bool remote_write) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     int dim = d / 2;
     int dir = d % 2;
     if (!commDimPartitioned(dim)) return;
     if (!comm_peer2peer_enabled(dir, dim))
-      errorQuda("sendStartStream requires peer-to-peer enabled for (dir=%d, dim=%d)", dir, dim);
+      errorQuda("sendStartStreamGated requires peer-to-peer enabled for (dir=%d, dim=%d)", dir, dim);
 
     // With remote_write the packing kernel has already written the halo straight
     // into the peer's buffer, so the copy-engine transfer must be skipped (doing it
@@ -1473,7 +1473,7 @@ namespace quda
         // (cuStreamWriteValue64/WaitValue64) instead of IPC events + MPI doorbells.
         // The per-kind ipcCopyEvents are compiled out on MNNVL builds, so the event
         // path (recvStart P2P doorbell / sendStart event record / ipcRemoteCopyEvent
-        // stream-wait) must be replaced by sendStartStream + commsWaitStream here.
+        // stream-wait) must be replaced by sendStartStreamGated + commsWaitStream here.
         const bool stream_gated = comm::p2p_signal() == QudaP2PSignal::STREAM_GATED;
 
         // prepost receive (skip the stream-gated P2P MPI doorbell -- the stream-gated
@@ -1499,7 +1499,7 @@ namespace quda
               if ((comm_peer2peer_enabled(dir, dim) + p2p) % 2 == 0) { // issue non-p2p transfers first
                 if (stream_gated && comm_peer2peer_enabled(dir, dim))
                   // stream-gated P2P: copy-engine memcpy + cuStreamWriteValue64 on the per-dir stream
-                  sendStartStream(2 * dim + dir, device::get_stream(2 * dim + dir));
+                  sendStartStreamGated(2 * dim + dir, device::get_stream(2 * dim + dir));
                 else
                   sendStart(2 * dim + dir, device::get_stream(2 * dim + dir), gdr_send);
               }

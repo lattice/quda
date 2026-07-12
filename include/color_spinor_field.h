@@ -662,7 +662,7 @@ namespace quda
        @param[in] d d=[2*dim+dir]
        @param[in] stream stream to enqueue the copy + signal on
     */
-    void sendStartStream(int d, const qudaStream_t &stream, bool remote_write = false) const;
+    void sendStartStreamGated(int d, const qudaStream_t &stream, bool remote_write = false) const;
 
     /**
        @brief Stream-gated wait: enqueue comm_p2p_wait_recv_signal(.., STREAM_GATED)

@@ -456,7 +456,7 @@ namespace quda
                   // Stream-mem-op signalling: queues qudaMemcpyP2PAsync + cuStreamWriteValue64
                   // on the per-direction stream.  No cudaIPC event, no MPI doorbell.
                   PROFILE(if (dslash_comms)
-                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                            halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(
@@ -659,7 +659,7 @@ namespace quda
                   // qudaStreamWaitEvent(packEnd) on that stream, so the P2P copy serializes
                   // with the pack output but runs in parallel with the other directions.
                   PROFILE(if (dslash_comms)
-                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                            halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(
@@ -771,7 +771,7 @@ namespace quda
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op P2P send on the per-direction stream (packEnd synced above).
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -890,7 +890,7 @@ namespace quda
                 // across directions run in parallel.  Host already synced packEnd
                 // above so the per-dir stream's buffer is ready.
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1015,7 +1015,7 @@ namespace quda
                 if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                   // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
                   PROFILE(if (dslash_comms)
-                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                            halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(
@@ -1128,7 +1128,7 @@ namespace quda
                 if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                   // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
                   PROFILE(if (dslash_comms)
-                            halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                            halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                           profile, QUDA_PROFILE_COMMS_START);
                 } else {
                   PROFILE(if (dslash_comms) halo.sendStart(2 * i + dir,
@@ -1237,7 +1237,7 @@ namespace quda
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1374,7 +1374,7 @@ namespace quda
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1504,7 +1504,7 @@ namespace quda
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1631,7 +1631,7 @@ namespace quda
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op P2P send on the per-direction stream (no cudaIPC event / doorbell).
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1752,7 +1752,7 @@ namespace quda
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -1889,7 +1889,7 @@ namespace quda
               if ((dslashParam.p2p_signal == QudaP2PSignal::STREAM_GATED) && comm_peer2peer_enabled(dir, i)) {
                 // Stream-mem-op signalling on the per-direction stream (no cudaIPC event / MPI doorbell).
                 PROFILE(if (dslash_comms)
-                          halo.sendStartStream(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
+                          halo.sendStartStreamGated(2 * i + dir, device::get_stream(2 * i + dir), dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
               } else {
                 PROFILE(if (dslash_comms) halo.sendStart(
@@ -2022,7 +2022,7 @@ namespace quda
                 // remote_write the signal goes on the default stream (ordered after the write);
                 // for copy-engine it goes on the per-dir stream (the default stream was synced
                 // above so the memcpy source is ready).  No cudaIPC event / MPI doorbell.
-                PROFILE(if (dslash_comms) halo.sendStartStream(
+                PROFILE(if (dslash_comms) halo.sendStartStreamGated(
                           2 * i + dir,
                           dslashParam.remote_write ? device::get_default_stream() : device::get_stream(2 * i + dir),
                           dslashParam.remote_write),
@@ -2161,7 +2161,7 @@ namespace quda
                 // remote_write the signal goes on the default stream (ordered after the write);
                 // for copy-engine it goes on the per-dir stream (the default stream was synced
                 // above so the memcpy source is ready).  No cudaIPC event / MPI doorbell.
-                PROFILE(if (dslash_comms) halo.sendStartStream(
+                PROFILE(if (dslash_comms) halo.sendStartStreamGated(
                           2 * i + dir,
                           dslashParam.remote_write ? device::get_default_stream() : device::get_stream(2 * i + dir),
                           dslashParam.remote_write),

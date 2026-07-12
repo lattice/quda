@@ -21,6 +21,14 @@ namespace quda
 #define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
+  // Wrap a CUDA driver (cu*) call: on failure abort via set_driver_error, which
+  // reports the CUresult name plus file:line.  Mirrors CHECK_CUDA_ERROR for the
+  // runtime API so we don't repeat `if (err != CUDA_SUCCESS) errorQuda(...)` at
+  // every driver call.  The argument is evaluated exactly once.  Sites that add
+  // per-direction (dim/dir) context keep an explicit errorQuda instead.
+#define CHECK_CU_DRIVER(call)                                                                                          \
+  target::cuda::set_driver_error(call, #call, __func__, __FILE__, __STRINGIFY__(__LINE__));
+
   namespace comm_target
   {
 #ifdef QUDA_MNNVL
@@ -40,7 +48,26 @@ namespace quda
       memcpy(&fh, peer_handle, sizeof(CUmemFabricHandle));
       CUmemGenericAllocationHandle h;
       CUresult err = cuMemImportFromShareableHandle(&h, &fh, CU_MEM_HANDLE_TYPE_FABRIC);
-      if (err != CUDA_SUCCESS) return false;
+      if (err != CUDA_SUCCESS) {
+        // A failed import means "peer not reachable over the fabric" -- the caller
+        // downgrades this link to MPI.  This probe must stay NON-fatal so the
+        // symmetric capability exchange can decide the transport, so we never
+        // abort here.  But we distinguish the expected not-reachable/not-permitted
+        // codes from an unexpected one (e.g. CUDA_ERROR_NOT_SUPPORTED, which means
+        // fabric/IMEX is unavailable altogether): surface the latter with a warning
+        // rather than silently masking a misconfiguration as a benign fallback.
+        // (The expected-code set is best-effort; an unexpected code only produces a
+        // diagnostic warning, never a behavior change.)
+        const char *name = nullptr;
+        cuGetErrorName(err, &name);
+        if (err != CUDA_ERROR_NOT_PERMITTED && err != CUDA_ERROR_INVALID_VALUE)
+          warningQuda("try_import_fabric_handle: unexpected import error %s -- treating peer as unreachable",
+                      name ? name : "UNKNOWN");
+        else
+          logQuda(QUDA_DEBUG_VERBOSE, "try_import_fabric_handle: peer unreachable (%s)\n", name ? name : "UNKNOWN");
+        cudaGetLastError(); // clear any latched runtime error state
+        return false;
+      }
       return cuMemRelease(h) == CUDA_SUCCESS;
     }
 
@@ -211,10 +238,8 @@ namespace quda
       size_t map_size = peer.size;
 
       CUdeviceptr peer_ptr = 0;
-      err = cuMemAddressReserve(&peer_ptr, map_size, 0, 0, 0);
-      if (err != CUDA_SUCCESS) errorQuda("cuMemAddressReserve (peer) failed");
-      err = cuMemMap(peer_ptr, map_size, 0, h, 0);
-      if (err != CUDA_SUCCESS) errorQuda("cuMemMap (peer) failed");
+      CHECK_CU_DRIVER(cuMemAddressReserve(&peer_ptr, map_size, 0, 0, 0));
+      CHECK_CU_DRIVER(cuMemMap(peer_ptr, map_size, 0, h, 0));
 
       int local_dev;
       CHECK_CUDA_ERROR(cudaGetDevice(&local_dev));
@@ -222,8 +247,7 @@ namespace quda
       acc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
       acc.location.id = local_dev;
       acc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-      err = cuMemSetAccess(peer_ptr, map_size, &acc, 1);
-      if (err != CUDA_SUCCESS) errorQuda("cuMemSetAccess (peer) failed");
+      CHECK_CU_DRIVER(cuMemSetAccess(peer_ptr, map_size, &acc, 1));
       err = cuMemRelease(h);
       if (err != CUDA_SUCCESS) errorQuda("cuMemRelease (peer import) failed (dim=%d dir=%d)", dim, dir);
       remote[dim][dir] = (void *)peer_ptr;
@@ -383,10 +407,9 @@ namespace quda
     if (!has_p2p_neighbor) return;
 
     CUdevice device;
-    CUresult err = cuCtxGetDevice(&device);
-    if (err != CUDA_SUCCESS) errorQuda("cuCtxGetDevice failed while initializing stream-gated P2P");
+    CHECK_CU_DRIVER(cuCtxGetDevice(&device));
     int supported = 0;
-    err = cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS, device);
+    CUresult err = cuDeviceGetAttribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS, device);
     if (err != CUDA_SUCCESS || !supported) errorQuda("STREAM_GATED requires 64-bit CUDA stream memory operations");
 
     // Defaults hold on non-MNNVL builds (the block below is compiled out): the
@@ -650,10 +673,7 @@ namespace quda
             "peer_slot(kind=%d,dim=%d,dir=%d) val=%lu\n",
             static_cast<int>(kind), buf, dim, dir, static_cast<int>(kind), dim, 1 - dir, (unsigned long)value);
 
-    CUresult err = cuStreamWriteValue64(target::cuda::get_stream(stream), peer, value, CU_STREAM_WRITE_VALUE_DEFAULT);
-    if (err != CUDA_SUCCESS) {
-      target::cuda::set_driver_error(err, "cuStreamWriteValue64", __func__, __FILE__, __STRINGIFY__(__LINE__));
-    }
+    CHECK_CU_DRIVER(cuStreamWriteValue64(target::cuda::get_stream(stream), peer, value, CU_STREAM_WRITE_VALUE_DEFAULT));
   }
 
   void comm_p2p_stream_wait_recv_signal(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream)
@@ -680,10 +700,7 @@ namespace quda
     // correct here.
     unsigned int wait_flags = CU_STREAM_WAIT_VALUE_GEQ;
     if (stream_gated_remote_flush_supported) wait_flags |= CU_STREAM_WAIT_VALUE_FLUSH;
-    CUresult err = cuStreamWaitValue64(target::cuda::get_stream(stream), local, expected, wait_flags);
-    if (err != CUDA_SUCCESS) {
-      target::cuda::set_driver_error(err, "cuStreamWaitValue64", __func__, __FILE__, __STRINGIFY__(__LINE__));
-    }
+    CHECK_CU_DRIVER(cuStreamWaitValue64(target::cuda::get_stream(stream), local, expected, wait_flags));
   }
 
   // ============================================================================
@@ -694,12 +711,30 @@ namespace quda
   // functions can become file-static.
   // ============================================================================
 
+  namespace
+  {
+    // Defensive guard for the enum-taking dispatchers: a caller may pass
+    // STREAM_GATED explicitly, so make sure stream-gating is actually the
+    // resolved P2P transport before dispatching to the stream-mem-op leaves.
+    // The resolved transport is init-verified/device-supported (see
+    // comm_create_stream_gated_comms, which errors if 64-bit stream mem ops are
+    // unavailable), so a mismatch here means a caller picked the wrong signal.
+    inline void assert_stream_gated_resolved(const char *who)
+    {
+      if (comm::p2p_signal() != QudaP2PSignal::STREAM_GATED)
+        errorQuda("%s: STREAM_GATED signalling requested but it is not the resolved P2P transport", who);
+    }
+  } // anonymous namespace
+
   void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream,
                                  QudaP2PSignal signal)
   {
     switch (signal) {
     case QudaP2PSignal::REMOTE_IPC: comm_p2p_signal_send_done(kind, buf, dim, dir, stream); return;
-    case QudaP2PSignal::STREAM_GATED: comm_p2p_stream_signal_send_done(kind, buf, dim, dir, stream); return;
+    case QudaP2PSignal::STREAM_GATED:
+      assert_stream_gated_resolved(__func__);
+      comm_p2p_stream_signal_send_done(kind, buf, dim, dir, stream);
+      return;
     }
     errorQuda("comm_p2p_signal_send_done: unknown QudaP2PSignal %d", static_cast<int>(signal));
   }
@@ -720,7 +755,10 @@ namespace quda
       (void)stream;
       comm_p2p_wait_recv_signal(kind, buf, dim, dir);
       return;
-    case QudaP2PSignal::STREAM_GATED: comm_p2p_stream_wait_recv_signal(kind, buf, dim, dir, stream); return;
+    case QudaP2PSignal::STREAM_GATED:
+      assert_stream_gated_resolved(__func__);
+      comm_p2p_stream_wait_recv_signal(kind, buf, dim, dir, stream);
+      return;
     }
     errorQuda("comm_p2p_wait_recv_signal: unknown QudaP2PSignal %d", static_cast<int>(signal));
   }
@@ -730,6 +768,7 @@ namespace quda
     switch (signal) {
     case QudaP2PSignal::REMOTE_IPC: comm_p2p_wait_send_drained(kind, buf, dim, dir); return;
     case QudaP2PSignal::STREAM_GATED:
+      assert_stream_gated_resolved(__func__);
       // STREAM_GATED has no separate "send drained" concept: stream ordering
       // guarantees that any subsequent op enqueued on the same stream will
       // observe the prior cuStreamWriteValue64 completed.  Nothing to wait for.

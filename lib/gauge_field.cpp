@@ -467,7 +467,7 @@ namespace quda {
   {
     if (!comm_dim_partitioned(dim)) return;
 
-    // P2P-able sends are handled by sendStartStream, which dispatches to the
+    // P2P-able sends are handled by sendStartStreamGated, which dispatches to the
     // selected signal transport.
     if (comm_peer2peer_enabled(dir, dim)) return;
     if (comm_gdr_enabled()) {
@@ -503,11 +503,11 @@ namespace quda {
     }
   }
 
-  void GaugeField::sendStartStream(int dim, int dir, const qudaStream_t &stream)
+  void GaugeField::sendStartStreamGated(int dim, int dir, const qudaStream_t &stream)
   {
     if (!comm_dim_partitioned(dim)) return;
     if (!comm_peer2peer_enabled(dir, dim))
-      errorQuda("sendStartStream requires peer-to-peer enabled for (dir=%d, dim=%d)", dir, dim);
+      errorQuda("sendStartStreamGated requires peer-to-peer enabled for (dir=%d, dim=%d)", dir, dim);
 
     void *ghost_dst
       = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
@@ -613,7 +613,7 @@ namespace quda {
           recvStart(dim, dir); // no-op for P2P recv, MPI/GDR doorbell otherwise
 
           if (comm_peer2peer_enabled(dir, dim)) {
-            sendStartStream(dim, dir, device::get_stream(2 * dim + dir));
+            sendStartStreamGated(dim, dir, device::get_stream(2 * dim + dir));
             if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED)
               qudaEventRecord(gauge_sendDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
           } else {
@@ -773,7 +773,7 @@ namespace quda {
           recvStart(dim, dir);
 
           if (comm_peer2peer_enabled(dir, dim)) {
-            sendStartStream(dim, dir, device::get_stream(2 * dim + dir));
+            sendStartStreamGated(dim, dir, device::get_stream(2 * dim + dir));
             if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED)
               qudaEventRecord(gauge_sendDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
           } else {
@@ -895,7 +895,7 @@ namespace quda {
             recvStart(dim, dir); // no-op for P2P recv, posts MPI/GDR doorbell otherwise
 
             if (comm_peer2peer_enabled(dir, dim)) {
-              sendStartStream(dim, dir, device::get_stream(2 * dim + dir));
+              sendStartStreamGated(dim, dir, device::get_stream(2 * dim + dir));
               if (comm::p2p_signal() == QudaP2PSignal::STREAM_GATED)
                 qudaEventRecord(gauge_sendDoneEvent[2 * dim + dir], device::get_stream(2 * dim + dir));
             } else {
