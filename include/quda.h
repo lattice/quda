@@ -1245,6 +1245,20 @@ extern "C" {
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
   /**
+   * Solve a block of RHS with deflation externalized into an outer cycle loop:
+   * each cycle performs one full-grid deflation of the residual followed by a
+   * plain (deflation-unaware) CG segment. Behaves like a restarted deflated CG.
+   * Requires a resident deflation space in param->eig_param->preserve_deflation_space
+   * (eigenvectors/eigenvalues loaded and mass-shifted by the caller). This is the
+   * Stage-1 entry point for the split-grid deflation scheme; with the default
+   * split_grid = {1,1,1,1} it runs entirely on the full grid.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   */
+  void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
+
+  /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
    * @param _hp_b    Source spinor fields

@@ -2082,7 +2082,32 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
   for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
 
-  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
+  // Route the deflated block solve through the externalized-deflation
+  // orchestrator (split-grid Stage 1) when opted in via QUDA_DEFLATED_MSRC, but
+  // only once the deflation space is already resident -- the orchestrator
+  // deflates on the parent grid and cannot build the space lazily the way the
+  // stock path does. The first solve per parity therefore falls through to the
+  // stock path, which builds and preserves the space (and the opposite parity is
+  // then filled via QUDA_MILC_EIG_FROM_OTHER_PARITY above), so from the second
+  // solve on the space is resident and the orchestrator engages. Falls back to
+  // the stock path when deflation is off or the flag is unset, so the default
+  // behavior is unchanged.
+  static const bool use_deflated_msrc = getenv("QUDA_DEFLATED_MSRC") != nullptr;
+  const deflation_space *resident_space
+    = reinterpret_cast<const deflation_space *>(qep.preserve_deflation_space);
+  const bool space_resident = resident_space && !resident_space->evecs.empty();
+  if (use_deflated_msrc && invertParam.eig_param && space_resident) {
+    printfQuda("QUDA_DEFLATED_MSRC: using externalized-deflation orchestrator "
+               "(invertMultiSrcDeflatedQuda) for parity %d, mass %e, num_src %d\n",
+               local_parity, mass, num_src);
+    invertMultiSrcDeflatedQuda(sln_pointer, src_pointer, &invertParam);
+  } else {
+    if (use_deflated_msrc && invertParam.eig_param && !space_resident)
+      printfQuda("QUDA_DEFLATED_MSRC: deflation space not yet resident for parity %d, mass %e; "
+                 "using stock invertMultiSrcQuda (builds/preserves the space)\n",
+                 local_parity, mass);
+    invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
+  }
 
   host_free(sln_pointer);
   host_free(src_pointer);

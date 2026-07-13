@@ -3608,6 +3608,281 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
+// ---------------------------------------------------------------------------
+// Externally-deflated multi-RHS solve (split-grid Stage 1).
+//
+// Sibling of invertMultiSrcQuda that pulls deflation OUT of the CG instance
+// into an outer "cycle" loop: each cycle is one full-grid deflation followed by
+// one plain (deflation-unaware) CG segment. Stage 1 runs entirely on the full
+// grid (no communicator splitting); the decoupling of deflation from the CG
+// instance is what later lets the CG segment run split while deflation stays on
+// the parent communicator.
+//
+// Fermion-agnostic: the operator is dispatched from solve_type exactly as
+// solve() does (DiracM for a DIRECT_PC solve, DiracMdagM for a NORMOP solve).
+// MILC-agnostic: the resident deflation space (evecs already mass-shifted by
+// the caller) is consumed as-is; no eigenvalue shifting happens here.
+// ---------------------------------------------------------------------------
+
+// The cycle loop, templated on the (hermitian, positive) operator type so it
+// stays fermion-agnostic. Operates entirely on the preconditioned fields
+// (out,in) that prepare() produced -- the same system the eigenvectors live on.
+// `space` is the resident full-grid deflation space; it is never handed to the
+// inner CG. Returns the summed iteration count over all cycles.
+template <typename DiracMat>
+static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in,
+                               const DiracMat &m, const DiracMat &mSloppy, const DiracMat &mPre, const DiracMat &mEig,
+                               deflation_space &space, QudaInvertParam &param)
+{
+  const int n_src = in.size();
+  auto *qep = static_cast<QudaEigParam *>(param.eig_param);
+
+  // One EigenSolver at this (parent) level, purely to reach deflate(). Cheap:
+  // create() allocates no Krylov space, and deflate() never applies mEig
+  // (eigensolve_quda.cpp:639-666) -- mEig only satisfies create()'s checks.
+  quda::EigenSolver *eig = quda::EigenSolver::create(qep, mEig);
+
+  // residual scratch, shaped like the preconditioned source
+  std::vector<ColorSpinorField> r;
+  ColorSpinorParam rParam(in[0]);
+  rParam.create = QUDA_ZERO_FIELD_CREATE;
+  resize(r, n_src, rParam);
+
+  // r = in - m*out ; returns per-RHS ||r||^2. Same operator the CG segment uses.
+  auto residual = [&]() -> std::vector<double> {
+    m(r, out);                     // r = A out
+    return blas::xmyNorm(in, r);   // r = in - r = in - A out ; returns ||r||^2
+  };
+  // out += V L^-1 V^dag r  (the only op that touches the eigenvectors)
+  auto deflate_accumulate = [&]() { eig->deflate(out, r, space.evecs, space.evals, /*accumulate=*/true); };
+
+  // ---- initial residual of the (possibly nonzero) initial guess ----
+  //   r = in - A out(guess)
+  auto r2 = residual();
+
+  // Per-RHS source norms, with the stock zero-norm guard (inv_cg_quda.cpp:148):
+  // for a zero preconditioned source, fall back to the initial residual as scale.
+  auto b2v = blas::norm2(in);
+  for (int i = 0; i < n_src; i++)
+    if (b2v[i] == 0.0) b2v[i] = r2[i];
+
+  // ---- initial deflation:  out += V L^-1 V^dag r ----
+  deflate_accumulate();
+
+  // Per-RHS stopping targets and an all-RHS convergence test that mirror stock
+  // exactly (Solver::stopping / convergenceL2, solver.cpp:378,440): honor
+  // L2_RELATIVE / L2_ABSOLUTE / both, converge only when *every* RHS is below its
+  // own target, and error on a diverged (NaN/Inf) residual. Do NOT collapse to a
+  // single global target -- a general caller may batch RHS with very different
+  // norms (ours only batches colors of one source, but that is not guaranteed).
+  const QudaResidualType rtype = param.residual_type;
+  const auto stop = Solver::stopping(param.tol, b2v, rtype);
+  auto converged = [&](const std::vector<double> &rr) {
+    if (!((rtype & QUDA_L2_RELATIVE_RESIDUAL) || (rtype & QUDA_L2_ABSOLUTE_RESIDUAL))) return true;
+    for (int i = 0; i < n_src; i++) {
+      if (std::isnan(rr[i]) || std::isinf(rr[i]))
+        errorQuda("invertMultiSrcDeflatedQuda: solver diverged, residual %9.6e", rr[i]);
+      if (rr[i] > stop[i]) return false;
+    }
+    return true;
+  };
+  // worst per-RHS relative residual -- drives the per-cycle tolerance schedule
+  auto worst_rel = [&](const std::vector<double> &rr) {
+    double w = 0.0;
+    for (int i = 0; i < n_src; i++) w = std::max(w, std::sqrt(rr[i] / b2v[i]));
+    return w;
+  };
+
+  const double tol_restart = param.tol_restart > 0.0 ? param.tol_restart : 1e-1;
+  const int max_cycles = 100;                         // guard
+
+  int total_iters = 0;
+  int cycle = 0;
+  r2 = residual();                 // true residual after the initial deflation
+
+  // Total iterations are capped at param.maxiter (like stock CG's k < maxiter),
+  // budgeted across cycles, so a non-converging solve bails rather than running
+  // up to max_cycles * maxiter.
+  while (!converged(r2) && cycle < max_cycles && total_iters < param.maxiter) {
+
+    // knock the worst per-RHS relative residual down ~one tol_restart decade,
+    // never past the final tolerance.
+    const double tol_cycle = std::max(param.tol, worst_rel(r2) * tol_restart);
+
+    // ---- plain CG segment: deflation OFF, init guess = out ----
+    SolverParam sp(param);
+    sp.deflate = false;            // detach deflation (invert_quda.h:282); CG never enters
+                                   // constructDeflationSpace, so `space` stays owned here
+    sp.eig_param.preserve_deflation_space = nullptr; // belt-and-suspenders
+    sp.inv_type = QUDA_CG_INVERTER;
+    sp.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    sp.tol = tol_cycle;
+    sp.maxiter = param.maxiter - total_iters;  // remaining global iteration budget
+    sp.iter = 0;
+    Solver *cg = Solver::create(sp, m, mSloppy, mPre, mEig);
+    (*cg)(out, in);                // block over all RHS; updates out in place
+    delete cg;
+    total_iters += sp.iter;
+
+    // recompute the true residual on the full-grid operator
+    r2 = residual();
+    if (converged(r2)) break;
+
+    // re-deflate: fold the projected residual correction into the guess
+    deflate_accumulate();
+    cycle++;
+  }
+
+  // Recompute so r2 matches `out` in every exit path (a max_cycles/budget exit
+  // leaves the last deflate_accumulate() applied after the last residual()).
+  r2 = residual();
+
+  if (!converged(r2))
+    warningQuda("invertMultiSrcDeflatedQuda: not converged after %d cycles, %d iters "
+                "(worst rel residual %e > tol %e)",
+                cycle, total_iters, worst_rel(r2), param.tol);
+
+  // Per-RHS residual reporting: MILC reads true_res[num_src-1] and
+  // true_res_hq[num_src-1] (milc_interface.cpp:2141-2142), so populate every RHS.
+  // HQ residual is not computed (stock CG dropped HQ support), so report 0 to
+  // match stock rather than leaving a stale value.
+  for (int i = 0; i < n_src; i++) {
+    param.true_res[i] = std::sqrt(r2[i] / b2v[i]);
+    param.true_res_hq[i] = 0.0;
+  }
+
+  delete eig;
+  return total_iters;
+}
+
+void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
+{
+  profilerStart(__func__);
+  auto profile = pushProfile(profileInvertMultiSrc, param);
+  pushVerbosity(param->verbosity);
+
+  checkInvertParam(param, _hp_x[0], _hp_b[0]);
+  if (!param->eig_param) errorQuda("invertMultiSrcDeflatedQuda requires eig_param (deflation)");
+  auto *qep = static_cast<QudaEigParam *>(param->eig_param);
+  auto *space = reinterpret_cast<deflation_space *>(qep->preserve_deflation_space);
+  if (!space || space->evecs.empty())
+    errorQuda("No resident deflation space; caller must load/mass-shift it first");
+
+  GaugeField *gauge = checkGauge(param);
+  const int n_src = param->num_src;
+
+  // classify the requested system exactly as solve() does (fermion-agnostic)
+  const bool mat_solution
+    = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
+  const bool direct_solve
+    = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  const bool norm_error_solve
+    = (param->solve_type == QUDA_NORMERR_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  const bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION)
+    || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  const bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE)
+    || (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  if (!mat_solution && direct_solve)
+    errorQuda("Two-pass (MATDAG_MAT + DIRECT) solves are not supported with externalized deflation");
+  if (norm_error_solve) errorQuda("Norm-error solves are not supported with externalized deflation");
+
+  // Stock solve() supports these; the orchestrator does not (yet). Reject them
+  // loudly rather than silently ignoring, so a general caller cannot get a wrong
+  // answer by setting a feature we quietly drop (the guarding principle: if the
+  // stock path handles it, we must handle it or refuse it).
+  if (param->chrono_use_resident || param->chrono_make_resident)
+    errorQuda("Chronological forecasting is not supported with externalized deflation");
+  if (param->use_resident_solution || param->make_resident_solution)
+    errorQuda("Resident-solution reuse is not supported with externalized deflation");
+  if (param->compute_action)
+    errorQuda("compute_action is not supported with externalized deflation");
+
+  // ---- Dirac operators (once) ----
+  Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
+  createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, *param, pc_solve, qep->use_smeared_gauge);
+
+  // ---- wrap host fields, download source, allocate solution ----
+  ColorSpinorParam cpuParam(_hp_b[0], *param, gauge->X(), pc_solution, param->input_location);
+  std::vector<ColorSpinorField> h_b(n_src);
+  for (int i = 0; i < n_src; i++) { cpuParam.v = _hp_b[i]; h_b[i] = ColorSpinorField(cpuParam); }
+
+  cpuParam.location = param->output_location;
+  std::vector<ColorSpinorField> h_x(n_src);
+  for (int i = 0; i < n_src; i++) { cpuParam.v = _hp_x[i]; h_x[i] = ColorSpinorField(cpuParam); }
+
+  ColorSpinorParam cudaParam(cpuParam, *param, QUDA_CUDA_FIELD_LOCATION);
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  std::vector<ColorSpinorField> b;
+  resize(b, n_src, cudaParam);
+  blas::copy(b, h_b);
+  std::vector<ColorSpinorField> x;
+  resize(x, n_src, cudaParam);
+  // Respect the caller's initial guess (MILC sets use_init_guess = YES and, for
+  // later solves in a mass/source sequence, passes a near-solution guess -- stock
+  // deflated CG then converges those in very few iterations). run_deflated_cycles
+  // deflates the *residual* of this guess, matching inv_cg_quda.cpp:144-163;
+  // zeroing it here would discard the head start and inflate the iteration count.
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES)
+    blas::copy(x, h_x);
+  else
+    blas::zero(x);
+
+  // ---- source normalization / mass rescale (mirror solve.cpp:137-155) ----
+  auto nb = blas::norm2(b);
+  for (auto &bi : nb)
+    if (bi == 0.0) errorQuda("Source has zero norm");
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    auto nb_inv(nb);
+    for (auto &bi : nb_inv) bi = 1.0 / std::sqrt(bi);
+    blas::ax(nb_inv, b);
+    blas::ax(nb_inv, x);           // scale the guess consistently with the source
+  }
+  massRescale(b, *param, false);
+  distanceReweight(b, *param, true);
+
+  // ---- prepare ONCE: full (x,b) -> preconditioned (out,in) ----
+  std::vector<ColorSpinorField> out(n_src), in(n_src);
+  dirac->prepare(out, in, x, b, param->solution_type);
+
+  // for a NORMOP solve with a MAT solution, form the normal-equation source
+  // in = M^dag b (solve.cpp:201-204). direct_solve (staggered) skips this.
+  if (mat_solution && !direct_solve) {
+    auto tmp = getFieldTmp(cvector_ref<ColorSpinorField>(in));
+    blas::copy(tmp, in);
+    dirac->Mdag(in, tmp);
+  }
+
+  // ---- run the cycle loop under the correct operator type ----
+  int iters = 0;
+  if (direct_solve) {              // e.g. staggered DIRECT_PC -> DiracM
+    DiracM m(*dirac), mS(*diracSloppy), mP(*diracPre), mE(*diracEig);
+    iters = run_deflated_cycles(out, in, m, mS, mP, mE, *space, *param);
+  } else {                         // NORMOP -> DiracMdagM
+    DiracMdagM m(*dirac), mS(*diracSloppy), mP(*diracPre), mE(*diracEig);
+    iters = run_deflated_cycles(out, in, m, mS, mP, mE, *space, *param);
+  }
+
+  // ---- reconstruct ONCE, un-normalize, write back ----
+  dirac->reconstruct(x, b, param->solution_type);
+  distanceReweight(x, *param, false);
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    for (auto &bi : nb) bi = std::sqrt(bi);
+    blas::ax(nb, x);
+  }
+
+  blas::copy(h_x, x);              // device -> host wrappers (writes _hp_x)
+  param->iter = iters;
+
+  delete dirac;
+  delete diracSloppy;
+  delete diracPre;
+  delete diracEig;
+
+  popVerbosity();
+  profilerStop(__func__);
+}
+
 void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
   auto op = [](const std::vector<void *> &_x, const std::vector<void *> &_b, QudaInvertParam &param, QudaParity parity) {
