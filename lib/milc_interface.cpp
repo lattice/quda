@@ -74,6 +74,13 @@ static double preserved_evals_mass[2] = {-1.0, -1.0};
 // Cache zero-mass eigenvalues instead of recomputing every time the mass is changed
 static std::vector<quda::Complex> preserved_evals_zero_mass;
 
+// Sub-grid layout for split-grid deflation (see qudaSetSplitGrid). A property of
+// the job rather than of a solve, so it is held here rather than passed through
+// QudaInvertArgs_t -- which is not zero-initialized by its callers, so a new
+// field in it would be garbage at every existing call site. Defaults to no split,
+// which is what a host application that never calls qudaSetSplitGrid gets.
+static int milc_split_grid[4] = {1, 1, 1, 1};
+
 using namespace quda;
 using namespace quda::fermion_force;
 
@@ -1961,6 +1968,22 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   qudamilc_called<false>(__func__, verbosity);
 } // qudaInvertMsrc
 
+// This stores and does nothing else -- no logging, no validation, no comm_*.
+// The host sets the split key while describing its layout, which is necessarily
+// before QUDA has been initialized (MILC calls this from setup(), well ahead of
+// initialize_quda()), and at that point QUDA has no communicator: comm_dim() is
+// unavailable, and so are printfQuda/errorQuda, which resolve the current
+// communicator to tag the rank. Anything more than a store aborts with
+// "Current communicator can't be found".
+//
+// The key is therefore validated where a communicator exists: against the
+// machine grid by the caller (MILC checks it against get_logical_dimensions()),
+// and again at solve time in qudaInvertMsrcDeflatable below.
+void qudaSetSplitGrid(const int split_grid[4])
+{
+  for (int i = 0; i < 4; i++) milc_split_grid[i] = split_grid[i];
+}
+
 void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                               QudaEigensolverArgs_t eig_args, double target_residual, double target_fermilab_residual,
                               const void *const fatlink, const void *const longlink, void **sourceArray,
@@ -2083,45 +2106,79 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
 
   // Route the deflated block solve through the externalized-deflation
-  // orchestrator (split-grid Stage 1) when opted in via QUDA_DEFLATED_MSRC, but
-  // only once the deflation space is already resident -- the orchestrator
-  // deflates on the parent grid and cannot build the space lazily the way the
-  // stock path does. The first solve per parity therefore falls through to the
-  // stock path, which builds and preserves the space (and the opposite parity is
-  // then filled via QUDA_MILC_EIG_FROM_OTHER_PARITY above), so from the second
-  // solve on the space is resident and the orchestrator engages. Falls back to
-  // the stock path when deflation is off or the flag is unset, so the default
-  // behavior is unchanged.
-  static const bool use_deflated_msrc = getenv("QUDA_DEFLATED_MSRC") != nullptr;
+  // orchestrator (invertMultiSrcDeflatedQuda), which runs the CG iterations on
+  // product(split_grid) sub-grids while the deflation stays on the parent grid.
+  //
+  // Dispatch is implicit: the orchestrator engages when the host has asked for a
+  // non-trivial split (qudaSetSplitGrid, driven by MILC's split_grid input
+  // keyword), the solve is deflated, and the deflation space is already
+  // resident. That last gate is not optional -- the orchestrator deflates on the
+  // parent grid and cannot build the space lazily the way the stock path does,
+  // so the first solve per parity falls through to the stock path, which builds
+  // and preserves the space (the opposite parity is then filled via
+  // QUDA_MILC_EIG_FROM_OTHER_PARITY above). From the second solve on the space
+  // is resident and the orchestrator takes over.
+  //
+  // QUDA_DEFLATED_MSRC is a debug-only override that runs the orchestrator with
+  // no split: implicit dispatch otherwise makes that configuration unreachable,
+  // and it is the baseline the split path is measured against.
+  static const bool force_deflated_msrc = getenv("QUDA_DEFLATED_MSRC") != nullptr;
+
+  // qudaSetSplitGrid cannot validate its argument (no communicator exists that
+  // early), so the key is checked here, on its first use.
+  int split_key[4] = {1, 1, 1, 1};
+  int n_sub_partition = 1;
+  for (int i = 0; i < 4; i++) {
+    if (milc_split_grid[i] < 1) errorQuda("Invalid split_grid[%d] = %d, must be >= 1", i, milc_split_grid[i]);
+    if (comm_dim(i) % milc_split_grid[i] != 0)
+      errorQuda("split_grid[%d] = %d does not divide the machine grid dimension %d", i, milc_split_grid[i],
+                comm_dim(i));
+    split_key[i] = milc_split_grid[i];
+    n_sub_partition *= split_key[i];
+  }
+
   const deflation_space *resident_space
     = reinterpret_cast<const deflation_space *>(qep.preserve_deflation_space);
   const bool space_resident = resident_space && !resident_space->evecs.empty();
-  if (use_deflated_msrc && invertParam.eig_param && space_resident) {
-    // Stage-2 test hook: the sub-grid layout is taken from QUDA_DEFLATED_MSRC_SPLIT
-    // ("nx ny nz nt", default "1 1 1 1" = no split, i.e. Stage-1 behaviour) so the
-    // split path can be exercised before the MILC input file learns to drive it
-    // (Stage 3). Replace this with real input-file plumbing when Stage 3 lands.
-    static const char *split_env = getenv("QUDA_DEFLATED_MSRC_SPLIT");
-    if (split_env) {
-      int sg[4] = {1, 1, 1, 1};
-      if (sscanf(split_env, "%d %d %d %d", &sg[0], &sg[1], &sg[2], &sg[3]) != 4)
-        errorQuda("QUDA_DEFLATED_MSRC_SPLIT must be four ints, e.g. \"1 1 1 2\"; got \"%s\"", split_env);
-      const int n_sub = sg[0] * sg[1] * sg[2] * sg[3];
-      if (n_sub < 1 || num_src % n_sub != 0)
-        errorQuda("QUDA_DEFLATED_MSRC_SPLIT product (%d) must divide num_src (%d)", n_sub, num_src);
-      for (int i = 0; i < 4; i++) invertParam.split_grid[i] = sg[i];
-      invertParam.num_src_per_sub_partition = num_src / n_sub;
+  const bool deflated = invertParam.eig_param != nullptr;
+
+  // A split key that does not divide this set's num_src cannot be honored: the
+  // sub-partitions would not evenly share the right-hand sides. That is a
+  // property of the set (num_src = number_of_propagators x ncolor), not of the
+  // job, so it is not fatal -- solve this set the stock way and say so loudly.
+  bool want_split = n_sub_partition > 1;
+  if (want_split && num_src % n_sub_partition != 0) {
+    printfQuda("WARNING: split_grid %d %d %d %d (product %d) does not divide num_src = %d for this "
+               "solve (parity %d, mass %e); SPLIT-GRID DEFLATION IS DISABLED for it and it falls back "
+               "to the stock solver\n",
+               split_key[0], split_key[1], split_key[2], split_key[3], n_sub_partition, num_src,
+               local_parity, mass);
+    want_split = false;
+  }
+  if (want_split && !deflated) {
+    printfQuda("WARNING: split_grid %d %d %d %d requested but this solve (parity %d, mass %e) is not "
+               "deflated; SPLIT-GRID DEFLATION IS DISABLED for it and it falls back to the stock solver\n",
+               split_key[0], split_key[1], split_key[2], split_key[3], local_parity, mass);
+    want_split = false;
+  }
+
+  // Only a validated key reaches invertParam: the stock invertMultiSrcQuda also
+  // honors split_grid, and we must not let a rejected key split the fallback.
+  const bool use_orchestrator = (want_split || force_deflated_msrc) && deflated && space_resident;
+  if (use_orchestrator) {
+    if (want_split) {
+      for (int i = 0; i < 4; i++) invertParam.split_grid[i] = split_key[i];
+      invertParam.num_src_per_sub_partition = num_src / n_sub_partition;
     }
-    printfQuda("QUDA_DEFLATED_MSRC: using externalized-deflation orchestrator "
-               "(invertMultiSrcDeflatedQuda) for parity %d, mass %e, num_src %d, "
-               "split_grid %d %d %d %d, num_src_per_sub_partition %d\n",
+    printfQuda("Using externalized-deflation orchestrator (invertMultiSrcDeflatedQuda) for parity %d, "
+               "mass %e, num_src %d, split_grid %d %d %d %d, num_src_per_sub_partition %d\n",
                local_parity, mass, num_src, invertParam.split_grid[0], invertParam.split_grid[1],
                invertParam.split_grid[2], invertParam.split_grid[3], invertParam.num_src_per_sub_partition);
     invertMultiSrcDeflatedQuda(sln_pointer, src_pointer, &invertParam);
   } else {
-    if (use_deflated_msrc && invertParam.eig_param && !space_resident)
-      printfQuda("QUDA_DEFLATED_MSRC: deflation space not yet resident for parity %d, mass %e; "
-                 "using stock invertMultiSrcQuda (builds/preserves the space)\n",
+    if ((want_split || force_deflated_msrc) && deflated && !space_resident)
+      printfQuda("Deflation space not yet resident for parity %d, mass %e; using stock "
+                 "invertMultiSrcQuda (builds/preserves the space)\n",
                  local_parity, mass);
     invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
   }

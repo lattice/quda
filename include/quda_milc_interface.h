@@ -634,6 +634,30 @@ extern "C" {
                       int num_src);
 
   /**
+   * Set the sub-grid layout used by split-grid deflation.
+   *
+   * With a non-trivial key, qudaInvertMsrcDeflatable runs the CG iterations of a
+   * deflated block solve on product(split_grid) sub-grids while the deflation
+   * itself stays on the full grid (where the eigenvectors are resident). The key
+   * must divide the machine grid in each direction, and its product must divide
+   * num_src; a solve whose num_src it does not divide falls back to the stock
+   * solver with a warning.
+   *
+   * This is a property of the job, not of an individual solve, so it is set once
+   * rather than passed through QudaInvertArgs_t: that struct is not
+   * zero-initialized by its callers, so a new field in it would be garbage at
+   * every call site that predates it. The default is {1,1,1,1} (no splitting),
+   * which is what a host application that never calls this gets.
+   *
+   * May be called before QUDA is initialized -- it only records the key, and
+   * validates nothing, because no communicator exists to report an error on.
+   * The key is validated on first use, in qudaInvertMsrcDeflatable.
+   *
+   * @param[in] split_grid Sub-grid layout, four ints, each >= 1
+   */
+  void qudaSetSplitGrid(const int split_grid[4]);
+
+  /**
    * Solve Ax=b with deflation for an improved staggered operator with many right hand sides.
    * All fields are fields passed and returned are host (CPU) field in MILC order.
    * This function requires that persistent gauge and clover fields have
