@@ -79,8 +79,6 @@ typedef struct openQCD_QudaSolver_s {
   double mg_su3csw;             /** SU(3) csw coefficient corresponding to the current mg-instance in QUDA */
   double mg_u1csw;              /** U(1) csw coefficient corresponding to the current mg-instance in QUDA */
   int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
-  int mg_ud_rev_delta;
-  int mg_ad_rev_delta;
 } openQCD_QudaSolver;
 
 static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, false, 1, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, MPI_COMM_NULL, MPI_COMM_NULL }, {}, {}, nullptr, {}, {}, ""};
@@ -965,13 +963,10 @@ inline bool mg_get_up2date(QudaInvertParam *param)
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   int test = param->preconditioner != nullptr;
-  int test_ud_rev = additional_prop->mg_ud_rev <= qudaState.ud_rev+additional_prop->mg_ud_rev_delta;
-  int test_ad_rev = additional_prop->mg_ad_rev <= qudaState.ad_rev+additional_prop->mg_ad_rev_delta;
 
-  printf("!!! test_ud_rev: %d, test_ad_rev: %d", test_ud_rev, test_ad_rev);
   MPI_Bcast(&test, 1, MPI_INT, 0, qudaState.layout.world_comm);
   return (test && gauge_field_get_up2date() && clover_field_get_up2date()
-          && test_ud_rev && test_ad_rev
+          && additional_prop->mg_ud_rev == qudaState.ud_rev && additional_prop->mg_ad_rev == qudaState.ad_rev
           && additional_prop->mg_kappa == 1.0 / (2.0 * (dp.m0 + 4.0)) && additional_prop->mg_su3csw == dp.su3csw
           && additional_prop->mg_u1csw == dp.u1csw && additional_prop->mg_qhat == dp.qhat);
 }
@@ -1116,9 +1111,9 @@ static void openQCD_qudaSolverUpdate(void *param_)
   bool do_clover_update = !clover_field_get_up2date() && !gauge_field_get_unset();
   bool do_multigrid_update = param_ != qudaState.dirac_handle && param->inv_type_precondition == QUDA_MG_INVERTER
     && !mg_get_up2date(param) && !gauge_field_get_unset();
-  bool do_multigrid_fat_update = do_multigrid_update
-    && (do_gauge_transfer || additional_prop->mg_ud_rev <= qudaState.ud_rev+additional_prop->mg_ud_rev_delta
-        || additional_prop->mg_ad_rev <= qudaState.ad_rev+additional_prop->mg_ad_rev_delta;);
+  bool do_multigrid_fat_update = false; // do_multigrid_update
+    // && (do_gauge_transfer || additional_prop->mg_ud_rev != qudaState.ud_rev
+        // || additional_prop->mg_ad_rev != qudaState.ad_rev);
 
   if (do_gauge_transfer) {
     if (qudaState.layout.h_gauge == nullptr) { WITH_COMM(errorQuda("qudaState.layout.h_gauge is not set.")); }
@@ -1221,11 +1216,10 @@ static void openQCD_qudaSolverUpdate(void *param_)
   }
 
   /* setup/update the multigrid instance or do nothing */
-  if (do_multigrid_update) { // Skip this is not necessary.
+  if (do_multigrid_update) {
     QudaMultigridParam *mg_param = additional_prop->mg_param;
 
     if (mg_param == nullptr) { WITH_COMM(errorQuda("No multigrid parameter struct set.")); }
-
     if (do_multigrid_fat_update && param->preconditioner != nullptr) {
       WITH_COMM(logQuda(QUDA_VERBOSE, "Destroying existing multigrid instance ...\n"));
       PUSH_RANGE("destroyMultigridQuda", 4);
