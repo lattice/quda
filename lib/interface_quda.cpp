@@ -3609,30 +3609,60 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 }
 
 // ---------------------------------------------------------------------------
-// Externally-deflated multi-RHS solve (split-grid Stage 1).
+// Externally-deflated multi-RHS solve (split-grid Stages 1-2).
 //
 // Sibling of invertMultiSrcQuda that pulls deflation OUT of the CG instance
 // into an outer "cycle" loop: each cycle is one full-grid deflation followed by
-// one plain (deflation-unaware) CG segment. Stage 1 runs entirely on the full
-// grid (no communicator splitting); the decoupling of deflation from the CG
-// instance is what later lets the CG segment run split while deflation stays on
-// the parent communicator.
+// one plain (deflation-unaware) CG segment. Deflation, the true-residual
+// recompute and the convergence test always run on the parent (full) grid,
+// where the eigenvectors are resident; only the CG segment moves.
+//
+// With split_grid = {1,1,1,1} the CG segment runs on the full grid too (Stage 1
+// behaviour, unchanged). With a non-trivial split_grid the segment runs on
+// sub-grids: the gauge and the (constant) preconditioned source are split once
+// up front, and each cycle scatters the current guess, runs plain CG inside the
+// sub-grid communicator, and gathers the improved solution back.
 //
 // Fermion-agnostic: the operator is dispatched from solve_type exactly as
 // solve() does (DiracM for a DIRECT_PC solve, DiracMdagM for a NORMOP solve).
 // MILC-agnostic: the resident deflation space (evecs already mass-shifted by
 // the caller) is consumed as-is; no eigenvalue shifting happens here.
+//
+// The split/join + communicator-switch fragments below deliberately duplicate
+// callMultiSrcQuda's (interface_quda.cpp:3431) rather than refactoring it: that
+// function does split-once/solve/join-once, while we need the split *inside* a
+// loop. De-duplicating the two is deferred.
 // ---------------------------------------------------------------------------
+
+namespace
+{
+
+  // Everything the split CG segment needs, built once per solve on the parent grid.
+  struct SplitSolveContext {
+    bool enabled = false;
+    CommKey split_key = {1, 1, 1, 1};
+    int num_sub_partition = 1;
+    int num_src_per_sub_partition = 1;
+    QudaPCType pc_type = QUDA_4D_PC;
+    ColorSpinorParam cs_param_split;              // descriptor of a collected (sub-grid) field
+    std::vector<ColorSpinorField> collect_in;     // the preconditioned source, split once
+    std::vector<ColorSpinorField> collect_out;    // the guess/solution, re-split every cycle
+    QudaInvertParam param_split;                  // param as seen by the sub-grid CG
+  };
+
+} // namespace
 
 // The cycle loop, templated on the (hermitian, positive) operator type so it
 // stays fermion-agnostic. Operates entirely on the preconditioned fields
 // (out,in) that prepare() produced -- the same system the eigenvectors live on.
 // `space` is the resident full-grid deflation space; it is never handed to the
-// inner CG. Returns the summed iteration count over all cycles.
-template <typename DiracMat>
+// inner CG. `segment` runs one plain-CG segment (full grid or split, see
+// run_deflated_solve) and returns its iteration count. All operators passed here
+// are the *parent-grid* ones. Returns the summed iteration count over all cycles.
+template <typename DiracMat, typename Segment>
 static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in,
-                               const DiracMat &m, const DiracMat &mSloppy, const DiracMat &mPre, const DiracMat &mEig,
-                               deflation_space &space, QudaInvertParam &param)
+                               const DiracMat &m, const DiracMat &mEig, deflation_space &space,
+                               QudaInvertParam &param, Segment &&segment)
 {
   const int n_src = in.size();
   auto *qep = static_cast<QudaEigParam *>(param.eig_param);
@@ -3710,19 +3740,10 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
     const double tol_cycle = std::max(param.tol, worst_rel(r2) * tol_restart);
 
     // ---- plain CG segment: deflation OFF, init guess = out ----
-    SolverParam sp(param);
-    sp.deflate = false;            // detach deflation (invert_quda.h:282); CG never enters
-                                   // constructDeflationSpace, so `space` stays owned here
-    sp.eig_param.preserve_deflation_space = nullptr; // belt-and-suspenders
-    sp.inv_type = QUDA_CG_INVERTER;
-    sp.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    sp.tol = tol_cycle;
-    sp.maxiter = param.maxiter - total_iters;  // remaining global iteration budget
-    sp.iter = 0;
-    Solver *cg = Solver::create(sp, m, mSloppy, mPre, mEig);
-    (*cg)(out, in);                // block over all RHS; updates out in place
-    delete cg;
-    total_iters += sp.iter;
+    // The only place iterations execute. Runs on the full grid or on the
+    // sub-grids depending on split_grid; either way it updates `out` in place
+    // and the loop around it stays on the parent grid.
+    total_iters += segment(out, in, tol_cycle, param.maxiter - total_iters);
 
     // recompute the true residual on the full-grid operator
     r2 = residual();
@@ -3755,6 +3776,133 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
   return total_iters;
 }
 
+// One plain-CG segment on the full grid (split_grid = {1,1,1,1}).
+template <typename DiracMat>
+static int full_cg_segment(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in, const DiracMat &m,
+                           const DiracMat &mSloppy, const DiracMat &mPre, const DiracMat &mEig,
+                           const QudaInvertParam &param, double tol, int maxiter)
+{
+  SolverParam sp(param);
+  sp.deflate = false;              // detach deflation (invert_quda.h:282); CG never enters
+                                   // constructDeflationSpace, so the space stays owned by the caller
+  sp.eig_param.preserve_deflation_space = nullptr; // belt-and-suspenders
+  sp.inv_type = QUDA_CG_INVERTER;
+  sp.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+  sp.tol = tol;
+  sp.maxiter = maxiter;
+  sp.iter = 0;
+  Solver *cg = Solver::create(sp, m, mSloppy, mPre, mEig);
+  (*cg)(out, in);                  // block over all RHS; updates out in place
+  delete cg;
+  return sp.iter;
+}
+
+// One plain-CG segment on the sub-grids. The operators here are the *sub-grid*
+// ones (built against the split gauge, inside the split communicator); `out` is
+// the parent-grid preconditioned guess/solution. Scatter the guess, solve, gather.
+// The source is not an argument: it is constant, so it was split once up front
+// into sc.collect_in.
+//
+// Gauge discipline: no swapGaugeSplit is needed around the segment. Both gauge
+// layouts stay allocated for the whole solve, and each Dirac captured its
+// GaugeField pointers at construction -- the parent Diracs against the full-grid
+// gauge, these against the split gauge. The global gauge handles are only read
+// when *creating* a Dirac, never when applying one. What this does NOT survive is
+// creating a Dirac and *then* splitting the gauge: UpdateSplitGauge deletes the
+// gauge objects it backs up (gauge_backup.h:70), so the caller builds the layouts
+// first and each Dirac afterwards. See invertMultiSrcDeflatedQuda.
+template <typename DiracMat>
+static int split_cg_segment(std::vector<ColorSpinorField> &out, const DiracMat &sm, const DiracMat &smSloppy,
+                            const DiracMat &smPre, const DiracMat &smEig, SplitSolveContext &sc, double tol,
+                            int maxiter)
+{
+  const int nsub = sc.num_sub_partition;
+  const int nper = sc.num_src_per_sub_partition;
+
+  // ---- scatter the current guess onto the sub-grids (parent communicator) ----
+  // RHS i lives on sub-partition j = i % nsub of collected field n = i / nsub,
+  // matching callMultiSrcQuda's n * num_sub_partition + j indexing.
+  for (int n = 0; n < nper; n++)
+    split_field(sc.collect_out[n], {out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.split_key, sc.pc_type);
+
+  comm_barrier();
+  push_communicator(sc.split_key);
+  updateR();
+  comm_barrier();
+
+  int iter = 0;
+  {
+    // Wrap the collected buffers as fields *under the split communicator* so their
+    // ghost/comm metadata matches the sub-grid topology (fields created on the
+    // parent communicator carry the parent's). REFERENCE create aliases the
+    // buffers, so no copy: the CG writes the solution straight back into them.
+    ColorSpinorParam ref(sc.cs_param_split);
+    ref.create = QUDA_REFERENCE_FIELD_CREATE;
+
+    std::vector<ColorSpinorField> sub_out(nper), sub_in(nper);
+    for (int n = 0; n < nper; n++) {
+      ref.v = sc.collect_out[n].data();
+      sub_out[n] = ColorSpinorField(ref);
+      ref.v = sc.collect_in[n].data();
+      sub_in[n] = ColorSpinorField(ref);
+    }
+
+    // param_split carries num_src = num_src_per_sub_partition, so SolverParam
+    // (and CG's per-RHS bookkeeping) is sized for this sub-grid's block.
+    SolverParam sp(sc.param_split);
+    sp.deflate = false;
+    sp.eig_param.preserve_deflation_space = nullptr;
+    sp.inv_type = QUDA_CG_INVERTER;
+    sp.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    sp.tol = tol;
+    sp.maxiter = maxiter;
+    sp.iter = 0;
+    Solver *cg = Solver::create(sp, sm, smSloppy, smPre, smEig);
+    (*cg)(sub_out, sub_in);
+    delete cg;
+    iter = sp.iter;
+  } // sub-grid fields destroyed before the communicator is popped
+
+  comm_barrier();
+  push_communicator(default_comm_key);
+  updateR();
+  comm_barrier();
+
+  // ---- gather the improved solution back to the parent grid ----
+  for (int n = 0; n < nper; n++)
+    join_field({out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.collect_out[n], sc.split_key, sc.pc_type);
+
+  // Sub-partitions converge in different iteration counts. The cycle loop's
+  // iteration budget must be identical on every rank or the loop desynchronises,
+  // so agree on the worst case.
+  comm_allreduce_max(iter);        // int -> the int32_t specialization (communicator_stack.cpp:340)
+  return iter;
+}
+
+// Build the operators of the requested type and run the cycle loop with the
+// matching segment. `sdirac*` are the sub-grid Diracs (null unless splitting).
+template <typename DiracMat>
+static int run_deflated_solve(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in, Dirac &dirac,
+                              Dirac &diracSloppy, Dirac &diracPre, Dirac &diracEig, Dirac *sdirac, Dirac *sdiracSloppy,
+                              Dirac *sdiracPre, Dirac *sdiracEig, deflation_space &space, QudaInvertParam &param,
+                              SplitSolveContext &sc)
+{
+  DiracMat m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
+
+  if (!sc.enabled) {
+    auto segment = [&](std::vector<ColorSpinorField> &o, std::vector<ColorSpinorField> &i, double tol, int maxiter) {
+      return full_cg_segment(o, i, m, mSloppy, mPre, mEig, param, tol, maxiter);
+    };
+    return run_deflated_cycles(out, in, m, mEig, space, param, segment);
+  }
+
+  DiracMat sm(*sdirac), smSloppy(*sdiracSloppy), smPre(*sdiracPre), smEig(*sdiracEig);
+  auto segment = [&](std::vector<ColorSpinorField> &o, std::vector<ColorSpinorField> &, double tol, int maxiter) {
+    return split_cg_segment(o, sm, smSloppy, smPre, smEig, sc, tol, maxiter);
+  };
+  return run_deflated_cycles(out, in, m, mEig, space, param, segment);
+}
+
 void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
   profilerStart(__func__);
@@ -3768,7 +3916,6 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
   if (!space || space->evecs.empty())
     errorQuda("No resident deflation space; caller must load/mass-shift it first");
 
-  GaugeField *gauge = checkGauge(param);
   const int n_src = param->num_src;
 
   // classify the requested system exactly as solve() does (fermion-agnostic)
@@ -3798,7 +3945,59 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
   if (param->compute_action)
     errorQuda("compute_action is not supported with externalized deflation");
 
-  // ---- Dirac operators (once) ----
+  // Bring the resident gauge into agreement with this solve's precisions BEFORE
+  // anything copies, splits or captures it. checkGauge is not a read-only check: if
+  // the sloppy/precondition/refinement/eigensolver precisions differ from what is
+  // resident it calls freeSloppyGaugeQuda() + loadSloppyGaugeQuda() and REBUILDS that
+  // tower (interface_quda.cpp:2581,2602). Run it after the split and UpdateSplitGauge
+  // would have backed up (and split) the stale sloppy fields, leaving the sub-grid CG
+  // with a gauge whose precision does not match cuda_prec_sloppy. The return value is
+  // deliberately discarded: UpdateSplitGauge deletes that object (see below).
+  checkGauge(param);
+
+  // ---- split-grid setup, part 1: the gauge (Stage 2) ----
+  // This MUST happen before the parent Dirac operators are created. UpdateSplitGauge
+  // does not merely re-point the global gauge handles: GaugeBundleBackup::backup()
+  // deep-*copies* the gauge (gauge_backup.h:22) and setupGaugeFields then deletes the
+  // originals (gauge_backup.h:70). A Dirac captures its GaugeField pointers at
+  // construction, so any Dirac built before this call is left dangling. Build the
+  // gauge layouts first, then create each Dirac against a live one.
+  SplitSolveContext sc;
+  sc.split_key = {param->split_grid[0], param->split_grid[1], param->split_grid[2], param->split_grid[3]};
+  if (!sc.split_key.is_valid())
+    errorQuda("split_key = [%d,%d,%d,%d] is not valid", sc.split_key[0], sc.split_key[1], sc.split_key[2],
+              sc.split_key[3]);
+  sc.num_sub_partition = quda::product(sc.split_key);
+  sc.enabled = sc.num_sub_partition > 1;
+
+  if (sc.enabled) {
+    // mirror callMultiSrcQuda's constraints (interface_quda.cpp:3462,3473)
+    if (param->num_src_per_sub_partition * sc.num_sub_partition != n_src)
+      errorQuda("We need to have split_grid[0](=%d) * split_grid[1](=%d) * split_grid[2](=%d) * split_grid[3](=%d) * "
+                "num_src_per_sub_partition(=%d) == num_src(=%d).",
+                sc.split_key[0], sc.split_key[1], sc.split_key[2], sc.split_key[3], param->num_src_per_sub_partition,
+                n_src);
+    if (param->inv_type_precondition == QUDA_MG_INVERTER) errorQuda("Split Grid does NOT work with MG yet");
+    sc.num_src_per_sub_partition = param->num_src_per_sub_partition;
+    if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) sc.pc_type = QUDA_5D_PC;
+
+    bool is_asqtad = Dirac::is_asqtad(param->dslash_type);
+    bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
+
+    // Split the gauge ONCE for the whole solve (it is constant across cycles). On
+    // return the split gauge is the active global gauge and a *copy* of the full-grid
+    // gauge sits in the backup bundles; swap so the full-grid copy is active while we
+    // build the parent Diracs below.
+    UpdateSplitGauge(param, is_asqtad, is_clover, sc.split_key);
+    swapGaugeSplit(true);          // active := full-grid gauge, split gauge buffered
+  }
+
+  // ---- Dirac operators (once), against the now-live full-grid gauge ----
+  // Re-fetch the handle: the object the first checkGauge() returned was deleted by
+  // UpdateSplitGauge and replaced by a copy. This call rebuilds nothing (the copies
+  // carry the precisions the first call established), it just yields a live pointer.
+  GaugeField *gauge = checkGauge(param);
   Dirac *dirac = nullptr, *diracSloppy = nullptr, *diracPre = nullptr, *diracEig = nullptr;
   createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, *param, pc_solve, qep->use_smeared_gauge);
 
@@ -3853,14 +4052,84 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
     dirac->Mdag(in, tmp);
   }
 
+  // ---- split-grid setup, part 2: the fields and the sub-grid operators ----
+  // Deflation, the residual and the convergence test stay on this (parent) grid;
+  // only the CG segment inside the cycle loop moves to the sub-grids.
+  Dirac *sdirac = nullptr, *sdiracSloppy = nullptr, *sdiracPre = nullptr, *sdiracEig = nullptr;
+
+  if (sc.enabled) {
+    // A collected field holds one RHS over a whole sub-grid: same local dims as
+    // this rank's share of the sub-grid, i.e. x[d] * split_key[d].
+    sc.cs_param_split = ColorSpinorParam(in[0]);
+    sc.cs_param_split.create = QUDA_NULL_FIELD_CREATE;
+    sc.cs_param_split.setPrecision(param->cuda_prec, param->cuda_prec, true); // native format
+    sc.cs_param_split.location = QUDA_CUDA_FIELD_LOCATION;
+    for (int d = 0; d < CommKey::n_dim; d++) sc.cs_param_split.x[d] *= sc.split_key[d];
+
+    resize(sc.collect_in, sc.num_src_per_sub_partition, sc.cs_param_split);
+    resize(sc.collect_out, sc.num_src_per_sub_partition, sc.cs_param_split);
+
+    // Split the preconditioned source ONCE -- it does not change across cycles.
+    // (in/out are already device-resident in native order, so unlike
+    // callMultiSrcQuda we need no host download / dev_buf staging.)
+    comm_barrier();
+    for (int n = 0; n < sc.num_src_per_sub_partition; n++)
+      split_field(sc.collect_in[n],
+                  {in.begin() + n * sc.num_sub_partition, in.begin() + (n + 1) * sc.num_sub_partition}, sc.split_key,
+                  sc.pc_type);
+
+    // The sub-grid CG sees native device fields and its own block size.
+    sc.param_split = *param;
+    sc.param_split.input_location = QUDA_CUDA_FIELD_LOCATION;
+    sc.param_split.output_location = QUDA_CUDA_FIELD_LOCATION;
+    sc.param_split.dirac_order = QUDA_INTERNAL_DIRAC_ORDER;
+    sc.param_split.cpu_prec = sc.collect_in[0].Precision();
+    sc.param_split.num_src = sc.num_src_per_sub_partition;
+
+    // Sub-grid Dirac operators: created with the split gauge active and *inside*
+    // the split communicator, so they capture the split GaugeFields and the
+    // sub-grid topology. Both gauge layouts stay allocated from here on, so the
+    // parent and sub-grid Diracs each hold a live pointer and the cycle loop can
+    // switch communicators without touching the gauge again.
+    swapGaugeSplit(true);          // active := split gauge, full-grid gauge buffered
+    comm_barrier();
+    push_communicator(sc.split_key);
+    updateR();
+    comm_barrier();
+    createDiracWithEig(sdirac, sdiracSloppy, sdiracPre, sdiracEig, sc.param_split, pc_solve, qep->use_smeared_gauge);
+    comm_barrier();
+    push_communicator(default_comm_key);
+    updateR();
+    comm_barrier();
+  }
+
   // ---- run the cycle loop under the correct operator type ----
   int iters = 0;
   if (direct_solve) {              // e.g. staggered DIRECT_PC -> DiracM
-    DiracM m(*dirac), mS(*diracSloppy), mP(*diracPre), mE(*diracEig);
-    iters = run_deflated_cycles(out, in, m, mS, mP, mE, *space, *param);
+    iters = run_deflated_solve<DiracM>(out, in, *dirac, *diracSloppy, *diracPre, *diracEig, sdirac, sdiracSloppy,
+                                       sdiracPre, sdiracEig, *space, *param, sc);
   } else {                         // NORMOP -> DiracMdagM
-    DiracMdagM m(*dirac), mS(*diracSloppy), mP(*diracPre), mE(*diracEig);
-    iters = run_deflated_cycles(out, in, m, mS, mP, mE, *space, *param);
+    iters = run_deflated_solve<DiracMdagM>(out, in, *dirac, *diracSloppy, *diracPre, *diracEig, sdirac, sdiracSloppy,
+                                           sdiracPre, sdiracEig, *space, *param, sc);
+  }
+
+  // ---- split teardown ----
+  // The split gauge is the active one here (we swapped to it to build the sub-grid
+  // Diracs). Drop those Diracs first -- they point into it -- then swap back, which
+  // leaves the full-grid gauge active for the reconstruct below and for whatever the
+  // caller does next. The parent Diracs point at the full-grid copies, which neither
+  // branch frees.
+  if (sc.enabled) {
+    delete sdirac;
+    delete sdiracSloppy;
+    delete sdiracPre;
+    delete sdiracEig;
+    sc.collect_in.clear();
+    sc.collect_out.clear();
+    if (update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_OFF)
+      swapGaugeSplit(false);       // free the split gauge, restore the full-grid one
+    else
+      swapGaugeSplit(true);        // keep the split gauge buffered for the next solve
   }
 
   // ---- reconstruct ONCE, un-normalize, write back ----

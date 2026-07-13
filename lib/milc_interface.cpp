@@ -2097,9 +2097,26 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
     = reinterpret_cast<const deflation_space *>(qep.preserve_deflation_space);
   const bool space_resident = resident_space && !resident_space->evecs.empty();
   if (use_deflated_msrc && invertParam.eig_param && space_resident) {
+    // Stage-2 test hook: the sub-grid layout is taken from QUDA_DEFLATED_MSRC_SPLIT
+    // ("nx ny nz nt", default "1 1 1 1" = no split, i.e. Stage-1 behaviour) so the
+    // split path can be exercised before the MILC input file learns to drive it
+    // (Stage 3). Replace this with real input-file plumbing when Stage 3 lands.
+    static const char *split_env = getenv("QUDA_DEFLATED_MSRC_SPLIT");
+    if (split_env) {
+      int sg[4] = {1, 1, 1, 1};
+      if (sscanf(split_env, "%d %d %d %d", &sg[0], &sg[1], &sg[2], &sg[3]) != 4)
+        errorQuda("QUDA_DEFLATED_MSRC_SPLIT must be four ints, e.g. \"1 1 1 2\"; got \"%s\"", split_env);
+      const int n_sub = sg[0] * sg[1] * sg[2] * sg[3];
+      if (n_sub < 1 || num_src % n_sub != 0)
+        errorQuda("QUDA_DEFLATED_MSRC_SPLIT product (%d) must divide num_src (%d)", n_sub, num_src);
+      for (int i = 0; i < 4; i++) invertParam.split_grid[i] = sg[i];
+      invertParam.num_src_per_sub_partition = num_src / n_sub;
+    }
     printfQuda("QUDA_DEFLATED_MSRC: using externalized-deflation orchestrator "
-               "(invertMultiSrcDeflatedQuda) for parity %d, mass %e, num_src %d\n",
-               local_parity, mass, num_src);
+               "(invertMultiSrcDeflatedQuda) for parity %d, mass %e, num_src %d, "
+               "split_grid %d %d %d %d, num_src_per_sub_partition %d\n",
+               local_parity, mass, num_src, invertParam.split_grid[0], invertParam.split_grid[1],
+               invertParam.split_grid[2], invertParam.split_grid[3], invertParam.num_src_per_sub_partition);
     invertMultiSrcDeflatedQuda(sln_pointer, src_pointer, &invertParam);
   } else {
     if (use_deflated_msrc && invertParam.eig_param && !space_resident)
