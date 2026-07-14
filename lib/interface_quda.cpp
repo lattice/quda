@@ -3647,6 +3647,7 @@ namespace
     ColorSpinorParam cs_param_split;              // descriptor of a collected (sub-grid) field
     std::vector<ColorSpinorField> collect_in;     // the preconditioned source, split once
     std::vector<ColorSpinorField> collect_out;    // the guess/solution, re-split every cycle
+    std::vector<ColorSpinorField> collect_r;      // the residual, computed on the sub-grid, joined back
     QudaInvertParam param_split;                  // param as seen by the sub-grid CG
   };
 
@@ -3667,7 +3668,11 @@ namespace
   struct DeflatedSolveTimers {
     host_timer_t gauge_split;  // UpdateSplitGauge: its TIME answers "rebuilt every solve?"
     host_timer_t deflate;      // eig->deflate() on the parent grid   -> C_proj
-    host_timer_t residual;     // parent-grid matvec (cycle overhead, NOT part of C_proj)
+    host_timer_t residual;     // PARENT-grid matvec. Expensive: pays the ghost-buffer rebuild
+                               // that push_communicator forces. Should now fire ~once per
+                               // solve, not once per cycle (see split_cg_segment).
+    host_timer_t sub_resid;    // SUB-grid matvec forming r. Cheap: buffers already hot.
+                               // Kept separate from `residual` so the two are comparable.
     host_timer_t split;        // split_field  (scatter guess to sub-grids)
     host_timer_t join;         // join_field   (gather solution back)
     host_timer_t rendez_in;    // barrier + push_communicator, parent -> sub-grid
@@ -3680,7 +3685,8 @@ namespace
     // copy-assignment would read them.
     void reset(const char *func, const char *file, int line)
     {
-      for (host_timer_t *t : {&gauge_split, &deflate, &residual, &split, &join, &rendez_in, &rendez_out, &cg_sub})
+      for (host_timer_t *t :
+           {&gauge_split, &deflate, &residual, &sub_resid, &split, &join, &rendez_in, &rendez_out, &cg_sub})
         t->reset(func, file, line);
       cycles = 0;
     }
@@ -3725,8 +3731,8 @@ namespace
   {
     // Collective: every rank must reach this, so it sits outside any rank- or
     // verbosity-dependent branch.
-    std::vector<double> tmax {cg_sub.time,    split.time,     join.time,       rendez_in.time,
-                              rendez_out.time, deflate.time,  residual.time,   gauge_split.time};
+    std::vector<double> tmax {cg_sub.time,     split.time,    join.time,     rendez_in.time, rendez_out.time,
+                              deflate.time,    residual.time, sub_resid.time, gauge_split.time};
     std::vector<double> tmin {cg_sub.time};
     comm_allreduce_max(tmax);
     comm_allreduce_min(tmin);
@@ -3739,10 +3745,11 @@ namespace
     // ~0 => cached; large => re-shipped every solve, and C_comm below is contaminated.
     printfQuda("SPLITPROF %s cycles %d iters %d | cg[max] %.4f cg[min] %.4f straggle %.4f | "
                "split %.4f (%d) join %.4f (%d) rendez %.4f | C_comm %.4f | "
-               "deflate/C_proj %.4f (%d) resid %.4f | gauge_split %.4f | R %d\n",
+               "deflate/C_proj %.4f (%d) resid[parent] %.4f (%d) resid[sub] %.4f (%d) | "
+               "gauge_split %.4f | R %d\n",
                split_enabled ? "split" : "nosplit", cycles, iters, tmax[0], tmin[0], tmax[0] - tmin[0],
                tmax[1], split.count, tmax[2], join.count, tmax[3] + tmax[4], c_comm, tmax[5], deflate.count,
-               tmax[6], tmax[7], reshuffles);
+               tmax[6], residual.count, tmax[7], sub_resid.count, tmax[8], reshuffles);
   }
 
 } // namespace
@@ -3831,6 +3838,11 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
   int cycle = 0;
   r2 = residual();                 // true residual after the initial deflation
 
+  // Is `r` stale with respect to `out`? deflate_accumulate() changes out and so
+  // invalidates r; a segment refreshes it. Tracking this lets the converged exit path
+  // skip a final parent-grid residual it does not need (see the loop exit below).
+  bool r_stale = false;
+
   // Total iterations are capped at param.maxiter (like stock CG's k < maxiter),
   // budgeted across cycles, so a non-converging solve bails rather than running
   // up to max_cycles * maxiter.
@@ -3846,23 +3858,39 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
     dt.cycles++;
 
     // ---- plain CG segment: deflation OFF, init guess = out ----
-    // The only place iterations execute. Runs on the full grid or on the
-    // sub-grids depending on split_grid; either way it updates `out` in place
-    // and the loop around it stays on the parent grid.
-    total_iters += segment(out, in, tol_cycle, param.maxiter - total_iters);
+    // The only place iterations execute. Runs on the full grid or on the sub-grids
+    // depending on split_grid; either way it updates `out` in place AND leaves the
+    // true residual of that `out` in `r`.
+    //
+    // The segment -- not this loop -- owns the residual. That is what keeps the
+    // Dirac operator off the parent grid inside the loop, and it is the whole point:
+    // push_communicator() unconditionally frees every ghost buffer, every message
+    // handle and the FieldTmp cache (communicator_stack.cpp:63-66), so the first
+    // halo-exchanging op on the parent after a switch-back pays to rebuild all of it.
+    // A single matvec cannot amortize that -- measured at ~0.1 s/call and 83% of the
+    // whole solve (ksspectrum16). The split segment therefore forms r on the sub-grid,
+    // where the buffers are already hot, and joins it back. Everything this loop then
+    // does on the parent -- norm2, the convergence test, deflate -- is pure BLAS and
+    // never touches a halo, so the teardown costs nothing to rebuild.
+    total_iters += segment(out, in, r, tol_cycle, param.maxiter - total_iters);
+    r_stale = false;
 
-    // recompute the true residual on the full-grid operator
-    r2 = residual();
+    // ||r||^2 per RHS: a reduction, but no halo -- cheap, like deflate.
+    r2 = blas::norm2(r);
     if (converged(r2)) break;
 
-    // re-deflate: fold the projected residual correction into the guess
+    // re-deflate: fold the projected residual correction into the guess. This changes
+    // `out`, so `r` no longer belongs to it.
     deflate_accumulate();
+    r_stale = true;
     cycle++;
   }
 
-  // Recompute so r2 matches `out` in every exit path (a max_cycles/budget exit
-  // leaves the last deflate_accumulate() applied after the last residual()).
-  r2 = residual();
+  // Only a max_cycles/budget exit can leave here with a deflate applied after the last
+  // residual; the converged path already has r2 matching `out`. Recompute just in that
+  // case, so we pay the parent-grid matvec (and its ghost-buffer rebuild) only when it
+  // is actually needed.
+  if (r_stale) r2 = residual();
 
   if (!converged(r2))
     warningQuda("invertMultiSrcDeflatedQuda: not converged after %d cycles, %d iters "
@@ -3883,10 +3911,17 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
 }
 
 // One plain-CG segment on the full grid (split_grid = {1,1,1,1}).
+//
+// Per the segment contract, this also leaves the true residual of `out` in `r`. Here
+// that is just a parent-grid matvec, and it is cheap: with no split there is no
+// push_communicator, so the ghost buffers are never torn down and stay hot across the
+// whole solve. (The expense that motivates the contract is specific to the split path
+// -- see split_cg_segment.)
 template <typename DiracMat>
-static int full_cg_segment(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in, const DiracMat &m,
-                           const DiracMat &mSloppy, const DiracMat &mPre, const DiracMat &mEig,
-                           const QudaInvertParam &param, double tol, int maxiter)
+static int full_cg_segment(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in,
+                           std::vector<ColorSpinorField> &r, const DiracMat &m, const DiracMat &mSloppy,
+                           const DiracMat &mPre, const DiracMat &mEig, const QudaInvertParam &param, double tol,
+                           int maxiter)
 {
   SolverParam sp(param);
   sp.deflate = false;              // detach deflation (invert_quda.h:282); CG never enters
@@ -3902,6 +3937,13 @@ static int full_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Color
     Solver *cg = Solver::create(sp, m, mSloppy, mPre, mEig);
     (*cg)(out, in);                // block over all RHS; updates out in place
     delete cg;
+  }
+
+  // r = in - m*out, the true residual of the solution we just produced.
+  {
+    TimedPhase p(dt.residual);
+    m(r, out);
+    blas::xmyNorm(in, r);          // r = in - r  (norms discarded; the caller takes norm2)
   }
   return sp.iter;
 }
@@ -3921,9 +3963,9 @@ static int full_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Color
 // gauge objects it backs up (gauge_backup.h:70), so the caller builds the layouts
 // first and each Dirac afterwards. See invertMultiSrcDeflatedQuda.
 template <typename DiracMat>
-static int split_cg_segment(std::vector<ColorSpinorField> &out, const DiracMat &sm, const DiracMat &smSloppy,
-                            const DiracMat &smPre, const DiracMat &smEig, SplitSolveContext &sc, double tol,
-                            int maxiter)
+static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &r, const DiracMat &sm,
+                            const DiracMat &smSloppy, const DiracMat &smPre, const DiracMat &smEig,
+                            SplitSolveContext &sc, double tol, int maxiter)
 {
   const int nsub = sc.num_sub_partition;
   const int nper = sc.num_src_per_sub_partition;
@@ -3954,12 +3996,14 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, const DiracMat &
     ColorSpinorParam ref(sc.cs_param_split);
     ref.create = QUDA_REFERENCE_FIELD_CREATE;
 
-    std::vector<ColorSpinorField> sub_out(nper), sub_in(nper);
+    std::vector<ColorSpinorField> sub_out(nper), sub_in(nper), sub_r(nper);
     for (int n = 0; n < nper; n++) {
       ref.v = sc.collect_out[n].data();
       sub_out[n] = ColorSpinorField(ref);
       ref.v = sc.collect_in[n].data();
       sub_in[n] = ColorSpinorField(ref);
+      ref.v = sc.collect_r[n].data();
+      sub_r[n] = ColorSpinorField(ref);
     }
 
     // param_split carries num_src = num_src_per_sub_partition, so SolverParam
@@ -3979,6 +4023,20 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, const DiracMat &
       delete cg;
     }
     iter = sp.iter;
+
+    // r = in - A*out, formed HERE, on the sub-grid, using the sub-grid operator -- not
+    // on the parent after the join. Same operator and same gauge as the parent's, just a
+    // different decomposition, so the result agrees to round-off; but here the ghost
+    // buffers and message handles are already live (CG has been exchanging halos with
+    // them for tens of iterations), whereas on the parent this one matvec would have to
+    // rebuild all of them from scratch after push_communicator freed them. That rebuild
+    // was 83% of the solve (ksspectrum16, §5.10). The norms are discarded: the caller
+    // takes norm2 of the joined r on the parent, which is a reduction with no halo.
+    {
+      TimedPhase p(dt.sub_resid);
+      sm(sub_r, sub_out);
+      blas::xmyNorm(sub_in, sub_r); // sub_r = sub_in - sub_r
+    }
   } // sub-grid fields destroyed before the communicator is popped
 
   // The straggler cost lands here. The first barrier is still inside the SPLIT
@@ -3994,11 +4052,16 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, const DiracMat &
     comm_barrier();
   }
 
-  // ---- gather the improved solution back to the parent grid ----
+  // ---- gather the improved solution AND its residual back to the parent grid ----
+  // Two joins per cycle instead of one (~+0.009 s) to save the parent-grid matvec and
+  // its ghost-buffer rebuild (~0.1 s). The parent needs `out` to deflate into and `r`
+  // to deflate *from*, and now gets both without ever applying the Dirac operator.
   {
     TimedPhase p(dt.join);
-    for (int n = 0; n < nper; n++)
+    for (int n = 0; n < nper; n++) {
       join_field({out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.collect_out[n], sc.split_key, sc.pc_type);
+      join_field({r.begin() + n * nsub, r.begin() + (n + 1) * nsub}, sc.collect_r[n], sc.split_key, sc.pc_type);
+    }
   }
 
   // Sub-partitions converge in different iteration counts. The cycle loop's
@@ -4018,16 +4081,19 @@ static int run_deflated_solve(std::vector<ColorSpinorField> &out, std::vector<Co
 {
   DiracMat m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
 
+  // A segment updates `o` in place and leaves the true residual of `o` in `rr`.
   if (!sc.enabled) {
-    auto segment = [&](std::vector<ColorSpinorField> &o, std::vector<ColorSpinorField> &i, double tol, int maxiter) {
-      return full_cg_segment(o, i, m, mSloppy, mPre, mEig, param, tol, maxiter);
+    auto segment = [&](std::vector<ColorSpinorField> &o, std::vector<ColorSpinorField> &i,
+                       std::vector<ColorSpinorField> &rr, double tol, int maxiter) {
+      return full_cg_segment(o, i, rr, m, mSloppy, mPre, mEig, param, tol, maxiter);
     };
     return run_deflated_cycles(out, in, m, mEig, space, param, segment);
   }
 
   DiracMat sm(*sdirac), smSloppy(*sdiracSloppy), smPre(*sdiracPre), smEig(*sdiracEig);
-  auto segment = [&](std::vector<ColorSpinorField> &o, std::vector<ColorSpinorField> &, double tol, int maxiter) {
-    return split_cg_segment(o, sm, smSloppy, smPre, smEig, sc, tol, maxiter);
+  auto segment = [&](std::vector<ColorSpinorField> &o, std::vector<ColorSpinorField> &,
+                     std::vector<ColorSpinorField> &rr, double tol, int maxiter) {
+    return split_cg_segment(o, rr, sm, smSloppy, smPre, smEig, sc, tol, maxiter);
   };
   return run_deflated_cycles(out, in, m, mEig, space, param, segment);
 }
@@ -4211,6 +4277,7 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
 
     resize(sc.collect_in, sc.num_src_per_sub_partition, sc.cs_param_split);
     resize(sc.collect_out, sc.num_src_per_sub_partition, sc.cs_param_split);
+    resize(sc.collect_r, sc.num_src_per_sub_partition, sc.cs_param_split);
 
     // Split the preconditioned source ONCE -- it does not change across cycles.
     // (in/out are already device-resident in native order, so unlike
@@ -4269,6 +4336,7 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
     delete sdiracEig;
     sc.collect_in.clear();
     sc.collect_out.clear();
+    sc.collect_r.clear();
     if (update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_OFF)
       swapGaugeSplit(false);       // free the split gauge, restore the full-grid one
     else
