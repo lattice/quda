@@ -112,11 +112,11 @@ GaugeField *extendedGaugeResident = nullptr;
 /**
  * callMultiSrcQuda related gauge split
  * update_split_gauge :
- * - QUDA_UPDATE_SPLITE_GAUGE_TRUE: the input gauge fields will be split and the buffered (split) gauges will be updated
+ * - QUDA_UPDATE_SPLIT_GAUGE_TRUE: the input gauge fields will be split and the buffered (split) gauges will be updated
  accordingly;
- * - QUDA_UPDATE_SPLITE_GAUGE_FALSE: the input gauge fields will not be split and the buffered (split) gauges will be
+ * - QUDA_UPDATE_SPLIT_GAUGE_FALSE: the input gauge fields will not be split and the buffered (split) gauges will be
  used for split grid solves;
- * - QUDA_UPDATE_SPLITE_GAUGE_OFF: nothing will be done.
+ * - QUDA_UPDATE_SPLIT_GAUGE_OFF: nothing will be done.
 
  * split_grid_bkup will be used to check whether split layout is changed or not
  * change in gauge precsions will need loadGaugeQuda which results in re-distribute
@@ -3294,7 +3294,8 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
     // swap to the buffered split gauge
     swapGaugeSplit(true);
     return;
-  } else {
+  } else if (update_split_gauge != QUDA_UPDATE_SPLIT_GAUGE_OFF) {
+    // OFF must survive the split: it is what tells the epilogue to free the buffers again
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   }
 
@@ -3584,7 +3585,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       for (int j = 0; j < num_sub_partition; j++) _h_x[n * num_sub_partition + j].copy(dev_buf[j]);
     }
 
-    // switch back to the original links, detete split gauge if update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_OFF
+    // switch back to the original links, delete split gauge if update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_OFF
     if (update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_OFF) {
       // do not use freeGaugeSplit which have additional swap
       swapGaugeSplit(false);
