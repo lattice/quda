@@ -3650,6 +3650,101 @@ namespace
     QudaInvertParam param_split;                  // param as seen by the sub-grid CG
   };
 
+  // ---- per-solve phase timers -------------------------------------------------
+  //
+  // Decomposes one deflated solve into the terms of the split_grid_summary.md cost
+  // model, which the coarse profileInvertMultiSrc wrapper cannot separate:
+  //
+  //   C_comm  = split + join + rendezvous_in + rendezvous_out
+  //   C_proj  = deflate
+  //   R       = split.count + join.count + gauge_split.count   (reshuffles / solve)
+  //
+  // Deliberately NOT a TimeProfile: that is keyed on the fixed QudaProfileType enum
+  // (timer.h:141), whose slots are generic (COMPUTE/COMMS/...) and which permits only
+  // one running timer -- adding slots would mean editing a public enum and its pname[]
+  // table for a measurement local to this orchestrator. host_timer_t already carries a
+  // cumulative `time` *and* a call `count`, so the reshuffle counter comes for free.
+  struct DeflatedSolveTimers {
+    host_timer_t gauge_split;  // UpdateSplitGauge: its TIME answers "rebuilt every solve?"
+    host_timer_t deflate;      // eig->deflate() on the parent grid   -> C_proj
+    host_timer_t residual;     // parent-grid matvec (cycle overhead, NOT part of C_proj)
+    host_timer_t split;        // split_field  (scatter guess to sub-grids)
+    host_timer_t join;         // join_field   (gather solution back)
+    host_timer_t rendez_in;    // barrier + push_communicator, parent -> sub-grid
+    host_timer_t rendez_out;   // barrier + push_communicator, sub-grid -> parent
+    host_timer_t cg_sub;       // the CG segment itself (full-grid or sub-grid)
+    int cycles = 0;
+
+    // Zero via Timer::reset rather than assigning a fresh struct: host_timer_t is
+    // Timer<false>, whose qudaEvent_t members are left uninitialized in that case, and
+    // copy-assignment would read them.
+    void reset(const char *func, const char *file, int line)
+    {
+      for (host_timer_t *t : {&gauge_split, &deflate, &residual, &split, &join, &rendez_in, &rendez_out, &cg_sub})
+        t->reset(func, file, line);
+      cycles = 0;
+    }
+
+    void report(bool split_enabled, int iters);
+  };
+
+  DeflatedSolveTimers dt;
+
+  // Times a phase with the device drained at both ends.
+  //
+  // host_timer_t is host wall-clock but QUDA kernels are asynchronous, so a stop()
+  // reached with work still in flight bills one phase's tail to the next -- CG's tail
+  // would land on join_field and inflate C_comm, the very number we are here to
+  // measure. The phases below are serialised by design, so syncing costs no overlap.
+  struct TimedPhase {
+    host_timer_t &t;
+    TimedPhase(host_timer_t &t_) : t(t_)
+    {
+      qudaDeviceSynchronize();
+      t.start();
+    }
+    ~TimedPhase()
+    {
+      qudaDeviceSynchronize();
+      t.stop();
+    }
+  };
+
+  // Reduce across the PARENT communicator and print one greppable line per solve.
+  // Must be called with the parent communicator active (i.e. after split teardown).
+  //
+  // The reductions are not cosmetic. printfQuda prints only from the verbose rank,
+  // which is global rank 0 and therefore lives in sub-partition 0 (see the note on
+  // reading solver output in split_grid_implementation.md S4.4). Sub-grids converge in
+  // different iteration counts, so a bare rank-0 dump would report *sub-grid 0's* CG
+  // time and call it the answer. The max/min spread of cg_sub across sub-grids IS the
+  // straggler cost -- the price the epoch-synchronised design pays, and the direct
+  // experimental answer to the open question of a fixed per-cycle iteration budget
+  // versus a residual target.
+  void DeflatedSolveTimers::report(bool split_enabled, int iters)
+  {
+    // Collective: every rank must reach this, so it sits outside any rank- or
+    // verbosity-dependent branch.
+    std::vector<double> tmax {cg_sub.time,    split.time,     join.time,       rendez_in.time,
+                              rendez_out.time, deflate.time,  residual.time,   gauge_split.time};
+    std::vector<double> tmin {cg_sub.time};
+    comm_allreduce_max(tmax);
+    comm_allreduce_min(tmin);
+
+    const double c_comm = tmax[1] + tmax[2] + tmax[3] + tmax[4];
+    const int reshuffles = split.count + join.count + gauge_split.count;
+
+    // gauge_split is called once per solve either way -- it either rebuilds or takes the
+    // reuse fast path -- so it is the TIME, not the count, that says which happened.
+    // ~0 => cached; large => re-shipped every solve, and C_comm below is contaminated.
+    printfQuda("SPLITPROF %s cycles %d iters %d | cg[max] %.4f cg[min] %.4f straggle %.4f | "
+               "split %.4f (%d) join %.4f (%d) rendez %.4f | C_comm %.4f | "
+               "deflate/C_proj %.4f (%d) resid %.4f | gauge_split %.4f | R %d\n",
+               split_enabled ? "split" : "nosplit", cycles, iters, tmax[0], tmin[0], tmax[0] - tmin[0],
+               tmax[1], split.count, tmax[2], join.count, tmax[3] + tmax[4], c_comm, tmax[5], deflate.count,
+               tmax[6], tmax[7], reshuffles);
+  }
+
 } // namespace
 
 // The cycle loop, templated on the (hermitian, positive) operator type so it
@@ -3680,11 +3775,17 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
 
   // r = in - m*out ; returns per-RHS ||r||^2. Same operator the CG segment uses.
   auto residual = [&]() -> std::vector<double> {
+    TimedPhase p(dt.residual);
     m(r, out);                     // r = A out
     return blas::xmyNorm(in, r);   // r = in - r = in - A out ; returns ||r||^2
   };
-  // out += V L^-1 V^dag r  (the only op that touches the eigenvectors)
-  auto deflate_accumulate = [&]() { eig->deflate(out, r, space.evecs, space.evals, /*accumulate=*/true); };
+  // out += V L^-1 V^dag r  (the only op that touches the eigenvectors). This is the
+  // cost model's C_proj, and these timers run on the unsplit path too -- so the
+  // no-split orchestrator baseline measures C_proj with zero comms contamination.
+  auto deflate_accumulate = [&]() {
+    TimedPhase p(dt.deflate);
+    eig->deflate(out, r, space.evecs, space.evals, /*accumulate=*/true);
+  };
 
   // ---- initial residual of the (possibly nonzero) initial guess ----
   //   r = in - A out(guess)
@@ -3739,6 +3840,11 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
     // never past the final tolerance.
     const double tol_cycle = std::max(param.tol, worst_rel(r2) * tol_restart);
 
+    // Count CG segments, not re-deflations: `cycle` below is incremented only when the
+    // loop goes round again, so it misses the final (converged) segment. The cost
+    // model's reshuffle count keys off segments -- each one is a scatter and a gather.
+    dt.cycles++;
+
     // ---- plain CG segment: deflation OFF, init guess = out ----
     // The only place iterations execute. Runs on the full grid or on the
     // sub-grids depending on split_grid; either way it updates `out` in place
@@ -3791,9 +3897,12 @@ static int full_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Color
   sp.tol = tol;
   sp.maxiter = maxiter;
   sp.iter = 0;
-  Solver *cg = Solver::create(sp, m, mSloppy, mPre, mEig);
-  (*cg)(out, in);                  // block over all RHS; updates out in place
-  delete cg;
+  {
+    TimedPhase p(dt.cg_sub);
+    Solver *cg = Solver::create(sp, m, mSloppy, mPre, mEig);
+    (*cg)(out, in);                // block over all RHS; updates out in place
+    delete cg;
+  }
   return sp.iter;
 }
 
@@ -3822,13 +3931,19 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, const DiracMat &
   // ---- scatter the current guess onto the sub-grids (parent communicator) ----
   // RHS i lives on sub-partition j = i % nsub of collected field n = i / nsub,
   // matching callMultiSrcQuda's n * num_sub_partition + j indexing.
-  for (int n = 0; n < nper; n++)
-    split_field(sc.collect_out[n], {out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.split_key, sc.pc_type);
+  {
+    TimedPhase p(dt.split);
+    for (int n = 0; n < nper; n++)
+      split_field(sc.collect_out[n], {out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.split_key, sc.pc_type);
+  }
 
-  comm_barrier();
-  push_communicator(sc.split_key);
-  updateR();
-  comm_barrier();
+  {
+    TimedPhase p(dt.rendez_in);
+    comm_barrier();
+    push_communicator(sc.split_key);
+    updateR();                     // trivial (interface_quda.cpp:549): 4 int stores, not a cost
+    comm_barrier();
+  }
 
   int iter = 0;
   {
@@ -3857,20 +3972,34 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, const DiracMat &
     sp.tol = tol;
     sp.maxiter = maxiter;
     sp.iter = 0;
-    Solver *cg = Solver::create(sp, sm, smSloppy, smPre, smEig);
-    (*cg)(sub_out, sub_in);
-    delete cg;
+    {
+      TimedPhase p(dt.cg_sub);
+      Solver *cg = Solver::create(sp, sm, smSloppy, smPre, smEig);
+      (*cg)(sub_out, sub_in);
+      delete cg;
+    }
     iter = sp.iter;
   } // sub-grid fields destroyed before the communicator is popped
 
-  comm_barrier();
-  push_communicator(default_comm_key);
-  updateR();
-  comm_barrier();
+  // The straggler cost lands here. The first barrier is still inside the SPLIT
+  // communicator, so it only syncs this sub-grid (which CG's own reductions have
+  // already synced -- it is near-free). The second, after the push, is on the parent:
+  // that is where sub-grid 0 waits for the slowest of the nine. Timing the window as a
+  // whole captures it; the cg_sub max/min spread in report() corroborates it.
+  {
+    TimedPhase p(dt.rendez_out);
+    comm_barrier();
+    push_communicator(default_comm_key);
+    updateR();
+    comm_barrier();
+  }
 
   // ---- gather the improved solution back to the parent grid ----
-  for (int n = 0; n < nper; n++)
-    join_field({out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.collect_out[n], sc.split_key, sc.pc_type);
+  {
+    TimedPhase p(dt.join);
+    for (int n = 0; n < nper; n++)
+      join_field({out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.collect_out[n], sc.split_key, sc.pc_type);
+  }
 
   // Sub-partitions converge in different iteration counts. The cycle loop's
   // iteration budget must be identical on every rank or the loop desynchronises,
@@ -3908,6 +4037,11 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
   profilerStart(__func__);
   auto profile = pushProfile(profileInvertMultiSrc, param);
   pushVerbosity(param->verbosity);
+
+  // Per-solve numbers: MILC calls this once per parity per set (~58 times in the 16^3x48
+  // test), and the cost model is per solve. Without this the timers would accumulate into
+  // a job total.
+  dt.reset(__func__, __FILE__, __LINE__);
 
   checkInvertParam(param, _hp_x[0], _hp_b[0]);
   if (!param->eig_param) errorQuda("invertMultiSrcDeflatedQuda requires eig_param (deflation)");
@@ -3989,7 +4123,16 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
     // return the split gauge is the active global gauge and a *copy* of the full-grid
     // gauge sits in the backup bundles; swap so the full-grid copy is active while we
     // build the parent Diracs below.
-    UpdateSplitGauge(param, is_asqtad, is_clover, sc.split_key);
+    // Timed because gauge_split.count is the whole answer to "is the split gauge
+    // rebuilt every solve, or cached?". UpdateSplitGauge has a reuse fast path
+    // (interface_quda.cpp:3291-3296) that returns early when the key is unchanged, in
+    // which case this is near-free and .count still increments -- so read .time, not
+    // .count, to tell a rebuild from a reuse. At 288 nodes a rebuild is a multi-TB
+    // all-to-all and would swamp C_comm.
+    {
+      TimedPhase p(dt.gauge_split);
+      UpdateSplitGauge(param, is_asqtad, is_clover, sc.split_key);
+    }
     swapGaugeSplit(true);          // active := full-grid gauge, split gauge buffered
   }
 
@@ -4142,6 +4285,11 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
 
   blas::copy(h_x, x);              // device -> host wrappers (writes _hp_x)
   param->iter = iters;
+
+  // After teardown, so the parent communicator is active: report() reduces across it.
+  // It is collective -- every rank must reach it -- so it is not gated on verbosity or
+  // rank; printfQuda inside does the rank filtering.
+  dt.report(sc.enabled, iters);
 
   delete dirac;
   delete diracSloppy;
