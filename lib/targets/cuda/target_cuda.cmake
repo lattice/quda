@@ -410,6 +410,9 @@ set(QUDA_MAX_SHARED_MEMORY "0" CACHE STRING "Max shared memory per block, 0 corr
 mark_as_advanced(QUDA_MAX_SHARED_MEMORY)
 configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/device.in.hpp
                ${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp @ONLY)
+# Expose the override to C++ translation units (e.g. device.cpp) that cannot
+# include the CUDA-only generated device.hpp but need to cap runtime queries.
+target_compile_definitions(quda_cpp PRIVATE QUDA_MAX_SHARED_MEMORY_OVERRIDE=${QUDA_MAX_SHARED_MEMORY})
 install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp" DESTINATION include/)
 
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
