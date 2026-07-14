@@ -3672,6 +3672,16 @@ namespace
     host_timer_t residual;     // PARENT-grid matvec. Expensive: pays the ghost-buffer rebuild
                                // that push_communicator forces. Should now fire ~once per
                                // solve, not once per cycle (see split_cg_segment).
+                               // On the SPLIT path this is only the rare r_stale exit; on the
+                               // UNSPLIT path it is full_cg_segment's per-cycle residual.
+    // The two preamble residuals, timed separately. They bracket deflate_accumulate(), which
+    // is pure BLAS -- no halo, no push_communicator -- so the ghost buffers CANNOT be torn
+    // down between them. Prediction: resid_pre pays the whole per-solve rebuild tax (it is the
+    // first parent halo op after the previous solve's pop) and resid_post is nearly free. If so,
+    // a zero-guess guard on resid_pre alone just MOVES the tax to resid_post and gains nothing,
+    // and only eliminating both parent matvecs wins. One number decides the fix; measure it.
+    host_timer_t resid_pre;    // :3800  residual of the initial guess (feeds the first deflate)
+    host_timer_t resid_post;   // :3840  residual after the initial deflation (sets cycle 0's tol)
     host_timer_t sub_resid;    // SUB-grid matvec forming r. Cheap: buffers already hot.
                                // Kept separate from `residual` so the two are comparable.
     host_timer_t split;        // split_field  (scatter guess to sub-grids)
@@ -3680,16 +3690,19 @@ namespace
     host_timer_t rendez_out;   // barrier + push_communicator, sub-grid -> parent
     host_timer_t cg_sub;       // the CG segment itself (full-grid or sub-grid)
     int cycles = 0;
+    double guess2 = 0.0;       // max_i ||out_i||^2 on entry. Zero => MILC passed a zero initial
+                               // guess, so r = in exactly and resid_pre's matvec is removable.
 
     // Zero via Timer::reset rather than assigning a fresh struct: host_timer_t is
     // Timer<false>, whose qudaEvent_t members are left uninitialized in that case, and
     // copy-assignment would read them.
     void reset(const char *func, const char *file, int line)
     {
-      for (host_timer_t *t :
-           {&gauge_split, &deflate, &residual, &sub_resid, &split, &join, &rendez_in, &rendez_out, &cg_sub})
+      for (host_timer_t *t : {&gauge_split, &deflate, &residual, &resid_pre, &resid_post, &sub_resid, &split, &join,
+                              &rendez_in, &rendez_out, &cg_sub})
         t->reset(func, file, line);
       cycles = 0;
+      guess2 = 0.0;
     }
 
     void report(bool split_enabled, int iters);
@@ -3732,25 +3745,34 @@ namespace
   {
     // Collective: every rank must reach this, so it sits outside any rank- or
     // verbosity-dependent branch.
-    std::vector<double> tmax {cg_sub.time,     split.time,    join.time,     rendez_in.time, rendez_out.time,
-                              deflate.time,    residual.time, sub_resid.time, gauge_split.time};
+    std::vector<double> tmax {cg_sub.time,   split.time,      join.time,      rendez_in.time,   rendez_out.time,
+                              deflate.time,  residual.time,   sub_resid.time, gauge_split.time, resid_pre.time,
+                              resid_post.time, guess2};
     std::vector<double> tmin {cg_sub.time};
     comm_allreduce_max(tmax);
     comm_allreduce_min(tmin);
 
     const double c_comm = tmax[1] + tmax[2] + tmax[3] + tmax[4];
     const int reshuffles = split.count + join.count + gauge_split.count;
+    // Every parent-grid matvec, however it was reached. This is the quantity the fix targets.
+    const double resid_parent = tmax[6] + tmax[9] + tmax[10];
 
     // gauge_split is called once per solve either way -- it either rebuilds or takes the
     // reuse fast path -- so it is the TIME, not the count, that says which happened.
     // ~0 => cached; large => re-shipped every solve, and C_comm below is contaminated.
+    //
+    // resid[pre]/resid[post] bracket a pure-BLAS deflate, so no communicator switch separates
+    // them: if the ghost-buffer teardown is the cost, pre >> post. guess2 == 0 says the initial
+    // guess is zero, which is what makes pre's matvec removable at all.
     printfQuda("SPLITPROF %s cycles %d iters %d | cg[max] %.4f cg[min] %.4f straggle %.4f | "
                "split %.4f (%d) join %.4f (%d) rendez %.4f | C_comm %.4f | "
                "deflate/C_proj %.4f (%d) resid[parent] %.4f (%d) resid[sub] %.4f (%d) | "
+               "resid[pre] %.4f (%d) resid[post] %.4f (%d) guess2 %.3e | "
                "gauge_split %.4f | R %d\n",
                split_enabled ? "split" : "nosplit", cycles, iters, tmax[0], tmin[0], tmax[0] - tmin[0],
                tmax[1], split.count, tmax[2], join.count, tmax[3] + tmax[4], c_comm, tmax[5], deflate.count,
-               tmax[6], residual.count, tmax[7], sub_resid.count, tmax[8], reshuffles);
+               resid_parent, residual.count + resid_pre.count + resid_post.count, tmax[7], sub_resid.count,
+               tmax[9], resid_pre.count, tmax[10], resid_post.count, tmax[11], tmax[8], reshuffles);
   }
 
 } // namespace
@@ -3782,8 +3804,12 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
   resize(r, n_src, rParam);
 
   // r = in - m*out ; returns per-RHS ||r||^2. Same operator the CG segment uses.
-  auto residual = [&]() -> std::vector<double> {
-    TimedPhase p(dt.residual);
+  // Billed to whichever timer the caller names: the two preamble calls are metered
+  // separately (dt.resid_pre / dt.resid_post) because the ghost-buffer rebuild that
+  // dominates this op is paid ONCE, by whichever parent halo op comes first -- so the
+  // per-call mean is misleading and the split is what tells us which fix is worth making.
+  auto residual = [&](host_timer_t &tm) -> std::vector<double> {
+    TimedPhase p(tm);
     m(r, out);                     // r = A out
     return blas::xmyNorm(in, r);   // r = in - r = in - A out ; returns ||r||^2
   };
@@ -3797,7 +3823,17 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
 
   // ---- initial residual of the (possibly nonzero) initial guess ----
   //   r = in - A out(guess)
-  auto r2 = residual();
+  // Record whether the guess is actually zero. MILC hardcodes use_init_guess = YES
+  // (milc_interface.cpp:946) and stock CG branches on that FLAG, not on the field
+  // (inv_cg_quda.cpp:144-156) -- so if `out` is in fact zero we are paying a matvec to
+  // compute r = in - A*0 = in, which is exact in floating point and free. This is the
+  // measurement that says whether that shortcut is available; it is a halo-free
+  // reduction, so it costs nothing to take on every solve.
+  {
+    auto g2 = blas::norm2(out);
+    for (auto v : g2) dt.guess2 = std::max(dt.guess2, v);
+  }
+  auto r2 = residual(dt.resid_pre);
 
   // Per-RHS source norms, with the stock zero-norm guard (inv_cg_quda.cpp:148):
   // for a zero preconditioned source, fall back to the initial residual as scale.
@@ -3837,7 +3873,7 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
 
   int total_iters = 0;
   int cycle = 0;
-  r2 = residual();                 // true residual after the initial deflation
+  r2 = residual(dt.resid_post);    // true residual after the initial deflation
 
   // Is `r` stale with respect to `out`? deflate_accumulate() changes out and so
   // invalidates r; a segment refreshes it. Tracking this lets the converged exit path
@@ -3891,7 +3927,7 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
   // residual; the converged path already has r2 matching `out`. Recompute just in that
   // case, so we pay the parent-grid matvec (and its ghost-buffer rebuild) only when it
   // is actually needed.
-  if (r_stale) r2 = residual();
+  if (r_stale) r2 = residual(dt.residual);
 
   if (!converged(r2))
     warningQuda("invertMultiSrcDeflatedQuda: not converged after %d cycles, %d iters "
