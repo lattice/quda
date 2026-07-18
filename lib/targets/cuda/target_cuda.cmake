@@ -528,11 +528,20 @@ if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
 
-# QUDA/NCI patch: use the CUDA toolkit's CCCL (the one NVSHMEM 3.x links) rather
-# than CPM-downloading a second CCCL, so there is ONE consistent CCCL. QUDA
-# requires CUDAToolkit, so CUDAToolkit_LIBRARY_ROOT points at the toolkit here.
-find_package(CCCL REQUIRED CONFIG
-    HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl")
+option(QUDA_DOWNLOAD_CCCL "Download CCCL v3.3.4 via CPM; OFF = use the CUDA toolkit's CCCL" ON)
+if(QUDA_DOWNLOAD_CCCL)
+  CPMAddPackage(
+      NAME CCCL
+      GITHUB_REPOSITORY nvidia/cccl
+      GIT_TAG v3.3.4 # Fetches this tagged commit
+  )
+else()
+  # Use the CUDA toolkit's CCCL (the same one NVSHMEM 3.x's config find_dependency
+  # resolves to) so QUDA and NVSHMEM share ONE CCCL -> no libcudacxx/cub clash.
+  # QUDA requires CUDAToolkit, so CUDAToolkit_LIBRARY_ROOT points at the toolkit.
+  find_package(CCCL REQUIRED CONFIG
+      HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl")
+endif()
 target_link_libraries(quda PRIVATE CCCL::CCCL)
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
