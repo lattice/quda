@@ -348,6 +348,9 @@ namespace quda {
        (qudaMemcpyP2PAsync + cuStreamWriteValue64).  No MPI request posted;
        the peer learns of arrival via the signal memory cell.  Caller must
        ensure peer-to-peer is enabled for (dir, dim).
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+       @param[in] stream The stream the copy and signal are enqueued on
     */
     void sendStartStreamGated(int dim, int dir, const qudaStream_t &stream);
 
@@ -356,6 +359,9 @@ namespace quda {
        (cuStreamWaitValue64).  No MPI wait; the signal is captured on the
        GPU stream so downstream consumers gate on the stream / events.
        Caller must ensure peer-to-peer is enabled for (1-dir, dim).
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+       @param[in] stream The stream the receive wait is captured on
     */
     void commsWaitStream(int dim, int dir, const qudaStream_t &stream);
 

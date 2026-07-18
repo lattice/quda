@@ -1179,7 +1179,7 @@ namespace quda
         qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_p2p_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
-      comm_p2p_signal_send_done(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, stream, QudaP2PSignal::REMOTE_IPC);
+      comm_p2p_signal_send_done(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, stream, QudaP2PSignal::REMOTE_EVENT);
     }
   }
 
@@ -1259,7 +1259,7 @@ namespace quda
 
     // first wait on send to "dir"
     if (comm_peer2peer_enabled(dir, dim)) {
-      comm_p2p_wait_send_drained(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, QudaP2PSignal::REMOTE_IPC);
+      comm_p2p_wait_send_drained(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, QudaP2PSignal::REMOTE_EVENT);
     } else if (gdr_send) {
       comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1268,7 +1268,7 @@ namespace quda
 
     // second wait on receive from "1 - dir"
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_p2p_wait_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir, stream, QudaP2PSignal::REMOTE_IPC);
+      comm_p2p_wait_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir, stream, QudaP2PSignal::REMOTE_EVENT);
     } else if (gdr_recv) {
       comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {

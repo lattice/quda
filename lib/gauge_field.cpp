@@ -453,7 +453,7 @@ namespace quda {
     // Event IPC still uses an MPI doorbell, so its persistent receive must be
     // preposted. Stream-gated signalling has no MPI receive to post.
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      if (comm::p2p_signal() == QudaP2PSignal::REMOTE_IPC) comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      if (comm::p2p_signal() == QudaP2PSignal::REMOTE_EVENT) comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
       return;
     }
     if (comm_gdr_enabled()) {

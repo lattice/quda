@@ -158,7 +158,7 @@ namespace comm
   QudaP2PSignal p2p_signal()
   {
     static bool cached = false;
-    static QudaP2PSignal resolved = QudaP2PSignal::REMOTE_IPC;
+    static QudaP2PSignal resolved = QudaP2PSignal::REMOTE_EVENT;
     if (cached) return resolved;
 
     // Default (env unset): backend/build default -- events where supported,
@@ -172,7 +172,7 @@ namespace comm
       if (strcasecmp(env, "stream_gated") == 0 || strcasecmp(env, "stream-gated") == 0) {
         requested = QudaP2PSignal::STREAM_GATED;
       } else if (strcasecmp(env, "events") == 0 || strcasecmp(env, "event") == 0 || strcasecmp(env, "remote_ipc") == 0) {
-        requested = QudaP2PSignal::REMOTE_IPC;
+        requested = QudaP2PSignal::REMOTE_EVENT;
       } else {
         errorQuda("Unrecognised QUDA_P2P_TRANSPORT='%s' (expected 'stream_gated' or 'events')", env);
       }
@@ -183,8 +183,8 @@ namespace comm
       choice = requested;
     }
 
-    if (getVerbosity() > QUDA_SILENT && comm_rank() == 0)
-      printfQuda("P2P signalling transport: %s\n", choice == QudaP2PSignal::STREAM_GATED ? "stream_gated" : "events");
+    logQuda(QUDA_SUMMARIZE, "P2P signalling transport: %s\n",
+            choice == QudaP2PSignal::STREAM_GATED ? "stream_gated" : "events");
 
     resolved = choice;
     cached = true;

@@ -729,7 +729,7 @@ namespace quda
                                  QudaP2PSignal signal)
   {
     switch (signal) {
-    case QudaP2PSignal::REMOTE_IPC: comm_p2p_signal_send_done(kind, buf, dim, dir, stream); return;
+    case QudaP2PSignal::REMOTE_EVENT: comm_p2p_signal_send_done(kind, buf, dim, dir, stream); return;
     case QudaP2PSignal::STREAM_GATED:
       assert_stream_gated_resolved(__func__);
       comm_p2p_stream_signal_send_done(kind, buf, dim, dir, stream);
@@ -742,14 +742,14 @@ namespace quda
                                  QudaP2PSignal signal)
   {
     switch (signal) {
-    case QudaP2PSignal::REMOTE_IPC:
+    case QudaP2PSignal::REMOTE_EVENT:
       // Legacy path is host-blocking (synchronizes on ipcRemoteCopyEvent).  For
-      // stream-ordered REMOTE_IPC behavior under this unified API we'd want
+      // stream-ordered REMOTE_EVENT behavior under this unified API we'd want
       // cudaStreamWaitEvent instead -- but no existing call site uses that
       // pattern, and current callers that need host-blocking will migrate to
       // the legacy 4-arg comm_p2p_wait_recv_signal directly.  For now, dispatch
       // to host-blocking (matches semantics of the existing 4-arg variant);
-      // callers that pass a stream and care about stream-ordering on REMOTE_IPC
+      // callers that pass a stream and care about stream-ordering on REMOTE_EVENT
       // should use stream wait events explicitly.
       (void)stream;
       comm_p2p_wait_recv_signal(kind, buf, dim, dir);
@@ -765,7 +765,7 @@ namespace quda
   void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir, QudaP2PSignal signal)
   {
     switch (signal) {
-    case QudaP2PSignal::REMOTE_IPC: comm_p2p_wait_send_drained(kind, buf, dim, dir); return;
+    case QudaP2PSignal::REMOTE_EVENT: comm_p2p_wait_send_drained(kind, buf, dim, dir); return;
     case QudaP2PSignal::STREAM_GATED:
       assert_stream_gated_resolved(__func__);
       // STREAM_GATED has no separate "send drained" concept: stream ordering

@@ -664,7 +664,9 @@ if(QUDA_MPI)
   target_link_libraries(quda PUBLIC MPI::MPI_CXX)
 endif()
 
-if(QUDA_MNNVL)
+# QUDA_MULTI_NODE_NVLINK is the user-facing CMake option; the compiler define
+# QUDA_MNNVL is kept as the in-source guard name.
+if(QUDA_MULTI_NODE_NVLINK)
   add_compile_definitions(QUDA_MNNVL)
 endif()
 

@@ -159,7 +159,7 @@ option(QUDA_QIO "build QIO code for binary I/O" OFF)
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
-option(QUDA_MNNVL "enable MNNVL fabric P2P communication path" OFF)
+option(QUDA_MULTI_NODE_NVLINK "enable multi-node NVLink (MNNVL) fabric P2P communication path" OFF)
 
 # ARPACK
 option(QUDA_ARPACK "build arpack interface" OFF)
@@ -348,8 +348,8 @@ endif()
 # MNNVL fabric P2P is CUDA-only (uses the CUDA VMM driver API + CU_MEM_HANDLE_TYPE_FABRIC).
 # Fail at configure time rather than during compilation. The minimum CUDA toolkit check
 # lives in lib/targets/cuda/target_cuda.cmake (CMAKE_CUDA_COMPILER_VERSION is set there).
-if(QUDA_MNNVL AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
-  message(FATAL_ERROR "QUDA_MNNVL=ON requires QUDA_TARGET_TYPE=CUDA (MNNVL fabric P2P is CUDA-only).")
+if(QUDA_MULTI_NODE_NVLINK AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
+  message(FATAL_ERROR "QUDA_MULTI_NODE_NVLINK=ON requires QUDA_TARGET_TYPE=CUDA (MNNVL fabric P2P is CUDA-only).")
 endif()
 
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:

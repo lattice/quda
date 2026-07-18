@@ -16,32 +16,35 @@ namespace quda
     /**
        @brief Size in bytes of the platform's exportable fabric handle
        (CUmemFabricHandle on CUDA).  Use this to size buffers without
-       pulling cuda.h into headers that don't want it.  Returns 0 on
-       non-MNNVL builds.
+       pulling cuda.h into headers that don't want it.
+       @return Handle size in bytes, or 0 on non-MNNVL builds
      */
     size_t fabric_handle_size();
 
     /**
        @brief Allocate a small probe buffer suitable for fabric P2P and
-       write its local CUmemFabricHandle into `out_handle` (must point at
-       at least fabric_handle_size() bytes).  Returns an opaque handle the
-       caller passes to close_fabric_probe() when done.  Returns nullptr on
-       non-MNNVL builds.
+       write its local CUmemFabricHandle into `out_handle`.
+       @param[out] out_handle Buffer of at least fabric_handle_size() bytes
+       that receives this rank's exportable fabric handle
+       @return Opaque probe handle to pass to close_fabric_probe() when done,
+       or nullptr on non-MNNVL builds
      */
     void *open_fabric_probe(void *out_handle);
 
     /**
        @brief Attempt cuMemImportFromShareableHandle on the supplied peer
-       fabric handle (fabric_handle_size() bytes).  Returns true on success
-       (and releases the imported handle), false otherwise.  Safe to call
-       on a peer outside this rank's actual fabric reach -- the failed
-       import is the truth signal.  Returns false on non-MNNVL builds.
+       fabric handle.  Safe to call on a peer outside this rank's actual
+       fabric reach -- the failed import is the truth signal.
+       @param[in] peer_handle Peer's fabric handle (fabric_handle_size() bytes)
+       @return true if the import succeeds (the imported handle is released
+       before returning), false otherwise or on non-MNNVL builds
      */
     bool try_import_fabric_handle(const void *peer_handle);
 
     /**
        @brief Release the probe buffer returned by open_fabric_probe().
        No-op on non-MNNVL builds.
+       @param[in] probe Opaque probe handle returned by open_fabric_probe()
      */
     void close_fabric_probe(void *probe);
   } // namespace comm_target

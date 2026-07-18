@@ -4,7 +4,7 @@
 // HIP currently lacks a confirmed equivalent of cuStreamWriteValue64 /
 // cuStreamWaitValue64 (hipStreamWriteValue64 exists in newer ROCm but the
 // stream-mem-op-gated halo path is not yet wired in lib/targets/hip/).
-// So STREAM_GATED is unsupported and the default is REMOTE_IPC (event-based,
+// So STREAM_GATED is unsupported and the default is REMOTE_EVENT (event-based,
 // cudaIPC analogue via hipIpc).  Once a HIP impl of the stream-mem-op path
 // lands in this directory, supported() can flip true for STREAM_GATED and
 // p2p_signal_default() can return it.
@@ -16,7 +16,7 @@ namespace quda::comm
   bool p2p_signal_supported(QudaP2PSignal kind)
   {
     switch (kind) {
-    case QudaP2PSignal::REMOTE_IPC: return true;
+    case QudaP2PSignal::REMOTE_EVENT: return true;
     case QudaP2PSignal::STREAM_GATED: return false; // not yet wired on HIP
     }
     return false;
@@ -26,7 +26,7 @@ namespace quda::comm
   {
     // Same clamping rule as the CUDA backend: prefer events, fall back to
     // stream-gated only where events are unsupported.  On HIP events are
-    // always supported, so this is REMOTE_IPC.
-    return p2p_signal_supported(QudaP2PSignal::REMOTE_IPC) ? QudaP2PSignal::REMOTE_IPC : QudaP2PSignal::STREAM_GATED;
+    // always supported, so this is REMOTE_EVENT.
+    return p2p_signal_supported(QudaP2PSignal::REMOTE_EVENT) ? QudaP2PSignal::REMOTE_EVENT : QudaP2PSignal::STREAM_GATED;
   }
 } // namespace quda::comm

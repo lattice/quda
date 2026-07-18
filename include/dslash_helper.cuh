@@ -355,7 +355,7 @@ namespace quda
     DslashConstant dc;      // pre-computed dslash constants for optimized indexing
     KernelType kernel_type; // interior, exterior_t, etc.
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
-    QudaP2PSignal p2p_signal = QudaP2PSignal::REMOTE_IPC; // P2P signalling mechanism (see comm_quda.h)
+    QudaP2PSignal p2p_signal = QudaP2PSignal::REMOTE_EVENT; // P2P signalling mechanism (see comm_quda.h)
 
     int_fastdiv threads; // number of threads in x-thread dimension
     int_fastdiv exterior_threads = 0; // number of threads in x-thread dimension for fused exterior dslash

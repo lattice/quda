@@ -653,24 +653,24 @@ namespace quda
     void commsWait(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
 
     /**
-       @brief Stream-gated send: enqueue qudaMemcpyP2PAsync into peer's recv
-       buffer followed by comm_p2p_signal_send_done(.., STREAM_GATED) on the
-       same stream (which writes peer's signal slot via cuStreamWriteValue64).
-       No MPI doorbell, no IPC event. Used by the QUDA_P2P_STREAM_GATED
-       sub-policy. Requires the direction to be peer-to-peer enabled;
-       errors out otherwise.
-       @param[in] d d=[2*dim+dir]
-       @param[in] stream stream to enqueue the copy + signal on
+       @brief Queue a peer-to-peer ghost send via stream-mem-op signalling
+       (qudaMemcpyP2PAsync into the peer's recv buffer + cuStreamWriteValue64
+       on the same stream).  No MPI doorbell and no IPC event; the peer learns
+       of arrival via the signal memory cell.  Caller must ensure peer-to-peer
+       is enabled for this direction.
+       @param[in] d d=[2*dim+dir], where dim is the dimension and dir the direction
+       @param[in] stream The stream the copy and signal are enqueued on
+       @param[in] remote_write Whether the halo is delivered by a remote write
     */
     void sendStartStreamGated(int d, const qudaStream_t &stream, bool remote_write = false) const;
 
     /**
-       @brief Stream-gated wait: enqueue comm_p2p_wait_recv_signal(.., STREAM_GATED)
-       (cuStreamWaitValue64 GEQ) on the stream where the consumer kernel
-       will run. No host poll. Requires the direction to be peer-to-peer
-       enabled; errors out otherwise.
-       @param[in] d d=[2*dim+dir]
-       @param[in] stream consumer stream to gate
+       @brief Queue a peer-to-peer recv wait via stream-mem-op signalling
+       (cuStreamWaitValue64).  No host poll; the wait is captured on the
+       consumer stream so the consumer kernel gates on halo arrival.  Caller
+       must ensure peer-to-peer is enabled for this receive direction.
+       @param[in] d d=[2*dim+dir], where dim is the dimension and dir the direction
+       @param[in] stream The consumer stream the wait is captured on
     */
     void commsWaitStream(int d, const qudaStream_t &stream) const;
 

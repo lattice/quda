@@ -310,8 +310,8 @@ namespace quda
      in the peer's imported VMM buffer across multiple transactions and the
      doorbell can be observed before the last data transaction commits; the only
      safe guard is a receiver-side flush (CU_STREAM_WAIT_VALUE_FLUSH). Some hardware
-     can report CAN_FLUSH_REMOTE_WRITES=0. In those casesr emote-write is dropped from the
-     policy list there and only thecopy-engine path is used.  Always true on non-MNNVL builds (that
+     can report CAN_FLUSH_REMOTE_WRITES=0. In those cases remote-write is dropped from the
+     policy list there and only the copy-engine path is used.  Always true on non-MNNVL builds (that
      path is correct without a flush).  Resolved at P2P setup
      (comm_create_stream_gated_comms).
   */
@@ -466,7 +466,7 @@ namespace quda
 
      Wraps the per-(buf, dim, dir) "I'm done writing your buffer" /
      "wait for peer to be done writing mine" sequence.  Dispatches on the
-     resolved QudaP2PSignal: REMOTE_IPC uses cudaIpcEvent + MPI doorbell;
+     resolved QudaP2PSignal: REMOTE_EVENT uses cudaIpcEvent + MPI doorbell;
      STREAM_GATED uses cuStreamWriteValue64 / cuStreamWaitValue64 on
      fabric-mapped signal slots.  Keyed by FieldKind so COLOR_SPINOR and
      GAUGE signals never alias.
@@ -479,26 +479,26 @@ namespace quda
      below to dispatch to the appropriate per-kind implementation inside the
      backend).
 
-     - REMOTE_IPC  : cudaIPC event record/wait + MPI doorbell.  Single-node
+     - REMOTE_EVENT  : cudaIPC event record/wait + MPI doorbell.  Single-node
                      only -- the IPC event handle does not cross the MNNVL
                      fabric.  HIP backend uses hipIpc analogues.
      - STREAM_GATED: cuStreamWriteValue64 / cuStreamWaitValue64 on a slot in
                      a peer-mapped flag buffer.  Works cross-clique within an
                      MNNVL NVLink fabric.
   */
-  enum class QudaP2PSignal { REMOTE_IPC, STREAM_GATED };
+  enum class QudaP2PSignal { REMOTE_EVENT, STREAM_GATED };
 
   namespace comm
   {
     /** Does the active backend (and build) support the given P2P signalling kind?
         Backend-provided allow-list: CUDA non-MNNVL supports both; CUDA MNNVL supports
-        STREAM_GATED only; HIP currently supports REMOTE_IPC only.  Implementation lives in
+        STREAM_GATED only; HIP currently supports REMOTE_EVENT only.  Implementation lives in
         lib/targets/<backend>/p2p_signal_defaults.cpp. */
     bool p2p_signal_supported(QudaP2PSignal kind);
 
     /** Backend/build default signalling kind when QUDA_P2P_TRANSPORT is unset.
-        Non-MNNVL: prefer REMOTE_IPC (events) to match legacy behavior.
-        MNNVL: (REMOTE_IPC is unsupported) defaults to STREAM_GATED.  Implemented
+        Non-MNNVL: prefer REMOTE_EVENT (events) to match legacy behavior.
+        MNNVL: (REMOTE_EVENT is unsupported) defaults to STREAM_GATED.  Implemented
         per-backend in lib/targets/<backend>/p2p_signal_defaults.cpp. */
     QudaP2PSignal p2p_signal_default();
 

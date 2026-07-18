@@ -831,6 +831,7 @@ namespace quda {
        Aliases the symmetric send buffer in non-NVSHMEM builds.
        @param[in] dir Direction we are requesting
        @param[in] dim Dimension we are requesting
+       @return Pointer to the contiguous P2P device send buffer
     */
     void *myFaceP2P_d(int dir, int dim) const;
 
@@ -839,6 +840,9 @@ namespace quda {
        (ghost_send_buffer_d) in a given direction/dimension.  Source for the
        NVSHMEM put fallback (kept symmetric so it is a legal NVSHMEM local
        source).  Aliases the P2P send buffer in non-NVSHMEM builds.
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to the symmetric device send buffer
     */
     void *myFaceShmem_d(int dir, int dim) const;
 
@@ -848,6 +852,7 @@ namespace quda {
        remote-write.  Base pointer -- caller offsets per dir/dim.
        @param[in] dir Direction we are requesting
        @param[in] dim Dimension we are requesting
+       @return Base pointer to the imported peer P2P recv buffer
     */
     void *remoteFaceP2P_d(int dir, int dim) const;
 
@@ -858,6 +863,8 @@ namespace quda {
        offsets per dir/dim.  Non-null only when the peer is NVLink-reachable.
        @param[in] dir Direction we are requesting
        @param[in] dim Dimension we are requesting
+       @return Base pointer to the NVSHMEM remote recv buffer, or nullptr when
+       the peer is not NVLink-reachable
     */
     void *remoteFaceShmem_d(int dir, int dim) const;
 
@@ -865,6 +872,7 @@ namespace quda {
        @brief Return base pointer to the symmetric ghost recv buffer
        (ghost_recv_buffer_d), used as the NVSHMEM put destination/reference.
        Base pointer -- caller offsets per dir/dim.
+       @return Base pointer to the symmetric ghost recv buffer
      */
     void *remoteFace_r() const;
 

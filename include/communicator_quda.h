@@ -318,7 +318,7 @@ namespace quda
           // (backward) neighbour, dir==1 the +1 (forward) neighbour (see
           // comm_set_neighbor_ranks).
           //
-          // Study hook: QUDA_P2P_FAKE_CLIQUE=<ranks-per-clique> soft-partitions the ranks
+          // Testing knob (environment variable): QUDA_P2P_FAKE_CLIQUE=<ranks-per-clique> soft-partitions the ranks
           // into contiguous cliques (clique = rank / ranks-per-clique).  A neighbour in a
           // different clique is left unreachable, so the symmetric-AND below downgrades
           // that link to MPI.  This exercises the hybrid in-clique-P2P + cross-clique
