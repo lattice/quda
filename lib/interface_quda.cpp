@@ -1545,6 +1545,11 @@ void endQuda(void)
     initialized = false;
 
     assertAllMemFree();
+
+    // Finalize the pool allocator (and, with NVSHMEM, NVSHMEM itself) while the
+    // GPU context and MPI are still live, before the device is torn down.
+    pool::finalize();
+
     device::destroy();
   }
 
