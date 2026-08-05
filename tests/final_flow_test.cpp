@@ -37,6 +37,7 @@ std::string base_io_dir = std::filesystem::current_path().string();
 bool print_legacy_info = false;
 
 bool take_fwd_gflow = false;
+bool take_adj_gflow = false;
 
 GaugeField cpuFatQDP = {};
 GaugeField cpuLongQDP = {};
@@ -96,6 +97,10 @@ void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option(
       "--take-fwd-gflow",
       take_fwd_gflow, "take forward gflow for testing purposes");
+  opgroup
+    ->add_option(
+      "--take-adj-gflow",
+      take_adj_gflow, "take adjoint gflow (default is flase)");
 }
 
 void add_meas_io_group(std::shared_ptr<QUDAApp> quda_app)
@@ -176,13 +181,14 @@ void write_files(const QudaFermMeasurements &ferm_meas)
       std::filesystem::create_directories(output_dir);
   } 
   std::string quark_str = n_naiks > 1 ? "_cbarc" : "_sbars";
+  std::string adj_str = take_adj_gflow ? "" : "N";
   std::string output_filestr;
   output_filestr = "_mq" + std::to_string(mass);
   output_filestr += "_naik" + std::to_string(eps_naik);
   output_filestr += "_start" + std::to_string(start_seed) + "_Nsrc" + std::to_string(Nsrc);
 
-  std::string filename_allcon = output_dir.string()+"/allcon"+output_filestr;
-  std::string filename_tslice = output_dir.string()+"/tslice"+output_filestr;
+  std::string filename_allcon = output_dir.string()+"/"+adj_str+"allcon"+output_filestr;
+  std::string filename_tslice = output_dir.string()+"/"+adj_str+"tslice"+output_filestr;
 
   auto* flow_int_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas.meas_int_vec);
   auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
@@ -230,6 +236,7 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   auto* ppb_t_data = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas.ppb_t);
 
   unsigned int flow_idx = 0;
+    printfQuda("out vec size #%i\n",out_ppb_t_vec.size());
   for (const auto& flow_t: *ppb_t_data) {
       assert(out_ppb_t_vec[flow_idx].good());
       printfQuda("begin writing flow time #%i\n",flow_idx);
@@ -510,7 +517,12 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   }
   quda::host_timer_t host_timer;
   host_timer.start();
+  if (take_adj_gflow){
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
+  }
+  else {
+  computeFlowedForwardPpb(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
+  }
   host_timer.stop();
   printfQuda("At end ppb has %li elements\n",ppb.size());
   printfQuda("At end ppb_t has %li elements\n",ppb_t.size());

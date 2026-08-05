@@ -1767,6 +1767,17 @@ extern "C" {
    */
   void computeFlowedPionCorrelator(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
                          size_t nSpinors);
+/**
+   * Performs flow of fermion bilinear
+   * @param[out] h_out Output fermion field set
+   * @param[in] h_in Input fermion field set
+   * @param[in] inv_param Dirac/Laplacian and solver meta data
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] ferm_meas Parameter struct that conducts measurements of fermionic observables
+   * @param[in] nSpinors Number of spinors in the input and output fields
+   */
+  void computeFlowedForwardPpb(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
+                         size_t nSpinors);
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the

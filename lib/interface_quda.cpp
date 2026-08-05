@@ -208,6 +208,9 @@ static TimeProfile profileAdjGFlowHier("AdjgFlowHierQuda");
 //!< Profiler for AdjgFlowHierQuda
 static TimeProfile profileFlowedPionCorrelator("FlowedPionCorrelator");
 
+//!< Profiler for ForwardPpbFlow
+static TimeProfile profileFlowedForwardPpb("FlowedPpbCorrelator");
+
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
 
@@ -6135,10 +6138,79 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
             
             }
           pion_corr_t_el.push_back(result_global);
-          
+          printfQuda("size of pion cvorr %i\n",pion_corr_t_el.size());
           ferm_m->pion_corr.push_back(pion_corr_t_el);
           
           
+      }
+}
+
+void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3, std::vector<std::reference_wrapper<GaugeField>> t_gf_list, QudaInvertParam *inv_param, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param)
+    { 
+      int Nsrc = (int) f_temp4.size();
+      int Nsrc_tile = inv_param->num_src;
+      printfQuda("pion We are here now, \n");
+      
+      if (Nsrc > 1){
+          printfQuda("doing multisrc\n");
+          f_temp3[0].PrintVector(0,0,0);
+          std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
+          
+          for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+                for (int i = 0; i < Nsrc_tile; i++) {
+                  data_f_temp3_tiled[i] = f_temp3[j + i].data();
+                  data_f_temp4_tiled[i] = f_temp4[j + i].data();
+                }
+                // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
+                invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+      }
+      }
+      else{
+          printfQuda("doing single source\n");
+          invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
+      }
+        
+      f_temp4[0].PrintVector(0,0,0);
+
+      
+      QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
+      printfQuda("here?\n");
+      std::array<int, 4> mom_modes = {0,0,0,0};
+      std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
+      std::array<int, 4> source_position = {0,0,0,0};
+      QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+      std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
+        
+      for (const auto& m : ferm_m->meas_diff_vec){
+          printfQuda("flow a distance of %i\n",m);
+          if (m != 0){
+            gfEvolve(f_temp3,t_gf_list, smear_param, inv_param, m, profileFlowedForwardPpb, ferm_m);
+            GaugeFieldParam gParam(*gaugePrecise);
+            gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+            GaugeField gaugeTemp(gParam);
+            GaugeField gin = *gaugeSmeared;
+            // helper gauge field for Laplace operator
+            GaugeField precise;
+            GaugeFieldParam gParam_helper(*gaugePrecise);
+            gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+            precise = GaugeField(gParam_helper);
+            t_gf_list = {gin,gaugeTemp,precise};
+            gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedForwardPpb, ferm_m);
+          }
+          std::vector<std::vector<Complex>> ppb_t_el = {};
+          //moving result_global outside here
+          std::fill(result_global.begin(), result_global.end(), 0.0);
+          //at this iteration, f_temp4.size() is simply the number of coors (3)
+          for (size_t nn = 0; nn < f_temp4.size(); nn++){
+            std::fill(result_global.begin(), result_global.end(), 0.0);
+            contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
+            comm_allreduce_sum(result_global);
+            ppb_t_el.push_back(result_global);
+            }
+          cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
+          ferm_m->ppb.push_back(PsiPsibarTest);
+          ferm_m->ppb_t.push_back(ppb_t_el);
+          printfQuda("ppb size %i\n",ferm_m->ppb.size());
       }
 }
 
@@ -6516,6 +6588,108 @@ void computeFlowedPionCorrelator(void **h_out, void **h_in, QudaInvertParam *inv
       auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
       size_t len_meas_list = ferm_m.meas_list.size();  
       printfQuda("size of meas list recon %li\n",len_meas_list);
+      for (size_t i = 0; i < len_meas_list; i++){
+          meas_list_ptr->push_back(ferm_m.meas_list[i]);
+      }
+  }
+  logQuda(QUDA_DEBUG_VERBOSE, "Spinor written to cpu \n");
+  popOutputPrefix();
+}
+
+void computeFlowedForwardPpb(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
+                         size_t nSpinors)
+{
+
+  auto profile = pushProfile(profileFlowedForwardPpb);
+  pushOutputPrefix("performFlowedPpbCorrelator: ");
+  checkGaugeSmearParam(smear_param);
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  if (smear_param->restart) {
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared must be loaded");
+  } else {
+    if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+    freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
+    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAdjGFlowHier);
+  }
+
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+  GaugeField gaugeTemp(gParam);
+  GaugeField gin = *gaugeSmeared;
+
+  // helper gauge field for Laplace operator
+  GaugeField precise;
+  GaugeFieldParam gParam_helper(*gaugePrecise);
+  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+  precise = GaugeField(gParam_helper);
+
+  // spinor fields, fout_h not needed
+  std::vector<ColorSpinorField> fin_h, fin, fout;
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+    fin_h.push_back(ColorSpinorField(cpuParam));
+    ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+    fin.push_back(ColorSpinorField(deviceParam));
+    fin[i] = fin_h[i];
+    deviceParam.create = QUDA_NULL_FIELD_CREATE;
+    fout.push_back(ColorSpinorField(deviceParam));
+  }
+  // The following is crucial when inverting matrices on the GPU
+  inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
+  inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
+  inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
+
+  std::vector<std::reference_wrapper<GaugeField>> t_gf_list = {gin,gaugeTemp,precise};
+
+  std::vector<unsigned int> meas_int_vec = {};
+  auto* meas_list_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas->meas_int_vec);
+  if (meas_list_pt == nullptr){
+    printfQuda("meas list not populated yet, populating now\n");
+    for (int m=ferm_meas->meas_int; m <= smear_param->n_steps; m = m + ferm_meas->meas_int){
+        meas_int_vec.push_back(m);
+    }
+  }
+  else{
+    printfQuda("meas list found\n");
+    meas_int_vec = *meas_list_pt;
+  }
+
+  std::vector<unsigned int> meas_diff_vec(meas_int_vec.size());
+  std::adjacent_difference(meas_int_vec.begin(), meas_int_vec.end(), meas_diff_vec.begin());
+  FermMeasObj ferm_m;
+  ferm_m.meas_diff_vec = meas_diff_vec;
+  perform_flow_forward_ppb(fout,fin,t_gf_list,inv_param,&ferm_m,smear_param);
+
+      //get back on cpu
+  inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
+  inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
+  inv_param->dirac_order=QUDA_DIRAC_ORDER;
+
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
+    ColorSpinorField fout_h(cpuParam);
+    fout_h = fout[i];
+  }
+  if ( ferm_meas->take_meas){
+      auto* ppb_ptr = reinterpret_cast<std::vector<std::vector<Complex>>*>(*ferm_meas->ppb);
+      size_t len_ppb = ferm_m.ppb.size();
+      printfQuda("size of ppb recon %li\n",len_ppb);
+      for (size_t i = 0; i < len_ppb; i++){
+          ppb_ptr->push_back(ferm_m.ppb[i]);
+      }
+
+      auto* ppb_t_ptr = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas->ppb_t);
+      size_t nft_ppb = ferm_m.ppb_t.size();
+      for (size_t i = 0; i < nft_ppb; i++){
+          ppb_t_ptr->push_back(ferm_m.ppb_t[i]);
+      }
+        
+      auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
+      size_t len_meas_list = ferm_m.meas_list.size();  
+      printfQuda("size of meas list recon %li\n",len_ppb);
       for (size_t i = 0; i < len_meas_list; i++){
           meas_list_ptr->push_back(ferm_m.meas_list[i]);
       }
