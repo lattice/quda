@@ -76,7 +76,7 @@ set (QUDA_OBJS
   madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
-  contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
+  contract.cu baryon_contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
   hmc.cpp hmc_integrator.cpp coarse_deflation_manager.cpp low_mode_force.cpp
   eigen_tracker.cpp eigen_forecast.cpp cg_ritz_extractor.cpp gcr_tracker.cpp eigen_tracking_state.cpp

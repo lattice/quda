@@ -1998,6 +1998,32 @@ extern "C" {
                       const int *const mom_modes, const QudaFFTSymmType *const fft_type);
 
   /**
+   * @brief Momentum-projected nucleon two-point contraction with the
+   * standard C gamma_5 diquark interpolator chi = eps_{abc} [u^{aT} (C
+   * g5) d^b] u^c.  The full 4x4 open sink-spin matrix is returned per
+   * timeslice and momentum so that any parity projector may be applied
+   * downstream.  Conventions are DeGrand-Rossi with C = gamma_4 gamma_2;
+   * host data in another basis is rotated on load.  Only
+   * QUDA_CONTRACT_TYPE_BARYON_NUCLEON_FT_T is supported.
+   * @param[in] prop_u pointer to up-quark propagator: array of 12 host
+   *            spinor fields ordered as [source_spin * 3 + source_color]
+   * @param[in] prop_d pointer to down-quark propagator, as prop_u
+   * @param[out] result pointer to host array of
+   *             n_mom * T_global * 4 * 4 complex doubles, ordered
+   *             [mom][t][spin_snk][spin_src], accumulated into
+   * @param[in] cType contraction type; must be QUDA_CONTRACT_TYPE_BARYON_NUCLEON_FT_T
+   * @param[in] cs_param_ptr meta data for construction of ColorSpinorFields.
+   * @param[in] X local lattice dimensions
+   * @param[in] source_position source position array
+   * @param[in] n_mom number of momentum modes
+   * @param[in] mom_modes momentum modes, 4 ints per momentum
+   * @param[in] fft_type Fourier phase factor type (cos, sin or exp{ikx}), 4 per momentum
+   */
+  void baryonContractFTQuda(void **prop_u, void **prop_d, void **result, const QudaContractType cType,
+                            void *cs_param_ptr, const int *X, const int *const source_position, const int n_mom,
+                            const int *const mom_modes, const QudaFFTSymmType *const fft_type);
+
+  /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing

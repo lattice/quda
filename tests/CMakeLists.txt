@@ -280,6 +280,11 @@ target_link_libraries(heatbath_test ${TEST_LIBS})
 quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(baryon_contract_test baryon_contract_test.cpp)
+target_link_libraries(baryon_contract_test ${TEST_LIBS})
+quda_checkbuildtest(baryon_contract_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS baryon_contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 
 if(QUDA_MPI OR QUDA_QMP)
   #helper function to extract required number of ranks from environment variable
@@ -368,6 +373,12 @@ if(QUDA_DIRAC_STAGGERED)
     --dim 2 4 6 8 --enable-testing true
     --gtest_output=xml:contract_ft_test.xml)
 endif()
+
+#Baryon contraction test
+add_test(NAME baryon_contract_test
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:baryon_contract_test> ${MPIEXEC_POSTFLAGS}
+  --dim 4 4 4 8
+  --gtest_output=xml:baryon_contract_test.xml)
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)

@@ -258,6 +258,9 @@ static TimeProfile profileContract("contractQuda");
 //!< Profiler for FT contractions
 static TimeProfile profileContractFT("contractFTQuda");
 
+//!< Profiler for baryon FT contractions
+static TimeProfile profileBaryonContractFT("baryonContractFTQuda");
+
 //!< Profiler for GEMM and other BLAS
 static TimeProfile profileBLAS("blasQuda");
 TimeProfile &getProfileBLAS() { return profileBLAS; }
@@ -6952,6 +6955,85 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
     }
   }
   profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
+}
+
+void baryonContractFTQuda(void **prop_u, void **prop_d, void **result, const QudaContractType cType,
+                          void *cs_param_ptr, const int *X, const int *const source_position, const int n_mom,
+                          const int *const mom_modes, const QudaFFTSymmType *const fft_type)
+{
+  auto profile = pushProfile(profileBaryonContractFT);
+
+  if (cType != QUDA_CONTRACT_TYPE_BARYON_NUCLEON_FT_T) errorQuda("Unsupported contraction type %d given", cType);
+
+  // create ColorSpinorFields from void** and parameter
+  auto cs_param = (ColorSpinorParam *)cs_param_ptr;
+  if (cs_param->nSpin != 4) errorQuda("Expected four-spinor propagator components, nSpin=%d given", cs_param->nSpin);
+  constexpr size_t nprop = 12;
+  cs_param->location = QUDA_CPU_FIELD_LOCATION;
+  cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
+
+  // The number of complex contraction results expected in the output per timeslice
+  constexpr size_t num_out_results = 16;
+
+  // wrap CPU host side pointers
+  std::vector<ColorSpinorField> h_u, h_d;
+  h_u.reserve(nprop);
+  h_d.reserve(nprop);
+  for (size_t i = 0; i < nprop; i++) {
+    cs_param->v = prop_u[i];
+    h_u.push_back(ColorSpinorField(*cs_param));
+    cs_param->v = prop_d[i];
+    h_d.push_back(ColorSpinorField(*cs_param));
+  }
+
+  // Create device spinor fields
+  ColorSpinorParam cudaParam(*cs_param);
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
+
+  std::vector<ColorSpinorField> d_u, d_d;
+  d_u.reserve(nprop);
+  d_d.reserve(nprop);
+  for (size_t i = 0; i < nprop; i++) {
+    d_u.push_back(ColorSpinorField(cudaParam));
+    d_d.push_back(ColorSpinorField(cudaParam));
+  }
+
+  // Transfer data from host to device
+  for (size_t i = 0; i < nprop; i++) {
+    d_u[i] = h_u[i];
+    d_d[i] = h_d[i];
+  }
+
+  // The number of slices in the decay dimension on this MPI rank and globally.
+  constexpr int corr_dim = 3;
+  size_t local_decay_dim_slices = X[corr_dim];
+  size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim(corr_dim);
+
+  cvector_ref<const ColorSpinorField> u_ref(d_u);
+  cvector_ref<const ColorSpinorField> d_ref(d_d);
+
+  // Array for all decay slices and spins, is zeroed prior to kernel launch
+  std::vector<Complex> result_global(global_decay_dim_slices * num_out_results);
+
+  profileBaryonContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
+  for (int mom_idx = 0; mom_idx < n_mom; ++mom_idx) {
+    std::fill(result_global.begin(), result_global.end(), 0.0);
+    baryonContractSummedQuda(u_ref, d_ref, result_global, cType, source_position, &mom_modes[4 * mom_idx],
+                             &fft_type[4 * mom_idx]);
+
+    comm_allreduce_sum(result_global);
+    for (size_t t = 0; t < global_decay_dim_slices; t++) {
+      for (size_t G_idx = 0; G_idx < num_out_results; G_idx++) {
+        int index = 2 * (global_decay_dim_slices * num_out_results * mom_idx + num_out_results * t + G_idx);
+        ((double *)*result)[index + 0] += result_global[num_out_results * t + G_idx].real();
+        ((double *)*result)[index + 1] += result_global[num_out_results * t + G_idx].imag();
+      }
+    }
+  }
+  profileBaryonContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 }
 
 void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,

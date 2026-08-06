@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <fstream>
+#include <string>
+#include <vector>
+
 #include <quda.h>
 #include <gauge_field.h>
 
@@ -58,6 +62,92 @@ quda::GaugeField cpuGauge = {};
 quda::GaugeField gauge = {};
 quda::GaugeField gaugeEx = {};
 
+// Magic header marking a QUDA RNG checkpoint file (version 1)
+constexpr uint64_t rng_checkpoint_magic = 0x514344524e470001ULL;
+
+std::string rng_checkpoint_filename(const std::string &base) { return base + ".rank" + std::to_string(quda::comm_rank()); }
+
+void save_rng_state()
+{
+  std::vector<char> buffer(randstates.StateBytes());
+  randstates.saveState(buffer.data());
+
+  std::string fname = rng_checkpoint_filename(heatbath_rng_save);
+  std::ofstream file(fname, std::ios::binary | std::ios::trunc);
+  if (!file) errorQuda("Failed to open RNG checkpoint file %s for writing", fname.c_str());
+  uint64_t header[2] = {rng_checkpoint_magic, static_cast<uint64_t>(buffer.size())};
+  file.write(reinterpret_cast<char *>(header), sizeof(header));
+  file.write(buffer.data(), buffer.size());
+  if (!file.good()) errorQuda("Failed writing RNG checkpoint file %s", fname.c_str());
+  printfQuda("Checkpointed RNG state to %s(.rank<n>)\n", heatbath_rng_save.c_str());
+}
+
+void load_rng_state()
+{
+  std::string fname = rng_checkpoint_filename(heatbath_rng_load);
+  std::ifstream file(fname, std::ios::binary);
+  if (!file) errorQuda("Failed to open RNG checkpoint file %s for reading", fname.c_str());
+  uint64_t header[2];
+  file.read(reinterpret_cast<char *>(header), sizeof(header));
+  if (!file.good() || header[0] != rng_checkpoint_magic)
+    errorQuda("File %s is not a QUDA RNG checkpoint", fname.c_str());
+  if (header[1] != randstates.StateBytes())
+    errorQuda("RNG checkpoint %s has state size %lu but %lu expected; geometry or process grid mismatch",
+              fname.c_str(), (unsigned long)header[1], (unsigned long)randstates.StateBytes());
+  std::vector<char> buffer(randstates.StateBytes());
+  file.read(buffer.data(), buffer.size());
+  if (!file.good()) errorQuda("Failed reading RNG checkpoint file %s", fname.c_str());
+  randstates.loadState(buffer.data());
+  printfQuda("Restored RNG state from %s(.rank<n>)\n", heatbath_rng_load.c_str());
+}
+
+// Save the current configuration, measure flowed observables on it, and
+// checkpoint the RNG state, as requested via the command line.
+void save_and_measure_config(int config_number)
+{
+  // copy back to the host
+  copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+  cpuGauge = gauge;
+
+  if (heatbath_save_config_prefix.size() > 0) {
+#ifdef HAVE_QIO
+    std::string fname = heatbath_save_config_prefix + "_cfg_" + std::to_string(config_number) + ".lime";
+    write_gauge_field(fname.c_str(), reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param.cpu_prec,
+                      gauge_param.X, 0, (char **)0);
+    printfQuda("Saved configuration %d to %s\n", config_number, fname.c_str());
+#else
+    errorQuda("--heatbath-save-config-prefix requires QUDA to be built with QUDA_QIO=ON");
+#endif
+  }
+
+  if (heatbath_flow_steps > 0) {
+    // Wilson-flowed observables through the public interface, on a copy
+    // of the configuration resident in the library
+    loadGaugeQuda(cpuGauge.raw_pointer(), &gauge_param);
+
+    QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+    smear_param.n_steps = heatbath_flow_steps;
+    smear_param.epsilon = heatbath_flow_epsilon;
+    smear_param.meas_interval = heatbath_flow_steps; // measure at start and end only
+    smear_param.smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
+
+    std::vector<QudaGaugeObservableParam> obs_param(2, newQudaGaugeObservableParam());
+    for (auto &o : obs_param) {
+      o.compute_plaquette = QUDA_BOOLEAN_TRUE;
+      o.compute_qcharge = QUDA_BOOLEAN_TRUE;
+    }
+    performWFlowQuda(&smear_param, obs_param.data());
+
+    double flow_time = heatbath_flow_steps * heatbath_flow_epsilon;
+    printfQuda("config %d flow time %g: plaquette = %.16e Q = %+.6e E = %.6e\n", config_number, flow_time,
+               obs_param.back().plaquette[0], obs_param.back().qcharge, obs_param.back().energy[0]);
+
+    freeGaugeSmearedQuda();
+  }
+
+  if (heatbath_rng_save.size() > 0) save_rng_state();
+}
+
 void init_gauge(int argc, char **argv)
 {
   // *** QUDA parameters begin here.
@@ -107,8 +197,9 @@ void init_gauge(int argc, char **argv)
   for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
   gaugeEx = quda::GaugeField(gParamEx);
 
-  // initialize the device-side RNG
+  // initialize the device-side RNG, restoring a checkpointed state if requested
   randstates = quda::RNG(gaugeEx, 1234);
+  if (heatbath_rng_load.size() > 0) load_rng_state();
 
   if (latfile.size() > 0 || heatbath_initialize_on_host) {
     // Load or fill the gauge fields from the host
@@ -224,7 +315,13 @@ void heatbath_test()
 
       gaugeObservables(gaugeEx, param);
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, param.plaquette[0], param.qcharge);
+
+      if (heatbath_save_config_interval > 0 && step % heatbath_save_config_interval == 0)
+        save_and_measure_config(heatbath_config_start + step);
     }
+
+    // leave a final RNG checkpoint so the stream can be continued
+    if (heatbath_rng_save.size() > 0) save_rng_state();
 
     // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     quda::PGaugeExchangeFree();

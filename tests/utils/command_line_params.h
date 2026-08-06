@@ -543,6 +543,13 @@ extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
 extern bool heatbath_initialize_on_host;
+extern std::string heatbath_save_config_prefix;
+extern int heatbath_save_config_interval;
+extern int heatbath_config_start;
+extern std::string heatbath_rng_save;
+extern std::string heatbath_rng_load;
+extern int heatbath_flow_steps;
+extern double heatbath_flow_epsilon;
 
 extern double hmc_beta;
 extern double hmc_tau;

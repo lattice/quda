@@ -43,4 +43,25 @@ namespace quda
   void evecProjectLaplace3D(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
                             cvector_ref<const ColorSpinorField> &y);
 
+  /**
+     @brief Momentum-projected nucleon two-point contraction, summed
+     over timeslices.  The 12 fields of each vector are the source
+     spin-color components of the flavor propagator, ordered as
+     [source_spin * nColor + source_color].  The result is the open
+     sink-spin 4x4 correlator per global timeslice (16 complex numbers
+     per slice); slices owned by other ranks are left zero, so a global
+     reduction over the result is required.
+     @param[in] u Up-quark propagator components (12 fields)
+     @param[in] d Down-quark propagator components (12 fields)
+     @param[out] result_global correlator array of length 16 * T_global
+     @param[in] cType contraction type; must be QUDA_CONTRACT_TYPE_BARYON_NUCLEON_FT_T
+     @param[in] source_position 4d array of source position
+     @param[in] mom_mode 4d array of momentum
+     @param[in] fft_type Fourier phase factor types
+   */
+  void baryonContractSummedQuda(cvector_ref<const ColorSpinorField> &u, cvector_ref<const ColorSpinorField> &d,
+                                std::vector<Complex> &result_global, QudaContractType cType,
+                                const int *const source_position, const int *const mom_mode,
+                                const QudaFFTSymmType *const fft_type);
+
 } // namespace quda

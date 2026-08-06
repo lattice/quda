@@ -73,6 +73,24 @@ namespace quda {
     host_free(backup_state);
   }
 
+  size_t RNG::StateBytes()
+  {
+    if (!isInitialized()) errorQuda("RNG is not initialized");
+    return size * sizeof(RNGState);
+  }
+
+  void RNG::saveState(void *buffer)
+  {
+    if (!isInitialized()) errorQuda("RNG is not initialized");
+    qudaMemcpy(buffer, state.get(), size * sizeof(RNGState), qudaMemcpyDeviceToHost);
+  }
+
+  void RNG::loadState(const void *buffer)
+  {
+    if (!isInitialized()) errorQuda("RNG is not initialized");
+    qudaMemcpy(state.get(), const_cast<void *>(buffer), size * sizeof(RNGState), qudaMemcpyHostToDevice);
+  }
+
   /*! @brief Get pointer to RNGState */
   RNGState *RNG::State()
   {

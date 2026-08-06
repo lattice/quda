@@ -332,6 +332,15 @@ bool eigentracking_use_poly_acc = false; // Chebyshev acceleration for initial T
 int eigentracking_poly_deg = 50;         // Chebyshev polynomial degree
 double eigentracking_a_min = 0.0;        // ~10x smallest target eval; 0 => caller fills
 double eigentracking_a_max = 0.0;        // 0 => QUDA power-iteration auto-estimate
+
+std::string heatbath_save_config_prefix = "";
+int heatbath_save_config_interval = 0;
+int heatbath_config_start = 0;
+std::string heatbath_rng_save = "";
+std::string heatbath_rng_load = "";
+int heatbath_flow_steps = 0;
+double heatbath_flow_epsilon = 0.01;
+
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -1254,9 +1263,24 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Number of measurement steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
                       "Number of warmup steps in heatbath test (default 10)");
-  // DMH
-  // opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
-  //"Number of measurement steps in heatbath before checkpointing (default 5)");
+  opgroup->add_option("--heatbath-save-config-prefix", heatbath_save_config_prefix,
+                      "If set, save the gauge field to <prefix>_cfg_<n>.lime at each save interval (default empty)");
+  opgroup->add_option("--heatbath-save-config-interval", heatbath_save_config_interval,
+                      "Number of measurement steps between configuration saves; 0 disables periodic saving (default 0)");
+  opgroup->add_option(
+    "--heatbath-config-start", heatbath_config_start,
+    "Offset added to the step number when naming saved configurations, for stream continuation (default 0)");
+  opgroup->add_option("--heatbath-rng-save", heatbath_rng_save,
+                      "If set, checkpoint the device RNG state to <file>.rank<n> at each configuration save and at the "
+                      "end of the run (default empty)");
+  opgroup->add_option("--heatbath-rng-load", heatbath_rng_load,
+                      "If set, restore the device RNG state from <file>.rank<n> instead of seeding, to continue a "
+                      "stream exactly; combine with --load-gauge and --heatbath-warmup-steps 0 (default empty)");
+  opgroup->add_option("--heatbath-flow-steps", heatbath_flow_steps,
+                      "Number of Wilson-flow steps for the flowed observables measured at each configuration save; 0 "
+                      "disables flowed measurements (default 0)");
+  opgroup->add_option("--heatbath-flow-epsilon", heatbath_flow_epsilon,
+                      "Wilson-flow step size used for flowed observables (default 0.01)");
 }
 
 void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)

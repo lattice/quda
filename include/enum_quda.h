@@ -581,6 +581,7 @@ typedef enum QudaContractType_s {
   QUDA_CONTRACT_TYPE_OPEN_SUM_Z,     // Open spin elementals, spatially summed over zdim
   QUDA_CONTRACT_TYPE_OPEN_FT_T,      // Open spin elementals, FT in tdim
   QUDA_CONTRACT_TYPE_OPEN_FT_Z,      // Open spin elementals, FT in zdim
+  QUDA_CONTRACT_TYPE_BARYON_NUCLEON_FT_T, // Nucleon two-point (C gamma_5 diquark), open sink spin, FT in tdim
   QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaContractType;
 

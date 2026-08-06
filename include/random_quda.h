@@ -44,6 +44,27 @@ namespace quda {
     /*! @brief Backup rng array states initialization */
     void backup();
 
+    /**
+       @brief Number of bytes needed to hold the RNG state array on the
+       host, e.g., for checkpointing to disk
+    */
+    size_t StateBytes();
+
+    /**
+       @brief Copy the RNG state array to a host buffer (for
+       checkpointing).  The buffer must hold at least StateBytes() bytes.
+       @param[out] buffer Host buffer the state is copied to
+    */
+    void saveState(void *buffer);
+
+    /**
+       @brief Restore the RNG state array from a host buffer written by
+       saveState().  The buffer contents must come from an RNG of
+       identical geometry, process grid, and target backend.
+       @param[in] buffer Host buffer the state is read from
+    */
+    void loadState(const void *buffer);
+
     /*! @brief Get pointer to RNGState */
     RNGState *State();
   };

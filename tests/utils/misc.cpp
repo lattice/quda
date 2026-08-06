@@ -181,6 +181,7 @@ const char *get_contract_str(QudaContractType type)
   case QUDA_CONTRACT_TYPE_DR_FT_Z: ret = "dr_ft_z"; break;
   case QUDA_CONTRACT_TYPE_STAGGERED: ret = "stag"; break;
   case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: ret = "stag_ft_t"; break;
+  case QUDA_CONTRACT_TYPE_BARYON_NUCLEON_FT_T: ret = "baryon_nucleon_ft_t"; break;
   default: ret = "unknown"; break;
   }
 
