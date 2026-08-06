@@ -292,6 +292,11 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER)
   install(TARGETS correlator_distribution_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+add_executable(hmc_gauge_test hmc_gauge_test.cpp)
+target_link_libraries(hmc_gauge_test ${TEST_LIBS})
+quda_checkbuildtest(hmc_gauge_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS hmc_gauge_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 
 if(QUDA_MPI OR QUDA_QMP)
   #helper function to extract required number of ranks from environment variable
