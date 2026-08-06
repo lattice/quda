@@ -1,9 +1,13 @@
 #pragma once
 
+#include <cstdlib>
+#include <cstring>
+
 #include <quda.h>
 #include <comm_quda.h>
 #include <communicator_quda.h>
 
+#include <malloc_quda.h>
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -13,6 +17,104 @@ namespace quda
 {
 
   int comm_rank_from_coords(const int *coords);
+
+  /**
+    @brief Whether the reshuffle may hand device pointers straight to MPI, skipping the host
+    bounce entirely.
+
+    Three conditions, all necessary:
+
+    - `QUDA_ENABLE_SPLIT_GDR` is not explicitly "0". This is a runtime escape hatch rather than a
+      feature switch: this is a header, so reverting the transport by rebuilding costs most of the
+      library, and being able to flip it inside a running allocation is the point. Enabling GDR is
+      also documented to interact with MPI over IPC handle ownership (communicator.cpp, where
+      comm_gdr_enabled() bumps enable_peer_to_peer to suppress the conflicting policies) -- if this
+      transport ever hangs rather than answering wrongly, that is the first thing to rule out.
+
+    - The field is device resident. A host-resident field has nothing to gain, and its pointer would
+      be wrong for an RDMA send.
+
+    - comm_gdr_enabled().
+
+    NOTE ON THE LAST CONDITION. comm_gdr_enabled() is a *user assertion about their MPI* -- it only
+    reads QUDA_ENABLE_GDR (communicator_stack.cpp) -- not a capability probe. Setting
+    QUDA_ENABLE_GDR=1 without a GPU-aware MPI will fault here exactly as it already does in the
+    Dslash GDR policies, which hand a device pointer to this same comm_declare_* family
+    (lattice_field.cpp:394). That is deliberate: this inherits QUDA's existing contract rather than
+    inventing a second one.
+  */
+  inline bool split_use_device_comms(QudaFieldLocation location)
+  {
+    static const bool enabled = []() {
+      const char *env = getenv("QUDA_ENABLE_SPLIT_GDR");
+      return !(env && strcmp(env, "0") == 0);
+    }();
+    return enabled && location == QUDA_CUDA_FIELD_LOCATION && comm_gdr_enabled();
+  }
+
+  /**
+    @brief Allocate one staging buffer for the reshuffle: device memory from QUDA's pooled allocator
+    when the transport can RDMA out of it, pinned host memory otherwise.
+
+    pool_device_malloc and NOT device_comms_pinned_malloc. The latter is what the ghost buffers use
+    and is the obvious thing to reach for, but its CUDA and HIP implementations differ -- HIP rounds
+    up to a 2 MiB boundary and short-circuits when peer-to-peer is absent (hip/malloc.cpp:351,241),
+    CUDA does neither -- which would make the split-grid device footprint target-dependent. An RDMA
+    send needs a device pointer and nothing more; the comms-pinned variant exists for the NVSHMEM
+    symmetric heap and P2P IPC mapping, and split-grid already refuses to run under NVSHMEM
+    (communicator_stack.cpp).
+  */
+  inline void *split_buffer_malloc(size_t bytes, bool device)
+  {
+    return device ? pool_device_malloc(bytes) : host_pinned_malloc(bytes);
+  }
+
+  /**
+    @brief Ceiling on the staging footprint of a single reshuffle, in bytes. Override with
+    QUDA_SPLIT_MAX_STAGING_MIB (default 256 MiB).
+
+    Pre-posting every receive needs n_replicates buffers live at once, and n_replicates * bytes is
+    NOT small for every caller. The colour-spinor reshuffles are fine -- at production that is
+    9 x 17.9 MB -- but UpdateSplitGauge splits a gauge field with n_fields == 1, where the base
+    field is a few hundred MB per rank, so pre-posting all of it would add several GB to the HBM
+    high-water on a configuration that already runs out of device memory at P >= 6. Measured at
+    three nodes: +188 MiB, essentially all of it the gauge.
+
+    So the pre-post is conditional, and the fallback is the original algorithm -- post all sends,
+    then one receive at a time -- rather than a partially-windowed one. That is deliberate: with a
+    sliding window the completion of rank A's window can depend on rank B having advanced to a
+    later window, and proving that graph acyclic across every split key is not worth the risk when
+    the only caller that trips the ceiling (the gauge) is cached after the first solve and does not
+    care about its latency.
+
+    Note this bounds the RECEIVE staging. join_field also holds n_replicates send buffers, one per
+    slice, which is unchanged in count from the original -- only their location moved from pinned
+    host to device.
+  */
+  inline size_t split_max_staging_bytes()
+  {
+    static const size_t cap = []() {
+      size_t mib = 256;
+      const char *env = getenv("QUDA_SPLIT_MAX_STAGING_MIB");
+      if (env) {
+        char *end = nullptr;
+        unsigned long v = strtoul(env, &end, 10);
+        if (end != env && v > 0) { mib = v; }
+      }
+      return mib * 1024ul * 1024ul;
+    }();
+    return cap;
+  }
+
+  inline void split_buffer_free(void *ptr, bool device)
+  {
+    if (!ptr) return;
+    if (device) {
+      pool_device_free(ptr);
+    } else {
+      host_free(ptr);
+    }
+  }
 
   template <class Field>
   void inline split_field(Field &collect_field, cvector_ref<Field> &v_base_field, const CommKey &comm_key,
@@ -42,15 +144,67 @@ namespace quda
       = comm_grid_dim / processor_dim; // How many such sub-partitions are there? partition_dim == comm_key
 
     int n_replicates = product(comm_key);
-    std::vector<void *> v_send_buffer_h(n_replicates, nullptr);
-    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
 
     int n_fields = v_base_field.size();
     if (n_fields == 0) { errorQuda("split_field: input field vec has zero size."); }
 
     const auto &meta = v_base_field[0];
+    const size_t bytes = meta.TotalBytes();
+    const bool device = split_use_device_comms(meta.Location());
 
-    // Send cycles
+    using param_type = typename Field::param_type;
+    param_type param(meta);
+    Field buffer_field(param);
+
+    CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
+
+    // Post EVERY receive before any send. Declaring a receive only after the previous one had
+    // completed -- as this used to -- serialises the whole exchange: under a rendezvous protocol the
+    // sender cannot move data until its match is posted, so each message waited on the previous
+    // message's transfer, its copy and its kernel. Nothing here is ordered, so post it all and let
+    // the network overlap it.
+    //
+    // Unless that would cost too much memory, in which case fall back to the original
+    // one-at-a-time receive -- see split_max_staging_bytes().
+    const bool prepost = static_cast<size_t>(n_replicates) * bytes <= split_max_staging_bytes();
+    const int n_recv_buffers = prepost ? n_replicates : 1;
+
+    std::vector<void *> v_recv_buffer(n_recv_buffers, nullptr);
+    std::vector<MsgHandle *> v_mh_recv(n_replicates, nullptr);
+
+    // Where does replicate i's data come from? Needed both to pre-post and to post late.
+    auto recv_peer = [&](int i) {
+      auto partition_idx
+        = coordinate_from_index(i, comm_key); // Here this means which partition of the field we are working on.
+      auto src_idx
+        = (comm_grid_idx % processor_dim) * partition_dim + partition_idx; // And where does this partition comes from?
+      return comm_rank_from_coords(src_idx.data());
+    };
+
+    for (int i = 0; i < n_recv_buffers; i++) { v_recv_buffer[i] = split_buffer_malloc(bytes, device); }
+
+    if (prepost) {
+      for (int i = 0; i < n_replicates; i++) {
+        int src_rank = recv_peer(i);
+        int tag = src_rank * total_rank + rank;
+        v_mh_recv[i] = comm_declare_recv_rank(v_recv_buffer[i], src_rank, tag, bytes);
+        comm_start(v_mh_recv[i]);
+      }
+    }
+
+    // One staging buffer per DISTINCT source field, not one per replicate. Replicate i sends
+    // v_base_field[i % n_fields], so when n_fields < n_replicates -- the gauge and clover splits,
+    // where n_fields == 1 -- the same field was previously copied out once per replicate. At
+    // production that is P redundant copies of a 4.7 GB/GPU field.
+    const int n_send_buffers = n_fields < n_replicates ? n_fields : n_replicates;
+    std::vector<void *> v_send_buffer(n_send_buffers, nullptr);
+    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
+
+    for (int i = 0; i < n_send_buffers; i++) {
+      v_send_buffer[i] = split_buffer_malloc(bytes, device);
+      v_base_field[i].copy_to_buffer(v_send_buffer[i]);
+    }
+
     for (int i = 0; i < n_replicates; i++) {
       auto partition_idx = coordinate_from_index(i, comm_key); // Which partition to send to?
       auto processor_idx = comm_grid_idx / partition_dim;      // Which processor in that partition to send to?
@@ -60,59 +214,45 @@ namespace quda
       int dst_rank = ::quda::comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
 
-      size_t bytes = meta.TotalBytes();
-
-      v_send_buffer_h[i] = host_pinned_malloc(bytes);
-
-      v_base_field[i % n_fields].copy_to_buffer(v_send_buffer_h[i]);
-
-      v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
+      v_mh_send[i] = comm_declare_send_rank(v_send_buffer[i % n_fields], dst_rank, tag, bytes);
       comm_start(v_mh_send[i]);
     }
 
-    using param_type = typename Field::param_type;
-    param_type param(meta);
-    Field buffer_field(param);
-
-    CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
-
-    // Receive cycles
+    // Unpack in replicate order. Each copyFieldOffset writes a disjoint region of collect_field
+    // (offset = partition_idx * field_dim), so completion order would not change the result -- but
+    // wait-any is deferred, along with the guard it needs for the n_fields < n_replicates case.
     for (int i = 0; i < n_replicates; i++) {
-      auto partition_idx
-        = coordinate_from_index(i, comm_key); // Here this means which partition of the field we are working on.
-      auto src_idx
-        = (comm_grid_idx % processor_dim) * partition_dim + partition_idx; // And where does this partition comes from?
+      const int b = prepost ? i : 0;
 
-      int src_rank = comm_rank_from_coords(src_idx.data());
-      int tag = src_rank * total_rank + rank;
+      if (!prepost) { // post it now, into the single shared buffer
+        int src_rank = recv_peer(i);
+        int tag = src_rank * total_rank + rank;
+        v_mh_recv[i] = comm_declare_recv_rank(v_recv_buffer[b], src_rank, tag, bytes);
+        comm_start(v_mh_recv[i]);
+      }
 
-      size_t bytes = buffer_field.TotalBytes();
+      comm_wait(v_mh_recv[i]);
+      buffer_field.copy_from_buffer(v_recv_buffer[b]);
 
-      void *recv_buffer_h = host_pinned_malloc(bytes);
-
-      auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
-
-      comm_start(mh_recv);
-      comm_wait(mh_recv);
-
-      buffer_field.copy_from_buffer(recv_buffer_h);
-
-      comm_free(mh_recv);
-      host_free(recv_buffer_h);
-
+      auto partition_idx = coordinate_from_index(i, comm_key);
       auto offset = partition_idx * field_dim;
 
       quda::copyFieldOffset(collect_field, buffer_field, offset, pc_type);
     }
 
+    // The sends are never waited on, so this barrier is load-bearing: it is the proxy for "every
+    // rank has drained its receives, therefore my sends have delivered, therefore the buffers and
+    // handles are safe to release". Removing it requires waiting on the sends first. With
+    // pool_device_free the buffer re-enters circulation immediately, so dropping the barrier
+    // without that wait would let the allocator hand an in-flight send buffer to someone else.
     comm_barrier();
 
-    for (auto &p : v_send_buffer_h) {
-      if (p) { host_free(p); }
-    };
-    for (auto &p : v_mh_send) {
-      if (p) { comm_free(p); }
-    };
+    for (int i = 0; i < n_replicates; i++) {
+      if (v_mh_recv[i]) { comm_free(v_mh_recv[i]); }
+      if (v_mh_send[i]) { comm_free(v_mh_send[i]); }
+    }
+    for (auto &p : v_recv_buffer) { split_buffer_free(p, device); }
+    for (auto &p : v_send_buffer) { split_buffer_free(p, device); }
   }
 
   template <class Field>
@@ -130,13 +270,13 @@ namespace quda
       = comm_grid_dim / processor_dim; // The full field needs to be partitioned according to the communicator grid.
 
     int n_replicates = product(comm_key);
-    std::vector<void *> v_send_buffer_h(n_replicates, nullptr);
-    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
 
     int n_fields = v_base_field.size();
     if (n_fields == 0) { errorQuda("join_field: output field vec has zero size."); }
 
     const auto &meta = v_base_field[0];
+    const size_t bytes = meta.TotalBytes();
+    const bool device = split_use_device_comms(meta.Location());
 
     using param_type = typename Field::param_type;
 
@@ -145,7 +285,38 @@ namespace quda
 
     CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
 
-    // Send cycles
+    // Post every receive first, memory permitting -- see the note in split_field.
+    const bool prepost = static_cast<size_t>(n_replicates) * bytes <= split_max_staging_bytes();
+    const int n_recv_buffers = prepost ? n_replicates : 1;
+
+    std::vector<void *> v_recv_buffer(n_recv_buffers, nullptr);
+    std::vector<MsgHandle *> v_mh_recv(n_replicates, nullptr);
+
+    auto recv_peer = [&](int i) {
+      auto partition_idx = coordinate_from_index(i, comm_key);
+      auto processor_idx = comm_grid_idx / partition_dim;
+      auto src_idx = partition_idx * processor_dim + processor_idx;
+      return comm_rank_from_coords(src_idx.data());
+    };
+
+    for (int i = 0; i < n_recv_buffers; i++) { v_recv_buffer[i] = split_buffer_malloc(bytes, device); }
+
+    if (prepost) {
+      for (int i = 0; i < n_replicates; i++) {
+        int src_rank = recv_peer(i);
+        int tag = src_rank * total_rank + rank;
+        v_mh_recv[i] = comm_declare_recv_rank(v_recv_buffer[i], src_rank, tag, bytes);
+        comm_start(v_mh_recv[i]);
+      }
+    }
+
+    // Unlike split_field there is no buffer to share: every replicate carries a different slice of
+    // collect_field, so each needs its own. buffer_field is reused across iterations, which is safe
+    // because copy_to_buffer is a blocking copy on the default stream and therefore orders after
+    // the copyFieldOffset that filled it.
+    std::vector<void *> v_send_buffer(n_replicates, nullptr);
+    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
+
     for (int i = 0; i < n_replicates; i++) {
 
       auto partition_idx = coordinate_from_index(i, comm_key);
@@ -154,49 +325,42 @@ namespace quda
       int dst_rank = comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank;
 
-      size_t bytes = meta.TotalBytes();
-
       auto offset = partition_idx * field_dim;
       quda::copyFieldOffset(buffer_field, collect_field, offset, pc_type);
 
-      v_send_buffer_h[i] = host_pinned_malloc(bytes);
-      buffer_field.copy_to_buffer(v_send_buffer_h[i]);
+      v_send_buffer[i] = split_buffer_malloc(bytes, device);
+      buffer_field.copy_to_buffer(v_send_buffer[i]);
 
-      v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
+      v_mh_send[i] = comm_declare_send_rank(v_send_buffer[i], dst_rank, tag, bytes);
 
       comm_start(v_mh_send[i]);
     }
 
-    // Receive cycles
+    // Replicate order is preserved deliberately: when n_fields < n_replicates several replicates
+    // land in the same base field and the last write wins, so completion order would be observable.
     for (int i = 0; i < n_replicates; i++) {
+      const int b = prepost ? i : 0;
 
-      auto partition_idx = coordinate_from_index(i, comm_key);
-      auto processor_idx = comm_grid_idx / partition_dim;
+      if (!prepost) {
+        int src_rank = recv_peer(i);
+        int tag = src_rank * total_rank + rank;
+        v_mh_recv[i] = comm_declare_recv_rank(v_recv_buffer[b], src_rank, tag, bytes);
+        comm_start(v_mh_recv[i]);
+      }
 
-      auto src_idx = partition_idx * processor_dim + processor_idx;
-
-      int src_rank = comm_rank_from_coords(src_idx.data());
-      int tag = src_rank * total_rank + rank;
-
-      size_t bytes = buffer_field.TotalBytes();
-
-      void *recv_buffer_h = host_pinned_malloc(bytes);
-
-      auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
-
-      comm_start(mh_recv);
-      comm_wait(mh_recv);
-
-      v_base_field[i % n_fields].copy_from_buffer(recv_buffer_h);
-
-      comm_free(mh_recv);
-      host_free(recv_buffer_h);
+      comm_wait(v_mh_recv[i]);
+      v_base_field[i % n_fields].copy_from_buffer(v_recv_buffer[b]);
     }
 
+    // Load-bearing -- see the note in split_field.
     comm_barrier();
 
-    for (auto &p : v_send_buffer_h) { host_free(p); };
-    for (auto &p : v_mh_send) { comm_free(p); };
+    for (int i = 0; i < n_replicates; i++) {
+      if (v_mh_recv[i]) { comm_free(v_mh_recv[i]); }
+      if (v_mh_send[i]) { comm_free(v_mh_send[i]); }
+    }
+    for (auto &p : v_recv_buffer) { split_buffer_free(p, device); }
+    for (auto &p : v_send_buffer) { split_buffer_free(p, device); }
   }
 
 } // namespace quda
