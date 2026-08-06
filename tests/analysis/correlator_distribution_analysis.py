@@ -108,20 +108,42 @@ def main():
         print(f"{t:4d}  {k[0]:+.6e} ({err[0]:.1e})  {k[1]:+.6e} ({err[1]:.1e})  "
               f"{k[2]:+.2e} ({err[2]:.1e}) [{sig3:4.1f}]  {k[3]:+.2e} ({err[3]:.1e}) [{sig4:4.1f}]")
 
+    # Effective-mass estimator battery with blocked-jackknife errors:
+    #   mean:  m(t) = ln(<C(t)>/<C(t+1)>)
+    #   n=2:   log-normal, from g2 = k1 + k2/2
+    #   n=3:   cumulant expansion truncated at n_max=3, g3 = k1 + k2/2 + k3/6
+    # ln<C> = sum_n kappa_n/n!, so n=3 corrects the log-normal estimator's
+    # bias with the measured skewness while keeping its variance behaviour.
+    def estimator_battery(sample):
+        mean_c = sample.mean(axis=0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            lnc = np.log(np.where(sample > 0, sample, np.nan))
+        m1 = np.nanmean(lnc, axis=0)
+        d = lnc - m1
+        m2 = np.nanmean(d**2, axis=0)
+        m3 = np.nanmean(d**3, axis=0)
+        g2 = m1 + 0.5 * m2
+        g3 = g2 + m3 / 6.0
+        with np.errstate(invalid="ignore", divide="ignore"):
+            m_mean = np.log(mean_c[:-1] / mean_c[1:])
+        return np.array([m_mean, g2[:-1] - g2[1:], g3[:-1] - g3[1:]])
+
+    n = (len(C) // args.block) * args.block
+    trimmed = C[:n]
+    nb = n // args.block
+    center = estimator_battery(trimmed)
+    jk = np.empty((nb,) + center.shape)
+    for i in range(nb):
+        mask = np.ones(n, dtype=bool)
+        mask[i * args.block : (i + 1) * args.block] = False
+        jk[i] = estimator_battery(trimmed[mask])
+    err = np.sqrt((nb - 1) / nb * ((jk - center) ** 2).sum(axis=0))
+
     print("#")
-    print("#  t  m_eff(mean C)     m_eff(log-normal)   difference")
-    mean_c = C.mean(axis=0)
+    print("#  t  m_eff(mean C) (err)     m_eff(n=2 lognormal) (err)  m_eff(n=3 cumulant) (err)")
     for t in range(T - 1):
-        m_mean = np.nan
-        if mean_c[t] > 0 and mean_c[t + 1] > 0:
-            m_mean = np.log(mean_c[t] / mean_c[t + 1])
-        m_ln = np.nan
-        if np.isfinite(k1[t]) and np.isfinite(k1[t + 1]):
-            mu_sig_t = k1[t] + 0.5 * k2[t]
-            mu_sig_t1 = k1[t + 1] + 0.5 * k2[t + 1]
-            m_ln = mu_sig_t - mu_sig_t1
-        diff = m_mean - m_ln if np.isfinite(m_mean) and np.isfinite(m_ln) else np.nan
-        print(f"{t:4d}  {m_mean:+.8e}  {m_ln:+.8e}  {diff:+.2e}")
+        print(f"{t:4d}  {center[0][t]:+.6f} ({err[0][t]:.6f})   {center[1][t]:+.6f} ({err[1][t]:.6f})     "
+              f"{center[2][t]:+.6f} ({err[2][t]:.6f})")
 
     if args.histogram:
         try:
