@@ -1387,6 +1387,8 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Poly-acc lower suppression bound, ~10x smallest target eigenvalue");
   opgroup->add_option("--eigentracking-a-max", eigentracking_a_max,
                       "Poly-acc upper bound; 0 => QUDA power-iteration auto-estimate (default 0)");
+}
+
 void add_corrdist_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   // Option group for per-configuration correlator distribution measurements
