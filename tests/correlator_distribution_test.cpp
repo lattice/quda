@@ -33,9 +33,11 @@
    performed anywhere: the per-configuration correlators ARE the data.
  */
 
-// Names of the DR meson channels in G_idx order (see contractQuda docs)
-static const char *meson_channel_names[16] = {"1",   "G1",  "G2",  "G3",  "G4",  "G5",  "G5G1", "G5G2",
-                                              "G5G3", "G5G4", "S12", "S13", "S14", "S23", "S24",  "S34"};
+// Names of the DR meson channels in the G_idx order used by the FT
+// contraction kernels (see get_dr_gm_i in gamma.cuh): vectors,
+// pseudo-vectors, scalar, pseudoscalar, tensors
+static const char *meson_channel_names[16] = {"G1",  "G2",  "G3",  "G4",  "G5G1", "G5G2", "G5G3", "G5G4",
+                                              "1",   "G5",  "S12", "S13", "S14",  "S23",  "S24",  "S34"};
 
 void display_test_info()
 {
@@ -59,7 +61,7 @@ template <typename Float> void make_point_source(void *v, const int *const X, co
 
   int lx[4];
   for (int d = 0; d < 4; d++) {
-    lx[d] = x[d] - comm_coord(d) * X[d];
+    lx[d] = x[d] - quda::comm_coord(d) * X[d];
     if (lx[d] < 0 || lx[d] >= X[d]) return; // source not on this rank
   }
 
@@ -120,7 +122,7 @@ int main(int argc, char **argv)
     prop[i] = safe_malloc(spinor_bytes);
   }
 
-  const size_t Lt = tdim * comm_dim(3);
+  const size_t Lt = tdim * quda::comm_dim(3);
   constexpr int n_mom = 1;
   const int mom[4] = {0, 0, 0, 0};
   const QudaFFTSymmType fft_type[4] = {QUDA_FFT_SYMM_EO, QUDA_FFT_SYMM_EO, QUDA_FFT_SYMM_EO, QUDA_FFT_SYMM_EO};
@@ -155,7 +157,7 @@ int main(int argc, char **argv)
                   prop_source_position[0][3]};
     if (corrdist_random_source) {
       srand(2718281 + cfg); // deterministic per configuration, identical on all ranks
-      for (int d = 0; d < 3; d++) src[d] = rand() % (X[d] * comm_dim(d));
+      for (int d = 0; d < 3; d++) src[d] = rand() % (X[d] * quda::comm_dim(d));
     }
 
     // twelve solves
@@ -182,11 +184,15 @@ int main(int argc, char **argv)
     if (quda::comm_rank() == 0) {
       char line[256];
       for (int G = 0; G < 16; G++) {
+        // sign convention from moving gamma_5 through the insertion,
+        // matching established practice; makes the pion (G5) positive
+        double sign = G < 8 ? -1.0 : 1.0;
         for (size_t t = 0; t < Lt; t++) {
           // shift so that t is the source-sink separation
           size_t ts = (t + src[3]) % Lt;
           snprintf(line, sizeof(line), "%d %d %d %d %d %s %zu %+.16e %+.16e\n", cfg, src[0], src[1], src[2], src[3],
-                   meson_channel_names[G], t, meson_result[2 * (16 * ts + G)], meson_result[2 * (16 * ts + G) + 1]);
+                   meson_channel_names[G], t, sign * meson_result[2 * (16 * ts + G)],
+                   sign * meson_result[2 * (16 * ts + G) + 1]);
           out_file << line;
         }
       }
