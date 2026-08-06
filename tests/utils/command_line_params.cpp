@@ -341,6 +341,12 @@ std::string heatbath_rng_load = "";
 int heatbath_flow_steps = 0;
 double heatbath_flow_epsilon = 0.01;
 
+std::string corrdist_config_prefix = "";
+int corrdist_config_start = 0;
+int corrdist_config_end = 0;
+int corrdist_config_step = 1;
+std::string corrdist_out = "";
+bool corrdist_random_source = true;
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -1381,6 +1387,23 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Poly-acc lower suppression bound, ~10x smallest target eigenvalue");
   opgroup->add_option("--eigentracking-a-max", eigentracking_a_max,
                       "Poly-acc upper bound; 0 => QUDA power-iteration auto-estimate (default 0)");
+void add_corrdist_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for per-configuration correlator distribution measurements
+  auto opgroup
+    = quda_app->add_option_group("corrdist", "Options controlling per-configuration correlator measurements");
+  opgroup->add_option("--corrdist-config-prefix", corrdist_config_prefix,
+                      "Prefix of the gauge configurations to measure, as written by the heatbath driver: "
+                      "<prefix>_cfg_<n>.lime");
+  opgroup->add_option("--corrdist-config-start", corrdist_config_start, "First configuration number (default 0)");
+  opgroup->add_option("--corrdist-config-end", corrdist_config_end, "Last configuration number (default 0)");
+  opgroup->add_option("--corrdist-config-step", corrdist_config_step,
+                      "Step between configuration numbers (default 1)");
+  opgroup->add_option("--corrdist-out", corrdist_out,
+                      "Output file the per-configuration correlators are appended to");
+  opgroup->add_option("--corrdist-random-source", corrdist_random_source,
+                      "Place the point source at a random spatial site per configuration, drawn deterministically "
+                      "from the configuration number (default true)");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)

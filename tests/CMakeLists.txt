@@ -285,6 +285,13 @@ target_link_libraries(baryon_contract_test ${TEST_LIBS})
 quda_checkbuildtest(baryon_contract_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS baryon_contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER)
+  add_executable(correlator_distribution_test correlator_distribution_test.cpp)
+  target_link_libraries(correlator_distribution_test ${TEST_LIBS})
+  quda_checkbuildtest(correlator_distribution_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS correlator_distribution_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 
 if(QUDA_MPI OR QUDA_QMP)
   #helper function to extract required number of ranks from environment variable
