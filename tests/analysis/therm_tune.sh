@@ -95,7 +95,8 @@ for _ in range(80):
     if math.erfc(math.sqrt(mid/8)) > acc_t: lo = mid
     else: hi = mid
 var_t = 0.5*(lo+hi)
-n = $N_STEPS * ($var/var_t)**0.25
+expo = 0.125 if $INTEGRATOR >= 2 else 0.25  # 4th-order FGI: var ~ n^-8; 2nd-order: n^-4
+n = $N_STEPS * ($var/var_t)**expo
 print(max(4, int(round(n))))
 ")
     echo "  retuned n_steps -> $N_STEPS (targeting acceptance $(python3 -c "print(0.5*($ACC_LO+$ACC_HI))"))"
