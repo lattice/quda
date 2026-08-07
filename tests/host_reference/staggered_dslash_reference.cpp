@@ -77,7 +77,7 @@ template <typename real_t> struct StaggeredDslashReference {
       }
     }
 
-#pragma omp parallel for
+    //#pragma omp parallel for
     for (int sid = 0; sid < Vh; sid++) {
       int offset = stag_spinor_site_size * sid;
 
