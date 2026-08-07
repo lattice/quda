@@ -1,0 +1,72 @@
+# Eigentracker next step: chronological prediction at integrator-step scale
+
+*Working note, experimental/log-normal branch, 2026-08-07.  Context: the
+adaptive re-anchoring work in commits `8573907b7` (residual-triggered
+TRLM re-anchor + single-matvec subspace probe) and `6124dd325` (pool
+persistence across restarts/chunks).*
+
+## What we measured
+
+The Rayleigh-Ritz pool evolution is exact in isolation
+(`EigenTracking.StaticFixedPoint`: bit-exact eigenvalues, pool
+orthonormality at 2e-15 on a static field) but its tracking radius is
+far smaller than a trajectory:
+
+| evolution step scale        | behaviour                                     |
+|-----------------------------|-----------------------------------------------|
+| tau = 0.01 per RR step      | tracks true lambda_min to ~1e-3 per step      |
+| tau = 0.125 (one FGI-10 integrator step) | untested — plausibly inside the tracking radius |
+| tau = 1.0 per RR step (current per-trajectory driving) | complete subspace decoherence, every trajectory: pool reports RQ ~1.1 of a lost subspace while true lambda_min stays ~0.071 |
+
+Conclusion: as currently driven, the tracker is a **low-mode subspace
+evolver** — adequate for rapid MG setup refresh (null vectors only need
+to span the low modes approximately) — not an eigenvector tracker.
+
+## The architecture to implement
+
+Predictor–corrector layering at integrator-step granularity:
+
+1. **Predictor (every integrator step, ~free):** apply the
+   chronologically forecast rotation (the existing `EigenForecast`
+   rotation-history machinery *is* the chronological predictor; today it
+   is starved at one rotation per trajectory — at step scale it gets
+   n_steps times the history at n_steps times finer spacing).
+2. **Corrector (sparse, gated):** full RR evolution only when the
+   single-matvec subspace probe (`EigenTracker::subspaceResidual`)
+   exceeds a correction threshold.  Full RR at every step would cost
+   ~pool-size matvecs ≈ +40% trajectory cost at nEv=8/pool 15; gating
+   keeps the corrector rare when the forecast is good.
+3. **Ground truth (checkpoint anchors):** fresh TRLM at the checkpoint
+   interval (already implemented via `--eigentracking-fresh-interval`,
+   aligned with `--hmc-checkpoint`), so every saved configuration
+   carries a converged lambda_min for the exceptional-configuration
+   diagnostics regardless of tracking quality between anchors.
+
+## Implementation checklist
+
+- [ ] Move the evolve/forecast hooks from the trajectory boundary
+      (`EigenTrackingState::beforeTrajectory` / `betweenTrajectories`)
+      to the integrator step (the per-step `forceUpdate(matHalf)` site
+      in `hmcTrajectoryQuda`, interface_quda.cpp ~line 5590).
+- [ ] Record forecast rotations per step; extend `EigenForecast` order
+      handling to the longer, finer-spaced history.
+- [ ] Gate RR correction on `subspaceResidual` (new threshold param,
+      distinct from the re-anchor threshold; suggest correcting at
+      ~0.02 and re-anchoring at ~0.2).
+- [ ] Promote the subspace-probe log line from VERBOSE to SUMMARIZE so
+      production logs always carry the deviation series.
+- [ ] Validate: per-step tracking at tau = 1.0 trajectories should hold
+      lambda_min near truth between TRLM anchors (compare anchor values
+      against tracked values at anchor time); StaticFixedPoint must stay
+      bit-exact.
+
+## Decision gate
+
+Await the deflation sweep on ensemble F (`~/lognormal_data/ensembleF/
+sweep/sweep.dat`): if force-solve CG iterations are flat in pool size,
+the solves do not consume the pool and the *physics program* needs only
+(a) MG-refresh-grade subspace evolution and (b) TRLM anchors at
+checkpoints — both already in place.  Step-scale fidelity then becomes
+relevant when MG-assisted light-mass running arrives at the bottom of
+the kappa ladder, where deflation/setup-refresh quality directly sets
+solve cost.
