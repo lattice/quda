@@ -179,6 +179,7 @@ namespace quda
       if (!reset) {
         consumed = true;
       } else {
+        // reset the atomic counter - this allows multiple calls to complete with ReduceArg construction
         for (int i = 0; i < n_reduce * n_item; i++) {
           result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
         }
