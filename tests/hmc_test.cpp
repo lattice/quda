@@ -1811,6 +1811,77 @@ TEST(EigenTracking, ForceUpdate)
 /**
  * Test: Multiple perturbations -> RR tracking accuracy.
  */
+/**
+ * Static-gauge fixed point: with the gauge field UNCHANGED, repeated
+ * Rayleigh-Ritz evolution must leave the tracked eigenvalues invariant
+ * (eigenvectors of a fixed operator are a fixed point of RR).  Any
+ * drift isolates a defect in the RR step itself — independent of MD.
+ * Also measures pool-basis orthonormality ||V^dag V - 1||_max, which the
+ * standard (non-generalized) projected eigenproblem silently assumes.
+ */
+TEST(EigenTracking, StaticFixedPoint)
+{
+  using namespace quda;
+
+  if ((inv_param.dslash_type == QUDA_CLOVER_WILSON_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
+
+  QudaInvertParam ip = inv_param;
+  Dirac *dirac = nullptr;
+  createEODirac(dirac, ip);
+  DiracMdagM matNorm(*dirac);
+  DiracM matHalf(*dirac);
+
+  const int nEv = makeEigentestNev();
+  QudaEigParam ep = makeEigentestEigParam(nEv);
+
+  auto *eigSolve = quda::EigenSolver::create(&ep, matNorm);
+  ColorSpinorField templateField = generateEOPseudofermion(inv_param, 2);
+  std::vector<ColorSpinorField> kSpace;
+  kSpace.reserve(3 * nEv);
+  kSpace.push_back(std::move(templateField));
+  std::vector<Complex> evals(nEv);
+  (*eigSolve)(kSpace, evals);
+  delete eigSolve;
+
+  const double lambda0 = evals[0].real();
+  printfQuda("StaticFixedPoint: TRLM lambda_min = %e, kSpace size = %d\n", lambda0, (int)kSpace.size());
+
+  // Mirror production: init from the FULL kSpace (converged + Krylov leftovers)
+  EigenTracker tracker;
+  tracker.init(kSpace, evals, matHalf, nEv, makeEigentestPoolCapacity(nEv));
+
+  // Pool-basis orthonormality diagnostic
+  auto gramDev = [&]() {
+    auto &pool = tracker.getPoolMutable();
+    int k = (int)pool.size();
+    double dev = 0.0;
+    for (int j = 0; j < k; j++) {
+      std::vector<Complex> dots(k);
+      blas::block::cDotProduct(dots, {pool.begin(), pool.begin() + k}, pool[j]);
+      for (int i = 0; i < k; i++) {
+        double target = (i == j) ? 1.0 : 0.0;
+        dev = std::max(dev, std::abs(std::abs(dots[i]) - target));
+      }
+    }
+    return dev;
+  };
+  printfQuda("StaticFixedPoint: initial pool Gram deviation = %e\n", gramDev());
+
+  // Fixed gauge: RR evolution must be a fixed point
+  for (int iter = 0; iter < 3; iter++) {
+    tracker.rayleighRitzEvolve(matNorm);
+    tracker.forceUpdate(matHalf);
+    double lam = tracker.getEvals()[0].real();
+    double dev = gramDev();
+    printfQuda("StaticFixedPoint: step %d lambda_min = %e (seed %e), Gram dev = %e\n", iter + 1, lam, lambda0, dev);
+    EXPECT_NEAR(lam, lambda0, 0.05 * lambda0) << "RR drifted on a static gauge field at step " << iter + 1;
+  }
+
+  delete dirac;
+}
+
 TEST(EigenTracking, RayleighRitzEvolve)
 {
   using namespace quda;
