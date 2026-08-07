@@ -546,7 +546,7 @@ namespace quda
 
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
-            errorQuda("QUDA_PRECISION=%d does not enable real_t precision", QUDA_PRECISION);
+            errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
         // always instantiate the double-precision template to allow CPU
         // fields through, and prevent double-precision GPU
         // instantiation using gpu_mapper
