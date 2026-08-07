@@ -75,12 +75,13 @@ namespace quda
     if (spectrum.compare(0, 1, "L") == 0 && !eig_param->use_poly_acc) {
       reverse = true;
     } else if (spectrum.compare(0, 1, "S") == 0 && eig_param->use_poly_acc) {
+      // The polynomial in chebyOp() is small on [a_min, a_max] and large below a_min,
+      // so the smallest-real eigenvalues of the operator are the largest-real
+      // eigenvalues of the accelerated operator.
       reverse = true;
       spectrum[0] = 'L';
-    } else if (spectrum.compare(0, 1, "L") == 0 && eig_param->use_poly_acc) {
-      reverse = true;
-      spectrum[0] = 'S';
     }
+    // LR under polynomial acceleration is rejected in EigenSolver::create().
 
     // For normal operators (MdagM, MMdag) the SVD of the
     // underlying operators (M, Mdag) is computed.
@@ -127,6 +128,10 @@ namespace quda
     if (eig_param->use_poly_acc) {
       if (!mat.hermitian()) errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
       if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
+      // chebyOp() builds a polynomial that is small on [a_min, a_max] and large only
+      // below a_min, so it can accelerate the smallest-real spectrum alone.
+      if (eig_param->spectrum != QUDA_SPECTRUM_SR_EIG)
+        errorQuda("Polynomial acceleration is supported for the smallest-real (SR) spectrum only");
     }
 
     // Cannot solve for imaginary spectrum of hermitian systems
