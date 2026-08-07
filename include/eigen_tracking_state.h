@@ -219,6 +219,22 @@ namespace quda
      * Caller follows up with seedEigenTrackingFromMG (when MG is available)
      * or maybeInit (TRLM fallback) — the existing init paths handle both.
      */
+    /**
+     * @brief Persist the deflation pool (vectors + eigenvalue estimates)
+     * so a restarted run can resume evolving it without a fresh TRLM.
+     * Vectors go through VectorIO (QIO); eigenvalues and pool geometry to
+     * a small text sidecar <path>.evals.
+     */
+    void savePool(const std::string &path) const;
+
+    /**
+     * @brief Restore a pool written by savePool.  Field geometry must
+     * match the current lattice/operator.  Returns false (leaving the
+     * tracker uninitialised, so the TRLM fallback fires) if the files
+     * are missing or inconsistent.
+     */
+    bool loadPool(const std::string &path, const DiracMatrix &matHalf, QudaInvertParam &inv_param);
+
     void resetForRefresh()
     {
       tracker_ = EigenTracker();

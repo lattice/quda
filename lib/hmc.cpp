@@ -186,6 +186,7 @@ namespace quda
       etp.nRitz = hmc_param->eigentracking_n_ritz;
       etp.forecastOrder = hmc_param->eigentracking_forecast_order;
       etp.freshTRLMInterval = hmc_param->eigentracking_fresh_trlm_interval;
+      etp.refreshResidual = hmc_param->eigentracking_refresh_residual;
       etp.solutionHistoryDepth = hmc_param->eigentracking_solution_history;
       etp.trlmTol = hmc_param->eigentracking_trlm_tol;
       etp.trlmMaxRestarts = hmc_param->eigentracking_trlm_max_restarts;

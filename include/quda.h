@@ -910,6 +910,9 @@ extern "C" {
     int eigentracking_n_ritz;              /**< Ritz pairs to extract per CG solve (default 4) */
     int eigentracking_forecast_order;      /**< Generator forecast order: 0/1/2 (default 1) */
     int eigentracking_fresh_trlm_interval; /**< Trajectories between fresh TRLM (0=disabled, default 10) */
+    char eigentracking_pool_infile[256];   /**< If set, restore the deflation pool from this VectorIO file at start
+                                                instead of running the initial TRLM; pools are saved automatically
+                                                alongside gauge checkpoints as <checkpoint>.pool */
     double eigentracking_refresh_residual; /**< Pool residual threshold triggering an adaptive fresh TRLM re-anchor
                                                 (0=disabled, default 0.2).  Detects subspace decoherence when the MD
                                                 trajectory rotates the IR eigenvectors faster than RR evolution can

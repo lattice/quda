@@ -588,6 +588,7 @@ extern int eigentracking_n_ritz;
 extern int eigentracking_forecast_order;
 extern int eigentracking_fresh_interval;
 extern double eigentracking_refresh_residual;
+extern std::string eigentracking_pool_infile;
 extern int eigentracking_solution_history;
 extern bool eigentracking_absorb_ritz;
 extern int eigentracking_mg_refresh_iters;

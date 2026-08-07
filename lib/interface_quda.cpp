@@ -5172,6 +5172,7 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
       etp.nRitz = hmc_param->eigentracking_n_ritz;
       etp.forecastOrder = hmc_param->eigentracking_forecast_order;
       etp.freshTRLMInterval = hmc_param->eigentracking_fresh_trlm_interval;
+      etp.refreshResidual = hmc_param->eigentracking_refresh_residual;
       etp.solutionHistoryDepth = hmc_param->eigentracking_solution_history;
       etp.absorbRitz = hmc_param->eigentracking_absorb_ritz != 0;
       etp.mgRefreshIters = hmc_param->eigentracking_mg_refresh_iters;
@@ -5205,6 +5206,10 @@ double hmcTrajectoryQuda(void *h_gauge, void *h_momentum, QudaHMCParam *hmc_para
       createDiracWithEig(d, dSloppy, dPre, dEig, ip, pc_solve, false);
       DiracMdagM matNorm(*d);
       DiracM matHalf(*d);
+      // Restore a persisted deflation pool if one was provided; the TRLM
+      // in maybeInit only runs when no pool was restored.
+      if (hmc_param->eigentracking_pool_infile[0])
+        getEigenTrackingInstance()->loadPool(hmc_param->eigentracking_pool_infile, matHalf, ip);
       getEigenTrackingInstance()->maybeInit(matNorm, matHalf, ip);
       delete d;
       if (dSloppy && dSloppy != d) delete dSloppy;
@@ -5601,6 +5606,9 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
       snprintf(filename, sizeof(filename), "%s%05d", hmc_param->checkpoint_prefix, traj + 1);
       logQuda(QUDA_SUMMARIZE, "hmcRunQuda: Checkpointing gauge to %s\n", filename);
       writeGaugeQuda(filename, gauge_param);
+      if (hmc_param->eigentracking_enabled) {
+        if (auto *et = getEigenTrackingInstance(); et) et->savePool(std::string(filename) + ".pool");
+      }
     }
   }
   profileHMC.TPSTOP(QUDA_PROFILE_COMPUTE);

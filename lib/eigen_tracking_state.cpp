@@ -7,6 +7,8 @@
  */
 
 #include <eigen_tracking_state.h>
+#include <vector_io.h>
+#include <fstream>
 #include <eigensolve_quda.h>
 #include <blas_quda.h>
 #include <gauge_field.h>
@@ -251,6 +253,64 @@ namespace quda
     // pool; the existing seed / maybeInit chain rebuilds it.
 
     logQuda(QUDA_VERBOSE, "EigenTrackingState: betweenTrajectories complete (trajectory %d)\n", trajectoryCount_);
+  }
+
+
+  void EigenTrackingState::savePool(const std::string &path) const
+  {
+    if (!tracker_.isInitialized()) return;
+    auto &pool = const_cast<EigenTracker &>(tracker_).getPoolMutable();
+    int k = static_cast<int>(pool.size());
+    auto &evals = tracker_.getEvals();
+
+    VectorIO io(path);
+    io.save({pool.begin(), pool.end()}, QUDA_DOUBLE_PRECISION, k);
+
+    std::ofstream side(path + ".evals");
+    side << k << " " << evals.size() << "\n";
+    side.precision(17);
+    for (auto &e : evals) side << e.real() << " " << e.imag() << "\n";
+    logQuda(QUDA_SUMMARIZE, "EigenTrackingState: saved %d-vector pool to %s\n", k, path.c_str());
+  }
+
+  bool EigenTrackingState::loadPool(const std::string &path, const DiracMatrix &matHalf, QudaInvertParam &inv_param)
+  {
+    if (tracker_.isInitialized()) return true; // idempotent, like maybeInit
+    std::ifstream side(path + ".evals");
+    if (!side) {
+      logQuda(QUDA_SUMMARIZE, "EigenTrackingState: no pool sidecar at %s.evals — falling back to TRLM\n", path.c_str());
+      return false;
+    }
+    int k = 0; size_t nevals = 0;
+    side >> k >> nevals;
+    if (k <= 0 || nevals == 0 || side.fail()) return false;
+    std::vector<Complex> evals(nevals);
+    for (auto &e : evals) {
+      double re, im;
+      side >> re >> im;
+      e = Complex(re, im);
+    }
+    if (side.fail()) return false;
+
+    // Reconstruct pool fields with the same geometry maybeInit uses
+    ColorSpinorParam csParam(nullptr, inv_param, ::gaugePrecise->X(), true, QUDA_CUDA_FIELD_LOCATION);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.setPrecision(::gaugePrecise->Precision());
+    csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
+    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    std::vector<ColorSpinorField> kSpace(k, csParam);
+
+    VectorIO io(path);
+    io.load({kSpace.begin(), kSpace.end()});
+
+    // init recomputes Dpool against the CURRENT operator, so a pool saved
+    // at checkpoint time resumes exactly when the matching gauge is loaded.
+    tracker_.init(kSpace, evals, matHalf, param_.nEv, param_.poolCapacity);
+    invParam_ = inv_param;
+    invParamSet_ = true;
+    logQuda(QUDA_SUMMARIZE, "EigenTrackingState: restored %d-vector pool from %s (lambda_min = %e)\n", k, path.c_str(),
+            evals[0].real());
+    return true;
   }
 
   void EigenTrackingState::beforeTrajectory(const DiracMatrix &matHalf)

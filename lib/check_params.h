@@ -1433,6 +1433,7 @@ void printQudaHMCParam(QudaHMCParam *param)
   memset(ret.checkpoint_prefix, 0, sizeof(ret.checkpoint_prefix));
   strncpy(ret.checkpoint_prefix, "ckpt_", sizeof(ret.checkpoint_prefix) - 1);
   memset(ret.gauge_infile, 0, sizeof(ret.gauge_infile));
+  memset(ret.eigentracking_pool_infile, 0, sizeof(ret.eigentracking_pool_infile));
   memset(ret.gauge_outfile, 0, sizeof(ret.gauge_outfile));
 #endif
 
