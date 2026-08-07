@@ -60,6 +60,11 @@ namespace quda
      links into a helper field and exchanges ghosts; apply() forms
      a*(hopping) + b*in. With (dir=4, b=-8) this is the full 4D Laplacian -- the
      default, legacy operator. With (dir=3, b=-6) it is the spatial Laplacian.
+
+     TEMPORAL BOUNDARY CONDITION: not applied by this operator. The Laplace kernel
+     never reads t_boundary so the BC is whatever is present in the caller's link
+     data. To flow with an anti-periodic BC, supply links with the sign already
+     baked in (harmless to the gauge flow: the sign cancels in every closed loop).
   */
   class LaplaceFlowOp : public FermionFlowOp
   {
@@ -87,6 +92,8 @@ namespace quda
       // Mirror the legacy performGFlowQuda helper-field creation exactly: only
       // override create; inherit reconstruct (etc.) from the template so the
       // default-operator path reproduces the legacy results byte-for-byte.
+      // t_boundary is inherited deliberately -- this operator applies no boundary
+      // sign of its own, so the helper must describe the caller's data honestly.
       GaugeFieldParam gParam_helper(gauge_template);
       gParam_helper.create = QUDA_NULL_FIELD_CREATE;
       precise = GaugeField(gParam_helper);
@@ -111,6 +118,15 @@ namespace quda
      (smear_param.staggered_phase_type, default MILC) and anti-periodic temporal
      BC. The generator returned is K_t = -1/4 MdagM (negative semi-definite for
      any mass, so the integrator's smoothing invariant holds).
+
+     TEMPORAL BOUNDARY CONDITION: applied BY this operator, always anti-periodic,
+     baked into the link data by applyStaggeredPhase -- the MILC phase array carries
+     the boundary factor on dim 3 alongside the KS phases on dims 0-2, so one call
+     supplies both. The caller must therefore hand over links with NO boundary sign
+     already applied, else it is applied twice and cancels to a periodic fermion BC;
+     createFermionFlowOp enforces t_boundary == QUDA_PERIODIC_T for this operator.
+     Note this is the opposite convention from the Laplacian/Wilson operators, which
+     inherit the BC from the caller's data.
 
      The 1/4 is a normalization, not a convention choice. QUDA's staggered Dirac
      operator uses the MILC "2m" convention, M = 2m + Dhop (so MdagM = 4m^2 - Dhop^2);
@@ -176,11 +192,12 @@ namespace quda
 #ifdef GPU_WILSON_DIRAC
   /**
      @brief Wilson -DdagD flow generator, built on the flowed thin links. The
-     Wilson operator (four-component spinors) uses kappa (inv_param.kappa) and the
-     standard anti-periodic temporal boundary condition; the latter is applied by
-     the gauge accessor at read time from the helper field's t_boundary, so -- unlike
-     staggered -- no phase needs to be baked into the link data. The generator is
-     K_t = -DdagD = -MdagM (negative semi-definite for any kappa).
+     Wilson operator (four-component spinors) uses kappa (inv_param.kappa). The
+     generator is K_t = -DdagD = -MdagM (negative semi-definite for any kappa).
+
+     TEMPORAL BOUNDARY CONDITION: not applied by this operator. The BC is whatever
+     is present in the caller's link data: anti-periodic if the caller bakes the
+     sign in (harmless to the gauge flow: it cancels in every closed loop).
   */
   class WilsonFlowOp : public FermionFlowOp
   {
@@ -194,7 +211,6 @@ namespace quda
       GaugeFieldParam gParam_helper(gauge_template);
       gParam_helper.create = QUDA_NULL_FIELD_CREATE;
       gParam_helper.reconstruct = QUDA_RECONSTRUCT_NO;
-      gParam_helper.t_boundary = QUDA_ANTI_PERIODIC_T; // standard Wilson temporal BC (applied by the gauge accessor)
       precise = GaugeField(gParam_helper);
 
       DiracParam diracParam;
@@ -242,6 +258,15 @@ namespace quda
      (smear_param.hisq_fat7_coeff / hisq_asqtad_coeff), final: tadpole-scaled and,
      for the asqtad set, with the Naik correction eps_N already folded in (QUDA
      does not own the HISQ action). They are required when a HISQ flow is selected.
+
+     TEMPORAL BOUNDARY CONDITION: applied BY this operator, always anti-periodic --
+     identical to StaggeredFlowOp, and inherited by X and L because the sign is baked
+     into the thin links before fattening. The caller must hand over links with NO
+     boundary sign already applied; createFermionFlowOp enforces
+     t_boundary == QUDA_PERIODIC_T for this operator. The dslash-ready fat/lng fields
+     are therefore labelled PERIODIC below -- everything is already in their data.
+     Opposite convention from the Laplacian/Wilson operators, which inherit the BC
+     from the caller's data.
   */
   class HisqFlowOp : public FermionFlowOp
   {
@@ -283,6 +308,14 @@ namespace quda
       raw_param.reconstruct = QUDA_RECONSTRUCT_NO;
       raw_param.link_type = QUDA_GENERAL_LINKS;
       raw_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      // The fattening inputs are phased thin links, so the outputs carry the KS phases
+      // and the anti-periodic T in their data -- exactly like the dslash-ready fat/lng
+      // fields below, whose t_boundary is PERIODIC for that reason. Pin it here too
+      // rather than inheriting it from the template, whose t_boundary is whatever the
+      // caller loaded the thin links with: fat.copy(Xraw) / lng.copy(Lraw) run
+      // checkField, which compares t_boundary exactly.
+      raw_param.t_boundary = QUDA_PERIODIC_T;
+      raw_param.staggeredPhaseType = smear_param.staggered_phase_type;
 
       // Dslash-ready fat field X (rebuilt in place each sub-stage). The anti-periodic
       // T and KS phases are already baked into the data, so use periodic T here.
@@ -394,6 +427,26 @@ namespace quda
                                             const QudaGaugeSmearParam &smear_param, const GaugeField &gauge_template,
                                             const int *comm_dim, int parity, TimeProfile &profile)
   {
+    // The flow is defined on phase-free thin links. The KS phase product around a
+    // plaquette is -1, so phased links give the wrong gauge flow, and the staggered/HISQ
+    // generators -- which apply the phases themselves each sub-stage -- would double-apply.
+    if (gauge_template.StaggeredPhaseApplied())
+      errorQuda("Fermion flow requires a gauge field with no staggered phases applied; load the field for flow "
+                "with staggered_phase_applied = false");
+
+    // Temporal boundary condition. The staggered/HISQ generators bake an anti-periodic sign
+    // into the phased links themselves (the MILC phase array carries it alongside the KS
+    // phases), so a sign already present in the caller's data would be applied twice and
+    // cancel silently to a periodic fermion BC. Require an honest periodic label for those.
+    // The Laplacian and Wilson generators apply no sign of their own and simply inherit
+    // whatever the data holds, so they accept either label.
+    if (gauge_template.TBoundary() != QUDA_PERIODIC_T
+        && (type == QUDA_FERMION_FLOW_STAGGERED || type == QUDA_FERMION_FLOW_HISQ
+            || type == QUDA_FERMION_FLOW_HISQ_TRUNCATED))
+      errorQuda("Staggered/HISQ fermion flow requires thin links with no temporal boundary condition applied "
+                "(load the gauge field for flow with t_boundary = QUDA_PERIODIC_T); this operator applies the KS "
+                "phases and the anti-periodic T itself.");
+
     switch (type) {
     case QUDA_FERMION_FLOW_LAPLACE_4D: return new LaplaceFlowOp(gauge_template, comm_dim, parity, 4, -8.0, profile);
     case QUDA_FERMION_FLOW_LAPLACE_3D: return new LaplaceFlowOp(gauge_template, comm_dim, parity, 3, -6.0, profile);
