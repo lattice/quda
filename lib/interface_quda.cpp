@@ -5843,6 +5843,7 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
     ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profile);
+
     // [0] = [4] = Laplace [0] = Laplace [3]
     f_temp0 = f_temp4;
     // [1] <- epsilon/4 x [0] + [1] = [3] + epsilon /4 x Laplace [3]
@@ -5856,6 +5857,7 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
     ApplyLaplace(f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, comm_dim, profile);
+
     // [1] <- [4]
     f_temp1 = f_temp4;
     // [2] <- 8/9 x epsilon x [1] + [2]
@@ -5869,6 +5871,7 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
     ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profile);
+
     // [2] <- [4] = Laplace [2]
     f_temp2 = f_temp4;
     // [3] <- 3/4 x epsilon x [2] + [3]
@@ -6150,6 +6153,7 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
       int Nsrc = (int) f_temp4.size();
       int Nsrc_tile = inv_param->num_src;
       printfQuda("pion We are here now, \n");
+      auto initial_gauge_copy = t_gf_list[0].get();
       
       if (Nsrc > 1){
           printfQuda("doing multisrc\n");
@@ -6185,22 +6189,13 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
           printfQuda("flow a distance of %i\n",m);
           if (m != 0){
             gfEvolve(f_temp3,t_gf_list, smear_param, inv_param, m, profileFlowedForwardPpb, ferm_m);
-            GaugeFieldParam gParam(*gaugePrecise);
-            gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
-            GaugeField gaugeTemp(gParam);
-            GaugeField gin = *gaugeSmeared;
-            // helper gauge field for Laplace operator
-            GaugeField precise;
-            GaugeFieldParam gParam_helper(*gaugePrecise);
-            gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-            precise = GaugeField(gParam_helper);
-            t_gf_list = {gin,gaugeTemp,precise};
+            t_gf_list[0] = initial_gauge_copy;
             gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedForwardPpb, ferm_m);
           }
           std::vector<std::vector<Complex>> ppb_t_el = {};
           //moving result_global outside here
           std::fill(result_global.begin(), result_global.end(), 0.0);
-          //at this iteration, f_temp4.size() is simply the number of coors (3)
+          //at this iteration, f_temp4.size() is simply the number of coords (3)
           for (size_t nn = 0; nn < f_temp4.size(); nn++){
             std::fill(result_global.begin(), result_global.end(), 0.0);
             contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);

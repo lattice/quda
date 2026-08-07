@@ -294,6 +294,7 @@ void init()
   }
 
   if (inv_deflate) {
+    printfQuda("deflation is actually running\n");
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
     if (use_split_grid) { errorQuda("Split grid does not work with deflation yet.\n"); }
