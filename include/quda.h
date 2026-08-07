@@ -910,6 +910,10 @@ extern "C" {
     int eigentracking_n_ritz;              /**< Ritz pairs to extract per CG solve (default 4) */
     int eigentracking_forecast_order;      /**< Generator forecast order: 0/1/2 (default 1) */
     int eigentracking_fresh_trlm_interval; /**< Trajectories between fresh TRLM (0=disabled, default 10) */
+    double eigentracking_refresh_residual; /**< Pool residual threshold triggering an adaptive fresh TRLM re-anchor
+                                                (0=disabled, default 0.2).  Detects subspace decoherence when the MD
+                                                trajectory rotates the IR eigenvectors faster than RR evolution can
+                                                track. */
     int eigentracking_solution_history;    /**< Chronological solution history depth (default 3) */
     /** Whether to absorb CG-extracted Ritz vectors into the tracker pool.
      *  When true (default), the pool drifts toward exact D†D eigenvectors,

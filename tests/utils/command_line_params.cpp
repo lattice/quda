@@ -323,6 +323,7 @@ int eigentracking_pool_capacity = 0; // 0 = derive from nEv, or default 2*nEv
 int eigentracking_n_ritz = 0;        // 0 = derive from nEv, or default nEv/2
 int eigentracking_forecast_order = 1;
 int eigentracking_fresh_interval = 0; // 0 = disabled (MG seeding replaces TRLM)
+double eigentracking_refresh_residual = 0.2; // adaptive re-anchor threshold (0 = disabled)
 int eigentracking_solution_history = 3;
 bool eigentracking_absorb_ritz = true;   // false = pool stays as RR-evolved MG null vectors only
 int eigentracking_mg_refresh_iters = -1; // -1=disabled, 0=pure pool, N>0=pool+N CG polish iters (Fix 2)
@@ -1357,6 +1358,8 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Ritz pairs to extract per CG solve (0=derive from n-ev, default 0)");
   opgroup->add_option("--eigentracking-forecast-order", eigentracking_forecast_order,
                       "Forecast order: 0=constant, 1=linear, 2=quadratic (default 1)");
+  opgroup->add_option("--eigentracking-refresh-residual", eigentracking_refresh_residual,
+                      "Pool residual threshold that triggers an adaptive fresh-TRLM re-anchor; 0 disables (default 0.2)");
   opgroup->add_option("--eigentracking-fresh-interval", eigentracking_fresh_interval,
                       "Trajectories between fresh TRLM (0=disabled, default 0)");
   opgroup->add_option("--eigentracking-solution-history", eigentracking_solution_history,

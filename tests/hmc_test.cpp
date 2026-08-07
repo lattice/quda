@@ -170,6 +170,7 @@ static QudaHMCParam makeHMCParam(QudaIntegratorType integrator_override = static
   p.eigentracking_n_ritz = eigentracking_n_ritz;
   p.eigentracking_forecast_order = eigentracking_forecast_order;
   p.eigentracking_fresh_trlm_interval = eigentracking_fresh_interval;
+  p.eigentracking_refresh_residual = eigentracking_refresh_residual;
   p.eigentracking_solution_history = eigentracking_solution_history;
   p.eigentracking_absorb_ritz = eigentracking_absorb_ritz ? 1 : 0;
   p.eigentracking_mg_refresh_iters = eigentracking_mg_refresh_iters;

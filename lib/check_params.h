@@ -1356,6 +1356,7 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(eigentracking_n_ritz, 4);
   P(eigentracking_forecast_order, 1);
   P(eigentracking_fresh_trlm_interval, 10);
+  P(eigentracking_refresh_residual, 0.2);
   P(eigentracking_solution_history, 3);
   P(eigentracking_absorb_ritz, 1);
   P(eigentracking_mg_refresh_iters, -1);

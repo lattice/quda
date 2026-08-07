@@ -36,6 +36,7 @@ namespace quda
     int nRitz = 4;                /**< Ritz pairs to extract per CG solve */
     int forecastOrder = 1;        /**< Generator forecast order (0/1/2) */
     int freshTRLMInterval = 10;   /**< Trajectories between fresh TRLM (0=disabled) */
+    double refreshResidual = 0.2; /**< Pool residual triggering adaptive re-anchor (0=disabled) */
     int solutionHistoryDepth = 3; /**< Number of previous solutions to store */
     /** When false, stashRitzVectors becomes a no-op so the pool stays as
      *  the (RR-evolved) original MG null vectors. Mirrors the Schwinger
@@ -110,6 +111,7 @@ namespace quda
 
     /** Statistics */
     int trajectoryCount_;
+    bool residualRefreshPending_ = false; /**< Adaptive re-anchor requested by residual trigger */
     int totalRitzAbsorbed_;
     int totalCGSolves_;
 
@@ -204,7 +206,9 @@ namespace quda
      */
     bool shouldRefresh() const
     {
-      return tracker_.isInitialized() && param_.freshTRLMInterval > 0 && trajectoryCount_ > 0
+      if (!tracker_.isInitialized()) return false;
+      if (residualRefreshPending_) return true;
+      return param_.freshTRLMInterval > 0 && trajectoryCount_ > 0
         && trajectoryCount_ % param_.freshTRLMInterval == 0;
     }
 
@@ -219,6 +223,7 @@ namespace quda
     {
       tracker_ = EigenTracker();
       forecast_.reset();
+      residualRefreshPending_ = false;
     }
 
     /**

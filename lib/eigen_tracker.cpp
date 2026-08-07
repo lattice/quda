@@ -12,6 +12,8 @@
 #include <eigen_helper.h>
 #include <quda_internal.h>
 #include <hmc_quda.h>
+#include <random>
+#include <cmath>
 
 namespace quda
 {
@@ -287,6 +289,44 @@ namespace quda
             eigvals_[0].real(), eigvals_[std::min(nEv_, k) - 1].real());
 
     return rotation;
+  }
+
+  double EigenTracker::subspaceResidual(const DiracMatrix &mat, unsigned long long seed)
+  {
+    if (!initialized_) return -1.0;
+    int k = std::min(nEv_, static_cast<int>(pool_.size()));
+
+    // Random unit phases: cross terms <r_i, r_j> average to zero so a
+    // single probe estimates sum_i ||r_i||^2 without cancellation bias.
+    std::mt19937_64 rng(seed);
+    std::uniform_real_distribution<double> uni(0.0, 2.0 * M_PI);
+    std::vector<Complex> c(k), clam(k);
+    double lam2 = 0.0;
+    for (int i = 0; i < k; i++) {
+      double phi = uni(rng);
+      c[i] = Complex(cos(phi), sin(phi));
+      clam[i] = c[i] * eigvals_[i];
+      lam2 += std::norm(eigvals_[i]);
+    }
+
+    ColorSpinorParam param(pool_[0]);
+    param.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField w(param);
+    ColorSpinorField d(param);
+
+    // w = sum_i c_i v_i  (one block kernel)
+    blas::block::caxpy(c, {pool_.begin(), pool_.begin() + k}, w);
+
+    // d = A w  (the single matvec)
+    mat(d, w);
+
+    // d -= sum_i (c_i lambda_i) v_i
+    for (auto &cl : clam) cl = -cl;
+    blas::block::caxpy(clam, {pool_.begin(), pool_.begin() + k}, d);
+
+    double res = sqrt(blas::norm2(d) / std::max(lam2, 1e-30));
+    logQuda(QUDA_VERBOSE, "EigenTracker: subspace residual (nEv=%d, 1 matvec) = %e\n", k, res);
+    return res;
   }
 
   double EigenTracker::maxResidual(const DiracMatrix &mat)

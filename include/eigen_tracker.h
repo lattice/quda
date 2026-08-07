@@ -123,6 +123,18 @@ namespace quda
     /** @brief Read-only access to eigenvalues */
     const std::vector<Complex> &getEvals() const { return eigvals_; }
 
+    /**
+     * @brief Single-matvec stochastic estimate of the aggregate subspace
+     * residual: with random unit phases c_i, ||A(sum c_i v_i) - sum c_i
+     * lambda_i v_i||^2 has expectation sum_i ||r_i||^2, normalised by
+     * sum_i lambda_i^2.  An 8-32x cheaper decoherence probe than
+     * per-vector maxResidual; quadrature-mean rather than max, which is
+     * sufficient for threshold detection.
+     * @param mat  The (normal) operator to probe against
+     * @param seed Seed for the random phases (deterministic per call site)
+     */
+    double subspaceResidual(const DiracMatrix &mat, unsigned long long seed);
+
     /** @brief Read-only access to pool vectors */
     const std::vector<ColorSpinorField> &getPool() const { return pool_; }
 

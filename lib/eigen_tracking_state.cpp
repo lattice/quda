@@ -226,6 +226,20 @@ namespace quda
     // 4. Recompute Dpool after RR rotation (RR rotates pool but Dpool needs refresh)
     tracker_.forceUpdate(matHalf);
 
+    // 4b. Adaptive re-anchor: if the RR-evolved pool no longer contains the
+    // true low modes (subspace decoherence over the trajectory), its residual
+    // against the current normal operator grows to O(1).  Request a fresh
+    // TRLM so the next maybeInit re-seeds the pool from scratch.
+    if (param_.refreshResidual > 0.0) {
+      double poolRes = tracker_.subspaceResidual(mat, 0x5eed0000ull + trajectoryCount_);
+      if (poolRes > param_.refreshResidual) {
+        residualRefreshPending_ = true;
+        logQuda(QUDA_SUMMARIZE,
+                "EigenTrackingState: pool residual %.3e exceeds threshold %.3e — adaptive TRLM re-anchor requested\n",
+                poolRes, param_.refreshResidual);
+      }
+    }
+
     // 5. Record rotation in forecast state
     int k = tracker_.poolSize();
     if (!rotation.empty()) { forecast_.recordRotation(rotation, k); }
