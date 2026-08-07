@@ -5955,7 +5955,7 @@ typedef struct FermMeasObj {
 
 } FermMeasObj;
     
-void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, FermionFlowOp &flow_op, TimeProfile &profile, FermMeasObj *ferm_m)
+void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, FermionFlowOp *flow_op, TimeProfile &profile, FermMeasObj *ferm_m)
 {
   GaugeField &gin = tgl[0].get();
   GaugeField &gaugeTemp = tgl[1].get();
@@ -5993,10 +5993,9 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     f_temp2 = f_temp3;
     
     // STEP 1
-    // [4] = Laplace [0]
-    copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profile);
+    // [4] = K_t [0]
+    flow_op->update(g_W0);
+    flow_op->apply(f_temp4, f_temp0);
 
     // [0] = [4] = Laplace [0] = Laplace [3]
     f_temp0 = f_temp4;
@@ -6007,10 +6006,9 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     // STEP 2
     // [3] <- [1]
     f_temp3 = f_temp1;
-    // [4] <- Laplace [1]
-    copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, comm_dim, profile);
+    // [4] <- K_t [1]
+    flow_op->update(g_W1);
+    flow_op->apply(f_temp4, f_temp1);
 
     // [1] <- [4]
     f_temp1 = f_temp4;
@@ -6021,10 +6019,9 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     // apply step W2 of gauge field flow part
     GFlowStep(g_W2, gaugeTemp, g_W1, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
     // STEP 3
-    // [4] <- Laplace [2]
-    copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
-    precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profile);
+    // [4] <- K_t [2]
+    flow_op->update(g_W2);
+    flow_op->apply(f_temp4, f_temp2);
 
     // [2] <- [4] = Laplace [2]
     f_temp2 = f_temp4;
@@ -6168,7 +6165,7 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
 }
 
-void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3,  QudaInvertParam *inv_param, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param, int m, GaugeField &gaugeTemp,GaugeField &precise){
+void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3,  QudaInvertParam *inv_param, FermionFlowOp &flow_op, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param, int m,  GaugeField &gaugeTemp,GaugeField &precise){
     // auto f_temp4 = r_f_temp4.get();
     // auto f_temp3 = r_f_temp3.get();
       int Nsrc = (int) f_temp4.size();
@@ -6183,7 +6180,6 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
           data_f_temp3_tiled[i] = f_temp3[j + i].data();
           data_f_temp4_tiled[i] = f_temp4[j + i].data();
         }
-        // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
         invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
       }
       f_temp4[0].PrintVector(0,0,0);
@@ -6195,7 +6191,7 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
         smear_param->n_steps = m;
         GaugeField g00 = *gaugeSmeared; 
         t_gf_list = {g00, gaugeTemp,precise};
-        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier, ferm_m);
+        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, &flow_op, profileAdjGFlowHier, ferm_m);
         printfQuda("checking again\n");
         f_temp4[0].PrintVector(0,0,0);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
@@ -6229,7 +6225,7 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
     
 }
 
-void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3, std::vector<std::reference_wrapper<GaugeField>> t_gf_list, QudaInvertParam *inv_param, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param)
+void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3, std::vector<std::reference_wrapper<GaugeField>> t_gf_list, QudaInvertParam *inv_param, FermionFlowOp &flow_op, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param)
     { 
       int Nsrc = (int) f_temp4.size();
       int Nsrc_tile = inv_param->num_src;
@@ -6265,7 +6261,7 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
       for (const auto& m : ferm_m->meas_diff_vec){
           printfQuda("flow a distance of %i\n",m);
           if (m != 0){
-            gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedPionCorrelator, ferm_m);
+            gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, &flow_op, profileFlowedPionCorrelator, ferm_m);
           }
           std::vector<std::vector<Complex>> pion_corr_t_el = {};
           std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
@@ -6286,7 +6282,7 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
       }
 }
 
-void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3, std::vector<std::reference_wrapper<GaugeField>> t_gf_list, QudaInvertParam *inv_param, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param)
+void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3, std::vector<std::reference_wrapper<GaugeField>> t_gf_list, QudaInvertParam *inv_param, FermionFlowOp &flow_op, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param)
     { 
       int Nsrc = (int) f_temp4.size();
       int Nsrc_tile = inv_param->num_src;
@@ -6326,9 +6322,9 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
       for (const auto& m : ferm_m->meas_diff_vec){
           printfQuda("flow a distance of %i\n",m);
           if (m != 0){
-            gfEvolve(f_temp3,t_gf_list, smear_param, inv_param, m, profileFlowedForwardPpb, ferm_m);
+            gfEvolve(f_temp3,t_gf_list, smear_param, inv_param, m, &flow_op, profileFlowedForwardPpb, ferm_m);
             t_gf_list[0] = initial_gauge_copy;
-            gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, profileFlowedForwardPpb, ferm_m);
+            gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, &flow_op, profileFlowedForwardPpb, ferm_m);
           }
           std::vector<std::vector<Complex>> ppb_t_el = {};
           //moving result_global outside here
@@ -6352,67 +6348,14 @@ void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
                    TimeProfile &profile, FermMeasObj *ferm_m)
 {
   GaugeFieldParam gParamDummy(*gaugeSmeared);
-// <<<<<<< HEAD
+
   GaugeField &gaugeW1 = sub_gf_list[0].get();
   GaugeField &gaugeW2 = sub_gf_list[1].get();
   GaugeField &gaugeVT = sub_gf_list[2].get();
   GaugeField &gaugeTemp = sub_gf_list[3].get();
   GaugeField &precise = sub_gf_list[4].get();
   printfQuda("We are smearing for %d steps now\n",smear_param->n_steps);
-// =======
-//   GaugeField gaugeW0(gParamDummy);
-//   GaugeField gaugeW1(gParamDummy);
-//   GaugeField gaugeW2(gParamDummy);
-//   GaugeField gaugeVT(gParamDummy);
-//   GaugeField gauge_out(gParamDummy);
 
-//   GaugeFieldParam gParam(*gaugePrecise);
-//   gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
-//   GaugeField gaugeTemp(gParam);
-
-//   auto n = smear_param->adj_n_save;
-
-//   std::vector<GaugeField> gauge_stages(n, gParamDummy);
-//   gauge_stages[0] = *gaugeSmeared;
-//   // Can also do below
-//   // creates copies std::vector<GaugeField> gauge_stages(n,*gaugeSmeared);
-
-//   GaugeField &gin = *gaugeSmeared;
-//   GaugeField &gout = gauge_out;
-
-//   // fermion-flow generator K_t. Defaults to the 4D Laplacian (legacy behavior);
-//   // opt-in via smear_param->fermion_flow_type. Created once and reused across
-//   // all adjSafeEvolve calls (it holds the helper gauge field internally,
-//   // refreshed each sub-stage via update()).
-//   int parity = 0;
-//   int comm_dim[4] = {};
-//   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
-//   std::unique_ptr<FermionFlowOp> flow_op(
-//     createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *smear_param, *gaugePrecise, comm_dim, parity,
-//                         profileAdjGFlowHier));
-
-//   // spinor fields
-//   std::vector<ColorSpinorField> fin_h, fin, fout;
-//   // auxilliary fermion fields [0], [1], [2] and [3]
-//   std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
-//   for (size_t i = 0; i < nSpinors; i++) {
-//     ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
-//     fin_h.push_back(ColorSpinorField(cpuParam));
-//     ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-//     fin.push_back(ColorSpinorField(deviceParam));
-//     fin[i] = fin_h[i];
-//     deviceParam.create = QUDA_NULL_FIELD_CREATE;
-//     fout.push_back(ColorSpinorField(deviceParam));
-//     f_temp0.push_back(ColorSpinorField(deviceParam));
-//     f_temp1.push_back(ColorSpinorField(deviceParam));
-//     f_temp2.push_back(ColorSpinorField(deviceParam));
-//     f_temp3.push_back(ColorSpinorField(deviceParam));
-//     f_temp4.push_back(ColorSpinorField(deviceParam));
-//     // set [3] = input spinor
-//     f_temp3[i] = fin[i];
-//   }
-
-// >>>>>>> lattice/feature/fermion-flow-operators
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
   logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
   int ret_idx = 0;
@@ -6632,7 +6575,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       
     printfQuda("begin initial measurement. Checking if the first flow time is zero:\n");
     if (meas_int_vec.front() == 0){
-        perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, 0, gaugeTemp, precise);
+        perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, *flow_op, &ferm_m, smear_param, 0, gaugeTemp, precise);
     }
     if (n_steps_total != 0)
     // for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
@@ -6654,7 +6597,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       f_temp3 = ferm_m.vec_ref;
       gin = *gaugeSmeared;
       algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,*flow_op,profileAdjGFlowHier,&ferm_m);
-      perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, m, gaugeTemp, precise);
+      perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, *flow_op, &ferm_m, smear_param, m, gaugeTemp, precise);
     }
 
   }
@@ -6727,6 +6670,12 @@ void computeFlowedPionCorrelator(void **h_out, void **h_in, QudaInvertParam *inv
   GaugeFieldParam gParam_helper(*gaugePrecise);
   gParam_helper.create = QUDA_NULL_FIELD_CREATE;
   precise = GaugeField(gParam_helper);
+  int parity = 0;
+  int comm_dim[4] = {};
+  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+  std::unique_ptr<FermionFlowOp> flow_op(
+  createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *smear_param, *gaugePrecise, comm_dim, parity,
+                        profileFlowedPionCorrelator));
 
   // spinor fields, fout_h not needed
   std::vector<ColorSpinorField> fin_h, fin, fout;
@@ -6765,7 +6714,7 @@ void computeFlowedPionCorrelator(void **h_out, void **h_in, QudaInvertParam *inv
   meas_diff_vec.insert(meas_diff_vec.begin(), 0);
   FermMeasObj ferm_m;
   ferm_m.meas_diff_vec = meas_diff_vec;
-  perform_flow_pion_corr(fout,fin,t_gf_list,inv_param,&ferm_m,smear_param);
+  perform_flow_pion_corr(fout,fin,t_gf_list,inv_param, *flow_op, &ferm_m,smear_param);
 
       //get back on cpu
   inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
@@ -6824,6 +6773,11 @@ void computeFlowedForwardPpb(void **h_out, void **h_in, QudaInvertParam *inv_par
   GaugeFieldParam gParam_helper(*gaugePrecise);
   gParam_helper.create = QUDA_NULL_FIELD_CREATE;
   precise = GaugeField(gParam_helper);
+  int parity = 0;
+  int comm_dim[4] = {};
+  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+  std::unique_ptr<FermionFlowOp> flow_op(createFermionFlowOp(smear_param->fermion_flow_type, *inv_param, *smear_param, *gaugePrecise, comm_dim, parity,
+                        profileGFlow));
 
   // spinor fields, fout_h not needed
   std::vector<ColorSpinorField> fin_h, fin, fout;
@@ -6860,7 +6814,7 @@ void computeFlowedForwardPpb(void **h_out, void **h_in, QudaInvertParam *inv_par
   std::adjacent_difference(meas_int_vec.begin(), meas_int_vec.end(), meas_diff_vec.begin());
   FermMeasObj ferm_m;
   ferm_m.meas_diff_vec = meas_diff_vec;
-  perform_flow_forward_ppb(fout,fin,t_gf_list,inv_param,&ferm_m,smear_param);
+  perform_flow_forward_ppb(fout,fin,t_gf_list,inv_param, *flow_op, &ferm_m,smear_param);
 
       //get back on cpu
   inv_param->input_location =QUDA_CPU_FIELD_LOCATION;

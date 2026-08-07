@@ -438,6 +438,12 @@ int main(int argc, char **argv)
 
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+  smear_param.fermion_flow_type = fermion_flow_type;
+  smear_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  // HISQ flow operators require caller-supplied path coefficients; compute the
+  // standard HISQ action from the existing --tadpole-coeff / --epsilon-naik globals.
+  // if (fermion_flow_type == QUDA_FERMION_FLOW_HISQ || fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED)
+  //   computeHISQFlowCoeffs(tadpole_factor, eps_naik, smear_param.hisq_fat7_coeff, smear_param.hisq_asqtad_coeff);
   smear_param.smear_type = gauge_smear_type;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
