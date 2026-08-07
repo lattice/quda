@@ -20,7 +20,11 @@ namespace quda {
 #ifndef QUDA_FAST_COMPILE_REDUCE
     using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
+#if defined(QUDA_TARGET_SYCL)
+    using array_type = PowerOfTwoArray<device::max_block_size() / 2, device::max_block_size()>;
+#else
     using array_type = PowerOfTwoArray<device::max_block_size(), device::max_block_size()>;
+#endif
 #endif
     static constexpr array_type block = array_type();
 
