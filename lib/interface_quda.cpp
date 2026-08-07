@@ -5994,7 +5994,9 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     
     // STEP 1
     // [4] = K_t [0]
+    
     flow_op->update(g_W0);
+      
     flow_op->apply(f_temp4, f_temp0);
 
     // [0] = [4] = Laplace [0] = Laplace [3]

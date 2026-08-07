@@ -44,6 +44,23 @@ GaugeField cpuLongQDP = {};
 GaugeField cpuFatMILC = {};
 GaugeField cpuLongMILC = {};
 
+static void computeHISQFlowCoeffs(double tadpole, double eps_naik, double fat7[6], double asqtad[6])
+{
+  const double u1 = 1.0 / tadpole, u2 = u1 * u1, u4 = u2 * u2, u6 = u4 * u2;
+  fat7[0] = 1.0 / 8.0;
+  fat7[1] = 0.0;
+  fat7[2] = u2 * (-1.0 / 8.0) * 0.5;
+  fat7[3] = u4 * (1.0 / 8.0) * 0.25 * 0.5;
+  fat7[4] = u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+  fat7[5] = 0.0;
+  asqtad[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0) * (1.0 + eps_naik); // one-link (eps_N in last 1/8)
+  asqtad[1] = -(1.0 + eps_naik) / 24.0;                                          // Naik, scaled by (1 + eps_N)
+  asqtad[2] = (-1.0 / 8.0) * 0.5;
+  asqtad[3] = (1.0 / 8.0) * 0.25 * 0.5;
+  asqtad[4] = (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+  asqtad[5] = -2.0 / 16.0;
+}
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -442,8 +459,8 @@ int main(int argc, char **argv)
   smear_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   // HISQ flow operators require caller-supplied path coefficients; compute the
   // standard HISQ action from the existing --tadpole-coeff / --epsilon-naik globals.
-  // if (fermion_flow_type == QUDA_FERMION_FLOW_HISQ || fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED)
-  //   computeHISQFlowCoeffs(tadpole_factor, eps_naik, smear_param.hisq_fat7_coeff, smear_param.hisq_asqtad_coeff);
+  if (fermion_flow_type == QUDA_FERMION_FLOW_HISQ || fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED)
+    computeHISQFlowCoeffs(tadpole_factor, eps_naik, smear_param.hisq_fat7_coeff, smear_param.hisq_asqtad_coeff);
   smear_param.smear_type = gauge_smear_type;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;

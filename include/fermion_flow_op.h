@@ -136,7 +136,8 @@ namespace quda
       GaugeFieldParam gParam_helper(gauge_template);
       gParam_helper.create = QUDA_NULL_FIELD_CREATE;
       gParam_helper.reconstruct = QUDA_RECONSTRUCT_NO;                     // phased links: store explicitly
-      gParam_helper.t_boundary = QUDA_ANTI_PERIODIC_T;                     // standard staggered temporal BC
+      // gParam_helper.t_boundary = QUDA_ANTI_PERIODIC_T;                     // standard staggered temporal BC
+      gParam_helper.t_boundary = QUDA_PERIODIC_T;                     // standard staggered temporal BC
       gParam_helper.staggeredPhaseType = smear_param.staggered_phase_type; // caller-supplied KS convention
       precise = GaugeField(gParam_helper);
 
@@ -161,6 +162,7 @@ namespace quda
       if (precise.StaggeredPhaseApplied()) precise.removeStaggeredPhase();
       copyExtendedGauge(precise, thin_ext, QUDA_CUDA_FIELD_LOCATION);
       precise.exchangeGhost();
+        
       precise.applyStaggeredPhase(); // uses staggeredPhaseType (caller-supplied) + t_boundary set above
       dirac->updateFields(&precise, nullptr, nullptr, nullptr);
     }
@@ -329,24 +331,22 @@ namespace quda
     void update(const GaugeField &thin_ext) override
     {
       const lat_dim_t &R = thin_ext.R();
-
       // Phase the (trimmed) thin links, then re-extend so the phases reach the halo.
       GaugeField thin(thin_param);
       copyExtendedGauge(thin, thin_ext, QUDA_CUDA_FIELD_LOCATION);
       thin.exchangeGhost();
       thin.applyStaggeredPhase();
       std::unique_ptr<GaugeField> thinEx(createExtendedGauge(thin, R));
-
       // Level 1: V = fat7(thin); W = unitarize(V).
       GaugeField V(raw_param), W(raw_param);
       fatKSLink(V, *thinEx, c_fat7);
+
       int *fails_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
       int *fails_d = static_cast<int *>(get_mapped_device_pointer(fails_h));
       *fails_h = 0;
       unitarizeLinks(W, V, fails_d);
       if (*fails_h > 0) errorQuda("HISQ flow unitarization: %d failures", *fails_h);
       host_free(fails_h);
-
       // Level 2: X = asqtad-fat(W) [+ L = Naik long(W) for full HISQ].
       std::unique_ptr<GaugeField> WEx(createExtendedGauge(W, R));
       GaugeField Xraw(raw_param);
