@@ -22,8 +22,7 @@ namespace quda
     unsigned int sharedBytesPerThread() const
     {
       // use ThreadLocalCache if using over improvement for two link fields
-      return (improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0)
-        + 4 * sizeof(int); // for thread_array
+      return improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0;
     }
 
   public:
@@ -85,9 +84,11 @@ namespace quda
 
     long long bytes() const // 6 links per dim, 1 in, 1 out.
     {
-      return ((1 + (stoutDim - 1) * (improved ? 24 : 6)) * in.Reconstruct() * in.Precision()
-              + out.Reconstruct() * out.Precision())
-        * stoutDim * in.LocalVolume();
+      const long long in_lp
+        = static_cast<long long>(static_cast<int>(in.Reconstruct()) * static_cast<int>(in.Precision()));
+      const long long out_lp
+        = static_cast<long long>(static_cast<int>(out.Reconstruct()) * static_cast<int>(out.Precision()));
+      return ((1 + (stoutDim - 1) * (improved ? 24 : 6)) * in_lp + out_lp) * stoutDim * in.LocalVolume();
     }
   };
 

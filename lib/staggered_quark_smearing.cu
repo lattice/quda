@@ -25,11 +25,12 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     StaggeredQSmear(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                    const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
@@ -53,14 +54,10 @@ namespace quda
       }
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
 
       // operator is Hermitian so do not instantiate dagger
-      if (arg.nParity == 1) {
-        Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
-      } else if (arg.nParity == 2) {
-        Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
-      }
+      Dslash::template instantiate<packStaggeredShmem, false, false>(tp, stream);
     }
 
     long long flops() const override
@@ -107,7 +104,7 @@ namespace quda
 
     virtual long long bytes() const override
     {
-      int gauge_bytes = arg.reconstruct * in.Precision();
+      int gauge_bytes = static_cast<int>(arg.reconstruct) * static_cast<int>(in.Precision());
       int spinor_bytes = 2 * in.Ncolor() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = (spinor_bytes + gauge_bytes) + 2 * spinor_bytes;      // 2 since we have to load the partial
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);                           // 3D or 4D operator
@@ -198,8 +195,8 @@ namespace quda
         auto halo = ColorSpinorField::create_comms_batch(in, 3);
         StaggeredQSmearArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity,
                                                                          dir, dagger, comm_override);
-        StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, in, halo, profile);
+        StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, out, in, halo, profile);
       } else {
         errorQuda("Unsupported nSpin = %d", in.Nspin());
       }

@@ -9,17 +9,17 @@ namespace quda
   {
     auto &profile = getProfile();
     if (param.su_project) {
-      int *num_failures_h = static_cast<int *>(pool_pinned_malloc(sizeof(int)));
+      int *num_failures_h = static_cast<int *>(pool_host_pinned_malloc(sizeof(int)));
       int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
       *num_failures_h = 0;
       auto tol = u.toleranceSU3();
       projectSU3(u, tol, num_failures_d);
       if (*num_failures_h > 0) errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
-      pool_pinned_free(num_failures_h);
+      pool_host_pinned_free(num_failures_h);
     }
 
     if (param.compute_rectangle) {
-      double4 plqrct = plaquetteRectangle(u);
+      auto plqrct = plaquetteRectangle(u);
       param.plaquette[0] = 0.5 * (plqrct.x + plqrct.y);
       param.plaquette[1] = plqrct.x;
       param.plaquette[2] = plqrct.y;
@@ -27,7 +27,7 @@ namespace quda
       param.rectangle[1] = plqrct.z;
       param.rectangle[2] = plqrct.w;
     } else if (param.compute_plaquette) {
-      double3 plaq = plaquette(u);
+      auto plaq = plaquette(u);
       param.plaquette[0] = plaq.x;
       param.plaquette[1] = plaq.y;
       param.plaquette[2] = plaq.z;
@@ -68,7 +68,7 @@ namespace quda
     GaugeFieldParam tensorParam(x, u.Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
     tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
     tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+    tensorParam.order = QUDA_NATIVE_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     GaugeField gaugeFmunu(tensorParam);
 

@@ -3,25 +3,21 @@
 #include <blas_lapack.h>
 #include <tunable_nd.h>
 #include <instantiate.h>
-
+#include <multigrid.h>
 #include <staggered_kd_build_xinv.h>
 #include <kernels/staggered_coarse_op_kernel.cuh>
 
-namespace quda {
+namespace quda
+{
 
-  template <typename Float, int fineColor>
-  class CalculateStaggeredKDBlock : public TunableKernel3D {
+  template <typename Float, int fineColor> class CalculateStaggeredKDBlock : public TunableKernel3D
+  {
 
     GaugeField &X;
     const GaugeField &g;
     double mass;
 
     const int nDim = 4;
-
-    long long flops() const {
-      // no work, just a permutation
-      return 0ll;
-    }
 
     long long bytes() const
     {
@@ -36,21 +32,15 @@ namespace quda {
 
   public:
     CalculateStaggeredKDBlock(const GaugeField &g, GaugeField &X, double mass) :
-      TunableKernel3D(g, fineColor*fineColor, 2),
-      X(X),
-      g(g),
-      mass(mass)
+      TunableKernel3D(g, fineColor * fineColor, 2), X(X), g(g), mass(mass)
     {
       checkPrecision(X, g);
       checkLocation(X, g);
-      if (g.Geometry() != QUDA_VECTOR_GEOMETRY)
-        errorQuda("Unsupported geometry %d", g.Geometry());
-      if (g.Ndim() != 4)
-        errorQuda("Number of dimensions %d is not supported", g.Ndim());
-      if (X.Geometry() != QUDA_SCALAR_GEOMETRY)
-        errorQuda("Unsupported geometry %d", X.Geometry());
+      if (g.Geometry() != QUDA_VECTOR_GEOMETRY) errorQuda("Unsupported geometry %d", g.Geometry());
+      if (g.Ndim() != 4) errorQuda("Number of dimensions %d is not supported", g.Ndim());
+      if (X.Geometry() != QUDA_SCALAR_GEOMETRY) errorQuda("Unsupported geometry %d", X.Geometry());
 
-      strcat(aux,",computeStaggeredKDBlock");
+      strcat(aux, ",computeStaggeredKDBlock");
 
       // X is relatively sparse; the kernel assumes the rest of X is already zero
       X.zero();
@@ -59,7 +49,7 @@ namespace quda {
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
         logQuda(QUDA_VERBOSE, "Global U_max = %e\n", max_scale);
-        X.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass);
+        X.Scale(max_scale > 2.0 * mass ? max_scale : 2.0 * mass);
       }
 
       apply(device::get_default_stream());
@@ -73,18 +63,16 @@ namespace quda {
       constexpr bool kd_build_x = true;
       if (X.Location() == QUDA_CPU_FIELD_LOCATION) {
         constexpr QudaGaugeFieldOrder order = QUDA_QDP_GAUGE_ORDER;
-        CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(X, X, g, mass);
+        CalculateStaggeredYArg<Float, fineColor, order, kd_build_x> arg(X, X, g, mass);
         launch_host<ComputeStaggeredVUV>(tp, stream, arg);
       } else if (X.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        constexpr QudaGaugeFieldOrder order = QUDA_FLOAT2_GAUGE_ORDER;
-        CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(X, X, g, mass);
+        constexpr QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER;
+        CalculateStaggeredYArg<Float, fineColor, order, kd_build_x> arg(X, X, g, mass);
         launch_device<ComputeStaggeredVUV>(tp, stream, arg);
       }
     }
   };
 
-
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
   /**
      @brief Build the Kahler-Dirac term from the fine gauge fields
 
@@ -94,16 +82,14 @@ namespace quda {
    */
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
-    // Instantiate based on precision, number of colors
-    // need to swizzle `g` to the first argument to get the right fine nColor
-    instantiate<CalculateStaggeredKDBlock>(g, X, mass);
+    if constexpr (is_enabled_spin(1) && is_enabled_multigrid()) {
+      // Instantiate based on precision, number of colors
+      // need to swizzle `g` to the first argument to get the right fine nColor
+      instantiate<CalculateStaggeredKDBlock>(g, X, mass);
+    } else {
+      errorQuda("Staggered fermion multigrid support has not been built");
+    }
   }
-#else
-  void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
-  {
-    errorQuda("Staggered fermion multigrid support has not been built");
-  }
-#endif
 
   /**
      @brief Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated.
@@ -135,19 +121,19 @@ namespace quda {
     {
       const int ndim = 4;
       lat_dim_t xc;
-      for (int i = 0; i < ndim; i++) { xc[i] = gauge.X()[i]/2; }
+      for (int i = 0; i < ndim; i++) { xc[i] = gauge.X()[i] / 2; }
       const int Nc_c = gauge.Ncolor() * 8; // 24
-      const int Ns_c = 2; // staggered parity
+      const int Ns_c = 2;                  // staggered parity
       GaugeFieldParam gParam;
       gParam.x = xc;
-      gParam.nColor = Nc_c*Ns_c;
+      gParam.nColor = Nc_c * Ns_c;
       gParam.location = location;
       gParam.reconstruct = QUDA_RECONSTRUCT_NO;
       gParam.order = QUDA_MILC_GAUGE_ORDER;
       gParam.link_type = QUDA_COARSE_LINKS;
       gParam.t_boundary = QUDA_PERIODIC_T;
       gParam.create = QUDA_ZERO_FIELD_CREATE;
-      gParam.setPrecision( QUDA_SINGLE_PRECISION );
+      gParam.setPrecision(QUDA_SINGLE_PRECISION);
       gParam.nDim = ndim;
       gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -162,7 +148,8 @@ namespace quda {
     // in any case change to reconstruct 18 so we can use fine-grained
     // accessors for constructing X. Logic copied from `staggered_coarse_op.cu`
     bool need_new_U = true;
-    if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() == QUDA_RECONSTRUCT_NO && gauge.Precision() == QUDA_SINGLE_PRECISION)
+    if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() == QUDA_RECONSTRUCT_NO
+        && gauge.Precision() == QUDA_SINGLE_PRECISION)
       need_new_U = false;
 
     std::unique_ptr<GaugeField> tmp_U(nullptr);
@@ -170,7 +157,7 @@ namespace quda {
     if (need_new_U) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 
-        //First make a cpu gauge field from the cuda gauge field
+        // First make a cpu gauge field from the cuda gauge field
         int pad = 0;
         GaugeFieldParam gf_param(gauge.X(), QUDA_SINGLE_PRECISION, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
         gf_param.location = location;
@@ -187,7 +174,7 @@ namespace quda {
 
         tmp_U = std::make_unique<GaugeField>(gf_param);
 
-        //Copy the cuda gauge field to the cpu
+        // Copy the cuda gauge field to the cpu
         tmp_U.get()->copy(gauge);
 
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -195,25 +182,21 @@ namespace quda {
         // We can assume: gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != QUDA_SINGLE_PRECISION)
         GaugeFieldParam gf_param(gauge);
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-        gf_param.order = QUDA_FLOAT2_GAUGE_ORDER; // guaranteed for no recon
-        gf_param.setPrecision( QUDA_SINGLE_PRECISION );
+        gf_param.setPrecision(QUDA_SINGLE_PRECISION, true);
         tmp_U = std::make_unique<GaugeField>(gf_param);
 
         tmp_U->copy(gauge);
       }
     }
 
-    const GaugeField& U = need_new_U ? *tmp_U : reinterpret_cast<const GaugeField&>(gauge);
+    const GaugeField &U = need_new_U ? *tmp_U : reinterpret_cast<const GaugeField &>(gauge);
 
     // Step 3: Create the X field based on Xinv, but switch to a native ordering for a GPU setup.
     std::unique_ptr<GaugeField> tmp_X(nullptr);
     GaugeFieldParam x_param(*xInvMilcOrder);
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-      x_param.setPrecision(x_param.Precision());
-    }
+    if (location == QUDA_CUDA_FIELD_LOCATION) x_param.setPrecision(x_param.Precision(), true);
     tmp_X = std::make_unique<GaugeField>(x_param);
-    GaugeField& X = *tmp_X;
+    GaugeField &X = *tmp_X;
 
     // Step 4: Calculate X from U
     logQuda(QUDA_VERBOSE, "Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -257,7 +240,6 @@ namespace quda {
     logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", Xinv.norm2());
   }
 
-
   // Allocates and calculates the inverse KD block, returning Xinv
   std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, const double mass,
                                                                           const bool dagger_approximation)
@@ -281,4 +263,4 @@ namespace quda {
     return Xinv;
   }
 
-} //namespace quda
+} // namespace quda

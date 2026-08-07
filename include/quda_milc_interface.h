@@ -188,6 +188,16 @@ extern "C" {
   } QudaTwoLinkQuarkSmearArgs_t;
 
   /**
+    Options when loading deflation space
+  **/
+  typedef enum QudaMilcEigLoad_s {
+    QUDA_MILC_EIG_LOAD,              /** Load this parity evecs from MILC **/
+    QUDA_MILC_EIG_COMPUTE,           /** Compute this parity evecs (or load from file via QUDA) **/
+    QUDA_MILC_EIG_FROM_OTHER_PARITY, /** Compute this parity evecs from the other parity **/
+    QUDA_MILC_INVALID_EIG = QUDA_INVALID_ENUM
+  } QudaMilcEigLoad;
+
+  /**
    * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
    *
    * @param[in] input Pointer to an MPI_Comm handle, static cast as a void *
@@ -378,6 +388,46 @@ extern "C" {
 		    double* const final_residual,
 		    double* const final_fermilab_residual,
 		    int* num_iters);
+
+  /**
+   * Project the low modes off of a source of given parity.
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] source Source vector(s)
+   * @param[out] source Solution vector(s)
+   * @param[in] nvec Number of source/solution vectors
+   * @param[in] n_evec Number of low modes to project off of the source vectors
+   * @param[in] parity Parity to use
+   */
+  void qudaProject(int external_precision, void **source, void **solution, int nvec, int n_evec, QudaParity parity);
+
+  /**
+   * Get pointers to QUDA's deflation space objects.
+   *
+   * @param[out] evecs Pointer to eigenvectors
+   * @param[out] evals Pointer to eigenvalues
+   * @param[in] parity Parity of the deflation space to return
+   * @param[in] nvecs The number of eigenvectors
+   */
+  void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int nvecs);
+
+  /**
+   * Load the deflation space (eigenvalues and eigenvectors) for a particular parity
+   * which is set in invargs.
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] milc_fatlink Fat-link field on the host
+   * @param[in] milc_longlink Long-link field on the host
+   * @param[in] mass Quark mass
+   * @param[in] invargs Struct containing information for the inverter
+   * @param[in] eigargs Struct containing information for the eigensolver
+   * @param[in] evecs Evecs coming from MILC
+   * @param[in] loadtype Whether to load from MILC, from file, compute, or check
+   */
+  void qudaLoadDeflationSpace(int external_precision, int quda_precision, const void *const milc_fatlink,
+                              const void *const milc_longlink, double mass, QudaInvertArgs_t invargs,
+                              QudaEigensolverArgs_t eigargs, void **evecs, QudaMilcEigLoad loadtype);
 
   /**
    * Solve Ax=b for an improved staggered operator. All fields are fields

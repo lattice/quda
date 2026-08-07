@@ -47,7 +47,7 @@ namespace quda
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
-  template <int nParity, bool dagger, int twist, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
+  template <bool dagger, int twist, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
   __device__ __host__ __forceinline__ void applyWilsonTM(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
                                                          int thread_dim, bool &active, int src_idx)
   {
@@ -55,7 +55,7 @@ namespace quda
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
     typedef Matrix<complex<real>, Arg::nColor> Link;
-    const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
+    const int their_spinor_parity = arg.nParity == 2 ? 1 - parity : 0;
 
 #pragma unroll
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
@@ -63,13 +63,12 @@ namespace quda
       if (arg.dd_in.doHopping(coord, d, +1)) {
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
-        const bool ghost
-            = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) :
             idx;
 
           Link U = arg.U(d, coord.x_cb, parity);
@@ -102,12 +101,12 @@ namespace quda
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = back_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
-        const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) :
             idx;
 
           Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
@@ -137,7 +136,7 @@ namespace quda
     } // nDim
   }
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct twistedMassPreconditioned : dslash_default {
 
     const Arg &arg;
@@ -161,7 +160,7 @@ namespace quda
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
 
       Vector out;
       if (arg.dd_out.isZero(coord)) {
@@ -170,9 +169,9 @@ namespace quda
       }
 
       if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
-        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       else // special dslash for symmetric dagger
-        applyWilsonTM<nParity, dagger, 1, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        applyWilsonTM<dagger, 1, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
@@ -193,7 +192,6 @@ namespace quda
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

@@ -25,31 +25,25 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     Laplace(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-            const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+            const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
 
       // operator is Hermitian so do not instantiate dagger
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
-      } else if (arg.nParity == 2) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
-      }
+      if (arg.xpay)
+        Dslash::template instantiate<packStaggeredShmem, false, true>(tp, stream);
+      else
+        Dslash::template instantiate<packStaggeredShmem, false, false>(tp, stream);
     }
 
     long long flops() const override
@@ -99,7 +93,7 @@ namespace quda
 
     virtual long long bytes() const override
     {
-      int gauge_bytes = arg.reconstruct * in.Precision();
+      int gauge_bytes = static_cast<int>(arg.reconstruct) * static_cast<int>(in.Precision());
       int spinor_bytes
         = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
@@ -158,13 +152,13 @@ namespace quda
       if (in.Nspin() == 1) {
         constexpr int nSpin = 1;
         LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
-        Laplace<decltype(arg)> laplace(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+        Laplace<decltype(arg)> laplace(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, out, in, halo, profile);
       } else if (in.Nspin() == 4) {
         constexpr int nSpin = 4;
         LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
-        Laplace<decltype(arg)> laplace(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+        Laplace<decltype(arg)> laplace(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, out, in, halo, profile);
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
       }

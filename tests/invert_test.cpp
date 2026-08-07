@@ -121,6 +121,7 @@ void init(int argc, char **argv)
 {
   // Set QUDA's internal parameters
   gauge_param = newQudaGaugeParam();
+  gauge_param.use_split_gauge_bkup = use_split_gauge_bkup == 1;
   setWilsonGaugeParam(gauge_param);
 
   inv_param = newQudaInvertParam();

@@ -15,7 +15,6 @@ namespace quda {
     const Float anisotropy;
     const int apeDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
@@ -55,8 +54,11 @@ namespace quda {
 
     long long bytes() const // 6 links per dim, 1 in, 1 out.
     {
-      return ((1 + (apeDim - 1) * 6) * in.Reconstruct() * in.Precision() +
-              out.Reconstruct() * out.Precision()) * apeDim * in.LocalVolume();
+      const long long in_bytes
+        = static_cast<long long>(static_cast<int>(in.Reconstruct()) * static_cast<int>(in.Precision()));
+      const long long out_bytes
+        = static_cast<long long>(static_cast<int>(out.Reconstruct()) * static_cast<int>(out.Precision()));
+      return ((1 + (apeDim - 1) * 6) * in_bytes + out_bytes) * apeDim * in.LocalVolume();
     }
 
   }; // GaugeAPE

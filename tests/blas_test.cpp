@@ -791,7 +791,7 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double4 d = blas::cDotProductNormAB(xD, yD);
+        auto d = blas::cDotProductNormAB(xD, yD);
         auto dot = blas::cDotProduct(xH, yH);
         auto x2 = blas::norm2(xH);
         auto y2 = blas::norm2(yH);
@@ -845,7 +845,7 @@ protected:
       zD = zH;
       {
         double3 d = blas::tripleCGReduction(xD, yD, zD);
-        double3 h = make_double3(blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH));
+        double3 h = {blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH)};
         error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
       }
       break;
@@ -1162,18 +1162,13 @@ TEST_P(BlasTest, verify)
   // failed without running
   double deviation = test(kernel);
   // printfQuda("%-35s error = %e\n", names[kernel], deviation);
-  double tol_x
-    = (prec_pair.first == QUDA_DOUBLE_PRECISION ?
-         1e-12 :
-         (prec_pair.first == QUDA_SINGLE_PRECISION ? 1e-6 : (prec_pair.first == QUDA_HALF_PRECISION ? 1e-4 : 1e-2)));
-  double tol_y
-    = (prec_pair.second == QUDA_DOUBLE_PRECISION ?
-         1e-12 :
-         (prec_pair.second == QUDA_SINGLE_PRECISION ? 1e-6 : (prec_pair.second == QUDA_HALF_PRECISION ? 1e-4 : 1e-2)));
+  // have more stringent tolerances for BLAS tests
+  double tol_x = 0.1 * getTolerance(prec_pair.first);
+  double tol_y = 0.1 * getTolerance(prec_pair.second);
   double tol = std::max(tol_x, tol_y);
   tol = is_copy(kernel) ? 5e-2 : tol; // use different tolerance for copy
+  ASSERT_FALSE(std::isnan(deviation)) << "Nan has propagated into the result";
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-  EXPECT_EQ(false, std::isnan(deviation)) << "Nan has propagated into the result";
 }
 
 TEST_P(BlasTest, benchmark)

@@ -21,16 +21,7 @@ namespace quda {
       cvector_ref<ColorSpinorField> &x, &y, &z, &w;
       T &result;
       QudaFieldLocation location;
-
-      virtual bool advanceSharedBytes(TuneParam &param) const override
-      {
-        TuneParam next(param);
-        advanceBlockDim(next); // to get next blockDim
-        int nthreads = next.block.x * next.block.y * next.block.z;
-        param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(param) ?
-          sharedBytesPerThread() * nthreads : sharedBytesPerBlock(param);
-        return false;
-      }
+      bool tuneSharedBytes() const override { return false; }
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw>
@@ -95,6 +86,10 @@ namespace quda {
           }
         }
         if (is_norm) strcat(aux, ",norm");
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, multi_reduce_unroll);
+        }
 
         apply(device::get_default_stream());
       }
@@ -121,8 +116,8 @@ namespace quda {
 
           // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
           constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
-          constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
-          constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
+          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
+          constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x0.Length() / M;
 
@@ -337,6 +332,10 @@ namespace quda {
         u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
         strcat(aux, ",max_nyw_tile=");
         strcat(aux, max_nyw_tile);
+        if (x0.Location() == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, multi_reduce_unroll);
+        }
 
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning
@@ -498,6 +497,10 @@ namespace quda {
         u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
         strcat(aux, ",max_nyw_tile=");
         strcat(aux, max_nyw_tile);
+        if (x[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, multi_reduce_unroll);
+        }
 
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning

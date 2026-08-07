@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <thread_array.h>
+#include <packed_array.h>
 #include <kernel.h>
 
 namespace quda
@@ -33,11 +33,9 @@ namespace quda
     }
   };
 
-  using computeForceOps = KernelOps<thread_array<int, 4>>;
-  template <typename Link, typename Force, typename Ftor>
-  __device__ __host__ void computeForce(Force &force_total, const Ftor &ftor, int xIndex, int parity, int mu, int nu)
+  template <typename Link, typename Force, typename Arg>
+  __device__ __host__ void computeForce(Force &force_total, const Arg &arg, int xIndex, int parity, int mu, int nu)
   {
-    const auto &arg = ftor.arg;
     const int otherparity = (1 - parity);
     const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
 
@@ -46,7 +44,7 @@ namespace quda
 
     // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
     {
-      thread_array<int, 4> d {ftor};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -80,7 +78,7 @@ namespace quda
     }
 
     {
-      thread_array<int, 4> d {ftor};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -119,7 +117,7 @@ namespace quda
     }
 
     {
-      thread_array<int, 4> d {ftor};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -157,7 +155,7 @@ namespace quda
     // Lower leaf
     // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
     {
-      thread_array<int, 4> d {ftor};
+      packed_array<int8_t, 4> d = {};
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -196,12 +194,9 @@ namespace quda
     }
   }
 
-  template <typename Arg> struct CloverDerivative : computeForceOps {
+  template <typename Arg> struct CloverDerivative {
     const Arg &arg;
-    template <typename... OpsArgs>
-    constexpr CloverDerivative(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
-    {
-    }
+    constexpr CloverDerivative(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __host__ __device__ void operator()(int x_cb, int parity, int mu)
@@ -214,7 +209,7 @@ namespace quda
 
       for (int nu = 0; nu < 4; nu++) {
         if (nu == mu) continue;
-        computeForce<Link>(force, *this, x_cb, parity, mu, nu);
+        computeForce<Link>(force, arg, x_cb, parity, mu, nu);
       }
 
       // Write to array

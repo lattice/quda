@@ -9,15 +9,15 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int level_, int hypDim_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int level_, int hypDim_>
   struct GaugeHYPArg : kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int hypDim = hypDim_;
     static constexpr int level = level_;
-    typedef typename gauge_mapper<Float, recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
 
     Gauge out;
     Gauge tmp[4];
@@ -26,9 +26,9 @@ namespace quda
     int_fastdiv E[4]; // extended grid dimensions
     int_fastdiv X[4]; // grid dimensions
     int border[4];
-    const Float alpha;
+    const real alpha;
     const int dir_ignore;
-    const Float tolerance;
+    const real tolerance;
 
     GaugeHYPArg(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int dir_ignore) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, hypDim)),
@@ -61,11 +61,11 @@ namespace quda
      @return The computed staple
   */
   template <typename Arg>
-  __host__ __device__ inline Matrix<complex<typename Arg::Float>, Arg::nColor>
+  __host__ __device__ inline Matrix<complex<typename Arg::real>, Arg::nColor>
   accumulateStaple(const Arg &arg, const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[],
-                   thread_array<int, 4> &dx, int parity, int2 tensor_arg, int2 shifts)
+                   packed_array<int8_t, 4> &dx, int parity, int2 tensor_arg, int2 shifts)
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     Link staple;
 
     // for readability
@@ -124,10 +124,10 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
-                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
+  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
+                                                      int mu, Matrix<complex<typename Arg::real>, Arg::nColor> staple[3])
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
     int cnt = 0;
@@ -146,10 +146,10 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
-                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
+  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
+                                                      int mu, Matrix<complex<typename Arg::real>, Arg::nColor> staple[3])
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
     int cnt = 0;
@@ -181,8 +181,8 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
-                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> &staple)
+  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
+                                                      int mu, Matrix<complex<typename Arg::real>, Arg::nColor> &staple)
   {
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
@@ -197,17 +197,15 @@ namespace quda
     }
   }
 
-  template <typename Arg> struct HYP : KernelOps<thread_array<int, 4>> {
+  template <typename Arg> struct HYP {
     const Arg &arg;
-    template <typename... OpsArgs> constexpr HYP(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
-    {
-    }
+    constexpr HYP(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::Float;
-      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using real = typename Arg::real;
+      using Link = Matrix<complex<real>, Arg::nColor>;
 
       // compute spacetime and local coords
       int x[4];
@@ -215,7 +213,7 @@ namespace quda
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx {*this};
+      packed_array<int8_t, 4> dx = {};
 
       Link U, Stap[3], TestU, I;
 
@@ -253,10 +251,10 @@ namespace quda
 
   template <typename Arg>
   __host__ __device__ inline void
-  computeStaple3DLevel1(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity, int mu,
-                        Matrix<complex<typename Arg::Float>, Arg::nColor> staple[2], const int dir_ignore)
+  computeStaple3DLevel1(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity, int mu,
+                        Matrix<complex<typename Arg::real>, Arg::nColor> staple[2], const int dir_ignore)
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     for (int i = 0; i < 2; ++i) staple[i] = Link();
 
     int cnt = 0;
@@ -276,11 +274,11 @@ namespace quda
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
-                                                        int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> &staple,
+  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], packed_array<int8_t, 4> &dx, int parity,
+                                                        int mu, Matrix<complex<typename Arg::real>, Arg::nColor> &staple,
                                                         int dir_ignore)
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     staple = Link();
 
 #pragma unroll
@@ -302,16 +300,15 @@ namespace quda
     }
   }
 
-  template <typename Arg> struct HYP3D : KernelOps<thread_array<int, 4>> {
+  template <typename Arg> struct HYP3D {
     const Arg &arg;
-    template <typename... OpsArgs> constexpr HYP3D(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
-    {
-    }
+    constexpr HYP3D(const Arg &arg) : arg(arg) { }
+
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::Float;
+      using real = typename Arg::real;
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords
@@ -320,7 +317,7 @@ namespace quda
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx {*this};
+      packed_array<int8_t, 4> dx = {};
 
       int dir_ = dir;
       dir = dir + (dir >= arg.dir_ignore);

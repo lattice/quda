@@ -1,3 +1,5 @@
+#pragma once
+
 /**
    @file quda_define.h
    @brief Macros defined set by the cmake build system.  This file
@@ -38,6 +40,12 @@
  */
 #define MAX_MULTI_RHS_TILE @QUDA_MAX_MULTI_RHS_TILE@
 
+/**
+ * @def   QUDA_ALTERNATIVE_I_TO_F
+ * @brief This sets the percentage of I2F conversions using the alternative path
+ */
+#define QUDA_ALTERNATIVE_I_TO_F @QUDA_ALTERNATIVE_I_TO_F@
+
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**
@@ -58,6 +66,8 @@
 #define HETEROGENEOUS_ATOMIC_INF_INIT
 #undef QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
 #endif
+
+#cmakedefine QUDA_SHARED_MEMORY_SPILL
 
 #cmakedefine QUDA_LARGE_KERNEL_ARG
 
@@ -80,7 +90,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_CLOVER
-#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER)
+#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH)
 /**
  * @def   GPU_CLOVER_DIRAC
  * @brief This macro is set when we have clover fermions enabled
@@ -157,6 +167,36 @@
  */
 #define GPU_DISTANCE_PRECONDITIONING
 #endif
+
+/**
+ * @def QUDA_DSLASH_DOUBLE_STORE
+ * @brief This macro sets whether to use double storage of the gauge
+ * field to simplify indexing in the Dslash kernels.
+ */
+#cmakedefine QUDA_DSLASH_DOUBLE_STORE
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_TYPE
+ * @brief This macro sets whether to use
+ * the TMA for L2 prefetching:
+ * NONE - no prefetch
+ * THREAD - per thread prefetch
+ * BULK - TMA bulk prefetch
+ * TENSOR - TMA tensor descriptor prefetch
+ */
+#define QUDA_DSLASH_PREFETCH_TYPE_@QUDA_DSLASH_PREFETCH_TYPE@
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_DISTANCE_WILSON
+ * @brief This macro sets the prefetch distance for Wilson fermions
+ */
+#define QUDA_DSLASH_PREFETCH_DISTANCE_WILSON @QUDA_DSLASH_PREFETCH_DISTANCE_WILSON@
+
+/**
+ * @def QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED
+ * @brief This macro sets the prefetch distance for staggered fermions
+ */
+#define QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED @QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED@
 
 #cmakedefine QUDA_MULTIGRID
 #ifdef QUDA_MULTIGRID
@@ -251,35 +291,41 @@
 #endif
 
 /**
- * @def QUDA_ORDER_FP
- * @brief This macro sets the data ordering for Wilson, gauge
- * (recon-8/9) and clover fixed-point fields
+ * @def QUDA_ORDER_DOUBLE
+ * @brief This macro sets the data ordering for double precision fields
  */
-#define QUDA_ORDER_FP @QUDA_ORDER_FP@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP");
-#endif
+#define QUDA_ORDER_DOUBLE @QUDA_ORDER_DOUBLE@
 
 /**
- * @def QUDA_ORDER_SP
- * @brief This macro sets the data ordering for single-precision multigrid fields
+ * @def QUDA_ORDER_SINGLE
+ * @brief This macro sets the data ordering for single precision fields
  */
-#define QUDA_ORDER_SP_MG @QUDA_ORDER_SP_MG@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDER_SP_MG");
-#endif
+#define QUDA_ORDER_SINGLE @QUDA_ORDER_SINGLE@
 
 /**
- * @def QUDA_ORDER_FP_MG
- * @brief This macro sets the data ordering for fixed-point multigrid fields
+ * @def QUDA_ORDER_HALF
+ * @brief This macro sets the data ordering for half precision fields
  */
-#define QUDA_ORDER_FP_MG @QUDA_ORDER_FP_MG@
+#define QUDA_ORDER_HALF @QUDA_ORDER_HALF@
 
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
-#endif
+/**
+ * @def QUDA_ORDER_QUARTER
+ * @brief This macro sets the data ordering for quarter precision fields
+ */
+#define QUDA_ORDER_QUARTER @QUDA_ORDER_QUARTER@
+
+/**
+ * @def QUDA_VECTORIZE_SINGLE
+ * @brief Whether to employ vectorized instruction for single precision (where supported)
+ */
+#cmakedefine QUDA_VECTORIZE_SINGLE
+
+/**
+ * @def QUDA_BLAS_PREFETCH_TYPE
+ * @brief BLAS prefetch mode set by CMake (\c QUDA_BLAS_PREFETCH_TYPE): expands to one of
+ * \c QUDA_BLAS_PREFETCH_TYPE_NONE, \c QUDA_BLAS_PREFETCH_TYPE_THREAD, \c QUDA_BLAS_PREFETCH_TYPE_BULK.
+ */
+#define QUDA_BLAS_PREFETCH_TYPE_@QUDA_BLAS_PREFETCH_TYPE@
 
 /**
  * @def QUDA_BUILD_NATIVE_FFT

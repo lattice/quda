@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 #include <typeinfo>
 
 #include <color_spinor_field.h>
@@ -8,6 +10,7 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <instantiate_dslash.h>
+#include <tma_helper.hpp>
 
 namespace quda
 {
@@ -27,8 +30,7 @@ namespace quda
      kernel.  For the wilson class example above, the WilsonArg class
      defined in the same file is the corresponding argument class.
   */
-  template <template <int, bool, bool, KernelType, typename> class D, typename Arg>
-  class Dslash : public TunableKernel3D
+  template <template <bool, bool, KernelType, typename> class D, typename Arg> class Dslash : public TunableKernel3D
   {
 
   protected:
@@ -71,6 +73,18 @@ namespace quda
       char tile_str[16];
       i32toa(tile_str, Arg::n_src_tile);
       strcat(aux_base, tile_str);
+      if constexpr (dslash_double_store()) strcat(aux_base, ",double_store");
+      if constexpr (Arg::prefetch_distance > 0) {
+        strcat(aux_base, ",prefetch=");
+        i32toa(tile_str, Arg::prefetch_distance);
+        strcat(aux_base, tile_str);
+        if constexpr (dslash_prefetch_type() == PrefetchType::THREAD)
+          strcat(aux_base, ",prefetch=thread");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::BULK)
+          strcat(aux_base, ",prefetch=bulk");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR)
+          strcat(aux_base, ",prefetch=tensor");
+      }
     }
 
     /**
@@ -83,6 +97,22 @@ namespace quda
       strcpy(aux[kernel_type], kernel_str);
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
       if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
+    }
+
+    bool tuneSharedCarveOut() const override
+    {
+      // default is to do carve out tuning if the architecture supports it
+      static bool tune_shared = device::shared_carve_out_supported();
+      static bool init = false;
+
+      if (!init) {
+        char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED_CARVE_OUT_DSLASH");
+        if (enable_shared_env) {
+          if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
+        }
+        init = true;
+      }
+      return tune_shared;
     }
 
     virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
@@ -115,7 +145,7 @@ namespace quda
       }
     }
 
-    inline void setParam(TuneParam &tp)
+    template <bool improved = false> inline void setParam(TuneParam &tp, const GaugeField &U, const GaugeField &L = {})
     {
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
@@ -136,12 +166,12 @@ namespace quda
         }
       }
 
-      arg.halo.resetGhost(ghost);
+      arg.halo.resetGhost(ghost, halo.SiteSubset());
 
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
-        arg.halo_pack.resetGhost(this->packBuffer);
+        arg.halo_pack.resetGhost(this->packBuffer, halo.SiteSubset());
         tp.grid.x += arg.pack_blocks;
         arg.counter = dslash::get_dslash_shmem_sync_counter();
       }
@@ -157,6 +187,16 @@ namespace quda
           (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
           0;
         tp.grid.x += arg.exterior_blocks;
+      }
+
+      if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR && Arg::prefetch_distance > 0) {
+        Dslash::arg.U.tensor_desc = get_tensor_descriptor(U, tp.block.x);
+        Dslash::arg.Uback.tensor_desc = get_tensor_descriptor(U.shift(), tp.block.x);
+        if constexpr (improved) {
+          assert(!U.empty());
+          Dslash::arg.L.tensor_desc = get_tensor_descriptor(L, tp.block.x);
+          Dslash::arg.Lback.tensor_desc = get_tensor_descriptor(L.shift(), tp.block.x);
+        }
       }
     }
 
@@ -204,9 +244,19 @@ namespace quda
       }
     }
 
+    virtual bool advanceBlockDim(TuneParam &param) const override
+    {
+      // if TMA is enabled we must keep parity separate in the block (2-d tuning)
+      if constexpr (dslash_prefetch_tma())
+        return TunableKernel2D_base<false>::advanceBlockDim(param);
+      else
+        return TunableKernel3D::advanceBlockDim(param);
+    }
+
     virtual bool advanceTuneParam(TuneParam &param) const override
     {
-      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
+      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceSharedCarveOut(param)
+        || advanceGridDim(param);
     }
 
     virtual void initTuneParam(TuneParam &param) const override
@@ -221,6 +271,9 @@ namespace quda
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
+
+      // if not autotuning the carve out, set to the historical optimal value (prefer shared memory)
+      param.shared_carve_out = tuneSharedCarveOut() ? 0 : 100;
     }
 
     virtual void defaultTuneParam(TuneParam &param) const override
@@ -235,6 +288,8 @@ namespace quda
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
+
+      param.shared_carve_out = 100; // historical optimal value
     }
 
     /**
@@ -243,12 +298,13 @@ namespace quda
        all dslash types, though in some cases we specialize to reduce
        compilation time.
     */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+    template <template <bool, QudaPCType, typename> class P, bool dagger, bool xpay, KernelType kernel_type>
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
+      if (dslash_prefetch_tma() && tp.block.z > 1) errorQuda("Z-dimension block size must be 1 when using TMA");
       launch_device<dslash_functor>(
-        tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
+        tp, stream, dslash_functor_arg<D, P, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }
 
   public:
@@ -258,23 +314,23 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, bool dagger, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: launch<P, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
 #ifdef NVSHMEM_COMMS
-        case UBER_KERNEL: launch<P, nParity, dagger, xpay, UBER_KERNEL>(tp, stream); break;
+        case UBER_KERNEL: launch<P, dagger, xpay, UBER_KERNEL>(tp, stream); break;
 #endif
-        case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        case EXTERIOR_KERNEL_X: launch<P, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        case EXTERIOR_KERNEL_Y: launch<P, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        case EXTERIOR_KERNEL_Z: launch<P, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        case EXTERIOR_KERNEL_T: launch<P, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        case EXTERIOR_KERNEL_ALL: launch<P, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -289,29 +345,13 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
-    inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (arg.dagger)
-        instantiate<P, nParity, true, xpay>(tp, stream);
-      else
-        instantiate<P, nParity, false, xpay>(tp, stream);
-    }
-
-    /**
-       @brief This instantiate function is used to instantiate the
-       the nParity template
-       @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The qudaStream_t where the kernel will run
-     */
     template <template <bool, QudaPCType, typename> class P, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-      switch (arg.nParity) {
-      case 1: instantiate<P, 1, xpay>(tp, stream); break;
-      case 2: instantiate<P, 2, xpay>(tp, stream); break;
-      default: errorQuda("nParity = %d undefined\n", arg.nParity);
-      }
+      if (arg.dagger)
+        instantiate<P, true, xpay>(tp, stream);
+      else
+        instantiate<P, false, xpay>(tp, stream);
     }
 
     /**
@@ -346,7 +386,8 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      // strcpy(aux, in.AuxString().c_str());
+      if (!TunableKernel3D::tuneSharedCarveOut() && tuneSharedCarveOut())
+        strcat(TunableKernel3D::aux, getSharedCarveOutStr().c_str());
       fillAuxBase(app_base);
 #ifdef MULTI_GPU
       fillAux(INTERIOR_KERNEL, "policy_kernel=interior,");
@@ -421,6 +462,7 @@ namespace quda
       case Shmem:
         strcat(aux_pack, arg.exterior_dims > 0 ? ",shmemuber" : ",shmem");
         strcat(aux_pack, (arg.shmem & 1 && arg.shmem & 2) ? "3" : "1");
+        strcat(aux_pack, comm_dim_topology_string());
         break;
 
       default: errorQuda("Unknown pack target location %d\n", location);
@@ -539,7 +581,7 @@ namespace quda
 
     virtual long long bytes() const override
     {
-      int gauge_bytes = arg.reconstruct * in.Precision();
+      int gauge_bytes = static_cast<int>(arg.reconstruct) * static_cast<int>(in.Precision());
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;

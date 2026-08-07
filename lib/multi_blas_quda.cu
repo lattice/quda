@@ -7,8 +7,8 @@ namespace quda {
 
   namespace blas {
 
-    template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
-    class MultiBlas : public TunableGridStrideKernel3D
+    template <template <typename...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
+    class MultiBlas : public TunableKernel3D_base<grid_stride>
     {
       using real = typename mapper<y_store_t>::type;
       const int NXZ;
@@ -25,11 +25,45 @@ namespace quda {
       // for these streaming kernels, there is no need to tune the grid size, just use max
       unsigned int minGridSize() const override { return maxGridSize(); }
 
+      /**
+         @brief Minimum x-domain length for one thread per logical multi-BLAS work item.
+
+         Uses \c x[0] length, parity, spin/site unroll, and device vector widths consistent with the kernel's \c M
+         value so autotuning does not launch with too few x threads.
+
+         @return Minimum \c threads.x for the 3D launch.
+       */
+      unsigned minThreads() const override
+      {
+        using device_store_t = typename device_type_mapper<store_t>::type;
+        using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+        constexpr bool site_unroll
+          = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
+        constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
+        constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+        return x[0].Length() / (nParity * M);
+      }
+
     public:
+      /**
+         @brief Construct a tunable multi-BLAS launcher, validate fields, set aux tuning tags, and enqueue the kernel.
+
+         @param[in] a Coefficient vector or object bound to the functor (type \c T).
+         @param[in] b Second coefficient bundle for the functor.
+         @param[in] c Third coefficient bundle for the functor.
+         @param[in] x0 Representative X field (geometry, subset, precision checks).
+         @param[in] y0 Representative Y field (precision/order for mixed precision).
+         @param[in] x Reference to the X (and Z/W) \c cvector_ref batch.
+         @param[in] y Reference to the Y (and W) \c cvector_ref batch.
+         @param[in] z Reference to the Z batch.
+         @param[in] w Reference to the W batch.
+
+         @return None.
+       */
       template <typename Vx, typename Vy, typename Vz, typename Vw>
-      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0,
-                Vx &x, Vy &y, Vz &z, Vw &w) :
-        TunableGridStrideKernel3D(x0, y.size(), x0.SiteSubset()),
+      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0, Vx &x,
+                Vy &y, Vz &z, Vw &w) :
+        TunableKernel3D_base<grid_stride>(x0, y.size(), x0.SiteSubset()),
         NXZ(x.size()),
         NYW(y.size()),
         f(NXZ, NYW),
@@ -38,10 +72,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(reinterpret_cast<cvector_ref<ColorSpinorField>&>(x)),
-        y(reinterpret_cast<cvector_ref<ColorSpinorField>&>(y)),
-        z(reinterpret_cast<cvector_ref<ColorSpinorField>&>(z)),
-        w(reinterpret_cast<cvector_ref<ColorSpinorField>&>(w))
+        x(reinterpret_cast<cvector_ref<ColorSpinorField> &>(x)),
+        y(reinterpret_cast<cvector_ref<ColorSpinorField> &>(y)),
+        z(reinterpret_cast<cvector_ref<ColorSpinorField> &>(z)),
+        w(reinterpret_cast<cvector_ref<ColorSpinorField> &>(w))
       {
         checkLocation(x[0], y[0], z[0], w[0]);
         checkLength(x[0], y[0], z[0], w[0]);
@@ -79,6 +113,11 @@ namespace quda {
 #ifdef QUDA_FAST_COMPILE_REDUCE
         strcat(aux, ",fast_compile");
 #endif
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          blas_tune_aux_prefetch(aux);
+          blas_tune_aux_work_item_unroll(aux, multi_blas_unroll(NXZ));
+          if constexpr (grid_stride) { strcat(aux, ",grid_stride"); }
+        }
 
         apply(device::get_default_stream());
       }
@@ -113,8 +152,8 @@ namespace quda {
 
           // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
           constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
-          constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
-          constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
+          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
+          constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0].Length() / (nParity * M);
 
@@ -233,13 +272,13 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const override
       {
-        TunableGridStrideKernel3D::initTuneParam(param);
+        TunableKernel3D_base<grid_stride>::initTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
       void defaultTuneParam(TuneParam &param) const override
       {
-        TunableGridStrideKernel3D::defaultTuneParam(param);
+        TunableKernel3D_base<grid_stride>::defaultTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 

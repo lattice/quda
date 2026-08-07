@@ -17,8 +17,8 @@ endif()
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80 sm_90)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80 sm_90)
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80 sm_90 sm_100)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80 sm_90 sm_100)
 set(QUDA_GPU_ARCH_SUFFIX
     ""
     CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
@@ -34,7 +34,7 @@ mark_as_advanced(CMAKE_CUDA_ARCHITECTURES)
 set(CMAKE_CUDA_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
     CACHE FILEPATH "Host compiler to be used by nvcc")
-set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
@@ -99,7 +99,7 @@ option(QUDA_INTERFACE_NVTX "add NVTX markup to interface calls" OFF)
 
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
-  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
+  message(STATUS "Heterogeneous atomics support: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
 cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
                        "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
@@ -129,12 +129,49 @@ endif()
 
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
+message(STATUS "QUDA_GPU_ARCH: ${QUDA_GPU_ARCH}")
+
+# ######################################################################################################################
+# data order variables
+cmake_dependent_option(LDG256 "are 256-bit load instructions supported" ON
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.9 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  OFF)
+
+if(LDG256)
+  set(QUDA_ORDER_DOUBLE "4" CACHE STRING "which data order to use for double precision fields (4 = default, 0 = legacy)")
+  set(QUDA_ORDER_SINGLE "8" CACHE STRING "which data order to use for single precision fields (8 = default, 0 = legacy)")
+  set(QUDA_ORDER_HALF "16" CACHE STRING "which data order to use for half precision fields (16 = default, 0 = legacy)")
+  set(QUDA_ORDER_QUARTER "16" CACHE STRING "which data order to use for quarter precision fields (16 = default, 0 = legacy)")
+else()
+  set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields (2 = default, 0 = legacy)")
+  set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields (4 = default, 0 = legacy)")
+  set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
+  set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
+endif()
+
+# Default I2F alternative-path percentage: Blackwell and newer (sm_100+).
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "25")
+else()
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+message(
+  STATUS
+  "I2F alternative-path cache default: ${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}% (QUDA_COMPUTE_CAPABILITY=${QUDA_COMPUTE_CAPABILITY})")
+
 # large arg support requires CUDA 12.1 and Volta+
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
   "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"
   OFF)
-message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
+message(STATUS "Large kernel arguments support: ${QUDA_LARGE_KERNEL_ARG}")
 mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+
+# single-precision vectorization presently disabled by default
+cmake_dependent_option(QUDA_VECTORIZE_SINGLE "use vector instructions for single precision device code" ON
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.2 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  OFF)
+message(STATUS "Single-precision vectorization support: ${QUDA_VECTORIZE_SINGLE}")
+mark_as_advanced(QUDA_VECTORIZE_SINGLE)
 
 # Set the maximum multi-RHS per kernel
 if(QUDA_LARGE_KERNEL_ARG)
@@ -143,6 +180,98 @@ else()
   set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
 endif()
 message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+
+# Enable shared memory spilling
+option(QUDA_SHARED_MEMORY_SPILL "enable shared memory spilling?" OFF)
+mark_as_advanced(QUDA_SHARED_MEMORY_SPILL)
+message(STATUS "Shared memory spilling: ${QUDA_SHARED_MEMORY_SPILL}")
+
+
+# ---------------------------
+# Set Dslash prefetching
+# ---------------------------
+
+# Arch-dependent defaults
+set(_dslash_double_store_default OFF)
+set(_dslash_prefetch_type_default NONE)
+set(_dslash_prefetch_dist_w_default 0)
+set(_dslash_prefetch_dist_s_default 0)
+
+# These are expected Blackwell+ defaults
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
+  set(_dslash_double_store_default ON)
+  set(_dslash_prefetch_type_default BULK)
+  set(_dslash_prefetch_dist_w_default 2)
+  set(_dslash_prefetch_dist_s_default 2)
+endif()
+
+# Cache variables (set only if not already defined)
+if(NOT DEFINED QUDA_DSLASH_DOUBLE_STORE)
+  set(QUDA_DSLASH_DOUBLE_STORE ${_dslash_double_store_default}
+      CACHE BOOL "store a forwards shifted copy of the gauge fields for simplified Dslash indexing")
+endif()
+mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
+message(STATUS "QUDA_DSLASH_DOUBLE_STORE: ${QUDA_DSLASH_DOUBLE_STORE}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_TYPE)
+  set(QUDA_DSLASH_PREFETCH_TYPE ${_dslash_prefetch_type_default}
+      CACHE STRING "enable Dslash prefetching (NONE, THREAD, BULK, TENSOR)")
+endif()
+set_property(CACHE QUDA_DSLASH_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK TENSOR)
+mark_as_advanced(QUDA_DSLASH_PREFETCH_TYPE)
+message(STATUS "QUDA_DSLASH_PREFETCH_TYPE: ${QUDA_DSLASH_PREFETCH_TYPE}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON ${_dslash_prefetch_dist_w_default}
+      CACHE STRING "Dslash prefetch distance for Wilson kernels")
+endif()
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+message(STATUS "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON: ${QUDA_DSLASH_PREFETCH_DISTANCE_WILSON}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED ${_dslash_prefetch_dist_s_default}
+      CACHE STRING "Dslash prefetch distance for Staggered kernels")
+endif()
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+message(STATUS "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED: ${QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED}")
+
+# Validate prefetch type
+set(_valid_prefetch NONE THREAD BULK TENSOR)
+if(NOT QUDA_DSLASH_PREFETCH_TYPE IN_LIST _valid_prefetch)
+  message(FATAL_ERROR
+    "Invalid QUDA_DSLASH_PREFETCH_TYPE='${QUDA_DSLASH_PREFETCH_TYPE}'. "
+    "Allowed: ${_valid_prefetch}")
+endif()
+
+# TMA prefetching requires double-store
+set(_tma_modes BULK TENSOR)
+
+# TMA prefetching requires double store
+if(QUDA_DSLASH_PREFETCH_TYPE IN_LIST _tma_modes AND NOT QUDA_DSLASH_DOUBLE_STORE)
+  message(FATAL_ERROR
+    "QUDA_DSLASH_PREFETCH_TYPE=${QUDA_DSLASH_PREFETCH_TYPE} "
+    "requires QUDA_DSLASH_DOUBLE_STORE=ON")
+endif()
+
+# TMA prefetching requires sm_90+
+if(QUDA_DSLASH_PREFETCH_TYPE IN_LIST _tma_modes AND QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR
+    "QUDA_DSLASH_PREFETCH_TYPE=${QUDA_DSLASH_PREFETCH_TYPE} "
+    "requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
+
+# validate prefetching distances
+if(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON GREATER 7)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON is greater than pipeline length")
+endif()
+if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
+endif()
+
+# BLAS bulk prefetch uses cp.async.bulk on CUDA Hopper+
+if(QUDA_BLAS_PREFETCH_TYPE STREQUAL "BULK" AND QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
@@ -153,15 +282,12 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-          -ftz=true
           -prec-div=false
           -prec-sqrt=false>
           $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
-          -Mflushz
           -Mfpapprox=div
           -Mfpapprox=sqrt>
           $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-          -fcuda-flush-denormals-to-zero
           -fcuda-approx-transcendentals
           -Xclang
           -fcuda-allow-variadic-functions>)
@@ -169,7 +295,18 @@ target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                -Wno-deprecated-gpu-targets --expt-relaxed-constexpr>)
 
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
+if(QUDA_FLUSH_DENORMALS)
+  target_compile_options(quda PRIVATE
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=flushz>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -Xclang -fcuda-flush-denormals-to-zero>)
+else()
+  target_compile_options(quda PRIVATE
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=false>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=noflushz>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -Xclang -fno-cuda-flush-denormals-to-zero>)
+endif()
+
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
                                     --expt-relaxed-constexpr>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
@@ -346,7 +483,9 @@ endif()
 target_compile_options(
   quda 
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
-          -gpu=lineinfo
+          $<$<CONFIG:DEVEL>:-Xptxas
+          -warn-lmem-usage,-warn-spills
+          -gpu=lineinfo>
           $<$<CONFIG:STRICT>:-Werror>
           >)
 
@@ -376,6 +515,13 @@ target_link_libraries(quda PUBLIC CUDA::nvml)
 if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
+
+CPMAddPackage(
+    NAME CCCL
+    GITHUB_REPOSITORY nvidia/cccl
+    GIT_TAG v3.1.4 # Fetches this tagged commit
+)
+target_link_libraries(quda PRIVATE CCCL::CCCL)
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)

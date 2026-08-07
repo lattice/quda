@@ -1,9 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
-
 #include <comm_key.h>
 
 namespace quda {
@@ -11,27 +11,36 @@ namespace quda {
   namespace gauge
   {
 
-    inline bool isNative(QudaGaugeFieldOrder order, QudaPrecision precision, QudaReconstructType reconstruct)
+    template <typename T> constexpr int get_vector_order();
+    template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+    template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<int>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
+
+    template <typename T> constexpr int get_vector_order(int length)
     {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
-          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13
-                   || reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-        }
-      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
-          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-          if (order == static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP)) return true;
-        }
+      constexpr int N = get_vector_order<T>();
+      if constexpr (N == 0) {                    // legacy path
+        int Nvec = length & (~(length - 1));     // greatest vector size that is a divisor of length
+        while (Nvec * sizeof(T) > 16) Nvec /= 2; // ensure we don't choose a size greater than 16 bytes
+        return Nvec;
+      } else {
+        int Nvec = N;
+        while (Nvec > length) Nvec /= 2;
+        return Nvec;
       }
-      return false;
+    }
+
+    constexpr int get_vector_order(size_t word_size, int length)
+    {
+      switch (word_size) {
+      case 1: return get_vector_order<int8_t>(length);
+      case 2: return get_vector_order<short>(length);
+      case 4: return get_vector_order<float>(length);
+      case 8: return get_vector_order<double>(length);
+      }
+      return 0;
     }
 
   } // namespace gauge
@@ -126,22 +135,9 @@ namespace quda {
     */
     void setPrecision(QudaPrecision precision, bool force_native = false)
     {
-      // is the current status in native field order?
-      bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
       this->precision = precision;
       this->ghost_precision = precision;
-
-      if (native) {
-        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
-            || reconstruct == QUDA_RECONSTRUCT_10) {
-          order = QUDA_FLOAT2_GAUGE_ORDER;
-        } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-                   && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
-          order = static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP);
-        } else {
-          order = QUDA_FLOAT4_GAUGE_ORDER;
-        }
-      }
+      if (force_native) order = QUDA_NATIVE_GAUGE_ORDER;
     }
   };
 
@@ -151,6 +147,7 @@ namespace quda {
   class GaugeField : public LatticeField {
 
     friend std::ostream &operator<<(std::ostream &output, const GaugeField &param);
+    friend GaugeField shift(const GaugeField &in, int shift);
 
   private:
     /**
@@ -197,8 +194,11 @@ namespace quda {
     double tadpole = 0.0;
     double fat_link_max = 0.0;
 
-    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost
-      = {}; // stores the ghost zone of the gauge field (non-native fields only)
+    mutable std::unique_ptr<GaugeField> shifted
+      = nullptr;             // shifted copy of the gauge field, used for double-store enabled dslash
+    bool is_shifted = false; // whether this instance is a shifted one
+
+    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost = {}; // ghost zone (separate allocation when QUDA_GHOST_EXCHANGE_PAD)
 
     mutable array<int, QUDA_MAX_DIM> ghostFace = {}; // the size of each face
 
@@ -424,7 +424,7 @@ namespace quda {
        This function returns true if the field is stored in an
        internal field order for the given precision.
     */
-    bool isNative() const { return gauge::isNative(order, precision, reconstruct); }
+    bool isNative() const { return order == QUDA_NATIVE_GAUGE_ORDER ? true : false; }
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
@@ -506,11 +506,7 @@ namespace quda {
 
     virtual int full_dim(int d) const { return x[d]; }
 
-    auto &Ghost() const
-    {
-      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return ghost;
-    }
+    auto &Ghost() const { return ghost; }
 
     /**
        @return The offset into the struct to the start of the gauge
@@ -532,8 +528,9 @@ namespace quda {
     /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
+     * @param[in] scale Arbitrary scale factor we want to apply
      */
-    void copy(const GaugeField &src);
+    void copy(const GaugeField &src, double scale = 1.0);
 
     /**
        @brief Compute the L1 norm of the field
@@ -652,6 +649,20 @@ namespace quda {
     }
 
     /**
+       @brief Return the shifted gauge field by shift in each
+       dimension.  Shifted field is cached for subsequent reuse.
+       @param[in] shift value (1 or 3 supported).  If no argument
+       passed the shift is set to Nface.
+       @return Reference to shifted field
+    */
+    GaugeField &shift(int shift = -1) const;
+
+    /**
+       @brief Resets the shifted field (if it exists).
+    */
+    void shift_reset() const;
+
+    /**
      * @brief Print the site data
      * @param[in] parity Parity index
      * @param[in] dim The dimension in which we are printing
@@ -672,6 +683,17 @@ namespace quda {
      @param[in] rank The rank we are requesting from (default is rank = 0)
   */
   void genericPrintMatrix(const GaugeField &a, int dim, int parity, unsigned int x_cb, int rank = 0);
+
+  /**
+     @brief Shift the gauge field by shift in each dimension and store
+     the resulting shifted field.  This is used to move the backwards
+     links on to this site.  The input field must be a padded field
+     with the ghost pre-exchanged if communications are enabled.
+     @param[in] in Input shifted field
+     @param[in] shift value (1 or 3 supported)
+     @return Shifted field
+   */
+  GaugeField shift(const GaugeField &in, int shift);
 
   /**
      @brief This is a debugging function, where we cast a gauge field
@@ -702,14 +724,15 @@ namespace quda {
      @param out The output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
      @param ghostOut The output ghost buffer (optional)
      @param ghostIn The input ghost buffer (optional)
      @param type The type of copy we doing (0 body and ghost else ghost only)
   */
-  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
-                        void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                        void *Out = 0, void *In = 0, void **ghostOut = 0, void **ghostIn = 0, int type = 0);
 
   /**
     @brief This function is used for copying from a source gauge field to a destination gauge field
@@ -727,11 +750,12 @@ namespace quda {
      @param out The extended output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
   */
-  void copyExtendedGauge(GaugeField &out, const GaugeField &in,
-			 QudaFieldLocation location, void *Out=0, void *In=0);
+  void copyExtendedGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                         void *Out = 0, void *In = 0);
 
   /**
      This function is used for creating an exteneded gauge field from the input,

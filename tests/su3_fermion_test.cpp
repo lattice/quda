@@ -2,6 +2,7 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <instantiate.h>
+#include <blas_quda.h>
 
 #include "host_utils.h"
 #include "gauge_utils.h"
@@ -25,6 +26,28 @@ public:
 int argc_copy;
 char **argv_copy;
 
+// Standard HISQ action path coefficients (Bazavov et al. 2010, Table V), as the
+// application (e.g. MILC) supplies them to QUDA. fat7 is tadpole-scaled; eps_naik
+// is folded into the level-2 asqtad one-link and Naik terms, so the returned
+// asqtad coefficients are final. Lives here because su3_fermion_test is the only
+// user (hisq_stencil_test_utils.h has its own copy and is intentionally untouched).
+static void computeHISQFlowCoeffs(double tadpole, double eps_naik, double fat7[6], double asqtad[6])
+{
+  const double u1 = 1.0 / tadpole, u2 = u1 * u1, u4 = u2 * u2, u6 = u4 * u2;
+  fat7[0] = 1.0 / 8.0;
+  fat7[1] = 0.0;
+  fat7[2] = u2 * (-1.0 / 8.0) * 0.5;
+  fat7[3] = u4 * (1.0 / 8.0) * 0.25 * 0.5;
+  fat7[4] = u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+  fat7[5] = 0.0;
+  asqtad[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0) * (1.0 + eps_naik); // one-link (eps_N in last 1/8)
+  asqtad[1] = -(1.0 + eps_naik) / 24.0;                                          // Naik, scaled by (1 + eps_N)
+  asqtad[2] = (-1.0 / 8.0) * 0.5;
+  asqtad[3] = (1.0 / 8.0) * 0.25 * 0.5;
+  asqtad[4] = (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+  asqtad[5] = -2.0 / 16.0;
+}
+
 void run(test_t param)
 {
   prec = ::testing::get<0>(param);
@@ -32,7 +55,15 @@ void run(test_t param)
 
   using namespace quda;
 
-  if (!is_enabled_spin(4)) errorQuda("Test requires Wilson-type fermion enablement");
+  // Staggered-type flow operators (staggered, HISQ, truncated HISQ) act on
+  // single-component (nSpin = 1) fields; the Laplacian and Wilson operators use
+  // Wilson-type (nSpin = 4) fields.
+  const bool single_component = (fermion_flow_type == QUDA_FERMION_FLOW_STAGGERED
+                                 || fermion_flow_type == QUDA_FERMION_FLOW_HISQ
+                                 || fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED);
+  if (!is_enabled_spin(single_component ? 1 : 4))
+    errorQuda("Test requires %s fermion enablement for the selected flow operator",
+              single_component ? "staggered-type (spin 1)" : "Wilson-type (spin 4)");
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
@@ -49,6 +80,11 @@ void run(test_t param)
 
   constructHostGaugeField(gauge, gauge_param, argc_copy, argv_copy);
   // Load the gauge field to the device
+  gauge_param.cuda_prec = prec;
+  gauge_param.cuda_prec_sloppy = prec;
+  gauge_param.cuda_prec_precondition = prec;
+  gauge_param.cuda_prec_refinement_sloppy = prec;
+  gauge_param.cuda_prec_eigensolver = prec;
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
   // start the timer
@@ -91,6 +127,12 @@ void run(test_t param)
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
   smear_param.smear_type = gauge_smear_type;
+  smear_param.fermion_flow_type = fermion_flow_type;
+  smear_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  // HISQ flow operators require caller-supplied path coefficients; compute the
+  // standard HISQ action from the existing --tadpole-coeff / --epsilon-naik globals.
+  if (fermion_flow_type == QUDA_FERMION_FLOW_HISQ || fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED)
+    computeHISQFlowCoeffs(tadpole_factor, eps_naik, smear_param.hisq_fat7_coeff, smear_param.hisq_asqtad_coeff);
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
   smear_param.hier_threshold = hier_threshold;
@@ -112,7 +154,22 @@ void run(test_t param)
 
   quda::ColorSpinorParam cs_param;
 
-  constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
+  if (single_component) {
+    // nSpin = 1 staggered-type fields; mass 0 -> pure DdagD generator. HISQ variants
+    // use the asqtad dslash type (also nSpin = 1) for the field layout.
+    invParam.dslash_type
+      = (fermion_flow_type == QUDA_FERMION_FLOW_STAGGERED) ? QUDA_STAGGERED_DSLASH : QUDA_ASQTAD_DSLASH;
+    invParam.mass = 0.0;
+    constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
+  } else {
+    // Wilson-type (nSpin = 4). The Laplacian flows ignore inv_param; the Wilson
+    // flow operator uses kappa (-1.0 sentinel -> a sensible default; override with --kappa).
+    if (fermion_flow_type == QUDA_FERMION_FLOW_WILSON) {
+      invParam.dslash_type = QUDA_WILSON_DSLASH;
+      invParam.kappa = (kappa != -1.0) ? kappa : 0.125;
+    }
+    constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
+  }
 
   std::vector<quda::ColorSpinorField> check_safe(Nsrc, cs_param), check_hier(Nsrc, cs_param), check_fwd(Nsrc, cs_param),
     check_o(Nsrc, cs_param);
@@ -188,21 +245,41 @@ void run(test_t param)
     printf("Forward method:\n");
     check_fwd[j].PrintVector(0, 0, 0);
 
+    // Per-site real count adapts to the field layout: 24 for Wilson-type
+    // (nSpin = 4), 6 for staggered (nSpin = 1). The raw-pointer loops below use it.
+    const int site_reals = 2 * check_safe[j].Ncolor() * check_safe[j].Nspin();
+
     double method_adj_diff = 0.;
     /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
-    for (int i = 0; i < V * 24; i++) {
+    for (int i = 0; i < V * site_reals; i++) {
       method_adj_diff += pow(fabs(check_safe[j].data<double *>()[i] - check_hier[j].data<double *>()[i]), 2);
     }
-    double method_adj_check = sqrt(method_adj_diff) / (V * 24.);
+    double method_adj_check = sqrt(method_adj_diff) / (V * (double)site_reals);
     printf(
       "Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e\n",
       method_adj_check);
 
+    // Print adjoint output norms (cheap, high-precision regression anchor)
+    double n_safe = 0., n_hier = 0.;
+    for (int i = 0; i < V * site_reals; i++) {
+      n_safe += pow(check_safe[j].data<double *>()[i], 2);
+      n_hier += pow(check_hier[j].data<double *>()[i], 2);
+    }
+    printfQuda("adj_safe[%d] norm = %.16e\n", j, n_safe);
+    printfQuda("adj_hier[%d] norm = %.16e\n", j, n_hier);
+
+    // twoColorSpinorContract assumes nSpin = 4; for staggered (nSpin = 1) use the
+    // layout-agnostic inner product (the same global sum over all components).
     std::complex<double> trace_fwd, trace_adj;
-    trace_fwd
-      = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_fwd[j].data<std::complex<double> *>());
-    trace_adj
-      = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_safe[j].data<std::complex<double> *>());
+    if (check_o[j].Nspin() == 4) {
+      trace_fwd = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(),
+                                         check_fwd[j].data<std::complex<double> *>());
+      trace_adj = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(),
+                                         check_safe[j].data<std::complex<double> *>());
+    } else {
+      trace_fwd = blas::cDotProduct(check_o[j], check_fwd[j]);
+      trace_adj = blas::cDotProduct(check_o[j], check_safe[j]);
+    }
 
     auto trace_diff_err = 2. * std::fabs(trace_fwd - std::conj(trace_adj)) / std::fabs(trace_fwd + std::conj(trace_adj));
 
@@ -272,7 +349,10 @@ struct su3_fermion_test : quda_test {
       printfQuda(" - alpha3 %f\n", gauge_smear_alpha3);
       break;
     case QUDA_GAUGE_SMEAR_WILSON_FLOW:
-    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: printfQuda(" - epsilon %f\n", gauge_smear_epsilon); break;
+    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
+      printfQuda(" - epsilon %f\n", gauge_smear_epsilon);
+      printfQuda(" - fermion flow operator %s\n", get_fermion_flow_str(fermion_flow_type));
+      break;
     default: errorQuda("Undefined test type %d given", test_type);
     }
     printfQuda(" - smearing steps %d\n", gauge_smear_steps);

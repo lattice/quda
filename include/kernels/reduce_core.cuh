@@ -1,5 +1,8 @@
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
 #include <reduce_helper.h>
@@ -11,6 +14,8 @@ namespace quda
 
   namespace blas
   {
+
+    constexpr unsigned int reduce_unroll = QUDA_BLAS_UNROLL_REDUCE;
 
     /**
        @brief Parameter struct for generic reduction blas kernel.
@@ -25,6 +30,7 @@ namespace quda
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
       using real = real_;
+      static constexpr unsigned int work_item_unroll = QUDA_BLAS_UNROLL_REDUCE;
       static constexpr int n = n_;
       using Reducer = Reducer_;
       using reduce_t = typename Reducer_::reduce_t;
@@ -64,29 +70,67 @@ namespace quda
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int, int src_idx) const
+      /**
+         MultiReduction / grid-stride entry. \a UnrollCount defaults to \c std::integral_constant<int, 1>
+         (one site per call). \a stride defaults to \c 0 so the non-unroll kernel path \c t(value, idx, k, j)
+         and \c requires(...) probes with four trailing arguments resolve to this overload unambiguously.
+       */
+      template <typename UnrollCount = std::integral_constant<int, 1>>
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int src_idx, int stride = 0) const
       {
-        using vec = array<complex<typename Arg::real>, Arg::n/2>;
+        static_assert(std::is_same_v<UnrollCount, std::integral_constant<int, UnrollCount::value>>,
+                      "grid-stride batching uses std::integral_constant<int, N> as the template argument");
+        constexpr int n = UnrollCount::value;
+        static_assert(n >= 1, "unroll count must be positive");
+        (void)k;
 
-        unsigned int parity = tid >= arg.length_cb ? 1 : 0;
-        unsigned int i = tid - parity * arg.length_cb;
+        using vec = array<complex<typename Arg::real>, Arg::n / 2>;
 
-        vec x, y, z, w, v;
-        if (arg.r.read.X) arg.X[src_idx].load(x, i, parity);
-        if (arg.r.read.Y) arg.Y[src_idx].load(y, i, parity);
-        if (arg.r.read.Z) arg.Z[src_idx].load(z, i, parity);
-        if (arg.r.read.W) arg.W[src_idx].load(w, i, parity);
-        if (arg.r.read.V) arg.V[src_idx].load(v, i, parity);
+        vec x[n], y[n], z[n], w[n], v[n];
 
-        arg.r(sum, x, y, z, w, v, src_idx);
+#pragma unroll
+        for (int u = 0; u < n; u++) {
+          const int tid_u = tid + u * stride;
+          const unsigned int parity = tid_u >= arg.length_cb ? 1u : 0u;
+          const unsigned int i = static_cast<unsigned int>(tid_u) - parity * static_cast<unsigned int>(arg.length_cb);
 
-        if (arg.r.write.X) arg.X[src_idx].save(x, i, parity);
-        if (arg.r.write.Y) arg.Y[src_idx].save(y, i, parity);
-        if (arg.r.write.Z) arg.Z[src_idx].save(z, i, parity);
-        if (arg.r.write.W) arg.W[src_idx].save(w, i, parity);
-        if (arg.r.write.V) arg.V[src_idx].save(v, i, parity);
+          if constexpr (Arg::Reducer::read.X) arg.X[src_idx].load(x[u], i, parity);
+          if constexpr (Arg::Reducer::read.Y) arg.Y[src_idx].load(y[u], i, parity);
+          if constexpr (Arg::Reducer::read.Z) arg.Z[src_idx].load(z[u], i, parity);
+          if constexpr (Arg::Reducer::read.W) arg.W[src_idx].load(w[u], i, parity);
+          if constexpr (Arg::Reducer::read.V) arg.V[src_idx].load(v[u], i, parity);
+        }
+
+#pragma unroll
+        for (int u = 0; u < n; u++) arg.r(sum, x[u], y[u], z[u], w[u], v[u], src_idx);
+
+#pragma unroll
+        for (int u = 0; u < n; u++) {
+          const int tid_u = tid + u * stride;
+          const unsigned int parity = tid_u >= arg.length_cb ? 1u : 0u;
+          const unsigned int i = static_cast<unsigned int>(tid_u) - parity * static_cast<unsigned int>(arg.length_cb);
+
+          if constexpr (Arg::Reducer::write.X) arg.X[src_idx].save(x[u], i, parity);
+          if constexpr (Arg::Reducer::write.Y) arg.Y[src_idx].save(y[u], i, parity);
+          if constexpr (Arg::Reducer::write.Z) arg.Z[src_idx].save(z[u], i, parity);
+          if constexpr (Arg::Reducer::write.W) arg.W[src_idx].save(w[u], i, parity);
+          if constexpr (Arg::Reducer::write.V) arg.V[src_idx].save(v[u], i, parity);
+        }
 
         return sum;
+      }
+
+      __device__ __host__ inline void prefetch(int tid, int, int src_idx) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          const unsigned int parity = tid >= arg.length_cb ? 1u : 0u;
+          const unsigned int i = tid - parity * static_cast<unsigned int>(arg.length_cb);
+          if constexpr (Arg::Reducer::read.X) arg.X[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.Y) arg.Y[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.Z) arg.Z[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.W) arg.W[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.V) arg.V[src_idx].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+        }
       }
     };
 

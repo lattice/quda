@@ -137,7 +137,7 @@ namespace quda {
     if (dir != 3) errorQuda("Unsupported direction %d", dir);
 
     // output array
-    array<double, 2> loop;
+    array<double, 2> loop = {};
 
     std::unique_ptr<GaugeField> condensed_field;
 
@@ -193,7 +193,7 @@ namespace quda {
         MsgHandle *recv_handle[2];
         MsgHandle *send_handle[2];
         for (int i = 0; i < 2; i++) {
-          v_double_buffer[i] = pinned_malloc(bytes);
+          v_double_buffer[i] = host_pinned_malloc(bytes);
           // receive from in front of me, send behind
           recv_handle[i] = comm_declare_receive_relative(v_double_buffer[i], dir, 1, bytes);
           send_handle[i] = comm_declare_send_relative(v_double_buffer[i], dir, -1, bytes);

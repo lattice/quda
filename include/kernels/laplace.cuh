@@ -22,13 +22,13 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
-                                                    spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
+    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+                                  QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type G;
 
     typedef typename mapper<Float>::type real;
 
@@ -37,7 +37,7 @@ namespace quda
     const Ghost halo_pack; /** accessor used for writing the halo field */
     const Ghost halo;      /** accessor used for reading the halo field */
     F x[MAX_MULTI_RHS];    /** input vector field for xpay*/
-    const G U;    /** the gauge field */
+    mutable G U;           /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
@@ -45,7 +45,7 @@ namespace quda
     LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                const ColorSpinorField &halo, const GaugeField &U, int dir, double a, double b,
                cvector_ref<const ColorSpinorField> &x, int parity, const int *comm_override) :
-      DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, 1, false, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, false, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
@@ -74,7 +74,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
+  template <KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity, int, int thread_dim,
                                                bool &active, int src_idx)
   {
@@ -87,19 +87,18 @@ namespace quda
       if (d != dir) {
         if (arg.dd_in.doHopping(coord, d, +1)) {
           // Forward gather - compute fwd offset for vector fetch
-          const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
-	  
+          const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
           if (doHalo<kernel_type>(d) && ghost) {
-	    
-            // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-            const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+
+            const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
             out += U * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
-            const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+            const int fwd_idx = linkIndexP1(coord, arg.dc.X, d);
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
 
@@ -109,15 +108,14 @@ namespace quda
         if (arg.dd_in.doHopping(coord, d, -1)) {
           // Backward gather - compute back offset for spinor and gauge fetch
 
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const int back_idx = linkIndexM1(coord, arg.dc.X, d);
           const int gauge_idx = back_idx;
 
-          const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+          const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
           if (doHalo<kernel_type>(d) && ghost) {
 
-            // const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dc.X, d, arg.nFace);
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
             const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -136,7 +134,7 @@ namespace quda
   }
 
   // out(x) = M*in
-  template <int nParity, bool, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
+  template <bool, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr laplace(const Ftor &ftor) : arg(ftor.arg) { }
@@ -157,7 +155,7 @@ namespace quda
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
       if (arg.dd_out.isZero(coord)) {
         if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
@@ -168,11 +166,9 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3: applyLaplace<nParity, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 3: applyLaplace<mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       case 4:
-      default:
-        applyLaplace<nParity, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
+      default: applyLaplace<mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       }
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {

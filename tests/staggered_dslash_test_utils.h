@@ -289,7 +289,7 @@ struct StaggeredDslashTestWrapper {
 
     // create device-size spinors
     ColorSpinorParam csParam(spinor[0]);
-    csParam.fieldOrder = colorspinor::getNative(inv_param.cuda_prec, 1);
+    csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
     csParam.pad = 0;
     csParam.setPrecision(inv_param.cuda_prec);
     csParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -316,7 +316,6 @@ struct StaggeredDslashTestWrapper {
     freeGaugeQuda();
     cpuFat = {};
     cpuLong = {};
-    commDimPartitionedReset();
   }
 
   static void destroy()
@@ -495,7 +494,9 @@ struct StaggeredDslashTestWrapper {
       printfQuda("GBYTES = %f\n", gbytes);
       ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
-      size_t ghost_bytes = cudaSpinor[0].GhostBytes();
+      int nFace = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 3;
+      auto halo = ColorSpinorField::create_comms_batch(cudaSpinor, nFace);
+      size_t ghost_bytes = static_cast<ColorSpinorField &>(halo).GhostBytes();
 
       ::testing::Test::RecordProperty("Halo_bidirectional_BW_GPU",
                                       1.0e-9 * 2 * ghost_bytes * niter / dslash_time.event_time);

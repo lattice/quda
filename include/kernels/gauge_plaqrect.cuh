@@ -4,6 +4,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <array.h>
+#include <packed_array.h>
 #include <reduction_kernel.h>
 
 namespace quda
@@ -50,7 +51,7 @@ namespace quda
     // There are 10 unique links to be fetched, with two of the links
     // being common to all three objects.
     double plaq, rect;
-    int dx[4] = {0, 0, 0, 0};
+    packed_array<int8_t, 4> dx = {};
 
     // Accumulate the two common links U_mu(x) and U_nu(x) in U1
     Link U1 = arg.U(mu, linkIndexShift(x, dx, arg.E), parity);                          // U_mu(x)
@@ -92,7 +93,7 @@ namespace quda
     // Sum of the two rectangles
     rect = getTrace(U4 + U3).real();
 
-    return make_double2(plaq, rect);
+    return {plaq, rect};
   }
 
   template <typename Arg> struct PlaquetteRectangle : plus<typename Arg::reduce_t> {
@@ -107,23 +108,20 @@ namespace quda
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
       reduce_t plaqRect {0, 0, 0, 0};
-      double2 tmp;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-#pragma unroll
       for (int mu = 0; mu < 3; mu++) {
-#pragma unroll
         for (int nu = 0; nu < 3; nu++) {
           if (nu >= mu + 1) {
-            tmp = plaquetteRectangle(arg, x, parity, mu, nu);
+            auto tmp = plaquetteRectangle(arg, x, parity, mu, nu);
             plaqRect[0] += tmp.x; // Spatial plaquette
             plaqRect[2] += tmp.y; // Spatial rectangle
           }
         }
-        tmp = plaquetteRectangle(arg, x, parity, mu, 3);
+        auto tmp = plaquetteRectangle(arg, x, parity, mu, 3);
         plaqRect[1] += tmp.x; // Temporal plaquette
         plaqRect[3] += tmp.y; // Temporal rectangle
       }

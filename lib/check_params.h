@@ -21,9 +21,15 @@
 #elif defined CHECK_PARAM
 #define P(x, val) if (param->x == val) errorQuda("Parameter " #x " undefined")
 #elif defined PRINT_PARAM
-#define P(x, val)							\
-  { if (val == INVALID_DOUBLE) printfQuda(#x " = %g\n", (double)param->x); \
-    else printfQuda(#x " = %d\n", (int)param->x); }
+#include <type_traits>
+#define P(x, val)                                                                                      \
+  do {                                                                                                 \
+    if constexpr (std::is_same_v<std::remove_cvref_t<decltype((val))>, double>) {                       \
+      printfQuda(#x " = %g\n", (double)(param->x));                                                    \
+    } else {                                                                                           \
+      printfQuda(#x " = %d\n", (int)(param->x));                                                       \
+    }                                                                                                  \
+  } while (0)
 #else
 #error INIT_PARAM, CHECK_PARAM, and PRINT_PARAM all undefined in check_params.h
 #endif
@@ -104,18 +110,26 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
+
+#ifndef CHECK_PARAM
+  P(ga_pad, 0);
+#elif defined CHECK_PARAM
   P(ga_pad, INVALID_INT);
+  param->ga_pad = 0;
+#endif
 
 #if defined INIT_PARAM
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_NO);
   P(staggered_phase_applied, 0);
   P(i_mu, 0.0);
   P(overlap, 0);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_TRUE);
 #else
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
   P(staggered_phase_applied, INVALID_INT);
   P(i_mu, INVALID_DOUBLE);
   P(overlap, INVALID_INT);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_FALSE);
 #endif
 
 #if defined INIT_PARAM
@@ -212,6 +226,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(require_convergence, QUDA_BOOLEAN_INVALID);
+  P(spectrum, QUDA_SPECTRUM_INVALID);
   P(n_ev, INVALID_INT);
   P(n_kr, INVALID_INT);
   P(n_conv, INVALID_INT);
@@ -760,16 +775,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-#ifdef NVSHMEM_COMMS
-  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
-#else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
-#endif
 #else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
+  P(additional_prop, 0);
   P(distance_pc_alpha0, 0.0);
   P(distance_pc_t0, -1);
 #else
@@ -1184,6 +1196,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha2, 0.0);
   P(alpha3, 0.0);
   P(dir_ignore, -1);
+  P(fermion_flow_type, QUDA_FERMION_FLOW_LAPLACE_4D);
+  P(staggered_phase_type, QUDA_STAGGERED_PHASE_MILC);
 #else
   P(n_steps, (unsigned int)INVALID_INT);
   P(meas_interval, (unsigned int)INVALID_INT);
@@ -1200,6 +1214,21 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha2, INVALID_DOUBLE);
   P(alpha3, INVALID_DOUBLE);
   P(dir_ignore, INVALID_INT);
+  P(fermion_flow_type, QUDA_FERMION_FLOW_INVALID);
+  P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
+#endif
+
+  // HISQ fermion-flow path coefficients are arrays, so they are handled outside the
+  // scalar P() macro: zeroed on init, printed on print, and not validated on check
+  // (the HISQ flow operator errors if they are required but left unset).
+#if defined INIT_PARAM
+  for (int i = 0; i < 6; i++) {
+    ret.hisq_fat7_coeff[i] = 0.0;
+    ret.hisq_asqtad_coeff[i] = 0.0;
+  }
+#elif defined PRINT_PARAM
+  for (int i = 0; i < 6; i++) printfQuda("hisq_fat7_coeff[%d] = %g\n", i, param->hisq_fat7_coeff[i]);
+  for (int i = 0; i < 6; i++) printfQuda("hisq_asqtad_coeff[%d] = %g\n", i, param->hisq_asqtad_coeff[i]);
 #endif
 
 #ifdef INIT_PARAM

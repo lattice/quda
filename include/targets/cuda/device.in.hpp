@@ -33,8 +33,10 @@ namespace quda
         return 100 * 1024;
 #elif (__COMPUTE_CAPABILITY__ == 900)
         return 228 * 1024;
-#elif (__COMPUTE_CAPABILITY__ == 1000)
+#elif (__COMPUTE_CAPABILITY__ == 1000) || (__COMPUTE_CAPABILITY__ == 1030)
         return 228 * 1024;
+#elif (__COMPUTE_CAPABILITY__ == 1200)
+        return 100 * 1024;
 #else
         return 0;
 #endif
@@ -57,8 +59,10 @@ namespace quda
       return 1536;
 #elif (__COMPUTE_CAPABILITY__ == 900)
       return 2048;
-#elif (__COMPUTE_CAPABILITY__ == 1000)
+#elif (__COMPUTE_CAPABILITY__ == 1000) || (__COMPUTE_CAPABILITY__ == 1030)
       return 2048;
+#elif (__COMPUTE_CAPABILITY__ == 1200)
+      return 1536;
 #else
       return 0;
 #endif

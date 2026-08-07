@@ -12,24 +12,13 @@ namespace quda {
 
   template <typename T> constexpr bool is_nan(T x) { return x != x; }
 
-  template<class T>
-    struct Identity
-    {
-      __device__  __host__ inline
-        static T val();
-    };
+  template <class T> struct Identity {
+    __device__ __host__ inline static T val();
+  };
 
-  template<>
-    __device__ __host__ inline
-    float2 Identity<float2>::val(){
-      return make_float2(1.,0.);
-    }
+  template <> __device__ __host__ inline float2 Identity<float2>::val() { return {1., 0.}; }
 
-  template<>
-    __device__ __host__ inline
-    double2 Identity<double2>::val(){
-      return make_double2(1.,0.);
-    }
+  template <> __device__ __host__ inline double2 Identity<double2>::val() { return {1., 0.}; }
 
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;
@@ -114,7 +103,8 @@ namespace quda {
            the absolute column sums.
            @return Compute L1 norm
         */
-        __device__ __host__ inline real L1() {
+        __device__ __host__ inline real L1() const
+        {
           real l1 = 0;
 #pragma unroll
           for (int j=0; j<N; j++) {
@@ -133,7 +123,8 @@ namespace quda {
            Frobenius norm which is an upper bound on the L2 norm.
            @return Computed L2 norm
         */
-        __device__ __host__ inline real L2() {
+        __device__ __host__ inline real L2() const
+        {
           real l2 = 0;
 #pragma unroll
           for (int j=0; j<N; j++) {
@@ -150,7 +141,8 @@ namespace quda {
            the absolute row sums.
            @return Computed Linfinity norm
         */
-        __device__ __host__ inline real Linf() {
+        __device__ __host__ inline real Linf() const
+        {
           real linf = 0;
 #pragma unroll
           for (int i=0; i<N; i++) {

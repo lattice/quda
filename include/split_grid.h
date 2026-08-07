@@ -62,7 +62,7 @@ namespace quda
 
       size_t bytes = meta.TotalBytes();
 
-      v_send_buffer_h[i] = pinned_malloc(bytes);
+      v_send_buffer_h[i] = host_pinned_malloc(bytes);
 
       v_base_field[i % n_fields].copy_to_buffer(v_send_buffer_h[i]);
 
@@ -88,7 +88,7 @@ namespace quda
 
       size_t bytes = buffer_field.TotalBytes();
 
-      void *recv_buffer_h = pinned_malloc(bytes);
+      void *recv_buffer_h = host_pinned_malloc(bytes);
 
       auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
 
@@ -159,7 +159,7 @@ namespace quda
       auto offset = partition_idx * field_dim;
       quda::copyFieldOffset(buffer_field, collect_field, offset, pc_type);
 
-      v_send_buffer_h[i] = pinned_malloc(bytes);
+      v_send_buffer_h[i] = host_pinned_malloc(bytes);
       buffer_field.copy_to_buffer(v_send_buffer_h[i]);
 
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
@@ -180,7 +180,7 @@ namespace quda
 
       size_t bytes = buffer_field.TotalBytes();
 
-      void *recv_buffer_h = pinned_malloc(bytes);
+      void *recv_buffer_h = host_pinned_malloc(bytes);
 
       auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
 

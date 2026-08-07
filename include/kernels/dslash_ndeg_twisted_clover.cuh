@@ -14,7 +14,7 @@ namespace quda
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     typedef typename clover_mapper<Float, length, true>::type C;
     typedef typename mapper<Float>::type real;
-    
+
     const C A; /** the clover field */
     real a; /** this is the Wilson-dslash scale factor */
     real b; /** this is the chiral twist factor */
@@ -45,7 +45,7 @@ namespace quda
       = std::conditional_t<kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL, KernelOps<Cache>, NoKernelOps>;
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedClover : dslash_default, nDegTwistedCloverParams<kernel_type, Arg>::Ops {
 
     const Arg &arg;
@@ -58,8 +58,8 @@ namespace quda
        out(x) = M*in = a * D * in + (A(x) + i*b*gamma_5*tau_3 + c*tau_1)*x
        Note this routine only exists in xpay form.
     */
-    template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity)
+    template <KernelType mykernel_type = kernel_type, bool allthreads = false>
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity, bool alive = true)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -67,63 +67,75 @@ namespace quda
 
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
-      bool active
-        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      bool active = mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
+      int thread_dim;                                     // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
 
-      if (arg.dd_out.isZero(coord)) {
-        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-        return;
+      if (!allthreads || alive) {
+        if (arg.dd_out.isZero(coord)) {
+          if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+          if constexpr (!allthreads)
+            return;
+          else
+            alive = false;
+        }
       }
 
-      // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      if (!allthreads || alive) {
+        // defined in dslash_wilson.cuh
+        applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      }
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
         if (arg.dd_x.isZero(coord)) {
-          out = arg.a * out;
+          if (!allthreads || alive) out = arg.a * out;
         } else {
-          // apply the chiral and flavor twists
-          // use consistent load order across s to ensure better cache locality
-          Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
           SharedMemoryCache<Vector> cache {*this};
-          cache.save(x);
-
-          x.toRel(); // switch to chiral basis
-
           Vector tmp;
+          if (!allthreads || alive) {
+            // apply the chiral and flavor twists
+            // use consistent load order across s to ensure better cache locality
+            Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
+            cache.save(x);
+
+            x.toRel(); // switch to chiral basis
+
 #pragma unroll
-          for (int chirality = 0; chirality < 2; chirality++) {
-            constexpr int n = Arg::nColor * Arg::nSpin / 2;
-            HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
-            HalfVector x_chi = x.chiral_project(chirality);
-            HalfVector Ax_chi = A * x_chi;
-            // i * mu * gamma_5 * tau_3
-            const complex<real> b(0.0, (chirality ^ flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
-            Ax_chi += b * x_chi;
-            tmp += Ax_chi.chiral_reconstruct(chirality);
+            for (int chirality = 0; chirality < 2; chirality++) {
+              constexpr int n = Arg::nColor * Arg::nSpin / 2;
+              HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
+              HalfVector x_chi = x.chiral_project(chirality);
+              HalfVector Ax_chi = A * x_chi;
+              // i * mu * gamma_5 * tau_3
+              const complex<real> b(0.0,
+                                    (chirality ^ flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+              Ax_chi += b * x_chi;
+              tmp += Ax_chi.chiral_reconstruct(chirality);
+            }
+
+            tmp.toNonRel();
+            // tmp += (c * tau_1) * x
           }
-
-          tmp.toNonRel();
-          // tmp += (c * tau_1) * x
           cache.sync();
-          tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
+          if (!allthreads || alive) {
+            tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
 
-          // add the Wilson part with normalisation
-          out = tmp + arg.a * out;
+            // add the Wilson part with normalisation
+            out = tmp + arg.a * out;
+          }
         }
       } else if (active) {
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out = x + arg.a * out;
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+      if (!allthreads || alive)
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
   };
 

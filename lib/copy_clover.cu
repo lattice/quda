@@ -26,7 +26,7 @@ namespace quda {
       TunableKernel2D(in, 2, location),
       compute_diagonal(out.Reconstruct() && !in.Reconstruct()), // if writing to a compressed field, we need to compute the diagonal
       diagonal_d(compute_diagonal ? static_cast<real*>(pool_device_malloc(sizeof(real))) : nullptr),
-      diagonal_h(compute_diagonal ? static_cast<real*>(pool_pinned_malloc(sizeof(real))) : nullptr),
+      diagonal_h(compute_diagonal ? static_cast<real*>(pool_host_pinned_malloc(sizeof(real))) : nullptr),
       out(out),
       in(in),
       inverse(inverse),
@@ -47,7 +47,7 @@ namespace quda {
 
     virtual ~CopyClover()
     {
-      if (diagonal_h) pool_pinned_free(diagonal_h);
+      if (diagonal_h) pool_host_pinned_free(diagonal_h);
       if (diagonal_d) pool_device_free(diagonal_d);
     }
 
@@ -130,6 +130,12 @@ namespace quda {
 #else
         errorQuda("BQCD interface has not been built\n");
 #endif
+      } else if (in.Order() == QUDA_OPENQCD_CLOVER_ORDER) {
+#ifdef BUILD_OPENQCD_INTERFACE
+        copyClover<OpenQCDOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
+#else
+        errorQuda("OpenQCD interface has not been built\n");
+#endif
       } else {
         errorQuda("Clover field %d order not supported", in.Order());
       }
@@ -145,18 +151,15 @@ namespace quda {
     }
   };
 
-#ifdef GPU_CLOVER_DIRAC
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
                          void *Out, const void *In)
   {
-    // swizzle in/out since we first want to instantiate precision
-    instantiatePrecision<CloverCopyIn>(in, out, inverse, location, Out, In);
+    if constexpr (is_enabled_clover()) {
+      // swizzle in/out since we first want to instantiate precision
+      instantiatePrecision<CloverCopyIn>(in, out, inverse, location, Out, In);
+    } else {
+      errorQuda("Clover has not been built");
+    }
   }
-#else
-  void copyGenericClover(CloverField &, const CloverField &, bool, QudaFieldLocation, void *, const void *)
-  {
-    errorQuda("Clover has not been built");
-  }
-#endif
 
 } // namespace quda

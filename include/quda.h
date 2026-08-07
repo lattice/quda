@@ -70,6 +70,7 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
+    int use_split_gauge_bkup; /**< Used by gauge split buffers (default=true keep split gauge after usage)*/
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
@@ -463,6 +464,9 @@ extern "C" {
     double distance_pc_alpha0;
     /** The t0 parameter for distance preconditioning, the timeslice where the source is located */
     int distance_pc_t0;
+
+    /** Additional user-defined properties */
+    void *additional_prop;
 
   } QudaInvertParam;
 
@@ -891,6 +895,14 @@ extern "C" {
     double t0;                     /**< Starting flow time for Wilson flow */
     int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
                                         A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
+    QudaFermionFlowType fermion_flow_type; /**< Generator of the fermion gradient flow in performGFlowQuda.
+                                                Defaults to QUDA_FERMION_FLOW_LAPLACE_4D (legacy behavior). */
+    QudaStaggeredPhase staggered_phase_type; /**< KS phase convention for the staggered/HISQ fermion-flow
+                                                  operators. Defaults to QUDA_STAGGERED_PHASE_MILC. */
+    double hisq_fat7_coeff[6];   /**< Level-1 (fat7) HISQ path coefficients for the HISQ fermion-flow operators.
+                                      Caller-supplied (tadpole-scaled); required when a HISQ operator is selected. */
+    double hisq_asqtad_coeff[6]; /**< Level-2 (asqtad) HISQ path coefficients for the HISQ fermion-flow operators.
+                                      Caller-supplied, final (tadpole-scaled and eps_N-folded); required for HISQ. */
   } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {
@@ -1023,7 +1035,7 @@ extern "C" {
    * initQuda.  Calling initQudaMemory requires that the user has
    * previously called initQudaDevice.
    */
-  void initQudaMemory();
+  void initQudaMemory(void);
 
   /**
    * Initialize the library.  This function is actually a wrapper
@@ -1046,7 +1058,7 @@ extern "C" {
    * @details This should only be needed for automated testing when
    * different partitioning is applied within a single run.
    */
-  void updateR();
+  void updateR(void);
 
   /**
    * A new QudaGaugeParam should always be initialized immediately
@@ -1189,6 +1201,13 @@ extern "C" {
    * @param param   Contains all metadata regarding host and device storage
    */
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+
+  /**
+   * Write the gauge field to disk
+   * @param file Filename to write to
+   * @param param   Contains all metadata regarding host and device storage
+   */
+  void writeGaugeQuda(const char *file, QudaGaugeParam *param);
 
   /**
    * Load the clover term and/or the clover inverse from the host.
@@ -1678,6 +1697,21 @@ extern "C" {
                                const QudaFermionSmearType smear_type);
 
   /**
+   * Performs Wuppertal smearing on a given set of spinors using the gauge field
+   * gaugeSmeared, if it exists, or gaugePrecise if no smeared field is present.
+   * This smears multiple right-hand sides simultaneously.
+   * @param h_out    Result spinor fields
+   * @param h_in     Input spinor fields
+   * @param param    Contains all metadata regarding host and device
+   *                 storage and operator which will be applied to the spinor
+   * @param n_steps  Number of steps to apply.
+   * @param alpha    Alpha coefficient for Wuppertal smearing.
+   * @param nSpinors Number of spinor fields to smear
+   */
+  void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *param, unsigned int n_steps, double alpha,
+                                 size_t nSpinors);
+
+  /**
    * LEGACY
    * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
@@ -1898,7 +1932,7 @@ extern "C" {
   void flushPoolQuda(QudaMemoryType type);
 
   void setMPICommHandleQuda(void *mycomm);
-  
+
   // Parameter set for quark smearing operations
   typedef struct QudaQuarkSmearParam_s {
     //-------------------------------------------------

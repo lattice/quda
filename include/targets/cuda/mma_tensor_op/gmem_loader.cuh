@@ -504,7 +504,7 @@ namespace quda
             // block all-reduce thread_max
             using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
             __shared__ typename block_reduce_t::TempStorage temp_storage;
-            float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+            float block_max = block_reduce_t(temp_storage).Reduce(thread_max, ::cuda::maximum());
 
             __shared__ float block_max_all;
             if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
@@ -666,7 +666,7 @@ namespace quda
             // block all-reduce thread_max
             using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
             __shared__ typename block_reduce_t::TempStorage temp_storage;
-            float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+            float block_max = block_reduce_t(temp_storage).Reduce(thread_max, ::cuda::maximum());
 
             __shared__ float block_max_all;
             if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {

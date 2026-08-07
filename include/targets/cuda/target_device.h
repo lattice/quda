@@ -7,8 +7,22 @@
 #include <nv/target>
 #endif
 
+#include <cuda/ptx>
+
 #if defined(__CUDACC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
 #define QUDA_CUDA_CC
+#endif
+
+#if (__COMPUTE_CAPABILITY__ >= 700) && (defined(__NVCC__) || (defined(__clang__) && (__clang_major__ >= 20)))
+#define GRID_CONSTANT __grid_constant__
+#else
+#define GRID_CONSTANT
+#endif
+
+#if defined(__NVCC__) && (CUDA_VERSION >= 12040)
+#define MAXNREG(x) __maxnreg__(x)
+#else
+#define MAXNREG(x)
 #endif
 
 namespace quda
@@ -20,24 +34,42 @@ namespace quda
 #ifdef _NVHPC_CUDA
 
     // nvc++: run-time dispatch using if target
-    template <template <bool, typename...> class f, typename... Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
       if target (nv::target::is_device) {
-        return f<true>()(args...);
+        if constexpr (sizeof...(Params) == 0) {
+          return f<true>()(args...);
+        } else {
+          return f<true>().template operator()<Params...>(args...);
+        }
       } else {
-        return f<false>()(args...);
+        if constexpr (sizeof...(Params) == 0) {
+          return f<false>()(args...);
+        } else {
+          return f<false>().template operator()<Params...>(args...);
+        }
       }
     }
 
 #else
 
     // nvcc or clang: compile-time dispatch
-    template <template <bool, typename...> class f, typename... Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
 #ifdef __CUDA_ARCH__
-      return f<true>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<true>()(args...);
+      } else {
+        return f<true>().template operator()<Params...>(args...);
+      }
 #else
-      return f<false>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<false>()(args...);
+      } else {
+        return f<false>().template operator()<Params...>(args...);
+      }
 #endif
     }
 
@@ -157,6 +189,85 @@ namespace quda
       case 3:
       default: return block_dim().z * block_dim().y * block_dim().x;
       }
+    }
+
+    template <bool is_device> struct is_thread_zero_impl {
+      template <class T> bool operator()(const T &) { return true; }
+    };
+
+#ifdef QUDA_CUDA_CC
+    template <> struct is_thread_zero_impl<true> {
+      template <class T> __device__ bool operator()(const T &)
+      {
+        unsigned int tid = thread_idx_linear<T::value>();
+        unsigned int warp_id = tid / 32;
+        unsigned int uniform_warp_id = __shfl_sync(0xFFFFFFFF, warp_id, 0); // Broadcast from lane 0
+        // unsigned int uniform_warp_id = __reduce_min_sync(~0, warp_id == 0); perhaps faster on sm_100
+        return (uniform_warp_id == 0 && cuda::ptx::elect_sync(0xFFFFFFFF));
+      }
+    };
+#endif
+
+    /**
+       @brief Return true only for a single thread in a thread block.
+       This function assumes all warps in the thread block are
+       converged.  Note that the single thread that is returned is not
+       necessarily thread 0 in the thread block.
+       @tparam dim The dimension of the thread block
+       @return true for a single thread in the thread block, else
+       false
+    */
+    template <int dim = 3> __device__ __host__ inline bool is_thread_zero()
+    {
+      return target::dispatch<is_thread_zero_impl>(std::integral_constant<int, dim>());
+    }
+
+    template <bool is_device> struct is_lane_zero_impl {
+      bool operator()() { return true; }
+    };
+#ifdef QUDA_CUDA_CC
+    template <> struct is_lane_zero_impl<true> {
+      __device__ bool operator()() { return cuda::ptx::elect_sync(0xFFFFFFFF); }
+    };
+#endif
+
+    /**
+       @brief Return true only for a single lane in a warp.
+       This function assumes the warp is converged.
+       Note that the single thread that is returned is not
+       necessarily lane 0 in the warp.
+       @return true for a single lane in the warp, else false
+    */
+    __device__ __host__ inline bool is_lane_zero() { return target::dispatch<is_lane_zero_impl>(); }
+
+    template <class T> constexpr bool vectorize()
+    {
+#ifdef QUDA_VECTORIZE_SINGLE
+      return std::is_same_v<T, float>;
+#else
+      return false;
+#endif
+    }
+
+    template <bool is_device> struct uniform_impl {
+      template <typename T> T operator()(const T &t) { return t; }
+    };
+#ifdef QUDA_CUDA_CC
+    template <> struct uniform_impl<true> {
+      template <typename T> __device__ inline T operator()(const T &t) { return __shfl_sync(0xFFFFFFFF, t, 0); }
+    };
+#endif
+
+    /**
+       @brief Return the warp uniform variant of a given operand.
+       This is used to suggest to a compiler that a variable is
+       constant across the warp.
+       @param[in] t The input value we want to make warp uniform
+       @return The warp uniform variant
+    */
+    template <typename T> __device__ __host__ inline bool uniform(const T &t)
+    {
+      return target::dispatch<uniform_impl>(t);
     }
 
   } // namespace target

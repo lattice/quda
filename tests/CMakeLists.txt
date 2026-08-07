@@ -68,8 +68,6 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
    OR QUDA_DIRAC_TWISTED_CLOVER
-   OR QUDA_DIRAC_NDEG_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_executable(dslash_test dslash_test.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS})
@@ -140,8 +138,6 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
    OR QUDA_DIRAC_TWISTED_CLOVER
-   OR QUDA_DIRAC_NDEG_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
   add_executable(blas_test blas_test.cpp)
@@ -211,11 +207,6 @@ target_link_libraries(staggered_flow_test ${TEST_LIBS})
 quda_checkbuildtest(staggered_flow_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS staggered_flow_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-add_executable(alt_staggered_flow_test alt_staggered_flow_test.cpp)
-target_link_libraries(alt_staggered_flow_test ${TEST_LIBS})
-quda_checkbuildtest(alt_staggered_flow_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS alt_staggered_flow_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 add_executable(final_flow_test final_flow_test.cpp)
 target_link_libraries(final_flow_test ${TEST_LIBS})
 quda_checkbuildtest(final_flow_test QUDA_BUILD_ALL_TESTS)
@@ -280,7 +271,7 @@ target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_executable(clover_force_test clover_force_test.cpp)
   target_link_libraries(clover_force_test ${TEST_LIBS})
   quda_checkbuildtest(clover_force_test QUDA_BUILD_ALL_TESTS)
@@ -326,8 +317,6 @@ endif()
 if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME blas_test_parity_wilson
@@ -660,7 +649,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
-  if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+  if(QUDA_DIRAC_TWISTED_MASS)
     # the ndeg-twisted-mas operator does not fit the pattern used for most other operators
     # since it is defined via 'dslash-type = twisted-mass` and 'flavor = nondeg-doublet'
     set(DIRAC_NAME twisted-mass)
@@ -773,7 +762,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
-  if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  if(QUDA_DIRAC_TWISTED_CLOVER)
     # the ndeg-twisted-clover operator does not fit the pattern used for most other operators
     # since it is defined via 'dslash-type = twisted-clover` and 'flavor = nondeg-doublet'
     set(DIRAC_NAME twisted-clover)
@@ -1144,7 +1133,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   if(QUDA_DIRAC_COVDEV)
     add_test(NAME covdev_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 6 8 10 12
+                     --dim 6 8 10 12 --enable-testing true
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
   endif()
 
@@ -1200,7 +1189,7 @@ if(QUDA_DIRAC_TWISTED_MASS)
     --gtest_output=xml:invert_test_twisted_mass_asym.xml)
 endif()
 
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+if(QUDA_DIRAC_TWISTED_MASS)
   add_test(NAME invert_test_ndeg_twisted_mass_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-mass
@@ -1250,7 +1239,7 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
     --gtest_output=xml:invert_test_twisted_clover_asym.xml)
 endif()
 
-if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+if(QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME invert_test_ndeg_twisted_clover_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-clover --compute-clover true
@@ -1418,7 +1407,7 @@ endif()
 if(QUDA_DIRAC_WILSON)    
   add_test(NAME eigensolve_test_wilson
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type wilson --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dslash-type wilson --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --dim 2 4 6 8 --eig-max-restarts 1000
     --enable-testing true 
     --gtest_output=xml:eigensolve_test_wilson.xml)
@@ -1427,23 +1416,23 @@ endif()
 if(QUDA_DIRAC_TWISTED_MASS)
   add_test(NAME eigensolve_test_twisted_mass_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dslash-type twisted-mass --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --dim 2 4 6 8 --eig-max-restarts 1000
     --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_twisted_mass_sym.xml)
     
   add_test(NAME eigensolve_test_twisted_mass_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dslash-type twisted-mass --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --dim 2 4 6 8 --eig-max-restarts 1000
     --matpc even-even-asym --enable-testing true 
     --gtest_output=xml:eigensolve_test_twisted_mass_asym.xml)
 endif()
   
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+if(QUDA_DIRAC_TWISTED_MASS)
   add_test(NAME eigensolve_test_ndeg_twisted_mass_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dslash-type twisted-mass --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --dim 2 4 6 8 --eig-max-restarts 1000
     --matpc even-even --flavor nondeg-doublet 
     --enable-testing true --eig-use-eigen-qr false
@@ -1451,7 +1440,7 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
   add_test(NAME eigensolve_test_ndeg_twisted_mass_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dslash-type twisted-mass --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --dim 2 4 6 8 --eig-max-restarts 1000
     --matpc even-even-asym --flavor nondeg-doublet
     --enable-testing true --eig-use-eigen-qr false
@@ -1462,7 +1451,7 @@ if(QUDA_DIRAC_CLOVER)
   add_test(NAME eigensolve_test_clover_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type clover --compute-clover true      
-    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even --enable-testing true 
     --gtest_output=xml:eigensolve_test_clover_sym.xml)
@@ -1470,7 +1459,7 @@ if(QUDA_DIRAC_CLOVER)
   add_test(NAME eigensolve_test_clover_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type clover --compute-clover true      
-    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even-asym --enable-testing true
     --gtest_output=xml:eigensolve_test_clover_asym.xml)
@@ -1480,7 +1469,7 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME eigensolve_test_twisted_clover_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-clover --compute-clover true
-    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even --enable-testing true 
     --gtest_output=xml:eigensolve_test_twisted_clover_sym.xml)
@@ -1488,17 +1477,17 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME eigensolve_test_twisted_clover_asym      
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-clover --compute-clover true
-    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even-asym --enable-testing true 
     --gtest_output=xml:eigensolve_test_twisted_clover_asym.xml)
 endif()
   
-if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+if(QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME eigensolve_test_ndeg_twisted_clover_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-clover --compute-clover true
-    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even --flavor nondeg-doublet
     --enable-testing true 
@@ -1507,7 +1496,7 @@ if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_test(NAME eigensolve_test_ndeg_twisted_clover_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-clover --compute-clover true
-    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even-asym --flavor nondeg-doublet
     --enable-testing true 
@@ -1518,7 +1507,7 @@ if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_domain_wall
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type domain-wall
-    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_domain_wall.xml)
@@ -1526,7 +1515,7 @@ if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_domain_wall_4d_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type domain-wall-4d
-    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_domain_wall_4d_sym.xml)
@@ -1534,7 +1523,7 @@ if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_domain_wall_4d_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type domain-wall-4d
-    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even-asym --enable-testing true
     --gtest_output=xml:eigensolve_test_domain_wall_4d_asym.xml)
@@ -1542,7 +1531,7 @@ if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_mobius_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type mobius
-    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_sym.xml)
@@ -1550,7 +1539,7 @@ if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_mobius_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type mobius
-    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even-asym --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_asym.xml)
@@ -1558,7 +1547,7 @@ if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_mobius_eofa_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type mobius-eofa
-    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_eofa_sym.xml)
@@ -1566,7 +1555,7 @@ if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_mobius_eofa_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type mobius-eofa
-    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
     --eig-max-restarts 1000
     --matpc even-even-asym --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_eofa_asym.xml)
@@ -1589,7 +1578,7 @@ if(QUDA_DIRAC_STAGGERED)
     add_test(NAME eigensolve_test_asqtad
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type asqtad --compute-fat-long true
-      --dim 6 6 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --dim 6 6 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 96
       --eig-max-restarts 1000
       --enable-testing true
       --gtest_output=xml:staggered_eigensolve_test_asqtad.xml)
@@ -1599,7 +1588,7 @@ if(QUDA_DIRAC_STAGGERED)
     add_test(NAME eigensolve_test_laplace
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type laplace --compute-fat-long true
-      --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 96
+      --dim 2 4 6 8 --eig-n-conv 16 --eig-n-ev 16 --eig-n-kr 48
       --eig-max-restarts 1000
       --enable-testing true
       --gtest_output=xml:staggered_eigensolve_test_laplace.xml)
@@ -1628,7 +1617,7 @@ if(QUDA_DIRAC_STAGGERED)
                    --gtest_output=xml:hisq_stencil_test.xml)
 endif()
 
-if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME clover_force_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8

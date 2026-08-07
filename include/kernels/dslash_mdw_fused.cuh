@@ -37,10 +37,11 @@ namespace quda {
       static constexpr bool reload = reload_;
       static constexpr bool spin_project = true;
       static constexpr bool spinor_direct_load = true; // false means texture load
-      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load>::type; // color spin field order
+      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load, true>::type; // color spin field order
       static constexpr bool gauge_direct_load = true;                          // false means texture load
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_EXTENDED; // gauge field used is an extended one
-      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type; // gauge field order
+      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+                                      QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type; // gauge field order
 
       F out;      // output vector field
       const F in; // input vector field
@@ -277,7 +278,7 @@ namespace quda {
 
     template <typename Arg> struct FusedMobiusDslashParams {
       struct SmemSize {
-        static constexpr unsigned int size(dim3 block)
+        template <typename... Args> static constexpr unsigned int size(const dim3 block, const Args &...)
         {
           const int a_size = (block.y * 4) * (block.y * 4 + sm_m_pad_size(block.y * 4));
           const int b_size = (block.y * 4) * (block.x * 6 + sm_n_pad_size(block.x * 6));

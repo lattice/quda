@@ -301,6 +301,7 @@ extern int &ydim;
 extern int &zdim;
 extern int &tdim;
 extern int Lsdim;
+extern int use_split_gauge_bkup;
 extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
@@ -571,6 +572,7 @@ extern int hier_threshold;
 extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;
+extern QudaFermionFlowType fermion_flow_type;
 extern bool su_project;
 
 extern double smear_coeff;
@@ -605,4 +607,4 @@ extern bool enable_testing;
 
 extern bool detratio;
 
-extern std::array<int, 4> covdev_mu;
+extern int covdev_mu;

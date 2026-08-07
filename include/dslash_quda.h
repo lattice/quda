@@ -19,7 +19,7 @@ namespace quda
     int_fastdiv X[QUDA_MAX_DIM];
     int Ls;
 
-    int volume_4d;
+    int_fastdiv volume_4d;
     int_fastdiv volume_4d_cb;
 
     int_fastdiv face_X[4];
@@ -30,20 +30,12 @@ namespace quda
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
-    int ghostFace[QUDA_MAX_DIM + 1];
     int ghostFaceCB[QUDA_MAX_DIM + 1];
 
     int X2X1;
     int X3X2X1;
     int X4X3X2X1;
-
-    int X2X1mX1;
-    int X3X2X1mX2X1;
-    int X4X3X2X1mX3X2X1;
-    int X5X4X3X2X1mX4X3X2X1;
-    int X4X3X2X1hmX3X2X1h;
-
-    int_fastdiv dims[4][3];
+    int X5X4X3X2X1;
   };
 
   /**

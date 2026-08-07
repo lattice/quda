@@ -89,7 +89,7 @@ namespace quda
       NdegTwistedCloverArg<Float, nColor, nDim, recon> arg(out, in, halo, U, A, a, b, c, x, parity, dagger,
                                                            comm_override);
       NdegTwistedClover<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };
 

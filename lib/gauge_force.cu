@@ -12,7 +12,6 @@ namespace quda {
     double epsilon;
     const paths<4> &p;
     unsigned int minThreads() const { return mom.VolumeCB(); }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     ForceGauge(const GaugeField &u, GaugeField &mom, double epsilon, const paths<4> &p) :

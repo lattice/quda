@@ -18,7 +18,7 @@ namespace quda
     using Arg = ProjectDDArg<Float, DDArg, nSpin, nColor, Order>;
     ColorSpinorField &out;
 
-    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
+    bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return out.VolumeCB(); }
 
   public:

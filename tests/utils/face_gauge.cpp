@@ -348,10 +348,10 @@ void exchange_llfat_init(QudaPrecision prec)
 
     size_t packet_size = Vs[i] * gauge_site_size * prec;
 
-    fwd_nbr_staple[i] = pinned_malloc(packet_size);
-    back_nbr_staple[i] = pinned_malloc(packet_size);
-    fwd_nbr_staple_sendbuf[i] = pinned_malloc(packet_size);
-    back_nbr_staple_sendbuf[i] = pinned_malloc(packet_size);
+    fwd_nbr_staple[i] = host_pinned_malloc(packet_size);
+    back_nbr_staple[i] = host_pinned_malloc(packet_size);
+    fwd_nbr_staple_sendbuf[i] = host_pinned_malloc(packet_size);
+    back_nbr_staple_sendbuf[i] = host_pinned_malloc(packet_size);
   }
 }
 

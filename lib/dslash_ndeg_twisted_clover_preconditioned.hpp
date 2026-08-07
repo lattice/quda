@@ -20,6 +20,7 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
     unsigned int sharedBytesPerThread() const
     {
@@ -27,9 +28,9 @@ namespace quda
     }
 
   public:
-    NdegTwistedCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out,
-                                    cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+    NdegTwistedCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                    const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
       TunableKernel3D::resizeStep(2, 1); // this will force flavor to be contained in the block
     }
@@ -37,18 +38,18 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.nParity != 1)
         errorQuda("Preconditioned non-degenerate twisted-clover operator not defined nParity=%d", arg.nParity);
 
       if (arg.xpay) {
         if (arg.dagger) errorQuda("xpay operator not only defined for not dagger");
-        Dslash::template instantiate<packShmem, 1, false, true>(tp, stream);
+        Dslash::template instantiate<packShmem, false, true>(tp, stream);
       } else {
         if (arg.dagger)
-          Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
+          Dslash::template instantiate<packShmem, true, false>(tp, stream);
         else
-          Dslash::template instantiate<packShmem, 1, false, false>(tp, stream);
+          Dslash::template instantiate<packShmem, false, false>(tp, stream);
       }
     }
 
@@ -106,8 +107,8 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, A, a, b, c, xpay, x,
                                                                                 parity, dagger, comm_override);
-      NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo, U);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };
 } // namespace quda

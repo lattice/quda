@@ -1,12 +1,10 @@
 #pragma once
 
-#include <dslash_helper.cuh>
 #include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <kernels/dslash_pack.cuh> // forthe packing kernel
+#include <kernels/dslash_pack.cuh> // for the packing kernel
 
 namespace quda
 {
@@ -17,7 +15,7 @@ namespace quda
   template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_u_,
             QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC,
             int n_src_tile = MAX_MULTI_RHS_TILE>
-  struct StaggeredArg : DslashArg<Float, nDim, DDArg, n_src_tile> {
+  struct StaggeredArg : DslashArg<Float, nDim, DDArg, improved_ ? 3 : 1, n_src_tile> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -25,8 +23,7 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
-                                                    spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct_u = reconstruct_u_;
     static constexpr QudaReconstructType reconstruct_l = reconstruct_l_;
@@ -34,47 +31,117 @@ namespace quda
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     static constexpr bool use_inphase = improved_ ? false : true;
     static constexpr QudaStaggeredPhase phase = phase_;
-    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
-    using GL =
-        typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
+    template <bool shifted>
+    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase,
+                                     QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
+    template <bool shifted>
+    using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost,
+                                     use_inphase, QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
 
     F out[MAX_MULTI_RHS];  /** output vector field */
     F in[MAX_MULTI_RHS];   /** input vector field */
     const Ghost halo_pack; /** accessor for writing the halo */
     const Ghost halo;      /** accessor for reading the halo */
     F x[MAX_MULTI_RHS];    /** input vector when doing xpay */
-    const GU U; /** the gauge field */
-    const GL L; /** the long gauge field */
+    mutable GU<false> U;     /** the gauge field */
+    mutable GU<true> Uback;  /** the gauge field */
+    mutable GL<false> L;     /** the long gauge field */
+    mutable GL<true> Lback;  /** the long gauge field */
 
     const real a; /** xpay scale factor */
     const real tboundary; /** temporal boundary condition */
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
+    static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED;
+    static constexpr int prefetch_distance_l1 = 0;
 
     const real dagger_scale;
 
     StaggeredArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  const ColorSpinorField &halo, const GaugeField &U, const GaugeField &L, double a,
                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim, DDArg, n_src_tile>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true,
-                                                improved_ ? 3 : 1, spin_project, comm_override),
-      halo_pack(halo, improved_ ? 3 : 1),
-      halo(halo, improved_ ? 3 : 1),
-      U(U),
-      L(L),
-      a(a),
-      tboundary(U.TBoundary()),
-      is_first_time_slice(comm_coord(3) == 0 ? true : false),
-      is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
-      dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
+      DslashArg < Float,
+    nDim, DDArg, improved ? 3 : 1, n_src_tile
+      > (out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, spin_project, comm_override),
+    halo_pack(halo, improved_ ? 3 : 1), halo(halo, improved_ ? 3 : 1), U(U),
+    Uback(dslash_double_store() ? U.shift(1) : U), L(L), Lback(dslash_double_store() ? L.shift(3) : L), a(a),
+    tboundary(U.TBoundary()), is_first_time_slice(comm_coord(3) == 0 ? true : false),
+    is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
+    dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {
+      if (!improved && prefetch_distance > 7)
+        warningQuda("dslash prefetch distance %d is greater than pipeline length for naive staggered", prefetch_distance);
+
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];
         this->x[i] = x[i];
       }
     }
+  };
+
+  /**
+     @brief Prefetch the gauge field into cache.
+     @param[in] dim The dimension we are presently working on
+     @param[in] dir The direction we are presently working on (1 = forwards, 0 = backwards)
+     @param[in] hop The hopping term we are presently working on (0 = 1 - hop, 1 = 3 - hop)
+     @param[in] coord Coordinates that we are working on with hop-3 boundary conditions evaluated
+     @param[in] coord1 Copy of coordinates that we are working on with hop-1 boundary conditions evaluated
+     @param[in] parity Partiry that we are working on
+     @param[in] arg Paramter struct
+   */
+  template <PrefetchType prefetch_type, int distance, class coord_t, class Arg>
+  __device__ __host__ void prefetch(int dim, int dir, int hop, const coord_t &coord, const coord_t &coord1, int parity,
+                                    const Arg &arg)
+  {
+    int step = 4 * dim + 2 * dir + hop + distance;
+    if (step >= Arg::improved ? 16 : 8) return;
+
+    // if using a TMA prefetch we need to use block's first coordinate
+    auto x_cb = dslash_prefetch_tma() ? coord.x_cb_0 : coord.x_cb;
+    x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
+
+    if constexpr (Arg::improved) {
+      int dim2 = step / 4;
+      switch (step % 4) {
+      case 0: arg.U.template prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 1: arg.L.template prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 2:
+        if constexpr (dslash_double_store())
+          arg.Uback.template prefetch<prefetch_type>(x_cb, dim2, parity);
+        else
+          arg.U.template prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
+      case 3:
+        if constexpr (dslash_double_store())
+          arg.Lback.template prefetch<prefetch_type>(x_cb, dim2, parity);
+        else
+          arg.L.template prefetch<prefetch_type>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
+      }
+    } else {
+      int dim2 = step / 2;
+      switch (step % 2) {
+      case 0: arg.U.template prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 1:
+        if constexpr (dslash_double_store())
+          arg.Uback.template prefetch<prefetch_type>(x_cb, dim2, parity);
+        else
+          arg.U.template prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
+      }
+    }
+  }
+
+  template <class coord_t, class Arg>
+  __device__ __host__ void prefetch(int dim, int dir, int hop, const coord_t &coord, const coord_t &coord1, int parity,
+                                    const Arg &arg)
+  {
+    if constexpr (Arg::prefetch_distance_l1 > 0) // L1 prefetch
+      prefetch<3, Arg::prefetch_distance_l1>(dim, dir, hop, coord, coord1, parity, arg);
+    if constexpr (Arg::prefetch_distance > 0) // L2 prefetch
+      prefetch<Arg::prefetch_type, Arg::prefetch_distance>(dim, dir, hop, coord, coord1, parity, arg);
   };
 
   /**
@@ -87,7 +154,7 @@ namespace quda
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
   */
-  template <int nParity, KernelType kernel_type, int n_src_tile, typename Coord, typename Arg, typename Vector>
+  template <KernelType kernel_type, int n_src_tile, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyStaggered(array<Vector, n_src_tile> &out, const Arg &arg, Coord &coord,
                                                  int parity, int, int thread_dim, bool &active, int src_idx)
   {
@@ -95,113 +162,146 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
+    Coord coord1 = coord;
+    if constexpr (Arg::improved) { // need to compute 1-hop in_boundary
+#pragma unroll
+      for (int d = 0; d < 4; d++) {
+        coord1.in_boundary[1][d] = -(coord[d] + 1 >= arg.dc.X[d]);
+        coord1.in_boundary[0][d] = -(coord[d] - 1 < 0);
+      }
+    }
+
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction
       if (arg.dd_in.doHopping(coord, d, +1)) {
-        const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord1.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
         if (doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
+          const Link U = dslash_double_store() ?
+            static_cast<const Link>(arg.Uback.Ghost(d, ghost_idx, 1 - parity, StaggeredPhase(coord, d, +1, arg))) :
+            static_cast<const Link>(arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg)));
+
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
-            Vector in
-              = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            Vector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
             out[s] = mv_add(U, in, out[s]);
           }
-        } else if (doBulk<kernel_type>() && !ghost) {
-          const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
+        }
+
+        if constexpr (doBulk<kernel_type>()) {
+          if (!ghost) {
+            const int fwd_idx = getNeighborIndexCB<1>(coord1, d, 1, arg.dc);
+            const Link U = arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
 #pragma unroll
-          for (auto s = 0; s < n_src_tile; s++) {
-            Vector in = arg.in[src_idx + s](fwd_idx, their_spinor_parity);
-            out[s] = mv_add(U, in, out[s]);
+            for (auto s = 0; s < n_src_tile; s++) {
+              Vector in = arg.in[src_idx + s](fwd_idx, their_spinor_parity);
+              out[s] = mv_add(U, in, out[s]);
+            }
           }
+          prefetch(d, 0, 0, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
       // improved - forward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, +3)) {
-        const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
-          const Link L = arg.L(d, coord.x_cb, parity);
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
+          const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback.Ghost(d, ghost_idx, 1 - parity)) :
+                                                 static_cast<const Link>(arg.L(d, coord.x_cb, parity));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
-              = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+              = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
             out[s] = mv_add(L, in, out[s]);
           }
-        } else if (doBulk<kernel_type>() && !ghost) {
-          const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
-          const Link L = arg.L(d, coord.x_cb, parity);
+        }
+
+        if constexpr (doBulk<kernel_type>()) {
+          if (!ghost) {
+            const int fwd3_idx = getNeighborIndexCB<3>(coord, d, 1, arg.dc);
+            const Link L = arg.L(d, coord.x_cb, parity);
 #pragma unroll
-          for (auto s = 0; s < n_src_tile; s++) {
-            const Vector in = arg.in[src_idx + s](fwd3_idx, their_spinor_parity);
-            out[s] = mv_add(L, in, out[s]);
+            for (auto s = 0; s < n_src_tile; s++) {
+              const Vector in = arg.in[src_idx + s](fwd3_idx, their_spinor_parity);
+              out[s] = mv_add(L, in, out[s]);
+            }
           }
+          prefetch(d, 0, 1, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
       if (arg.dd_in.doHopping(coord, d, -1)) {
         // Backward gather - compute back offset for spinor and gauge fetch
-        const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord1.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
-          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
-            arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
+          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
+          const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 3) : ghost_idx2;
+          const Link U
+            = static_cast<const Link>(arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg)));
+
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
-            Vector in
-              = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
-            out[s] = mv_add(conj(U), -in, out[s]);
+            Vector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            out[s] = mv_sub(conj(U), in, out[s]);
           }
-        } else if (doBulk<kernel_type>() && !ghost) {
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
-          const int gauge_idx = back_idx;
-          const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
-            arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
+        }
+
+        if constexpr (doBulk<kernel_type>()) {
+          if (!ghost) {
+            const int back_idx = getNeighborIndexCB<1>(coord1, d, -1, arg.dc);
+            const Link U = dslash_double_store() ?
+              static_cast<const Link>(arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg))) :
+              static_cast<const Link>(arg.U(d, back_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg)));
+
 #pragma unroll
-          for (auto s = 0; s < n_src_tile; s++) {
-            Vector in = arg.in[src_idx + s](back_idx, their_spinor_parity);
-            out[s] = mv_add(conj(U), -in, out[s]);
+            for (auto s = 0; s < n_src_tile; s++) {
+              Vector in = arg.in[src_idx + s](back_idx, their_spinor_parity);
+              out[s] = mv_sub(conj(U), in, out[s]);
+            }
           }
+          prefetch(d, 1, 0, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
       // improved - backward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, -3)) {
-        const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
-          // when updating replace arg.nFace with 1 here
-          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
+          const Link L = static_cast<const Link>(arg.L.Ghost(d, ghost_idx, 1 - parity));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
-              = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
-            out[s] = mv_add(conj(L), -in, out[s]);
-          }
-        } else if (doBulk<kernel_type>() && !ghost) {
-          const int back3_idx = linkIndexM3(coord, arg.dim, d);
-          const int gauge_idx = back3_idx;
-          const Link L = arg.L(d, gauge_idx, 1 - parity);
-#pragma unroll
-          for (auto s = 0; s < n_src_tile; s++) {
-            const Vector in = arg.in[src_idx + s](back3_idx, their_spinor_parity);
-            out[s] = mv_add(conj(L), -in, out[s]);
+              = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            out[s] = mv_sub(conj(L), in, out[s]);
           }
         }
+
+        if constexpr (doBulk<kernel_type>()) {
+          if (!ghost) {
+            const int back3_idx = getNeighborIndexCB<3>(coord, d, -1, arg.dc);
+            const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback(d, coord.x_cb, parity)) :
+                                                   static_cast<const Link>(arg.L(d, back3_idx, 1 - parity));
+#pragma unroll
+            for (auto s = 0; s < n_src_tile; s++) {
+              const Vector in = arg.in[src_idx + s](back3_idx, their_spinor_parity);
+              out[s] = mv_sub(conj(L), in, out[s]);
+            }
+          }
+          prefetch(d, 1, 1, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
+        }
       }
+
     } // nDim
   }
 
   // out(x) = M*in = (-D + m) * in(x-mu)
-  template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
-  struct staggered : dslash_default {
+  template <bool dummy, bool xpay, KernelType kernel_type, typename Arg> struct staggered : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr staggered(const Ftor &ftor) : arg(ftor.arg) { }
@@ -216,10 +316,8 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      auto coord = arg.improved ? getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, 0, parity, thread_dim) :
-                                  getCoords<QUDA_4D_PC, mykernel_type, Arg, 1>(arg, idx, 0, parity, thread_dim);
-
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
 
       array<Vector, n_src_tile> out;
       if (arg.dd_out.isZero(coord)) {
@@ -229,7 +327,7 @@ namespace quda
         return;
       }
 
-      applyStaggered<nParity, mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyStaggered<mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
 #pragma unroll
       for (auto s = 0; s < n_src_tile; s++) out[s] *= arg.dagger_scale;
@@ -240,13 +338,13 @@ namespace quda
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
           Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
-          out[s] = arg.a * x - out[s];
+          out[s] = axpy(arg.a, x, -out[s]);
         }
       } else if (mykernel_type != INTERIOR_KERNEL) {
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
           Vector x = arg.out[src_idx + s](coord.x_cb, my_spinor_parity);
-          out[s] = x + (xpay ? -out[s] : out[s]);
+          out[s] = xpay ? x - out[s] : x + out[s];
         }
       }
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) {

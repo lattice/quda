@@ -94,21 +94,26 @@ namespace quda
 #ifdef _DEBUG
         // Debug code: Copy original A matrix to host
         std::complex<float> *A_h
-          = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
+          = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_host_pinned_malloc(size)) :
                                                     static_cast<std::complex<float> *>(A_d));
         if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
 #endif
 
         int *dipiv = static_cast<int *>(pool_device_malloc(batch * n * sizeof(int)));
         int *dinfo_array = static_cast<int *>(pool_device_malloc(batch * sizeof(int)));
-        int *info_array = static_cast<int *>(pool_pinned_malloc(batch * sizeof(int)));
+        int *info_array = static_cast<int *>(pool_host_pinned_malloc(batch * sizeof(int)));
         memset(info_array, '0', batch * sizeof(int)); // silence memcheck warnings
 
         if (prec == QUDA_SINGLE_PRECISION) {
+#if hipblasVersionMajor >= 3
+          typedef hipComplex C;
+#else
+          // The hipblas v1 interface, deprecated in v2, and removed in v3
           typedef hipblasComplex C;
+#endif
           C **A_array = static_cast<C **>(pool_device_malloc(2 * batch * sizeof(C *)));
           C **Ainv_array = A_array + batch;
-          C **A_array_h = static_cast<C **>(pool_pinned_malloc(2 * batch * sizeof(C *)));
+          C **A_array_h = static_cast<C **>(pool_host_pinned_malloc(2 * batch * sizeof(C *)));
           C **Ainv_array_h = A_array_h + batch;
           for (uint64_t i = 0; i < batch; i++) {
             A_array_h[i] = static_cast<C *>(A_d) + i * n * n;
@@ -150,22 +155,27 @@ namespace quda
           }
 
           pool_device_free(A_array);
-          pool_pinned_free(A_array_h);
+          pool_host_pinned_free(A_array_h);
 
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
-          std::complex<float> *Ainv_h = static_cast<std::complex<float> *>(pool_pinned_malloc(size));
+          std::complex<float> *Ainv_h = static_cast<std::complex<float> *>(pool_host_pinned_malloc(size));
           qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
 
           for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
-          pool_pinned_free(Ainv_h);
-          pool_pinned_free(A_h);
+          pool_host_pinned_free(Ainv_h);
+          pool_host_pinned_free(A_h);
 #endif
         } else if (prec == QUDA_DOUBLE_PRECISION) {
+#if hipblasVersionMajor >= 3
+          typedef hipDoubleComplex Z;
+#else
+          // The hipblas v1 interface, deprecated in v2, and removed in v3
           typedef hipblasDoubleComplex Z;
+#endif
           Z **A_array = static_cast<Z **>(pool_device_malloc(2 * batch * sizeof(Z *)));
           Z **Ainv_array = A_array + batch;
-          Z **A_array_h = static_cast<Z **>(pool_pinned_malloc(2 * batch * sizeof(Z *)));
+          Z **A_array_h = static_cast<Z **>(pool_host_pinned_malloc(2 * batch * sizeof(Z *)));
           Z **Ainv_array_h = A_array_h + batch;
           for (uint64_t i = 0; i < batch; i++) {
             A_array_h[i] = static_cast<Z *>(A_d) + i * n * n;
@@ -207,16 +217,16 @@ namespace quda
           }
 
           pool_device_free(A_array);
-          pool_pinned_free(A_array_h);
+          pool_host_pinned_free(A_array_h);
 
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
-          std::complex<double> *Ainv_h = static_cast<std::complex<double> *>(pool_pinned_malloc(size));
+          std::complex<double> *Ainv_h = static_cast<std::complex<double> *>(pool_host_pinned_malloc(size));
           qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
 
           for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcd, double>(A_h, Ainv_h, n, i); }
-          pool_pinned_free(Ainv_h);
-          pool_pinned_free(A_h);
+          pool_host_pinned_free(Ainv_h);
+          pool_host_pinned_free(A_h);
 #endif
         } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);
@@ -230,7 +240,7 @@ namespace quda
 
         pool_device_free(dipiv);
         pool_device_free(dinfo_array);
-        pool_pinned_free(info_array);
+        pool_host_pinned_free(info_array);
 
         qudaDeviceSynchronize();
         gettimeofday(&stop, NULL);
@@ -406,7 +416,12 @@ namespace quda
         //-------------------------------------------------------------------------
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
 
+#if hipblasVersionMajor >= 3
+          typedef hipDoubleComplex Z;
+#else
+          // The hipblas v1 interface, deprecated in v2, and removed in v3
           typedef hipblasDoubleComplex Z;
+#endif
           const std::complex<double> al = static_cast<const std::complex<double>>(blas_param.alpha);
           const std::complex<double> be = static_cast<const std::complex<double>>(blas_param.beta);
 
@@ -432,7 +447,12 @@ namespace quda
           flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
+#if hipblasVersionMajor >= 3
+          typedef hipComplex C;
+#else
+          // The hipblas v1 interface, deprecated in v2, and removed in v3
           typedef hipblasComplex C;
+#endif
 
           const std::complex<float> al = static_cast<const std::complex<float>>(blas_param.alpha);
           const std::complex<float> be = static_cast<const std::complex<float>>(blas_param.beta);
