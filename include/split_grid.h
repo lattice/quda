@@ -8,6 +8,7 @@
 #include <communicator_quda.h>
 
 #include <malloc_quda.h>
+#include <quda_api.h>
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -116,6 +117,33 @@ namespace quda
     }
   }
 
+  /**
+    @brief Retire everything the reshuffle has enqueued on the default stream. No-op on the host
+    transport.
+
+    With host staging, copy_to_buffer was a device-to-host copy and copy_from_buffer a host-to-device
+    copy, and cudaMemcpy in either of those directions is synchronous with respect to the host: the
+    call did not return until the bytes were there. comm_start could therefore be issued on the next
+    line and the data was guaranteed present.
+
+    With device staging both become device-to-device, and cudaMemcpy D2D is explicitly documented as
+    NOT host-synchronising -- it is enqueued on the default stream and returns. cuMemcpyDtoD and the
+    HIP equivalents behave the same way. So comm_start could hand MPI a buffer that the copy (and, in
+    join_field, the copyFieldOffset kernel feeding it) had not yet written, and the RDMA or IPC engine
+    would ship whatever was there. Symmetrically on the receive side: a shared receive buffer could be
+    handed to the next MPI receive, or returned to the pool, while an unretired D2D read of it was
+    still outstanding.
+
+    qudaDeviceSynchronize and not a stream synchronise: every operation involved (qudaMemcpy_ and
+    CopyFieldOffset::apply) targets device::get_default_stream(), so the two are equivalent here, and
+    the device-wide form stays correct if that ever stops being true. The cost is a sync per
+    reshuffle against a call that already ends in a comm_barrier.
+  */
+  inline void split_sync_device(bool device)
+  {
+    if (device) { qudaDeviceSynchronize(); }
+  }
+
   template <class Field>
   void inline split_field(Field &collect_field, cvector_ref<Field> &v_base_field, const CommKey &comm_key,
                           QudaPCType pc_type = QUDA_4D_PC)
@@ -205,6 +233,9 @@ namespace quda
       v_base_field[i].copy_to_buffer(v_send_buffer[i]);
     }
 
+    // The send buffers are only filled once the stream drains -- see split_sync_device().
+    split_sync_device(device);
+
     for (int i = 0; i < n_replicates; i++) {
       auto partition_idx = coordinate_from_index(i, comm_key); // Which partition to send to?
       auto processor_idx = comm_grid_idx / partition_dim;      // Which processor in that partition to send to?
@@ -238,7 +269,15 @@ namespace quda
       auto offset = partition_idx * field_dim;
 
       quda::copyFieldOffset(collect_field, buffer_field, offset, pc_type);
+
+      // Without a pre-post every replicate lands in the SAME receive buffer, so the next iteration's
+      // MPI receive would overwrite it while this copy_from_buffer is still queued. Retire it here.
+      // (With a pre-post each buffer is written once and read once, and the sync below suffices.)
+      if (!prepost) { split_sync_device(device); }
     }
+
+    // Retire the reads out of the receive buffers before pool_device_free hands them to anyone else.
+    split_sync_device(device);
 
     // The sends are never waited on, so this barrier is load-bearing: it is the proxy for "every
     // rank has drained its receives, therefore my sends have delivered, therefore the buffers and
@@ -317,19 +356,29 @@ namespace quda
     std::vector<void *> v_send_buffer(n_replicates, nullptr);
     std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
 
+    // Two loops, not one. Every slice is packed first, then the stream is drained, and only then is
+    // anything handed to MPI. Interleaving comm_start with the packing -- as this used to -- would
+    // hand MPI a buffer whose copyFieldOffset kernel and device-to-device copy were still queued;
+    // see split_sync_device(). buffer_field is still safe to reuse across iterations because the
+    // packing is all default-stream work and therefore self-ordered: iteration i+1's kernel cannot
+    // start before iteration i's copy out of it has finished.
     for (int i = 0; i < n_replicates; i++) {
-
       auto partition_idx = coordinate_from_index(i, comm_key);
-      auto dst_idx = (comm_grid_idx % processor_dim) * partition_dim + partition_idx;
-
-      int dst_rank = comm_rank_from_coords(dst_idx.data());
-      int tag = rank * total_rank + dst_rank;
-
       auto offset = partition_idx * field_dim;
       quda::copyFieldOffset(buffer_field, collect_field, offset, pc_type);
 
       v_send_buffer[i] = split_buffer_malloc(bytes, device);
       buffer_field.copy_to_buffer(v_send_buffer[i]);
+    }
+
+    split_sync_device(device);
+
+    for (int i = 0; i < n_replicates; i++) {
+      auto partition_idx = coordinate_from_index(i, comm_key);
+      auto dst_idx = (comm_grid_idx % processor_dim) * partition_dim + partition_idx;
+
+      int dst_rank = comm_rank_from_coords(dst_idx.data());
+      int tag = rank * total_rank + dst_rank;
 
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer[i], dst_rank, tag, bytes);
 
@@ -350,7 +399,13 @@ namespace quda
 
       comm_wait(v_mh_recv[i]);
       v_base_field[i % n_fields].copy_from_buffer(v_recv_buffer[b]);
+
+      // Shared receive buffer -- see the note in split_field.
+      if (!prepost) { split_sync_device(device); }
     }
+
+    // Retire the reads out of the receive buffers before they go back to the pool.
+    split_sync_device(device);
 
     // Load-bearing -- see the note in split_field.
     comm_barrier();
