@@ -250,11 +250,22 @@ namespace quda
 
   template <typename Arg> struct reDotProduct3d : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
+    using compute_t = reduction_t;
     using plus<reduce_t>::operator();
     static constexpr int reduce_block_dim = 2;
     const Arg &arg;
     constexpr reDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
+
+    /**
+       Compute the real dot product of x and y
+    */
+    template <typename T>
+    __device__ __host__ auto dot_(compute_t &sum, const complex<T> &a, const complex<T> &b)
+    {
+      sum = fma(compute_t(a.real()), compute_t(b.real()), sum);
+      sum = fma(compute_t(a.imag()), compute_t(b.imag()), sum);
+    }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {
@@ -267,7 +278,11 @@ namespace quda
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
-      return operator()(result, static_cast<reduction_t>(innerProduct(x, y).real()));
+      compute_t sum = {};
+#pragma unroll
+      for (int k = 0; k < x.size; k++) dot_(sum, x(k), y(k));
+
+      return operator()(result, sum);
     }
   };
 
@@ -301,12 +316,25 @@ namespace quda
 
   template <typename Arg> struct cDotProduct3d : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
+    using compute_t = reduction_t;
     using plus<reduce_t>::operator();
     static constexpr int reduce_block_dim = 2;
 
     const Arg &arg;
     constexpr cDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
+
+    /**
+       Compute complex-valued dot product of x and y
+    */
+    template <typename T>
+    __device__ __host__ auto cdot_(complex<compute_t> &sum, const complex<T> &a, const complex<T> &b)
+    {
+      sum.real(fma(compute_t(a.real()), compute_t(b.real()), sum.real()));
+      sum.real(fma(compute_t(a.imag()), compute_t(b.imag()), sum.real()));
+      sum.imag(fma(compute_t(a.real()), compute_t(b.imag()), sum.imag()));
+      sum.imag(fma(-compute_t(a.imag()), compute_t(b.real()), sum.imag()));
+    }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {
@@ -319,10 +347,12 @@ namespace quda
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
-      const complex<real> res = innerProduct(x, y);
-      const array<compute_t, 2> site {static_cast<compute_t>(res.real()), static_cast<compute_t>(res.imag())};
+      complex<compute_t> res = {};
+#pragma unroll
+      for (int k = 0; k < x.size; k++) cdot_(res, x(k), y(k));
 
-      return operator()(result, site);
+      return operator()(result, {res.real(), res.imag()});
     }
   };
+
 } // namespace quda
