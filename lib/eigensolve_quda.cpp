@@ -187,7 +187,7 @@ namespace quda
       if (eig_param->a_min >= eig_param->a_max)
         errorQuda("Invalid a_min = %e a_max = %e combination", eig_param->a_min, eig_param->a_max);
       if (eig_param->a_min <= 0.0)
-	warningQuda("Chebyshev minimum a_min = %e is non-positive. Acceleration may be ineffective.", eig_param->a_min);
+        warningQuda("Chebyshev minimum a_min = %e is non-positive. Acceleration may be ineffective.", eig_param->a_min);
     }
   }
 
