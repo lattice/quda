@@ -335,10 +335,8 @@ namespace quda
     // Power iteration
     double norm = 0.0;
     for (int i = 0; i < 100; i++) {
-      if ((i + 1) % 10 == 0) {
-        norm = sqrt(blas::norm2(in));
-        blas::ax(1.0 / norm, in);
-      }
+      norm = sqrt(blas::norm2(in));
+      blas::ax(1.0 / norm, in);
       mat(out, in);
       std::swap(out, in);
     }
