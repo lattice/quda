@@ -182,8 +182,12 @@ namespace quda
         eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
         logQuda(QUDA_SUMMARIZE, "Chebyshev maximum estimate: %e.\n", eig_param->a_max);
       }
+      if (!std::isfinite(eig_param->a_max))
+        errorQuda("Chebyshev maximum estimate is not finite (a_max = %e)", eig_param->a_max);
       if (eig_param->a_min >= eig_param->a_max)
         errorQuda("Invalid a_min = %e a_max = %e combination", eig_param->a_min, eig_param->a_max);
+      if (eig_param->a_min <= 0.0)
+	warningQuda("Chebyshev minimum a_min = %e is non-positive. Acceleration may be ineffective.", eig_param->a_min);
     }
   }
 
