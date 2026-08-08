@@ -28,7 +28,7 @@ run_point() {
   local nev=$1 log=$2 et_flags=$3
   local t0 t1
   t0=$(date +%s.%N)
-  "$BUILD_TESTS"/hmc_test --dim $DIMS --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" \
+  timeout ${POINT_TIMEOUT:-1800} "$BUILD_TESTS"/hmc_test --dim $DIMS --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" \
     --prec double --prec-sloppy double --mg-levels 1 --hmc-beta "$BETA" \
     --hmc-integrator 2 --hmc-n-steps "$N_STEPS" --hmc-tau "$TAU" \
     --hmc-thermalization 0 --hmc-n-trajectories "$N_TRAJ" \

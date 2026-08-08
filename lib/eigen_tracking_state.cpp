@@ -65,7 +65,9 @@ namespace quda
               blkSize, rounded);
       nEvUsed = rounded;
     }
-    int nKr = 3 * nEvUsed;
+    // QUDA's TRLM requires n_kr >= n_conv + 12; the plain 3x rule violates
+    // this for small pools (nEv=4 -> nKr=12 < 16) and aborts the solver.
+    int nKr = std::max(3 * nEvUsed, nEvUsed + 16);
     if (isBlock && nKr % blkSize != 0) { nKr = ((nKr + blkSize - 1) / blkSize) * blkSize; }
 
     logQuda(QUDA_SUMMARIZE, "EigenTrackingState: running initial eig solve (type=%d, nEv=%d, nKr=%d, blockSize=%d)\n",

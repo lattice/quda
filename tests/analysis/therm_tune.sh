@@ -50,7 +50,7 @@ for chunk in $(seq 1 "$MAX_CHUNKS"); do
     et_args+=(--eigentracking-pool-infile "${STATE_GAUGE}.pool")
   fi
 
-  "$BUILD_TESTS"/hmc_test --dim $DIMS --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" \
+  timeout ${CHUNK_TIMEOUT:-2400} "$BUILD_TESTS"/hmc_test --dim $DIMS --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" \
     --prec double --prec-sloppy double --mg-levels 1 --hmc-beta "$BETA" \
     --hmc-integrator "$INTEGRATOR" --hmc-n-steps "$N_STEPS" --hmc-tau "$TAU" \
     --hmc-thermalization "$CHUNK" --hmc-n-trajectories "$CHUNK" \
