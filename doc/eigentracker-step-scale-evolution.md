@@ -70,3 +70,25 @@ checkpoints — both already in place.  Step-scale fidelity then becomes
 relevant when MG-assisted light-mass running arrives at the bottom of
 the kappa ladder, where deflation/setup-refresh quality directly sets
 solve cost.
+
+## Decision gate: RESOLVED (2026-08-08 sweep, ensemble F thermalized state)
+
+Force-solve CG iterations are flat in pool size (38.9 / 38.9 / 38.0 /
+38.0 for ET-off / nEv 4 / 8 / 16): **the force solves do not consume
+the pool** — the deflation benefit axis is currently zero.  TRLM anchor
+cost is ~250 operator applications roughly independent of nEv (the
+n_kr floor dominates for small pools).  Consequences:
+
+- The cost/benefit crossover is at the smallest pool giving reliable
+  lambda_min anchors: **nEv = 4-8**.
+- Step-scale predictor-corrector fidelity work is deferred (as gated).
+- The higher-value upstream item is wiring the pool into force-solve
+  deflation (deflated CG / init-guess projection) — without it the
+  eigentracker is a diagnostics instrument, which is all this physics
+  program requires, but not what the machinery was built for.
+
+Sweep caveats: per-point wall-clock numbers were truncated by the
+30-minute orchestration timeout (2-4 of 6 trajectories completed per
+point); CG-iteration flatness and TRLM cost are unaffected.  The
+subspace-residual column was empty because the probe logs at VERBOSE —
+promote to SUMMARIZE (checklist item above) before the next sweep.
