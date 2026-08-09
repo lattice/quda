@@ -52,6 +52,9 @@ namespace quda
        @param[in] in Input field set
     */
     virtual void apply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) = 0;
+
+    virtual void get_fatlong(GaugeField *&fat_p, GaugeField *&lng_p) = 0;
+
   };
 
   /**
@@ -100,6 +103,9 @@ namespace quda
 
     void apply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     { ApplyLaplace(out, in, precise, dir, a, b, in, parity, comm_dim, profile); }
+
+    void get_fatlong(GaugeField *&fat_p, GaugeField *&lng_p) override
+    {}
   };
 
 #ifdef GPU_STAGGERED_DIRAC
@@ -172,6 +178,8 @@ namespace quda
       dirac->MdagM(out, in);  // MdagM = 4m^2 - D^2 >= 0 (QUDA staggered M = 2m + Dhop)
       blas::ax(-0.25, out);   // K_t = -1/4 MdagM = -m^2 + 1/4 Dhop^2; see class note
     }
+    void get_fatlong(GaugeField *&fat_p, GaugeField *&lng_p) override
+    {}
   };
 #endif
 
@@ -225,6 +233,8 @@ namespace quda
       // kappa normalization differs from the staggered "2m" case, so the staggered 1/4
       // does NOT carry over -- resolve separately before trusting Wilson flow times.
     }
+    void get_fatlong(GaugeField *&fat_p, GaugeField *&lng_p) override
+    {}
   };
 #endif
 
@@ -281,6 +291,10 @@ namespace quda
 
       // Fattening-output template: general links, explicit storage, no halo.
       raw_param = GaugeFieldParam(gauge_template);
+      // if (raw_param.t_boundary == QUDA_ANTI_PERIODIC_T){
+      // printfQuda("aParam is aperiodic OOPS\n");
+      // raw_param.t_boundary = QUDA_PERIODIC_T;
+      // }
       raw_param.create = QUDA_ZERO_FIELD_CREATE;
       raw_param.reconstruct = QUDA_RECONSTRUCT_NO;
       raw_param.link_type = QUDA_GENERAL_LINKS;
@@ -313,7 +327,7 @@ namespace quda
       setUnitarizeLinksConstants(1e-14, 1e-10, true, false, 1e-6, 1e-6);
 
       DiracParam diracParam;
-      diracParam.mass = inv_param.mass;
+      diracParam.mass = 0;
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = QUDA_MATPC_EVEN_EVEN;
       for (int i = 0; i < 4; i++) diracParam.commDim[i] = comm_dim[i];
@@ -376,6 +390,85 @@ namespace quda
       dirac->MdagM(out, in);  // MdagM = 4m^2 - D^2 (QUDA staggered/HISQ M = 2m + Dhop)
       blas::ax(-0.25, out);   // K_t = -1/4 MdagM; see StaggeredFlowOp note on the 1/4
     }
+
+    void get_fatlong(GaugeField *&fat_p, GaugeField *&lng_p) override
+    {
+       fat_p = &fat;
+       lng_p = &lng;
+    }
+
+    // void apply_invertMultiSrc(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    // {
+    //   DiracParam diracParam;
+    //   // 3. Back up all ASQTAD/HISQ global pointers (in case they held previous data)
+    //   GaugeField *backup_fatPrecise       = gaugeFatPrecise;
+    //   GaugeField *backup_fatSloppy        = gaugeFatSloppy;
+    //   GaugeField *backup_fatPrecondition  = gaugeFatPrecondition;
+    //   GaugeField *backup_fatRefinement    = gaugeFatRefinement;
+    //   GaugeField *backup_fatEig           = gaugeFatEig;
+      
+    //   GaugeField *backup_longPrecise      = gaugeLongPrecise;
+    //   GaugeField *backup_longSloppy       = gaugeLongSloppy;
+    //   GaugeField *backup_longPrecondition = gaugeLongPrecondition;
+    //   GaugeField *backup_longRefinement   = gaugeLongRefinement;
+    //   GaugeField *backup_longEig          = gaugeLongEig;
+
+    //   // 4. Inject your custom computed precise fields
+    //   gaugeFatPrecise = my_custom_fat_link;
+    //   gaugeLongPrecise = my_custom_long_link;
+      
+    //   // 5. Nullify the fat/long sloppy pointers so QUDA knows to allocate new memory for them
+    //   gaugeFatSloppy = nullptr;
+    //   gaugeFatPrecondition = nullptr;
+    //   gaugeFatRefinement = nullptr;
+    //   gaugeFatEig = nullptr;
+      
+    //   gaugeLongSloppy = nullptr;
+    //   gaugeLongPrecondition = nullptr;
+    //   gaugeLongRefinement = nullptr;
+    //   gaugeLongEig = nullptr;
+      
+    //   // 6. Map the desired precisions from your QudaInvertParam
+    //   QudaPrecision prec[4] = {inv_param->cuda_prec_sloppy, 
+    //                            inv_param->cuda_prec_precondition,
+    //                            inv_param->cuda_prec_refinement_sloppy, 
+    //                            inv_param->cuda_prec_eigensolver};
+      
+    //   // 7. Map the reconstruct types (Fat links are never reconstructed, 
+    //   // so these apply to the long links)
+    //   QudaReconstructType recon[4] = {gaugeLongPrecise->Reconstruct(), 
+    //                                   gaugeLongPrecise->Reconstruct(),
+    //                                   gaugeLongPrecise->Reconstruct(), 
+    //                                   gaugeLongPrecise->Reconstruct()};
+      
+    //   // 8. Generate the lower-precision fields. 
+    //   // Because gaugePrecise is currently nullptr, this function will safely IGNORE 
+    //   // your Wilson fields and only build the fat and long sloppy fields.
+    //   loadSloppyGaugeQuda(prec, recon);
+      
+    //   diracParam.mass = inv_param.m;
+    //   diracParam.dagger = QUDA_DAG_NO;
+    //   diracParam.matpcType = QUDA_MATPC_EVEN_EVEN;
+    //   for (int i = 0; i < 4; i++) diracParam.commDim[i] = comm_dim[i];
+    //   if (with_long) {
+    //     diracParam.type = QUDA_ASQTAD_DIRAC; // full HISQ: fat one-link X + Naik long L
+    //     diracParam.fatGauge = &fat;
+    //     diracParam.longGauge = &lng;
+    //   } else {
+    //     diracParam.type = QUDA_STAGGERED_DIRAC; // truncated HISQ: one-link operator on X
+    //     diracParam.gauge = &fat;
+    //   }
+    //   dirac.reset(Dirac::create(diracParam));
+    //   if (with_long) {
+    //     dirac->updateFields(nullptr, &fat, &lng, nullptr); // DiracImprovedStaggered: (gauge ignored, fat, long)
+    //   } else {
+    //     dirac->updateFields(&fat, nullptr, nullptr, nullptr); // DiracStaggered: gauge = fat
+    //   }
+      
+    //   invertMultiSrcQuda(out.data(),in.data(),inv_param);
+
+      
+    // }
   };
 #endif
 

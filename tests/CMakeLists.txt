@@ -212,6 +212,11 @@ target_link_libraries(final_flow_test ${TEST_LIBS})
 quda_checkbuildtest(final_flow_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS final_flow_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(correct_flow_test correct_flow_test.cpp)
+target_link_libraries(correct_flow_test ${TEST_LIBS})
+quda_checkbuildtest(correct_flow_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS correct_flow_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(pion_corr_test pion_corr_test.cpp)
 target_link_libraries(pion_corr_test ${TEST_LIBS})
 quda_checkbuildtest(pion_corr_test QUDA_BUILD_ALL_TESTS)

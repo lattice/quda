@@ -350,6 +350,8 @@ namespace quda {
 
   void solve(const std::vector<void *> &hp_x, const std::vector<void *> &hp_b, QudaInvertParam &param,
              const GaugeField &u);
+  void solve(const std::vector<void *> &hp_x, const std::vector<void *> &hp_b, QudaInvertParam &param,
+             const GaugeField &u, Dirac &dirac);
 }
 
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
@@ -3638,11 +3640,11 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
-void invertMultiSrcQudaEG(void **_hp_x, void **_hp_b, QudaInvertParam *param, GaugeField &gauge)
+void invertMultiSrcQudaED(void **_hp_x, void **_hp_b, QudaInvertParam *param, GaugeField &gauge, Dirac &dirac)
 {
   auto op = [&](const std::vector<void *> &_x, const std::vector<void *> &_b, QudaInvertParam &param) {
     // check the gauge fields have been created
-    solve(_x, _b, param, gauge);
+    solve(_x, _b, param, gauge, dirac);
   };
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
@@ -6290,6 +6292,76 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
       int Nsrc_tile = inv_param->num_src;
       printfQuda("pion We are here now, \n");
       auto initial_gauge_copy = t_gf_list[0].get();
+
+      flow_op.update(initial_gauge_copy);
+
+      // GaugeField *backup_gaugePrecise = gaugePrecise;
+      // gaugePrecise = nullptr;
+
+      GaugeField *backup_fatPrecise       = gaugeFatPrecise;
+      GaugeField *backup_fatSloppy        = gaugeFatSloppy;
+      GaugeField *backup_fatPrecondition  = gaugeFatPrecondition;
+      GaugeField *backup_fatRefinement    = gaugeFatRefinement;
+      GaugeField *backup_fatEigensolver   = gaugeFatEigensolver;
+      printfQuda("pion We are here now, \n");
+      GaugeField *backup_longPrecise      = gaugeLongPrecise;
+      GaugeField *backup_longSloppy       = gaugeLongSloppy;
+      GaugeField *backup_longPrecondition = gaugeLongPrecondition;
+      GaugeField *backup_longRefinement   = gaugeLongRefinement;
+      GaugeField *backup_longEigensolver  = gaugeLongEigensolver;
+
+      // 4. Inject your custom computed precise fields
+      // gaugeFatPrecise = flow_op.fat;
+      // gaugeLongPrecise = flow_op.lng;
+      printfQuda("pion We are here now, \n");
+      flow_op.get_fatlong(gaugeFatPrecise,gaugeLongPrecise);
+      if (gaugeFatPrecise == nullptr){
+
+        printfQuda("fatt gauge precise in nulptr \n");
+      }
+      else{
+        printfQuda("no it isnt \n");
+      }
+      printfQuda("pion We are here noasdfw, \n");
+      // 5. Nullify the fat/long sloppy pointers so QUDA knows to allocate new memory for them
+      gaugeFatSloppy = nullptr;
+      gaugeFatPrecondition = nullptr;
+      gaugeFatRefinement = nullptr;
+      gaugeFatEigensolver = nullptr;
+      
+      gaugeLongSloppy = nullptr;
+      gaugeLongPrecondition = nullptr;
+      gaugeLongRefinement = nullptr;
+      gaugeLongEigensolver = nullptr;
+      
+      // 6. Map the desired precisions from your QudaInvertParam
+      // QudaPrecision prec[4] = {inv_param->cuda_prec_sloppy, 
+      //                          inv_param->cuda_prec_precondition,
+      //                          inv_param->cuda_prec_refinement_sloppy, 
+      //                          inv_param->cuda_prec_eigensolver};
+      
+      QudaPrecision prec[4] = {QUDA_SINGLE_PRECISION, 
+                               QUDA_SINGLE_PRECISION,
+                               QUDA_SINGLE_PRECISION, 
+                               QUDA_SINGLE_PRECISION};
+      printfQuda("bgin window, \n");
+      // 7. Map the reconstruct types (Fat links are never reconstructed, 
+      // so these apply to the long links)
+      QudaReconstructType recon_val = QUDA_RECONSTRUCT_NO;
+      if (gaugeLongPrecise != nullptr) {
+          recon_val = gaugeLongPrecise->Reconstruct();
+      }
+      
+      QudaReconstructType recon[4] = {recon_val, recon_val, recon_val, recon_val};
+      printfQuda("end window, \n");
+      
+      // 8. Generate the lower-precision fields. 
+      // Because gaugePrecise is currently nullptr, this function will safely IGNORE 
+      // your Wilson fields and only build the fat and long sloppy fields.
+      printfQuda("pion We are here now, \n");
+      freeSloppyGaugeQuda();
+      loadSloppyGaugeQuda(prec, recon);
+
       
       if (Nsrc > 1){
           printfQuda("doing multisrc\n");
@@ -6301,14 +6373,43 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
                   data_f_temp3_tiled[i] = f_temp3[j + i].data();
                   data_f_temp4_tiled[i] = f_temp4[j + i].data();
                 }
-                // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
-                invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+                // invertMultiSrcQudaED(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*gaugePrecise,*dirac);
+            invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
       }
       }
       else{
           printfQuda("doing single source\n");
           invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
       }
+
+      // 11. Manually free the temporary fat/long sloppy fields we just used
+      // if (gaugeFatSloppy) { delete gaugeFatSloppy; gaugeFatSloppy = nullptr; }
+      // if (gaugeFatPrecondition) { delete gaugeFatPrecondition; gaugeFatPrecondition = nullptr; }
+      // if (gaugeFatRefinement) { delete gaugeFatRefinement; gaugeFatRefinement = nullptr; }
+      // if (gaugeFatEigensolver) { delete gaugeFatEigensolver; gaugeFatEigensolver = nullptr; }
+      
+      // if (gaugeLongSloppy) { delete gaugeLongSloppy; gaugeLongSloppy = nullptr; }
+      // if (gaugeLongPrecondition) { delete gaugeLongPrecondition; gaugeLongPrecondition = nullptr; }
+      // if (gaugeLongRefinement) { delete gaugeLongRefinement; gaugeLongRefinement = nullptr; }
+      // if (gaugeLongEigensolver) { delete gaugeLongEigensolver; gaugeLongEigensolver = nullptr; }
+
+      freeSloppyGaugeQuda();
+      
+      // 12. Restore the original Fat and Long globals
+      gaugeFatPrecise       = backup_fatPrecise;
+      gaugeFatSloppy        = backup_fatSloppy;
+      gaugeFatPrecondition  = backup_fatPrecondition;
+      gaugeFatRefinement    = backup_fatRefinement;
+      gaugeFatEigensolver   = backup_fatEigensolver;
+      
+      gaugeLongPrecise      = backup_longPrecise;
+      gaugeLongSloppy       = backup_longSloppy;
+      gaugeLongPrecondition = backup_longPrecondition;
+      gaugeLongRefinement   = backup_longRefinement;
+      gaugeLongEigensolver  = backup_longEigensolver;
+      
+      // 13. Unhide the original Wilson gauge field
+      // gaugePrecise = backup_gaugePrecise;
         
       f_temp4[0].PrintVector(0,0,0);
 
@@ -6766,6 +6867,7 @@ void computeFlowedForwardPpb(void **h_out, void **h_in, QudaInvertParam *inv_par
   }
 
   GaugeFieldParam gParam(*gaugePrecise);
+    
   gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
   GaugeField gaugeTemp(gParam);
   GaugeField gin = *gaugeSmeared;

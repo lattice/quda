@@ -155,6 +155,7 @@ void run(test_t param)
   quda::ColorSpinorParam cs_param;
 
   if (single_component) {
+      printfQuda("this is running single component\n");
     // nSpin = 1 staggered-type fields; mass 0 -> pure DdagD generator. HISQ variants
     // use the asqtad dslash type (also nSpin = 1) for the field layout.
     invParam.dslash_type

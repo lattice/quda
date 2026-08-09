@@ -12,6 +12,7 @@
 // External headers
 #include <misc.h>
 #include <host_utils.h>
+#include <gauge_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
@@ -350,6 +351,7 @@ void init()
   void *qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
   void *qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
   void *qdp_longlink[4] = {cpuLongQDP.data(0), cpuLongQDP.data(1), cpuLongQDP.data(2), cpuLongQDP.data(3)};
+    
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, true);
 
   // Reorder gauge fields to MILC order
@@ -362,29 +364,14 @@ void init()
   double plaq[3];
   computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     // Compute fat link plaquette
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
 
-  // freeGaugeQuda();
-
   loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
 
-  // now copy back to QDP aliases, since these are used for the reference dslash
-  // cpuFatQDP = cpuFatMILC;
-  // cpuFatQDP.exchangeGhost();
-  // cpuFatMILC.exchangeGhost();
-  // if (dslash_type == QUDA_ASQTAD_DSLASH) {
-  //   cpuLongQDP = cpuLongMILC;
-  //   cpuLongQDP.exchangeGhost();
-  //   cpuLongMILC.exchangeGhost();
-  // }
-
-  // Staggered Gauge construct END
-  //-----------------------------------------------------------------------------------
 }
 void cleanup()
 {
