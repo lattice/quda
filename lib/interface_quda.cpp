@@ -350,8 +350,6 @@ namespace quda {
 
   void solve(const std::vector<void *> &hp_x, const std::vector<void *> &hp_b, QudaInvertParam &param,
              const GaugeField &u);
-  void solve(const std::vector<void *> &hp_x, const std::vector<void *> &hp_b, QudaInvertParam &param,
-             const GaugeField &u, Dirac &dirac);
 }
 
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
@@ -3640,14 +3638,14 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
-void invertMultiSrcQudaED(void **_hp_x, void **_hp_b, QudaInvertParam *param, GaugeField &gauge, Dirac &dirac)
-{
-  auto op = [&](const std::vector<void *> &_x, const std::vector<void *> &_b, QudaInvertParam &param) {
-    // check the gauge fields have been created
-    solve(_x, _b, param, gauge, dirac);
-  };
-  callMultiSrcQuda(_hp_x, _hp_b, param, op);
-}
+// void invertMultiSrcQudaED(void **_hp_x, void **_hp_b, QudaInvertParam *param, GaugeField &gauge, Dirac &dirac)
+// {
+//   auto op = [&](const std::vector<void *> &_x, const std::vector<void *> &_b, QudaInvertParam &param) {
+//     // check the gauge fields have been created
+//     solve(_x, _b, param, gauge, dirac);
+//   };
+//   callMultiSrcQuda(_hp_x, _hp_b, param, op);
+// }
 
 void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
@@ -6303,12 +6301,14 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
       GaugeField *backup_fatPrecondition  = gaugeFatPrecondition;
       GaugeField *backup_fatRefinement    = gaugeFatRefinement;
       GaugeField *backup_fatEigensolver   = gaugeFatEigensolver;
+      GaugeField *backup_fatExtended      = gaugeFatExtended;
       printfQuda("pion We are here now, \n");
       GaugeField *backup_longPrecise      = gaugeLongPrecise;
       GaugeField *backup_longSloppy       = gaugeLongSloppy;
       GaugeField *backup_longPrecondition = gaugeLongPrecondition;
       GaugeField *backup_longRefinement   = gaugeLongRefinement;
       GaugeField *backup_longEigensolver  = gaugeLongEigensolver;
+      GaugeField *backup_longExtended     = gaugeLongExtended;
 
       // 4. Inject your custom computed precise fields
       // gaugeFatPrecise = flow_op.fat;
@@ -6328,12 +6328,13 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
       gaugeFatPrecondition = nullptr;
       gaugeFatRefinement = nullptr;
       gaugeFatEigensolver = nullptr;
+      gaugeFatExtended = nullptr;
       
       gaugeLongSloppy = nullptr;
       gaugeLongPrecondition = nullptr;
       gaugeLongRefinement = nullptr;
       gaugeLongEigensolver = nullptr;
-      
+      gaugeLongExtended = nullptr;
       // 6. Map the desired precisions from your QudaInvertParam
       // QudaPrecision prec[4] = {inv_param->cuda_prec_sloppy, 
       //                          inv_param->cuda_prec_precondition,
@@ -6401,12 +6402,13 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
       gaugeFatPrecondition  = backup_fatPrecondition;
       gaugeFatRefinement    = backup_fatRefinement;
       gaugeFatEigensolver   = backup_fatEigensolver;
-      
+      gaugeFatExtended  = backup_fatExtended;
       gaugeLongPrecise      = backup_longPrecise;
       gaugeLongSloppy       = backup_longSloppy;
       gaugeLongPrecondition = backup_longPrecondition;
       gaugeLongRefinement   = backup_longRefinement;
       gaugeLongEigensolver  = backup_longEigensolver;
+      gaugeLongExtended  = backup_longExtended;
       
       // 13. Unhide the original Wilson gauge field
       // gaugePrecise = backup_gaugePrecise;
@@ -6444,6 +6446,8 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
           ferm_m->ppb_t.push_back(ppb_t_el);
           printfQuda("ppb size %i\n",ferm_m->ppb.size());
       }
+
+  
 }
 
 void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list, std::vector<GaugeField> &gauge_stages,
