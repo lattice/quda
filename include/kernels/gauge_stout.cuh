@@ -72,7 +72,7 @@ namespace quda
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
+      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -155,7 +155,7 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, arg.dir_ignore, arg.anisotropy);
+      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);

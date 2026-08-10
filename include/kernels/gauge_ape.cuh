@@ -67,7 +67,7 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
+      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
