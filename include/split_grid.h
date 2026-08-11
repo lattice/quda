@@ -139,6 +139,74 @@ namespace quda
   }
 
   /**
+    @brief Whether the reshuffle may skip its staging copies where the field's own allocation is
+    already what MPI has to send (split_field) or what copyFieldOffset can write into (join_field).
+    Default on; set QUDA_SPLIT_ZERO_COPY=0 to disable.
+  */
+  inline bool split_zero_copy_enabled()
+  {
+    static const bool enabled = []() {
+      const char *env = getenv("QUDA_SPLIT_ZERO_COPY");
+      return !(env && strcmp(env, "0") == 0);
+    }();
+    return enabled;
+  }
+
+  /**
+    @brief The device pointer MPI can send TotalBytes() from directly, or nullptr when this field
+    shape needs a staging copy first.
+
+    split_field used to allocate a staging buffer per distinct source field and fill it with
+    copy_to_buffer purely so that comm_declare_send_rank had a pointer. For the shapes below that
+    copy is the identity: copy_to_buffer on a device-resident field is a single qudaMemcpy out of
+    data() with no reordering, so the field's own allocation already IS the buffer. Sending from it
+    is bit-identical, not merely equivalent.
+  */
+  inline void *split_send_pointer(const GaugeField &f)
+  {
+    return f.is_pointer_array(f.Order()) ? nullptr : f.data();
+  }
+
+  inline void *split_send_pointer(const ColorSpinorField &f) { return f.data(); }
+
+  inline void *split_send_pointer(const CloverField &) { return nullptr; }
+
+  /**
+    @brief Whether copyFieldOffset may write straight into a staging buffer through a
+    QUDA_REFERENCE_FIELD_CREATE view of it, letting join_field drop its scratch buffer_field and
+    the device-to-device copy that drained it.
+  */
+  inline bool split_can_reference(const ColorSpinorField &) { return true; }
+
+  inline bool split_can_reference(const GaugeField &) { return false; }
+
+  inline bool split_can_reference(const CloverField &) { return false; }
+
+  /**
+    @brief Point a field param at an external allocation, so the Field built from it is a view.
+
+    Only the colour-spinor overload is ever reached -- split_can_reference() is the gate, and it is
+    false for the other two. The others exist so that the templates stay instantiable for every
+    Field type, and they abort rather than silently doing the wrong thing if that gate is ever
+    loosened without reading the note above.
+  */
+  inline void split_param_reference(ColorSpinorParam &param, void *ptr)
+  {
+    param.v = ptr;
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+  }
+
+  inline void split_param_reference(GaugeFieldParam &, void *)
+  {
+    errorQuda("A reference-created GaugeField exchanges ghosts from its constructor; see split_can_reference()");
+  }
+
+  inline void split_param_reference(CloverFieldParam &, void *)
+  {
+    errorQuda("CloverField::copy_to_buffer concatenates two allocations; see split_can_reference()");
+  }
+
+  /**
     @brief Retire everything the reshuffle has enqueued on the default stream. No-op on the host
     transport.
 
@@ -203,7 +271,10 @@ namespace quda
 
     using param_type = typename Field::param_type;
     param_type param(meta);
-    Field buffer_field(param);
+
+    // Unpack straight out of the receive buffer where the Field type allows a view of it.
+    const bool unpack_in_place = device && split_zero_copy_enabled() && split_can_reference(meta);
+    Field buffer_field = unpack_in_place ? Field() : Field(param);
 
     CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
 
@@ -241,20 +312,28 @@ namespace quda
       }
     }
 
-    // One staging buffer per DISTINCT source field, not one per replicate. Replicate i sends
-    // v_base_field[i % n_fields], so when n_fields < n_replicates -- the gauge and clover splits,
-    // where n_fields == 1 -- the same field was previously copied out once per replicate. At
-    // production that is P redundant copies of a 4.7 GB/GPU field.
+    // One staging buffer per DISTINCT source field, not one per replicate.
     const int n_send_buffers = n_fields < n_replicates ? n_fields : n_replicates;
+
+    // ... and no staging buffer at all where the field can be sent from its own pointer.
     std::vector<void *> v_send_buffer(n_send_buffers, nullptr);
+    std::vector<void *> v_send_from(n_send_buffers, nullptr);
     std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
 
     for (int i = 0; i < n_send_buffers; i++) {
-      v_send_buffer[i] = split_buffer_malloc(bytes, device);
-      v_base_field[i].copy_to_buffer(v_send_buffer[i]);
+      // Only on the device transport. With pinned host staging copy_to_buffer is a real
+      // device-to-host copy and the field pointer would be the wrong address space, so
+      // QUDA_ENABLE_SPLIT_GDR=0 keeps exactly the behaviour it had.
+      v_send_from[i]
+        = (device && split_zero_copy_enabled()) ? split_send_pointer(v_base_field[i]) : nullptr;
+      if (!v_send_from[i]) {
+        v_send_buffer[i] = split_buffer_malloc(bytes, device);
+        v_base_field[i].copy_to_buffer(v_send_buffer[i]);
+        v_send_from[i] = v_send_buffer[i];
+      }
     }
 
-    // The send buffers are only filled once the stream drains -- see split_sync_device().
+    // The send buffers are only filled once the stream drains.
     split_sync_device(device);
 
     for (int i = 0; i < n_replicates; i++) {
@@ -266,7 +345,7 @@ namespace quda
       int dst_rank = ::quda::comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
 
-      v_mh_send[i] = comm_declare_send_rank(v_send_buffer[i % n_fields], dst_rank, tag, bytes);
+      v_mh_send[i] = comm_declare_send_rank(v_send_from[i % n_fields], dst_rank, tag, bytes);
       comm_start(v_mh_send[i]);
     }
 
@@ -284,15 +363,23 @@ namespace quda
       }
 
       comm_wait(v_mh_recv[i]);
-      buffer_field.copy_from_buffer(v_recv_buffer[b]);
 
       auto partition_idx = coordinate_from_index(i, comm_key);
       auto offset = partition_idx * field_dim;
 
-      quda::copyFieldOffset(collect_field, buffer_field, offset, pc_type);
+      if (unpack_in_place) {
+        param_type recv_param(param);
+        split_param_reference(recv_param, v_recv_buffer[b]);
+        Field recv_field(recv_param);
+        quda::copyFieldOffset(collect_field, recv_field, offset, pc_type);
+      } else {
+        buffer_field.copy_from_buffer(v_recv_buffer[b]);
+        quda::copyFieldOffset(collect_field, buffer_field, offset, pc_type);
+      }
 
       // Without a pre-post every replicate lands in the SAME receive buffer, so the next iteration's
-      // MPI receive would overwrite it while this copy_from_buffer is still queued. Retire it here.
+      // MPI receive would overwrite it while this iteration's read of it is still queued -- the
+      // copy_from_buffer, or, in place, the copyFieldOffset kernel reading the view. Retire it here.
       // (With a pre-post each buffer is written once and read once, and the sync below suffices.)
       if (!prepost) { split_sync_device(device); }
     }
@@ -305,6 +392,8 @@ namespace quda
     // handles are safe to release". Removing it requires waiting on the sends first. With
     // pool_device_free the buffer re-enters circulation immediately, so dropping the barrier
     // without that wait would let the allocator hand an in-flight send buffer to someone else.
+    // It is what covers the zero-copy sends too: it is the point after which the caller may write
+    // v_base_field again, because until it returns MPI may still be reading out of it.
     comm_barrier();
 
     for (int i = 0; i < n_replicates; i++) {
@@ -341,7 +430,10 @@ namespace quda
     using param_type = typename Field::param_type;
 
     param_type param(meta);
-    Field buffer_field(param);
+
+    // Pack straight into the send buffer where the Field type allows a view of it.
+    const bool pack_in_place = device && split_zero_copy_enabled() && split_can_reference(meta);
+    Field buffer_field = pack_in_place ? Field() : Field(param);
 
     CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
 
@@ -371,25 +463,32 @@ namespace quda
     }
 
     // Unlike split_field there is no buffer to share: every replicate carries a different slice of
-    // collect_field, so each needs its own. buffer_field is reused across iterations, which is safe
-    // because copy_to_buffer is a blocking copy on the default stream and therefore orders after
-    // the copyFieldOffset that filled it.
+    // collect_field, so each needs its own.
     std::vector<void *> v_send_buffer(n_replicates, nullptr);
     std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
 
     // Two loops, not one. Every slice is packed first, then the stream is drained, and only then is
     // anything handed to MPI. Interleaving comm_start with the packing -- as this used to -- would
     // hand MPI a buffer whose copyFieldOffset kernel and device-to-device copy were still queued;
-    // see split_sync_device(). buffer_field is still safe to reuse across iterations because the
-    // packing is all default-stream work and therefore self-ordered: iteration i+1's kernel cannot
-    // start before iteration i's copy out of it has finished.
+    // see split_sync_device().
     for (int i = 0; i < n_replicates; i++) {
       auto partition_idx = coordinate_from_index(i, comm_key);
       auto offset = partition_idx * field_dim;
-      quda::copyFieldOffset(buffer_field, collect_field, offset, pc_type);
 
       v_send_buffer[i] = split_buffer_malloc(bytes, device);
-      buffer_field.copy_to_buffer(v_send_buffer[i]);
+
+      if (pack_in_place) {
+        param_type send_param(param);
+        split_param_reference(send_param, v_send_buffer[i]);
+        Field send_field(send_param);
+        // copyFieldOffset writes the body only, and a reference-created field skips the zeroPad
+        // its allocating counterpart gets.
+        send_field.zeroPad();
+        quda::copyFieldOffset(send_field, collect_field, offset, pc_type);
+      } else {
+        quda::copyFieldOffset(buffer_field, collect_field, offset, pc_type);
+        buffer_field.copy_to_buffer(v_send_buffer[i]);
+      }
     }
 
     split_sync_device(device);
