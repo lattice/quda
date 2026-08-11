@@ -6370,15 +6370,19 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
           }
           std::vector<std::vector<Complex>> pion_corr_t_el = {};
           std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
+          std::vector<Complex> temp_color(f_temp4[0].full_dim(3)*comm_dim(3));
           //moving result_global outside here
           std::fill(result_global.begin(), result_global.end(), 0.0);
           //at this iteration, f_temp4.size() is simply the number of coors (3)
           for (size_t nn = 0; nn < f_temp4.size(); nn++){
+            std::fill(temp_color.begin(), temp_color.end(), 0.0);
+            contractSummedQuda(f_temp4[nn], f_temp4[nn], temp_color, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
             
-            contractSummedQuda(f_temp4[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
-            comm_allreduce_sum(result_global);
-            
+            for (int t = 0; t < f_temp4[0].full_dim(3)*comm_dim(3); t++) {
+                  result_global[t] += temp_color[t];
+              }
             }
+          comm_allreduce_sum(result_global);
           pion_corr_t_el.push_back(result_global);
           printfQuda("size of pion cvorr %i\n",pion_corr_t_el.size());
           ferm_m->pion_corr.push_back(pion_corr_t_el);
