@@ -3303,6 +3303,11 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
   auto profile = pushProfile(profileUpdateSplitGauge, param);
   profileUpdateSplitGauge.TPSTART(QUDA_PROFILE_PREAMBLE);
 
+  const size_t usgmem_entry_live = device_allocated();
+  const size_t usgmem_entry_peak = device_allocated_peak();
+  static int usgmem_rebuild = 0;
+  usgmem_rebuild++;
+
   // delete the buffered split gauge
   freeGaugeSplit();
 
@@ -3416,6 +3421,26 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
   }
 
   comm_barrier();
+
+  // Give the driver back what this rebuild left in QUDA's device pool
+  const size_t usgmem_pre_flush_live = device_allocated();
+  if (update_split_gauge != QUDA_UPDATE_SPLIT_GAUGE_OFF && split_flush_pool_after_gauge()) {
+    printfQuda("Flushing the QUDA device memory pool after the split gauge rebuild\n");
+    flushPoolQuda(QUDA_MEMORY_DEVICE);
+  }
+  {
+    const double to_mib = 1.0 / (1024.0 * 1024.0);
+    printfQuda("USGMEM rebuild %d | live %.1f -> %.1f MiB (flushed %.1f) | peak %.1f -> %.1f MiB "
+               "(transient excess %+.1f) | split_key %d %d %d %d\n",
+               usgmem_rebuild, usgmem_pre_flush_live * to_mib, device_allocated() * to_mib,
+               (usgmem_pre_flush_live - device_allocated()) * to_mib, usgmem_entry_peak * to_mib,
+               device_allocated_peak() * to_mib,
+               (double)(device_allocated_peak() - usgmem_entry_peak) * to_mib, split_key[0],
+               split_key[1], split_key[2], split_key[3]);
+    logQuda(QUDA_DEBUG_VERBOSE, "USGMEM rebuild %d entry live %.1f MiB\n", usgmem_rebuild,
+            usgmem_entry_live * to_mib);
+  }
+
   // switch back assuming switching have almost zero cost
   push_communicator(default_comm_key);
   updateR();

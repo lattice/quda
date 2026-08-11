@@ -107,6 +107,27 @@ namespace quda
     return cap;
   }
 
+  /**
+    @brief Whether UpdateSplitGauge should return its pool residue to the driver when it finishes a
+    rebuild. Default on; set QUDA_FLUSH_POOL_AFTER_SPLIT_GAUGE=0 to disable.
+
+    pool::device_free_ puts a freed block in deviceCache and never calls cudaFree, so when a rebuild
+    finishes the cache is holding two things that nothing afterwards has a use for: the split_field
+    staging for the two precise link splits, and the whole full-grid tower, which setupGaugeFields
+    deletes after GaugeBundleBackup has copied it.
+
+    DEFAULT ON. Turn it off for any workload that rebuilds far more often than it solves -- gauge
+    generation driving split multi-src solves would be the case to watch.
+  */
+  inline bool split_flush_pool_after_gauge()
+  {
+    static const bool enabled = []() {
+      const char *env = getenv("QUDA_FLUSH_POOL_AFTER_SPLIT_GAUGE");
+      return !(env && strcmp(env, "0") == 0);
+    }();
+    return enabled;
+  }
+
   inline void split_buffer_free(void *ptr, bool device)
   {
     if (!ptr) return;
