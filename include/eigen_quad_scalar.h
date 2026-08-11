@@ -37,6 +37,9 @@ namespace Eigen
     enum {
       IsComplex = 0,
       IsInteger = 0,
+      IsSigned = 1, // do not inherit is_signed from numeric_limits<__float128>;
+                    // many standard libraries leave it unspecialized (is_signed=0),
+                    // which makes Eigen's numext::abs a no-op and breaks eigensolves.
       RequireInitialization = 1,
       ReadCost = 1,
       AddCost = 3,
