@@ -6118,6 +6118,93 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
 }
 
+std::vector<GaugeField*> apply_Hisq2Wilson(FermionFlowOp &flow_op)
+  {
+      GaugeField *backup_fatPrecise       = gaugeFatPrecise;
+      GaugeField *backup_fatSloppy        = gaugeFatSloppy;
+      GaugeField *backup_fatPrecondition  = gaugeFatPrecondition;
+      GaugeField *backup_fatRefinement    = gaugeFatRefinement;
+      GaugeField *backup_fatEigensolver   = gaugeFatEigensolver;
+      GaugeField *backup_fatExtended      = gaugeFatExtended;
+      GaugeField *backup_longPrecise      = gaugeLongPrecise;
+      GaugeField *backup_longSloppy       = gaugeLongSloppy;
+      GaugeField *backup_longPrecondition = gaugeLongPrecondition;
+      GaugeField *backup_longRefinement   = gaugeLongRefinement;
+      GaugeField *backup_longEigensolver  = gaugeLongEigensolver;
+      GaugeField *backup_longExtended     = gaugeLongExtended;
+
+      // Specifically computed fat/long
+    
+      flow_op.get_fatlong(gaugeFatPrecise,gaugeLongPrecise);
+
+      gaugeFatSloppy = nullptr;
+      gaugeFatPrecondition = nullptr;
+      gaugeFatRefinement = nullptr;
+      gaugeFatEigensolver = nullptr;
+      gaugeFatExtended = nullptr;
+      
+      gaugeLongSloppy = nullptr;
+      gaugeLongPrecondition = nullptr;
+      gaugeLongRefinement = nullptr;
+      gaugeLongEigensolver = nullptr;
+      gaugeLongExtended = nullptr;
+      // 6. Map the desired precisions from your QudaInvertParam
+      // QudaPrecision prec[4] = {inv_param->cuda_prec_sloppy, 
+      //                          inv_param->cuda_prec_precondition,
+      //                          inv_param->cuda_prec_refinement_sloppy, 
+      //                          inv_param->cuda_prec_eigensolver};
+      
+      QudaPrecision prec[4] = {QUDA_SINGLE_PRECISION, 
+                               QUDA_SINGLE_PRECISION,
+                               QUDA_SINGLE_PRECISION, 
+                               QUDA_SINGLE_PRECISION};
+      QudaReconstructType recon_val = QUDA_RECONSTRUCT_NO;
+      if (gaugeLongPrecise != nullptr) {
+          recon_val = gaugeLongPrecise->Reconstruct();
+      }
+      
+      QudaReconstructType recon[4] = {recon_val, recon_val, recon_val, recon_val};
+      printfQuda("end window, \n");
+      
+      // ignore Wilson fields and only build the fat and long.
+      freeSloppyGaugeQuda();
+      loadSloppyGaugeQuda(prec, recon);
+      std::vector<GaugeField*> backups = {
+          backup_fatPrecise, 
+          backup_fatSloppy, 
+          backup_fatPrecondition, 
+          backup_fatRefinement, 
+          backup_fatEigensolver, 
+          backup_fatExtended,
+          backup_longPrecise, 
+          backup_longSloppy, 
+          backup_longPrecondition, 
+          backup_longRefinement, 
+          backup_longEigensolver, 
+          backup_longExtended
+      };
+      return backups;
+  }
+
+void apply_Wilson2Hisq(std::vector<GaugeField*> backups)
+{
+      freeSloppyGaugeQuda();
+
+      gaugeFatPrecise       = backups[0];
+      gaugeFatSloppy        = backups[1];
+      gaugeFatPrecondition  = backups[2];
+      gaugeFatRefinement    = backups[3];
+      gaugeFatEigensolver   = backups[4];
+      gaugeFatExtended      = backups[5];
+      
+      gaugeLongPrecise      = backups[6];
+      gaugeLongSloppy       = backups[7];
+      gaugeLongPrecondition = backups[8];
+      gaugeLongRefinement   = backups[9];
+      gaugeLongEigensolver  = backups[10];
+      gaugeLongExtended     = backups[11];
+}
+
 
     
 /* total_dist == n_steps, n_b is dividing factor of each block, n_Save is the size of the list, "front" denotes whether split hierarchy goes to existing or new subhierarchy */
@@ -6227,106 +6314,22 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
     
 }
 
-std::vector<GaugeField*> apply_Hisq2Wilson(FermionFlowOp &flow_op)
-  {
-      GaugeField *backup_fatPrecise       = gaugeFatPrecise;
-      GaugeField *backup_fatSloppy        = gaugeFatSloppy;
-      GaugeField *backup_fatPrecondition  = gaugeFatPrecondition;
-      GaugeField *backup_fatRefinement    = gaugeFatRefinement;
-      GaugeField *backup_fatEigensolver   = gaugeFatEigensolver;
-      GaugeField *backup_fatExtended      = gaugeFatExtended;
-      GaugeField *backup_longPrecise      = gaugeLongPrecise;
-      GaugeField *backup_longSloppy       = gaugeLongSloppy;
-      GaugeField *backup_longPrecondition = gaugeLongPrecondition;
-      GaugeField *backup_longRefinement   = gaugeLongRefinement;
-      GaugeField *backup_longEigensolver  = gaugeLongEigensolver;
-      GaugeField *backup_longExtended     = gaugeLongExtended;
 
-      // 4. Inject your custom computed precise fields
-      // gaugeFatPrecise = flow_op.fat;
-      // gaugeLongPrecise = flow_op.lng;
-      flow_op.get_fatlong(gaugeFatPrecise,gaugeLongPrecise);
-      // 5. Nullify the fat/long sloppy pointers so QUDA knows to allocate new memory for them
-      gaugeFatSloppy = nullptr;
-      gaugeFatPrecondition = nullptr;
-      gaugeFatRefinement = nullptr;
-      gaugeFatEigensolver = nullptr;
-      gaugeFatExtended = nullptr;
-      
-      gaugeLongSloppy = nullptr;
-      gaugeLongPrecondition = nullptr;
-      gaugeLongRefinement = nullptr;
-      gaugeLongEigensolver = nullptr;
-      gaugeLongExtended = nullptr;
-      // 6. Map the desired precisions from your QudaInvertParam
-      // QudaPrecision prec[4] = {inv_param->cuda_prec_sloppy, 
-      //                          inv_param->cuda_prec_precondition,
-      //                          inv_param->cuda_prec_refinement_sloppy, 
-      //                          inv_param->cuda_prec_eigensolver};
-      
-      QudaPrecision prec[4] = {QUDA_SINGLE_PRECISION, 
-                               QUDA_SINGLE_PRECISION,
-                               QUDA_SINGLE_PRECISION, 
-                               QUDA_SINGLE_PRECISION};
-      printfQuda("bgin window, \n");
-      // 7. Map the reconstruct types (Fat links are never reconstructed, 
-      // so these apply to the long links)
-      QudaReconstructType recon_val = QUDA_RECONSTRUCT_NO;
-      if (gaugeLongPrecise != nullptr) {
-          recon_val = gaugeLongPrecise->Reconstruct();
-      }
-      
-      QudaReconstructType recon[4] = {recon_val, recon_val, recon_val, recon_val};
-      printfQuda("end window, \n");
-      
-      // 8. Generate the lower-precision fields. 
-      // Because gaugePrecise is currently nullptr, this function will safely IGNORE 
-      // your Wilson fields and only build the fat and long sloppy fields.
-      freeSloppyGaugeQuda();
-      loadSloppyGaugeQuda(prec, recon);
-      std::vector<GaugeField*> backups = {
-          backup_fatPrecise, 
-          backup_fatSloppy, 
-          backup_fatPrecondition, 
-          backup_fatRefinement, 
-          backup_fatEigensolver, 
-          backup_fatExtended,
-          backup_longPrecise, 
-          backup_longSloppy, 
-          backup_longPrecondition, 
-          backup_longRefinement, 
-          backup_longEigensolver, 
-          backup_longExtended
-      };
-      return backups;
-  }
-
-void apply_Wilson2Hisq(std::vector<GaugeField*> backups)
-{
-      freeSloppyGaugeQuda();
-      
-      // 12. Restore the original Fat and Long globals
-      gaugeFatPrecise       = backups[0];
-      gaugeFatSloppy        = backups[1];
-      gaugeFatPrecondition  = backups[2];
-      gaugeFatRefinement    = backups[3];
-      gaugeFatEigensolver   = backups[4];
-      gaugeFatExtended      = backups[5];
-      
-      gaugeLongPrecise      = backups[6];
-      gaugeLongSloppy       = backups[7];
-      gaugeLongPrecondition = backups[8];
-      gaugeLongRefinement   = backups[9];
-      gaugeLongEigensolver  = backups[10];
-      gaugeLongExtended     = backups[11];
-}
   
 
 void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<ColorSpinorField>&f_temp3, std::vector<std::reference_wrapper<GaugeField>> t_gf_list, QudaInvertParam *inv_param, FermionFlowOp &flow_op, FermMeasObj *ferm_m, QudaGaugeSmearParam *smear_param)
     { 
       int Nsrc = (int) f_temp4.size();
       int Nsrc_tile = inv_param->num_src;
-      printfQuda("pion We are here now, \n");
+      
+      auto initial_gauge_copy = t_gf_list[0].get();
+      std::vector<GaugeField*> backups;
+      if (smear_param->fermion_flow_type == QUDA_FERMION_FLOW_HISQ || smear_param->fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED)
+      {
+        printfQuda("We are here now, ready to hisqify links, \n");
+        flow_op.update(initial_gauge_copy);
+         backups = apply_Hisq2Wilson(flow_op);
+      }
       
       if (Nsrc > 1){
           printfQuda("doing multisrc\n");
@@ -6346,8 +6349,13 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
           printfQuda("doing single source\n");
           invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
       }
-        
       f_temp4[0].PrintVector(0,0,0);
+      if (smear_param->fermion_flow_type == QUDA_FERMION_FLOW_HISQ || smear_param->fermion_flow_type == QUDA_FERMION_FLOW_HISQ_TRUNCATED)
+      {
+        printfQuda("Now to un-hisqify links, \n");
+        apply_Wilson2Hisq(backups);
+      }
+      
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
       printfQuda("here?\n");
       std::array<int, 4> mom_modes = {0,0,0,0};
@@ -6388,76 +6396,7 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
 
       flow_op.update(initial_gauge_copy);
 
-      // GaugeField *backup_gaugePrecise = gaugePrecise;
-      // gaugePrecise = nullptr;
       std::vector<GaugeField*> backups = apply_Hisq2Wilson(flow_op);
-      // GaugeField *backup_fatPrecise       = gaugeFatPrecise;
-      // GaugeField *backup_fatSloppy        = gaugeFatSloppy;
-      // GaugeField *backup_fatPrecondition  = gaugeFatPrecondition;
-      // GaugeField *backup_fatRefinement    = gaugeFatRefinement;
-      // GaugeField *backup_fatEigensolver   = gaugeFatEigensolver;
-      // GaugeField *backup_fatExtended      = gaugeFatExtended;
-      // printfQuda("pion We are here now, \n");
-      // GaugeField *backup_longPrecise      = gaugeLongPrecise;
-      // GaugeField *backup_longSloppy       = gaugeLongSloppy;
-      // GaugeField *backup_longPrecondition = gaugeLongPrecondition;
-      // GaugeField *backup_longRefinement   = gaugeLongRefinement;
-      // GaugeField *backup_longEigensolver  = gaugeLongEigensolver;
-      // GaugeField *backup_longExtended     = gaugeLongExtended;
-
-      // // 4. Inject your custom computed precise fields
-      // // gaugeFatPrecise = flow_op.fat;
-      // // gaugeLongPrecise = flow_op.lng;
-      // printfQuda("pion We are here now, \n");
-      // flow_op.get_fatlong(gaugeFatPrecise,gaugeLongPrecise);
-      // if (gaugeFatPrecise == nullptr){
-
-      //   printfQuda("fatt gauge precise in nulptr \n");
-      // }
-      // else{
-      //   printfQuda("no it isnt \n");
-      // }
-      // printfQuda("pion We are here noasdfw, \n");
-      // // 5. Nullify the fat/long sloppy pointers so QUDA knows to allocate new memory for them
-      // gaugeFatSloppy = nullptr;
-      // gaugeFatPrecondition = nullptr;
-      // gaugeFatRefinement = nullptr;
-      // gaugeFatEigensolver = nullptr;
-      // gaugeFatExtended = nullptr;
-      
-      // gaugeLongSloppy = nullptr;
-      // gaugeLongPrecondition = nullptr;
-      // gaugeLongRefinement = nullptr;
-      // gaugeLongEigensolver = nullptr;
-      // gaugeLongExtended = nullptr;
-      // // 6. Map the desired precisions from your QudaInvertParam
-      // // QudaPrecision prec[4] = {inv_param->cuda_prec_sloppy, 
-      // //                          inv_param->cuda_prec_precondition,
-      // //                          inv_param->cuda_prec_refinement_sloppy, 
-      // //                          inv_param->cuda_prec_eigensolver};
-      
-      // QudaPrecision prec[4] = {QUDA_SINGLE_PRECISION, 
-      //                          QUDA_SINGLE_PRECISION,
-      //                          QUDA_SINGLE_PRECISION, 
-      //                          QUDA_SINGLE_PRECISION};
-      // printfQuda("bgin window, \n");
-      // // 7. Map the reconstruct types (Fat links are never reconstructed, 
-      // // so these apply to the long links)
-      // QudaReconstructType recon_val = QUDA_RECONSTRUCT_NO;
-      // if (gaugeLongPrecise != nullptr) {
-      //     recon_val = gaugeLongPrecise->Reconstruct();
-      // }
-      
-      // QudaReconstructType recon[4] = {recon_val, recon_val, recon_val, recon_val};
-      // printfQuda("end window, \n");
-      
-      // // 8. Generate the lower-precision fields. 
-      // // Because gaugePrecise is currently nullptr, this function will safely IGNORE 
-      // // your Wilson fields and only build the fat and long sloppy fields.
-      // printfQuda("pion We are here now, \n");
-      // freeSloppyGaugeQuda();
-      // loadSloppyGaugeQuda(prec, recon);
-
       
       if (Nsrc > 1){
           printfQuda("doing multisrc\n");
@@ -6477,22 +6416,6 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
           printfQuda("doing single source\n");
           invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
       }
-
-      // freeSloppyGaugeQuda();
-      
-      // // 12. Restore the original Fat and Long globals
-      // gaugeFatPrecise       = backup_fatPrecise;
-      // gaugeFatSloppy        = backup_fatSloppy;
-      // gaugeFatPrecondition  = backup_fatPrecondition;
-      // gaugeFatRefinement    = backup_fatRefinement;
-      // gaugeFatEigensolver   = backup_fatEigensolver;
-      // gaugeFatExtended  = backup_fatExtended;
-      // gaugeLongPrecise      = backup_longPrecise;
-      // gaugeLongSloppy       = backup_longSloppy;
-      // gaugeLongPrecondition = backup_longPrecondition;
-      // gaugeLongRefinement   = backup_longRefinement;
-      // gaugeLongEigensolver  = backup_longEigensolver;
-      // gaugeLongExtended  = backup_longExtended;
 
       apply_Wilson2Hisq(backups);
         
