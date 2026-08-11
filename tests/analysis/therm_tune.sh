@@ -33,7 +33,7 @@ ET_ARGS_FILE=${ET_ARGS_FILE:-}
 PREFIX=${PREFIX:?set PREFIX to the ensemble directory/prefix, e.g. ~/data/ensF/thermtune}
 
 mkdir -p "$(dirname "$PREFIX")"
-STATE_GAUGE=""
+STATE_GAUGE="${START_GAUGE:-}"   # seed chunk 1 from a nearby-kappa thermalized config
 plateau=0
 prev_iters=-1
 

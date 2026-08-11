@@ -30,6 +30,7 @@ log() { echo "[ladder $(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 
 kappa=${LADDER_START_KAPPA:?set LADDER_START_KAPPA (first rung kappa)}
 skip_therm_prefix=${LADDER_SKIP_THERM_PREFIX:-}  # reuse an existing therm-tune result for rung 1
+last_cfg=${LADDER_SEED_CFG:-}   # thermalized config seeding rung-1 therm; chained thereafter
 
 for rung in $(seq 1 $MAX_RUNGS); do
   tag=$(echo "$kappa" | sed 's/0\.//;s/^/k0/')
@@ -43,6 +44,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
     log "reusing existing therm-tune: $tuned"
   else
     DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=10 \
+      START_GAUGE="$last_cfg" \
       PREFIX=$ED/tt BUILD_TESTS=$T bash $A/therm_tune.sh > "$ED"/thermtune.log 2>&1
     if ! grep -q "^THERMALIZED" "$ED"/thermtune.log; then
       log "HALT: therm-tune failed at kappa=$kappa (see $ED/thermtune.log)"; exit 1
@@ -73,6 +75,8 @@ for rung in $(seq 1 $MAX_RUNGS); do
   if grep -q "Exceeded maximum iterations" "$ED"/production.log; then
     log "HALT: solver iteration blowup at kappa=$kappa"; exit 1
   fi
+
+  last_cfg=$(ls "$ED"/cfg_* | grep -vE "\.pool|\.evals" | sort | tail -1)
 
   # lambda_min record from the fresh-TRLM anchors (exceptionality watch)
   grep -oE "initialized. Smallest eval = [0-9.e+-]+" "$ED"/production.log | awk '{print $5}' > "$ED"/lambda_min.dat
