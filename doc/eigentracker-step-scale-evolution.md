@@ -92,3 +92,21 @@ Sweep caveats: per-point wall-clock numbers were truncated by the
 point); CG-iteration flatness and TRLM cost are unaffected.  The
 subspace-residual column was empty because the probe logs at VERBOSE —
 promote to SUMMARIZE (checklist item above) before the next sweep.
+
+## MG bring-up: RESOLVED (2026-08-10/11)
+
+The MG crashes (calculateY precision mismatch, MGPreconditionedRun
+segfault) were precision-flag incoherence, not library defects: MG
+internals are single-precision and collide with --prec-sloppy double.
+The working set is
+
+    --prec double --prec-sloppy single --prec-precondition single
+    --prec-null single --mg-levels 2 --inv-multigrid true
+
+Measured at kappa=0.1456, 12^3x32: 12 MG-GCR outer iterations to 1e-10
+(true residual 5e-11) vs 105 plain-CG iterations; HMC+MG 4/4 accepted
+trajectories with eigentracking seeding its 24-vector pool from the MG
+null space (no TRLM cost; fresh-TRLM anchors remain the exact
+lambda_min diagnostic).  MG-era eigentracking is live; the step-scale
+predictor-corrector item remains open for when pool fidelity between
+anchors matters.
