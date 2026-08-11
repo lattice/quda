@@ -79,7 +79,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
   last_cfg=$(ls "$ED"/cfg_* | grep -vE "\.pool|\.evals" | sort | tail -1)
 
   # lambda_min record from the fresh-TRLM anchors (exceptionality watch)
-  grep -oE "initialized. Smallest eval = [0-9.e+-]+" "$ED"/production.log | awk '{print $5}' > "$ED"/lambda_min.dat
+  grep -oE "([Ii]nitialized. Smallest eval = |seeded from MG. Pool=[0-9]+, smallest eval=)[0-9.e+-]+" "$ED"/production.log | grep -oE "[0-9.e+-]+$" > "$ED"/lambda_min.dat
   lmin=$(sort -g "$ED"/lambda_min.dat | head -1)
   log "rung $rung lambda_min anchors: min=$lmin n=$(wc -l < "$ED"/lambda_min.dat)"
 
@@ -165,8 +165,8 @@ if s and s > 0:
     # kappa_c (where m^2 extrapolates to zero), never more than 0.005
     x_c = x2 - m2*m2 / s
     k_c = 1/x_c
-    import os
-cap = min(float(os.environ.get('CLAMP_MAX','0.005')), max(0.001, float(os.environ.get('CLAMP_FRAC','0.25')) * (k_c - k2)))
+    cap = min(float(os.environ.get('CLAMP_MAX', '0.005')),
+              max(0.001, float(os.environ.get('CLAMP_FRAC', '0.25')) * (k_c - k2)))
 else:
     k_next = k2 + 0.0010
     cap = 0.0010
