@@ -82,7 +82,15 @@ PYEOF
   echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters"
 
   # ---- thermalization criterion: solver-iteration plateau ------------
-  if [ "$iters" -eq "$prev_iters" ]; then plateau=$((plateau + 1)); else plateau=0; fi
+  # Tolerance-based: at light masses lambda_min fluctuations jitter the
+  # iteration count by a few per chunk; require stability within
+  # max(2, 3%) rather than exact equality.
+  tol=$(python3 -c "print(max(2, int(0.03 * $iters)))")
+  if [ "$prev_iters" -ge 0 ] && [ $((iters - prev_iters)) -le "$tol" ] && [ $((prev_iters - iters)) -le "$tol" ]; then
+    plateau=$((plateau + 1))
+  else
+    plateau=0
+  fi
   prev_iters=$iters
   if [ "$plateau" -ge "$PLATEAU_CHUNKS" ]; then
     echo "THERMALIZED after $((chunk * CHUNK)) trajectories (iteration count stable at $iters for $PLATEAU_CHUNKS chunks)"
