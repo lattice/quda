@@ -331,7 +331,6 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
   setVerbosity(verbosity);
-  check_naik(eps_naik, n_naiks);
 
   // Set values for precisions via the command line.
   setQudaPrecisions();
