@@ -22,8 +22,9 @@ mkdir -p "$TUNECACHE"
 if [ "${USE_MG:-0}" -eq 1 ]; then
   SOLVER_FLAGS="--prec double --prec-sloppy single --prec-precondition single --prec-null single \
 --mg-levels 2 --inv-multigrid true --niter $NITER"
-  THERM_MG="--hmc-mg-setup-interval $MG_SETUP_INTERVAL_THERM"
-  PROD_MG="--hmc-mg-setup-interval $MG_SETUP_INTERVAL_PROD"
+  THERM_MG=""; PROD_MG=""
+  [ "${MG_SETUP_INTERVAL_THERM:-0}" -gt 0 ] && THERM_MG="--hmc-mg-setup-interval $MG_SETUP_INTERVAL_THERM"
+  [ "${MG_SETUP_INTERVAL_PROD:-0}" -gt 0 ] && PROD_MG="--hmc-mg-setup-interval $MG_SETUP_INTERVAL_PROD"
 else
   SOLVER_FLAGS="--prec double --prec-sloppy double --mg-levels 1 --niter $NITER"
   THERM_MG=""; PROD_MG=""

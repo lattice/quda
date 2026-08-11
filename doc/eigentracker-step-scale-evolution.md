@@ -110,3 +110,13 @@ null space (no TRLM cost; fresh-TRLM anchors remain the exact
 lambda_min diagnostic).  MG-era eigentracking is live; the step-scale
 predictor-corrector item remains open for when pool fidelity between
 anchors matters.
+
+## Known issue: HMC MG setup-refresh path (2026-08-11)
+
+--hmc-mg-setup-interval N triggers an MG re-setup during the run that
+fails coarse-operator verification (L2 deviation ~0.4 vs 2e-3) on the
+evolved gauge, aborting the run; the initial setup on the same fields
+verifies fine.  Mitigation: refresh disabled; seeded rung starts keep
+the setup field close to the running field so stale-setup drift is
+small.  Upstream: debug the re-setup path (stale vector reuse vs full
+regeneration) before long single-setup productions at light mass.
