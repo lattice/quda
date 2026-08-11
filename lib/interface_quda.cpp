@@ -6833,7 +6833,7 @@ void computeFlowedPionCorrelator(void **h_out, void **h_in, QudaInvertParam *inv
   ferm_m.meas_diff_vec = meas_diff_vec;
   perform_flow_pion_corr(fout,fin,t_gf_list,inv_param, *flow_op, &ferm_m,smear_param);
 
-      //get back on cpu
+  //get back on cpu; we are switching back to normal Dirac order, BEWARE!!!
   inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
   inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
   inv_param->dirac_order=QUDA_DIRAC_ORDER;
@@ -6934,7 +6934,7 @@ void computeFlowedForwardPpb(void **h_out, void **h_in, QudaInvertParam *inv_par
   ferm_m.meas_diff_vec = meas_diff_vec;
   perform_flow_forward_ppb(fout,fin,t_gf_list,inv_param, *flow_op, &ferm_m,smear_param);
 
-      //get back on cpu
+  //get back on cpu; we are switching back to normal Dirac order, BEWARE!!!
   inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
   inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
   inv_param->dirac_order=QUDA_DIRAC_ORDER;
