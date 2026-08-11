@@ -624,6 +624,7 @@ private:
   __host__ __device__ ReproducibleFloatingAccumulator& operator-=(const ReproducibleFloatingAccumulator &other){
     const auto temp = -other;
     binned_dbdbadd(temp);
+    return *this;
   }
 
   ///Determines if two binned fp are equal
@@ -647,7 +648,7 @@ private:
 
   ///Returns the negative of this binned fp
   ///NOTE: Makes a copy and performs arithmetic; slow.
-  __host__ __device__ ReproducibleFloatingAccumulator operator-() {
+  __host__ __device__ ReproducibleFloatingAccumulator operator-() const {
     constexpr int incpriX = 1;
     constexpr int inccarX = 1;
     ReproducibleFloatingAccumulator temp = *this;
