@@ -26,9 +26,9 @@ import re, sys, math
 # collect the first full solve's per-iteration residuals
 res = []
 for line in open(sys.argv[1]):
-    m = re.search(r"CG: (\d+) iterations?, <r,r> = ([0-9.e+-]+)", line)
+    m = re.search(r"CG:\s+(\d+) iterations, <r,r> = ([0-9.e+-]+)", line)
     if not m:
-        m = re.search(r"CG: (\d+) iterations, r2 = ([0-9.e+-]+)", line)
+        m = None
     if m:
         it, r2 = int(m.group(1)), float(m.group(2))
         if res and it < res[-1][0]:  # next solve started
