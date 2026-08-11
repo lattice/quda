@@ -45,7 +45,7 @@ namespace Eigen
 
     __host__ __device__ static inline __float128 epsilon()
     {
-      return quda::eigen_fp128_pow(static_cast<__float128>(2), static_cast<__float128>(-113));
+      return quda::eigen_fp128_pow(static_cast<__float128>(2), static_cast<__float128>(-112));
     }
     __host__ __device__ static inline __float128 dummy_precision()
     {
@@ -53,12 +53,12 @@ namespace Eigen
     }
     __host__ __device__ static inline __float128 highest()
     {
-      return quda::eigen_fp128_pow(static_cast<__float128>(2), static_cast<__float128>(16384));
+      // Finite binary128 max: (2 - 2^-112) * 2^16383
+      const __float128 two = static_cast<__float128>(2);
+      return (two - quda::eigen_fp128_pow(two, static_cast<__float128>(-112)))
+        * quda::eigen_fp128_pow(two, static_cast<__float128>(16383));
     }
-    __host__ __device__ static inline __float128 lowest()
-    {
-      return -quda::eigen_fp128_pow(static_cast<__float128>(2), static_cast<__float128>(16384));
-    }
+    __host__ __device__ static inline __float128 lowest() { return -highest(); }
     static inline int digits10() { return 33; }
   };
 

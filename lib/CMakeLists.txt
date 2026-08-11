@@ -805,9 +805,14 @@ set_property(CACHE QUDA_REDUCTION_ALGORITHM PROPERTY STRINGS NAIVE KAHAN REPRODU
 if(${QUDA_REDUCTION_ALGORITHM} STREQUAL "NAIVE")
   set(QUDA_REDUCTION_ALGORITHM_NAIVE 1)
 elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "KAHAN")
-  set(QUDA_REDUCTION_ALGORITHM_KAHAN 1)
+  # Keep KAHAN in STRINGS so it remains visible, but reject until kahan_t exists.
+  message(FATAL_ERROR "QUDA_REDUCTION_ALGORITHM=KAHAN is not implemented yet "
+                      "(no kahan_t definition). Use NAIVE or REPRODUCIBLE.")
 elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "REPRODUCIBLE")
   set(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE 1)
+else()
+  message(FATAL_ERROR "Invalid value for QUDA_REDUCTION_ALGORITHM: '${QUDA_REDUCTION_ALGORITHM}'. "
+                      "Allowed: NAIVE, REPRODUCIBLE (KAHAN reserved but not implemented).")
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
