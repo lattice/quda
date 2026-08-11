@@ -410,7 +410,7 @@ __device__ __host__  inline bool operator>(const doubledouble &a, const doubledo
 
 __device__ __host__  inline bool operator>=(const doubledouble &a, const doubledouble &b)
 {
-  if (a.head() >= b.head()) {
+  if (a.head() > b.head()) {
     return true;
   } else if (a.head() == b.head() && a.tail() >= b.tail()) {
     return true;
@@ -432,7 +432,7 @@ __device__ __host__  inline bool operator<(const doubledouble &a, const doubledo
 
 __device__ __host__  inline bool operator<=(const doubledouble &a, const doubledouble &b)
 {
-  if (a.head() <= b.head()) {
+  if (a.head() < b.head()) {
     return true;
   } else if (a.head() == b.head() && a.tail() <= b.tail()) {
     return true;
