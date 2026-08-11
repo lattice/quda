@@ -111,12 +111,35 @@ lambda_min diagnostic).  MG-era eigentracking is live; the step-scale
 predictor-corrector item remains open for when pool fidelity between
 anchors matters.
 
-## Known issue: HMC MG setup-refresh path (2026-08-11)
+## RESOLVED: HMC MG setup-refresh failure = stale sloppy-gauge ghost zones (2026-08-11)
 
---hmc-mg-setup-interval N triggers an MG re-setup during the run that
-fails coarse-operator verification (L2 deviation ~0.4 vs 2e-3) on the
-evolved gauge, aborting the run; the initial setup on the same fields
-verifies fine.  Mitigation: refresh disabled; seeded rung starts keep
-the setup field close to the running field so stale-setup drift is
-small.  Upstream: debug the re-setup path (stale vector reuse vs full
-regeneration) before long single-setup productions at light mass.
+--hmc-mg-setup-interval N triggered an MG re-setup that failed
+coarse-operator verification (L2 deviation ~0.4 vs 2e-3) on the evolved
+gauge while the initial setup on the same fields verified fine.
+
+Root cause (established by controlled bisection, all inputs
+hash-verified): the Wilson-type dslash reads gauge ghost pads even on a
+single GPU (no_comms_fill — "dslash kernels presently require this"),
+and hmcRefreshResidentGaugeState's in-place gaugeSloppy->copy(precise)
+does not reliably refresh the destination's ghost zone.  After a
+trajectory of in-place evolution the sloppy family's ghost links are
+stale by O(1) relative to the bulk, so the boundary-corrupted sloppy
+operator gaps out the near-null modes; the 20-iteration null-vector
+polish then converges to machine zero (solutions ~1e-11 vs healthy
+~1e-5), post-orthonormalization normalises that noise into garbage null
+vectors, and D_c = P^dag D P fails at 0.38.  Evidence chain: deviation
+scales with tau (passes at tau=1e-3); sloppy BULK bit-identical to a
+fresh copy of precise (element diff 0.0) yet in-place recopy does not
+fix while family reallocation does; B[0]/cloverSloppy/gaugePrecondition
+hashes identical between failing and passing runs; a bare
+gaugeSloppy->exchangeGhost() with no reallocation fixes verification
+completely.
+
+Fix: hmcRefreshResidentGaugeState now calls exchangeGhost() on each
+distinct sloppy-family gauge after its in-place copy (and now also
+covers gaugeRefinement/gaugeEigensolver, which were previously never
+refreshed at all).  Side benefit: the stale ghosts also made every
+mixed-precision inner solve inconsistent with the outer operator at the
+boundary throughout MD — the likely cause of the reliable-update
+stagnation (~1e-7 CG stalls) observed earlier in the campaign.
+--hmc-mg-setup-interval is safe to enable again.

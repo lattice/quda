@@ -18,8 +18,10 @@ DSLASH=clover
 USE_MG=1                    # 1: 2-level MG-GCR (coherent precisions); 0: plain CG all-double
 NITER=3000                  # force/action solve cap; generous so the blowup guard
                             # signals genuine exceptionality, not a truncation
-MG_SETUP_INTERVAL_THERM=0   # mid-run MG re-setup path fails coarse-op verification (branch bug); seeded starts make refresh unnecessary
-MG_SETUP_INTERVAL_PROD=0
+MG_SETUP_INTERVAL_THERM=0   # therm rungs are short; seeded starts keep setup fresh enough
+MG_SETUP_INTERVAL_PROD=25   # periodic full MG re-setup (safe since the stale-ghost fix
+                            # in hmcRefreshResidentGaugeState, 2026-08-11; see
+                            # doc/eigentracker-step-scale-evolution.md)
 
 # ---- integrator ------------------------------------------------------
 INTEGRATOR=2                # 0 leapfrog, 1 Omelyan, 2 FGI (4th order; var(dH) ~ n^-8)

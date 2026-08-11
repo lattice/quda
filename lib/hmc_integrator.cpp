@@ -376,10 +376,34 @@ namespace quda
     // 1. ghost pads: copy() fills only the local volume, the Dirac
     //    operators read the pads;
     gaugePrecise->exchangeGhost();
-    // 2. sloppy/precondition gauge copies (aliased at uniform precision);
-    if (gaugeSloppy && gaugeSloppy != gaugePrecise) gaugeSloppy->copy(*gaugePrecise);
-    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy)
+    // 2. sloppy/precondition/refinement/eigensolver gauge copies (aliased at
+    //    uniform precision). Each distinct copy must ALSO re-exchange its own
+    //    ghost zone: the dslash reads gauge ghost pads even on a single GPU
+    //    (no_comms_fill), and copy() does not reliably refresh the
+    //    destination's ghost region on the in-place CUDA->CUDA path. Stale
+    //    sloppy ghosts leave the mixed-precision inner operator inconsistent
+    //    with the bulk (degraded reliable updates) and feed the MG
+    //    setup-refresh a boundary-corrupted operator whose null-vector
+    //    polish collapses to noise (coarse-op verification failure at
+    //    L2 ~ 0.4 on evolved gauge; root-caused 2026-08-11).
+    if (gaugeSloppy && gaugeSloppy != gaugePrecise) {
+      gaugeSloppy->copy(*gaugePrecise);
+      gaugeSloppy->exchangeGhost();
+    }
+    if (gaugePrecondition && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeSloppy) {
       gaugePrecondition->copy(*gaugePrecise);
+      gaugePrecondition->exchangeGhost();
+    }
+    if (gaugeRefinement && gaugeRefinement != gaugePrecise && gaugeRefinement != gaugeSloppy
+        && gaugeRefinement != gaugePrecondition) {
+      gaugeRefinement->copy(*gaugePrecise);
+      gaugeRefinement->exchangeGhost();
+    }
+    if (gaugeEigensolver && gaugeEigensolver != gaugePrecise && gaugeEigensolver != gaugeSloppy
+        && gaugeEigensolver != gaugePrecondition && gaugeEigensolver != gaugeRefinement) {
+      gaugeEigensolver->copy(*gaugePrecise);
+      gaugeEigensolver->exchangeGhost();
+    }
     // 3. the cached extended gauge (createCloverQuda and the gauge force
     //    read it; new_gauge = true forces the rebuild);
     lat_dim_t R;
