@@ -1,0 +1,66 @@
+# Campaign configuration — every run variable in one place.
+# Copy to <name>.conf, edit, and drive with:  run_campaign.sh <subcommand> <conf>
+# Values below are the battle-tested settings as of 2026-08-11.
+
+# ---- paths -----------------------------------------------------------
+DATA_DIR=$HOME/lognormal_data
+BUILD_TESTS=$HOME/applications/build_quda/tests
+ANALYSIS_DIR=$HOME/applications/quda/tests/analysis
+TUNECACHE=$DATA_DIR/tunecache3
+
+# ---- lattice / action ------------------------------------------------
+DIMS="12 12 12 32"          # probe/production geometry (space space space time)
+BETA=5.3
+CSW=1.0
+DSLASH=clover
+
+# ---- solver ----------------------------------------------------------
+USE_MG=1                    # 1: 2-level MG-GCR (coherent precisions); 0: plain CG all-double
+NITER=3000                  # force/action solve cap; generous so the blowup guard
+                            # signals genuine exceptionality, not a truncation
+MG_SETUP_INTERVAL_THERM=5   # refresh MG null space during thermalization (stale-setup fix)
+MG_SETUP_INTERVAL_PROD=10
+
+# ---- integrator ------------------------------------------------------
+INTEGRATOR=2                # 0 leapfrog, 1 Omelyan, 2 FGI (4th order; var(dH) ~ n^-8)
+TAU=1.0
+N_STEPS=10                  # initial; therm-tune retunes toward the acceptance band
+ACC_LO=0.80
+ACC_HI=0.92
+
+# ---- chunked thermalization -----------------------------------------
+CHUNK=10                    # trajectories per chunk
+PLATEAU_CHUNKS=3            # consecutive stable chunks to declare thermalized
+MAX_CHUNKS=30
+CHUNK_TIMEOUT=2400          # seconds; wedge protection (MPI_Abort can hang)
+
+# ---- eigentracking ---------------------------------------------------
+ET_ENABLED=1
+ET_NEV=8                    # sweep verdict: smallest reliable pool; deflation benefit
+ET_FRESH_INTERVAL=5         # TRLM anchor cadence, aligned with checkpoint interval so
+                            # every saved config carries a converged lambda_min
+ET_REFRESH_RESIDUAL=0.2     # adaptive re-anchor threshold (single-matvec probe)
+
+# ---- kappa ladder ----------------------------------------------------
+TARGET_AMS="0.7164 0.6448 0.5731"   # 500/450/400 MeV at ainv=698 MeV (w0-measured)
+KAPPA_START=0.14977
+PROBE_CONFIGS=20            # am-measurement rungs
+PROD_CONFIGS=200            # full distribution ensembles at each target
+WINDOW_FRAC=0.04            # |am-target|/target to trigger production
+CLAMP_MAX=0.005             # adaptive kappa step: min(CLAMP_MAX, CLAMP_FRAC*(kappa_c - kappa))
+CLAMP_FRAC=0.25
+MAX_RUNGS=16
+CHECKPOINT_INTERVAL=5
+
+# ---- measurement -----------------------------------------------------
+MEAS_TOL=1e-10              # all-double exactness path (solver-hygiene verified)
+MEAS_NITER=20000
+ANALYSIS_BLOCK=4            # jackknife block (configs are CHECKPOINT_INTERVAL apart)
+
+# ---- scale setting ---------------------------------------------------
+W0_FM=0.176                 # N_f=2 physical w0
+FLOW_STEPS=150
+FLOW_EPS=0.02
+FLOW_MEAS_INTERVAL=5
+A_SANITY_LO=0.08            # fm; loud-fail band for the w0 fit
+A_SANITY_HI=0.35
