@@ -147,7 +147,7 @@ std::vector<unsigned int> read_meas_int_vec()
     std::ifstream file(meas_vec_file_str);
     if (!file.is_open()) {
         printfQuda("No measurement int file, constructing meas int vec from step size and total steps\n");
-        for(int m=measurement_interval; m <= gauge_smear_steps; m = m + measurement_interval){
+        for(int m = 0; m <= gauge_smear_steps; m = m + measurement_interval){
             res.push_back(m);
         }
     }
