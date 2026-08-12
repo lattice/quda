@@ -89,12 +89,12 @@ scout)
   cfgs=$(ls "$ED"/cfg_* 2>/dev/null | grep -vE "pool|evals" | tail -${SCOUT_CONFIGS:-20})
   [ -z "$cfgs" ] && { echo "SCOUT HALT: no configs produced"; exit 1; }
   bash "$0" w0 "$conf" $cfgs | tee "$ED"/w0.txt
-  a_meas=$(grep -oE "a = [0-9.]+" "$ED"/w0.txt | grep -oE "[0-9.]+")
+  a_meas=$(grep -E "^a = " "$ED"/w0.txt | grep -oE "[0-9.]+" | head -1)
   if [ -n "$a_meas" ] && [ -n "${TARGET_A_FM:-}" ]; then
     python3 -c "
 import math
 a, tgt = $a_meas, $TARGET_A_FM
-db = -math.log(a/tgt)/1.29
+db = math.log(a/tgt)/1.29  # d(ln a)/d(beta) = -1.29: a too fine -> lower beta
 print(f'SCOUT RESULT: a={a} fm (target {tgt}); suggested beta correction {db:+.3f} -> beta={$BETA+db:.3f}')"
   fi
   ;;
