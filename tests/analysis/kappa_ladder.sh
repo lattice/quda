@@ -43,7 +43,8 @@ for rung in $(seq 1 $MAX_RUNGS); do
     tuned=$(grep "^TUNED:" "$skip_therm_prefix"/thermtune.log | tail -1)
     log "reusing existing therm-tune: $tuned"
   else
-    DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=10 \
+    SOLVER_FLAGS="${THERM_SOLVER_FLAGS:-$SOLVER_FLAGS}" \
+      DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=10 \
       START_GAUGE="$last_cfg" \
       PREFIX=$ED/tt BUILD_TESTS=$T bash $A/therm_tune.sh > "$ED"/thermtune.log 2>&1
     if ! grep -q "^THERMALIZED" "$ED"/thermtune.log; then
@@ -119,7 +120,11 @@ PYEOF
 
   # ---- within the current physical-target window? ----
   tgt=${TARGETS[$target_idx]}
-  if python3 -c "exit(0 if abs(float('$am') - $tgt)/$tgt < $WINDOW_FRAC else 1)"; then
+  # widen the window 1.5x for the two lightest targets: rung cost dominates
+  # there and a ~6% mass miss is inside the accepted volume-matching tolerance
+  wfrac=$WINDOW_FRAC
+  [ $target_idx -ge $(( ${#TARGETS[@]} - 2 )) ] && wfrac=$(python3 -c "print(1.5*$WINDOW_FRAC)")
+  if python3 -c "exit(0 if abs(float('$am') - $tgt)/$tgt < $wfrac else 1)"; then
     log "TARGET $((target_idx+1)) WINDOW HIT: am=$am ~ $tgt at kappa=$kappa — starting $PROD_CONFIGS-config production"
     last_probe=$(ls "$ED"/cfg_* | grep -vE "\.pool|\.evals" | sort | tail -1)
     ptraj=$((PROD_CONFIGS * 5 * 12 / 10))

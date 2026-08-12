@@ -29,6 +29,15 @@ else
   SOLVER_FLAGS="--prec double --prec-sloppy double --mg-levels 1 --niter $NITER"
   THERM_MG=""; PROD_MG=""
 fi
+# Thermalization always runs plain CG unless USE_MG_THERM=1: MG setup cannot
+# hot-start on unthermalized gauge (coarse-op verification fails), and rung-1
+# of a ladder at a new beta has no seed configuration.
+if [ "${USE_MG_THERM:-0}" -eq 1 ]; then
+  THERM_SOLVER_FLAGS="$SOLVER_FLAGS"
+else
+  THERM_SOLVER_FLAGS="--prec double --prec-sloppy double --mg-levels 1 --niter $NITER"
+fi
+export THERM_SOLVER_FLAGS
 MEAS_FLAGS="--tol $MEAS_TOL --niter $MEAS_NITER --prec double --prec-sloppy double \
 --prec-refine double --prec-precondition double"
 ET_FLAGS=""
@@ -53,6 +62,41 @@ ladder)
   BUILD_TESTS=$BUILD_TESTS ANALYSIS_DIR=$ANALYSIS_DIR BETA=$BETA CSW=$CSW \
   INTEGRATOR=$INTEGRATOR TAU=$TAU ANALYSIS_BLOCK=$ANALYSIS_BLOCK \
     bash "$ANALYSIS_DIR"/kappa_ladder.sh
+  ;;
+scout)
+  # Scale-setting scout: chunked therm at KAPPA on DIMS, short production,
+  # w0 measurement, and a suggested beta correction toward TARGET_A_FM.
+  ED=$DATA_DIR/scout_b$(echo $BETA | tr -d .)
+  mkdir -p "$ED"
+  DIMS="$DIMS" BETA=$BETA KAPPA=${SCOUT_KAPPA:?set SCOUT_KAPPA in conf} CSW=$CSW \
+  INTEGRATOR=$INTEGRATOR N_STEPS=$N_STEPS TAU=$TAU CHUNK=$CHUNK \
+  PLATEAU_CHUNKS=$PLATEAU_CHUNKS MAX_CHUNKS=$MAX_CHUNKS CHUNK_TIMEOUT=$CHUNK_TIMEOUT \
+  ACC_LO=$ACC_LO ACC_HI=$ACC_HI BUILD_TESTS=$BUILD_TESTS \
+  PREFIX="$ED"/tt \
+    bash "$ANALYSIS_DIR"/therm_tune.sh > "$ED"/thermtune.log 2>&1
+  tuned=$(grep "TUNED:" "$ED"/thermtune.log | tail -1)
+  n_steps=$(echo "$tuned" | sed -E 's/.*n_steps=([0-9]+).*/\1/')
+  start_cfg=$(echo "$tuned" | sed -E 's/.*start_config=(\S+).*/\1/')
+  [ -z "$start_cfg" ] && { echo "SCOUT HALT: therm failed (see $ED/thermtune.log)"; exit 1; }
+  ntraj=$(( ${SCOUT_CONFIGS:-20} * 5 * 12 / 10 ))
+  timeout $((ntraj * ${SCOUT_TRAJ_TIMEOUT:-300} + 3600)) "$BUILD_TESTS"/hmc_test --dim $DIMS $SOLVER_FLAGS \
+    --dslash-type clover --clover-csw $CSW --kappa $SCOUT_KAPPA --hmc-beta $BETA \
+    --hmc-integrator $INTEGRATOR --hmc-n-steps ${n_steps:-$N_STEPS} --hmc-tau $TAU \
+    --hmc-thermalization 0 --hmc-n-trajectories $ntraj \
+    --hmc-gauge-infile "$start_cfg" \
+    --hmc-checkpoint 5 --hmc-checkpoint-prefix "$ED"/cfg_ \
+    --gtest_filter=HMC.Production > "$ED"/production.log 2>&1
+  cfgs=$(ls "$ED"/cfg_* 2>/dev/null | grep -vE "pool|evals" | tail -${SCOUT_CONFIGS:-20})
+  [ -z "$cfgs" ] && { echo "SCOUT HALT: no configs produced"; exit 1; }
+  bash "$0" w0 "$conf" $cfgs | tee "$ED"/w0.txt
+  a_meas=$(grep -oE "a = [0-9.]+" "$ED"/w0.txt | grep -oE "[0-9.]+")
+  if [ -n "$a_meas" ] && [ -n "${TARGET_A_FM:-}" ]; then
+    python3 -c "
+import math
+a, tgt = $a_meas, $TARGET_A_FM
+db = -math.log(a/tgt)/1.29
+print(f'SCOUT RESULT: a={a} fm (target {tgt}); suggested beta correction {db:+.3f} -> beta={$BETA+db:.3f}')"
+  fi
   ;;
 w0)
   out=$DATA_DIR/w0_$(date +%s); mkdir -p "$out"; i=0
