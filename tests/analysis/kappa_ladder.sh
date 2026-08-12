@@ -9,7 +9,8 @@ set -u
 D=${DATA_DIR:?}
 T=${BUILD_TESTS:?}
 A=${ANALYSIS_DIR:?}
-export QUDA_RESOURCE_PATH=$D/tunecache3
+# resource path comes from the dispatcher (conf TUNECACHE); fallback for standalone use
+export QUDA_RESOURCE_PATH=${QUDA_RESOURCE_PATH:-$D/tunecache3}
 export CUDA_MPS_PIPE_DIRECTORY=/tmp/no-mps
 
 MAX_RUNGS=${MAX_RUNGS:-16}
