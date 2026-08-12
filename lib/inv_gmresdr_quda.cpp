@@ -30,9 +30,9 @@ namespace quda {
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
-  using DenseMatrix = EigMatrixXcd;
-  using VectorSet = EigMatrixXcd;
-  using Vector = EigVectorXcd;
+  using DenseMatrix = MatrixXc;
+  using VectorSet = MatrixXc;
+  using Vector = VectorXc;
 
   // special types needed for compatibility with QUDA blas:
   using RowMajorDenseMatrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;

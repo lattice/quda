@@ -17,9 +17,6 @@
 namespace quda
 {
 
-  using MatrixX = Matrix<real_t, Dynamic, Dynamic>;
-  using MatrixXc = Matrix<complex_t, Dynamic, Dynamic>;
-
   // Implicitly Restarted Arnoldi Method constructor
   IRAM::IRAM(const DiracMatrix &mat, QudaEigParam *eig_param) : EigenSolver(mat, eig_param)
   {
@@ -308,39 +305,34 @@ namespace quda
 
   void IRAM::eigensolveFromUpperHess(std::vector<complex_t> &evals, const real_t beta)
   {
-    // Eigen's dense Schur/eigensolvers compute incorrect eigenvectors for
-    // extended (quad) precision (see eigen_helper.h), and the projected upper
-    // Hessenberg matrix carries only <= double precision, so these dense
-    // decompositions are performed in complex<double>.
-    using SolveMatrixc = Matrix<eig_solve_complex_t, Dynamic, Dynamic>;
     if (eig_param->use_eigen_qr) {
       getProfile().TPSTART(QUDA_PROFILE_EIGENQR);
       // Construct the upper Hessenberg matrix
-      SolveMatrixc Q = SolveMatrixc::Identity(n_kr, n_kr);
-      SolveMatrixc R = SolveMatrixc::Zero(n_kr, n_kr);
+      MatrixXc Q = MatrixXc::Identity(n_kr, n_kr);
+      MatrixXc R = MatrixXc::Zero(n_kr, n_kr);
       for (int i = 0; i < n_kr; i++) {
-        for (int j = 0; j < n_kr; j++) { R(i, j) = to_eig_solve(upperHess[i][j]); }
+        for (int j = 0; j < n_kr; j++) { R(i, j) = upperHess[i][j]; }
       }
 
       // QR the upper Hessenberg matrix
-      Eigen::ComplexSchur<SolveMatrixc> schurUH;
+      Eigen::ComplexSchur<MatrixXc> schurUH;
       schurUH.computeFromHessenberg(R, Q);
       getProfile().TPSTOP(QUDA_PROFILE_EIGENQR);
 
       getProfile().TPSTART(QUDA_PROFILE_EIGENEV);
       // Extract the upper triangular matrix, eigensolve, then
       // get the eigenvectors of the upper Hessenberg
-      SolveMatrixc matUpper = SolveMatrixc::Zero(n_kr, n_kr);
+      MatrixXc matUpper = MatrixXc::Zero(n_kr, n_kr);
       matUpper = schurUH.matrixT().triangularView<Eigen::Upper>();
       matUpper.conservativeResize(n_kr, n_kr);
-      Eigen::ComplexEigenSolver<SolveMatrixc> eigenSolver(matUpper);
+      Eigen::ComplexEigenSolver<MatrixXc> eigenSolver(matUpper);
       Q = schurUH.matrixU() * eigenSolver.eigenvectors();
 
       // Update eigenvalues, residuia, and the Q matrix
       for (int i = 0; i < n_kr; i++) {
-        evals[i] = from_eig_solve<real_t>(eigenSolver.eigenvalues()[i]);
-        residua[i] = abs(beta * from_eig_solve<real_t>(Q.col(i)[n_kr - 1]));
-        for (int j = 0; j < n_kr; j++) Qmat[i][j] = from_eig_solve<real_t>(Q(i, j));
+        evals[i] = eigenSolver.eigenvalues()[i];
+        residua[i] = abs(beta * Q.col(i)[n_kr - 1]);
+        for (int j = 0; j < n_kr; j++) Qmat[i][j] = Q(i, j);
       }
       getProfile().TPSTOP(QUDA_PROFILE_EIGENEV);
     } else {
@@ -401,26 +393,26 @@ namespace quda
       // Compute the eigevectors of the origial upper Hessenberg
       // This is now very cheap because the input matrix to Eigen
       // is upper triangular.
-      SolveMatrixc Q = SolveMatrixc::Zero(n_kr, n_kr);
-      SolveMatrixc R = SolveMatrixc::Zero(n_kr, n_kr);
+      MatrixXc Q = MatrixXc::Zero(n_kr, n_kr);
+      MatrixXc R = MatrixXc::Zero(n_kr, n_kr);
       for (int i = 0; i < n_kr; i++) {
         for (int j = 0; j < n_kr; j++) {
-          Q(i, j) = to_eig_solve(Qmat[i][j]);
-          R(i, j) = to_eig_solve(Rmat[i][j]);
+          Q(i, j) = Qmat[i][j];
+          R(i, j) = Rmat[i][j];
         }
       }
 
-      SolveMatrixc matUpper = SolveMatrixc::Zero(n_kr, n_kr);
+      MatrixXc matUpper = MatrixXc::Zero(n_kr, n_kr);
       matUpper = R.triangularView<Eigen::Upper>();
       matUpper.conservativeResize(n_kr, n_kr);
-      Eigen::ComplexEigenSolver<SolveMatrixc> eigenSolver(matUpper);
+      Eigen::ComplexEigenSolver<MatrixXc> eigenSolver(matUpper);
       Q *= eigenSolver.eigenvectors();
 
       // Update eigenvalues, residuia, and the Q matrix
       for (int i = 0; i < n_kr; i++) {
-        evals[i] = from_eig_solve<real_t>(eigenSolver.eigenvalues()[i]);
-        residua[i] = abs(beta * from_eig_solve<real_t>(Q.col(i)[n_kr - 1]));
-        for (int j = 0; j < n_kr; j++) Qmat[i][j] = from_eig_solve<real_t>(Q(i, j));
+        evals[i] = eigenSolver.eigenvalues()[i];
+        residua[i] = abs(beta * Q.col(i)[n_kr - 1]);
+        for (int j = 0; j < n_kr; j++) Qmat[i][j] = Q(i, j);
       }
 
       logQuda(QUDA_VERBOSE, "QR iterations = %d\n", iter);

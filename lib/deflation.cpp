@@ -9,9 +9,6 @@ namespace quda
 
   using namespace blas;
   using DynamicStride = Stride<Dynamic, Dynamic>;
-  using MatrixXc = Matrix<complex_t, Dynamic, Dynamic>;
-  using VectorXc = Matrix<complex_t, Dynamic, 1>;
-  using VectorX = Matrix<real_t, Dynamic, 1>;
 
   static auto pinned_allocator = [] (size_t bytes ) { return static_cast<complex_t*>(pool_host_pinned_malloc(bytes)); };
   static auto pinned_deleter   = [] (complex_t *hptr) { pool_host_pinned_free(hptr); };
