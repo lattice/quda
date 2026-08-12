@@ -78,7 +78,7 @@ print(f"{v:.6g} {statistics.mean(dh):+.6g} "
       f"{max(it) if it else -1}")
 PYEOF
 )"
-  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters"
+  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters" | tee -a "$PREFIX"_tune.log
 
   # ---- thermalization criterion: solver-iteration plateau ------------
   # Tolerance-based: at light masses lambda_min fluctuations jitter the
@@ -93,6 +93,20 @@ PYEOF
   prev_iters=$iters
   if [ "$plateau" -ge "$PLATEAU_CHUNKS" ]; then
     echo "THERMALIZED after $((chunk * CHUNK)) trajectories (iteration count stable at $iters for $PLATEAU_CHUNKS chunks)"
+    # Hand off the step count of the best in-band chunk, not the final
+    # retune: the last retune is an extrapolation that was never validated
+    # by a chunk of its own (observed: handoff n_steps=20 -> 45% production
+    # acceptance while chunk-measured 26 -> 95%).
+    BEST_N=$(grep -E "^chunk" "$PREFIX"_tune.log 2>/dev/null | python3 -c "
+import sys, re
+best, bn = 1e9, 0
+for l in sys.stdin:
+    m = re.search(r'n_steps=(\d+).*pred_acc=([0-9.]+)', l)
+    if m:
+        d = abs(float(m.group(2)) - 0.86)
+        if d < best: best, bn = d, int(m.group(1))
+print(bn if bn else 0)")
+    [ "${BEST_N:-0}" -gt 0 ] && N_STEPS=$BEST_N
     echo "TUNED: n_steps=$N_STEPS  start_config=$STATE_GAUGE"
     exit 0
   fi
