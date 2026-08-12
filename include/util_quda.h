@@ -6,6 +6,7 @@
 #include <comm_quda.h>
 #include <tune_key.h>
 #include <malloc_quda.h>
+#include <type_traits>
 #include <utility>
 
 namespace quda
@@ -93,11 +94,20 @@ namespace quda
 {
   namespace printf_detail
   {
+    // Convert host quads to double for fprintf/sprintf.  Use a single forwarding
+    // overload so __float128 lvalues (common at logQuda call sites) are not
+    // preferentially bound by a catch-all template that would skip conversion.
+    template <typename T> constexpr decltype(auto) printf_arg(T &&x)
+    {
 #ifdef QUDA_USE_QUAD_SCALAR
-    inline double printf_arg(__float128 x) { return static_cast<double>(x); }
+      if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, __float128>) {
+        return static_cast<double>(x);
+      } else
 #endif
-
-    template <typename T> constexpr decltype(auto) printf_arg(T &&x) { return std::forward<T>(x); }
+      {
+        return std::forward<T>(x);
+      }
+    }
 
     template <typename... Args> inline void printfQudaImpl(const char *fmt, Args &&...args)
     {

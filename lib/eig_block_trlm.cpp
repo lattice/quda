@@ -496,8 +496,7 @@ namespace quda
               blocks, arrow_pos, block_arrow_pos, num_locked_offset);
       for (int b = 0; b < std::min(dim, 4); b++) {
         for (int c = 0; c < std::min(dim, 4); c++) {
-          logQuda(QUDA_DEBUG_VERBOSE, "  T(%d,%d) = (%+.16e,%+.16e)\n", b, c, to_double(T(b, c).real()),
-                  to_double(T(b, c).imag()));
+          logQuda(QUDA_DEBUG_VERBOSE, "  T(%d,%d) = (%+.16e,%+.16e)\n", b, c, T(b, c).real(), T(b, c).imag());
         }
       }
     }
@@ -515,7 +514,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
       for (int i = 0; i < std::min(dim, 4); i++)
-        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, to_double(eigensolver.eigenvalues()[i]));
+        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, eigensolver.eigenvalues()[i]);
     }
 
     // Use Sum of all beta values in the final block for

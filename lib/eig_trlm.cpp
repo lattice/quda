@@ -316,7 +316,7 @@ namespace quda
               num_locked, num_keep, (int)reverse);
       for (int b = 0; b < std::min(dim, 4); b++) {
         for (int c = 0; c < std::min(dim, 4); c++) {
-          logQuda(QUDA_DEBUG_VERBOSE, "  A(%d,%d) = %+.16e\n", b, c, to_double(A(b, c)));
+          logQuda(QUDA_DEBUG_VERBOSE, "  A(%d,%d) = %+.16e\n", b, c, A(b, c));
         }
       }
     }
@@ -327,7 +327,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
       for (int i = 0; i < std::min(dim, 4); i++)
-        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, to_double(eigensolver.eigenvalues()[i]));
+        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, eigensolver.eigenvalues()[i]);
     }
 
     // repopulate ritz matrix
