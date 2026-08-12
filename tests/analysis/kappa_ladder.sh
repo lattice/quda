@@ -21,7 +21,7 @@ target_idx=0
 WINDOW_FRAC=${WINDOW_FRAC:-0.04}
 CHECKPOINT_INTERVAL=${CHECKPOINT_INTERVAL:-5}
 LDIMS=${LADDER_DIMS:-"24 24 24 48"}
-STATE=$D/ladder_state.dat   # lines: kappa am
+STATE=$D/ladder_state_b$(echo ${BETA:-5.3} | tr -d .).dat   # lines: kappa am (one file per beta)
 LOG=$D/ladder.log
 
 log() { echo "[ladder $(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
@@ -74,7 +74,9 @@ for rung in $(seq 1 $MAX_RUNGS); do
   if python3 -c "exit(0 if float('$accfrac' or 0) < 50 else 1)"; then
     log "HALT: acceptance collapsed (${accfrac}%) at kappa=$kappa"; exit 1
   fi
-  if grep -q "Exceeded maximum iterations" "$ED"/production.log; then
+  # only genuine outer-solver failures halt: MG-internal setup/polish solvers
+  # (prefixed "MG level") run to their iteration caps by design
+  if grep -v "^MG level" "$ED"/production.log | grep -q "Exceeded maximum iterations"; then
     log "HALT: solver iteration blowup at kappa=$kappa"; exit 1
   fi
 
