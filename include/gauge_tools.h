@@ -60,6 +60,34 @@ namespace quda
   void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
 
   /**
+     @brief Apply a gauge transformation on gauge.
+     @param[in] gauge The gauge field to transform
+     @param[in] transform The gauge transformations
+  */
+  void gaugeTransform(GaugeField &gauge, const GaugeField &transform);
+
+  /**
+     @brief Perform an eigendecomposition on the links and then create
+     an hermitian matrix from which the fundamental representation
+     can be read, assuming Gell-Mann matricies tau.
+
+     The Algorithm
+     U = exp(iH) where H = sum_{i=1..N^2-1} \alpha_i \tau_i,
+     UV = lambdaV = exp(i sigma)V,
+     HV = sigmaV,
+     hence H = V S V^{\dag} | S = diag(sigma_1, sigma_2, ... , sigma_N).
+
+     @param[out] out The hermitian matrix H
+     @param[in] in The SU(N) gauge field
+     @param[in] qr_tol The tolerance on the QR solver
+     @param[in] qr_max_iter The maximum number of iterations in the QR
+     @param[in] taylor_N The number of terms in the Taylor expansion of exp(iH)
+  */
+  void gaugeFundamentalRep(GaugeField &out, const GaugeField &in, const double qr_tol, const int qr_max_iter,
+                           const int taylor_N);
+
+
+  /**
      @brief Generate Gaussian distributed su(N) or SU(N) fields.  If U
      is a momentum field, then we generate random Gaussian distributed
      field in the Lie algebra using the anti-Hermitation convention.
