@@ -21,7 +21,7 @@ mkdir -p "$TUNECACHE"
 # solver flag groups assembled once, from config
 if [ "${USE_MG:-0}" -eq 1 ]; then
   SOLVER_FLAGS="--prec double --prec-sloppy single --prec-precondition single --prec-null single \
---mg-levels 2 --inv-multigrid true --niter $NITER"
+--mg-levels ${MG_LEVELS:-2} --inv-multigrid true --niter $NITER ${MG_EXTRA_FLAGS:-}"
   THERM_MG=""; PROD_MG=""
   [ "${MG_SETUP_INTERVAL_THERM:-0}" -gt 0 ] && THERM_MG="--hmc-mg-setup-interval $MG_SETUP_INTERVAL_THERM"
   [ "${MG_SETUP_INTERVAL_PROD:-0}" -gt 0 ] && PROD_MG="--hmc-mg-setup-interval $MG_SETUP_INTERVAL_PROD"
