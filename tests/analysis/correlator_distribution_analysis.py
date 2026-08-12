@@ -22,8 +22,12 @@ import numpy as np
 
 
 def read_dataset(fname, channel):
-    """Return (cfgs, T, data) where data[i, t] = Re C(t) on config i."""
-    cfg_col, t_col, re_col = [], [], []
+    """Return (cfgs, T, data, n_src) where each row of data is one
+    (configuration, source) sample of Re C(t), rows ordered so that all
+    sources of a configuration are contiguous (required for correct
+    jackknife blocking by configuration), and n_src is the (uniform)
+    number of sources per configuration."""
+    key_col, t_col, re_col = [], [], []
     with open(fname) as f:
         for line in f:
             if line.startswith("#"):
@@ -31,20 +35,25 @@ def read_dataset(fname, channel):
             tok = line.split()
             if len(tok) != 9 or tok[5] != channel:
                 continue
-            cfg_col.append(int(tok[0]))
+            # sample key: (cfg, sx, sy, sz, st) — one row per source
+            key_col.append((int(tok[0]), int(tok[1]), int(tok[2]), int(tok[3]), int(tok[4])))
             t_col.append(int(tok[6]))
             re_col.append(float(tok[7]))
-    if not cfg_col:
+    if not key_col:
         sys.exit(f"no rows for channel {channel} in {fname}")
-    cfgs = sorted(set(cfg_col))
+    keys = sorted(set(key_col))  # sorts by cfg first: sources stay contiguous
     T = max(t_col) + 1
-    index = {c: i for i, c in enumerate(cfgs)}
-    data = np.full((len(cfgs), T), np.nan)
-    for c, t, re in zip(cfg_col, t_col, re_col):
-        data[index[c], t] = re
+    index = {k: i for i, k in enumerate(keys)}
+    data = np.full((len(keys), T), np.nan)
+    for k, t, re in zip(key_col, t_col, re_col):
+        data[index[k], t] = re
     if np.isnan(data).any():
-        sys.exit("dataset has missing (cfg, t) entries")
-    return np.array(cfgs), T, data
+        sys.exit("dataset has missing (sample, t) entries")
+    cfgs = sorted(set(k[0] for k in keys))
+    n_src = len(keys) // len(cfgs)
+    if n_src * len(cfgs) != len(keys):
+        sys.exit("non-uniform number of sources per configuration")
+    return np.array(cfgs), T, data, n_src
 
 
 def cumulants(x):
@@ -83,9 +92,12 @@ def main():
     p.add_argument("--out", default="", help="output prefix for histogram plots")
     args = p.parse_args()
 
-    cfgs, T, C = read_dataset(args.datafile, args.channel)
+    cfgs, T, C, n_src = read_dataset(args.datafile, args.channel)
     N = len(cfgs)
-    print(f"# {args.datafile}: channel {args.channel}, {N} configurations, T = {T}")
+    # --block is in units of configurations; sources within a configuration
+    # are correlated, so they always share a jackknife block
+    args.block *= n_src
+    print(f"# {args.datafile}: channel {args.channel}, {N} configurations x {n_src} sources, T = {T}")
 
     n_nonpos = (C <= 0).sum()
     if n_nonpos:

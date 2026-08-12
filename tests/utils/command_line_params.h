@@ -603,6 +603,7 @@ extern int corrdist_config_end;
 extern int corrdist_config_step;
 extern std::string corrdist_out;
 extern bool corrdist_random_source;
+extern int corrdist_num_sources;
 
 extern int gf_gauge_dir;
 extern int gf_maxiter;

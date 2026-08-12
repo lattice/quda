@@ -349,6 +349,7 @@ int corrdist_config_end = 0;
 int corrdist_config_step = 1;
 std::string corrdist_out = "";
 bool corrdist_random_source = true;
+int corrdist_num_sources = 1;
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -1413,6 +1414,10 @@ void add_corrdist_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--corrdist-random-source", corrdist_random_source,
                       "Place the point source at a random spatial site per configuration, drawn deterministically "
                       "from the configuration number (default true)");
+  opgroup->add_option("--corrdist-num-sources", corrdist_num_sources,
+                      "Number of point sources per configuration, spread evenly across timeslices with "
+                      "deterministic random spatial positions; each source contributes an independent "
+                      "distribution sample (default 1)");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)

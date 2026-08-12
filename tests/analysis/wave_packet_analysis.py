@@ -19,7 +19,9 @@ import numpy as np
 
 
 def read_dataset(fname, channel):
-    cfg_col, t_col, re_col = [], [], []
+    # one row per (configuration, source) sample; t is already
+    # source-relative in the data file
+    key_col, t_col, re_col = [], [], []
     with open(fname) as f:
         for line in f:
             if line.startswith("#"):
@@ -27,17 +29,18 @@ def read_dataset(fname, channel):
             tok = line.split()
             if len(tok) != 9 or tok[5] != channel:
                 continue
-            cfg_col.append(int(tok[0]))
+            key_col.append((int(tok[0]), int(tok[1]), int(tok[2]), int(tok[3]), int(tok[4])))
             t_col.append(int(tok[6]))
             re_col.append(float(tok[7]))
-    if not cfg_col:
+    if not key_col:
         sys.exit(f"no rows for channel {channel} in {fname}")
-    cfgs = sorted(set(cfg_col))
+    keys = sorted(set(key_col))
     T = max(t_col) + 1
-    index = {c: i for i, c in enumerate(cfgs)}
-    data = np.full((len(cfgs), T), np.nan)
-    for c, t, re in zip(cfg_col, t_col, re_col):
-        data[index[c], t] = re
+    index = {k: i for i, k in enumerate(keys)}
+    data = np.full((len(keys), T), np.nan)
+    for k, t, re in zip(key_col, t_col, re_col):
+        data[index[k], t] = re
+    cfgs = sorted(set(k[0] for k in keys))
     return np.array(cfgs), T, data
 
 

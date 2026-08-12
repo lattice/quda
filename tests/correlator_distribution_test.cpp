@@ -151,12 +151,18 @@ int main(int argc, char **argv)
     loadGaugeQuda((void *)gauge, &gauge_param);
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(nullptr, nullptr, &inv_param);
 
-    // source position: fixed, or a random spatial site drawn
-    // deterministically from the configuration number
+    // Sources per configuration: spread evenly across timeslices (maximally
+    // separated, so samples decorrelate) with spatial positions drawn
+    // deterministically per (configuration, source). Statistics for the
+    // distribution analysis are sized by cumulant errors, not spectroscopy,
+    // so extra sources per config substitute for extra HMC.
+    for (int s = 0; s < corrdist_num_sources; s++) {
+
     int src[4] = {prop_source_position[0][0], prop_source_position[0][1], prop_source_position[0][2],
                   prop_source_position[0][3]};
+    src[3] = (src[3] + (s * (int)Lt) / corrdist_num_sources) % (int)Lt;
     if (corrdist_random_source) {
-      srand(2718281 + cfg); // deterministic per configuration, identical on all ranks
+      srand(2718281 + 131 * cfg + s); // deterministic per (configuration, source), identical on all ranks
       for (int d = 0; d < 3; d++) src[d] = rand() % (X[d] * quda::comm_dim(d));
     }
 
@@ -219,11 +225,13 @@ int main(int argc, char **argv)
       out_file.flush();
     }
 
+    printfQuda("Measured configuration %d source %d/%d (%d %d %d %d)\n", cfg, s + 1, corrdist_num_sources, src[0],
+               src[1], src[2], src[3]);
+    } // source loop
+
     freeGaugeQuda();
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) freeCloverQuda();
     n_measured++;
-    printfQuda("Measured configuration %d (source %d %d %d %d), %d done\n", cfg, src[0], src[1], src[2], src[3],
-               n_measured);
   }
 
   printfQuda("Correlator distribution measurement complete: %d configurations -> %s\n", n_measured,

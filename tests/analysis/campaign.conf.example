@@ -57,7 +57,12 @@ CHECKPOINT_INTERVAL=5
 # ---- measurement -----------------------------------------------------
 MEAS_TOL=1e-10              # all-double exactness path (solver-hygiene verified)
 MEAS_NITER=20000
-ANALYSIS_BLOCK=4            # jackknife block (configs are CHECKPOINT_INTERVAL apart)
+MEAS_SOURCES=4              # point sources per config, spread across timeslices.
+                            # Statistics target is cumulant estimation (histogram
+                            # filling), not spectroscopy: extra sources substitute
+                            # for extra HMC. Sources share a jackknife block.
+ANALYSIS_BLOCK=4            # jackknife block in CONFIGS (analysis multiplies by
+                            # sources internally; configs are CHECKPOINT_INTERVAL apart)
 
 # ---- scale setting ---------------------------------------------------
 W0_FM=0.176                 # N_f=2 physical w0

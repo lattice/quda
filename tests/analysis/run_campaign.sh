@@ -77,9 +77,10 @@ sweep)
   ;;
 measure)
   prefix=${1:?}; lo=${2:?}; hi=${3:?}; kappa=${4:?}; out=${5:?}
-  timeout $(( (hi - lo + 1) * 150 + 1800 )) "$BUILD_TESTS"/correlator_distribution_test \
+  timeout $(( (hi - lo + 1) * 150 * ${MEAS_SOURCES:-1} + 1800 )) "$BUILD_TESTS"/correlator_distribution_test \
     --dim $DIMS --dslash-type $DSLASH --clover-csw $CSW --kappa $kappa $MEAS_FLAGS \
     --corrdist-config-prefix "$prefix" --corrdist-config-start $lo --corrdist-config-end $hi \
+    --corrdist-num-sources ${MEAS_SOURCES:-1} \
     --corrdist-out "$out"
   python3 "$ANALYSIS_DIR"/correlator_distribution_analysis.py "$out" --channel G5 \
     --block $ANALYSIS_BLOCK
