@@ -114,6 +114,12 @@ for _ in range(80):
 var_t = 0.5*(lo+hi)
 expo = 0.125 if $INTEGRATOR >= 2 else 0.25  # 4th-order FGI: var ~ n^-8; 2nd-order: n^-4
 n = $N_STEPS * ($var/var_t)**expo
+# Cap the per-chunk increase at 3x: runaway trajectories (integrator
+# instability) inflate var(dH) far outside the smooth-error scaling regime,
+# and the power law then extrapolates absurdly (e.g. n=432). A 3x step-count
+# increase re-enters the stability region; further growth happens next chunk
+# if genuinely needed.
+n = min(n, 3*$N_STEPS)
 print(max(4, int(round(n))))
 ")
     echo "  retuned n_steps -> $N_STEPS (targeting acceptance $(python3 -c "print(0.5*($ACC_LO+$ACC_HI))"))"
