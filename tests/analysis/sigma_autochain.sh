@@ -10,7 +10,7 @@
 #
 # Usage: sigma_autochain.sh <scout_conf> <scout_log>
 set -u
-conf=${1:?scout conf}; slog=${2:?scout log}
+conf=${1:?scout conf}; slog=${2:?scout log}; skip=${3:-0}  # ignore log lines <= skip (stale content)
 source "$conf"
 A=$(cd "$(dirname "$0")" && pwd)
 MAX_RESCOUTS=${MAX_RESCOUTS:-2}
@@ -20,8 +20,8 @@ log() { echo "[autochain $(date +%H:%M:%S)] $*"; }
 
 while :; do
   # wait for a verdict line beyond the current attempt marker
-  until grep -qE "SCOUT RESULT|SCOUT HALT" <(tail -n 40 "$slog" 2>/dev/null); do sleep 300; done
-  verdict=$(grep -E "SCOUT RESULT|SCOUT HALT" "$slog" | tail -1)
+  until awk "NR>$skip" "$slog" 2>/dev/null | grep -qE "SCOUT RESULT|SCOUT HALT"; do sleep 300; done
+  verdict=$(awk "NR>$skip" "$slog" | grep -E "SCOUT RESULT|SCOUT HALT" | tail -1)
   log "verdict: $verdict"
   case "$verdict" in
   *"SCOUT HALT"*)
