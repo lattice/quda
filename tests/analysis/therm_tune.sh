@@ -159,6 +159,10 @@ try:
 except FileNotFoundError:
     pass
 n = max(n, floor)
+# absolute ceiling (conf N_STEPS_MAX): transition-spike trajectories are
+# force-accepted during therm and cease once equilibrated — escalating the
+# step count without bound only produces timeout-length chunks
+n = min(n, ${N_STEPS_MAX:-64})
 print(max(4, int(round(n))))
 ")
     echo "  retuned n_steps -> $N_STEPS (targeting acceptance $(python3 -c "print(0.5*($ACC_LO+$ACC_HI))"))"
