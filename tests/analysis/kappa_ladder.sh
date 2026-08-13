@@ -173,8 +173,13 @@ if s and s > 0:
     # kappa_c (where m^2 extrapolates to zero), never more than 0.005
     x_c = x2 - m2*m2 / s
     k_c = 1/x_c
+    # floor raised 0.001 -> 0.0015 and default fraction 0.25 -> 0.5: the
+    # two-point linear fit is convex-biased at heavy mass and estimates
+    # kappa_c far too close, throttling steps to a creep (observed at
+    # beta=5.85: four ~0.001 rungs from am 0.49 to 0.40). The m2_target
+    # floor above still limits each hop to a ~33% mass reduction.
     cap = min(float(os.environ.get('CLAMP_MAX', '0.005')),
-              max(0.001, float(os.environ.get('CLAMP_FRAC', '0.25')) * (k_c - k2)))
+              max(0.0015, float(os.environ.get('CLAMP_FRAC', '0.5')) * (k_c - k2)))
 else:
     k_next = k2 + 0.0010
     cap = 0.0010

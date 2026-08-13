@@ -50,7 +50,18 @@ for chunk in $(seq 1 "$MAX_CHUNKS"); do
     et_args+=(--eigentracking-pool-infile "${STATE_GAUGE}.pool")
   fi
 
-  timeout ${CHUNK_TIMEOUT:-2400} "$BUILD_TESTS"/hmc_test --dim $DIMS ${SOLVER_FLAGS:?} ${THERM_MG:-} --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" --hmc-beta "$BETA" \
+  # Solver selection per chunk: chunk 1 from a COLD start runs plain CG
+  # (ordered gauge, no setup churn while the UV disorders); every later
+  # chunk — and chunk 1 of a SEEDED start — runs the full MG+eigentracking
+  # stack (MG_THERM_FLAGS), whose re-setup/re-anchor machinery tracks the
+  # fast early-therm drift. The therm period doubles as the MG-parameter
+  # timing bed (secs/traj per chunk logged below).
+  CHUNK_FLAGS="${SOLVER_FLAGS:?}"
+  if [ -n "${MG_THERM_FLAGS:-}" ]; then
+    if [ "$chunk" -gt 1 ] || [ -n "${START_GAUGE:-}" ]; then CHUNK_FLAGS="$MG_THERM_FLAGS"; fi
+  fi
+  t_chunk0=$(date +%s)
+  timeout ${CHUNK_TIMEOUT:-2400} "$BUILD_TESTS"/hmc_test --dim $DIMS $CHUNK_FLAGS ${THERM_MG:-} --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" --hmc-beta "$BETA" \
     --hmc-integrator "$INTEGRATOR" --hmc-n-steps "$N_STEPS" --hmc-tau "$TAU" \
     --hmc-thermalization "$CHUNK" --hmc-n-trajectories "$CHUNK" \
     --hmc-checkpoint "$CHUNK" --hmc-checkpoint-prefix "${PREFIX}_c${chunk}_" \
@@ -78,7 +89,9 @@ print(f"{v:.6g} {statistics.mean(dh):+.6g} "
       f"{max(it) if it else -1}")
 PYEOF
 )"
-  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters" | tee -a "$PREFIX"_tune.log
+  t_chunk1=$(date +%s)
+  spt=$(( (t_chunk1 - t_chunk0) / CHUNK ))
+  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters secs_per_traj=$spt" | tee -a "$PREFIX"_tune.log
 
   # ---- thermalization criterion: solver-iteration plateau ------------
   # Tolerance-based: at light masses lambda_min fluctuations jitter the
