@@ -44,9 +44,13 @@ for rung in $(seq 1 $MAX_RUNGS); do
     tuned=$(grep "^TUNED:" "$skip_therm_prefix"/thermtune.log | tail -1)
     log "reusing existing therm-tune: $tuned"
   else
+    # COLD START at every kappa change (Dean, 2026-08-13): seeding a new
+    # kappa from the previous rung's sea puts the chain far from the new
+    # equilibrium in the low-mode structure, and the re-ordering transient
+    # drives the integrator through near-exceptional force spikes. Cold
+    # starts thermalize longer but smoothly, at stable step counts.
     SOLVER_FLAGS="${THERM_SOLVER_FLAGS:-$SOLVER_FLAGS}" \
-      DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=${n_steps:-10} \
-      START_GAUGE="$last_cfg" \
+      DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=12 \
       PREFIX=$ED/tt BUILD_TESTS=$T bash $A/therm_tune.sh > "$ED"/thermtune.log 2>&1
     if ! grep -q "^THERMALIZED" "$ED"/thermtune.log; then
       log "HALT: therm-tune failed at kappa=$kappa (see $ED/thermtune.log)"; exit 1
