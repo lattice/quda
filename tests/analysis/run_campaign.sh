@@ -38,17 +38,17 @@ else
   THERM_SOLVER_FLAGS="--prec double --prec-sloppy double --mg-levels 1 --niter $NITER"
 fi
 export THERM_SOLVER_FLAGS
+MEAS_FLAGS="--tol $MEAS_TOL --niter $MEAS_NITER --prec double --prec-sloppy double \
+--prec-refine double --prec-precondition double"
+ET_FLAGS=""
+[ "${ET_ENABLED:-0}" -eq 1 ] && ET_FLAGS="--eigentracking true --eigentracking-n-ev $ET_NEV \
+--eigentracking-fresh-interval $ET_FRESH_INTERVAL --eigentracking-refresh-residual $ET_REFRESH_RESIDUAL"
 # MG+ET flags for thermalization chunks >= 2 (and seeded chunk 1); consumed
 # by therm_tune.sh per Dean's chunk-switching scheme (2026-08-12)
 if [ "${USE_MG:-0}" -eq 1 ]; then
   MG_THERM_FLAGS="$SOLVER_FLAGS $ET_FLAGS"
   export MG_THERM_FLAGS
 fi
-MEAS_FLAGS="--tol $MEAS_TOL --niter $MEAS_NITER --prec double --prec-sloppy double \
---prec-refine double --prec-precondition double"
-ET_FLAGS=""
-[ "${ET_ENABLED:-0}" -eq 1 ] && ET_FLAGS="--eigentracking true --eigentracking-n-ev $ET_NEV \
---eigentracking-fresh-interval $ET_FRESH_INTERVAL --eigentracking-refresh-residual $ET_REFRESH_RESIDUAL"
 export SOLVER_FLAGS THERM_MG PROD_MG MEAS_FLAGS ET_FLAGS
 
 case "$sub" in
