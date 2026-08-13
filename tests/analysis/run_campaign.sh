@@ -50,6 +50,9 @@ if [ "${USE_MG:-0}" -eq 1 ]; then
   export MG_THERM_FLAGS
 fi
 export SOLVER_FLAGS THERM_MG PROD_MG MEAS_FLAGS ET_FLAGS
+# therm parameters must reach therm_tune.sh through nested invocations
+# (ladder -> therm_tune); conf variables are not exported by source
+export CHUNK PLATEAU_CHUNKS MAX_CHUNKS CHUNK_TIMEOUT ACC_LO ACC_HI
 
 case "$sub" in
 therm)
