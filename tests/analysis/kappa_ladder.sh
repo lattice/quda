@@ -65,6 +65,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
   ntraj=$((RUNG_CONFIGS * 5 * 12 / 10))  # ~20% margin for rejects
   timeout $((ntraj * 150 + 3600)) $T/hmc_test --dim $LDIMS ${SOLVER_FLAGS:?} ${PROD_MG:-} --dslash-type clover --clover-csw ${CSW:-1.0} --kappa $kappa --hmc-beta ${BETA:-5.3} \
     --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps $n_steps --hmc-tau ${TAU:-1.0} \
+    --hmc-n-inner-steps ${INNER_STEPS:-3} \
     --hmc-thermalization 0 --hmc-n-trajectories $ntraj \
     --hmc-gauge-infile "$start_cfg" \
     ${ET_FLAGS:-} \
@@ -137,6 +138,7 @@ PYEOF
     ptraj=$((PROD_CONFIGS * 5 * 12 / 10))
     timeout $((ptraj * 150 + 3600)) $T/hmc_test --dim $LDIMS ${SOLVER_FLAGS:?} ${PROD_MG:-} --dslash-type clover --clover-csw ${CSW:-1.0} --kappa $kappa --hmc-beta ${BETA:-5.3} \
       --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps $n_steps --hmc-tau ${TAU:-1.0} \
+    --hmc-n-inner-steps ${INNER_STEPS:-3} \
       --hmc-thermalization 0 --hmc-n-trajectories $ptraj \
       --hmc-gauge-infile "$last_probe" \
       ${ET_FLAGS:-} \

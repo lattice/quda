@@ -63,6 +63,7 @@ for chunk in $(seq 1 "$MAX_CHUNKS"); do
   t_chunk0=$(date +%s)
   timeout ${CHUNK_TIMEOUT:-2400} "$BUILD_TESTS"/hmc_test --dim $DIMS $CHUNK_FLAGS ${THERM_MG:-} --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" --hmc-beta "$BETA" \
     --hmc-integrator "$INTEGRATOR" --hmc-n-steps "$N_STEPS" --hmc-tau "$TAU" \
+    --hmc-n-inner-steps "${INNER_STEPS:-3}" \
     --hmc-thermalization "$CHUNK" --hmc-n-trajectories "$CHUNK" \
     --hmc-checkpoint "$CHUNK" --hmc-checkpoint-prefix "${PREFIX}_c${chunk}_" \
     "${infile_args[@]}" ${et_args[@]+"${et_args[@]}"} \
