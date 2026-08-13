@@ -604,8 +604,11 @@ void freeUniqueGaugeUtility(GaugeField *&precise, GaugeField *&sloppy, GaugeFiel
  * Generate the re-distributed gauge links based on is_asqtad, is_clover, split_key and current gauges
  * Swap the current gauges into buffers
  * If the split_key/gauges is the same as previous ones, the already splitted buffers will swap in
+ * alias_eigensolver drops the split eigensolver tier onto the split precise field; only callers that
+ * never apply the eigensolver gauge on the sub-grid may pass true (see gauge_backup.h).
  */
-void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is_clover, CommKey &split_key);
+void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is_clover, CommKey &split_key,
+                      bool alias_eigensolver = false);
 
 /**
  * If keep_buffer == true :
@@ -3275,13 +3278,21 @@ void freeGaugeSplit()
   swapGaugeSplit(false);
 }
 
-void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is_clover, CommKey &split_key)
+void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is_clover, CommKey &split_key,
+                      bool alias_eigensolver)
 {
   if (update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_FALSE) {
     for (int i = 0; i < 4; i++) {
       if (param->split_grid[i] != split_grid_bkup[i]) { update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE; }
     }
   }
+
+  // A buffered tower carries the aliasing decision it was built with, so it cannot be handed to a
+  // caller that made the other one. Only FALSE can reach the reuse path below, so promoting FALSE is
+  // both sufficient and safe (OFF has its own meaning for the epilogue and must survive).
+  static bool split_gauge_eig_aliased = false;
+  if (update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_FALSE and alias_eigensolver != split_gauge_eig_aliased)
+    update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
 
   int is_clover_bkup = 0;
   int is_asqtad_bkup = 0;
@@ -3298,6 +3309,9 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
     // OFF must survive the split: it is what tells the epilogue to free the buffers again
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   }
+
+  // Past the reuse path: this call rebuilds, so the tower it leaves buffered is this caller's shape.
+  split_gauge_eig_aliased = alias_eigensolver;
 
   profilerStart(__func__);
   auto profile = pushProfile(profileUpdateSplitGauge, param);
@@ -3401,14 +3415,16 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
   logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading gauge field...\n");
   if (!is_asqtad) {
     setupGaugeFields(collected_gauge, gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
-                     gaugeExtended, *thin_links_bkup, profile.profile);
+                     gaugeExtended, *thin_links_bkup, profile.profile, alias_eigensolver);
 
   } else {
     setupGaugeFields(collected_milc_fatlink_field, gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition,
-                     gaugeFatRefinement, gaugeFatEigensolver, gaugeFatExtended, *fat_links_bkup, profile.profile);
+                     gaugeFatRefinement, gaugeFatEigensolver, gaugeFatExtended, *fat_links_bkup, profile.profile,
+                     alias_eigensolver);
 
     setupGaugeFields(collected_milc_longlink_field, gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition,
-                     gaugeLongRefinement, gaugeLongEigensolver, gaugeLongExtended, *long_links_bkup, profile.profile);
+                     gaugeLongRefinement, gaugeLongEigensolver, gaugeLongExtended, *long_links_bkup, profile.profile,
+                     alias_eigensolver);
   }
   logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded gauge field...\n");
 
@@ -4251,15 +4267,14 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
     // return the split gauge is the active global gauge and a *copy* of the full-grid
     // gauge sits in the backup bundles; swap so the full-grid copy is active while we
     // build the parent Diracs below.
-    // Timed because gauge_split.count is the whole answer to "is the split gauge
-    // rebuilt every solve, or cached?". UpdateSplitGauge has a reuse fast path
-    // (interface_quda.cpp:3291-3296) that returns early when the key is unchanged, in
-    // which case this is near-free and .count still increments -- so read .time, not
-    // .count, to tell a rebuild from a reuse. At 288 nodes a rebuild is a multi-TB
-    // all-to-all and would swamp C_comm.
+    // alias_eigensolver = true: the split eigensolver tier is P x the whole eigensolver gauge and
+    // nothing on the sub-grid ever reads it. Deliberately NOT passed by callMultiSrcQuda,
+    // whose split path may legitimately deflate on the sub-grid and so needs a real
+    // eigensolver gauge.
+    const bool alias_split_eig = split_alias_eigensolver();
     {
       TimedPhase p(dt.gauge_split);
-      UpdateSplitGauge(param, is_asqtad, is_clover, sc.split_key);
+      UpdateSplitGauge(param, is_asqtad, is_clover, sc.split_key, alias_split_eig);
     }
     swapGaugeSplit(true);          // active := full-grid gauge, split gauge buffered
   }
@@ -4357,6 +4372,8 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
     sc.param_split.dirac_order = QUDA_INTERNAL_DIRAC_ORDER;
     sc.param_split.cpu_prec = sc.collect_in[0].Precision();
     sc.param_split.num_src = sc.num_src_per_sub_partition;
+    // Match the aliasing UpdateSplitGauge was asked for above
+    if (split_alias_eigensolver()) sc.param_split.cuda_prec_eigensolver = sc.param_split.cuda_prec;
 
     // Sub-grid Dirac operators: created with the split gauge active and *inside*
     // the split communicator, so they capture the split GaugeFields and the

@@ -60,9 +60,13 @@ namespace quda
 
   }; // Class
 
+  // alias_eigensolver points the eigensolver tier at 'precise' instead of building a field of its
+  // own. Only pass true when the eigensolver gauge is guaranteed never to be applied, and set
+  // cuda_prec_eigensolver to the precise precision to match -- see setDiracEigParam's check.
   void setupGaugeFields(GaugeField *collected_gauge, GaugeField *&precise, GaugeField *&sloppy,
                         GaugeField *&precondition, GaugeField *&refinement, GaugeField *&eigensolver,
-                        GaugeField *&extended, const GaugeBundleBackup &bkup, TimeProfile &profile)
+                        GaugeField *&extended, const GaugeBundleBackup &bkup, TimeProfile &profile,
+                        bool alias_eigensolver = false)
   {
     // First things first. The new collected gauge is going to become the 'precise'
     // Things to check: what to do about precise first (We copied it so we can free it)
@@ -130,14 +134,22 @@ namespace quda
     else if (bkup.eigensolver == bkup.sloppy)
       eigensolver = sloppy;
     else {
+      // None of the arms above matched, so the incoming eigensolver field is uniquely owned and
+      // nothing else will free it. Delete it on BOTH paths below -- aliasing without this leaks it
+      // once per rebuild.
       if (eigensolver) delete eigensolver;
-      GaugeFieldParam eigensolver_param(*(bkup.eigensolver));
-      eigensolver_param.create = QUDA_NULL_FIELD_CREATE;
-      eigensolver_param.x = precise_param.x;
-      eigensolver_param.pad = precise_param.pad;
 
-      eigensolver = new GaugeField(eigensolver_param);
-      eigensolver->copy(*precise);
+      if (alias_eigensolver) {
+        eigensolver = precise;
+      } else {
+        GaugeFieldParam eigensolver_param(*(bkup.eigensolver));
+        eigensolver_param.create = QUDA_NULL_FIELD_CREATE;
+        eigensolver_param.x = precise_param.x;
+        eigensolver_param.pad = precise_param.pad;
+
+        eigensolver = new GaugeField(eigensolver_param);
+        eigensolver->copy(*precise);
+      }
     }
 
     if (bkup.extended) {

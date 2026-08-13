@@ -128,6 +128,21 @@ namespace quda
     return enabled;
   }
 
+  /**
+    @brief Whether the split gauge tower may point its eigensolver tier at its own precise field
+    instead of building a separate one (gauge_backup.h's alias_eigensolver). DEFAULT OFF -- set
+    QUDA_SPLIT_ALIAS_EIG=1 to enable. Enable this if no deflation occurs within a sub-grid to
+    skip allocating sub-grid fields for the eigensolver.
+  */
+  inline bool split_alias_eigensolver()
+  {
+    static const bool enabled = []() {
+      const char *env = getenv("QUDA_SPLIT_ALIAS_EIG");
+      return env && strcmp(env, "1") == 0;
+    }();
+    return enabled;
+  }
+
   inline void split_buffer_free(void *ptr, bool device)
   {
     if (!ptr) return;
