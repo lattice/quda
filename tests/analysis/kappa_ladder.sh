@@ -45,7 +45,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
     log "reusing existing therm-tune: $tuned"
   else
     SOLVER_FLAGS="${THERM_SOLVER_FLAGS:-$SOLVER_FLAGS}" \
-      DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=10 \
+      DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=${n_steps:-10} \
       START_GAUGE="$last_cfg" \
       PREFIX=$ED/tt BUILD_TESTS=$T bash $A/therm_tune.sh > "$ED"/thermtune.log 2>&1
     if ! grep -q "^THERMALIZED" "$ED"/thermtune.log; then

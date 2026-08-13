@@ -147,6 +147,18 @@ n = $N_STEPS * ($var/var_t)**expo
 # increase re-enters the stability region; further growth happens next chunk
 # if genuinely needed.
 n = min(n, 3*$N_STEPS)
+# Runaway floor: never relax below 1.15x the largest step count that ever
+# produced a runaway (<dH> > 5) this rung — downward probes across the
+# stability boundary waste a chunk each and inject violent configs.
+import re
+floor = 0
+try:
+    for l in open("$PREFIX" + "_tune.log"):
+        m = re.search(r'n_steps=(\d+).*<dH>=\+?(-?[0-9.e+]+)', l)
+        if m and abs(float(m.group(2))) > 5: floor = max(floor, int(1.15*int(m.group(1))))
+except FileNotFoundError:
+    pass
+n = max(n, floor)
 print(max(4, int(round(n))))
 ")
     echo "  retuned n_steps -> $N_STEPS (targeting acceptance $(python3 -c "print(0.5*($ACC_LO+$ACC_HI))"))"
