@@ -117,7 +117,7 @@ namespace quda
         if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
           return mat_norm;
         else
-          return fabs(sr_norm);
+          return sr_norm;
       };
 
       // Locking check
@@ -419,14 +419,10 @@ namespace quda
       }
     }
 
-    // Invert the spectrum due to Chebyshev (except the arrow diagonal)
+    // Invert the spectrum due to Chebyshev
     if (reverse) {
       for (int b = 0; b < dim; b++) {
-        for (int c = 0; c < dim; c++) {
-          T(c, b) *= -1.0;
-          if (restart_iter > 0)
-            if (b == c && b < arrow_pos && c < arrow_pos) T(c, b) *= -1.0;
-        }
+        for (int c = 0; c < dim; c++) { T(c, b) *= -1.0; }
       }
     }
 
@@ -436,6 +432,11 @@ namespace quda
 
     // Populate the alpha array with eigenvalues
     for (int i = 0; i < dim; i++) alpha[i + num_locked] = eigensolver.eigenvalues()[i];
+
+    // Put spectrum back in order
+    if (reverse) {
+      for (int i = num_locked; i < n_kr; i++) { alpha[i] *= -1.0; }
+    }
 
     // Repopulate ritz matrix: COLUMN major
     for (int i = 0; i < dim; i++)
