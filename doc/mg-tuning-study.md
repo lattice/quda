@@ -72,6 +72,23 @@ single production.
    vs standard CG-based refresh. Use the per-chunk secs_per_traj
    telemetry already in the therm logs.
 
+## Autotuning hygiene (mandatory)
+
+Kernel autotuning contaminates wall-clock: every candidate (new
+blocking, level count, or precision) instantiates kernels with new tune
+keys, and their first execution runs the tuner's launch-parameter sweep
+inside the measured region. Discard tuning runs from selection:
+
+1. Per candidate, run one full UNTIMED warm-up pass of the complete
+   solve mix (setup + all RHS + one trajectory) to populate the
+   tunecache, then run the TIMED passes.
+2. Use a single persistent QUDA_RESOURCE_PATH for the whole study so
+   repeats and later stages hit a warm cache; never delete it mid-study.
+3. Validate each timed pass: grep the log for tuning activity ("Tuned
+   block=" lines); any hit voids that timing and the pass is rerun.
+4. Report timings as the median of 3 timed passes per candidate (spread
+   doubles as the contention/noise estimate).
+
 ## Design
 
 Not a full grid — staged sweeps with the best of each stage carried
