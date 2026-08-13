@@ -153,7 +153,7 @@ n = min(n, 3*$N_STEPS)
 import re
 floor = 0
 try:
-    for l in open("$PREFIX" + "_tune.log"):
+    for l in open('$PREFIX' + '_tune.log'):
         m = re.search(r'n_steps=(\d+).*<dH>=\+?(-?[0-9.e+]+)', l)
         if m and abs(float(m.group(2))) > 5: floor = max(floor, int(1.15*int(m.group(1))))
 except FileNotFoundError:
