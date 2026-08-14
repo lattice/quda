@@ -245,6 +245,10 @@ namespace quda
                   tp.block.y, device::warp_size());
       if (n_batch_block_max > Arg::max_n_batch_block)
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
+      if (tp.block.z > n_batch_block_max)
+        errorQuda("block.z = %u exceeds n_batch_block_max = %u", tp.block.z, n_batch_block_max);
+      if (tp.block.z > Arg::max_n_batch_block)
+        errorQuda("block.z = %u exceeds max_n_batch_block = %u", tp.block.z, Arg::max_n_batch_block);
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, arg);
 
       if (!commAsyncReduction()) {
