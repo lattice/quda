@@ -175,9 +175,9 @@ try:
     for l in open('$PREFIX' + '_tune.log'):
         m = re.search(r'n_steps=(\d+).*<dH>=\+?(-?[0-9.e+]+)', l)
         if m and abs(float(m.group(2))) > 5:
-            n = int(m.group(1)); events[n] = events.get(n, 0) + 1
-    for n, c in events.items():
-        if c >= 2: floor = max(floor, int(1.15*n))
+            hn = int(m.group(1)); events[hn] = events.get(hn, 0) + 1
+    for hn, c in events.items():
+        if c >= 2: floor = max(floor, int(1.15*hn))
 except FileNotFoundError:
     pass
 n = max(n, floor)
