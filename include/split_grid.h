@@ -318,6 +318,9 @@ namespace quda
 
     for (int i = 0; i < n_recv_buffers; i++) { v_recv_buffer[i] = split_buffer_malloc(bytes, device); }
 
+    // Retire the stream BEFORE arming any receive, not just before the sends.
+    split_sync_device(device);
+
     if (prepost) {
       for (int i = 0; i < n_replicates; i++) {
         int src_rank = recv_peer(i);
@@ -467,6 +470,9 @@ namespace quda
     };
 
     for (int i = 0; i < n_recv_buffers; i++) { v_recv_buffer[i] = split_buffer_malloc(bytes, device); }
+
+    // Retire the stream before arming any receive.
+    split_sync_device(device);
 
     if (prepost) {
       for (int i = 0; i < n_replicates; i++) {
