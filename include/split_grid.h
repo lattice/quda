@@ -167,6 +167,69 @@ namespace quda
     return enabled;
   }
 
+  // ===== DEBUG(split-corruption) -- REMOVE BEFORE PR ==============================================
+  //
+  // Instrumentation for the cycle-8 `out` corruption first seen at split_grid 1 1 3 3 (job
+  // 56684319, 144288_d960_288N_test8/output_1133.out). Everything under this banner is diagnostic
+  // and is meant to come out again: grep DEBUG(split-corruption) to find all of it.
+  namespace pool
+  {
+    extern bool debug_last_alloc_recycled; // lib/targets/cuda/malloc.cpp
+  }
+
+  /** Whether the reshuffle norm cross-checks run. Off by default; QUDA_SPLIT_CHECK_RESHUFFLE=1. */
+  inline bool split_check_reshuffle()
+  {
+    static const bool enabled = []() {
+      const char *env = getenv("QUDA_SPLIT_CHECK_RESHUFFLE");
+      return env && strcmp(env, "1") == 0;
+    }();
+    return enabled;
+  }
+
+  /**
+    @brief Whether to comm_wait the sends before releasing their buffers. Off by default;
+    QUDA_SPLIT_WAIT_SENDS=1.
+
+    A PROBE, and a candidate fix, not instrumentation -- hence default off, so it is one env var to
+    A/B. Today the sends are never waited on and the trailing comm_barrier() stands in for
+    completion. A barrier proves every rank REACHED it; it does not retire local send resources, and
+    under GDR the NIC is reading device memory asynchronously. join_field then frees those send
+    buffers straight into deviceCache, and the join loop's very next call -- join_field for `r` --
+    is the next thing to allocate from it, arming an RDMA receive into what may still be the
+    outgoing `out` message. That is a coherent route to the peer receiving corrupted `out` while its
+    own `r` stays clean, which is the observed asymmetry.
+
+    No deadlock: every receive is posted and drained before this point, so every send has a match.
+  */
+  inline bool split_wait_sends()
+  {
+    static const bool enabled = []() {
+      const char *env = getenv("QUDA_SPLIT_WAIT_SENDS");
+      return env && strcmp(env, "1") == 0;
+    }();
+    return enabled;
+  }
+
+  /**
+    @brief One line per reshuffle site, the first time it runs.
+
+    `prepost` is the load-bearing assumption behind the whole 1133 diagnosis and has only ever been
+    inferred from two calculations agreeing (9 x 17.9 MB against a 256 MiB cap), never observed. If
+    it is false the call is on the one-at-a-time path, which is synchronised differently, and the
+    reasoning has to start over. `recycled` says how many of the staging buffers came back out of
+    deviceCache rather than from a fresh cudaMalloc.
+  */
+  inline void split_debug_announce(const char *site, bool prepost, int n_replicates, int n_fields, size_t bytes,
+                                   bool device, bool in_place, int recycled, int allocated)
+  {
+    printfQuda("DEBUG(split-corruption) %s: prepost=%d n_replicates=%d n_fields=%d bytes=%zu cap=%zu "
+               "device=%d zero_copy=%d in_place=%d recycled=%d/%d\n",
+               site, prepost ? 1 : 0, n_replicates, n_fields, bytes, split_max_staging_bytes(), device ? 1 : 0,
+               split_zero_copy_enabled() ? 1 : 0, in_place ? 1 : 0, recycled, allocated);
+  }
+  // ===== end DEBUG(split-corruption) ==============================================================
+
   /**
     @brief The device pointer MPI can send TotalBytes() from directly, or nullptr when this field
     shape needs a staging copy first.
@@ -316,7 +379,21 @@ namespace quda
       return comm_rank_from_coords(src_idx.data());
     };
 
-    for (int i = 0; i < n_recv_buffers; i++) { v_recv_buffer[i] = split_buffer_malloc(bytes, device); }
+    int dbg_recycled = 0; // DEBUG(split-corruption) -- REMOVE BEFORE PR
+    for (int i = 0; i < n_recv_buffers; i++) {
+      v_recv_buffer[i] = split_buffer_malloc(bytes, device);
+      if (device && pool::debug_last_alloc_recycled) { dbg_recycled++; } // DEBUG(split-corruption)
+    }
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. static => one line per Field instantiation.
+    {
+      static bool announced = false;
+      if (!announced) {
+        announced = true;
+        split_debug_announce("split_field", prepost, n_replicates, n_fields, bytes, device, unpack_in_place,
+                             dbg_recycled, n_recv_buffers);
+      }
+    }
 
     // Retire the stream BEFORE arming any receive, not just before the sends.
     split_sync_device(device);
@@ -412,6 +489,14 @@ namespace quda
     // without that wait would let the allocator hand an in-flight send buffer to someone else.
     // It is what covers the zero-copy sends too: it is the point after which the caller may write
     // v_base_field again, because until it returns MPI may still be reading out of it.
+    //
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. The probe replaces that proxy with the real
+    // thing; see split_wait_sends().
+    if (split_wait_sends()) {
+      for (int i = 0; i < n_replicates; i++) {
+        if (v_mh_send[i]) { comm_wait(v_mh_send[i]); }
+      }
+    }
     comm_barrier();
 
     for (int i = 0; i < n_replicates; i++) {
@@ -469,7 +554,21 @@ namespace quda
       return comm_rank_from_coords(src_idx.data());
     };
 
-    for (int i = 0; i < n_recv_buffers; i++) { v_recv_buffer[i] = split_buffer_malloc(bytes, device); }
+    int dbg_recycled = 0; // DEBUG(split-corruption) -- REMOVE BEFORE PR
+    for (int i = 0; i < n_recv_buffers; i++) {
+      v_recv_buffer[i] = split_buffer_malloc(bytes, device);
+      if (device && pool::debug_last_alloc_recycled) { dbg_recycled++; } // DEBUG(split-corruption)
+    }
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. static => one line per Field instantiation.
+    {
+      static bool announced = false;
+      if (!announced) {
+        announced = true;
+        split_debug_announce("join_field", prepost, n_replicates, n_fields, bytes, device, pack_in_place,
+                             dbg_recycled, n_recv_buffers);
+      }
+    }
 
     // Retire the stream before arming any receive.
     split_sync_device(device);
@@ -549,6 +648,15 @@ namespace quda
     split_sync_device(device);
 
     // Load-bearing -- see the note in split_field.
+    //
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. This is the site the probe exists for: these
+    // send buffers go straight back into deviceCache below, and the join loop's next call is the
+    // one that allocates from it. See split_wait_sends().
+    if (split_wait_sends()) {
+      for (int i = 0; i < n_replicates; i++) {
+        if (v_mh_send[i]) { comm_wait(v_mh_send[i]); }
+      }
+    }
     comm_barrier();
 
     for (int i = 0; i < n_replicates; i++) {

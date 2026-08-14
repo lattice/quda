@@ -3751,6 +3751,78 @@ namespace
 
   DeflatedSolveTimers dt;
 
+  // ===== DEBUG(split-corruption) -- REMOVE BEFORE PR ============================================
+  //
+  // Instrumentation for the cycle-8 `out` corruption first seen at split_grid 1 1 3 3 (job 56684319,
+  // 144288_d960_288N_test8/output_1133.out), where the sub-grid CG opened its last cycle at
+  // |r|/|b| = 12.9 having closed the previous one at 6.7e-8. The parent's `r` and the sources were
+  // both intact, so whatever happened, happened to `out` between the deflate and the next segment.
+  // grep DEBUG(split-corruption) to find every piece of this.
+  //
+  // TIER 0 (always on, ~0.25%): the residual of the guess each sub-grid is handed, against the
+  // residual that same sub-grid left behind one cycle earlier. Costs one extra sub-grid matvec per
+  // cycle -- and only the matvec, since the ghost-buffer rebuild it triggers was going to be paid by
+  // CG's first matvec anyway. Deliberately NOT a SolverParam field: keeping it here confines the
+  // diff to this file and makes removal a delete.
+  //
+  // TIER 1 (QUDA_SPLIT_CHECK_RESHUFFLE=1): `out` must not change except where a segment changes it.
+  // The split only READS out (the zero-copy sends go straight out of its allocation), and the `r`
+  // join must not touch it at all -- so both checks are exact equality, not a tolerance. The second
+  // one is aimed squarely at the join loop's ordering: join_field(out) frees its send buffers to the
+  // pool with no comm_wait, and join_field(r) is the very next caller to allocate.
+  struct SplitCorruptionDetector {
+    // Tier 0, per sub-grid: this sub-grid's own closing |r|^2 from the previous cycle.
+    std::vector<double> prev_close_r2;
+    bool have_prev = false;
+    double worst_ratio = 0.0;     // worst sqrt(open/close) this solve
+    int worst_cycle = -1;
+    int worst_n = -1;
+
+    int events = 0;               // Tier 0 ratios over 10x -- one race can fire more than once
+
+    // Tier 1, on the parent: worst relative change in norm2(out) across a phase that must not
+    // modify it.
+    double worst_split_delta = 0.0; // across the whole split phase
+    double worst_join_delta = 0.0;  // between out's own join and the end of the join phase
+
+    // Tier 1, ACROSS the transport: sum over sub-partitions of ||sub_out||^2 before the join
+    // against sum over j of ||out[n*nsub+j]||^2 after it.
+    //
+    // The two deltas above compare the parent against itself, and that is NOT enough to see the
+    // leading hypothesis. If rank A's out-send buffer is clobbered, it is rank B that receives
+    // corrupted `out` -- and on rank B the field is wrong from the instant its join lands, so
+    // "after the join" and "end of the phase" agree with each other and both are wrong. Only a
+    // comparison against what the sub-grid actually held catches that.
+    //
+    // Compared as SUMS to avoid needing this rank's sub-partition index: a sum is blind to a
+    // compensating error, which is irrelevant at the magnitude in question (the observed event
+    // moved a norm by ~1e16).
+    double worst_transport_out = 0.0;
+    double worst_transport_r = 0.0;
+
+    // Bracket the one thing between the joins and the next split that legitimately writes out.
+    // Not an equality check -- deflate is meant to change `out` -- but after cycle 1 it contributes
+    // nothing measurable, so an O(1) jump here would be its own answer.
+    double worst_deflate_delta = 0.0;
+
+    void reset() { *this = SplitCorruptionDetector(); }
+  };
+
+  SplitCorruptionDetector dbg;
+
+  // Worst relative difference between two per-RHS norm vectors. Both are norm2 results, so a
+  // phase that did not touch the field returns exactly 0.0.
+  inline double dbg_worst_rel(const std::vector<double> &a, const std::vector<double> &b)
+  {
+    double w = 0.0;
+    for (size_t i = 0; i < a.size() && i < b.size(); i++) {
+      const double scale = std::max(std::abs(a[i]), std::abs(b[i]));
+      if (scale > 0.0) w = std::max(w, std::abs(a[i] - b[i]) / scale);
+    }
+    return w;
+  }
+  // ===== end DEBUG(split-corruption) =============================================================
+
   // Times a phase with the device drained at both ends.
   //
   // host_timer_t is host wall-clock but QUDA kernels are asynchronous, so a stop()
@@ -3814,6 +3886,37 @@ namespace
                tmax[1], split.count, tmax[2], join.count, tmax[3] + tmax[4], c_comm, tmax[5], deflate.count,
                resid_parent, residual.count + resid_pre.count + resid_post.count, tmax[7], sub_resid.count,
                tmax[9], resid_pre.count, tmax[10], resid_post.count, tmax[11], tmax[8], reshuffles);
+
+    // ===== DEBUG(split-corruption) -- REMOVE BEFORE PR ==========================================
+    //
+    // Reduced, for the same reason the timers above are: printfQuda prints from global rank 0,
+    // which lives in sub-partition 0, and the victim is not reliably sub-partition 0 -- in
+    // output_1133.tune it was some other sub-grid entirely while rank 0's own cycle 8 opened clean.
+    // A bare rank-0 dump would have called that run healthy.
+    //
+    // `where` packs rank*10000 + cycle*100 + n so the argmax survives a plain max-reduction; -1
+    // when nothing was recorded. Tier 1's two deltas are exact-equality checks, so anything but
+    // 0.000e+00 is a hit -- there is no round-off floor to argue about.
+    std::vector<double> dmax {dbg.worst_ratio,        dbg.worst_split_delta,   dbg.worst_join_delta,
+                              dbg.worst_transport_out, dbg.worst_transport_r,  dbg.worst_deflate_delta,
+                              static_cast<double>(dbg.events)};
+    comm_allreduce_max(dmax);
+
+    std::vector<double> dwho {dbg.worst_ratio == dmax[0] && dmax[0] > 0.0 ?
+                                static_cast<double>(comm_rank() * 10000 + dbg.worst_cycle * 100 + dbg.worst_n) :
+                                -1.0};
+    comm_allreduce_max(dwho);
+
+    const long who = static_cast<long>(dwho[0]);
+    printfQuda("DEBUG(split-corruption) tier0 open/close %.3e events %d", dmax[0], static_cast<int>(dmax[6]));
+    if (who >= 0) {
+      printfQuda(" at rank %ld cycle %ld n %ld", who / 10000, (who / 100) % 100, who % 100);
+    } else {
+      printfQuda(" (no cycle-to-cycle pair seen)");
+    }
+    printfQuda(" | tier1 %s split %.3e join %.3e transport[out] %.3e transport[r] %.3e deflate %.3e\n",
+               split_check_reshuffle() ? "on" : "OFF", dmax[1], dmax[2], dmax[3], dmax[4], dmax[5]);
+    // ===== end DEBUG(split-corruption) ===========================================================
   }
 
 } // namespace
@@ -3959,7 +4062,15 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
 
     // re-deflate: fold the projected residual correction into the guess. This changes
     // `out`, so `r` no longer belongs to it.
+    //
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. The last unchecked step in the window between
+    // one segment's join and the next segment's split.
+    std::vector<double> dbg_pre_deflate;
+    if (split_check_reshuffle()) dbg_pre_deflate = blas::norm2(out);
     deflate_accumulate();
+    if (split_check_reshuffle())
+      dbg.worst_deflate_delta = std::max(dbg.worst_deflate_delta, dbg_worst_rel(dbg_pre_deflate, blas::norm2(out)));
+
     r_stale = true;
     cycle++;
   }
@@ -4051,11 +4162,19 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
   // ---- scatter the current guess onto the sub-grids (parent communicator) ----
   // RHS i lives on sub-partition j = i % nsub of collected field n = i / nsub,
   // matching callMultiSrcQuda's n * num_sub_partition + j indexing.
+  // DEBUG(split-corruption) -- REMOVE BEFORE PR. The split only reads `out`.
+  std::vector<double> dbg_out_pre_split;
+  if (split_check_reshuffle()) dbg_out_pre_split = blas::norm2(out);
+
   {
     TimedPhase p(dt.split);
     for (int n = 0; n < nper; n++)
       split_field(sc.collect_out[n], {out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.split_key, sc.pc_type);
   }
+
+  // DEBUG(split-corruption) -- REMOVE BEFORE PR
+  if (split_check_reshuffle())
+    dbg.worst_split_delta = std::max(dbg.worst_split_delta, dbg_worst_rel(dbg_out_pre_split, blas::norm2(out)));
 
   {
     TimedPhase p(dt.rendez_in);
@@ -4064,6 +4183,11 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
     updateR();                     // trivial (interface_quda.cpp:549): 4 int stores, not a cost
     comm_barrier();
   }
+
+  // DEBUG(split-corruption) -- REMOVE BEFORE PR. What the sub-grid held before the join, to be
+  // compared against what the parent holds after it. Filled inside the split communicator, so these
+  // are reduced over this sub-grid only.
+  std::vector<double> dbg_sub_out, dbg_sub_r;
 
   int iter = 0;
   {
@@ -4094,6 +4218,27 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
     sp.tol = tol;
     sp.maxiter = maxiter;
     sp.iter = 0;
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. TIER 0: what residual did this sub-grid's guess
+    // actually arrive with? sub_r is scratch here -- the previous cycle's residual has already been
+    // joined back to the parent -- so clobbering it costs nothing.
+    {
+      sm(sub_r, sub_out);
+      auto open_r2 = blas::xmyNorm(sub_in, sub_r);
+      if (dbg.have_prev && dbg.prev_close_r2.size() == open_r2.size()) {
+        for (int n = 0; n < nper; n++) {
+          if (dbg.prev_close_r2[n] <= 0.0) continue;
+          const double ratio = std::sqrt(open_r2[n] / dbg.prev_close_r2[n]);
+          if (ratio > 10.0) dbg.events++;
+          if (ratio > dbg.worst_ratio) {
+            dbg.worst_ratio = ratio;
+            dbg.worst_cycle = dt.cycles;
+            dbg.worst_n = n;
+          }
+        }
+      }
+    }
+
     {
       TimedPhase p(dt.cg_sub);
       Solver *cg = Solver::create(sp, sm, smSloppy, smPre, smEig);
@@ -4113,7 +4258,16 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
     {
       TimedPhase p(dt.sub_resid);
       sm(sub_r, sub_out);
-      blas::xmyNorm(sub_in, sub_r); // sub_r = sub_in - sub_r
+      auto close_r2 = blas::xmyNorm(sub_in, sub_r); // sub_r = sub_in - sub_r
+      // DEBUG(split-corruption) -- REMOVE BEFORE PR. TIER 0: what this sub-grid leaves behind.
+      dbg.prev_close_r2.assign(close_r2.begin(), close_r2.end());
+      dbg.have_prev = true;
+    }
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR
+    if (split_check_reshuffle()) {
+      dbg_sub_out = blas::norm2(sub_out);
+      dbg_sub_r = blas::norm2(sub_r);
     }
   } // sub-grid fields destroyed before the communicator is popped
 
@@ -4134,12 +4288,53 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
   // Two joins per cycle instead of one (~+0.009 s) to save the parent-grid matvec and
   // its ghost-buffer rebuild (~0.1 s). The parent needs `out` to deflate into and `r`
   // to deflate *from*, and now gets both without ever applying the Dirac operator.
+  // DEBUG(split-corruption) -- REMOVE BEFORE PR. Nothing after out's own join may touch out: not
+  // the r join that immediately follows it, not a later n. Captured per n, compared once the whole
+  // phase is done. Note this puts reductions inside the dt.join window, so do NOT quote C_comm or
+  // the join timings from a QUDA_SPLIT_CHECK_RESHUFFLE run.
+  std::vector<double> dbg_out_after_join;
+
   {
     TimedPhase p(dt.join);
     for (int n = 0; n < nper; n++) {
       join_field({out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.collect_out[n], sc.split_key, sc.pc_type);
+      if (split_check_reshuffle()) { // DEBUG(split-corruption)
+        auto slice = blas::norm2({out.begin() + n * nsub, out.begin() + (n + 1) * nsub});
+        dbg_out_after_join.insert(dbg_out_after_join.end(), slice.begin(), slice.end());
+      }
       join_field({r.begin() + n * nsub, r.begin() + (n + 1) * nsub}, sc.collect_r[n], sc.split_key, sc.pc_type);
     }
+  }
+
+  // DEBUG(split-corruption) -- REMOVE BEFORE PR
+  if (split_check_reshuffle()) {
+    const auto out_now = blas::norm2(out);
+    dbg.worst_join_delta = std::max(dbg.worst_join_delta, dbg_worst_rel(dbg_out_after_join, out_now));
+
+    // Across the transport. comm_allreduce_sum counts each sub-grid's value once per rank in it,
+    // hence the divide; the parent side is the plain sum over that sub-grid's RHS.
+    const auto r_now = blas::norm2(r);
+    const double ranks_per_sub = static_cast<double>(comm_size()) / static_cast<double>(nsub);
+
+    std::vector<double> sub_sum(dbg_sub_out);
+    sub_sum.insert(sub_sum.end(), dbg_sub_r.begin(), dbg_sub_r.end());
+    comm_allreduce_sum(sub_sum);
+    for (auto &v : sub_sum) v /= ranks_per_sub;
+
+    std::vector<double> par_sum(2 * nper, 0.0);
+    for (int n = 0; n < nper; n++) {
+      for (int j = 0; j < nsub; j++) {
+        par_sum[n] += out_now[n * nsub + j];
+        par_sum[nper + n] += r_now[n * nsub + j];
+      }
+    }
+
+    dbg.worst_transport_out = std::max(dbg.worst_transport_out,
+                                       dbg_worst_rel({sub_sum.begin(), sub_sum.begin() + nper},
+                                                     {par_sum.begin(), par_sum.begin() + nper}));
+    dbg.worst_transport_r = std::max(dbg.worst_transport_r,
+                                     dbg_worst_rel({sub_sum.begin() + nper, sub_sum.end()},
+                                                   {par_sum.begin() + nper, par_sum.end()}));
   }
 
   // Sub-partitions converge in different iteration counts. The cycle loop's
@@ -4186,6 +4381,7 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
   // test), and the cost model is per solve. Without this the timers would accumulate into
   // a job total.
   dt.reset(__func__, __FILE__, __LINE__);
+  dbg.reset(); // DEBUG(split-corruption) -- REMOVE BEFORE PR
 
   checkInvertParam(param, _hp_x[0], _hp_b[0]);
   if (!param->eig_param) errorQuda("invertMultiSrcDeflatedQuda requires eig_param (deflation)");

@@ -625,6 +625,15 @@ namespace quda
         in the cache). */
     static std::map<void *, size_t> deviceSize;
 
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR.
+    // Provenance of the most recent pool_device_malloc: true when the block came back out of
+    // deviceCache (so some earlier tenant owned it, and the pool's only guarantee that their work
+    // is finished is that everything touching it was default-stream), false when it was a fresh
+    // cudaMalloc (which cannot alias anything). Read immediately after the call -- there is no
+    // locking and no history. Exists to answer whether the split reshuffle's staging buffers are
+    // recycled blocks at the moment they are handed to MPI.
+    bool debug_last_alloc_recycled = false;
+
     static bool pool_init = false;
 
     /** whether to use a memory pool allocator for device memory */
@@ -707,6 +716,7 @@ namespace quda
     void *device_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
       void *ptr = nullptr;
+      debug_last_alloc_recycled = false; // DEBUG(split-corruption) -- REMOVE BEFORE PR
       if (device_memory_pool) {
         if (deviceCache.empty()) {
           ptr = quda::device_malloc_(func, file, line, nbytes);
@@ -716,6 +726,7 @@ namespace quda
             nbytes = it->first;
             ptr = it->second;
             deviceCache.erase(it);
+            debug_last_alloc_recycled = true; // DEBUG(split-corruption) -- REMOVE BEFORE PR
           } else { // sacrifice the smallest cached allocation
             it = deviceCache.begin();
             ptr = it->second;
