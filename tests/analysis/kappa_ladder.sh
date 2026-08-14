@@ -70,6 +70,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
     --hmc-thermalization 0 --hmc-n-trajectories $ntraj \
     --hmc-gauge-infile "$start_cfg" \
     ${ET_FLAGS:-} \
+    $([ -n "${ET_FLAGS:-}" ] && [ -f "$start_cfg.pool.evals" ] && echo "--eigentracking-pool-infile $start_cfg.pool") \
     --hmc-checkpoint $CHECKPOINT_INTERVAL --hmc-checkpoint-prefix "$ED"/cfg_ \
     --gtest_filter=HMC.Production > "$ED"/production.log 2>&1
   acc=$(grep -oE "acceptance = [0-9]+/[0-9]+" "$ED"/production.log | tail -1)
@@ -144,6 +145,7 @@ PYEOF
       --hmc-thermalization 0 --hmc-n-trajectories $ptraj \
       --hmc-gauge-infile "$last_probe" \
       ${ET_FLAGS:-} \
+      $([ -n "${ET_FLAGS:-}" ] && [ -f "$last_probe.pool.evals" ] && echo "--eigentracking-pool-infile $last_probe.pool") \
       --hmc-checkpoint $CHECKPOINT_INTERVAL --hmc-checkpoint-prefix "$ED"/prod_ \
       --gtest_filter=HMC.Production > "$ED"/production_full.log 2>&1
     for f in "$ED"/prod_*; do
