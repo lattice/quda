@@ -50,7 +50,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
     # drives the integrator through near-exceptional force spikes. Cold
     # starts thermalize longer but smoothly, at stable step counts.
     SOLVER_FLAGS="${THERM_SOLVER_FLAGS:-$SOLVER_FLAGS}" \
-      DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${INTEGRATOR:-2} N_STEPS=12 \
+      DIMS="$LDIMS" BETA=${BETA:-5.3} KAPPA=$kappa CSW=${CSW:-1.0} INTEGRATOR=${THERM_INTEGRATOR:-${INTEGRATOR:-2}} N_STEPS=12 \
       PREFIX=$ED/tt BUILD_TESTS=$T bash $A/therm_tune.sh > "$ED"/thermtune.log 2>&1
     if ! grep -q "^THERMALIZED" "$ED"/thermtune.log; then
       log "HALT: therm-tune failed at kappa=$kappa (see $ED/thermtune.log)"; exit 1
@@ -64,7 +64,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
   # ---- production: RUNG_CONFIGS configs at checkpoint interval 5 ----
   ntraj=$((RUNG_CONFIGS * 5 * 12 / 10))  # ~20% margin for rejects
   timeout $((ntraj * 150 + 3600)) $T/hmc_test --dim $LDIMS ${SOLVER_FLAGS:?} ${PROD_MG:-} --dslash-type clover --clover-csw ${CSW:-1.0} --kappa $kappa --hmc-beta ${BETA:-5.3} \
-    --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps $n_steps --hmc-tau ${TAU:-1.0} \
+    --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps ${PROD_N_STEPS:-$n_steps} --hmc-tau ${TAU:-1.0} \
     --hmc-n-inner-steps ${INNER_STEPS:-3} \
     --hmc-thermalization 0 --hmc-n-trajectories $ntraj \
     --hmc-gauge-infile "$start_cfg" \
@@ -137,7 +137,7 @@ PYEOF
     last_probe=$(ls "$ED"/cfg_* | grep -vE "\.pool|\.evals" | sort | tail -1)
     ptraj=$((PROD_CONFIGS * 5 * 12 / 10))
     timeout $((ptraj * 150 + 3600)) $T/hmc_test --dim $LDIMS ${SOLVER_FLAGS:?} ${PROD_MG:-} --dslash-type clover --clover-csw ${CSW:-1.0} --kappa $kappa --hmc-beta ${BETA:-5.3} \
-      --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps $n_steps --hmc-tau ${TAU:-1.0} \
+      --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps ${PROD_N_STEPS:-$n_steps} --hmc-tau ${TAU:-1.0} \
     --hmc-n-inner-steps ${INNER_STEPS:-3} \
       --hmc-thermalization 0 --hmc-n-trajectories $ptraj \
       --hmc-gauge-infile "$last_probe" \

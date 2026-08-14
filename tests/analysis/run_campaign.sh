@@ -52,7 +52,7 @@ fi
 export SOLVER_FLAGS THERM_MG PROD_MG MEAS_FLAGS ET_FLAGS
 # therm parameters must reach therm_tune.sh through nested invocations
 # (ladder -> therm_tune); conf variables are not exported by source
-export CHUNK PLATEAU_CHUNKS MAX_CHUNKS CHUNK_TIMEOUT ACC_LO ACC_HI N_STEPS_MAX INNER_STEPS
+export CHUNK PLATEAU_CHUNKS MAX_CHUNKS CHUNK_TIMEOUT ACC_LO ACC_HI N_STEPS_MAX INNER_STEPS THERM_INTEGRATOR PROD_N_STEPS
 
 case "$sub" in
 therm)
