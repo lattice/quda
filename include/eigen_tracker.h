@@ -144,6 +144,9 @@ namespace quda
     /** @brief Mutable access to pool vectors (for rotation by EigenForecast) */
     std::vector<ColorSpinorField> &getPoolMutable() { return pool_; }
 
+    /** @brief Mutable access to eigenvalues (for pool snapshot restore) */
+    std::vector<Complex> &getEvalsMutable() { return eigvals_; }
+
     /** @brief Mutable access to Dpool vectors (for rotation by EigenForecast) */
     std::vector<ColorSpinorField> &getDpoolMutable() { return Dpool_; }
   };

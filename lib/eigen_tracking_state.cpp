@@ -275,6 +275,35 @@ namespace quda
     logQuda(QUDA_SUMMARIZE, "EigenTrackingState: saved %d-vector pool to %s\n", k, path.c_str());
   }
 
+  void EigenTrackingState::backupPool()
+  {
+    if (!tracker_.isInitialized()) return;
+    auto &pool = tracker_.getPoolMutable();
+    auto &Dpool = tracker_.getDpoolMutable();
+    poolBackup_.clear();
+    DpoolBackup_.clear();
+    for (auto &v : pool) poolBackup_.emplace_back(v);
+    for (auto &v : Dpool) DpoolBackup_.emplace_back(v);
+    evalsBackup_ = tracker_.getEvals();
+    hasPoolBackup_ = true;
+    logQuda(QUDA_VERBOSE, "EigenTrackingState: pool snapshot taken (%zu vectors)\n", poolBackup_.size());
+  }
+
+  bool EigenTrackingState::restorePool()
+  {
+    if (!hasPoolBackup_ || !tracker_.isInitialized()) return false;
+    auto &pool = tracker_.getPoolMutable();
+    auto &Dpool = tracker_.getDpoolMutable();
+    if (pool.size() != poolBackup_.size() || Dpool.size() != DpoolBackup_.size()) return false;
+    for (size_t i = 0; i < pool.size(); i++) blas::copy(pool[i], poolBackup_[i]);
+    for (size_t i = 0; i < Dpool.size(); i++) blas::copy(Dpool[i], DpoolBackup_[i]);
+    tracker_.getEvalsMutable() = evalsBackup_;
+    forecast_.reset();
+    logQuda(QUDA_SUMMARIZE, "EigenTrackingState: pool restored from last accepted-state snapshot (%zu vectors)\n",
+            pool.size());
+    return true;
+  }
+
   bool EigenTrackingState::loadPool(const std::string &path, const DiracMatrix &matHalf, QudaInvertParam &inv_param)
   {
     if (tracker_.isInitialized()) return true; // idempotent, like maybeInit

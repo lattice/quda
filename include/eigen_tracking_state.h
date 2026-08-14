@@ -109,6 +109,15 @@ namespace quda
     QudaInvertParam invParam_;
     bool invParamSet_;
 
+    /** In-memory pool snapshot taken at the last accepted state, restored
+        on Metropolis rejection (a single RR forceUpdate cannot re-lock a
+        pool decohered by a full rejected trajectory — the tracking radius
+        is far smaller than tau) */
+    std::vector<ColorSpinorField> poolBackup_;
+    std::vector<ColorSpinorField> DpoolBackup_;
+    std::vector<Complex> evalsBackup_;
+    bool hasPoolBackup_ = false;
+
     /** Statistics */
     int trajectoryCount_;
     bool residualRefreshPending_ = false; /**< Adaptive re-anchor requested by residual trigger */
@@ -234,6 +243,21 @@ namespace quda
      * are missing or inconsistent.
      */
     bool loadPool(const std::string &path, const DiracMatrix &matHalf, QudaInvertParam &inv_param);
+
+    /**
+     * @brief Snapshot the pool (vectors, Dpool, eigenvalues) in memory.
+     * Call at the last accepted state; no-op if the tracker is not yet
+     * initialised.
+     */
+    void backupPool();
+
+    /**
+     * @brief Restore the pool from the last backupPool() snapshot and
+     * reset the forecast rotation history (rotations recorded along a
+     * rejected trajectory are meaningless for the restored state).
+     * Returns false if no snapshot exists.
+     */
+    bool restorePool();
 
     void resetForRefresh()
     {

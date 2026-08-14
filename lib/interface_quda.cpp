@@ -5559,6 +5559,9 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
         if (et_dS && et_dS != et_d) delete et_dS;
         if (et_dP && et_dP != et_d && et_dP != et_dS) delete et_dP;
         if (et_dE && et_dE != et_d && et_dE != et_dP) delete et_dE;
+        // Snapshot the pool at this accepted state so a later rejection can
+        // restore it instead of limping on with a decohered pool.
+        getEigenTrackingInstance()->backupPool();
       }
     } else {
       // Reject: restore gauge from backup, then run the FULL state-refresh
@@ -5583,20 +5586,28 @@ void hmcRunQuda(void *h_gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_pa
               prob, rand_val, 100.0 * n_accepted / n_total);
       // No MG update needed on rejection — gauge is unchanged
 
-      // Eigentracking: refresh Dpool with restored gauge (Dpool drifted during trajectory)
+      // Eigentracking: the pool decohered along the rejected trajectory and
+      // a single RR forceUpdate cannot re-lock it (tracking radius << tau).
+      // Restore the snapshot taken at the last accepted state — without
+      // this, consecutive rejections compound pool damage into a rejection
+      // spiral (observed: dH +0.9 -> +29 -> +2.9 -> +2.6 -> +5.1 on a
+      // frozen gauge). Fall back to the legacy forceUpdate only when no
+      // snapshot exists yet (rejection before the first accepted state).
       if (getEigenTrackingInstance() && getEigenTrackingInstance()->isActive()) {
         auto etProfile = pushProfile(getEigenTrackProfile());
         using namespace quda;
-        QudaInvertParam ip = *inv_param;
-        bool pc = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
-        Dirac *d = nullptr, *dS = nullptr, *dP = nullptr, *dE = nullptr;
-        createDiracWithEig(d, dS, dP, dE, ip, pc, false);
-        DiracM matHalf(*d);
-        getEigenTrackingInstance()->getTrackerMutable().forceUpdate(matHalf);
-        delete d;
-        if (dS && dS != d) delete dS;
-        if (dP && dP != d && dP != dS) delete dP;
-        if (dE && dE != d && dE != dP) delete dE;
+        if (!getEigenTrackingInstance()->restorePool()) {
+          QudaInvertParam ip = *inv_param;
+          bool pc = (ip.solve_type == QUDA_DIRECT_PC_SOLVE) || (ip.solve_type == QUDA_NORMOP_PC_SOLVE);
+          Dirac *d = nullptr, *dS = nullptr, *dP = nullptr, *dE = nullptr;
+          createDiracWithEig(d, dS, dP, dE, ip, pc, false);
+          DiracM matHalf(*d);
+          getEigenTrackingInstance()->getTrackerMutable().forceUpdate(matHalf);
+          delete d;
+          if (dS && dS != d) delete dS;
+          if (dP && dP != d && dP != dS) delete dP;
+          if (dE && dE != d && dE != dP) delete dE;
+        }
       }
     }
 
