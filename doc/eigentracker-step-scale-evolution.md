@@ -171,16 +171,17 @@ toward light mass. Two characterized limitations:
 
 ## Nested-FGI inner/outer balance (2026-08-14, kappa=0.14342)
 
-The 36-44x8 production degradation (74% acceptance, dH tail to +20.8)
-was NOT outer-resolution starvation: an inner-step scan at fixed outer
-60 showed inner=8 giving var(dH) ~ 1.5-2 while inner=2-3 give 5e-4 to
-2e-3 — three orders of magnitude — at 2-3x lower cost (141-154 vs 320+
-s/traj; the inner loop carries the coarse-deflation force, so inner
-steps are not cheap). Too many inner steps degrade the split: tune
-gauge (inner) first, conservative, then descend outer. Outer descent at
-inner=3: 48/40/34 clean, 30 shows <dH> = +0.19 decoupling from var/2
-(systematic drift, incipient at 34). Production setting 40x3, ~105
-s/traj at ~95% acceptance.
+RETRACTED (2026-08-14, same day): the inner-step scan, outer descent,
+grid, and 15-trajectory confirmations described in earlier drafts of
+this section all omitted --hmc-gauge-infile — hmc_test then starts from
+a RANDOM gauge (plaquette 0.12 vs the thermalized 0.598), so the entire
+tuning surface was measured in the wrong stiffness regime and is
+invalid. The symptom that exposed it: ladder productions (which DO pass
+the infile) blew up (dH +62..+172) at settings the fake-state scans
+had "confirmed" at var(dH) ~ 5e-3. Probe drivers now pass the infile,
+chain the pool, and carry a start-state plaquette guard that aborts the
+scan on mismatch. The corrected grid (real state) is the authority for
+production settings; do not cite numbers from the retracted scans.
 
 Probe hygiene: the binary's default --hmc-momentum-seed 12345 made
 every invocation replay one momentum stream — probe validations were
