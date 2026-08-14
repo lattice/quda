@@ -116,7 +116,7 @@ namespace quda {
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     } else if (geometry == QUDA_KDINVERSE_GEOMETRY) {
       real_length = (1 << nDim) * volume * nInternal;
-      length = 2 * (1 << nDim) * nDim * stride * nInternal; // two comes from being full lattice
+      length = 2 * (1 << nDim) * stride * nInternal; // two comes from being full lattice
     }
 
     switch (geometry) {
