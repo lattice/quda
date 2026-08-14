@@ -66,6 +66,7 @@ for rung in $(seq 1 $MAX_RUNGS); do
   timeout $((ntraj * 150 + 3600)) $T/hmc_test --dim $LDIMS ${SOLVER_FLAGS:?} ${PROD_MG:-} --dslash-type clover --clover-csw ${CSW:-1.0} --kappa $kappa --hmc-beta ${BETA:-5.3} \
     --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps ${PROD_N_STEPS:-$n_steps} --hmc-tau ${TAU:-1.0} \
     --hmc-n-inner-steps ${INNER_STEPS:-3} \
+    --hmc-momentum-seed $((10#$(date +%s) % 899999 + 100000)) \
     --hmc-thermalization 0 --hmc-n-trajectories $ntraj \
     --hmc-gauge-infile "$start_cfg" \
     ${ET_FLAGS:-} \
@@ -139,6 +140,7 @@ PYEOF
     timeout $((ptraj * 150 + 3600)) $T/hmc_test --dim $LDIMS ${SOLVER_FLAGS:?} ${PROD_MG:-} --dslash-type clover --clover-csw ${CSW:-1.0} --kappa $kappa --hmc-beta ${BETA:-5.3} \
       --hmc-integrator ${INTEGRATOR:-2} --hmc-n-steps ${PROD_N_STEPS:-$n_steps} --hmc-tau ${TAU:-1.0} \
     --hmc-n-inner-steps ${INNER_STEPS:-3} \
+      --hmc-momentum-seed $((10#$(date +%s) % 899999 + 100000)) \
       --hmc-thermalization 0 --hmc-n-trajectories $ptraj \
       --hmc-gauge-infile "$last_probe" \
       ${ET_FLAGS:-} \

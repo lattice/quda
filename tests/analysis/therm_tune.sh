@@ -61,7 +61,7 @@ for chunk in $(seq 1 "$MAX_CHUNKS"); do
     if [ "$chunk" -gt 1 ] || [ -n "${START_GAUGE:-}" ]; then CHUNK_FLAGS="$MG_THERM_FLAGS"; fi
   fi
   t_chunk0=$(date +%s)
-  timeout ${CHUNK_TIMEOUT:-2400} "$BUILD_TESTS"/hmc_test --dim $DIMS $CHUNK_FLAGS ${THERM_MG:-} --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" --hmc-beta "$BETA" \
+  timeout ${CHUNK_TIMEOUT:-2400} "$BUILD_TESTS"/hmc_test --dim $DIMS $CHUNK_FLAGS ${THERM_MG:-} --hmc-momentum-seed $((10#$(date +%s) % 899999 + 100000)) --dslash-type clover --clover-csw "$CSW" --kappa "$KAPPA" --hmc-beta "$BETA" \
     --hmc-integrator "$INTEGRATOR" --hmc-n-steps "$N_STEPS" --hmc-tau "$TAU" \
     --hmc-n-inner-steps "${INNER_STEPS:-3}" \
     --hmc-thermalization "$CHUNK" --hmc-n-trajectories "$CHUNK" \
