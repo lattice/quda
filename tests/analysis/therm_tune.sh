@@ -154,9 +154,16 @@ n = min(n, 3*$N_STEPS)
 import re
 floor = 0
 try:
+    # require >=2 runaway events at a step count before pinning the floor:
+    # a single tail event (exceptional momentum draw) once ratcheted a rung
+    # to 74+ steps permanently
+    events = {}
     for l in open('$PREFIX' + '_tune.log'):
         m = re.search(r'n_steps=(\d+).*<dH>=\+?(-?[0-9.e+]+)', l)
-        if m and abs(float(m.group(2))) > 5: floor = max(floor, int(1.15*int(m.group(1))))
+        if m and abs(float(m.group(2))) > 5:
+            n = int(m.group(1)); events[n] = events.get(n, 0) + 1
+    for n, c in events.items():
+        if c >= 2: floor = max(floor, int(1.15*n))
 except FileNotFoundError:
     pass
 n = max(n, floor)

@@ -107,6 +107,36 @@ db = math.log(a/tgt)/1.29  # d(ln a)/d(beta) = -1.29: a too fine -> lower beta
 print(f'SCOUT RESULT: a={a} fm (target {tgt}); suggested beta correction {db:+.3f} -> beta={$BETA+db:.3f}')"
   fi
   ;;
+mgtune)
+  # MG tuning sweep per doc/mg-tuning-study.md: candidates from
+  # $DATA_DIR/mgtune_candidates.txt (name|extra flags per line), timed as
+  # one full HMC trajectory (production mix incl. setup) per run on each
+  # supplied config. First run per candidate is an UNTIMED tunecache
+  # warm-up; report median of the timed runs. Timings void if tuning
+  # activity is detected in a timed pass.
+  CAND=$DATA_DIR/mgtune_candidates.txt
+  [ -f "$CAND" ] || { echo "missing $CAND"; exit 1; }
+  OUT=$DATA_DIR/mgtune_$(date +%s).csv
+  echo "candidate,config,run,secs,accept,dH,tuned_lines" > "$OUT"
+  while IFS='|' read -r name flags; do
+    [ -z "$name" ] && continue
+    case "$name" in \#*) continue;; esac
+    for cfg in "$@"; do
+      for run in warm t1 t2; do
+        log=$DATA_DIR/mgtune_${name}_$(basename $cfg)_$run.log
+        t0=$(date +%s)
+        timeout 3600 "$BUILD_TESTS"/hmc_test --dim $DIMS           --prec double --prec-sloppy single --prec-precondition single --prec-null single           --inv-multigrid true --niter $NITER $flags           --eigentracking true --eigentracking-n-ev $ET_NEV --eigentracking-fresh-interval $ET_FRESH_INTERVAL           --eigentracking-refresh-residual $ET_REFRESH_RESIDUAL --hmc-mg-setup-interval 1           --dslash-type clover --clover-csw $CSW --kappa ${MGTUNE_KAPPA:?set MGTUNE_KAPPA in conf} --hmc-beta $BETA           --hmc-integrator ${INTEGRATOR:-3} --hmc-n-steps ${PROD_N_STEPS:-36} --hmc-n-inner-steps ${INNER_STEPS:-8}           --hmc-tau $TAU --hmc-thermalization 0 --hmc-n-trajectories 1           --hmc-gauge-infile "$cfg"           --gtest_filter=HMC.Production > "$log" 2>&1
+        t1=$(( $(date +%s) - t0 ))
+        acc=$(grep -oE "rate = [0-9.]+" "$log" | tail -1)
+        dh=$(grep -oE "dH = [+-][0-9.e+-]+" "$log" | tail -1 | grep -oE "[+-][0-9.e+-]+")
+        tuned=$(grep -c "Tuned block=" "$log")
+        echo "$name,$(basename $cfg),$run,$t1,$acc,$dh,$tuned" >> "$OUT"
+        echo "[mgtune] $name $(basename $cfg) $run: ${t1}s acc=$acc dH=$dh tuned=$tuned"
+      done
+    done
+  done < "$CAND"
+  echo "[mgtune] results: $OUT"
+  ;;
 w0)
   out=$DATA_DIR/w0_$(date +%s); mkdir -p "$out"; i=0
   for cfg in "$@"; do
