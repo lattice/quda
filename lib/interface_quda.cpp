@@ -3734,6 +3734,9 @@ namespace
     double guess2 = 0.0;       // max_i ||out_i||^2 on entry. Zero => MILC passed a zero initial
                                // guess, so r = in exactly and resid_pre's matvec is removable.
 
+    int iters_local = 0;
+    int iters_subgrid_max = 0; // max over sub-grids of iters_local: the worst sub-grid's REAL total.
+
     // Zero via Timer::reset rather than assigning a fresh struct: host_timer_t is
     // Timer<false>, whose qudaEvent_t members are left uninitialized in that case, and
     // copy-assignment would read them.
@@ -3744,6 +3747,8 @@ namespace
         t->reset(func, file, line);
       cycles = 0;
       guess2 = 0.0;
+      iters_local = 0;
+      iters_subgrid_max = 0;
     }
 
     void report(bool split_enabled, int iters);
@@ -3843,6 +3848,25 @@ namespace
     }
   };
 
+  // Scoped output prefix, used to say which sub-grid and CG cycle a line of solver output is about.
+  struct ScopedOutputPrefix {
+    // "grid j: " -- for output ABOUT sub-grid j, printed by whichever rank is doing the printing.
+    explicit ScopedOutputPrefix(int sub_partition)
+    {
+      char buf[64];
+      snprintf(buf, sizeof(buf), "grid %d: ", sub_partition);
+      pushOutputPrefix(buf);
+    }
+    // "grid j, cycle n: " -- for output emitted BY sub-grid j while inside cycle n.
+    ScopedOutputPrefix(int sub_partition, int cycle)
+    {
+      char buf[64];
+      snprintf(buf, sizeof(buf), "grid %d, cycle %d: ", sub_partition, cycle);
+      pushOutputPrefix(buf);
+    }
+    ~ScopedOutputPrefix() { popOutputPrefix(); }
+  };
+
   // Reduce across the PARENT communicator and print one greppable line per solve.
   // Must be called with the parent communicator active (i.e. after split teardown).
   //
@@ -3931,7 +3955,7 @@ namespace
 template <typename DiracMat, typename Segment>
 static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in,
                                const DiracMat &m, const DiracMat &mEig, deflation_space &space,
-                               QudaInvertParam &param, Segment &&segment)
+                               QudaInvertParam &param, const SplitSolveContext &sc, Segment &&segment)
 {
   const int n_src = in.size();
   auto *qep = static_cast<QudaEigParam *>(param.eig_param);
@@ -4086,13 +4110,58 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
                 "(worst rel residual %e > tol %e)",
                 cycle, total_iters, worst_rel(r2), param.tol);
 
-  // Per-RHS residual reporting: MILC reads true_res[num_src-1] and
-  // true_res_hq[num_src-1] (milc_interface.cpp:2141-2142), so populate every RHS.
-  // HQ residual is not computed (stock CG dropped HQ support), so report 0 to
-  // match stock rather than leaving a stale value.
+  // Per-RHS residual reporting
   for (int i = 0; i < n_src; i++) {
     param.true_res[i] = std::sqrt(r2[i] / b2v[i]);
     param.true_res_hq[i] = 0.0;
+  }
+
+  // ---- per-sub-grid convergence report ----------------------------------------------------------
+  //
+  // Restores the reporting SHAPE of the stock solver. Stock runs one CG for the whole block and
+  // prints one "Convergence at" line per RHS, once, at the end (invertMultiSrcQuda -> solve()); the
+  // orchestrator instead creates and destroys a Solver every cycle, so CG reports once per CYCLE --
+  // and only from the single sub-grid that passes the rank filter, leaving the other grids silent for
+  // the whole run. This block prints n_src lines, one per RHS, covering EVERY sub-grid, each
+  // carrying the iteration count that sub-grid actually ran.
+  //
+  // The residuals need no communication at all: the last segment joined `r` back to the parent, r2
+  // is its norm and b2v the source norms, so the printing rank already holds every residual indexed
+  // by parent RHS. Only the iteration counts live out on the sub-grids. One length-nsub max-reduction
+  if (sc.enabled) {
+    const int nsub = sc.num_sub_partition;
+    const int nper = sc.num_src_per_sub_partition;
+
+    if (nsub * nper != n_src)
+      errorQuda("run_deflated_cycles: split deal does not cover the sources exactly "
+                "(num_sub_partition %d * num_src_per_sub_partition %d != num_src %d)",
+                nsub, nper, n_src);
+
+    std::vector<double> sub_iters(nsub, 0.0);
+    sub_iters[split_sub_partition_index(sc.split_key)] = dt.iters_local; // parent communicator: see
+    comm_allreduce_max(sub_iters);                                       // the helper's contract
+    dt.iters_subgrid_max = static_cast<int>(*std::max_element(sub_iters.begin(), sub_iters.end()));
+
+    for (int j = 0; j < nsub; j++) {
+      const ScopedOutputPrefix prefix(j);
+      for (int n = 0; n < nper; n++) {
+        const int i = n * nsub + j; // Parent RHS index, not a sub-grid-local one
+        const std::string rhs_str = n_src > 1 ? "n = " + std::to_string(i) + ", " : std::string();
+
+        // FORMAT: a deliberate copy of Solver::PrintSummary, which is a non-static member and there
+	// is no live Solver here -- the segment deletes its CG every cycle. Note that `iterated`
+	// and `true` are EQUAL BY CONSTRUCTION: both are the parent's post-join residual. What
+	// stock puts in `iterated` is CG's recursively-updated r2, a local in inv_cg_quda.cpp that
+	// never reaches SolverParam. Two columns are kept for format parity.
+        logQuda(QUDA_SUMMARIZE,
+                "CG: Convergence at %d iterations, %sL2 relative residual: iterated = %9.6e, "
+                "true = %9.6e (requested = %9.6e)\n",
+                static_cast<int>(sub_iters[j]), rhs_str.c_str(), param.true_res[i], param.true_res[i],
+                std::sqrt(stop[i] / b2v[i]));
+      }
+    }
+  } else {
+    dt.iters_subgrid_max = total_iters; // one grid, so the two agree; keeps the field meaningful
   }
 
   delete eig;
@@ -4134,6 +4203,9 @@ static int full_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Color
     m(r, out);
     blas::xmyNorm(in, r);          // r = in - r  (norms discarded; the caller takes norm2)
   }
+  // No reduction here, so this path's count is exact and iters_local tracks total_iters exactly.
+  // Accumulated anyway so the field means the same thing on both paths.
+  dt.iters_local += sp.iter;
   return sp.iter;
 }
 
@@ -4158,6 +4230,11 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
 {
   const int nsub = sc.num_sub_partition;
   const int nper = sc.num_src_per_sub_partition;
+
+  // Which sub-grid this rank is in. Computed HERE, at the top, because we are still on the parent
+  // communicator -- comm_dim/comm_coord inside the split region describe the sub-grid instead, and
+  // the answer would be a useless zero. Held for the whole segment and used to label CG's output.
+  const int sub_partition_idx = split_sub_partition_index(sc.split_key);
 
   // ---- scatter the current guess onto the sub-grids (parent communicator) ----
   // RHS i lives on sub-partition j = i % nsub of collected field n = i / nsub,
@@ -4240,6 +4317,9 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
     }
 
     {
+      // Everything CG prints from here on is labelled with the sub-grid that produced it and the
+      // cycle it is in.
+      const ScopedOutputPrefix prefix(sub_partition_idx, dt.cycles);
       TimedPhase p(dt.cg_sub);
       Solver *cg = Solver::create(sp, sm, smSloppy, smPre, smEig);
       (*cg)(sub_out, sub_in);
@@ -4337,10 +4417,13 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
                                                    {par_sum.begin() + nper, par_sum.end()}));
   }
 
+  // Accumulate THIS sub-grid's own count first.
+  dt.iters_local += iter;
+
   // Sub-partitions converge in different iteration counts. The cycle loop's
   // iteration budget must be identical on every rank or the loop desynchronises,
   // so agree on the worst case.
-  comm_allreduce_max(iter);        // int -> the int32_t specialization (communicator_stack.cpp:340)
+  comm_allreduce_max(iter);
   return iter;
 }
 
@@ -4360,7 +4443,7 @@ static int run_deflated_solve(std::vector<ColorSpinorField> &out, std::vector<Co
                        std::vector<ColorSpinorField> &rr, double tol, int maxiter) {
       return full_cg_segment(o, i, rr, m, mSloppy, mPre, mEig, param, tol, maxiter);
     };
-    return run_deflated_cycles(out, in, m, mEig, space, param, segment);
+    return run_deflated_cycles(out, in, m, mEig, space, param, sc, segment);
   }
 
   DiracMat sm(*sdirac), smSloppy(*sdiracSloppy), smPre(*sdiracPre), smEig(*sdiracEig);
@@ -4368,7 +4451,7 @@ static int run_deflated_solve(std::vector<ColorSpinorField> &out, std::vector<Co
                      std::vector<ColorSpinorField> &rr, double tol, int maxiter) {
     return split_cg_segment(o, rr, sm, smSloppy, smPre, smEig, sc, tol, maxiter);
   };
-  return run_deflated_cycles(out, in, m, mEig, space, param, segment);
+  return run_deflated_cycles(out, in, m, mEig, space, param, sc, segment);
 }
 
 void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
@@ -4627,11 +4710,11 @@ void invertMultiSrcDeflatedQuda(void **_hp_x, void **_hp_b, QudaInvertParam *par
   }
 
   blas::copy(h_x, x);              // device -> host wrappers (writes _hp_x)
-  param->iter = iters;
+
+  // `iters` is the cycle loop's budget, Sum_cycles ( max_over_sub-grids ).
+  param->iter = sc.enabled ? dt.iters_subgrid_max : iters;
 
   // After teardown, so the parent communicator is active: report() reduces across it.
-  // It is collective -- every rank must reach it -- so it is not gated on verbosity or
-  // rank; printfQuda inside does the rank filtering.
   dt.report(sc.enabled, iters);
 
   delete dirac;

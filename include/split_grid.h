@@ -167,6 +167,26 @@ namespace quda
     return enabled;
   }
 
+  /**
+    @brief Which sub-partition this rank belongs to, in the same flattened order the reshuffle uses:
+    parent RHS `n * num_sub_partition + j` is solved by sub-partition `j` (see split_field/join_field
+    in interface_quda.cpp's split_cg_segment).
+
+    MUST BE CALLED WITH THE PARENT COMMUNICATOR ACTIVE. comm_dim() and comm_coord() are relative to
+    the *current* communicator, so calling this between push_communicator(split_key) and the pop back
+    to the parent would describe this rank's place inside its own sub-grid -- which is always the
+    trivial answer -- rather than which sub-grid it is.
+  */
+  inline int split_sub_partition_index(const CommKey &split_key)
+  {
+    int idx = 0;
+    for (int d = CommKey::n_dim - 1; d >= 0; d--) {
+      const int ranks_per_sub = comm_dim(d) / split_key[d]; // this sub-grid's extent along d
+      idx = idx * split_key[d] + comm_coord(d) / ranks_per_sub;
+    }
+    return idx;
+  }
+
   // ===== DEBUG(split-corruption) -- REMOVE BEFORE PR ==============================================
   //
   // Instrumentation for the cycle-8 `out` corruption first seen at split_grid 1 1 3 3 (job
