@@ -74,7 +74,8 @@ set (QUDA_OBJS
   laplace.cpp
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
-  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cpp
+  reduce_quda_double.cu reduce_quda_single.cu reduce_quda_half.cu reduce_quda_quarter.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp

@@ -284,7 +284,7 @@ namespace quda {
                         cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                         cvector_ref<ColorSpinorField> &w);
 
-    // reduction kernels - defined in reduce_quda.cu
+    // reduction kernels - defined in reduce_quda.cpp / reduce_quda_{double,single,half,quarter}.cu
 
     /**
        @brief Compute the maximum absolute real element of a field
