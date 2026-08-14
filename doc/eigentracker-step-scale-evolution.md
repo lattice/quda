@@ -143,3 +143,28 @@ mixed-precision inner solve inconsistent with the outer operator at the
 boundary throughout MD — the likely cause of the reliable-update
 stagnation (~1e-7 CG stalls) observed earlier in the campaign.
 --hmc-mg-setup-interval is safe to enable again.
+
+## Nested-FGI deployment findings (2026-08-13)
+
+Validated for production at 16^3x64 beta=5.85: 36 outer x 8 inner with
+per-trajectory MG re-setup gives dH ~ 0.1 at 100% acceptance, ~2x
+cheaper per accepted trajectory than 80-step single FGI, gap widening
+toward light mass. Two characterized limitations:
+
+1. Frozen-basis decoherence ACROSS trajectories: with thin updates only,
+   dH grew 0.2 -> 4.6 -> 19 over three trajectories (coarse operator Y
+   and deflation basis frozen while the gauge moves). Cure deployed:
+   full MG re-setup + coarse re-solve every accepted trajectory
+   (MG_SETUP_INTERVAL_PROD=1). The intra-trajectory decoherence that
+   remains is the step-scale predictor-corrector's target — measured
+   fine-pool residual ~1.5 per tau=1 trajectory sets the error floor.
+
+2. Unequilibrated-state startup: the first trajectory from a mid-therm
+   configuration explodes (dH ~ +1e7) while equilibrated starts are
+   clean from trajectory 1. Interpretation: the force split is exact for
+   any basis, but its stiffness allocation is not — on unequilibrated
+   states the coarse deflation basis does not capture the true stiff
+   low-mode directions, leaving the stiff force on the outer timescale.
+   Not a code bug; nested FGI requires an equilibrated operator. Policy:
+   THERM_INTEGRATOR=2 (single FGI) for thermalization, nested for
+   probes/productions.
