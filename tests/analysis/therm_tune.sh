@@ -73,40 +73,54 @@ for chunk in $(seq 1 "$MAX_CHUNKS"); do
   [ -z "$STATE_GAUGE" ] && { echo "chunk $chunk produced no checkpoint"; exit 1; }
 
   # ---- monitor -------------------------------------------------------
-  read -r var mean creutz acc iters <<< "$(python3 - "$log" <<'PYEOF'
+  read -r var mean creutz acc iters miters <<< "$(python3 - "$log" <<'PYEOF'
 import math, re, statistics, sys
 dh, it, cur = [], [], []
+solves = tot = 0
 for line in open(sys.argv[1]):
     m = re.search(r"Convergence at (\d+) iterations", line)
     if m: cur.append(int(m.group(1)))
+    m = re.search(r"CG stats: (\d+) solves, (\d+) total iters", line)
+    if m: solves += int(m.group(1)); tot += int(m.group(2))
     m = re.search(r"hmcTrajectoryQuda: H_final.*dH = ([+-e0-9.]+)", line)
     if m:
         dh.append(float(m.group(1)))
         if cur: it.append(max(cur)); cur = []
 v = statistics.variance(dh) if len(dh) > 1 else 0.0
+# mean iters/solve is the thermalization observable: per-solve difficulty
+# is independent of how many solves a chunk contains, unlike the max,
+# which is an extreme-value statistic over an n_steps-dependent sample
+# count and gives false plateau signals when the step count changes.
+mi = tot / solves if solves else (statistics.mean(it) if it else -1)
 print(f"{v:.6g} {statistics.mean(dh):+.6g} "
       f"{statistics.mean(math.exp(-x) for x in dh):.4f} "
       f"{math.erfc(math.sqrt(v/8)):.4f} "
-      f"{max(it) if it else -1}")
+      f"{max(it) if it else -1} {mi:.1f}")
 PYEOF
 )"
   t_chunk1=$(date +%s)
   spt=$(( (t_chunk1 - t_chunk0) / CHUNK ))
-  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters secs_per_traj=$spt" | tee -a "$PREFIX"_tune.log
+  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters mean_iters=$miters secs_per_traj=$spt" | tee -a "$PREFIX"_tune.log
 
   # ---- thermalization criterion: solver-iteration plateau ------------
   # Tolerance-based: at light masses lambda_min fluctuations jitter the
   # iteration count by a few per chunk; require stability within
   # max(2, 3%) rather than exact equality.
-  tol=$(python3 -c "print(max(2, int(0.03 * $iters)))")
-  if [ "$prev_iters" -ge 0 ] && [ $((iters - prev_iters)) -le "$tol" ] && [ $((prev_iters - iters)) -le "$tol" ]; then
+  # Plateau observable: MEAN iters/solve (step-size robust), and only
+  # in-band chunks count — comparing across step-count changes or during
+  # tuner transients produces false thermalization signals (Dean,
+  # 2026-08-13).
+  mi_int=$(python3 -c "print(int(round(float('$miters'))))")
+  tol=$(python3 -c "print(max(2, int(0.03 * $mi_int)))")
+  in_band_now=$(python3 -c "print(1 if $ACC_LO <= $acc <= $ACC_HI else 0)")
+  if [ "$in_band_now" -eq 1 ] && [ "$prev_iters" -ge 0 ] && [ $((mi_int - prev_iters)) -le "$tol" ] && [ $((prev_iters - mi_int)) -le "$tol" ]; then
     plateau=$((plateau + 1))
   else
     plateau=0
   fi
-  prev_iters=$iters
+  prev_iters=$mi_int
   if [ "$plateau" -ge "$PLATEAU_CHUNKS" ]; then
-    echo "THERMALIZED after $((chunk * CHUNK)) trajectories (iteration count stable at $iters for $PLATEAU_CHUNKS chunks)"
+    echo "THERMALIZED after $((chunk * CHUNK)) trajectories (mean iters/solve stable at $mi_int for $PLATEAU_CHUNKS chunks)"
     # Hand off the step count of the best in-band chunk, not the final
     # retune: the last retune is an extrapolation that was never validated
     # by a chunk of its own (observed: handoff n_steps=20 -> 45% production
