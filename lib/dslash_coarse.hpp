@@ -503,6 +503,13 @@ namespace quda {
                 halo_location, halo);
             } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
+              // int8 (quarter) halos have no MMA shared-memory swizzle
+              // specializations (tmp2s_smem_t<int8_t,...>); instantiate the
+              // non-MMA kernel for this combination. Halo precision is only
+              // exercised on partitioned dims anyway.
+              if constexpr (use_mma) {
+                errorQuda("Quarter-precision halos not supported with MMA coarse dslash");
+              } else
               ApplyCoarse<D, float, short, int8_t, dagger, coarseColor, use_mma, nVec>(
                 out, inA, inB, Y, X, kappa, parity, dslash, clover, comms ? DSLASH_FULL : DSLASH_INTERIOR,
                 halo_location, halo);
@@ -562,6 +569,13 @@ namespace quda {
                 halo_location, halo);
             } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
+              // int8 (quarter) halos have no MMA shared-memory swizzle
+              // specializations (tmp2s_smem_t<int8_t,...>); instantiate the
+              // non-MMA kernel for this combination. Halo precision is only
+              // exercised on partitioned dims anyway.
+              if constexpr (use_mma) {
+                errorQuda("Quarter-precision halos not supported with MMA coarse dslash");
+              } else
               ApplyCoarse<D, float, short, int8_t, dagger, coarseColor, use_mma, nVec>(
                 out, inA, inB, Y, X, kappa, parity, dslash, clover, comms ? DSLASH_INTERIOR : DSLASH_INTERIOR,
                 halo_location, halo);
