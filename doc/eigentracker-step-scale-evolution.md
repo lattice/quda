@@ -168,3 +168,27 @@ toward light mass. Two characterized limitations:
    Not a code bug; nested FGI requires an equilibrated operator. Policy:
    THERM_INTEGRATOR=2 (single FGI) for thermalization, nested for
    probes/productions.
+
+## Nested-FGI inner/outer balance (2026-08-14, kappa=0.14342)
+
+The 36-44x8 production degradation (74% acceptance, dH tail to +20.8)
+was NOT outer-resolution starvation: an inner-step scan at fixed outer
+60 showed inner=8 giving var(dH) ~ 1.5-2 while inner=2-3 give 5e-4 to
+2e-3 — three orders of magnitude — at 2-3x lower cost (141-154 vs 320+
+s/traj; the inner loop carries the coarse-deflation force, so inner
+steps are not cheap). Too many inner steps degrade the split: tune
+gauge (inner) first, conservative, then descend outer. Outer descent at
+inner=3: 48/40/34 clean, 30 shows <dH> = +0.19 decoupling from var/2
+(systematic drift, incipient at 34). Production setting 40x3, ~105
+s/traj at ~95% acceptance.
+
+Probe hygiene: the binary's default --hmc-momentum-seed 12345 made
+every invocation replay one momentum stream — probe validations were
+correlated replicas (44x8 "5/5 clean" was the same noise draw as its
+36x8 failure, with more steps). Scripts now seed per invocation from
+the launch epoch. Within a run the RNG family seeds once and streams
+advance (verified in lib/hmc.cpp): fresh state-independent momenta and
+Metropolis coins per trajectory — detailed balance intact; distinct
+per-segment seeds across restarts are the standard valid practice.
+Latent wart: momentum_seed=0 re-seeds from time() every trajectory
+(second resolution) — never pass 0.
