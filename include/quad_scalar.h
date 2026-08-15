@@ -34,7 +34,9 @@ namespace std
 
   inline std::ostream &operator<<(std::ostream &os, __float128 x);
 
-  // libstdc++ leaves numeric_limits<__float128> unspecialized (infinity() == 0).
+  // libstdc++ < 14 leaves numeric_limits<__float128> unspecialized (infinity() == 0).
+  // GCC 14+ already provides this specialization; redefining it is an error.
+#if !defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14
   template <> class numeric_limits<__float128>
   {
   public:
@@ -74,6 +76,7 @@ namespace std
     static __float128 signaling_NaN() { return __builtin_nansq(""); }
     static constexpr __float128 denorm_min() { return __FLT128_DENORM_MIN__; }
   };
+#endif
 
 } // namespace std
 
