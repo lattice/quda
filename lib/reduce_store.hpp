@@ -11,10 +11,13 @@ namespace quda
   {
 
     template <typename store_t> constexpr QudaPrecision store_prec_v = QUDA_INVALID_PRECISION;
-    template <> constexpr QudaPrecision store_prec_v<double> = QUDA_DOUBLE_PRECISION;
-    template <> constexpr QudaPrecision store_prec_v<float> = QUDA_SINGLE_PRECISION;
-    template <> constexpr QudaPrecision store_prec_v<short> = QUDA_HALF_PRECISION;
-    template <> constexpr QudaPrecision store_prec_v<int8_t> = QUDA_QUARTER_PRECISION;
+    // Explicit specializations are not implicitly inline; clang emits a strong
+    // symbol per TU (gcc merges them). Both reduce_quda.cpp and
+    // multi_reduce_quda.cpp include this header.
+    template <> inline constexpr QudaPrecision store_prec_v<double> = QUDA_DOUBLE_PRECISION;
+    template <> inline constexpr QudaPrecision store_prec_v<float> = QUDA_SINGLE_PRECISION;
+    template <> inline constexpr QudaPrecision store_prec_v<short> = QUDA_HALF_PRECISION;
+    template <> inline constexpr QudaPrecision store_prec_v<int8_t> = QUDA_QUARTER_PRECISION;
 
     // Double stays instantiable for host fields even when GPU double is off
     // (same convention as instantiate<> in blas_helper.cuh).
