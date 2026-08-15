@@ -36,6 +36,7 @@ mkdir -p "$(dirname "$PREFIX")"
 STATE_GAUGE="${START_GAUGE:-}"   # seed chunk 1 from a nearby-kappa thermalized config
 plateau=0
 prev_iters=-1
+prev_w0=-1
 
 for chunk in $(seq 1 "$MAX_CHUNKS"); do
   log="${PREFIX}_chunk${chunk}.log"
@@ -72,6 +73,36 @@ for chunk in $(seq 1 "$MAX_CHUNKS"); do
   STATE_GAUGE=$(ls -t "${PREFIX}_c${chunk}_"* 2>/dev/null | grep -vE "\.pool|\.evals" | head -1)
   [ -z "$STATE_GAUGE" ] && { echo "chunk $chunk produced no checkpoint"; exit 1; }
 
+  # ---- Wilson-flow thermalization observable --------------------------
+  # Solver-independent IR probe: MG iteration counts are confounded by
+  # null-vector/setup quality when the setup refreshes between chunks
+  # (Dean, 2026-08-15), and plaquette is UV-blind to slow IR relaxation
+  # (w0/a drifted 31% after plaquette went flat at this kappa). Flow the
+  # chunk checkpoint and extract w0/a; thermalization = w0 stationarity.
+  flog="${PREFIX}_flow_c${chunk}.log"
+  timeout 900 "$BUILD_TESTS"/su3_test --dim $DIMS --load-gauge "$STATE_GAUGE" \
+    --su3-smear-type wilson --su3-smear-steps ${FLOW_STEPS:-250} \
+    --su3-smear-epsilon ${FLOW_EPS:-0.02} \
+    --su3-measurement-interval ${FLOW_MEAS_INTERVAL:-5} > "$flog" 2>&1
+  w0=$(python3 - "$flog" <<'PYEOF'
+import re, sys
+ts, Es = [], []
+for line in open(sys.argv[1]):
+    m = re.match(r"performWFlowQuda: ([0-9.e+-]+) ([0-9.e+-]+) ([0-9.e+-]+) ", line)
+    if m:
+        ts.append(float(m.group(1)))
+        Es.append(float(m.group(2)) + float(m.group(3)))
+w0 = -1.0
+W = [(ts[k], ts[k]*(ts[k+1]**2*Es[k+1]-ts[k-1]**2*Es[k-1])/(ts[k+1]-ts[k-1]))
+     for k in range(1, len(ts)-1)]
+for (t1, w1), (t2, w2) in zip(W, W[1:]):
+    if w1 < 0.3 <= w2:
+        w0 = (t1 + (0.3-w1)*(t2-t1)/(w2-w1))**0.5
+        break
+print(f"{w0:.4f}")
+PYEOF
+)
+
   # ---- monitor -------------------------------------------------------
   read -r var mean creutz acc iters miters <<< "$(python3 - "$log" <<'PYEOF'
 import math, re, statistics, sys
@@ -100,27 +131,28 @@ PYEOF
 )"
   t_chunk1=$(date +%s)
   spt=$(( (t_chunk1 - t_chunk0) / CHUNK ))
-  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters mean_iters=$miters secs_per_traj=$spt" | tee -a "$PREFIX"_tune.log
+  echo "chunk $chunk: n_steps=$N_STEPS var(dH)=$var <dH>=$mean <e^-dH>=$creutz pred_acc=$acc max_cg_iters=$iters mean_iters=$miters w0=$w0 secs_per_traj=$spt" | tee -a "$PREFIX"_tune.log
 
   # ---- thermalization criterion: solver-iteration plateau ------------
   # Tolerance-based: at light masses lambda_min fluctuations jitter the
   # iteration count by a few per chunk; require stability within
   # max(2, 3%) rather than exact equality.
-  # Plateau observable: MEAN iters/solve (step-size robust), and only
-  # in-band chunks count — comparing across step-count changes or during
-  # tuner transients produces false thermalization signals (Dean,
-  # 2026-08-13).
-  mi_int=$(python3 -c "print(int(round(float('$miters'))))")
-  tol=$(python3 -c "print(max(2, int(0.03 * $mi_int)))")
-  in_band_now=$(python3 -c "print(1 if $ACC_LO <= $acc <= $ACC_HI else 0)")
-  if [ "$in_band_now" -eq 1 ] && [ "$prev_iters" -ge 0 ] && [ $((mi_int - prev_iters)) -le "$tol" ] && [ $((prev_iters - mi_int)) -le "$tol" ]; then
+  # Plateau observable: Wilson-flow w0/a stationarity (Dean, 2026-08-15).
+  # Solver- and step-size-independent; requires |dw0|/w0 < FLOW_TOL for
+  # PLATEAU_CHUNKS consecutive chunks. Failed extractions (w0 < 0) reset
+  # nothing and never count.
+  flow_ok=$(python3 -c "
+w0 = float('$w0'); prev = float('${prev_w0:--1}')
+tol = float('${FLOW_TOL:-0.01}')
+print(1 if (w0 > 0 and prev > 0 and abs(w0 - prev)/w0 < tol) else 0)")
+  if [ "$flow_ok" -eq 1 ]; then
     plateau=$((plateau + 1))
-  else
+  elif [ "$(python3 -c "print(1 if float('$w0') > 0 else 0)")" -eq 1 ]; then
     plateau=0
   fi
-  prev_iters=$mi_int
+  prev_w0=$w0
   if [ "$plateau" -ge "$PLATEAU_CHUNKS" ]; then
-    echo "THERMALIZED after $((chunk * CHUNK)) trajectories (mean iters/solve stable at $mi_int for $PLATEAU_CHUNKS chunks)"
+    echo "THERMALIZED after $((chunk * CHUNK)) trajectories (w0/a stationary at $w0 within ${FLOW_TOL:-0.01} for $PLATEAU_CHUNKS chunks)"
     # Hand off the step count of the best in-band chunk, not the final
     # retune: the last retune is an extrapolation that was never validated
     # by a chunk of its own (observed: handoff n_steps=20 -> 45% production
