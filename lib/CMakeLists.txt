@@ -76,7 +76,9 @@ set (QUDA_OBJS
   madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cpp
   reduce_quda_double.cu reduce_quda_single.cu reduce_quda_half.cu reduce_quda_quarter.cu
-  multi_reduce_quda.cu reduce_helper.cu
+  multi_reduce_quda.cpp
+  multi_reduce_quda_double.cu multi_reduce_quda_single.cu multi_reduce_quda_half.cu multi_reduce_quda_quarter.cu
+  reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu

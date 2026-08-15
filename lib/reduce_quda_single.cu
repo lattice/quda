@@ -1,7 +1,15 @@
-#define REDUCE_SUFFIX single
-#define REDUCE_PREC QUDA_SINGLE_PRECISION
-#define REDUCE_STORE float
+#if QUDA_PRECISION & 4
 #include "reduce_quda_inst.hpp"
-#undef REDUCE_STORE
-#undef REDUCE_PREC
-#undef REDUCE_SUFFIX
+
+namespace quda
+{
+
+  namespace blas
+  {
+
+    INSTANTIATE_REDUCE_STORE(float)
+
+  } // namespace blas
+
+} // namespace quda
+#endif
