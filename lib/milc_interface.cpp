@@ -1421,7 +1421,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       dEig->Dslash({temps.begin(), temps.begin() + bs},
                    {other_parity_space->evecs.begin() + lo, other_parity_space->evecs.begin() + hi}, parity);
       auto t_norms = blas::norm2({temps.begin(), temps.begin() + bs});
-      quda::vector<complex_t> scales(bs);
+      quda::vector<complex_t> scales(static_cast<uint64_t>(bs));
       for (int j = 0; j < bs; j++) scales[j] = 1.0 / quda::sqrt(t_norms[j]);
       blas::axy(scales, {temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
 

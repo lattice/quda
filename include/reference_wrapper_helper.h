@@ -555,10 +555,12 @@ namespace quda
     vector(const T &t) : std::vector<T>(1, t) { }
 
     /**
-       @brief Construct a length-1 vector from an arithmetic scalar
+       @brief Construct a length-1 vector from a floating-point scalar.
+       Integers are excluded so vector<T>(n) with an int selects the
+       size constructor, not a length-1 wrap of n.
     */
     template <class U,
-              std::enable_if_t<std::is_arithmetic_v<U> && !std::is_same_v<U, T> && !std::is_same_v<std::complex<U>, T>> * = nullptr>
+              std::enable_if_t<std::is_floating_point_v<U> && !std::is_same_v<U, T> && !std::is_same_v<std::complex<U>, T>> * = nullptr>
     vector(const U &u) : std::vector<T>(1, static_cast<T>(u))
     {
     }
