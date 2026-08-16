@@ -379,7 +379,9 @@ struct doubledouble {
 
   __device__ __host__ void print() const { printf("scalar: %16.14e + %16.14e\n", head(), tail()); }
 
+#ifdef QUDA_USE_QUAD_SCALAR
   explicit constexpr operator __float128() const { return __float128(head()) + __float128(tail()); }
+#endif
   explicit constexpr operator double() const { return head(); }
   explicit constexpr operator float() const { return static_cast<float>(head()); }
   explicit constexpr operator int() const { return static_cast<int>(head()); }

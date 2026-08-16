@@ -230,7 +230,9 @@ namespace quda {
   template <> struct get_scalar<double2> { using type = double; };
   template <> struct get_scalar<doubledouble> { using type = doubledouble; };
   template <> struct get_scalar<doubledouble2> { using type = doubledouble; };
+#ifdef QUDA_USE_QUAD_SCALAR
   template <> struct get_scalar<__float128> { using type = __float128; };
+#endif
   template <> struct get_scalar<complex<float>> { using type = float; };
   template <> struct get_scalar<complex<double>> { using type = double; };
   template <> struct get_scalar<complex_t> { using type = real_t; };
