@@ -901,7 +901,7 @@ private:
 
   template <class T> using rfa_t = reproducible::ReproducibleFloatingAccumulator<T>;
 
-  // RFA only supports float/double as ftype (not doubledouble / __float128 reduction types)
+  // RFA only supports float/double as ftype (not doubledouble / float128_t reduction types)
   template <class T>
   struct get_scalar<rfa_t<T>, std::enable_if_t<std::is_floating_point_v<T>>> {
     using type = rfa_t<T>;

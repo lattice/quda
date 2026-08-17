@@ -428,49 +428,50 @@ namespace quda {
   __device__ __host__ inline double fma_rn(double a, double b, double c) { return target::dispatch<fma_rn_impl>(a, b, c); }
 
 #ifdef QUDA_USE_QUAD_SCALAR
+#include <float128_t.h>
 #include <quadmath.h>
 #include <crt/device_fp128_functions.h>
 
   template <bool is_device> struct fabs_fp128_impl;
   template <> struct fabs_fp128_impl<false> {
-    __host__ __float128 operator()(__float128 a) { return fabsq(a); }
+    __host__ float128_t operator()(float128_t a) { return fabsq(a); }
   };
   template <> struct fabs_fp128_impl<true> {
-    __device__ __float128 operator()(__float128 a) { return __nv_fp128_fabs(a); }
+    __device__ float128_t operator()(float128_t a) { return __nv_fp128_fabs(a); }
   };
-  inline __host__ __device__ __float128 fabs(__float128 a) { return target::dispatch<fabs_fp128_impl>(a); }
-  inline __host__ __device__ __float128 abs(__float128 a) { return target::dispatch<fabs_fp128_impl>(a); }
+  inline __host__ __device__ float128_t fabs(float128_t a) { return target::dispatch<fabs_fp128_impl>(a); }
+  inline __host__ __device__ float128_t abs(float128_t a) { return target::dispatch<fabs_fp128_impl>(a); }
 
   template <bool is_device> struct sqrt_fp128_impl;
   template <> struct sqrt_fp128_impl<false> {
-    __host__ __float128 operator()(__float128 a) { return sqrtq(a); }
+    __host__ float128_t operator()(float128_t a) { return sqrtq(a); }
   };
   template <> struct sqrt_fp128_impl<true> {
-    __device__ __float128 operator()(__float128 a) { return __nv_fp128_sqrt(a); }
+    __device__ float128_t operator()(float128_t a) { return __nv_fp128_sqrt(a); }
   };
-  inline __host__ __device__ __float128 sqrt(__float128 a) { return target::dispatch<sqrt_fp128_impl>(a); }
+  inline __host__ __device__ float128_t sqrt(float128_t a) { return target::dispatch<sqrt_fp128_impl>(a); }
 
 #define QUDA_FP128_UNARY_CUDA(FUNC, HOSTFN, DEVICEFN)                                                                \
   template <bool is_device> struct fp128_##FUNC##_impl;                                                              \
   template <> struct fp128_##FUNC##_impl<false> {                                                                    \
-    __host__ __float128 operator()(__float128 a) { return HOSTFN(a); }                                               \
+    __host__ float128_t operator()(float128_t a) { return HOSTFN(a); }                                               \
   };                                                                                                                 \
   template <> struct fp128_##FUNC##_impl<true> {                                                                     \
-    __device__ __float128 operator()(__float128 a) { return DEVICEFN(a); }                                            \
+    __device__ float128_t operator()(float128_t a) { return DEVICEFN(a); }                                            \
   };                                                                                                                 \
-  inline __host__ __device__ __float128 FUNC(__float128 a) { return target::dispatch<fp128_##FUNC##_impl>(a); }
+  inline __host__ __device__ float128_t FUNC(float128_t a) { return target::dispatch<fp128_##FUNC##_impl>(a); }
 
   template <bool is_device> struct fp128_cbrt_impl;
   template <> struct fp128_cbrt_impl<false> {
-    __host__ __float128 operator()(__float128 a) { return cbrtq(a); }
+    __host__ float128_t operator()(float128_t a) { return cbrtq(a); }
   };
   template <> struct fp128_cbrt_impl<true> {
-    __device__ __float128 operator()(__float128 a)
+    __device__ float128_t operator()(float128_t a)
     {
-      return __nv_fp128_pow(a, static_cast<__float128>(1.0) / static_cast<__float128>(3.0));
+      return __nv_fp128_pow(a, static_cast<float128_t>(1.0) / static_cast<float128_t>(3.0));
     }
   };
-  inline __host__ __device__ __float128 cbrt(__float128 a) { return target::dispatch<fp128_cbrt_impl>(a); }
+  inline __host__ __device__ float128_t cbrt(float128_t a) { return target::dispatch<fp128_cbrt_impl>(a); }
   QUDA_FP128_UNARY_CUDA(cos, cosq, __nv_fp128_cos)
   QUDA_FP128_UNARY_CUDA(acos, acosq, __nv_fp128_acos)
   QUDA_FP128_UNARY_CUDA(cosh, coshq, __nv_fp128_cosh)
@@ -483,12 +484,12 @@ namespace quda {
 #define QUDA_FP128_PRED_CUDA(FUNC, HOSTFN, DEVICEFN)                                                                   \
   template <bool is_device> struct fp128_##FUNC##_impl;                                                                \
   template <> struct fp128_##FUNC##_impl<false> {                                                                      \
-    __host__ bool operator()(__float128 a) { return HOSTFN(a); }                                                        \
+    __host__ bool operator()(float128_t a) { return HOSTFN(a); }                                                        \
   };                                                                                                                   \
   template <> struct fp128_##FUNC##_impl<true> {                                                                      \
-    __device__ bool operator()(__float128 a) { return DEVICEFN(a); }                                                    \
+    __device__ bool operator()(float128_t a) { return DEVICEFN(a); }                                                    \
   };                                                                                                                   \
-  inline __host__ __device__ bool FUNC(__float128 a) { return target::dispatch<fp128_##FUNC##_impl>(a); }
+  inline __host__ __device__ bool FUNC(float128_t a) { return target::dispatch<fp128_##FUNC##_impl>(a); }
 
   QUDA_FP128_PRED_CUDA(isnan, isnanq, __nv_fp128_isnan)
 

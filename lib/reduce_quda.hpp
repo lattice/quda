@@ -12,7 +12,7 @@ namespace quda
   namespace blas
   {
 
-    /** Promote a device/host reduction value to host scalar real_t (e.g. doubledouble -> __float128). */
+    /** Promote a device/host reduction value to host scalar real_t (e.g. doubledouble -> float128_t). */
     template <typename T> real_t reduction_to_real(const T &x)
     {
       if constexpr (is_rfa<T>::value) {

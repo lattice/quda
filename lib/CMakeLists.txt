@@ -433,14 +433,21 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   mark_as_advanced(QUDA_GITDIR)
 endif()
 
+set(_quda_scalar_help "set the host scalar coefficient type (double, doubledouble, float128)")
 set(QUDA_SCALAR_TYPE
     double
-    CACHE STRING "set the host scalar coefficient type (double, doubledouble, __float128)")
-set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble __float128)
+    CACHE STRING "${_quda_scalar_help}")
+set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble float128)
+set_property(CACHE QUDA_SCALAR_TYPE PROPERTY HELPSTRING "${_quda_scalar_help}")
 
-if(${QUDA_SCALAR_TYPE} STREQUAL "__float128")
+# Canonical name is float128. Keep accepting the compiler spellings.
+if(QUDA_SCALAR_TYPE STREQUAL "__float128" OR QUDA_SCALAR_TYPE STREQUAL "_Float128")
+  set(QUDA_SCALAR_TYPE float128 CACHE STRING "${_quda_scalar_help}" FORCE)
+endif()
+
+if(QUDA_SCALAR_TYPE STREQUAL "float128")
   set(QUDA_USE_QUAD_SCALAR 1)
-elseif(${QUDA_SCALAR_TYPE} STREQUAL "doubledouble")
+elseif(QUDA_SCALAR_TYPE STREQUAL "doubledouble")
   set(QUDA_SCALAR_IS_DOUBLEDOUBLE 1)
 endif()
 
@@ -448,9 +455,12 @@ if(QUDA_USE_QUAD_SCALAR)
   include(CheckCXXSourceCompiles)
   check_cxx_source_compiles(
     "typedef __float128 q; int main() { return q(0) == q(0); }"
-    QUDA_COMPILER_SUPPORTS_FLOAT128)
-  if(NOT QUDA_COMPILER_SUPPORTS_FLOAT128)
-    message(FATAL_ERROR "QUDA_SCALAR_TYPE=__float128 requires compiler support for __float128")
+    QUDA_COMPILER_HAS_GNU_FLOAT128)
+  check_cxx_source_compiles(
+    "typedef _Float128 q; int main() { return q(0) == q(0); }"
+    QUDA_COMPILER_HAS_IEC_FLOAT128)
+  if(NOT QUDA_COMPILER_HAS_GNU_FLOAT128 AND NOT QUDA_COMPILER_HAS_IEC_FLOAT128)
+    message(FATAL_ERROR "QUDA_SCALAR_TYPE=float128 requires __float128 or _Float128")
   endif()
 endif()
 

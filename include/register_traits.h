@@ -70,23 +70,23 @@ namespace quda {
     typedef double type;
   };
 #ifdef QUDA_USE_QUAD_SCALAR
-  template <> struct PromoteTypeId<__float128, double> {
-    typedef __float128 type;
+  template <> struct PromoteTypeId<float128_t, double> {
+    typedef float128_t type;
   };
-  template <> struct PromoteTypeId<double, __float128> {
-    typedef __float128 type;
+  template <> struct PromoteTypeId<double, float128_t> {
+    typedef float128_t type;
   };
-  template <> struct PromoteTypeId<__float128, float> {
-    typedef __float128 type;
+  template <> struct PromoteTypeId<float128_t, float> {
+    typedef float128_t type;
   };
-  template <> struct PromoteTypeId<float, __float128> {
-    typedef __float128 type;
+  template <> struct PromoteTypeId<float, float128_t> {
+    typedef float128_t type;
   };
-  template <> struct PromoteTypeId<__float128, int> {
-    typedef __float128 type;
+  template <> struct PromoteTypeId<float128_t, int> {
+    typedef float128_t type;
   };
-  template <> struct PromoteTypeId<int, __float128> {
-    typedef __float128 type;
+  template <> struct PromoteTypeId<int, float128_t> {
+    typedef float128_t type;
   };
 #endif
   template <> struct PromoteTypeId<double, short> {
@@ -231,7 +231,7 @@ namespace quda {
   template <> struct get_scalar<doubledouble> { using type = doubledouble; };
   template <> struct get_scalar<doubledouble2> { using type = doubledouble; };
 #ifdef QUDA_USE_QUAD_SCALAR
-  template <> struct get_scalar<__float128> { using type = __float128; };
+  template <> struct get_scalar<float128_t> { using type = float128_t; };
 #endif
   template <> struct get_scalar<complex<float>> { using type = float; };
   template <> struct get_scalar<complex<double>> { using type = double; };

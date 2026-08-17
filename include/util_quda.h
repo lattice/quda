@@ -8,6 +8,7 @@
 #include <malloc_quda.h>
 #include <type_traits>
 #include <utility>
+#include <float128_t.h>
 
 namespace quda
 {
@@ -95,12 +96,12 @@ namespace quda
   namespace printf_detail
   {
     // Convert host quads to double for fprintf/sprintf.  Use a single forwarding
-    // overload so __float128 lvalues (common at logQuda call sites) are not
+    // overload so float128_t lvalues (common at logQuda call sites) are not
     // preferentially bound by a catch-all template that would skip conversion.
     template <typename T> constexpr decltype(auto) printf_arg(T &&x)
     {
 #ifdef QUDA_USE_QUAD_SCALAR
-      if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, __float128>) {
+      if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, float128_t>) {
         return static_cast<double>(x);
       } else
 #endif

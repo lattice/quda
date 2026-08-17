@@ -2,6 +2,7 @@
 
 #ifdef QUDA_USE_QUAD_SCALAR
 
+#include "float128_t.h"
 #include <complex>
 #include <Eigen/Core>
 
@@ -15,7 +16,7 @@
 namespace quda
 {
 
-  __host__ __device__ inline __float128 eigen_fp128_pow(__float128 a, __float128 b)
+  __host__ __device__ inline float128_t eigen_fp128_pow(float128_t a, float128_t b)
   {
 #if defined(__CUDA_ARCH__)
     return __nv_fp128_pow(a, b);
@@ -29,15 +30,17 @@ namespace quda
 namespace Eigen
 {
 
-  template <> struct NumTraits<__float128> : GenericNumTraits<__float128>
+  using quda::float128_t;
+
+  template <> struct NumTraits<float128_t> : GenericNumTraits<float128_t>
   {
-    typedef __float128 Real;
-    typedef __float128 NonInteger;
-    typedef __float128 Nested;
+    typedef float128_t Real;
+    typedef float128_t NonInteger;
+    typedef float128_t Nested;
     enum {
       IsComplex = 0,
       IsInteger = 0,
-      IsSigned = 1, // do not inherit is_signed from numeric_limits<__float128>;
+      IsSigned = 1, // do not inherit is_signed from numeric_limits<float128_t>;
                     // many standard libraries leave it unspecialized (is_signed=0),
                     // which makes Eigen's numext::abs a no-op and breaks eigensolves.
       RequireInitialization = 1,
@@ -46,47 +49,47 @@ namespace Eigen
       MulCost = 3,
     };
 
-    __host__ __device__ static inline __float128 epsilon()
+    __host__ __device__ static inline float128_t epsilon()
     {
-      return quda::eigen_fp128_pow(static_cast<__float128>(2), static_cast<__float128>(-112));
+      return quda::eigen_fp128_pow(static_cast<float128_t>(2), static_cast<float128_t>(-112));
     }
-    __host__ __device__ static inline __float128 dummy_precision()
+    __host__ __device__ static inline float128_t dummy_precision()
     {
-      return quda::eigen_fp128_pow(static_cast<__float128>(10), static_cast<__float128>(-32));
+      return quda::eigen_fp128_pow(static_cast<float128_t>(10), static_cast<float128_t>(-32));
     }
-    __host__ __device__ static inline __float128 highest()
+    __host__ __device__ static inline float128_t highest()
     {
       // Finite binary128 max: (2 - 2^-112) * 2^16383
-      const __float128 two = static_cast<__float128>(2);
-      return (two - quda::eigen_fp128_pow(two, static_cast<__float128>(-112)))
-        * quda::eigen_fp128_pow(two, static_cast<__float128>(16383));
+      const float128_t two = static_cast<float128_t>(2);
+      return (two - quda::eigen_fp128_pow(two, static_cast<float128_t>(-112)))
+        * quda::eigen_fp128_pow(two, static_cast<float128_t>(16383));
     }
-    __host__ __device__ static inline __float128 lowest() { return -highest(); }
+    __host__ __device__ static inline float128_t lowest() { return -highest(); }
     static inline int digits10() { return 33; }
   };
 
-  template <> struct NumTraits<std::complex<__float128>> : NumTraits<__float128>
+  template <> struct NumTraits<std::complex<float128_t>> : NumTraits<float128_t>
   {
     enum { IsComplex = 1 };
-    typedef __float128 Real;
+    typedef float128_t Real;
   };
 
   namespace internal
   {
 
-    template <> struct cast_impl<__float128, __float128>
+    template <> struct cast_impl<float128_t, float128_t>
     {
-      __host__ __device__ static inline __float128 run(const __float128 &x) { return x; }
+      __host__ __device__ static inline float128_t run(const float128_t &x) { return x; }
     };
 
-    template <> struct cast_impl<double, __float128>
+    template <> struct cast_impl<double, float128_t>
     {
-      __host__ __device__ static inline __float128 run(const double &x) { return static_cast<__float128>(x); }
+      __host__ __device__ static inline float128_t run(const double &x) { return static_cast<float128_t>(x); }
     };
 
-    template <> struct cast_impl<__float128, double>
+    template <> struct cast_impl<float128_t, double>
     {
-      __host__ __device__ static inline double run(const __float128 &x) { return static_cast<double>(x); }
+      __host__ __device__ static inline double run(const float128_t &x) { return static_cast<double>(x); }
     };
 
   } // namespace internal

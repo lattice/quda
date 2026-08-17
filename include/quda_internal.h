@@ -8,6 +8,7 @@
 #include <vector>
 
 #ifdef QUDA_USE_QUAD_SCALAR
+#include "float128_t.h"
 #include "quad_scalar.h"
 #endif
 
@@ -63,7 +64,11 @@ namespace quda {
   /**
      Scalar real variable type on the host
   */
+#ifdef QUDA_USE_QUAD_SCALAR
+  using real_t = float128_t;
+#else
   using real_t = QUDA_SCALAR_TYPE;
+#endif
 
   /**
      Scalar complex variable type on the host
