@@ -3,27 +3,33 @@
 #ifdef QUDA_USE_QUAD_SCALAR
 
 #include "float128_t.h"
+#include "float128_math.h"
 #include <complex>
 #include <Eigen/Core>
+#include <target_device.h>
 
-#if defined(__CUDACC__)
+#if defined(QUDA_CUDA_CC)
 #include <crt/device_fp128_functions.h>
-#endif
-#if !defined(__CUDA_ARCH__)
-#include "float128_math.h"
 #endif
 
 namespace quda
 {
 
-  __host__ __device__ inline float128_t eigen_fp128_pow(float128_t a, float128_t b)
+#if defined(QUDA_CUDA_CC)
+  template <bool is_device> struct eigen_fp128_pow_impl;
+  template <> struct eigen_fp128_pow_impl<false> {
+    __host__ float128_t operator()(float128_t a, float128_t b) { return fp128::pow(a, b); }
+  };
+  template <> struct eigen_fp128_pow_impl<true> {
+    __device__ float128_t operator()(float128_t a, float128_t b) { return __nv_fp128_pow(a, b); }
+  };
+  inline __host__ __device__ float128_t eigen_fp128_pow(float128_t a, float128_t b)
   {
-#if defined(__CUDA_ARCH__)
-    return __nv_fp128_pow(a, b);
-#else
-    return fp128::pow(a, b);
-#endif
+    return target::dispatch<eigen_fp128_pow_impl>(a, b);
   }
+#else
+  inline float128_t eigen_fp128_pow(float128_t a, float128_t b) { return fp128::pow(a, b); }
+#endif
 
 } // namespace quda
 
