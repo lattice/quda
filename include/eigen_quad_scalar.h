@@ -10,7 +10,7 @@
 #include <crt/device_fp128_functions.h>
 #endif
 #if !defined(__CUDA_ARCH__)
-#include <quadmath.h>
+#include "float128_math.h"
 #endif
 
 namespace quda
@@ -21,7 +21,7 @@ namespace quda
 #if defined(__CUDA_ARCH__)
     return __nv_fp128_pow(a, b);
 #else
-    return powq(a, b);
+    return fp128::pow(a, b);
 #endif
   }
 

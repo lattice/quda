@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cmath>
+#ifdef QUDA_USE_QUAD_SCALAR
+#include <float128_math.h>
+#endif
 
 namespace quda
 {
@@ -61,18 +64,16 @@ namespace quda
   inline double2 add2(double2 a, double2 b) { return {a.x + b.x, a.y + b.y}; }
 
 #ifdef QUDA_USE_QUAD_SCALAR
-#include <float128_t.h>
-#include <quadmath.h>
 
-  inline float128_t sqrt(float128_t a) { return sqrtq(a); }
-  inline float128_t cbrt(float128_t a) { return cbrtq(a); }
-  inline float128_t cos(float128_t a) { return cosq(a); }
-  inline float128_t acos(float128_t a) { return acosq(a); }
-  inline float128_t cosh(float128_t a) { return coshq(a); }
-  inline float128_t acosh(float128_t a) { return acoshq(a); }
-  inline float128_t sinh(float128_t a) { return sinhq(a); }
-  inline float128_t asinh(float128_t a) { return asinhq(a); }
-  inline bool isnan(float128_t a) { return isnanq(a); }
+  inline float128_t sqrt(float128_t a) { return fp128::sqrt(a); }
+  inline float128_t cbrt(float128_t a) { return fp128::cbrt(a); }
+  inline float128_t cos(float128_t a) { return fp128::cos(a); }
+  inline float128_t acos(float128_t a) { return fp128::acos(a); }
+  inline float128_t cosh(float128_t a) { return fp128::cosh(a); }
+  inline float128_t acosh(float128_t a) { return fp128::acosh(a); }
+  inline float128_t sinh(float128_t a) { return fp128::sinh(a); }
+  inline float128_t asinh(float128_t a) { return fp128::asinh(a); }
+  inline bool isnan(float128_t a) { return fp128::isnan(a); }
 
 #endif
 

@@ -5,6 +5,9 @@
 #include <cmath>
 #include <type_traits>
 #include <target_device.h>
+#ifdef QUDA_USE_QUAD_SCALAR
+#include <float128_math.h>
+#endif
 
 #if defined(__CUDACC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
 #define QUDA_CUDA_CC
@@ -428,13 +431,11 @@ namespace quda {
   __device__ __host__ inline double fma_rn(double a, double b, double c) { return target::dispatch<fma_rn_impl>(a, b, c); }
 
 #ifdef QUDA_USE_QUAD_SCALAR
-#include <float128_t.h>
-#include <quadmath.h>
 #include <crt/device_fp128_functions.h>
 
   template <bool is_device> struct fabs_fp128_impl;
   template <> struct fabs_fp128_impl<false> {
-    __host__ float128_t operator()(float128_t a) { return fabsq(a); }
+    __host__ float128_t operator()(float128_t a) { return fp128::fabs(a); }
   };
   template <> struct fabs_fp128_impl<true> {
     __device__ float128_t operator()(float128_t a) { return __nv_fp128_fabs(a); }
@@ -444,7 +445,7 @@ namespace quda {
 
   template <bool is_device> struct sqrt_fp128_impl;
   template <> struct sqrt_fp128_impl<false> {
-    __host__ float128_t operator()(float128_t a) { return sqrtq(a); }
+    __host__ float128_t operator()(float128_t a) { return fp128::sqrt(a); }
   };
   template <> struct sqrt_fp128_impl<true> {
     __device__ float128_t operator()(float128_t a) { return __nv_fp128_sqrt(a); }
@@ -463,7 +464,7 @@ namespace quda {
 
   template <bool is_device> struct fp128_cbrt_impl;
   template <> struct fp128_cbrt_impl<false> {
-    __host__ float128_t operator()(float128_t a) { return cbrtq(a); }
+    __host__ float128_t operator()(float128_t a) { return fp128::cbrt(a); }
   };
   template <> struct fp128_cbrt_impl<true> {
     __device__ float128_t operator()(float128_t a)
@@ -472,12 +473,12 @@ namespace quda {
     }
   };
   inline __host__ __device__ float128_t cbrt(float128_t a) { return target::dispatch<fp128_cbrt_impl>(a); }
-  QUDA_FP128_UNARY_CUDA(cos, cosq, __nv_fp128_cos)
-  QUDA_FP128_UNARY_CUDA(acos, acosq, __nv_fp128_acos)
-  QUDA_FP128_UNARY_CUDA(cosh, coshq, __nv_fp128_cosh)
-  QUDA_FP128_UNARY_CUDA(acosh, acoshq, __nv_fp128_acosh)
-  QUDA_FP128_UNARY_CUDA(sinh, sinhq, __nv_fp128_sinh)
-  QUDA_FP128_UNARY_CUDA(asinh, asinhq, __nv_fp128_asinh)
+  QUDA_FP128_UNARY_CUDA(cos, fp128::cos, __nv_fp128_cos)
+  QUDA_FP128_UNARY_CUDA(acos, fp128::acos, __nv_fp128_acos)
+  QUDA_FP128_UNARY_CUDA(cosh, fp128::cosh, __nv_fp128_cosh)
+  QUDA_FP128_UNARY_CUDA(acosh, fp128::acosh, __nv_fp128_acosh)
+  QUDA_FP128_UNARY_CUDA(sinh, fp128::sinh, __nv_fp128_sinh)
+  QUDA_FP128_UNARY_CUDA(asinh, fp128::asinh, __nv_fp128_asinh)
 
 #undef QUDA_FP128_UNARY_CUDA
 
@@ -491,7 +492,7 @@ namespace quda {
   };                                                                                                                   \
   inline __host__ __device__ bool FUNC(float128_t a) { return target::dispatch<fp128_##FUNC##_impl>(a); }
 
-  QUDA_FP128_PRED_CUDA(isnan, isnanq, __nv_fp128_isnan)
+  QUDA_FP128_PRED_CUDA(isnan, fp128::isnan, __nv_fp128_isnan)
 
 #undef QUDA_FP128_PRED_CUDA
 

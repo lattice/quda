@@ -447,6 +447,7 @@ endif()
 
 if(QUDA_SCALAR_TYPE STREQUAL "float128")
   set(QUDA_USE_QUAD_SCALAR 1)
+  set(QUDA_USE_QUAD_SCALAR 1 PARENT_SCOPE)
 elseif(QUDA_SCALAR_TYPE STREQUAL "doubledouble")
   set(QUDA_SCALAR_IS_DOUBLEDOUBLE 1)
 endif()
@@ -467,7 +468,7 @@ endif()
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
 
-if(QUDA_USE_QUAD_SCALAR)
+if(QUDA_USE_QUAD_SCALAR AND QUDA_COMPILER_HAS_GNU_FLOAT128)
   target_link_libraries(quda_cpp PUBLIC quadmath)
 endif()
 
@@ -650,7 +651,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 target_link_libraries(quda PUBLIC Threads::Threads)
-if(QUDA_USE_QUAD_SCALAR)
+if(QUDA_USE_QUAD_SCALAR AND QUDA_COMPILER_HAS_GNU_FLOAT128)
   target_link_libraries(quda PUBLIC quadmath)
 endif()
 
