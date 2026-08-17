@@ -49,8 +49,8 @@ namespace quda
     QUDA_FP128_BINARY(pow, powq, __builtin_powf128)
     QUDA_FP128_BINARY(fmod, fmodq, __builtin_fmodf128)
     QUDA_FP128_BINARY(hypot, hypotq, __builtin_hypotf128)
-    QUDA_FP128_PRED(isinf, isinfq, __builtin_isinff128)
-    QUDA_FP128_PRED(isnan, isnanq, __builtin_isnanf128)
+    QUDA_FP128_PRED(isinf, isinfq, __builtin_isinf)
+    QUDA_FP128_PRED(isnan, isnanq, __builtin_isnan)
 
 #undef QUDA_FP128_UNARY
 #undef QUDA_FP128_BINARY
