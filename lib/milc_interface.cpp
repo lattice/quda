@@ -1289,7 +1289,7 @@ void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int N
 
   // Copy eigenvalues if requested
   if (evals)
-    for (int i = 0; i < Nvecs; i++) evals[i] = space->evals[i].real();
+    for (int i = 0; i < Nvecs; i++) evals[i] = static_cast<std::remove_cvref_t<decltype(evals[i])>>(space->evals[i].real());
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaGetDeflationSpace

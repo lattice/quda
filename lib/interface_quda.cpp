@@ -6269,8 +6269,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
           for (size_t t = 0; t < global_decay_dim_slices; t++) {
             for (size_t G_idx = 0; G_idx < num_out_results; G_idx++) {
               int index = 2 * (global_decay_dim_slices * num_out_results * mom_idx + num_out_results * t + G_idx);
-              ((double *)*result)[index + 0] += result_global[num_out_results * t + G_idx].real();
-              ((double *)*result)[index + 1] += result_global[num_out_results * t + G_idx].imag();
+              ((double *)*result)[index + 0] += static_cast<double>(result_global[num_out_results * t + G_idx].real());
+              ((double *)*result)[index + 1] += static_cast<double>(result_global[num_out_results * t + G_idx].imag());
             }
           }
         }

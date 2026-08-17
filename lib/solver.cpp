@@ -593,28 +593,32 @@ namespace quda {
 
   void SolverParam::updateInvertParam(QudaInvertParam &param, int offset)
   {
-    for (auto i = 0u; i < true_res.size(); i++) param.true_res[i] = true_res[i];
-    for (auto i = 0u; i < true_res_hq.size(); i++) param.true_res_hq[i] = true_res_hq[i];
+    for (auto i = 0u; i < true_res.size(); i++)
+      param.true_res[i] = static_cast<std::remove_cvref_t<decltype(param.true_res[i])>>(true_res[i]);
+    for (auto i = 0u; i < true_res_hq.size(); i++)
+      param.true_res_hq[i] = static_cast<std::remove_cvref_t<decltype(param.true_res_hq[i])>>(true_res_hq[i]);
     param.iter += iter;
     if (offset >= 0) {
-      param.true_res_offset[offset] = true_res_offset[offset];
-      param.iter_res_offset[offset] = iter_res_offset[offset];
-      param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
+      param.true_res_offset[offset] = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[0])>>(true_res_offset[offset]);
+      param.iter_res_offset[offset] = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[0])>>(iter_res_offset[offset]);
+      param.true_res_hq_offset[offset] = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[0])>>(true_res_hq_offset[offset]);
     } else {
       for (int i = 0; i < num_offset; i++) {
-        param.true_res_offset[i] = true_res_offset[i];
-        param.iter_res_offset[i] = iter_res_offset[i];
-        param.true_res_hq_offset[i] = true_res_hq_offset[i];
+        param.true_res_offset[i] = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[i])>>(true_res_offset[i]);
+        param.iter_res_offset[i] = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[i])>>(iter_res_offset[i]);
+        param.true_res_hq_offset[i] = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[i])>>(true_res_hq_offset[i]);
       }
     }
     // for incremental eigCG:
     param.rhs_idx = rhs_idx;
 
-    param.ca_lambda_min = ca_lambda_min;
-    param.ca_lambda_max = ca_lambda_max;
+    param.ca_lambda_min = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_min)>>(ca_lambda_min);
+    param.ca_lambda_max = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_max)>>(ca_lambda_max);
 
-    param.ca_lambda_min_precondition = ca_lambda_min_precondition;
-    param.ca_lambda_max_precondition = ca_lambda_max_precondition;
+    param.ca_lambda_min_precondition
+      = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_min_precondition)>>(ca_lambda_min_precondition);
+    param.ca_lambda_max_precondition
+      = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_max_precondition)>>(ca_lambda_max_precondition);
 
     if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
   }
