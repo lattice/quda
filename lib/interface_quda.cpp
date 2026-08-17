@@ -3938,8 +3938,15 @@ namespace
     } else {
       printfQuda(" (no cycle-to-cycle pair seen)");
     }
-    printfQuda(" | tier1 %s split %.3e join %.3e transport[out] %.3e transport[r] %.3e deflate %.3e\n",
+    printfQuda(" | tier1 %s split %.3e join %.3e transport[out] %.3e transport[r] %.3e deflate %.3e",
                split_check_reshuffle() ? "on" : "OFF", dmax[1], dmax[2], dmax[3], dmax[4], dmax[5]);
+
+    // Stamp failures, summed over every rank -- a mismatch is reported by its own victim, but the
+    // total belongs on the one line a reader greps for. "OFF" and "0" must not be confused: a
+    // stamp-off run says nothing about delivery.
+    std::vector<double> dstamp {static_cast<double>(split_stamp_failures())};
+    comm_allreduce_sum(dstamp);
+    printfQuda(" | stamp %s failures %d\n", split_stamp_enabled() ? "on" : "OFF", static_cast<int>(dstamp[0]));
     // ===== end DEBUG(split-corruption) ===========================================================
   }
 
@@ -4077,6 +4084,7 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
     // where the buffers are already hot, and joins it back. Everything this loop then
     // does on the parent -- norm2, the convergence test, deflate -- is pure BLAS and
     // never touches a halo, so the teardown costs nothing to rebuild.
+    split_stamp_set_cycle(cycle + 1); // DEBUG(split-corruption) -- 1-based, to match CG's cycle label
     total_iters += segment(out, in, r, tol_cycle, param.maxiter - total_iters);
     r_stale = false;
 
@@ -4245,8 +4253,10 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
 
   {
     TimedPhase p(dt.split);
-    for (int n = 0; n < nper; n++)
+    for (int n = 0; n < nper; n++) {
+      split_stamp_set_slot(n, SPLIT_STAMP_OUT); // DEBUG(split-corruption)
       split_field(sc.collect_out[n], {out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.split_key, sc.pc_type);
+    }
   }
 
   // DEBUG(split-corruption) -- REMOVE BEFORE PR
@@ -4377,11 +4387,13 @@ static int split_cg_segment(std::vector<ColorSpinorField> &out, std::vector<Colo
   {
     TimedPhase p(dt.join);
     for (int n = 0; n < nper; n++) {
+      split_stamp_set_slot(n, SPLIT_STAMP_OUT); // DEBUG(split-corruption)
       join_field({out.begin() + n * nsub, out.begin() + (n + 1) * nsub}, sc.collect_out[n], sc.split_key, sc.pc_type);
       if (split_check_reshuffle()) { // DEBUG(split-corruption)
         auto slice = blas::norm2({out.begin() + n * nsub, out.begin() + (n + 1) * nsub});
         dbg_out_after_join.insert(dbg_out_after_join.end(), slice.begin(), slice.end());
       }
+      split_stamp_set_slot(n, SPLIT_STAMP_R); // DEBUG(split-corruption)
       join_field({r.begin() + n * nsub, r.begin() + (n + 1) * nsub}, sc.collect_r[n], sc.split_key, sc.pc_type);
     }
   }

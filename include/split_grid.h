@@ -248,6 +248,155 @@ namespace quda
                site, prepost ? 1 : 0, n_replicates, n_fields, bytes, split_max_staging_bytes(), device ? 1 : 0,
                split_zero_copy_enabled() ? 1 : 0, in_place ? 1 : 0, recycled, allocated);
   }
+
+  // ---- self-identifying reshuffle messages ------------------------------------------------------
+  //
+  // The norm checks above (tier 1) cannot see the mechanism they were written for. Two reasons, both
+  // structural:
+  //
+  //   - The benchmark input has every sub-grid solving IDENTICAL right-hand sides, so a message
+  //     delivered from the wrong SUB-GRID carries byte-identical data. Most mis-delivery is invisible
+  //     by construction.
+  //   - The cross-transport check compares SUMS of norms and says so ("blind to a compensating
+  //     error"). A field whose slices arrive correct-in-norm but wrong-in-place passes it.
+  //
+  // So a clean tier 1 is not evidence of correct delivery. This sends a small side-channel message
+  // per replicate carrying who sent it and which slot it belongs in, and checks it on arrival. It is
+  // deliberately NOT stamped into the payload: that would perturb the solve, and with it the race.
+  //
+  // Evidence this is aimed at the right thing: the observed corruption is a FINITE field of plausible
+  // magnitude (|r|/|b| = 12.9 against 1.0 for a zero guess), not NaN or denormals -- test6's genuine
+  // D2D race produced NaN. Valid-looking data in the wrong place is what mis-delivery looks like.
+
+  struct SplitStamp {
+    uint32_t magic;   // kSplitStampMagic -- catches an unwritten or stale buffer
+    int32_t src_rank; // sender's comm_rank() on the communicator the reshuffle runs on
+    int32_t replicate;
+    int32_t cycle;
+    int32_t n;     // which nper group
+    int32_t which; // SplitStampWhich
+  };
+
+  static constexpr uint32_t kSplitStampMagic = 0x53504c54u; // 'SPLT'
+
+  enum SplitStampWhich { SPLIT_STAMP_OUT = 0, SPLIT_STAMP_R = 1, SPLIT_STAMP_IN = 2, SPLIT_STAMP_OTHER = 3 };
+
+  /** Whether the side-channel identity check runs. Off by default; QUDA_SPLIT_STAMP=1. */
+  inline bool split_stamp_enabled()
+  {
+    static const bool enabled = []() {
+      const char *env = getenv("QUDA_SPLIT_STAMP");
+      return env && strcmp(env, "1") == 0;
+    }();
+    return enabled;
+  }
+
+  /**
+    @brief Positive control. QUDA_SPLIT_STAMP_POISON=k deliberately sends replicate k's stamp to the
+    wrong destination, so the checker MUST report a mismatch.
+
+    Not optional in a run that matters. A checker that has never been observed to fire proves nothing
+    when it comes back clean, and this investigation has already made that mistake twice: d6a33a913
+    was committed on the strength of a clean run it could not have fixed, and QUDA_SPLIT_WAIT_SENDS
+    was scored on a leg whose control never fired.
+  */
+  inline int split_stamp_poison()
+  {
+    static const int which = []() {
+      const char *env = getenv("QUDA_SPLIT_STAMP_POISON");
+      return env ? atoi(env) : -1;
+    }();
+    return which;
+  }
+
+  /** Where the reshuffle is, set by the caller so a stamp can say which call it belongs to. */
+  struct SplitStampCtx {
+    int cycle = -1;
+    int n = -1;
+    int which = SPLIT_STAMP_OTHER;
+  };
+
+  inline SplitStampCtx &split_stamp_ctx()
+  {
+    static SplitStampCtx ctx;
+    return ctx;
+  }
+
+  /** Set by run_deflated_cycles, which is the only scope that knows the cycle number. */
+  inline void split_stamp_set_cycle(int cycle) { split_stamp_ctx().cycle = cycle; }
+
+  /** Set per reshuffle call inside the segment; leaves the cycle alone. */
+  inline void split_stamp_set_slot(int n, int which)
+  {
+    split_stamp_ctx().n = n;
+    split_stamp_ctx().which = which;
+  }
+
+  /** Mismatches seen so far, reported next to the tier 0 line. */
+  inline int &split_stamp_failures()
+  {
+    static int failures = 0;
+    return failures;
+  }
+
+  /**
+    @brief Check one arrived stamp against what this slot expected.
+
+    `expect_src` is what the receive was declared against, so MPI itself will not violate it -- it is
+    checked anyway because a violation would mean the matching layer, not this code, is the problem.
+    The bite is in cycle/n/which: the same (src, dst, tag) triple recurs on EVERY call, so a message
+    left over from an earlier call is exactly what a mis-separated pair of joins would deliver, and it
+    is invisible to any norm check.
+
+    DO NOT "FIX" THIS BY ASSERTING got.replicate == slot.  They are different quantities and the
+    difference is real.  Worked through for split_field at processor_dim = 1 (1648_stamp/, job
+    57186712): rank R sends its replicate i to rank i with tag R*total_rank + i, while rank D receives
+    slot j from rank j with tag j*total_rank + D.  Matching those gives j = R and D = i -- so
+
+        the receiver's SLOT index is the SENDER's rank, and
+        the sender's REPLICATE index is the RECEIVER's rank.
+
+    Rank 0 therefore receives everybody's replicate 0.  That is why QUDA_SPLIT_STAMP_POISON=0 lit up
+    all three slots on rank 0 rather than one, which looks like a checker bug and is not.
+    got.replicate is printed for diagnosis and deliberately not asserted.
+  */
+  inline void split_stamp_verify(const char *site, const SplitStamp &got, int expect_src, int slot)
+  {
+    const auto &ctx = split_stamp_ctx();
+    const bool ok = got.magic == kSplitStampMagic && got.src_rank == expect_src && got.cycle == ctx.cycle
+      && got.n == ctx.n && got.which == ctx.which;
+    if (ok) return;
+
+    split_stamp_failures()++;
+    // printf, not printfQuda: printfQuda prints on rank 0 only, and the whole point is that the
+    // victim moves between runs. Every rank must be able to report its own mismatch.
+    printf("DEBUG(split-corruption) STAMP MISMATCH %s rank %d slot %d: expected "
+           "{magic=SPLT src=%d cycle=%d n=%d which=%d}, got {magic=%08x src=%d replicate=%d cycle=%d n=%d which=%d}\n",
+           site, comm_rank(), slot, expect_src, ctx.cycle, ctx.n, ctx.which, got.magic, got.src_rank, got.replicate,
+           got.cycle, got.n, got.which);
+    fflush(stdout);
+  }
+
+  /**
+    @brief Tag for the stamp that shadows a payload tag.
+
+    Payload tags are already src * total_rank + dst, which reaches ~1.33M at 1152 ranks; shifting the
+    stamps clear of them doubles that. MPI_TAG_UB is only guaranteed to be 32767 and some MPICH builds
+    report 2^21-1, so this refuses rather than silently colliding -- returns -1 when there is no room,
+    and the caller skips stamping. Fine on a small rig; a 288-node run needs a separate communicator.
+  */
+  inline int split_stamp_tag(int payload_tag, int total_rank)
+  {
+    // 32767 is the only value MPI guarantees. Raise it with QUDA_SPLIT_STAMP_TAG_UB once you have
+    // checked what MPI_TAG_UB actually reports on the machine in question.
+    static const int tag_ub = []() {
+      const char *env = getenv("QUDA_SPLIT_STAMP_TAG_UB");
+      return env ? atoi(env) : 32767;
+    }();
+    const long shifted = static_cast<long>(payload_tag) + static_cast<long>(total_rank) * total_rank;
+    if (shifted > tag_ub) return -1;
+    return static_cast<int>(shifted);
+  }
   // ===== end DEBUG(split-corruption) ==============================================================
 
   /**
@@ -399,6 +548,13 @@ namespace quda
       return comm_rank_from_coords(src_idx.data());
     };
 
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR
+    const bool stamp = split_stamp_enabled();
+    std::vector<SplitStamp> stamp_send(stamp ? n_replicates : 0);
+    std::vector<SplitStamp> stamp_recv(stamp ? n_replicates : 0);
+    std::vector<MsgHandle *> mh_stamp_send(stamp ? n_replicates : 0, nullptr);
+    std::vector<MsgHandle *> mh_stamp_recv(stamp ? n_replicates : 0, nullptr);
+
     int dbg_recycled = 0; // DEBUG(split-corruption) -- REMOVE BEFORE PR
     for (int i = 0; i < n_recv_buffers; i++) {
       v_recv_buffer[i] = split_buffer_malloc(bytes, device);
@@ -424,6 +580,20 @@ namespace quda
         int tag = src_rank * total_rank + rank;
         v_mh_recv[i] = comm_declare_recv_rank(v_recv_buffer[i], src_rank, tag, bytes);
         comm_start(v_mh_recv[i]);
+      }
+    }
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. Stamps are 24 bytes, so they are all posted up
+    // front whatever `prepost` says -- there is no staging budget to respect and no reason to
+    // serialise them with the payload.
+    if (stamp) {
+      for (int i = 0; i < n_replicates; i++) {
+        int src_rank = recv_peer(i);
+        int st = split_stamp_tag(src_rank * total_rank + rank, total_rank);
+        if (st < 0) continue;
+        stamp_recv[i].magic = 0;
+        mh_stamp_recv[i] = comm_declare_recv_rank(&stamp_recv[i], src_rank, st, sizeof(SplitStamp));
+        comm_start(mh_stamp_recv[i]);
       }
     }
 
@@ -462,6 +632,22 @@ namespace quda
 
       v_mh_send[i] = comm_declare_send_rank(v_send_from[i % n_fields], dst_rank, tag, bytes);
       comm_start(v_mh_send[i]);
+
+      // DEBUG(split-corruption) -- REMOVE BEFORE PR. Posted AFTER the payload send so the payload
+      // ordering this race depends on is left alone.
+      if (stamp) {
+        const int st = split_stamp_tag(tag, total_rank);
+        if (st >= 0) {
+          const auto &ctx = split_stamp_ctx();
+          stamp_send[i] = {kSplitStampMagic, rank, i, ctx.cycle, ctx.n, ctx.which};
+          // Positive control: corrupt the CONTENT, never the destination. Misrouting the stamp would
+          // leave the intended receiver waiting on a message nobody sends, and a deadlocked control
+          // leg proves nothing.
+          if (split_stamp_poison() == i) { stamp_send[i].cycle = ctx.cycle + 1000; }
+          mh_stamp_send[i] = comm_declare_send_rank(&stamp_send[i], dst_rank, st, sizeof(SplitStamp));
+          comm_start(mh_stamp_send[i]);
+        }
+      }
     }
 
     // Unpack in replicate order. Each copyFieldOffset writes a disjoint region of collect_field
@@ -478,6 +664,12 @@ namespace quda
       }
 
       comm_wait(v_mh_recv[i]);
+
+      // DEBUG(split-corruption) -- REMOVE BEFORE PR
+      if (stamp && mh_stamp_recv[i]) {
+        comm_wait(mh_stamp_recv[i]);
+        split_stamp_verify("split_field", stamp_recv[i], recv_peer(i), i);
+      }
 
       auto partition_idx = coordinate_from_index(i, comm_key);
       auto offset = partition_idx * field_dim;
@@ -518,6 +710,18 @@ namespace quda
       }
     }
     comm_barrier();
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. Drain the stamp sends before their (stack)
+    // buffers go out of scope. The payload's barrier proxy does not cover these.
+    if (stamp) {
+      for (int i = 0; i < n_replicates; i++) {
+        if (mh_stamp_send[i]) { comm_wait(mh_stamp_send[i]); }
+      }
+      for (int i = 0; i < n_replicates; i++) {
+        if (mh_stamp_recv[i]) { comm_free(mh_stamp_recv[i]); }
+        if (mh_stamp_send[i]) { comm_free(mh_stamp_send[i]); }
+      }
+    }
 
     for (int i = 0; i < n_replicates; i++) {
       if (v_mh_recv[i]) { comm_free(v_mh_recv[i]); }
@@ -574,6 +778,13 @@ namespace quda
       return comm_rank_from_coords(src_idx.data());
     };
 
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR
+    const bool stamp = split_stamp_enabled();
+    std::vector<SplitStamp> stamp_send(stamp ? n_replicates : 0);
+    std::vector<SplitStamp> stamp_recv(stamp ? n_replicates : 0);
+    std::vector<MsgHandle *> mh_stamp_send(stamp ? n_replicates : 0, nullptr);
+    std::vector<MsgHandle *> mh_stamp_recv(stamp ? n_replicates : 0, nullptr);
+
     int dbg_recycled = 0; // DEBUG(split-corruption) -- REMOVE BEFORE PR
     for (int i = 0; i < n_recv_buffers; i++) {
       v_recv_buffer[i] = split_buffer_malloc(bytes, device);
@@ -599,6 +810,18 @@ namespace quda
         int tag = src_rank * total_rank + rank;
         v_mh_recv[i] = comm_declare_recv_rank(v_recv_buffer[i], src_rank, tag, bytes);
         comm_start(v_mh_recv[i]);
+      }
+    }
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. See the note at the matching site in split_field.
+    if (stamp) {
+      for (int i = 0; i < n_replicates; i++) {
+        int src_rank = recv_peer(i);
+        int st = split_stamp_tag(src_rank * total_rank + rank, total_rank);
+        if (st < 0) continue;
+        stamp_recv[i].magic = 0;
+        mh_stamp_recv[i] = comm_declare_recv_rank(&stamp_recv[i], src_rank, st, sizeof(SplitStamp));
+        comm_start(mh_stamp_recv[i]);
       }
     }
 
@@ -643,6 +866,18 @@ namespace quda
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer[i], dst_rank, tag, bytes);
 
       comm_start(v_mh_send[i]);
+
+      // DEBUG(split-corruption) -- REMOVE BEFORE PR. After the payload send, as in split_field.
+      if (stamp) {
+        const int st = split_stamp_tag(tag, total_rank);
+        if (st >= 0) {
+          const auto &ctx = split_stamp_ctx();
+          stamp_send[i] = {kSplitStampMagic, rank, i, ctx.cycle, ctx.n, ctx.which};
+          if (split_stamp_poison() == i) { stamp_send[i].cycle = ctx.cycle + 1000; }
+          mh_stamp_send[i] = comm_declare_send_rank(&stamp_send[i], dst_rank, st, sizeof(SplitStamp));
+          comm_start(mh_stamp_send[i]);
+        }
+      }
     }
 
     // Replicate order is preserved deliberately: when n_fields < n_replicates several replicates
@@ -658,6 +893,13 @@ namespace quda
       }
 
       comm_wait(v_mh_recv[i]);
+
+      // DEBUG(split-corruption) -- REMOVE BEFORE PR
+      if (stamp && mh_stamp_recv[i]) {
+        comm_wait(mh_stamp_recv[i]);
+        split_stamp_verify("join_field", stamp_recv[i], recv_peer(i), i);
+      }
+
       v_base_field[i % n_fields].copy_from_buffer(v_recv_buffer[b]);
 
       // Shared receive buffer -- see the note in split_field.
@@ -678,6 +920,17 @@ namespace quda
       }
     }
     comm_barrier();
+
+    // DEBUG(split-corruption) -- REMOVE BEFORE PR. See the note at the matching site in split_field.
+    if (stamp) {
+      for (int i = 0; i < n_replicates; i++) {
+        if (mh_stamp_send[i]) { comm_wait(mh_stamp_send[i]); }
+      }
+      for (int i = 0; i < n_replicates; i++) {
+        if (mh_stamp_recv[i]) { comm_free(mh_stamp_recv[i]); }
+        if (mh_stamp_send[i]) { comm_free(mh_stamp_send[i]); }
+      }
+    }
 
     for (int i = 0; i < n_replicates; i++) {
       if (v_mh_recv[i]) { comm_free(v_mh_recv[i]); }
