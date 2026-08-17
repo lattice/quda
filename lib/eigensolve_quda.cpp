@@ -174,7 +174,8 @@ namespace quda
     if (eig_param->use_poly_acc) {
       if (eig_param->a_max <= 0.0) {
         // Use part of the kSpace as temps
-        eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
+        eig_param->a_max = static_cast<std::remove_cvref_t<decltype(eig_param->a_max)>>(
+          estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]));
         logQuda(QUDA_SUMMARIZE, "Chebyshev maximum estimate: %e.\n", eig_param->a_max);
       }
       if (eig_param->a_min >= eig_param->a_max)
