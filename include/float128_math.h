@@ -9,28 +9,8 @@
 #if defined(__SIZEOF_FLOAT128__)
 #include <quadmath.h>
 #else
-// Declare libm TS 18661-3 entry points. Do not rely on math.h exposing them;
-// cmath may already have been included without the IEC feature-test macro.
-extern "C" {
-_Float128 sqrtf128(_Float128);
-_Float128 fabsf128(_Float128);
-_Float128 cbrtf128(_Float128);
-_Float128 sinf128(_Float128);
-_Float128 cosf128(_Float128);
-_Float128 sinhf128(_Float128);
-_Float128 coshf128(_Float128);
-_Float128 acosf128(_Float128);
-_Float128 asinhf128(_Float128);
-_Float128 acoshf128(_Float128);
-_Float128 expf128(_Float128);
-_Float128 logf128(_Float128);
-_Float128 powf128(_Float128, _Float128);
-_Float128 fmodf128(_Float128, _Float128);
-_Float128 hypotf128(_Float128, _Float128);
-int isinff128(_Float128);
-int isnanf128(_Float128);
-int strfromf128(char *, std::size_t, const char *, _Float128);
-}
+#include <cmath>
+#include <cstdlib>
 #endif
 
 namespace quda
@@ -54,23 +34,23 @@ namespace quda
   inline bool name(float128_t x) { return iec(x); }
 #endif
 
-    QUDA_FP128_UNARY(sqrt, sqrtq, sqrtf128)
-    QUDA_FP128_UNARY(fabs, fabsq, fabsf128)
-    QUDA_FP128_UNARY(cbrt, cbrtq, cbrtf128)
-    QUDA_FP128_UNARY(sin, sinq, sinf128)
-    QUDA_FP128_UNARY(cos, cosq, cosf128)
-    QUDA_FP128_UNARY(sinh, sinhq, sinhf128)
-    QUDA_FP128_UNARY(cosh, coshq, coshf128)
-    QUDA_FP128_UNARY(acos, acosq, acosf128)
-    QUDA_FP128_UNARY(asinh, asinhq, asinhf128)
-    QUDA_FP128_UNARY(acosh, acoshq, acoshf128)
-    QUDA_FP128_UNARY(exp, expq, expf128)
-    QUDA_FP128_UNARY(log, logq, logf128)
-    QUDA_FP128_BINARY(pow, powq, powf128)
-    QUDA_FP128_BINARY(fmod, fmodq, fmodf128)
-    QUDA_FP128_BINARY(hypot, hypotq, hypotf128)
-    QUDA_FP128_PRED(isinf, isinfq, isinff128)
-    QUDA_FP128_PRED(isnan, isnanq, isnanf128)
+    QUDA_FP128_UNARY(sqrt, sqrtq, __builtin_sqrtf128)
+    QUDA_FP128_UNARY(fabs, fabsq, __builtin_fabsf128)
+    QUDA_FP128_UNARY(cbrt, cbrtq, __builtin_cbrtf128)
+    QUDA_FP128_UNARY(sin, sinq, __builtin_sinf128)
+    QUDA_FP128_UNARY(cos, cosq, __builtin_cosf128)
+    QUDA_FP128_UNARY(sinh, sinhq, __builtin_sinhf128)
+    QUDA_FP128_UNARY(cosh, coshq, __builtin_coshf128)
+    QUDA_FP128_UNARY(acos, acosq, __builtin_acosf128)
+    QUDA_FP128_UNARY(asinh, asinhq, __builtin_asinhf128)
+    QUDA_FP128_UNARY(acosh, acoshq, __builtin_acoshf128)
+    QUDA_FP128_UNARY(exp, expq, __builtin_expf128)
+    QUDA_FP128_UNARY(log, logq, __builtin_logf128)
+    QUDA_FP128_BINARY(pow, powq, __builtin_powf128)
+    QUDA_FP128_BINARY(fmod, fmodq, __builtin_fmodf128)
+    QUDA_FP128_BINARY(hypot, hypotq, __builtin_hypotf128)
+    QUDA_FP128_PRED(isinf, isinfq, __builtin_isinff128)
+    QUDA_FP128_PRED(isnan, isnanq, __builtin_isnanf128)
 
 #undef QUDA_FP128_UNARY
 #undef QUDA_FP128_BINARY
