@@ -2368,8 +2368,8 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
+    auto cpu = blas::norm2(in_h);
+    auto gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -2384,8 +2384,8 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
   out_h = out;
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(out_h);
-    double gpu = blas::norm2(out);
+    auto cpu = blas::norm2(out_h);
+    auto gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 

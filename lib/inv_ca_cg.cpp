@@ -383,8 +383,8 @@ namespace quda
     real_t maxr_deflate = rNorm; // The maximum residual since the last deflation
 
     // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    real_t m_map = 2. / (lambda_max - lambda_min);
+    real_t b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     auto get_i = [](std::vector<std::vector<ColorSpinorField>> &p, int i) {
       vector_ref<ColorSpinorField> p_i;

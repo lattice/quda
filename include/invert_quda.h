@@ -664,7 +664,7 @@ namespace quda {
        @return Norm of final power iteration result
     */
     template <typename... Args>
-    static double performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
+    static real_t performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
                                          ColorSpinorField &tempvec1, ColorSpinorField &tempvec2, int niter,
                                          int normalize_freq, Args &&...args);
 
@@ -682,13 +682,13 @@ namespace quda {
     template <typename... Args>
     static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<std::vector<ColorSpinorField>> &Ap,
                                      std::vector<std::vector<ColorSpinorField>> &p, int n_krylov, QudaCABasis basis,
-                                     double m_map, double b_map, Args &&...args);
+                                     real_t m_map, real_t b_map, Args &&...args);
 
     // FIXME delete this variant once CA-CG is MRHS aware
     template <typename... Args>
     void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
-                              std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
-                              double b_map, Args &&...args)
+                              std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, real_t m_map,
+                              real_t b_map, Args &&...args)
     {
       std::vector<std::vector<ColorSpinorField>> p2(p.size());
       for (auto i = 0u; i < p.size(); i++) {

@@ -234,8 +234,8 @@ namespace quda
     }
 
     // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    real_t m_map = 2. / (lambda_max - lambda_min);
+    real_t b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (is_zero_src(x, b, b2)) {
