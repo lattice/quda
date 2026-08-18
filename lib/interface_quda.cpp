@@ -1617,7 +1617,7 @@ namespace quda {
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
-    double kappa = inv_param->kappa;
+    real_t kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       kappa *= gaugePrecise->Anisotropy();
     }
