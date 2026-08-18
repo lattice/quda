@@ -28,8 +28,8 @@ namespace quda
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_>(out, in, halo, U, a, x, parity, dagger,
                                                                         comm_override, alpha0, t0),
       A(A, false),
-      a(a),
-      b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -0.5 * b : 0.5 * b)) // factor of 1/2 comes from clover normalization we need to correct for
     {
       checkPrecision(U, A);
       checkLocation(U, A);

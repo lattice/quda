@@ -23,12 +23,12 @@ namespace quda
                        cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
                                                           comm_override),
-      a(a),
-      b(dagger ? -b : b), // if dagger flip the chiral twist
-      c(c),
-      a_inv(1.0 / (a * (1.0 + b * b - c * c))),
-      b_inv(dagger ? b : -b),
-      c_inv(-c)
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -b : b)), // if dagger flip the chiral twist
+      c(static_cast<real>(c)),
+      a_inv(static_cast<real>(1.0 / (a * (1.0 + b * b - c * c)))),
+      b_inv(static_cast<real>(dagger ? b : -b)),
+      c_inv(static_cast<real>(-c))
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {

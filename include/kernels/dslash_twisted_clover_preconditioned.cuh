@@ -29,9 +29,9 @@ namespace quda
                                                           comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-      a(a),
-      b(dagger ? -0.5 * b : 0.5 * b), // factor of 0.5 comes from basis transform
-      b2(0.25 * b * b)
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -0.5 * b : 0.5 * b)), // factor of 0.5 comes from basis transform
+      b2(static_cast<real>(0.25 * b * b))
     {
       checkPrecision(U, A);
       checkLocation(U, A);

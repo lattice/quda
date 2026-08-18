@@ -56,8 +56,8 @@ namespace quda
       halo(halo),
       U(U),
       Uback(dslash_double_store() ? U.shift(1) : U),
-      a(a),
-      alpha0(alpha0),
+      a(static_cast<real>(a)),
+      alpha0(static_cast<real>(alpha0)),
       t0(t0)
     {
       for (auto i = 0u; i < out.size(); i++) {

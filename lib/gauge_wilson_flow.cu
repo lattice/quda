@@ -9,13 +9,12 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowStep : TunableKernel3D
   {
-    using real = typename mapper<Float>::type;
     static constexpr int wflow_dim = 4; // apply flow in all dims
     GaugeField &out;
     GaugeField &temp;
     const GaugeField &in;
-    const real epsilon;
-    const real anisotropy;
+    const real_t epsilon;
+    const real_t anisotropy;
     const QudaGaugeSmearType wflow_type;
     const QudaWFlowStepType step_type;
 
@@ -41,8 +40,8 @@ namespace quda
       out(out),
       temp(temp),
       in(in),
-      epsilon(static_cast<real>(eps)),
-      anisotropy(static_cast<real>(aniso)),
+      epsilon(eps),
+      anisotropy(aniso),
       wflow_type(wflow_type),
       step_type(step_type)
     {
