@@ -49,7 +49,7 @@ bool is_flow(QudaGaugeSmearType type)
 
 GaugeInputMode default_gauge_input_mode()
 {
-  return enable_testing ? GaugeInputMode::GAUSSIAN_SU3 : GaugeInputMode::HAAR;
+  return GaugeInputMode::GAUSSIAN_SU3;
 }
 
 QudaGaugeObservableParam make_disabled_observables()
