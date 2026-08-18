@@ -12,7 +12,7 @@ namespace quda
     GaugeField &out;
     GaugeField *tmp[4];
     const GaugeField &in;
-    const Float alpha;
+    const real_t alpha;
     const int level;
     const int dir_ignore;
     const int hypDim;
@@ -25,7 +25,7 @@ namespace quda
       out(out),
       tmp {tmp[0], tmp[1], tmp[2], tmp[3]},
       in(in),
-      alpha(static_cast<Float>(alpha)),
+      alpha(alpha),
       level(level),
       dir_ignore(dir_ignore),
       hypDim((dir_ignore == 4) ? 4 : 3)

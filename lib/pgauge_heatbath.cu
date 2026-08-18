@@ -14,7 +14,7 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType recon>
   class GaugeHB : TunableKernel1D {
     GaugeField &U;
-    Float beta;
+    real_t beta;
     RNG &rng;
     int mu;
     int parity;
@@ -26,7 +26,7 @@ namespace quda {
     GaugeHB(GaugeField &U, real_t beta, RNG &rng, int mu, int parity, bool heatbath) :
       TunableKernel1D(U),
       U(U),
-      beta(static_cast<Float>(beta)),
+      beta(beta),
       rng(rng),
       mu(mu),
       parity(parity),

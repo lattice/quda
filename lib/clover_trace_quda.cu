@@ -11,7 +11,7 @@ namespace quda {
     GaugeField &output;
     const CloverField &clover;
     const bool twisted;
-    Float coeff;
+    real_t coeff;
     const int parity;
     unsigned int minThreads() const override { return clover.VolumeCB(); }
 
@@ -21,7 +21,7 @@ namespace quda {
       output(output),
       clover(clover),
       twisted(clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-      coeff(static_cast<Float>(coeff)),
+      coeff(coeff),
       parity(parity)
     {
       if (twisted) strcat(aux, ",twisted");
