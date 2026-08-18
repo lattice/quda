@@ -17,15 +17,10 @@
 #include "command_line_params.h"
 #include "test.h"
 
-using smear_test_t = std::tuple<QudaPrecision, QudaReconstructType, QudaGaugeSmearType, int>;
-using flow_smear_test_t = std::tuple<QudaPrecision, QudaReconstructType, QudaGaugeSmearType, int, unsigned int>;
-using anisotropic_smear_test_t = std::tuple<QudaPrecision, QudaReconstructType, QudaGaugeSmearType, int, double>;
-using anisotropic_flow_smear_test_t
-  = std::tuple<QudaPrecision, QudaReconstructType, QudaGaugeSmearType, int, unsigned int, double>;
+// google test
+#include "gauge_smear_test_gtest.hpp"
 
 namespace {
-
-constexpr double kAnisotropicSmearValue = 1.3;
 
 QudaGaugeSmearParam make_smear_param(QudaGaugeSmearType type, int dir_ignore, bool use_cli, unsigned int rk_order = 3,
                                      double smear_anisotropy = 1.0, unsigned int n_steps = 1)
@@ -141,7 +136,7 @@ int verify_one_step(QudaPrecision precision, QudaGaugeSmearParam smear_param,
   auto max_deviation = 0.0;
   for (int dir = 0; dir < 4; dir++) {
     max_deviation = std::max(max_deviation, compare_floats_v2(result.data(dir), reference.data(dir), V * gauge_site_size,
-                                                               std::numeric_limits<double>::infinity(), fields.gauge_param.cpu_prec));
+                                                              std::numeric_limits<double>::infinity(), fields.gauge_param.cpu_prec));
     check &= compare_floats(result.data(dir), reference.data(dir), V * gauge_site_size, tolerance, fields.gauge_param.cpu_prec);
   }
   logQuda(QUDA_SUMMARIZE,
@@ -215,190 +210,19 @@ void report_benchmark(QudaGaugeSmearType type, int n_steps, const SmearMetrics &
   printfQuda("Kernel performance: %.3f GFLOP/s, %.3f GB/s, %.3f FLOP/byte\n", gflops, gbytes, intensity);
 }
 
-const char *reconstruct_label(QudaReconstructType reconstruct)
-{
-  switch (reconstruct) {
-  case QUDA_RECONSTRUCT_NO: return "r18";
-  case QUDA_RECONSTRUCT_12: return "r12";
-  default: return "runknown";
-  }
-}
-
-std::string test_name(testing::TestParamInfo<smear_test_t> param)
-{
-  const auto precision = testing::get<0>(param.param);
-  const auto reconstruct = testing::get<1>(param.param);
-  const auto dir_ignore = testing::get<3>(param.param);
-  const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_" + direction;
-}
-
-std::string flow_test_name(testing::TestParamInfo<flow_smear_test_t> param)
-{
-  const auto precision = testing::get<0>(param.param);
-  const auto reconstruct = testing::get<1>(param.param);
-  const auto rk_order = testing::get<4>(param.param);
-  const auto dir_ignore = testing::get<3>(param.param);
-  const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk"
-         + std::to_string(rk_order) + "_" + direction;
-}
-
-std::string anisotropic_test_name(testing::TestParamInfo<anisotropic_smear_test_t> param)
-{
-  const auto precision = testing::get<0>(param.param);
-  const auto reconstruct = testing::get<1>(param.param);
-  const auto dir_ignore = testing::get<3>(param.param);
-  const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_aniso_" + direction;
-}
-
-std::string anisotropic_flow_test_name(testing::TestParamInfo<anisotropic_flow_smear_test_t> param)
-{
-  const auto precision = testing::get<0>(param.param);
-  const auto reconstruct = testing::get<1>(param.param);
-  const auto rk_order = testing::get<4>(param.param);
-  const auto dir_ignore = testing::get<3>(param.param);
-  const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk"
-         + std::to_string(rk_order) + "_aniso_" + direction;
-}
-
 } // namespace
 
-class GaugeSmearTest : public ::testing::TestWithParam<smear_test_t> {
-protected:
-  void TearDown() override { freeGaugeQuda(); }
-};
-
-TEST_P(GaugeSmearTest, OneStep)
+int smear_verify(QudaPrecision precision, QudaReconstructType reconstruct, QudaGaugeSmearType type, int dir_ignore,
+                 double smear_anisotropy)
 {
-  const auto [precision, reconstruct, type, dir_ignore] = GetParam();
-  if (!quda::is_enabled(precision)) GTEST_SKIP();
-  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
-  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
-  ASSERT_EQ(verify_one_step(precision, make_smear_param(type, dir_ignore, false), reconstruct), 1)
-    << "CPU and QUDA gauge smearing implementations do not agree";
+  return verify_one_step(precision, make_smear_param(type, dir_ignore, false, 3, smear_anisotropy), reconstruct);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  APE, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_APE),
-                   testing::Values(-1, 3, 4)),
-  test_name);
-INSTANTIATE_TEST_SUITE_P(
-  Stout, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_STOUT),
-                   testing::Values(-1, 3, 4)),
-  test_name);
-INSTANTIATE_TEST_SUITE_P(
-  OvrImpStout, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(-1, 3, 4)),
-  test_name);
-INSTANTIATE_TEST_SUITE_P(
-  HYP, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_HYP),
-                   testing::Values(-1, 3, 4)),
-  test_name);
-
-class GaugeFlowSmearTest : public ::testing::TestWithParam<flow_smear_test_t> {
-protected:
-  void TearDown() override { freeGaugeQuda(); }
-};
-
-TEST_P(GaugeFlowSmearTest, OneStep)
+int flow_verify(QudaPrecision precision, QudaReconstructType reconstruct, QudaGaugeSmearType type, int dir_ignore,
+                unsigned int rk_order, double smear_anisotropy)
 {
-  const auto [precision, reconstruct, type, dir_ignore, rk_order] = GetParam();
-  if (!quda::is_enabled(precision)) GTEST_SKIP();
-  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
-  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
-  ASSERT_EQ(verify_one_step(precision, make_smear_param(type, dir_ignore, false, rk_order), reconstruct), 1)
-    << "CPU and QUDA gauge smearing implementations do not agree";
+  return verify_one_step(precision, make_smear_param(type, dir_ignore, false, rk_order, smear_anisotropy), reconstruct);
 }
-
-INSTANTIATE_TEST_SUITE_P(
-  WilsonFlow, GaugeFlowSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1), testing::Values(3u, 4u)),
-  flow_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  SymanzikFlow, GaugeFlowSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1), testing::Values(3u, 4u)),
-  flow_test_name);
-
-class GaugeSmearAnisotropicTest : public ::testing::TestWithParam<anisotropic_smear_test_t> {
-protected:
-  void TearDown() override { freeGaugeQuda(); }
-};
-
-TEST_P(GaugeSmearAnisotropicTest, OneStep)
-{
-  const auto [precision, reconstruct, type, dir_ignore, smear_anisotropy] = GetParam();
-  if (!quda::is_enabled(precision)) GTEST_SKIP();
-  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
-  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
-  ASSERT_EQ(verify_one_step(precision, make_smear_param(type, dir_ignore, false, 3, smear_anisotropy), reconstruct), 1)
-    << "CPU and QUDA gauge smearing implementations do not agree";
-}
-
-INSTANTIATE_TEST_SUITE_P(
-  APE_Anisotropic, GaugeSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_APE),
-                   testing::Values(4), testing::Values(kAnisotropicSmearValue)),
-  anisotropic_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  Stout_Anisotropic, GaugeSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_STOUT),
-                   testing::Values(4), testing::Values(kAnisotropicSmearValue)),
-  anisotropic_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  OvrImpStout_Anisotropic, GaugeSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(4),
-                   testing::Values(kAnisotropicSmearValue)),
-  anisotropic_test_name);
-
-class GaugeFlowSmearAnisotropicTest : public ::testing::TestWithParam<anisotropic_flow_smear_test_t> {
-protected:
-  void TearDown() override { freeGaugeQuda(); }
-};
-
-TEST_P(GaugeFlowSmearAnisotropicTest, OneStep)
-{
-  const auto [precision, reconstruct, type, dir_ignore, rk_order, smear_anisotropy] = GetParam();
-  if (!quda::is_enabled(precision)) GTEST_SKIP();
-  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
-  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
-  ASSERT_EQ(verify_one_step(precision, make_smear_param(type, dir_ignore, false, rk_order, smear_anisotropy), reconstruct),
-            1)
-    << "CPU and QUDA gauge smearing implementations do not agree";
-}
-
-INSTANTIATE_TEST_SUITE_P(
-  WilsonFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1), testing::Values(3u, 4u),
-                   testing::Values(kAnisotropicSmearValue)),
-  anisotropic_flow_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  SymanzikFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1), testing::Values(3u, 4u),
-                   testing::Values(kAnisotropicSmearValue)),
-  anisotropic_flow_test_name);
 
 struct gauge_smear_test : quda_test {
   void display_info() const override
