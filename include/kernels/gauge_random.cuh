@@ -27,7 +27,7 @@ namespace quda {
       kernel_param(dim3(U.LocalVolumeCB(), 2, 1)),
       U(U),
       rng(rng),
-      sigma(sigma)
+      sigma(static_cast<real>(sigma))
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = U.R()[dir];

@@ -26,7 +26,7 @@ namespace quda {
       kernel_param(dim3(f.VolumeCB(), 2, 1)),
       clover(clover, 0),
       f(f),
-      coeff(coeff)
+      coeff(static_cast<real>(coeff))
     { 
       for (int dir=0; dir<4; ++dir) X[dir] = f.X()[dir];
     }

@@ -97,7 +97,10 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<TwistGamma>(tp, stream, GammaArg<Float, nColor>(out, in, d, 0, kappa, mu, epsilon, dagger, type));
+      using real = typename mapper<Float>::type;
+      launch<TwistGamma>(tp, stream,
+                         GammaArg<Float, nColor>(out, in, d, 0, static_cast<real>(kappa), static_cast<real>(mu),
+                                                  static_cast<real>(epsilon), dagger, type));
     }
 
     void preTune() { out.backup(); }
