@@ -256,6 +256,11 @@ target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(gauge_smear_test gauge_smear_test.cpp)
+target_link_libraries(gauge_smear_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_smear_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_smear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_executable(clover_force_test clover_force_test.cpp)
   target_link_libraries(clover_force_test ${TEST_LIBS})
@@ -1617,6 +1622,11 @@ add_test(NAME gauge_path
   COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
   --dim 2 4 6 8 --enable-testing true --niter 1
   --gtest_output=xml:gauge_path_test.xml)
+
+add_test(NAME gauge_smear
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_smear_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true
+  --gtest_output=xml:gauge_smear_test.xml)
 
 foreach(prec IN LISTS TEST_PRECS)
 

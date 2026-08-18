@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <complex>
 
 #include <gauge_field.h>
@@ -238,6 +239,8 @@ public:
   Matrix &operator-=(const Matrix<N, T> &mat);
   const T &operator()(int i, int j) const;
   T &operator()(int i, int j);
+  T determinant() const;
+  Matrix inverse() const;
 };
 
 template <int N, class T> Matrix<N, T>::Matrix()
@@ -250,6 +253,31 @@ template <int N, class T> Matrix<N, T>::Matrix()
 template <int N, class T> T &Matrix<N, T>::operator()(int i, int j) { return data[i][j]; }
 
 template <int N, class T> const T &Matrix<N, T>::operator()(int i, int j) const { return data[i][j]; }
+
+template <int N, class T> T Matrix<N, T>::determinant() const
+{
+  static_assert(N == 3, "Matrix::determinant is implemented only for 3x3 matrices");
+  return (*this)(0, 0) * ((*this)(1, 1) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 1))
+    - (*this)(0, 1) * ((*this)(1, 0) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 0))
+    + (*this)(0, 2) * ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0));
+}
+
+template <int N, class T> Matrix<N, T> Matrix<N, T>::inverse() const
+{
+  static_assert(N == 3, "Matrix::inverse is implemented only for 3x3 matrices");
+  Matrix<N, T> out;
+  const auto det = determinant();
+  out(0, 0) = ((*this)(1, 1) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 1)) / det;
+  out(0, 1) = ((*this)(0, 2) * (*this)(2, 1) - (*this)(0, 1) * (*this)(2, 2)) / det;
+  out(0, 2) = ((*this)(0, 1) * (*this)(1, 2) - (*this)(0, 2) * (*this)(1, 1)) / det;
+  out(1, 0) = ((*this)(1, 2) * (*this)(2, 0) - (*this)(1, 0) * (*this)(2, 2)) / det;
+  out(1, 1) = ((*this)(0, 0) * (*this)(2, 2) - (*this)(0, 2) * (*this)(2, 0)) / det;
+  out(1, 2) = ((*this)(0, 2) * (*this)(1, 0) - (*this)(0, 0) * (*this)(1, 2)) / det;
+  out(2, 0) = ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0)) / det;
+  out(2, 1) = ((*this)(0, 1) * (*this)(2, 0) - (*this)(0, 0) * (*this)(2, 1)) / det;
+  out(2, 2) = ((*this)(0, 0) * (*this)(1, 1) - (*this)(0, 1) * (*this)(1, 0)) / det;
+  return out;
+}
 
 template <int N, class T> Matrix<N, T> &Matrix<N, T>::operator+=(const Matrix<N, T> &mat)
 {
@@ -302,6 +330,89 @@ template <int N, class T> Matrix<N, std::complex<T>> conj(const Matrix<N, std::c
   return result;
 }
 
+/**
+ * @brief Replace a matrix with its traceless Hermitian projection.
+ *
+ * @param[in,out] m Matrix to project.
+ */
+template <typename real_t> void make_herm(Matrix<3, std::complex<real_t>> &m)
+{
+  auto anti_hermitian = conj(m) - m;
+  real_t trace = 0;
+  for (int i = 0; i < 3; i++) trace += anti_hermitian(i, i).imag();
+  for (int i = 0; i < 3; i++) anti_hermitian(i, i).imag(anti_hermitian(i, i).imag() - trace / 3);
+  m = std::complex<real_t>(0, static_cast<real_t>(0.5)) * anti_hermitian;
+}
+
+/**
+ * @brief Compute exp(i Q) for a traceless Hermitian SU(3) generator.
+ *
+ * @param[in] q Traceless Hermitian generator.
+ * @return Matrix exponential exp(i Q).
+ */
+template <typename real_t> Matrix<3, std::complex<real_t>> exponentiate_iQ(const Matrix<3, std::complex<real_t>> &q)
+{
+  using complex = std::complex<real_t>;
+  constexpr real_t inv3 = static_cast<real_t>(1.0 / 3.0);
+  constexpr real_t inv_pi = static_cast<real_t>(1.0 / M_PI);
+  constexpr real_t inv_3pi = static_cast<real_t>(1.0 / (3.0 * M_PI));
+
+  const auto q2 = q * q;
+  real_t c0 = q.determinant().real();
+  const real_t c1 = static_cast<real_t>(0.5) * trace(q2).real();
+  const real_t sqrt_c1_inv3 = std::sqrt(c1 * inv3);
+  const real_t c0_max = 2 * c1 * inv3 * sqrt_c1_inv3;
+  Matrix<3, complex> identity;
+  for (int i = 0; i < 3; i++) identity(i, i) = static_cast<real_t>(1.0);
+
+  if (c1 == 0) return identity;
+
+  int parity = 0;
+  if (c0 < 0) {
+    c0 = -c0;
+    parity = 1;
+  }
+
+  const real_t theta = std::acos(c0 / c0_max);
+  const real_t u = std::cos(theta * inv_3pi * static_cast<real_t>(M_PI)) * sqrt_c1_inv3;
+  const real_t w = std::sin(theta * inv_3pi * static_cast<real_t>(M_PI)) * std::sqrt(c1);
+  const real_t u_sq = u * u;
+  const real_t w_sq = w * w;
+  const real_t denom_inv = static_cast<real_t>(1.0) / (9 * u_sq - w_sq);
+  const real_t exp_iu_re = std::cos(u * inv_pi * static_cast<real_t>(M_PI));
+  const real_t exp_iu_im = std::sin(u * inv_pi * static_cast<real_t>(M_PI));
+  const real_t exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+  const real_t exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+  const real_t cos_w = std::cos(w * inv_pi * static_cast<real_t>(M_PI));
+  const real_t sinc_w = std::abs(w) < static_cast<real_t>(0.05) ?
+    static_cast<real_t>(1.0) - w_sq / 6 * (static_cast<real_t>(1.0) - w_sq * static_cast<real_t>(0.05)
+                                             * (static_cast<real_t>(1.0) - w_sq / 42
+                                                * (static_cast<real_t>(1.0) - w_sq / 72))) :
+    std::sin(w * inv_pi * static_cast<real_t>(M_PI)) / w;
+
+  real_t h_re = (u_sq - w_sq) * exp_2iu_re + 8 * u_sq * cos_w * exp_iu_re
+    + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_im;
+  real_t h_im = (u_sq - w_sq) * exp_2iu_im - 8 * u_sq * cos_w * exp_iu_im
+    + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_re;
+  complex f0(h_re * denom_inv, h_im * denom_inv);
+
+  h_re = 2 * u * exp_2iu_re - 2 * u * cos_w * exp_iu_re + (3 * u_sq - w_sq) * sinc_w * exp_iu_im;
+  h_im = 2 * u * exp_2iu_im + 2 * u * cos_w * exp_iu_im + (3 * u_sq - w_sq) * sinc_w * exp_iu_re;
+  complex f1(h_re * denom_inv, h_im * denom_inv);
+
+  h_re = exp_2iu_re - cos_w * exp_iu_re - 3 * u * sinc_w * exp_iu_im;
+  h_im = exp_2iu_im + cos_w * exp_iu_im - 3 * u * sinc_w * exp_iu_re;
+  complex f2(h_re * denom_inv, h_im * denom_inv);
+
+  if (parity) {
+    f0.imag(-f0.imag());
+    f1.real(-f1.real());
+    f2.imag(-f2.imag());
+  }
+
+  return f0 * identity + f1 * q + f2 * q2;
+}
+
 template <int N, class T> Matrix<N, T> transpose(const Matrix<N, std::complex<T>> &mat)
 {
   Matrix<N, T> result;
@@ -313,7 +424,7 @@ template <int N, class T> Matrix<N, T> transpose(const Matrix<N, std::complex<T>
 
 template <int N, class T> T trace(const Matrix<N, T> &mat)
 {
-  T tr;
+  T tr {};
   for (int i = 0; i < N; i++) tr += mat(i, i);
 
   return tr;
