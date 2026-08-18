@@ -1,3 +1,4 @@
+#include <cmath>
 #include <quda.h>
 #include <gauge_field.h>
 #include <qio_field.h>
@@ -5,6 +6,7 @@
 #include "command_line_params.h"
 #include "host_utils.h"
 #include "rng_utils.hpp"
+#include "force_utils.hpp"
 #include "gauge_utils.h"
 #include "index_utils.hpp"
 #include "instantiate_host.hpp"
@@ -419,6 +421,134 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
 void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision)
 {
   instantiate_host<ConstructRandomSU3GaugeField>(precision, gauge);
+}
+
+/**
+ * @brief Construct independent Gaussian SU(3) links by algebra projection and exponentiation.
+ *
+ * @tparam real_t Floating point type of the gauge field.
+ * @param[out] gauge Generated QDP-ordered gauge field.
+ * @param[in] width Gaussian width sigma applied to each matrix component.
+ */
+template <typename real_t> struct ConstructGaussianSU3GaugeField {
+  void operator()(void *const *gauge_, double width)
+  {
+    using complex = std::complex<real_t>;
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+
+    for (int dir = 0; dir < 4; dir++) {
+#pragma omp parallel for
+      for (int i = 0; i < Vh; i++) {
+        for (int parity = 0; parity < 2; parity++) {
+          Matrix<3, complex> matrix;
+          for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+              matrix(row, col)
+                = complex(random_gaussian_host<real_t>(i, parity, 0, width), random_gaussian_host<real_t>(i, parity, 0, width));
+            }
+          }
+          make_herm(matrix);
+          const auto link = exponentiate_iQ(matrix);
+
+          auto out = reinterpret_cast<complex *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
+          for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) { out[row * 3 + col] = link(row, col); }
+          }
+        }
+      }
+    }
+  }
+};
+
+void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision, double width)
+{
+  instantiate_host<ConstructGaussianSU3GaugeField>(precision, gauge, width);
+}
+
+const char *getGaugeInputStr(GaugeInputMode mode)
+{
+  switch (mode) {
+  case GaugeInputMode::HAAR: return "haar";
+  case GaugeInputMode::UNIT: return "unit";
+  case GaugeInputMode::GAUSSIAN_SU3: return "gaussian-su3";
+  case GaugeInputMode::LOAD: return "load";
+  }
+  errorQuda("Invalid gauge input mode %d", static_cast<int>(mode));
+  return "invalid";
+}
+
+GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
+{
+  const bool explicit_input = !gauge_input.empty();
+  const bool has_load = !latfile.empty();
+
+  if (explicit_input) {
+    GaugeInputMode mode = GaugeInputMode::HAAR;
+    if (gauge_input == "unit")
+      mode = GaugeInputMode::UNIT;
+    else if (gauge_input == "gaussian-su3")
+      mode = GaugeInputMode::GAUSSIAN_SU3;
+    else if (gauge_input == "load")
+      mode = GaugeInputMode::LOAD;
+
+    if (mode != GaugeInputMode::GAUSSIAN_SU3 && gauge_input_width_explicit) {
+      errorQuda("--gauge-input-width requires --gauge-input gaussian-su3");
+    }
+    if (mode != GaugeInputMode::LOAD && has_load) {
+      errorQuda("--load-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
+    }
+    if (mode != GaugeInputMode::UNIT && unit_gauge) {
+      errorQuda("--unit-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
+    }
+    if (mode == GaugeInputMode::LOAD && !has_load) { errorQuda("--gauge-input load requires --load-gauge"); }
+    if (mode == GaugeInputMode::GAUSSIAN_SU3 && (!std::isfinite(gauge_input_width) || gauge_input_width < 0)) {
+      errorQuda("--gauge-input-width must be finite and nonnegative");
+    }
+    return mode;
+  }
+
+  if (has_load) return GaugeInputMode::LOAD;
+  if (unit_gauge) return GaugeInputMode::UNIT;
+  return default_mode;
+}
+
+void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode)
+{
+  switch (resolveGaugeInputMode(default_mode)) {
+  case GaugeInputMode::HAAR:
+    constructRandomSU3GaugeField(gauge, gauge_param.cpu_prec);
+    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
+    break;
+  case GaugeInputMode::UNIT:
+    constructIdentityGaugeField(gauge, gauge_param.cpu_prec);
+    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
+    break;
+  case GaugeInputMode::GAUSSIAN_SU3:
+    constructGaussianSU3GaugeField(gauge, gauge_param.cpu_prec, gauge_input_width);
+    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
+    break;
+  case GaugeInputMode::LOAD:
+    logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
+    read_gauge_field(latfile.c_str(), (void **)gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
+    break;
+  }
+}
+
+void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode)
+{
+  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+    constructHostGaugeInputField(static_cast<void *const *>(gauge.raw_pointer()), gauge_param, argc, argv, default_mode);
+  } else {
+    GaugeFieldParam param(gauge);
+    param.order = QUDA_QDP_GAUGE_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField u(param);
+    constructHostGaugeInputField(static_cast<void *const *>(u.raw_pointer()), gauge_param, argc, argv, default_mode);
+    gauge = u;
+  }
 }
 
 /**

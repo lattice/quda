@@ -1,4 +1,5 @@
 #include "command_line_params.h"
+#include <cmath>
 #include <comm_quda.h>
 
 // parameters parsed from the command line
@@ -47,6 +48,9 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 std::string latfile;
 bool unit_gauge = false;
+std::string gauge_input;
+double gauge_input_width = 0.1;
+bool gauge_input_width_explicit = false;
 double gaussian_sigma = 0.2;
 std::string gauge_outfile;
 int Nsrc = 1;
@@ -561,6 +565,26 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
   quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
+  quda_app
+    ->add_option(
+      "--gauge-input", gauge_input,
+      "Gauge field input mode: haar, unit, gaussian-su3, or load (default: legacy --unit-gauge / --load-gauge selection)")
+    ->check(CLI::IsMember({"haar", "unit", "gaussian-su3", "load"}));
+  quda_app
+    ->add_option(
+      "--gauge-input-width",
+      [&](CLI::results_t res) {
+        gauge_input_width_explicit = true;
+        double width = 0;
+        if (!CLI::detail::lexical_cast(res[0], width)) return false;
+        if (!std::isfinite(width) || width < 0) {
+          throw CLI::ValidationError("--gauge-input-width", "expected a finite nonnegative value");
+        }
+        gauge_input_width = width;
+        return true;
+      },
+      "Gaussian width sigma for --gauge-input gaussian-su3 (default 0.1)")
+    ->type_name("FLOAT");
   quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
   quda_app->add_option("--mass", mass, "Mass of Dirac operator (default 0.1)");

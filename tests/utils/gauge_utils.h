@@ -12,6 +12,20 @@ using quda::GaugeFieldParam;
 // Local enums for gauge field construction types
 enum class GaugeFieldConstructionType { UNIT_GAUGE, RANDOM_GAUGE, LOAD_GAUGE };
 
+enum class GaugeInputMode { HAAR, UNIT, GAUSSIAN_SU3, LOAD };
+
+/**
+ * @brief Resolve the active gauge-input mode from command-line options.
+ */
+GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMode::HAAR);
+
+/**
+ * @brief Return the command-line name of a gauge-input mode.
+ *
+ * @param[in] mode Gauge-input mode.
+ */
+const char *getGaugeInputStr(GaugeInputMode mode);
+
 /**
  * @brief Constructs a QDP-ordered gauge field: either unit, random, or based on a file
  *
@@ -130,3 +144,34 @@ void addNoiseToGaugeField(void *const *gauge, double noise_max, QudaPrecision pr
  */
 void constructRandomGaugeField(void *const *gauge, const QudaGaugeParam &param, QudaPrecision precision,
                                QudaDslashType dslash_type = QUDA_WILSON_DSLASH);
+
+/**
+ * @brief Construct a gauge field from independent Gaussian SU(3) links.
+ *
+ * @param[out] gauge Generated QDP-ordered gauge field.
+ * @param[in] precision Gauge field floating point precision.
+ * @param[in] width Gaussian width sigma applied to each matrix component.
+ */
+void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision, double width);
+
+/**
+ * @brief Construct a host gauge field from the resolved gauge-input mode.
+ *
+ * @param[out] gauge Generated QDP-ordered gauge field.
+ * @param[in] gauge_param Information about the desired gauge field.
+ * @param[in] argc Input command-line argument count.
+ * @param[in] argv Input command-line arguments used when loading a file.
+ */
+void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode = GaugeInputMode::HAAR);
+
+/**
+ * @brief Construct a host gauge field from the resolved gauge-input mode.
+ *
+ * @param[out] gauge Generated gauge field.
+ * @param[in] gauge_param Information about the desired gauge field.
+ * @param[in] argc Input command-line argument count.
+ * @param[in] argv Input command-line arguments used when loading a file.
+ */
+void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode = GaugeInputMode::HAAR);

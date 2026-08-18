@@ -52,6 +52,11 @@ bool is_flow(QudaGaugeSmearType type)
   return type == QUDA_GAUGE_SMEAR_WILSON_FLOW || type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW;
 }
 
+GaugeInputMode default_gauge_input_mode()
+{
+  return enable_testing ? GaugeInputMode::GAUSSIAN_SU3 : GaugeInputMode::HAAR;
+}
+
 QudaGaugeObservableParam make_disabled_observables()
 {
   QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
@@ -105,7 +110,7 @@ struct GaugeSmearFields {
     gauge_param(make_gauge_param(precision, reconstruct)),
     input(make_field_param(gauge_param))
   {
-    createSiteLinkCPU(input, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+    constructHostGaugeInputField(input, gauge_param, 0, nullptr, default_gauge_input_mode());
     auto input_ptrs = input.data_array<void *>();
     loadGaugeQuda(input_ptrs.data, &gauge_param);
   }
@@ -401,6 +406,13 @@ struct gauge_smear_test : quda_test {
     default: errorQuda("Undefined gauge smear type %d", gauge_smear_type);
     }
     printfQuda(" - smearing ignore direction %d\n", gauge_smear_dir_ignore);
+    {
+      const auto input_mode = resolveGaugeInputMode(default_gauge_input_mode());
+      printfQuda(" - gauge input %s\n", getGaugeInputStr(input_mode));
+      if (input_mode == GaugeInputMode::GAUSSIAN_SU3) {
+        printfQuda(" - gauge input width %f\n", gauge_input_width);
+      }
+    }
     if (!enable_testing) {
       printfQuda(" - benchmark steps (--niter) %d\n", niter);
       printfQuda(" - one-step verification (--verify) %s\n", verify_results ? "enabled" : "disabled");
