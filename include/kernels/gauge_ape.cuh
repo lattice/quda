@@ -8,13 +8,15 @@
 namespace quda
 {
 
-  template <typename store_t, int nColor_, QudaReconstructType recon_, int apeDim_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int apeDim_, int prefetch_distance_>
   struct GaugeAPEArg : kernel_param<> {
     using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int apeDim = apeDim_;
+    static_assert(prefetch_distance_ >= 0 && prefetch_distance_ <= 4, "Invalid APE prefetch distance");
+    static constexpr int prefetch_distance = prefetch_distance_;
     typedef typename gauge_mapper<store_t, recon>::type Gauge;
 
     Gauge out;
@@ -67,7 +69,11 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
+      if constexpr (Arg::prefetch_distance == 0) {
+        computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
+      } else {
+        computeStaplePrefetch<Arg::prefetch_distance>(arg, x, X, parity, dir, Stap, arg.dir_ignore);
+      }
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);

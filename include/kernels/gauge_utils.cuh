@@ -77,6 +77,116 @@ namespace quda
     }
   }
 
+  /**
+   * @brief Prefetch the three links needed by a forward or backward staple.
+   */
+  template <bool forward, typename Arg, typename Int>
+  __device__ __forceinline__ void prefetchStapleTriplet(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                        const int mu, const int nu)
+  {
+    packed_array<int8_t, 4> dx = {};
+
+    if constexpr (forward) {
+      arg.in.template prefetch<PrefetchType::THREAD>(linkIndexShift(x, dx, X), mu, parity);
+
+      dx[mu]++;
+      arg.in.template prefetch<PrefetchType::THREAD>(linkIndexShift(x, dx, X), nu, 1 - parity);
+      dx[mu]--;
+
+      dx[nu]++;
+      arg.in.template prefetch<PrefetchType::THREAD>(linkIndexShift(x, dx, X), mu, 1 - parity);
+    } else {
+      dx[mu]--;
+      arg.in.template prefetch<PrefetchType::THREAD>(linkIndexShift(x, dx, X), mu, 1 - parity);
+      arg.in.template prefetch<PrefetchType::THREAD>(linkIndexShift(x, dx, X), nu, 1 - parity);
+
+      dx[nu]++;
+      arg.in.template prefetch<PrefetchType::THREAD>(linkIndexShift(x, dx, X), mu, parity);
+    }
+  }
+
+  /**
+   * @brief Prefetch the signed staple triplet a compile-time distance ahead.
+   */
+  template <int prefetch_distance, typename Arg, typename Int>
+  __device__ __forceinline__ void prefetchStapleAhead(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                       const int nu, const int dir_ignore, const int current_mu,
+                                                       const bool current_forward)
+  {
+    static_assert(prefetch_distance > 0 && prefetch_distance <= 4, "Invalid APE prefetch distance");
+
+    int inter = 2 * current_mu + (current_forward ? 0 : 1) + prefetch_distance;
+    const int first_excluded = nu < dir_ignore ? nu : dir_ignore;
+    const int second_excluded = nu < dir_ignore ? dir_ignore : nu;
+
+    // Each excluded direction contributes two skipped signed triplets.  Check
+    // in ascending direction order since skipping the first can cross the second.
+    if (first_excluded > current_mu && inter >= 2 * first_excluded) inter += 2;
+    if (second_excluded > current_mu && inter >= 2 * second_excluded) inter += 2;
+
+    const int future_mu = inter >> 1;
+    if (future_mu >= 4) return;
+    const bool future_forward = !(inter & 1);
+
+    if (future_forward)
+      prefetchStapleTriplet<true>(arg, x, X, parity, future_mu, nu);
+    else
+      prefetchStapleTriplet<false>(arg, x, X, parity, future_mu, nu);
+  }
+
+  /**
+   * @brief Prefetch-compatible APE staple computation.
+   */
+  template <int prefetch_distance, typename Arg, typename Staple, typename Int>
+  __host__ __device__ inline void computeStaplePrefetch(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                        const int nu, Staple &staple, const int dir_ignore)
+  {
+    static_assert(prefetch_distance > 0 && prefetch_distance <= 4, "Invalid APE prefetch distance");
+
+    using Link = typename get_type<Staple>::type;
+    staple = Link();
+
+    packed_array<int8_t, 4> dx = {};
+#pragma unroll
+    for (int mu = 0; mu < 4; mu++) {
+      auto coeff = mu == 3 ? arg.anisotropy * arg.anisotropy : static_cast<typename Arg::real>(1.0);
+
+      if (mu != nu && mu != dir_ignore) {
+        prefetchStapleAhead<prefetch_distance>(arg, x, X, parity, nu, dir_ignore, mu, true);
+
+        {
+          Link U1 = arg.in(mu, linkIndexShift(x, dx, X), parity);
+
+          dx[mu]++;
+          Link U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
+          dx[mu]--;
+
+          dx[nu]++;
+          Link U3 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
+          dx[nu]--;
+
+          staple = staple + coeff * U1 * U2 * conj(U3);
+        }
+
+        prefetchStapleAhead<prefetch_distance>(arg, x, X, parity, nu, dir_ignore, mu, false);
+
+        {
+          dx[mu]--;
+          Link U1 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
+          Link U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
+
+          dx[nu]++;
+          Link U3 = arg.in(mu, linkIndexShift(x, dx, X), parity);
+
+          dx[nu]--;
+          dx[mu]++;
+
+          staple = staple + coeff * conj(U1) * U2 * U3;
+        }
+      }
+    }
+  }
+
   // This function will get the three 2x1 rectangles and the central 1x1 square
   // that define the Symanzik staple around the link.
   //

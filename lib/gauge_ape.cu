@@ -4,10 +4,39 @@
 #include <instantiate.h>
 #include <kernels/gauge_ape.cuh>
 
+#include <cerrno>
+#include <cstdlib>
+
 namespace quda {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeAPE : TunableKernel3D
+  namespace {
+
+    int ape_prefetch_distance()
+    {
+      static const int distance = []() {
+        const char *env = getenv("QUDA_APE_PREFETCH_DISTANCE");
+        if (!env) return 0;
+
+        char *end = nullptr;
+        errno = 0;
+        const long value = strtol(env, &end, 10);
+        if (errno == ERANGE || end == env || *end != '\0' || value < 0 || value > 4) {
+          errorQuda("QUDA_APE_PREFETCH_DISTANCE=%s is invalid; expected an integer in [0,4]", env);
+        }
+        return static_cast<int>(value);
+      }();
+
+      return distance;
+    }
+
+  } // namespace
+
+  template <typename Float, int nColor, QudaReconstructType recon, int prefetch_distance_>
+  class GaugeAPE : TunableKernel3D
   {
+    static_assert(prefetch_distance_ >= 0 && prefetch_distance_ <= 4, "Invalid APE prefetch distance");
+    static constexpr int prefetch_distance = prefetch_distance_;
+
     GaugeField &out;
     const GaugeField &in;
     const Float alpha;
@@ -29,6 +58,8 @@ namespace quda {
     {
       strcat(aux, ",dir_ignore=");
       i32toa(aux + strlen(aux), dir_ignore);
+      strcat(aux, ",prefetch_distance=");
+      i32toa(aux + strlen(aux), prefetch_distance);
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
     }
@@ -37,9 +68,11 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (apeDim == 3) {
-        launch<APE>(tp, stream, GaugeAPEArg<Float, nColor, recon, 3>(out, in, alpha, dir_ignore, anisotropy));
+        launch<APE>(tp, stream,
+                    GaugeAPEArg<Float, nColor, recon, 3, prefetch_distance>(out, in, alpha, dir_ignore, anisotropy));
       } else if (apeDim == 4) {
-        launch<APE>(tp, stream, GaugeAPEArg<Float, nColor, recon, 4>(out, in, alpha, dir_ignore, anisotropy));
+        launch<APE>(tp, stream,
+                    GaugeAPEArg<Float, nColor, recon, 4, prefetch_distance>(out, in, alpha, dir_ignore, anisotropy));
       }
     }
 
@@ -63,6 +96,22 @@ namespace quda {
 
   }; // GaugeAPE
 
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeAPEDispatch
+  {
+  public:
+    GaugeAPEDispatch(GaugeField &out, const GaugeField &in, real_t alpha, int dir_ignore, real_t anisotropy)
+    {
+      switch (ape_prefetch_distance()) {
+      case 0: GaugeAPE<Float, nColor, recon, 0>(out, in, alpha, dir_ignore, anisotropy); break;
+      case 1: GaugeAPE<Float, nColor, recon, 1>(out, in, alpha, dir_ignore, anisotropy); break;
+      case 2: GaugeAPE<Float, nColor, recon, 2>(out, in, alpha, dir_ignore, anisotropy); break;
+      case 3: GaugeAPE<Float, nColor, recon, 3>(out, in, alpha, dir_ignore, anisotropy); break;
+      case 4: GaugeAPE<Float, nColor, recon, 4>(out, in, alpha, dir_ignore, anisotropy); break;
+      default: errorQuda("Unexpected APE prefetch distance %d", ape_prefetch_distance());
+      }
+    }
+  };
+
   void APEStep(GaugeField &out, GaugeField &in, real_t alpha, int dir_ignore, real_t smear_anisotropy)
   {
     checkPrecision(out, in);
@@ -74,7 +123,7 @@ namespace quda {
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugeAPE>(out, in, alpha, dir_ignore, smear_anisotropy);
+    instantiate<GaugeAPEDispatch>(out, in, alpha, dir_ignore, smear_anisotropy);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
