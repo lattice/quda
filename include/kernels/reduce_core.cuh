@@ -285,8 +285,8 @@ namespace quda
       real b[MAX_MULTI_RHS] = {};
       axpbyzNorm2(cvector<real_t> &a, cvector<real_t> &b)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i]);
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = static_cast<real>(b[i]);
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int j) const
       {
@@ -311,7 +311,7 @@ namespace quda
       real a[MAX_MULTI_RHS] = {};
       AxpyReDot(cvector<real_t> &a, cvector<real_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i]);
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &, int j) const
       {
@@ -337,8 +337,8 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpyNorm2(cvector<complex_t> &a, cvector<complex_t> &b)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &, int j) const
       {
@@ -427,7 +427,7 @@ namespace quda
       complex<real> a[MAX_MULTI_RHS] = {};
       caxpydotzy(cvector<complex_t> &a, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int j) const
       {
@@ -497,8 +497,8 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpbypzYmbwcDotProductUYNormY_(cvector<complex_t> &a, cvector<complex_t> &b)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T>
       __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v, int j) const
@@ -529,7 +529,7 @@ namespace quda
       real a[MAX_MULTI_RHS] = {};
       axpyCGNorm2(cvector<real_t> &a, cvector<real_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i]);
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &, int j) const
       {
@@ -676,7 +676,7 @@ namespace quda
       real a[MAX_MULTI_RHS] = {};
       quadrupleCG3InitNorm_(cvector<real_t> &a, cvector<real_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i]);
       }
       template <typename T>
       __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v, int j) const
@@ -712,8 +712,8 @@ namespace quda
       real b[MAX_MULTI_RHS] = {};
       quadrupleCG3UpdateNorm_(cvector<real_t> &a, cvector<real_t> &b)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-        for (auto i = 0u; i < a.size(); i++) this->b[i] = b[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i]);
+        for (auto i = 0u; i < b.size(); i++) this->b[i] = static_cast<real>(b[i]);
       }
       template <typename T>
       __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v, int j) const

@@ -1041,7 +1041,8 @@ namespace quda {
       real scale;
       real scale_inv;
       Reconstruct(const GaugeField &u) :
-        scale(isFixed<Float>::value ? u.LinkMax() : 1.0), scale_inv(isFixed<Float>::value ? 1.0 / scale : 1.0)
+        scale(isFixed<Float>::value ? static_cast<real>(u.LinkMax()) : static_cast<real>(1.0)),
+        scale_inv(isFixed<Float>::value ? static_cast<real>(1.0) / scale : static_cast<real>(1.0))
       {
       }
 
