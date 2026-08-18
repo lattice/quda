@@ -1660,8 +1660,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
     resize(acc2_odd, 4, accParam);
   }
 
-  double m_l, m_s, m_u, m_d, dl, ds, du, dd;
-  double zscale = 0.0, zscale2 = 0.0;
+  real_t m_l, m_s, m_u, m_d, dl, ds, du, dd;
+  real_t zscale = 0.0, zscale2 = 0.0;
 
   // Loop over eigenvectors
   for (int i = 0; i < n_evecs; i++) {

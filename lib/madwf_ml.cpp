@@ -90,7 +90,7 @@ namespace quda
 
     RNG rng(null_b, 2767);
 
-    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Generating Null Space Vectors ... \n"); }
+    logQuda(QUDA_VERBOSE, "Generating Null Space Vectors ... \n");
     spinorNoise(null_b, rng, QUDA_NOISE_GAUSS);
 
     csParam.setPrecision(prec_precondition);
@@ -114,12 +114,10 @@ namespace quda
     int count = 0;
     for (auto &phi : B) {
       residual += blas::norm2(phi);
-      if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("reference dslash norm %03d = %8.4e\n", count, blas::norm2(phi));
-      }
+      logQuda(QUDA_VERBOSE, "reference dslash norm %03d = %8.4e\n", count, blas::norm2(phi));
       count++;
     }
-    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("reference dslash norm = %8.4e\n", residual); }
+    logQuda(QUDA_VERBOSE, "reference dslash norm = %8.4e\n", residual);
 
     csParam.x[4] = Ls_base;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -145,12 +143,10 @@ namespace quda
 
     real_t pmu = 0.0;
 
-    transfer_float alpha;
+    real_t alpha;
     transfer_float b = 0.8;
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("beta          = %.3f\n", b);
-      printfQuda("training mu   = %.3f\n", mu);
-    }
+    logQuda(QUDA_VERBOSE, "beta          = %.3f\n", b);
+    logQuda(QUDA_VERBOSE, "training mu   = %.3f\n", mu);
 
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
     getProfile().TPSTART(QUDA_PROFILE_TRAINING);
@@ -240,25 +236,21 @@ namespace quda
         }
       }
 
-      axpby(device_param, 0.0f, device_param, -alpha, P);
+      axpby(device_param, 0.0f, device_param, static_cast<transfer_float>(-alpha), P);
       if (tune_suppressor) { mu -= alpha * pmu; }
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("grad min iter %05d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
-                   iteration, chi2, chi2 / residual, alpha, mu);
-      }
+      logQuda(QUDA_SUMMARIZE, "grad min iter %05d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n",
+              comm_rank(), iteration, chi2, chi2 / residual, alpha, mu);
     }
 
     trained = true;
 
-    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training finished ...\n"); }
+    logQuda(QUDA_VERBOSE, "Training finished ...\n");
     count = 0;
     for (auto &phi : B) {
       real_t ind_chi2 = cost(ref, base, chi, phi);
       real_t phi2 = blas::norm2(phi);
-      if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, phi2);
-      }
+      logQuda(QUDA_VERBOSE, "chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, phi2);
       count++;
     }
 
@@ -295,7 +287,7 @@ namespace quda
       errorQuda("Unable to write trained parameters to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
                 host_param.size());
     }
-    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Trained parameters saved to %s ...\n", save_param_path.c_str()); }
+    logQuda(QUDA_VERBOSE, "Trained parameters saved to %s ...\n", save_param_path.c_str());
   }
 
   void MadwfAcc::load_parameter(int Ls, int Ls_base)
@@ -311,7 +303,7 @@ namespace quda
     auto search_cache = host_training_param_cache.find(param_file_name_str);
     if (search_cache != host_training_param_cache.end()) {
       host_param = search_cache->second;
-      if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training params loaded from CACHE.\n"); }
+      logQuda(QUDA_VERBOSE, "Training params loaded from CACHE.\n");
     } else {
       // the parameter is not in cache: load from file system.
       std::string save_param_path(param.madwf_param_infile);
@@ -327,7 +319,7 @@ namespace quda
       host_training_param_cache.insert({param_file_name_str, host_param});
       printf("Rank %05d: Training params loaded from FILE %s ... \n", comm_rank(), save_param_path.c_str());
       comm_barrier();
-      if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("All ranks loaded.\n"); }
+      logQuda(QUDA_VERBOSE, "All ranks loaded.\n");
     }
     device_param.resize(param_size); // 2 for complex
     device_param.from_host(host_param);

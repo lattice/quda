@@ -39,10 +39,10 @@ namespace quda {
 
   struct SortedEvals {
 
-    double _val;
+    real_t _val;
     int _idx;
 
-    SortedEvals(double val, int idx) : _val(val), _idx(idx) {};
+    SortedEvals(real_t val, int idx) : _val(val), _idx(idx) {};
     static bool SelectSmall(SortedEvals v1, SortedEvals v2) { return (v1._val < v2._val); }
   };
 
@@ -310,7 +310,7 @@ namespace quda {
 
     std::unique_ptr<complex_t[]> givensH((do_givens) ? new complex_t[(args.m + 1) * args.m] : nullptr);
     std::unique_ptr<complex_t[]> cn((do_givens) ? new complex_t[args.m] : nullptr);
-    std::unique_ptr<double[]> sn((do_givens) ? new double[args.m] : nullptr);
+    std::unique_ptr<real_t[]> sn((do_givens) ? new real_t[args.m] : nullptr);
 
     complex_t c0 = args.c[0];
 
