@@ -703,54 +703,48 @@ namespace quda
       }
     }
 
-    std::vector<std::pair<complex_t, complex_t>> array(n);
-    for (int i = 0; i < n; i++) array[i] = {x[i], y[i]};
+    // Sort indices rather than (x, y) pairs so std::sort never passes
+    // pair<complex_t, complex_t> by value (GCC -Wpsabi on _Float128).
+    std::vector<int> idx(n);
+    for (int i = 0; i < n; i++) idx[i] = i;
 
     switch (spec_type) {
     case QUDA_SPECTRUM_LM_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<complex_t, complex_t> &a, const std::pair<complex_t, complex_t> &b) {
-                  return (abs(a.first) < abs(b.first));
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return abs(x[i]) < abs(x[j]); });
       break;
     case QUDA_SPECTRUM_SM_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<complex_t, complex_t> &a, const std::pair<complex_t, complex_t> &b) {
-                  return (abs(a.first) > abs(b.first));
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return abs(x[i]) > abs(x[j]); });
       break;
     case QUDA_SPECTRUM_LR_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<complex_t, complex_t> &a, const std::pair<complex_t, complex_t> &b) {
-                  return (a.first).real() < (b.first).real();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].real() < x[j].real(); });
       break;
     case QUDA_SPECTRUM_SR_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<complex_t, complex_t> &a, const std::pair<complex_t, complex_t> &b) {
-                  return (a.first).real() > (b.first).real();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].real() > x[j].real(); });
       break;
     case QUDA_SPECTRUM_LI_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<complex_t, complex_t> &a, const std::pair<complex_t, complex_t> &b) {
-                  return (a.first).imag() < (b.first).imag();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].imag() < x[j].imag(); });
       break;
     case QUDA_SPECTRUM_SI_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<complex_t, complex_t> &a, const std::pair<complex_t, complex_t> &b) {
-                  return (a.first).imag() > (b.first).imag();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].imag() > x[j].imag(); });
       break;
     default: errorQuda("Undefined spectrum type %d given", spec_type);
     }
 
-    // Repopulate x and y arrays with sorted elements
+    std::vector<complex_t> x_sorted(n), y_sorted(n);
     for (int i = 0; i < n; i++) {
-      x[i] = array[i].first;
-      y[i] = array[i].second;
+      x_sorted[i] = x[idx[i]];
+      y_sorted[i] = y[idx[i]];
     }
+    // n may be a prefix (e.g. num_shifts < residua.size()); only
+    // exchange the whole vector when sizes match.
+    if (static_cast<int>(x.size()) == n)
+      x.swap(x_sorted);
+    else
+      std::move(x_sorted.begin(), x_sorted.end(), x.begin());
+    if (static_cast<int>(y.size()) == n)
+      y.swap(y_sorted);
+    else
+      std::move(y_sorted.begin(), y_sorted.end(), y.begin());
   }
 
   // Overloaded version of sortArrays to deal with real y array.
