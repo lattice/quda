@@ -4043,7 +4043,6 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
     return w;
   };
 
-  const double tol_restart = param.tol_restart > 0.0 ? param.tol_restart : 1e-1;
   const int max_cycles = 100;                         // guard
 
   int total_iters = 0;
@@ -4060,9 +4059,8 @@ static int run_deflated_cycles(std::vector<ColorSpinorField> &out, std::vector<C
   // up to max_cycles * maxiter.
   while (!converged(r2) && cycle < max_cycles && total_iters < param.maxiter) {
 
-    // knock the worst per-RHS relative residual down ~one tol_restart decade,
-    // never past the final tolerance.
-    const double tol_cycle = std::max(param.tol, worst_rel(r2) * tol_restart);
+    // knock the worst per-RHS relative residual down ~one param.tol_restart decade
+    const double tol_cycle = std::max(param.tol, worst_rel(r2) * param.tol_restart);
 
     // Count CG segments, not re-deflations: `cycle` below is incremented only when the
     // loop goes round again, so it misses the final (converged) segment. The cost
