@@ -24,7 +24,7 @@ namespace quda {
     GaugePhaseArg(GaugeField &u) :
       kernel_param(dim3(u.VolumeCB(), 2, 1)),
       u(u),
-      i_mu(u.iMu())
+      i_mu(static_cast<Float>(u.iMu()))
     {
       // if staggered phases are applied, then we are removing them
       // else we are applying them

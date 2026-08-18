@@ -434,8 +434,11 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       cabxpyAx_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i].real();
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = a[i].real() * b[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i].real());
+        for (auto i = 0u; i < b.size(); i++) {
+          const complex_t ab = a[i].real() * b[i];
+          this->b[i] = {static_cast<real>(ab.real()), static_cast<real>(ab.imag())};
+        }
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &, int j) const
       {

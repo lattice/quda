@@ -134,8 +134,8 @@ namespace quda
       baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), x(x), y(y)
     {
       if (x.X(3) > MAX_ORTHO_DIM) errorQuda("Orthogonal dimension %d exceeds maximum %d", x.X(3), MAX_ORTHO_DIM);
-      for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-      for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i]);
+      for (auto i = 0u; i < b.size(); i++) this->b[i] = static_cast<real>(b[i]);
     }
   };
 
@@ -189,8 +189,8 @@ namespace quda
       baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), x(x), y(y)
     {
       if (x.X(3) > MAX_ORTHO_DIM) errorQuda("Orthogonal dimension %d exceeds maximum %d", x.X(3), MAX_ORTHO_DIM);
-      for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-      for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+      for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
     }
   };
 

@@ -367,8 +367,8 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       cabxpyzaxnorm(cvector<complex_t> &a, cvector<complex_t> &b)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i].real();
-        for (auto i = 0u; i < a.size(); i++) this->b[i] = b[i];
+        for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i].real());
+        for (auto i = 0u; i < a.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int j) const
       {
