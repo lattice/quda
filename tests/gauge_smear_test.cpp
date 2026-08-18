@@ -162,15 +162,10 @@ struct SmearMetrics {
   unsigned long long bytes;
 };
 
-SmearMetrics benchmark(QudaPrecision precision, QudaGaugeSmearParam smear_param,
-                       QudaReconstructType reconstruct = QUDA_RECONSTRUCT_INVALID)
+SmearMetrics measure_smear(QudaGaugeSmearParam smear_param, unsigned int n_steps)
 {
-  GaugeSmearFields fields(precision, reconstruct);
-
-  auto warmup_param = smear_param;
-  warmup_param.n_steps = 1;
-  warmup_param.meas_interval = 2;
-  run_smear(warmup_param);
+  smear_param.n_steps = n_steps;
+  smear_param.meas_interval = n_steps + 1; // suppress in-loop measurements so only the fixed initial observable runs
 
   const auto flops0 = quda::Tunable::flops_global();
   const auto bytes0 = quda::Tunable::bytes_global();
@@ -184,19 +179,40 @@ SmearMetrics benchmark(QudaPrecision precision, QudaGaugeSmearParam smear_param,
   return {timer.last(), quda::Tunable::flops_global() - flops0, quda::Tunable::bytes_global() - bytes0};
 }
 
+// Isolate the marginal per-step smearing cost by finite-differencing two runs. The public entry point bundles a
+// one-time extended-field build (the CopyGauge/GhostExtractor kernels that copy gaugePrecise into the halo'd field)
+// with the step loop, and that build is constant per call regardless of n_steps. Differencing two calls therefore
+// cancels it exactly, leaving only the work that scales with n_steps: the smear stencil plus its per-step extended
+// boundary refresh (and, when partitioned, the halo pack/exchange). The disabled observables contribute nothing. This
+// differential replaces the usual "time only the kernel in a loop" harness, which isn't possible here because the
+// extension cannot be hoisted out of the measured call through the public interface.
+SmearMetrics benchmark(QudaPrecision precision, QudaGaugeSmearParam smear_param,
+                       QudaReconstructType reconstruct = QUDA_RECONSTRUCT_INVALID)
+{
+  GaugeSmearFields fields(precision, reconstruct);
+
+  const auto steps = smear_param.n_steps;
+
+  auto warmup = smear_param; // tune the extension and smear kernels before any measured run
+  warmup.n_steps = 1;
+  warmup.meas_interval = 2;
+  run_smear(warmup);
+
+  const auto lo = measure_smear(smear_param, 1);
+  const auto hi = measure_smear(smear_param, steps + 1);
+  return {hi.seconds - lo.seconds, hi.flops - lo.flops, hi.bytes - lo.bytes};
+}
+
 void report_benchmark(QudaGaugeSmearType type, int n_steps, const SmearMetrics &metrics)
 {
   const auto steps = static_cast<double>(n_steps);
-  const auto flops_per_step = metrics.flops / n_steps;
-  const auto bytes_per_step = metrics.bytes / n_steps;
   const auto gflops = 1e-9 * metrics.flops / metrics.seconds;
   const auto gbytes = 1e-9 * metrics.bytes / metrics.seconds;
   const auto intensity = metrics.bytes == 0 ? 0.0 : static_cast<double>(metrics.flops) / metrics.bytes;
 
-  printfQuda("%s benchmark: %.3f us per step\n", get_gauge_smear_str(type), 1e6 * metrics.seconds / steps);
-  printfQuda("Accounted FLOPs: %llu total, %llu per step\n", metrics.flops, flops_per_step);
-  printfQuda("Accounted bytes: %llu total, %llu per step\n", metrics.bytes, bytes_per_step);
-  printfQuda("Accounted performance: %.3f GFLOP/s, %.3f GB/s, %.3f FLOP/byte\n", gflops, gbytes, intensity);
+  printfQuda("%s kernel benchmark: %.3f us/step, %llu FLOPs/step, %llu bytes/step\n", get_gauge_smear_str(type),
+             1e6 * metrics.seconds / steps, metrics.flops / n_steps, metrics.bytes / n_steps);
+  printfQuda("Kernel performance: %.3f GFLOP/s, %.3f GB/s, %.3f FLOP/byte\n", gflops, gbytes, intensity);
 }
 
 const char *reconstruct_label(QudaReconstructType reconstruct)
