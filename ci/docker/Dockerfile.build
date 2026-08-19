@@ -77,8 +77,12 @@ RUN wget -q https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPIC
 
 RUN echo "${MPICH_PATH}/lib" >> /etc/ld.so.conf.d/cscs.conf && ldconfig
 
-# Drop the build-time CUDA driver stub now that the CUDA-aware builds are done.
-RUN rm /etc/ld.so.conf.d/cuda-stubs.conf && ldconfig
+# NOTE: the CUDA driver stub registered above must stay in place until after
+# QUDA itself is built: QUDA's own binaries link through mpicc/mpicxx, and
+# those wrappers now carry -lcuda (since MPICH was configured --with-cuda),
+# so both CMake's find_package(MPI) compiler probe and the final QUDA link
+# step need -lcuda to resolve. It is removed at the very end of this file,
+# once nothing further needs to link against CUDA.
 
 COPY . /quda/src
 
@@ -102,3 +106,8 @@ RUN  QUDA_TEST_GRID_SIZE=$QUDA_TEST_GRID_SIZE cmake -S /quda/src \
 RUN cmake --build /quda/build -j ${BUILD_JOBS}
 
 RUN cmake --install /quda/build
+
+# Drop the build-time CUDA driver stub now that everything that needed to
+# link against CUDA (libfabric, MPICH, QUDA) is built. The real driver is
+# injected by the container engine at run time.
+RUN rm /etc/ld.so.conf.d/cuda-stubs.conf && ldconfig
