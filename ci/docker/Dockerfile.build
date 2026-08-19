@@ -13,21 +13,72 @@ RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
     wget \
     ninja-build \
     git \
-    ca-certificates && \
+    ca-certificates \
+    automake \
+    autoconf \
+    libtool \
+    pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
-ARG MPICH_VERSION=3.3.2
+# CSCS Alps/Daint GH200 nodes expose the Slingshot interconnect to containers
+# via a container-engine "CXI hook" that swaps in the host's libfabric/xpmem
+# stack at *runtime*. That only works if the MPI inside the image was itself
+# built against libfabric+xpmem (ch4:ofi), matching CSCS's documented MPICH
+# recipe (https://docs.cscs.ch/software/communication/mpich/). We deliberately
+# avoid bind-mounting any host Cray Programming Environment paths here, since
+# those are an internal implementation detail that CSCS has changed before
+# (see git history) and will change again.
+
+# xpmem: shared-memory intra-node transport, used by libfabric/MPICH.
+RUN git clone --depth 1 https://github.com/hpc/xpmem && \
+    cd xpmem/lib && \
+    gcc -I../include -shared -o libxpmem.so.1 libxpmem.c && \
+    ln -s libxpmem.so.1 libxpmem.so && \
+    mv libxpmem.so* /usr/lib && \
+    cp ../include/xpmem.h /usr/include/ && \
+    ldconfig && \
+    cd ../.. && rm -rf xpmem
+
+# The image is built without a GPU/driver present, so register the CUDA
+# driver *stub* library that ships with the "devel" base image. This lets
+# libfabric's and MPICH's configure/build-time CUDA checks resolve -lcuda.
+# The real driver is injected by the container engine at run time, so this
+# entry is removed again once the CUDA-aware builds below are done.
+RUN echo '/usr/local/cuda/lib64/stubs' > /etc/ld.so.conf.d/cuda-stubs.conf && ldconfig
+
+# libfabric with CUDA support, needed for GPU-aware (HMEM) transfers over CXI.
+ARG LIBFABRIC_VERSION=1.22.0
+RUN wget -q https://github.com/ofiwg/libfabric/archive/refs/tags/v${LIBFABRIC_VERSION}.tar.gz && \
+    tar xf v${LIBFABRIC_VERSION}.tar.gz && \
+    cd libfabric-${LIBFABRIC_VERSION} && \
+    ./autogen.sh && \
+    ./configure --prefix=/usr --with-cuda=/usr/local/cuda && \
+    make -j${BUILD_JOBS} && \
+    make install && \
+    ldconfig && \
+    cd .. && rm -rf v${LIBFABRIC_VERSION}.tar.gz libfabric-${LIBFABRIC_VERSION}
+
+# MPICH built against the libfabric/xpmem stack above (ch4:ofi), with CUDA
+# support so GPU buffers can be passed directly to MPI calls.
+ARG MPICH_VERSION=4.3.1
 ARG MPICH_PATH=/usr/local/mpich
 RUN wget -q https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPICH_VERSION}.tar.gz && \
     tar -xzf mpich-${MPICH_VERSION}.tar.gz && \
     cd mpich-${MPICH_VERSION} && \
     ./configure \
     --disable-fortran \
+    --with-device=ch4:ofi \
+    --with-libfabric=/usr \
+    --with-xpmem=/usr \
+    --with-cuda=/usr/local/cuda \
     --prefix=$MPICH_PATH && \
     make install -j${BUILD_JOBS} && \
-    rm -rf /root/mpich-${MPICH_VERSION}.tar.gz /root/mpich-${MPICH_VERSION}
+    cd .. && rm -rf mpich-${MPICH_VERSION}.tar.gz mpich-${MPICH_VERSION}
 
 RUN echo "${MPICH_PATH}/lib" >> /etc/ld.so.conf.d/cscs.conf && ldconfig
+
+# Drop the build-time CUDA driver stub now that the CUDA-aware builds are done.
+RUN rm /etc/ld.so.conf.d/cuda-stubs.conf && ldconfig
 
 COPY . /quda/src
 

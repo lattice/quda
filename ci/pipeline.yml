@@ -19,13 +19,10 @@ test_job:
   extends: .container-runner-daint-gh200
   image: $PERSIST_IMAGE_NAME
   script:
-    - export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
-    - export LD_PRELOAD=/usr/lib64/libmpi_gtl_cuda.so
     - if [[ $SLURM_LOCALID == "0" ]]; then rm -rf /quda/build/Testing && ln -s /dev/shm /quda/build/Testing; fi
     - sleep 1
     - ctest --test-dir /quda/build/ --output-on-failure
   variables:
-    CRAY_CUDA_MPS: 0
     NVIDIA_VISIBLE_DEVICES: all
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4
@@ -34,5 +31,8 @@ test_job:
     USE_MPI: "YES"
     QUDA_ENABLE_TUNING: 0
     QUDA_RESOURCE_PATH: .
-    SLURM_MPI_TYPE: cray_shasta
-    CSCS_ADDITIONAL_MOUNTS: '["/opt/cray/pe/mpich/8.1.28/ofi/gnu/12.3/lib/libmpi.so:/usr/local/mpich/lib/libmpi.so.12.1.8", "/opt/cray/pe/lib64/libpmi.so.0:/usr/lib64/libpmi.so.0", "/opt/cray/pe/lib64/libpmi2.so.0:/usr/lib64/libpmi2.so.0",  "/opt/cray/pals/1.4/lib/libpals.so.0:/usr/lib64/libpals.so.0",  "/usr/lib64/libgfortran.so.5:/usr/lib64/libgfortran.so.5", "/opt/cray/pe/mpich/8.1.28/gtl/lib/libmpi_gtl_cuda.so:/usr/lib64/libmpi_gtl_cuda.so"]'
+    # Our MPICH is built against libfabric+xpmem (ch4:ofi), so it can be
+    # launched with plain PMI-2 rather than depending on the Cray PALS/
+    # cray_shasta plugin or any host-mounted Cray PE libraries.
+    SLURM_MPI_TYPE: pmi2
+    MPIR_CVAR_CH4_OFI_ENABLE_HMEM: 1
