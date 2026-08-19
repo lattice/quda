@@ -88,12 +88,26 @@ COPY . /quda/src
 
 ENV QUDA_TEST_GRID_SIZE="1 1 2 2"
 
+# ctest runs ~130 short-lived MPI test binaries back-to-back. Slurm's PMI-2
+# plugin only supports a single MPI_Init/MPI_Finalize cycle per srun step
+# (a second PMI2_Init is treated by slurmstepd as an invalid request and the
+# connection is torn down -- see src/plugins/mpi/pmi2/pmi2.c), so we can't
+# let each test binary rendezvous via the ambient srun/PMI2 environment the
+# way the outer CI job step is launched (that works for exactly one test,
+# then every subsequent one dies with SIGPIPE). Instead, QUDA_CTEST_LAUNCH
+# wraps every test in our own `mpirun` (MPICH's Hydra process manager),
+# forced to use its "fork" launcher and "user" resource-management kernel so
+# it never shells out to Slurm at all: Hydra manages process lifecycle
+# locally and can be invoked as many times in a row as needed. The process
+# count here mirrors QUDA_TEST_GRID_SIZE's product (1*1*2*2 = 4) below; the
+# CI job's driver script (ci/pipeline.yml) only runs ctest on one rank, so
+# there is no outer MPI job for Hydra to conflict with.
 RUN  QUDA_TEST_GRID_SIZE=$QUDA_TEST_GRID_SIZE cmake -S /quda/src \
     -DCMAKE_CUDA_COMPILER=nvcc \
     -DCMAKE_CXX_COMPILER=/usr/local/mpich/bin/mpicxx \
     -DCMAKE_C_COMPILER=/usr/local/mpich/bin/mpicc \
     -DCMAKE_BUILD_TYPE=STRICT \
-    -DQUDA_CTEST_LAUNCH="" \
+    -DQUDA_CTEST_LAUNCH="/usr/local/mpich/bin/mpirun;-launcher;fork;-rmk;user;-np;4" \
     -DQUDA_GPU_ARCH=sm_90 \
     -DQUDA_MULTIGRID=ON \
     -DQUDA_MULTIGRID_NVEC_LIST=6 \

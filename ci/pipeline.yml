@@ -21,7 +21,14 @@ test_job:
   script:
     - if [[ $SLURM_LOCALID == "0" ]]; then rm -rf /quda/build/Testing && ln -s /dev/shm /quda/build/Testing; fi
     - sleep 1
-    - ctest --test-dir /quda/build/ --output-on-failure
+    # Only rank 0 of this step runs ctest at all. Each test binary gets its
+    # own self-contained MPI world via QUDA_CTEST_LAUNCH's `mpirun -launcher
+    # fork` (see ci/docker/Dockerfile.build) instead of joining the ambient
+    # srun/PMI2 environment of this step, since Slurm's PMI-2 plugin can't
+    # support the ~130 sequential MPI_Init/MPI_Finalize cycles ctest performs
+    # within one step (only the first one succeeds; every later test dies
+    # with SIGPIPE as slurmstepd tears down the stale PMI2 connection).
+    - if [[ $SLURM_LOCALID == "0" ]]; then ctest --test-dir /quda/build/ --output-on-failure; fi
   variables:
     NVIDIA_VISIBLE_DEVICES: all
     SLURM_JOB_NUM_NODES: 1
@@ -33,6 +40,9 @@ test_job:
     QUDA_RESOURCE_PATH: .
     # Our MPICH is built against libfabric+xpmem (ch4:ofi), so it can be
     # launched with plain PMI-2 rather than depending on the Cray PALS/
-    # cray_shasta plugin or any host-mounted Cray PE libraries.
+    # cray_shasta plugin or any host-mounted Cray PE libraries. This only
+    # matters for this outer step launch itself now (rank 0 vs. idle ranks);
+    # the actual test binaries are launched by Hydra's own "fork" launcher,
+    # not via this PMI2 wire-up (see the script above).
     SLURM_MPI_TYPE: pmi2
     MPIR_CVAR_CH4_OFI_ENABLE_HMEM: 1
