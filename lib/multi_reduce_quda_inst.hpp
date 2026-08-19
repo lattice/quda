@@ -24,7 +24,7 @@ namespace quda
       void reDotProduct_t(std::vector<real_t> &result, cvector_ref<const ColorSpinorField> &x,
                           cvector_ref<const ColorSpinorField> &y)
       {
-        if constexpr (reduce_prec_enabled<store_t>()) {
+        if constexpr (multi_reduce_prec_enabled<store_t>()) {
           init_reduce_store<store_t>();
           reDotProduct_impl<store_t>(result, x, y);
         } else {
@@ -36,7 +36,7 @@ namespace quda
       void cDotProduct_t(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                          cvector_ref<const ColorSpinorField> &y)
       {
-        if constexpr (reduce_prec_enabled<store_t>()) {
+        if constexpr (multi_reduce_prec_enabled<store_t>()) {
           init_reduce_store<store_t>();
           cDotProduct_impl<store_t>(result, x, y);
         } else {
@@ -48,7 +48,7 @@ namespace quda
       void hDotProduct_t(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                          cvector_ref<const ColorSpinorField> &y)
       {
-        if constexpr (reduce_prec_enabled<store_t>()) {
+        if constexpr (multi_reduce_prec_enabled<store_t>()) {
           init_reduce_store<store_t>();
           hDotProduct_impl<store_t>(result, x, y);
         } else {
@@ -60,7 +60,7 @@ namespace quda
       void hDotProduct_Anorm_t(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                                cvector_ref<const ColorSpinorField> &y)
       {
-        if constexpr (reduce_prec_enabled<store_t>()) {
+        if constexpr (multi_reduce_prec_enabled<store_t>()) {
           init_reduce_store<store_t>();
           hDotProduct_Anorm_impl<store_t>(result, x, y);
         } else {

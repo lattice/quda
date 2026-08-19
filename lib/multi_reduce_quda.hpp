@@ -140,24 +140,28 @@ namespace quda
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
-          using device_store_t = typename device_type_mapper<store_t>::type;
-          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
-          using device_real_t = typename mapper<device_y_store_t>::type;
-          Reducer<device_reduce_t, device_real_t> r_(NXZ, NYW);
+          // multi-reduce has no CPU fallback (see the errorQuda below), so unlike
+          // Reduce/Blas there is no reason to instantiate anything here at all when
+          // either side is a disabled double precision: just error out at compile time
+          // rather than redundantly compiling a device kernel already built for
+          // whichever precision is actually enabled.
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
+                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+            errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+          } else {
+            if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
+            using device_real_t = typename mapper<y_store_t>::type;
+            Reducer<device_reduce_t, device_real_t> r_(NXZ, NYW);
 
-          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll
-            = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
-          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
-          constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
-          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int length = x0.Length() / M;
+            constexpr int N = n_vector<store_t, true>(nSpin, site_unroll_check);
+            constexpr int Ny = n_vector<y_store_t, true>(nSpin, site_unroll_check);
+            constexpr int M = site_unroll_check ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+            const int length = x0.Length() / M;
 
-          MultiReduceArg<device_real_t, M, NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(
-            x, y, z, w, r_, NYW, length, nParity);
+            MultiReduceArg<device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW,
+                                                                                                length, nParity);
 
-          std::vector<host_reduce_t> result_(NXZ * arg.NYW);
+            std::vector<host_reduce_t> result_(NXZ * arg.NYW);
 
 #if 0 // no parameters to set so far
           constexpr bool multi_1d = false;
@@ -165,15 +169,15 @@ namespace quda
           if (b.size()) { set_param<multi_1d>(arg, 'b', b); }
           if (c.size()) { set_param<multi_1d>(arg, 'c', c); }
 #endif
-          launch<MultiReduce_>(result_, tp, stream, arg);
+            launch<MultiReduce_>(result_, tp, stream, arg);
 
-          // need to transpose for same order with vector thread reduction
-          for (int i = 0; i < NXZ; i++) {
-            for (int j = 0; j < arg.NYW; j++) {
-              assign_multi_reduce_result(result[i * arg.NYW + j], result_[j * NXZ + i]);
+            // need to transpose for same order with vector thread reduction
+            for (int i = 0; i < NXZ; i++) {
+              for (int j = 0; j < arg.NYW; j++) {
+                assign_multi_reduce_result(result[i * arg.NYW + j], result_[j * NXZ + i]);
+              }
             }
           }
-
         } else {
           errorQuda("Only implemented for GPU fields");
         }

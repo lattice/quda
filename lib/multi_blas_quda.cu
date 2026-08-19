@@ -144,45 +144,54 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
-          using device_store_t = typename device_type_mapper<store_t>::type;
-          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
-          using device_real_t = typename mapper<device_y_store_t>::type;
-          Functor<device_real_t> f_(NXZ, NYW);
-
-          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
-          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
-          constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
-          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int length = x[0].Length() / (nParity * M);
-
-          if (tp.aux.x > 1 && (length * tp.aux.x) % device::warp_size() != 0) {
-            // if problem size isn't divisible by the warp size then we can't use warp splitting
-            launchError() = QUDA_ERROR;
+          // multi-blas has no CPU fallback (see the errorQuda below), so unlike
+          // Reduce/Blas there is no reason to instantiate anything here at all when
+          // either side is a disabled double precision: just error out at compile time
+          // rather than redundantly compiling a device kernel already built for
+          // whichever precision is actually enabled.
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
+                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+            errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
           } else {
-            tp.block.x *= tp.aux.x; // include warp-split factor
-            switch (tp.aux.x) {
-            case 1:
-              Launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
-                     device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-              break;
-            case 2:
-              if constexpr (enable_warp_split()) {
-                Launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
-                       device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-                break;
-              }
-            case 4:
-              if constexpr (enable_warp_split()) {
-                Launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
-                       device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-                break;
-              }
-            default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
-            }
+            if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
+            using device_real_t = typename mapper<y_store_t>::type;
+            Functor<device_real_t> f_(NXZ, NYW);
 
-            tp.block.x /= tp.aux.x; // restore block size
+            constexpr int N = n_vector<store_t, true>(nSpin, site_unroll_check);
+            constexpr int Ny = n_vector<y_store_t, true>(nSpin, site_unroll_check);
+            constexpr int M = site_unroll_check ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+            const int length = x[0].Length() / (nParity * M);
+
+            if (tp.aux.x > 1 && (length * tp.aux.x) % device::warp_size() != 0) {
+              // if problem size isn't divisible by the warp size then we can't use warp splitting
+              launchError() = QUDA_ERROR;
+            } else {
+              tp.block.x *= tp.aux.x; // include warp-split factor
+              switch (tp.aux.x) {
+              case 1:
+                Launch(tp, stream,
+                       MultiBlasArg<1, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(
+                         x, y, z, w, f_, NYW, length));
+                break;
+              case 2:
+                if constexpr (enable_warp_split()) {
+                  Launch(tp, stream,
+                         MultiBlasArg<2, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(
+                           x, y, z, w, f_, NYW, length));
+                  break;
+                }
+              case 4:
+                if constexpr (enable_warp_split()) {
+                  Launch(tp, stream,
+                         MultiBlasArg<4, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(
+                           x, y, z, w, f_, NYW, length));
+                  break;
+                }
+              default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
+              }
+
+              tp.block.x /= tp.aux.x; // restore block size
+            }
           }
         } else {
           errorQuda("Only implemented for GPU fields");

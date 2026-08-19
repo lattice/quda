@@ -27,6 +27,14 @@ namespace quda
       return is_enabled(store_prec_v<store_t>);
     }
 
+    // Unlike reduce_prec_enabled, multi-reduce has no CPU-field fallback
+    // (see the `errorQuda("Only implemented for GPU fields")` in
+    // MultiReduce::compute), so there is no reason to keep double
+    // artificially "enabled" here: doing so only forces
+    // multi_reduce_quda_double.cu to redundantly compile the same device
+    // kernels already built by whichever precision is actually enabled.
+    template <typename store_t> constexpr bool multi_reduce_prec_enabled() { return is_enabled(store_prec_v<store_t>); }
+
     // Call only from an `if constexpr (reduce_prec_enabled<store_t>())` branch.
     // Do not wrap *_impl in a lambda passed to a helper: decltype(fn())
     // instantiates the lambda body and emits kernels for disabled precisions.
