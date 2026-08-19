@@ -15,7 +15,9 @@ namespace quda {
     static constexpr compute_type type = type_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
-    int X[4]; // grid dimensions
+
+    int_fastdiv X[4]; // regular grid dims
+    int_fastdiv E[4]; // extended grid dims
     int border[4];
     Gauge u;
 
@@ -24,8 +26,9 @@ namespace quda {
       u(u)
     {
       for (int dir=0; dir<4; ++dir) {
+        E[dir] = u.X()[dir];
         border[dir] = u.R()[dir];
-        X[dir] = u.X()[dir] - border[dir]*2;
+        X[dir] = E[dir] - 2 * border[dir];
       }
     }
   };
@@ -41,22 +44,17 @@ namespace quda {
     // return the determinant or trace at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      int X[4];
-#pragma unroll
-      for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
-
       int x[4];
-      getCoords(x, x_cb, X, parity);
+      getCoords(x, x_cb, arg.X, parity);
+
 #pragma unroll
-      for(int dr=0; dr<4; ++dr) {
+      for (int dr = 0; dr < 4; ++dr)
         x[dr] += arg.border[dr];
-        X[dr] += 2*arg.border[dr];
-      }
 
       complex<double> local = {};
 #pragma unroll
       for (int mu = 0; mu < 4; mu++) {
-        Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
+        Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, arg.E), parity);
         local += Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
       }
 

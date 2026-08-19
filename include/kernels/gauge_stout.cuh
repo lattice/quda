@@ -22,7 +22,8 @@ namespace quda
     Gauge out;
     const Gauge in;
 
-    int X[4]; // grid dimensions
+    int_fastdiv X[4]; // regular grid dims
+    int_fastdiv E[4]; // extended grid dims
     int border[4];
     const real rho;
     const real staple_coeff;
@@ -41,8 +42,9 @@ namespace quda
       anisotropy(anisotropy)
     {
       for (int dir = 0; dir < 4; ++dir) {
+        E[dir] = in.X()[dir];
         border[dir] = in.R()[dir];
-        X[dir] = in.X()[dir] - border[dir] * 2;
+        X[dir] = E[dir] - 2 * border[dir];
       }
     }
   };
@@ -59,23 +61,20 @@ namespace quda
       using Link = Matrix<complex<real>, Arg::nColor>;
 
       // Compute spacetime and local coords
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
       int x[4];
-      getCoords(x, x_cb, X, parity);
-      for (int dr = 0; dr < 4; ++dr) {
+      getCoords(x, x_cb, arg.X, parity);
+#pragma unroll
+      for (int dr = 0; dr < 4; ++dr)
         x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
-      }
       dir = dir + (dir >= arg.dir_ignore);
 
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
+      computeStaple(arg, x, arg.E, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
-      U = arg.in(dir, linkIndex(x, X), parity);
+      U = arg.in(dir, linkIndex(x, arg.E), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //--------------------------------------------------------------------
@@ -88,7 +87,7 @@ namespace quda
 
       Link exp_iQ = exponentiate_iQ(Q);
       U = exp_iQ * U;
-      arg.out(dir, linkIndex(x, X), parity) = U;
+      arg.out(dir, linkIndex(x, arg.E), parity) = U;
 
       // Debug tools
 #if 0
@@ -138,14 +137,11 @@ namespace quda
       using Link = Matrix<complex<real>, Arg::nColor>;
 
       // Compute spacetime and local coords
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
       int x[4];
-      getCoords(x, x_cb, X, parity);
-      for (int dr = 0; dr < 4; ++dr) {
+      getCoords(x, x_cb, arg.X, parity);
+#pragma unroll
+      for (int dr = 0; dr < 4; ++dr)
         x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
-      }
       dir = dir + (dir >= arg.dir_ignore);
 
       Link U, Q;
@@ -155,10 +151,10 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, arg.dir_ignore);
+      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, arg.dir_ignore);
 
       // Get link U
-      U = arg.in(dir, linkIndex(x, X), parity);
+      U = arg.in(dir, linkIndex(x, arg.E), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
@@ -172,7 +168,7 @@ namespace quda
 
       Link exp_iQ = exponentiate_iQ(Q);
       U = exp_iQ * U;
-      arg.out(dir, linkIndex(x, X), parity) = U;
+      arg.out(dir, linkIndex(x, arg.E), parity) = U;
 
       // Debug tools
 #if 0

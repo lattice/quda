@@ -24,7 +24,6 @@ namespace quda
 
     int_fastdiv X[4]; // regular grid dims
     int_fastdiv E[4]; // extended grid dims
-
     int border[4];
     const real alpha;
     const real staple_scale;
@@ -63,6 +62,8 @@ namespace quda
       // compute spacetime and local coords
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
+
+#pragma unroll
       for (int dr = 0; dr < 4; ++dr)
         x[dr] += arg.border[dr];
 
