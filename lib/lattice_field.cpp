@@ -4,6 +4,7 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
+#include <comm_target.h> // constexpr comm_build_is_mnnvl()
 
 namespace quda {
 
@@ -42,15 +43,19 @@ namespace quda {
     my_face_h {},
     my_face_hd {},
     my_face_d {},
+    my_face_p2p_d {},
     my_face_dim_dir_h {},
     my_face_dim_dir_hd {},
     my_face_dim_dir_d {},
+    my_face_dim_dir_p2p_d {},
     from_face_h {},
     from_face_hd {},
     from_face_d {},
+    from_face_p2p_d {},
     from_face_dim_dir_h {},
     from_face_dim_dir_hd {},
     from_face_dim_dir_d {},
+    from_face_dim_dir_p2p_d {},
     mh_recv {},
     mh_send {},
     mh_recv_rdma {},
@@ -81,15 +86,19 @@ namespace quda {
     my_face_h {},
     my_face_hd {},
     my_face_d {},
+    my_face_p2p_d {},
     my_face_dim_dir_h {},
     my_face_dim_dir_hd {},
     my_face_dim_dir_d {},
+    my_face_dim_dir_p2p_d {},
     from_face_h {},
     from_face_hd {},
     from_face_d {},
+    from_face_p2p_d {},
     from_face_dim_dir_h {},
     from_face_dim_dir_hd {},
     from_face_dim_dir_d {},
+    from_face_dim_dir_p2p_d {},
     mh_recv {},
     mh_send {},
     mh_recv_rdma {},
@@ -214,15 +223,19 @@ namespace quda {
     my_face_h = std::exchange(src.my_face_h, {});
     my_face_hd = std::exchange(src.my_face_hd, {});
     my_face_d = std::exchange(src.my_face_d, {});
+    my_face_p2p_d = std::exchange(src.my_face_p2p_d, {});
     my_face_dim_dir_h = std::exchange(src.my_face_dim_dir_h, {});
     my_face_dim_dir_hd = std::exchange(src.my_face_dim_dir_hd, {});
     my_face_dim_dir_d = std::exchange(src.my_face_dim_dir_d, {});
+    my_face_dim_dir_p2p_d = std::exchange(src.my_face_dim_dir_p2p_d, {});
     from_face_h = std::exchange(src.from_face_h, {});
     from_face_hd = std::exchange(src.from_face_hd, {});
     from_face_d = std::exchange(src.from_face_d, {});
+    from_face_p2p_d = std::exchange(src.from_face_p2p_d, {});
     from_face_dim_dir_h = std::exchange(src.from_face_dim_dir_h, {});
     from_face_dim_dir_hd = std::exchange(src.from_face_dim_dir_hd, {});
     from_face_dim_dir_d = std::exchange(src.from_face_dim_dir_d, {});
+    from_face_dim_dir_p2p_d = std::exchange(src.from_face_dim_dir_p2p_d, {});
     mh_recv = std::exchange(src.mh_recv, {});
     mh_send = std::exchange(src.mh_send, {});
     mh_recv_rdma = std::exchange(src.mh_recv_rdma, {});
@@ -249,6 +262,40 @@ namespace quda {
     param.scale = scale;
   }
 
+  // Ghost/comm buffers live in the NVSHMEM symmetric heap when built with
+  // NVSHMEM (the NVSHMEM dslash does nvshmem_ptr/put on them, so they must be
+  // symmetric), and in the DeviceCommBuffer (cuMemAlloc, P2P/MPI-shared) kind
+  // otherwise.  This keeps NVSHMEM allocations separate from P2P/MPI -- the
+  // reason the comm-buffer tags exist -- and restores the routing develop did
+  // via device_comms_pinned_malloc before the Phase-3 tag refactor.  (A future
+  // refinement, deferred to the fabric/NVSHMEM coexistence work, gives P2P a
+  // separate contiguous buffer alongside the symmetric ghosts.)
+  static inline void *ghost_comm_buffer_malloc(size_t bytes)
+  {
+    // The symmetric ghost buffers come from the NVSHMEM symmetric heap ONLY when
+    // NVSHMEM is enabled at runtime.  With QUDA_ENABLE_NVSHMEM=0 (a first-class
+    // config) we take the DeviceCommBuffer path -- byte-identical to a
+    // non-NVSHMEM build -- so the ghost/P2P path never touches the NVSHMEM
+    // allocator (whose collectives don't track a split sub-communicator).  The
+    // #ifdef is still required: the nvshmem_comm_buffer_malloc overload only
+    // exists under NVSHMEM_COMMS.  comm_nvshmem_enabled() is latched once, so
+    // alloc and free always agree.
+#ifdef NVSHMEM_COMMS
+    if (comm_nvshmem_enabled()) return nvshmem_comm_buffer_malloc(bytes);
+#endif
+    return device_comm_buffer_malloc(bytes);
+  }
+  static inline void ghost_comm_buffer_free(void *ptr)
+  {
+#ifdef NVSHMEM_COMMS
+    if (comm_nvshmem_enabled()) {
+      nvshmem_comm_buffer_free(ptr);
+      return;
+    }
+#endif
+    device_comm_buffer_free(ptr);
+  }
+
   void LatticeField::allocateGhostBuffer(size_t ghost_bytes) const
   {
     // only allocate if not already allocated or buffer required is bigger than previously
@@ -269,8 +316,20 @@ namespace quda {
           // hipErrorInvalidValue.
           destroyIPCComms();
           for (int b=0; b<2; b++) {
-            device_comms_pinned_free(ghost_recv_buffer_d[b]);
-            device_comms_pinned_free(ghost_send_buffer_d[b]);
+            ghost_comm_buffer_free(ghost_recv_buffer_d[b]);
+            ghost_comm_buffer_free(ghost_send_buffer_d[b]);
+#ifdef NVSHMEM_COMMS
+            // P2P buffers are a SEPARATE contiguous DeviceCommBuffer allocation
+            // only when NVSHMEM is enabled at runtime; free them too.  (NVSHMEM
+            // off, or non-NVSHMEM build: they alias the symmetric buffers just
+            // freed -- do not double-free.)
+            if (comm_nvshmem_enabled()) {
+              device_comm_buffer_free(ghost_recv_buffer_p2p_d[b]);
+              device_comm_buffer_free(ghost_send_buffer_p2p_d[b]);
+            }
+#endif
+            ghost_recv_buffer_p2p_d[b] = nullptr;
+            ghost_send_buffer_p2p_d[b] = nullptr;
             host_free(ghost_pinned_send_buffer_h[b]);
             host_free(ghost_pinned_recv_buffer_h[b]);
           }
@@ -280,14 +339,46 @@ namespace quda {
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          ghost_recv_buffer_d[b] = ghost_comm_buffer_malloc(ghost_bytes);
           // silence any false cuda-memcheck initcheck errors
           qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          ghost_send_buffer_d[b] = ghost_comm_buffer_malloc(ghost_bytes);
           // silence any false cuda-memcheck initcheck errors
           qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
+
+          // Contiguous, RDMA-capable P2P buffers.  Under NVSHMEM ghost_*_buffer_d
+          // above are symmetric-heap (for the NVSHMEM transport); QUDA-owned P2P
+          // needs its own single-allocation DeviceCommBuffer (recv: the exported
+          // buffer peers write into; send: GDR-send NIC source).  Non-NVSHMEM:
+          // the symmetric buffers already ARE DeviceCommBuffer, so alias them
+          // (no second allocation, byte-identical behaviour).
+#ifdef NVSHMEM_COMMS
+          if (comm_nvshmem_enabled()) {
+            // NVSHMEM on: symmetric ghosts are nvshmem-heap; P2P needs its own
+            // separate contiguous DeviceCommBuffer.
+            ghost_recv_buffer_p2p_d[b] = device_comm_buffer_malloc(ghost_bytes);
+            qudaMemset(ghost_recv_buffer_p2p_d[b], 0, ghost_bytes);
+            ghost_send_buffer_p2p_d[b] = device_comm_buffer_malloc(ghost_bytes);
+            qudaMemset(ghost_send_buffer_p2p_d[b], 0, ghost_bytes);
+          } else {
+            // NVSHMEM off: the symmetric ghosts ARE DeviceCommBuffer, so alias
+            // them (no second allocation) -- identical to a non-NVSHMEM build.
+            ghost_recv_buffer_p2p_d[b] = ghost_recv_buffer_d[b];
+            ghost_send_buffer_p2p_d[b] = ghost_send_buffer_d[b];
+          }
+#else
+          ghost_recv_buffer_p2p_d[b] = ghost_recv_buffer_d[b];
+          ghost_send_buffer_p2p_d[b] = ghost_send_buffer_d[b];
+#endif
+
+          // NB: the stream-mem-op signal-slot ("flag") buffer is NOT allocated
+          // here.  It is constant-size, created once from createIPCComms() and
+          // torn down from freeGhostBuffer() (so it tracks the communicator but is
+          // stable across ordinary ghost-buffer resizing), kept out of this
+          // per-field ghost realloc churn -- otherwise its address would be reused
+          // on every resize and the cudaIPC re-open fails.
 
           // pinned buffer used for sending
           ghost_pinned_send_buffer_h[b] = host_pinned_malloc(ghost_bytes);
@@ -314,17 +405,48 @@ namespace quda {
   void LatticeField::freeGhostBuffer(void)
   {
     destroyIPCComms();
+    // Tear down the stream-gated flag buffers right after the ghost P2P imports
+    // (still device-ready here).  No-op if stream-gating wasn't set up.  This runs
+    // on every freeGhostBuffer, i.e. communicator changes (push_communicator) and
+    // final teardown, so the flag buffers are destroyed/recreated with the comms.
+    comm_destroy_stream_gated_comms();
+
+    // Re-sync the shared double-buffer index on every communicator switch.  bufferIndex is
+    // a single global static toggled by ALL field exchanges (gauge AND color-spinor); split-
+    // grid sub-communicator work can advance it a different number of times on different
+    // ranks, so a collective gauge exchange after a push/pop ends up with sender and receiver
+    // on DIFFERENT flag/ghost buffers -> stream-gated signal deadlock (or wrong-halo).  Comms
+    // are torn down + barriered above, so no exchange is in flight; resetting to 0 here re-
+    // synchronises all ranks.  (Proper fix: give each multi-buffered resource its own index /
+    // bundle a buffer's data + signalling together.)
+    bufferIndex = 0;
 
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
       // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
+      if (ghost_recv_buffer_d[b]) ghost_comm_buffer_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) ghost_comm_buffer_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
+
+#ifdef NVSHMEM_COMMS
+      // free the separate contiguous P2P buffers (only allocated separately when
+      // NVSHMEM is enabled at runtime; NVSHMEM off / non-NVSHMEM build: they
+      // aliased the symmetric buffers freed above -- do not double-free).
+      if (comm_nvshmem_enabled()) {
+        if (ghost_recv_buffer_p2p_d[b]) device_comm_buffer_free(ghost_recv_buffer_p2p_d[b]);
+        if (ghost_send_buffer_p2p_d[b]) device_comm_buffer_free(ghost_send_buffer_p2p_d[b]);
+      }
+#endif
+      ghost_recv_buffer_p2p_d[b] = nullptr;
+      ghost_send_buffer_p2p_d[b] = nullptr;
+
+      // NB: the stream-gated flag buffer was already freed by
+      // comm_destroy_stream_gated_comms() above (it is decoupled from these
+      // per-field ghost buffers, but freed in the same call).
 
       // free pinned send memory buffer
       if (ghost_pinned_recv_buffer_h[b]) host_free(ghost_pinned_recv_buffer_h[b]);
@@ -359,6 +481,10 @@ namespace quda {
       from_face_h[b] = ghost_pinned_recv_buffer_h[b];
       from_face_hd[b] = ghost_pinned_recv_buffer_hd[b];
       from_face_d[b] = ghost_recv_buffer_d[b];
+      // Contiguous P2P device send/recv bases (alias the symmetric ones in
+      // non-NVSHMEM builds; see allocateGhostBuffer).
+      my_face_p2p_d[b] = ghost_send_buffer_p2p_d[b];
+      from_face_p2p_d[b] = ghost_recv_buffer_p2p_d[b];
     }
 
     // initialize ghost send pointers
@@ -375,6 +501,9 @@ namespace quda {
 
           my_face_dim_dir_d[b][i][dir] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][dir];
           from_face_dim_dir_d[b][i][dir] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir];
+
+          my_face_dim_dir_p2p_d[b][i][dir] = static_cast<char *>(my_face_p2p_d[b]) + ghost_offset[i][dir];
+          from_face_dim_dir_p2p_d[b][i][dir] = static_cast<char *>(from_face_p2p_d[b]) + ghost_offset[i][dir];
         } // loop over b
       }   // loop over direction
     } // loop over dimension
@@ -390,10 +519,15 @@ namespace quda {
         for (int b = 0; b < 2; ++b) {
           mh_send[b][i][dir] = comm_declare_send_relative(my_face_dim_dir_h[b][i][dir], i, hop, ghost_face_bytes[i]);
           mh_recv[b][i][dir] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][dir], i, hop, ghost_face_bytes[i]);
+          // GDR is a P2P-family transport: the NIC reads the send buffer and
+          // writes the recv buffer, so register the contiguous, RDMA-capable
+          // P2P caches (fabric/gpuDirectRDMA-capable -- patch 0018).  These
+          // alias the symmetric caches in non-NVSHMEM builds.
           mh_send_rdma[b][i][dir]
-            = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
-          mh_recv_rdma[b][i][dir]
-            = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
+            = gdr ? comm_declare_send_relative(my_face_dim_dir_p2p_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
+          mh_recv_rdma[b][i][dir] = gdr ?
+            comm_declare_receive_relative(from_face_dim_dir_p2p_d[b][i][dir], i, hop, ghost_face_bytes[i]) :
+            nullptr;
         }
       } // loop over b
 
@@ -416,16 +550,20 @@ namespace quda {
       my_face_h = {};
       my_face_hd = {};
       my_face_d = {};
+      my_face_p2p_d = {};
       from_face_h = {};
       from_face_hd = {};
       from_face_d = {};
+      from_face_p2p_d = {};
 
       my_face_dim_dir_h = {};
       my_face_dim_dir_hd = {};
       my_face_dim_dir_d = {};
+      my_face_dim_dir_p2p_d = {};
       from_face_dim_dir_h = {};
       from_face_dim_dir_hd = {};
       from_face_dim_dir_d = {};
+      from_face_dim_dir_p2p_d = {};
 
       for (int b=0; b<2; ++b) {
 	for (int i=0; i<nDimComms; i++) {
@@ -467,11 +605,29 @@ namespace quda {
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
       errorQuda("ghost_field appears not to be allocated");
 
+    // Set up the stream-gated signal-slot ("flag") buffers here -- this is the
+    // first device-ready point past comm/peer2peer init (comm_init is too early:
+    // no CUDA context yet for cuMemAlloc).  Once-guarded and no-op unless
+    // stream-gating is the resolved transport.  Deliberately NOT torn down on
+    // ghost_field_reset (stable address); freed only in freeGhostBuffer.
+    comm_create_stream_gated_comms();
+
     for (int b=0; b<2; b++) {
-      // set remote send buffer to ghost receive buffers on neighboring processes
-      comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
+      // QUDA-owned P2P remote pointer: import the peer's contiguous P2P recv
+      // buffer (single fabric/cudaIPC handle).  Under NVSHMEM this is a separate
+      // allocation from the symmetric ghosts; non-NVSHMEM it aliases them.
+      comm_create_neighbor_memory_p2p(ghost_remote_send_buffer_p2p_d[b], ghost_recv_buffer_p2p_d[b]);
+      // NVSHMEM-transport remote pointer: nvshmem_ptr of the peer's symmetric
+      // recv buffer (no-op in non-NVSHMEM builds).
+      comm_create_neighbor_memory_shmem(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
       // get remote events
-      comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
+      // cudaIPC events cannot traverse nodes; MNNVL builds skip the event
+      // exchange entirely and synchronise via stream-mem-op signalling.
+      if constexpr (!comm_build_is_mnnvl()) comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
+      // NB: the stream-mem-op signal-slot ("flag") buffer is exchanged by
+      // comm_create_stream_gated_comms() near the top of createIPCComms (once per
+      // communicator, idempotent), NOT in this per-buffer loop -- it stays out of
+      // the ghost create/destroy churn to keep a stable address.
     }
 
     // zero the host-side signaling buffers
@@ -510,8 +666,11 @@ namespace quda {
     comm_barrier();
 
     for (int b = 0; b < 2; b++) {
-      comm_destroy_neighbor_memory(ghost_remote_send_buffer_d[b]);
-      comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
+      comm_destroy_neighbor_memory_p2p(ghost_remote_send_buffer_p2p_d[b]);
+      comm_destroy_neighbor_memory_shmem(ghost_remote_send_buffer_d[b]);
+      if constexpr (!comm_build_is_mnnvl()) comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
+      // NB: the stream-gated flag buffer is unmapped by
+      // comm_destroy_stream_gated_comms() (called from freeGhostBuffer), not here.
     }
 
     for (int dim=0; dim<4; ++dim) {
@@ -555,9 +714,19 @@ namespace quda {
 
   void *LatticeField::myFace_hd(int dir, int dim) const { return my_face_dim_dir_hd[bufferIndex][dim][dir]; }
 
-  void *LatticeField::myFace_d(int dir, int dim) const { return my_face_dim_dir_d[bufferIndex][dim][dir]; }
+  void *LatticeField::myFaceP2P_d(int dir, int dim) const { return my_face_dim_dir_p2p_d[bufferIndex][dim][dir]; }
 
-  void *LatticeField::remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
+  void *LatticeField::myFaceShmem_d(int dir, int dim) const { return my_face_dim_dir_d[bufferIndex][dim][dir]; }
+
+  void *LatticeField::remoteFaceP2P_d(int dir, int dim) const
+  {
+    return ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir];
+  }
+
+  void *LatticeField::remoteFaceShmem_d(int dir, int dim) const
+  {
+    return ghost_remote_send_buffer_d[bufferIndex][dim][dir];
+  }
 
   void *LatticeField::remoteFace_r() const { return ghost_recv_buffer_d[bufferIndex]; }
 
@@ -675,15 +844,19 @@ namespace quda {
     output << "my_face_h = " << field.my_face_h << std::endl;
     output << "my_face_hd = " << field.my_face_hd << std::endl;
     output << "my_face_d = " << field.my_face_d << std::endl;
+    output << "my_face_p2p_d = " << field.my_face_p2p_d << std::endl;
     output << "my_face_dim_dir_h = " << field.my_face_dim_dir_h << std::endl;
     output << "my_face_dim_dir_hd = " << field.my_face_dim_dir_hd << std::endl;
     output << "my_face_dim_dir_d = " << field.my_face_dim_dir_d << std::endl;
+    output << "my_face_dim_dir_p2p_d = " << field.my_face_dim_dir_p2p_d << std::endl;
     output << "from_face_h = " << field.from_face_h << std::endl;
     output << "from_face_hd = " << field.from_face_hd << std::endl;
     output << "from_face_d = " << field.from_face_d << std::endl;
+    output << "from_face_p2p_d = " << field.from_face_p2p_d << std::endl;
     output << "from_face_dim_dir_h = " << field.from_face_dim_dir_h << std::endl;
     output << "from_face_dim_dir_hd = " << field.from_face_dim_dir_hd << std::endl;
     output << "from_face_dim_dir_d = " << field.from_face_dim_dir_d << std::endl;
+    output << "from_face_dim_dir_p2p_d = " << field.from_face_dim_dir_p2p_d << std::endl;
     output << "mh_recv = " << field.mh_recv << std::endl;
     output << "mh_send = " << field.mh_send << std::endl;
     output << "mh_recv_rdma = " << field.mh_recv_rdma << std::endl;

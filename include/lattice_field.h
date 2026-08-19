@@ -246,14 +246,36 @@ namespace quda {
     */
 
     /**
-       Double buffered static GPU halo send buffer
+       Double buffered static GPU halo send buffer.  Under an NVSHMEM build this
+       is the symmetric-heap send buffer used as the NVSHMEM put-fallback source.
+       Non-NVSHMEM builds: the sole device send buffer (DeviceCommBuffer).
     */
     inline static array<void *, 2> ghost_send_buffer_d = {};
 
     /**
-       Double buffered static GPU halo receive buffer
+       Double buffered static GPU halo receive buffer.  Under an NVSHMEM build
+       this is the symmetric-heap recv buffer used as the NVSHMEM put
+       destination/reference; non-NVSHMEM builds: the sole device recv buffer.
      */
     inline static array<void *, 2> ghost_recv_buffer_d = {};
+
+    /**
+       Contiguous, RDMA-capable P2P send buffer (DeviceCommBuffer:
+       vmm_alloc_p2p_fabric on IMEX, cuMemAlloc on non-IMEX).  Source for the
+       P2P copy-engine / remote-write packs and the GDR-send NIC registration.
+       Under NVSHMEM this is a SEPARATE allocation from ghost_send_buffer_d;
+       in non-NVSHMEM builds it aliases ghost_send_buffer_d (no second alloc).
+    */
+    inline static array<void *, 2> ghost_send_buffer_p2p_d = {};
+
+    /**
+       Contiguous, RDMA-capable P2P recv buffer (DeviceCommBuffer).  This is the
+       buffer QUDA exports (single fabric/cudaIPC handle) so peers write their
+       halos into it -- the correctness driver for the split.  Under NVSHMEM a
+       SEPARATE allocation from ghost_recv_buffer_d; in non-NVSHMEM builds it
+       aliases ghost_recv_buffer_d.
+     */
+    inline static array<void *, 2> ghost_recv_buffer_p2p_d = {};
 
     /**
        Double buffered static pinned send buffers
@@ -276,9 +298,22 @@ namespace quda {
     inline static array<void *, 2> ghost_pinned_recv_buffer_hd = {};
 
     /**
-       Remote ghost pointer for sending to
+       NVSHMEM-transport remote ghost pointer (Shmem direct-NVLink put dest),
+       obtained via nvshmem_ptr() of the peer's symmetric recv buffer by
+       comm_create_neighbor_memory_shmem.  Populated ONLY in NVSHMEM builds;
+       comm_create_neighbor_memory_shmem nulls it otherwise.  Read exclusively
+       via remoteFaceShmem_d -- never carries the QUDA P2P import.
     */
     inline static array_3d<void *, 2, QUDA_MAX_DIM, 2> ghost_remote_send_buffer_d;
+
+    /**
+       QUDA-owned P2P remote ghost pointer: fabric (MNNVL) / cudaIPC (non-IMEX)
+       import of the peer's contiguous ghost_recv_buffer_p2p_d, set by
+       comm_create_neighbor_memory_p2p.  Pack destination for P2P copy-engine /
+       remote-write, read via remoteFaceP2P_d.  Populated in ALL builds; in
+       non-NVSHMEM builds it imports the (aliased) sole recv buffer.
+    */
+    inline static array_3d<void *, 2, QUDA_MAX_DIM, 2> ghost_remote_send_buffer_p2p_d;
 
     /**
        The current size of the static ghost allocation
@@ -326,9 +361,17 @@ namespace quda {
     mutable array<void *, 2> my_face_hd = {};
 
     /**
-       Device memory buffer for sending messages
+       Device memory buffer for sending messages (symmetric send buffer under
+       NVSHMEM; the NVSHMEM put-fallback source).
      */
     mutable array<void *, 2> my_face_d = {};
+
+    /**
+       Contiguous P2P device send base (= ghost_send_buffer_p2p_d); source for
+       P2P copy-engine / remote-write and GDR-send registration.  Aliases
+       my_face_d in non-NVSHMEM builds.
+     */
+    mutable array<void *, 2> my_face_p2p_d = {};
 
     /**
        Local pointers to the pinned my_face buffer
@@ -341,9 +384,16 @@ namespace quda {
     mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd = {};
 
     /**
-       Local pointers to the device ghost_send buffer
+       Local pointers to the device ghost_send buffer (symmetric; NVSHMEM put
+       source).
     */
     mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d = {};
+
+    /**
+       Local pointers to the contiguous P2P device send buffer
+       (ghost_send_buffer_p2p_d).  Aliases my_face_dim_dir_d in non-NVSHMEM.
+    */
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_p2p_d = {};
 
     /**
        Memory buffer used for receiving all messages
@@ -356,9 +406,17 @@ namespace quda {
     mutable array<void *, 2> from_face_hd = {};
 
     /**
-       Device memory buffer for receiving messages
+       Device memory buffer for receiving messages (symmetric recv buffer under
+       NVSHMEM; the Shmem read base / NVSHMEM put destination).
      */
     mutable array<void *, 2> from_face_d = {};
+
+    /**
+       Contiguous P2P device recv base (= ghost_recv_buffer_p2p_d); read base for
+       P2P / GDR halos (where peer P2P writes and GDR NIC writes land).  Aliases
+       from_face_d in non-NVSHMEM builds.
+     */
+    mutable array<void *, 2> from_face_p2p_d = {};
 
     /**
        Local pointers to the pinned from_face buffer
@@ -371,9 +429,18 @@ namespace quda {
     mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd = {};
 
     /**
-       Local pointers to the device ghost_recv buffer
+       Local pointers to the device ghost_recv buffer (symmetric; Shmem read
+       base).
     */
     mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d = {};
+
+    /**
+       Local pointers to the contiguous P2P device recv buffer
+       (ghost_recv_buffer_p2p_d): read base for P2P/GDR halos and target of the
+       GDR receive handle (mh_recv_rdma).  Aliases from_face_dim_dir_d in
+       non-NVSHMEM builds.
+    */
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_p2p_d = {};
 
     /**
        Message handles for receiving
@@ -394,6 +461,11 @@ namespace quda {
        Message handles for sending
     */
     mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma = {};
+
+  public:
+    // P2P per-(buf,dim,dir) sync state.  These are inline-static global arrays
+    // (already process-shared) read by the backend-substitutable comm_p2p_* layer
+    // (comm_quda.h), which lives outside this class, so access is public.
 
     /**
        Message handles for receiving
@@ -425,6 +497,11 @@ namespace quda {
     */
     inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcRemoteCopyEvent = {};
 
+    // Stream-mem-op signalling state (flag_buffer_d / flag_buffer_remote_d /
+    // flag_send_counter / flag_recv_counter) lives in the CUDA backend TU
+    // (lib/targets/cuda/comm_target.cpp) -- only that TU touches it.
+
+  protected:
     /**
        Whether we have initialized communication for this field
     */
@@ -748,30 +825,54 @@ namespace quda {
     void *myFace_hd(int dir, int dim) const;
 
     /**
-       @brief Return pointer to the device send buffer in a given
-       direction and dimension
+       @brief Return pointer to the contiguous P2P device send buffer
+       (ghost_send_buffer_p2p_d) in a given direction/dimension.  Source for
+       P2P copy-engine / remote-write packs and for GDR-send (NIC reads it).
+       Aliases the symmetric send buffer in non-NVSHMEM builds.
        @param[in] dir Direction we are requesting
        @param[in] dim Dimension we are requesting
-       @return Pointer to pinned memory buffer
+       @return Pointer to the contiguous P2P device send buffer
     */
-    void *myFace_d(int dir, int dim) const;
+    void *myFaceP2P_d(int dir, int dim) const;
 
     /**
-       @brief Return base pointer to a remote device buffer for direct
-       sending in a given direction and dimension.  Since this is a
-       base pointer, one still needs to take care of offsetting to the
-       correct point for each direction/dimension.
+       @brief Return pointer to the symmetric device send buffer
+       (ghost_send_buffer_d) in a given direction/dimension.  Source for the
+       NVSHMEM put fallback (kept symmetric so it is a legal NVSHMEM local
+       source).  Aliases the P2P send buffer in non-NVSHMEM builds.
        @param[in] dir Direction we are requesting
        @param[in] dim Dimension we are requesting
-       @return Pointer to remote memory buffer
+       @return Pointer to the symmetric device send buffer
     */
-    void *remoteFace_d(int dir, int dim) const;
+    void *myFaceShmem_d(int dir, int dim) const;
 
     /**
-       @brief Return base pointer to the ghost recv buffer. Since this is a
-       base pointer, one still needs to take care of offsetting to the
-       correct point for each direction/dimension.
-       @return Pointer to remote memory buffer
+       @brief Return base pointer to the imported peer P2P recv buffer
+       (ghost_remote_send_buffer_p2p_d), the destination for P2P copy-engine /
+       remote-write.  Base pointer -- caller offsets per dir/dim.
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Base pointer to the imported peer P2P recv buffer
+    */
+    void *remoteFaceP2P_d(int dir, int dim) const;
+
+    /**
+       @brief Return base pointer to the NVSHMEM remote pointer
+       (ghost_remote_send_buffer_d = nvshmem_ptr of the peer's symmetric recv
+       buffer), the Shmem direct-NVLink put dest.  Base pointer -- caller
+       offsets per dir/dim.  Non-null only when the peer is NVLink-reachable.
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Base pointer to the NVSHMEM remote recv buffer, or nullptr when
+       the peer is not NVLink-reachable
+    */
+    void *remoteFaceShmem_d(int dir, int dim) const;
+
+    /**
+       @brief Return base pointer to the symmetric ghost recv buffer
+       (ghost_recv_buffer_d), used as the NVSHMEM put destination/reference.
+       Base pointer -- caller offsets per dir/dim.
+       @return Base pointer to the symmetric ghost recv buffer
      */
     void *remoteFace_r() const;
 

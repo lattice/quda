@@ -21,17 +21,18 @@ namespace quda {
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    CopyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-               void *Out, const void *In) :
+    CopyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location, void *Out,
+               const void *In) :
       TunableKernel2D(in, 2, location),
-      compute_diagonal(out.Reconstruct() && !in.Reconstruct()), // if writing to a compressed field, we need to compute the diagonal
-      diagonal_d(compute_diagonal ? static_cast<real*>(pool_device_malloc(sizeof(real))) : nullptr),
-      diagonal_h(compute_diagonal ? static_cast<real*>(pool_host_pinned_malloc(sizeof(real))) : nullptr),
+      compute_diagonal(out.Reconstruct()
+                       && !in.Reconstruct()), // if writing to a compressed field, we need to compute the diagonal
+      diagonal_d(compute_diagonal ? static_cast<real *>(pool_device_malloc(sizeof(real))) : nullptr),
+      diagonal_h(compute_diagonal ? static_cast<real *>(pool_host_pinned_malloc(sizeof(real))) : nullptr),
       out(out),
       in(in),
       inverse(inverse),
-      Out(static_cast<FloatOut*>(Out)),
-      In(static_cast<const FloatIn*>(In))
+      Out(static_cast<FloatOut *>(Out)),
+      In(static_cast<const FloatIn *>(In))
     {
       if (compute_diagonal) {
         char aux2[TuneKey::aux_n];

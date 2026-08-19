@@ -55,13 +55,44 @@ namespace quda {
    */
   void *device_malloc_(const char *func, const char *file, int line, size_t size);
   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size);
-  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size);
+  // Tag-dispatched communication-buffer allocator. The DeviceCommBuffer overload uses the
+  // driver-API cuMemAlloc (avoids the cudaMalloc runtime-API hijack risk and
+  // gives physically-contiguous memory), so the buffer is P2P-capable and
+  // RDMA-ready -- suitable for cudaIPC handle export and, under MNNVL, fabric
+  // export. NVSHMEM overload uses shmem_malloc_. Each allocation is tagged in
+  // the alloc[] tracker so the per-kind *_comm_buffer_free can verify the kind.
+  // (MPI comm buffers share the DeviceCommBuffer kind -- they resolve to the
+  // same primitive -- so there is no separate MPI tag.)
+  namespace comm
+  {
+    struct DeviceCommBuffer {
+    };
+    struct QudaCommTypeNVSHMEM {
+    };
+  } // namespace comm
+
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::DeviceCommBuffer, size_t size);
+#ifdef NVSHMEM_COMMS
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::QudaCommTypeNVSHMEM, size_t size);
+#endif
+  // Per-kind free: each asserts the ptr is in alloc[KIND] and dispatches to
+  // the matching free primitive.  Callers pair their *_comm_buffer_malloc
+  // with the matching *_comm_buffer_free.
+  void device_comm_buffer_free_(const char *func, const char *file, int line, void *ptr);
+#ifdef NVSHMEM_COMMS
+  void nvshmem_comm_buffer_free_(const char *func, const char *file, int line, void *ptr);
+#endif
+
+  // The P2P fabric-handle accessors (get_p2p_fabric_handle / get_p2p_buffer_size /
+  // get_p2p_buffer_generation) are CUDA/MNNVL-specific and return a CUmemFabricHandle,
+  // so they live in <malloc_target.h> (targets/cuda) to keep <cuda.h> and the
+  // QUDA_MNNVL #ifdef out of this generic header.
+
   void *safe_malloc_(const char *func, const char *file, int line, size_t size);
   void *host_pinned_malloc_(const char *func, const char *file, int line, size_t size);
   void *managed_malloc_(const char *func, const char *file, int line, size_t size);
   void device_free_(const char *func, const char *file, int line, void *ptr);
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr);
-  void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr);
   void managed_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
   void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes);
@@ -86,15 +117,18 @@ namespace quda {
 
 #define device_malloc(size) quda::device_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define device_pinned_malloc(size) quda::device_pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
-#define device_comms_pinned_malloc(size)                                                                               \
-  quda::device_comms_pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define safe_malloc(size) quda::safe_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define host_pinned_malloc(size) quda::host_pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define managed_malloc(size) quda::managed_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define device_free(ptr) quda::device_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define device_pinned_free(ptr) quda::device_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-#define device_comms_pinned_free(ptr)                                                                                  \
-  quda::device_comms_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define device_comm_buffer_malloc(size)                                                                                \
+  quda::comm_buffer_malloc_(__func__, quda::file_name(__FILE__), __LINE__, quda::comm::DeviceCommBuffer {}, size)
+#define nvshmem_comm_buffer_malloc(size)                                                                               \
+  quda::comm_buffer_malloc_(__func__, quda::file_name(__FILE__), __LINE__, quda::comm::QudaCommTypeNVSHMEM {}, size)
+#define device_comm_buffer_free(ptr) quda::device_comm_buffer_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define nvshmem_comm_buffer_free(ptr)                                                                                  \
+  quda::nvshmem_comm_buffer_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define get_mapped_device_pointer(ptr)                                                                                 \

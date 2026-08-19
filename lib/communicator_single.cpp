@@ -55,6 +55,12 @@ namespace quda
 
   void Communicator::comm_gather_gpuid(int *gpuid_recv_buf) { gpuid_recv_buf[0] = comm_gpuid(); }
 
+  void Communicator::comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size)
+  {
+    // single-process backend: just copy local to slot 0
+    memcpy(recv_buf, send_handle, handle_size);
+  }
+
   MsgHandle *Communicator::comm_declare_send_rank(void *, int, int, size_t) { return nullptr; }
 
   MsgHandle *Communicator::comm_declare_recv_rank(void *, int, int, size_t) { return nullptr; }

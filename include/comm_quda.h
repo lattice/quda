@@ -264,26 +264,64 @@ namespace quda
   int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid);
 
   /**
-     @brief Symmetric exchange of local memory addresses between
-     logically neighboring processes on the lattice.  The remote
-     addresses that are returned are directly addressable by the local
-     process and can be read or written to by a kernel, or can be
-     copied to and from.  This exchange is only defined between
-     devices that are peer-to-peer enabled.
-     @param[out] remote Array of remote memory pointers to neighboring
-     pointers
+     @brief P2P exchange of local memory addresses between logically neighboring processes.
+     Exchanges a SINGLE fabric (MNNVL) or cudaIPC (non-IMEX) handle for the local contiguous
+     P2P buffer and imports the peer's, so P2P writes target a single-allocation, RDMA-capable buffer.
+     Only defined between peer-to-peer-enabled devices.
+     @param[out] remote Array of remote memory pointers to neighboring pointers
      @param[in] local The process-local memory pointer to be exchanged
-     from this process
   */
-  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
+  void comm_create_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
   /**
-     @brief Deallocate the remote addresses to logically neighboring
-     processes on the on the lattice.
-     @param[in] remote Array of remote memory pointers to neighboring
-     pointers
+     @brief Create local array of remote memory pointers to buffers on neighboring ranks, for NVSHMEM use.
+     @param[out] remote Array of remote memory pointers to buffers on neighboring ranks
+     @param[in] local The process-local symmetric buffer
   */
-  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+  void comm_create_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
+
+  /**
+     @brief Deallocate the QUDA-owned P2P remote addresses created by
+     comm_create_neighbor_memory_p2p.
+     @param[in] remote Array of remote memory pointers to neighboring pointers
+  */
+  void comm_destroy_neighbor_memory_p2p(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+
+  /**
+     @brief Tear down the NVSHMEM-transport neighbor pointers (no-op: owned by
+     NVSHMEM).
+     @param[in] remote Array of remote memory pointers to neighboring pointers
+  */
+  void comm_destroy_neighbor_memory_shmem(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+
+  /**
+     @brief Allocate and IPC-exchange the stream-mem-op signal-slot ("flag")
+     buffers used by the stream-gated P2P signalling path.  No-op unless
+     stream-gating is the resolved transport (comm::p2p_signal() ==
+     STREAM_GATED), so events-only / HIP builds never allocate it.  The flag
+     buffer is constant-size and is created from createIPCComms()
+  */
+  void comm_create_stream_gated_comms();
+
+  /**
+     @brief Whether the REMOTE_WRITE P2P policy (the packing kernel stores halos
+     directly into the peer's buffer) is safe to offer to the dslash policy
+     tuner on this build/device.  On MNNVL/fabric builds remote-write halos land
+     in the peer's imported VMM buffer across multiple transactions and the
+     doorbell can be observed before the last data transaction commits; the only
+     safe guard is a receiver-side flush (CU_STREAM_WAIT_VALUE_FLUSH). Some hardware
+     can report CAN_FLUSH_REMOTE_WRITES=0. In those cases remote-write is dropped from the
+     policy list there and only the copy-engine path is used.  Always true on non-MNNVL builds (that
+     path is correct without a flush).  Resolved at P2P setup
+     (comm_create_stream_gated_comms).
+  */
+  bool comm_p2p_remote_write_supported();
+
+  /**
+     @brief Destroy the stream-gated signal-slot buffers created by
+     comm_create_stream_gated_comms.
+  */
+  void comm_destroy_stream_gated_comms();
 
   /**
      @brief Create unique events shared between each logical pair of
@@ -422,6 +460,86 @@ namespace quda
   void comm_start(MsgHandle *mh);
   void comm_wait(MsgHandle *mh);
   int comm_query(MsgHandle *mh);
+
+  /**
+     Backend-substitutable layer for peer-to-peer halo signalling.
+
+     Wraps the per-(buf, dim, dir) "I'm done writing your buffer" /
+     "wait for peer to be done writing mine" sequence.  Dispatches on the
+     resolved QudaP2PSignal: REMOTE_EVENT uses cudaIpcEvent + MPI doorbell;
+     STREAM_GATED uses cuStreamWriteValue64 / cuStreamWaitValue64 on
+     fabric-mapped signal slots.  Keyed by FieldKind so COLOR_SPINOR and
+     GAUGE signals never alias.
+  */
+  enum class FieldKind { COLOR_SPINOR, GAUGE };
+  static constexpr int N_FIELD_KINDS = 2; // keep in sync with FieldKind
+
+  /**
+     P2P signalling mechanism (used by the comm_p2p_signal_* unified API
+     below to dispatch to the appropriate per-kind implementation inside the
+     backend).
+
+     - REMOTE_EVENT  : cudaIPC event record/wait + MPI doorbell.  Single-node
+                     only -- the IPC event handle does not cross the MNNVL
+                     fabric.  HIP backend uses hipIpc analogues.
+     - STREAM_GATED: cuStreamWriteValue64 / cuStreamWaitValue64 on a slot in
+                     a peer-mapped flag buffer.  Works cross-clique within an
+                     MNNVL NVLink fabric.
+  */
+  enum class QudaP2PSignal { REMOTE_EVENT, STREAM_GATED };
+
+  namespace comm
+  {
+    /** Does the active backend (and build) support the given P2P signalling kind?
+        Backend-provided allow-list: CUDA non-MNNVL supports both; CUDA MNNVL supports
+        STREAM_GATED only; HIP currently supports REMOTE_EVENT only.  Implementation lives in
+        lib/targets/<backend>/p2p_signal_defaults.cpp. */
+    bool p2p_signal_supported(QudaP2PSignal kind);
+
+    /** Backend/build default signalling kind when QUDA_P2P_TRANSPORT is unset.
+        Non-MNNVL: prefer REMOTE_EVENT (events) to match legacy behavior.
+        MNNVL: (REMOTE_EVENT is unsupported) defaults to STREAM_GATED.  Implemented
+        per-backend in lib/targets/<backend>/p2p_signal_defaults.cpp. */
+    QudaP2PSignal p2p_signal_default();
+
+    /** Resolve the active P2P signalling transport for this run (cached).
+        Reads the QUDA_P2P_TRANSPORT env var (string, case-insensitive:
+        "stream_gated" | "events"); if set it must be supported by this
+        backend/build or we errorQuda (an explicit request is never silently
+        substituted).  If unset, returns p2p_signal_default().  This is the
+        single source of truth for both the autotuned (dslash) and the
+        non-autotuned (gauge) P2P consumers. */
+    QudaP2PSignal p2p_signal();
+  } // namespace comm
+
+  /** Sender: P2P write into peer's recv buffer is complete; peer may now read. */
+  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream);
+
+  /** Sender: non-blocking query — has the local send been drained? */
+  int comm_p2p_query_send_drained(FieldKind kind, int buf, int dim, int dir);
+
+  /** Sender: block host until local send is drained AND own copy event has fired. */
+  void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir);
+
+  /** Receiver: non-blocking query — has the peer signalled completion? */
+  int comm_p2p_query_recv_signal(FieldKind kind, int buf, int dim, int dir);
+
+  /** Receiver: block host until peer signal arrives AND peer's copy event has fired. */
+  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir);
+
+  /**
+     Unified P2P signal API.  Dispatches internally on QudaP2PSignal to the
+     appropriate per-kind implementation inside the backend (event-based via
+     cudaIPC + MPI doorbell, or stream-mem-op via cuStreamWriteValue64 /
+     WaitValue64). The event-based variants remain externally
+     visible (above) for the few remaining direct callers but new code should
+     use the QudaP2PSignal overloads.
+  */
+  void comm_p2p_signal_send_done(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream,
+                                 QudaP2PSignal signal);
+  void comm_p2p_wait_recv_signal(FieldKind kind, int buf, int dim, int dir, const qudaStream_t &stream,
+                                 QudaP2PSignal signal);
+  void comm_p2p_wait_send_drained(FieldKind kind, int buf, int dim, int dir, QudaP2PSignal signal);
 
   template <typename T> void comm_allreduce_sum(T &v);
   template <typename T> void comm_allreduce_max(T &v);

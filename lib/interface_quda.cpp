@@ -1494,9 +1494,7 @@ void flushPoolQuda(QudaMemoryType type)
   case QUDA_MEMORY_DEVICE:
     pool::flush_device();
     break;
-  case QUDA_MEMORY_HOST_PINNED:
-    pool::flush_host_pinned();
-    break;
+  case QUDA_MEMORY_HOST_PINNED: pool::flush_host_pinned(); break;
   default:
     errorQuda("MemoryType %d not supported", type);
   }

@@ -103,6 +103,12 @@ namespace quda
     MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE));
   }
 
+  void Communicator::comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size)
+  {
+    MPI_CHECK(
+      MPI_Allgather(send_handle, (int)handle_size, MPI_BYTE, recv_buf, (int)handle_size, MPI_BYTE, MPI_COMM_HANDLE));
+  }
+
   void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
   {
     int initialized;

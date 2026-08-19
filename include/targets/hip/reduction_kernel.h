@@ -17,12 +17,14 @@ namespace quda
   namespace reduction_prefetch
   {
     template <template <typename> class Transformer, typename Arg>
-    inline constexpr bool reduction_functor_prefetch_2d_v = requires(Transformer<Arg> &t) {
+    inline constexpr bool reduction_functor_prefetch_2d_v = requires(Transformer<Arg> &t)
+    {
       t.prefetch(0, 0);
     };
 
     template <template <typename> class Functor, typename Arg>
-    inline constexpr bool reduction_functor_prefetch_3d_v = requires(Functor<Arg> &t) {
+    inline constexpr bool reduction_functor_prefetch_3d_v = requires(Functor<Arg> &t)
+    {
       t.prefetch(0, 0, 0);
     };
   } // namespace reduction_prefetch
@@ -80,9 +82,7 @@ namespace quda
             idx += Arg::work_item_unroll * stride;
           } else {
 #pragma unroll
-            for (unsigned e = 0; e < Arg::work_item_unroll; e++) {
-              value = t(value, idx + e * stride, j);
-            }
+            for (unsigned e = 0; e < Arg::work_item_unroll; e++) { value = t(value, idx + e * stride, j); }
             idx += Arg::work_item_unroll * stride;
           }
         }
@@ -177,9 +177,7 @@ namespace quda
             idx += Arg::work_item_unroll * stride;
           } else {
 #pragma unroll
-            for (unsigned e = 0; e < Arg::work_item_unroll; e++) {
-              value = t(value, idx + e * stride, k, j);
-            }
+            for (unsigned e = 0; e < Arg::work_item_unroll; e++) { value = t(value, idx + e * stride, k, j); }
             idx += Arg::work_item_unroll * stride;
           }
         }

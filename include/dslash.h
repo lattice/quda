@@ -153,6 +153,13 @@ namespace quda
       // ghost_buf, but this is only presently set with the
       // synchronous exchangeGhost.
       static void *ghost[8] = {}; // needs to be persistent across interior and exterior calls
+      // Halo read base depends on the transport: the NVSHMEM (shmem) dslash
+      // reads the SYMMETRIC recv buffer (nvshmem_putmem destination), while the
+      // P2P/GDR/MPI dslash reads the contiguous non-shmem recv buffer (where
+      // peer P2P writes, GDR NIC writes and unpackGhost staging land).  arg.shmem
+      // is a compile-time 0 in non-NVSHMEM builds, so this collapses to Ghost2
+      // (which itself aliases the symmetric buffer there).
+      const char *ghost_base = static_cast<const char *>(arg.shmem > 0 ? halo.Ghost2Shmem() : halo.Ghost2());
       for (int dim = 0; dim < 4; dim++) {
 
         for (int dir = 0; dir < 2; dir++) {
@@ -161,7 +168,7 @@ namespace quda
           // kernel, then we only have to update the non-p2p ghosts,
           // since these may have been assigned to zero-copy memory
           if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL) {
-            ghost[2 * dim + dir] = (typename Arg::Float *)((char *)halo.Ghost2() + halo.GhostOffset(dim, dir));
+            ghost[2 * dim + dir] = (typename Arg::Float *)(ghost_base + halo.GhostOffset(dim, dir));
           }
         }
       }
@@ -428,21 +435,27 @@ namespace quda
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
-            packBuffer[2 * dim + dir] = static_cast<char *>(halo.remoteFace_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir);
+            // QUDA P2P: pack directly into the imported peer contiguous P2P recv buffer.
+            packBuffer[2 * dim + dir]
+              = static_cast<char *>(halo.remoteFaceP2P_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = halo.myFace_hd(dir, dim);
           } else if (location & Shmem) {
-            // we check whether we can directly pack into the in.remoteFace_d(dir, dim) buffer on the remote GPU
+            // NVSHMEM transport.  Remote pointer + put dest/source stay on the
+            // SYMMETRIC buffers (remoteFaceShmem_d / remoteFace_r / myFaceShmem_d):
+            // nvshmem_putmem needs a symmetric dest and a legal NVSHMEM local
+            // source -- never the P2P DeviceCommBuffer.
+            // we check whether we can directly pack into the nvshmem_ptr remote buffer on the remote GPU
             // pack directly into remote or local memory
-            packBuffer[2 * dim + dir] = halo.remoteFace_d(dir, dim) ?
-              static_cast<char *>(halo.remoteFace_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir) :
-              halo.myFace_d(dir, dim);
+            packBuffer[2 * dim + dir] = halo.remoteFaceShmem_d(dir, dim) ?
+              static_cast<char *>(halo.remoteFaceShmem_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir) :
+              halo.myFaceShmem_d(dir, dim);
             // whether we need to shmem_putmem into the receiving buffer
-            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = halo.remoteFace_d(dir, dim) ?
+            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = halo.remoteFaceShmem_d(dir, dim) ?
               nullptr :
               static_cast<char *>(halo.remoteFace_r()) + halo.GhostOffset(dim, 1 - dir);
-          } else { // pack to local gpu memory
-            packBuffer[2 * dim + dir] = halo.myFace_d(dir, dim);
+          } else { // pack to local gpu memory (P2P copy-engine source / GDR-send source)
+            packBuffer[2 * dim + dir] = halo.myFaceP2P_d(dir, dim);
           }
         }
       }

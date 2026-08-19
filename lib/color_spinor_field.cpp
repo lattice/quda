@@ -746,6 +746,25 @@ namespace quda
 
   const void *ColorSpinorField::Ghost2() const
   {
+    // Device dslash halo read base for the NON-shmem transports (P2P / GDR /
+    // MPI-host-staged): all of these deposit the halo into the contiguous
+    // recv buffer (peer P2P writes, GDR NIC writes, unpackGhost staging).
+    // Aliases the symmetric buffer in non-NVSHMEM builds.
+    if (Location() == QUDA_CPU_FIELD_LOCATION) {
+      return nullptr;
+    } else {
+      if (bufferIndex < 2) {
+        return ghost_recv_buffer_p2p_d[bufferIndex];
+      } else {
+        return ghost_pinned_recv_buffer_hd[bufferIndex % 2];
+      }
+    }
+  }
+
+  const void *ColorSpinorField::Ghost2Shmem() const
+  {
+    // Device dslash halo read base for the NVSHMEM transport: the halo lands in
+    // the SYMMETRIC recv buffer (nvshmem_putmem destination).
     if (Location() == QUDA_CPU_FIELD_LOCATION) {
       return nullptr;
     } else {
@@ -1024,13 +1043,14 @@ namespace quda
       for (int dir = 0; dir < 2; dir++) {
         switch (location[2 * dim + dir]) {
 
-        case Device: // pack to local device buffer
-          packBuffer[2 * dim + dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+        case Device: // pack to local device buffer (P2P copy-engine / GDR send source)
+          packBuffer[2 * dim + dir] = my_face_dim_dir_p2p_d[bufferIndex][dim][dir];
           packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = nullptr;
           break;
         case Shmem:
-          // this is the remote buffer when using shmem ...
-          // if the ghost_remote_send_buffer_d exists we can directly use it
+          // NVSHMEM transport: stays on the SYMMETRIC buffers (nvshmem_ptr remote,
+          // symmetric recv, symmetric local source) -- never the P2P buffers.
+          // if the (symmetric) nvshmem_ptr remote exists we can directly use it
           // - else we need pack locally and send data to the recv buffer
           packBuffer[2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
             static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
@@ -1042,9 +1062,9 @@ namespace quda
         case Host: // pack to zero-copy memory
           packBuffer[2 * dim + dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
-        case Remote: // pack to remote peer memory
+        case Remote: // pack to remote peer memory (P2P: imported peer contiguous recv)
           packBuffer[2 * dim + dir]
-            = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
+            = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
           break;
         default: errorQuda("Undefined location %d", location[2 * dim + dir]);
         }
@@ -1070,8 +1090,11 @@ namespace quda
                                    const qudaStream_t &stream) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
-    void *gpu_buf
-      = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
+    // Source matches the non-shmem (Device) pack target, which packs into the
+    // contiguous P2P send buffer (packGhost Device case).  Aliases the symmetric
+    // buffer in non-NVSHMEM builds.
+    void *gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_p2p_d[bufferIndex][dim][0] :
+                                              my_face_dim_dir_p2p_d[bufferIndex][dim][1];
     qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], qudaMemcpyDeviceToHost, stream);
   }
 
@@ -1081,7 +1104,11 @@ namespace quda
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     const void *src = ghost_spinor;
     auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
-    void *ghost_dst = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+    // Non-shmem (MPI/host-staged) recv: land in the contiguous non-shmem recv
+    // buffer, which is where the non-shmem dslash reads its halo (Ghost2 /
+    // scatter early-returns for genuine P2P dirs).  Aliases the symmetric buffer
+    // in non-NVSHMEM builds.
+    void *ghost_dst = static_cast<char *>(ghost_recv_buffer_p2p_d[bufferIndex]) + offset;
 
     qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], qudaMemcpyHostToDevice, stream);
   }
@@ -1144,17 +1171,15 @@ namespace quda
 
       // if not using copy engine then the packing kernel will remotely write the halos
       if (!remote_write) {
-        // all goes here
-        void *ghost_dst
-          = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+        // P2P copy-engine: source = local contiguous P2P send buffer, dest =
+        // imported peer contiguous P2P recv buffer.
+        void *ghost_dst = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir])
+          + ghost_offset[dim][(dir + 1) % 2];
 
-        qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
+        qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_p2p_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
-        // record the event
-      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
-      // send to the processor in the -1 direction
-      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+      comm_p2p_signal_send_done(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, stream, QudaP2PSignal::REMOTE_EVENT);
     }
   }
 
@@ -1179,9 +1204,17 @@ namespace quda
     if (!commDimPartitioned(dim)) return 1;
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
+    const bool stream_gated = comm::p2p_signal() == QudaP2PSignal::STREAM_GATED;
+
     // first query send to backwards
     if (comm_peer2peer_enabled(dir, dim)) {
-      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_p2p[bufferIndex][dim][dir]);
+      // Stream-gated P2P sends are stream-ordered (cuStreamWriteValue64) -- there is
+      // no MPI send doorbell to poll, so treat the send as complete here.  (The
+      // event/cudaIPC path still polls mh_send_p2p.)
+      if (stream_gated)
+        complete_send[dim][dir] = true;
+      else if (!complete_send[dim][dir])
+        complete_send[dim][dir] = comm_p2p_query_send_drained(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir);
     } else if (gdr_send) {
       if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1190,8 +1223,12 @@ namespace quda
 
     // second query receive from forwards
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      if (!complete_recv[dim][1 - dir])
-        complete_recv[dim][1 - dir] = comm_query(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      // Stream-gated P2P receives are gated via commsWaitStream (cuStreamWaitValue64)
+      // on the stream -- no MPI recv doorbell to poll, so treat as complete here.
+      if (stream_gated)
+        complete_recv[dim][1 - dir] = true;
+      else if (!complete_recv[dim][1 - dir])
+        complete_recv[dim][1 - dir] = comm_p2p_query_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir);
     } else if (gdr_recv) {
       if (!complete_recv[dim][1 - dir])
         complete_recv[dim][1 - dir] = comm_query(mh_recv_rdma[bufferIndex][dim][1 - dir]);
@@ -1208,7 +1245,7 @@ namespace quda
     }
   }
 
-  void ColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv) const
+  void ColorSpinorField::commsWait(int d, const qudaStream_t &stream, bool gdr_send, bool gdr_recv) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     // note this is scatter centric, so dir=0 (1) is send backwards
@@ -1222,8 +1259,7 @@ namespace quda
 
     // first wait on send to "dir"
     if (comm_peer2peer_enabled(dir, dim)) {
-      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
-      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+      comm_p2p_wait_send_drained(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, QudaP2PSignal::REMOTE_EVENT);
     } else if (gdr_send) {
       comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1232,13 +1268,62 @@ namespace quda
 
     // second wait on receive from "1 - dir"
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
-      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+      comm_p2p_wait_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir, stream, QudaP2PSignal::REMOTE_EVENT);
     } else if (gdr_recv) {
       comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
       comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
     }
+  }
+
+  void ColorSpinorField::sendStartStreamGated(int d, const qudaStream_t &stream, bool remote_write) const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return;
+    if (!comm_peer2peer_enabled(dir, dim))
+      errorQuda("sendStartStreamGated requires peer-to-peer enabled for (dir=%d, dim=%d)", dir, dim);
+
+    // With remote_write the packing kernel has already written the halo straight
+    // into the peer's buffer, so the copy-engine transfer must be skipped (doing it
+    // would clobber the remote-written data with the unpacked local send buffer) --
+    // mirrors sendStart's `if (!remote_write)` guard.  The signal still goes on this
+    // per-direction stream: issueGather inserts a qudaStreamWaitEvent(.., packEnd) on
+    // it, so the cuStreamWriteValue64 is correctly ordered after the remote write.
+    if (!remote_write) {
+      // P2P copy-engine (stream-gated): contiguous P2P send -> imported peer P2P recv.
+      void *ghost_dst
+        = static_cast<char *>(ghost_remote_send_buffer_p2p_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+      qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_p2p_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
+    }
+    comm_p2p_signal_send_done(FieldKind::COLOR_SPINOR, bufferIndex, dim, dir, stream, QudaP2PSignal::STREAM_GATED);
+  }
+
+  void ColorSpinorField::commsWaitStream(int d, const qudaStream_t &stream) const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return;
+    if (!comm_peer2peer_enabled(1 - dir, dim))
+      errorQuda("commsWaitStream requires peer-to-peer enabled for receive (1-dir=%d, dim=%d)", 1 - dir, dim);
+
+    comm_p2p_wait_recv_signal(FieldKind::COLOR_SPINOR, bufferIndex, dim, 1 - dir, stream, QudaP2PSignal::STREAM_GATED);
+  }
+
+  bool ColorSpinorField::commsQuerySend(int d, bool gdr) const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return true;
+    // P2P sends are completed via their own signalling (stream merge / copy event),
+    // not the MPI request, so report them drained here.  Only the non-P2P (MPI/IB)
+    // send needs an explicit MPI_Test, mirroring commsQuery's send half.
+    if (comm_peer2peer_enabled(dir, dim)) return true;
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
+    return gdr ? comm_query(mh_send_rdma[bufferIndex][dim][dir]) : comm_query(mh_send[bufferIndex][dim][dir]);
   }
 
   void ColorSpinorField::scatter(int dim_dir, const qudaStream_t &stream) const
@@ -1316,11 +1401,14 @@ namespace quda
         void *send[4 * QUDA_MAX_DIM];
         for (int d = 0; d < nDimComms; d++) {
           for (int dir = 0; dir < 2; dir++) {
+            // Non-shmem exchange: device send/recv use the contiguous P2P
+            // buffers (P2P/GDR/MPI-staged); Host stays host-mapped.  Alias the
+            // symmetric buffers in non-NVSHMEM builds.
             send[2 * d + dir] = pack_destination[2 * d + dir] == Host ? my_face_dim_dir_hd[bufferIndex][d][dir] :
-                                                                        my_face_dim_dir_d[bufferIndex][d][dir];
+                                                                        my_face_dim_dir_p2p_d[bufferIndex][d][dir];
             send[2 * QUDA_MAX_DIM + 2 * d + dir] = nullptr;
             ghost_buf[2 * d + dir] = halo_location[2 * d + dir] == Host ? from_face_dim_dir_hd[bufferIndex][d][dir] :
-                                                                          from_face_dim_dir_d[bufferIndex][d][dir];
+                                                                          from_face_dim_dir_p2p_d[bufferIndex][d][dir];
           }
 
           // if doing p2p, then we must pack to and load the halo from device memory
@@ -1361,26 +1449,39 @@ namespace quda
                 if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
                     && // fuse forwards and backwards if possible
                     pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
-                  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
+                  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_p2p_d[bufferIndex][i][0],
                                   2 * ghost_face_bytes_aligned[i], qudaMemcpyDeviceToHost, device::get_default_stream());
                 } else {
                   if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
-                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
+                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_p2p_d[bufferIndex][i][0],
                                     ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
                   if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
+                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_p2p_d[bufferIndex][i][1],
                                     ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
                 }
               }
             }
           } else if (total_bytes && !pack_host) {
-            qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes,
+            // fused D->H of the whole (non-shmem) send buffer -- contiguous P2P
+            // send base (aliases symmetric in non-NVSHMEM builds).
+            qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_p2p_d[bufferIndex], total_bytes,
                             qudaMemcpyDeviceToHost, device::get_default_stream());
           }
         }
 
-        // prepost receive
-        for (int i = 0; i < 2 * nDimComms; i++) recvStart(i, device::get_default_stream(), gdr_recv);
+        // Under stream-gating the P2P halo exchange uses stream-mem-op signalling
+        // (cuStreamWriteValue64/WaitValue64) instead of IPC events + MPI doorbells.
+        // The per-kind ipcCopyEvents are compiled out on MNNVL builds, so the event
+        // path (recvStart P2P doorbell / sendStart event record / ipcRemoteCopyEvent
+        // stream-wait) must be replaced by sendStartStreamGated + commsWaitStream here.
+        const bool stream_gated = comm::p2p_signal() == QudaP2PSignal::STREAM_GATED;
+
+        // prepost receive (skip the stream-gated P2P MPI doorbell -- the stream-gated
+        // sender posts no MPI send, so this recv would never complete).
+        for (int i = 0; i < 2 * nDimComms; i++) {
+          if (stream_gated && comm_peer2peer_enabled(1 - (i % 2), i / 2)) continue;
+          recvStart(i, device::get_default_stream(), gdr_recv);
+        }
 
         // FIXME use events to properly synchronize streams, logic below failed when using p2p in all 4 dimensions (DGX2)
         bool sync = true;
@@ -1396,10 +1497,22 @@ namespace quda
           for (int dim = 0; dim < nDimComms; dim++) {
             for (int dir = 0; dir < 2; dir++) {
               if ((comm_peer2peer_enabled(dir, dim) + p2p) % 2 == 0) { // issue non-p2p transfers first
-                sendStart(2 * dim + dir, device::get_stream(2 * dim + dir), gdr_send);
+                if (stream_gated && comm_peer2peer_enabled(dir, dim))
+                  // stream-gated P2P: copy-engine memcpy + cuStreamWriteValue64 on the per-dir stream
+                  sendStartStreamGated(2 * dim + dir, device::get_stream(2 * dim + dir));
+                else
+                  sendStart(2 * dim + dir, device::get_stream(2 * dim + dir), gdr_send);
               }
             }
           }
+        }
+
+        // stream-gated P2P receive waits: gate the default stream on each peer's flag
+        // (cuStreamWaitValue64) so the received halo is visible to downstream work.
+        if (stream_gated) {
+          for (int dim = 0; dim < nDimComms; dim++)
+            for (int dir = 0; dir < 2; dir++)
+              if (comm_peer2peer_enabled(1 - dir, dim)) commsWaitStream(2 * dim + dir, device::get_default_stream());
         }
 
         bool comms_complete[2 * QUDA_MAX_DIM] = {};
@@ -1412,7 +1525,10 @@ namespace quda
                   = commsQuery(2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
                 if (comms_complete[2 * dim + dir]) {
                   comms_done++;
-                  if (comm_peer2peer_enabled(1 - dir, dim))
+                  // Event path only: order the received P2P halo on the default stream.
+                  // Stream-gated already did this via commsWaitStream above (the
+                  // ipcRemoteCopyEvents don't exist on MNNVL builds).
+                  if (!stream_gated && comm_peer2peer_enabled(1 - dir, dim))
                     qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][dim][1 - dir], 0);
                 }
               }
@@ -1427,30 +1543,41 @@ namespace quda
                 if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
                     && // fuse forwards and backwards if possible
                     halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
-                  qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+                  qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                                   2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice, device::get_default_stream());
                 } else {
                   if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
-                    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+                    qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                                     ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
                   if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
+                    qudaMemcpyAsync(from_face_dim_dir_p2p_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
                                     ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
                 }
               }
             }
           } else if (total_bytes && !halo_host) {
-            qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
+            // fused H->D into the whole (non-shmem) recv buffer -- contiguous
+            // P2P recv base (aliases symmetric in non-NVSHMEM builds).
+            qudaMemcpyAsync(ghost_recv_buffer_p2p_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
                             qudaMemcpyHostToDevice, device::get_default_stream());
           }
         }
 
         // ensure that the p2p sending is completed before returning
-        for (int dim = 0; dim < nDimComms; dim++) {
-          if (!comm_dim_partitioned(dim)) continue;
-          for (int dir = 0; dir < 2; dir++) {
-            if (comm_peer2peer_enabled(dir, dim))
-              qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
+        if (stream_gated) {
+          // Stream-gated P2P sends (memcpy + cuStreamWriteValue64) live on the per-dir
+          // streams and record no ipcCopyEvent.  Hard-drain the device so the send
+          // memcpys finish (send buffer safe to reuse) and the queued default-stream
+          // receive waits resolve before the halo is consumed -- matching the event
+          // path's per-send-completion guarantee.  exchangeGhost is not a hot path.
+          qudaDeviceSynchronize();
+        } else {
+          for (int dim = 0; dim < nDimComms; dim++) {
+            if (!comm_dim_partitioned(dim)) continue;
+            for (int dir = 0; dir < 2; dir++) {
+              if (comm_peer2peer_enabled(dir, dim))
+                qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
+            }
           }
         }
       } else {

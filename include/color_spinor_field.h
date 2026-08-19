@@ -653,6 +653,42 @@ namespace quda
     void commsWait(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
 
     /**
+       @brief Queue a peer-to-peer ghost send via stream-mem-op signalling
+       (qudaMemcpyP2PAsync into the peer's recv buffer + cuStreamWriteValue64
+       on the same stream).  No MPI doorbell and no IPC event; the peer learns
+       of arrival via the signal memory cell.  Caller must ensure peer-to-peer
+       is enabled for this direction.
+       @param[in] d d=[2*dim+dir], where dim is the dimension and dir the direction
+       @param[in] stream The stream the copy and signal are enqueued on
+       @param[in] remote_write Whether the halo is delivered by a remote write
+    */
+    void sendStartStreamGated(int d, const qudaStream_t &stream, bool remote_write = false) const;
+
+    /**
+       @brief Queue a peer-to-peer recv wait via stream-mem-op signalling
+       (cuStreamWaitValue64).  No host poll; the wait is captured on the
+       consumer stream so the consumer kernel gates on halo arrival.  Caller
+       must ensure peer-to-peer is enabled for this receive direction.
+       @param[in] d d=[2*dim+dir], where dim is the dimension and dir the direction
+       @param[in] stream The consumer stream the wait is captured on
+    */
+    void commsWaitStream(int d, const qudaStream_t &stream) const;
+
+    /**
+       @brief Non-blocking drain of the *send* to direction "dir" (d=2*dim+dir).
+       Used by the stream-gated policies in the hybrid case where the matching
+       receive (1-dir) is P2P (handled by a queued stream wait) but this send
+       direction is non-P2P (MPI/IB): the persistent send request must still be
+       polled to completion, exactly as the message-passing path does, or the
+       next iteration's MPI_Start hits MPI_ERR_REQUEST. P2P sends are drained via
+       their own signalling, so this reports them complete immediately.
+       @param[in] d d=[2*dim+dir]
+       @param[in] gdr whether the non-P2P send used the RDMA (GDR) handle
+       @return true once the send is drained (or the dir is P2P / not partitioned)
+    */
+    bool commsQuerySend(int d, bool gdr = false) const;
+
+    /**
        @brief Unpacks the ghost from host to device after
        communication has finished.
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
@@ -732,7 +768,18 @@ namespace quda
      */
     size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
+    /**
+       @brief Device halo read base for the non-shmem transports (P2P/GDR/
+       MPI-host-staged): the contiguous recv buffer that all of these deposit
+       into.  Aliases the symmetric buffer in non-NVSHMEM builds.
+     */
     const void *Ghost2() const;
+
+    /**
+       @brief Device halo read base for the NVSHMEM transport: the symmetric recv
+       buffer (nvshmem_putmem destination).
+     */
+    const void *Ghost2Shmem() const;
 
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)

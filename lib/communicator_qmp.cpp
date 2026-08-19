@@ -137,6 +137,25 @@ namespace quda
 // There are more efficient ways to do the following,
 // but it doesn't really matter since this function should be
 // called just once.
+void Communicator::comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size)
+{
+#ifdef USE_MPI_GATHER
+  MPI_CHECK(MPI_Allgather(send_handle, (int)handle_size, MPI_BYTE, recv_buf, (int)handle_size, MPI_BYTE, MPI_COMM_HANDLE));
+#else
+  // QMP fallback: byte-wise emulation via reductions.
+  // FIXME: We should optimize this to use a multi-reduction.
+  unsigned char *send_bytes = (unsigned char *)send_handle;
+  unsigned char *recv_bytes = (unsigned char *)recv_buf;
+  for (int i = 0; i < comm_size(); ++i) {
+    for (size_t b = 0; b < handle_size; ++b) {
+      int data = (i == comm_rank()) ? send_bytes[b] : 0;
+      comm_allreduce_int(data);
+      recv_bytes[i * handle_size + b] = (unsigned char)data;
+    }
+  }
+#endif
+}
+
 void Communicator::comm_gather_gpuid(int *gpuid_recv_buf)
 {
 

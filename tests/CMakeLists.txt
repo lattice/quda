@@ -1124,6 +1124,54 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
 endforeach(pol)
 
+# ---------------------------------------------------------------------------
+# Stream-gated P2P regression.  Guards the stream-gated flag-buffer lifecycle: on
+# an NVSHMEM build, QUDA_ENABLE_NVSHMEM=0 drives the non-NVSHMEM stream-gated P2P
+# path; if flag-buffer creation is ever suppressed, the lifecycle invariant in
+# comm_target.cpp aborts deterministically (no reliance on a numerical race).
+# --require-p2p makes it non-vacuous (fails if no P2P neighbour is enabled).
+#
+# Registered only when the configure-time grid has >1 rank (QUDA_TEST_NUM_PROCS,
+# derived from QUDA_TEST_GRID_SIZE which MUST be set BEFORE cmake configure). A
+# single-rank configure cannot exercise P2P, so we skip with a clear message.
+if(QUDA_NVSHMEM AND QUDA_DIRAC_STAGGERED AND (QUDA_MPI OR QUDA_QMP))
+  if(QUDA_TEST_NUM_PROCS GREATER 1)
+    # Split partition = the full configure-time grid (each sub-grid is 1 rank ->
+    # maximal communicator create/destroy churn). Product == QUDA_TEST_NUM_PROCS > 1.
+    separate_arguments(SG_GRID_PARTITION UNIX_COMMAND "$ENV{QUDA_TEST_GRID_SIZE}")
+
+    add_test(NAME staggered_dslash_stream_gated_p2p
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type staggered
+                     --test Dslash
+                     --require-p2p true
+                     --dim 4 4 6 8
+                     --gtest_output=xml:staggered_dslash_stream_gated_p2p.xml)
+    set_tests_properties(staggered_dslash_stream_gated_p2p PROPERTIES
+      ENVIRONMENT "QUDA_ENABLE_NVSHMEM=0;QUDA_P2P_TRANSPORT=stream_gated;QUDA_ENABLE_P2P=5;QUDA_ENABLE_DSLASH_POLICY=0"
+      LABELS "multi_gpu;stream_gated;regression"
+      TIMEOUT 600)
+
+    # Split-grid variant: explicit --grid-partition (product>1) makes test_split_grid
+    # true, genuinely entering the push_communicator() flag-buffer recreate path.
+    add_test(NAME staggered_dslash_stream_gated_p2p_splitgrid
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type staggered
+                     --test Dslash
+                     --require-p2p true
+                     --grid-partition ${SG_GRID_PARTITION}
+                     --dim 4 4 6 8
+                     --gtest_output=xml:staggered_dslash_stream_gated_p2p_splitgrid.xml)
+    set_tests_properties(staggered_dslash_stream_gated_p2p_splitgrid PROPERTIES
+      ENVIRONMENT "QUDA_ENABLE_NVSHMEM=0;QUDA_P2P_TRANSPORT=stream_gated;QUDA_ENABLE_P2P=5;QUDA_ENABLE_DSLASH_POLICY=0"
+      LABELS "multi_gpu;stream_gated;regression"
+      TIMEOUT 600)
+  else()
+    message(STATUS "stream_gated regression: SKIPPED registration (QUDA_TEST_NUM_PROCS=${QUDA_TEST_NUM_PROCS}); "
+                   "set QUDA_TEST_GRID_SIZE (product>1) BEFORE cmake configure to enable it.")
+  endif()
+endif()
+
 # enable the precisions that are compiled
 math(EXPR double_prec  "${QUDA_PRECISION} & 8")
 math(EXPR single_prec  "${QUDA_PRECISION} & 4")

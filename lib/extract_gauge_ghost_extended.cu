@@ -55,7 +55,7 @@ namespace quda {
     long long bytes() const
     {
       return 2LL * 2 * (size / 2) * static_cast<long long>(static_cast<int>(u.Reconstruct()))
-             * static_cast<int>(u.Precision());
+        * static_cast<int>(u.Precision());
     }
   };
 

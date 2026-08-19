@@ -6,6 +6,7 @@
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
 #include <device.h>
+#include <malloc_target.h> // declarations for the CUDA/MNNVL P2P fabric-handle accessors
 #include <shmem_helper.cuh>
 #include "timer.h"
 
@@ -36,7 +37,9 @@ namespace quda
                name ? name : "unknown", str ? str : "unknown");
   }
 
-  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, N_ALLOC_TYPE };
+  // DEVICE_COMM_BUFFER: device-side communication buffer -- P2P-capable and
+  // RDMA-ready (cuMemAlloc'd, physically contiguous, cudaIPC/fabric-exportable).
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, DEVICE_COMM_BUFFER, N_ALLOC_TYPE };
 
   class MemAlloc
   {
@@ -110,7 +113,7 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host", "Host Pinned", "Managed", "Shmem"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Host Pinned", "Managed", "Shmem ", "Comm  "};
 
     for (auto entry : alloc[type]) {
       void *ptr = entry.first;
@@ -130,7 +133,7 @@ namespace quda
   {
     total_bytes[type] += a.base_size;
     if (total_bytes[type] > max_total_bytes[type]) { max_total_bytes[type] = total_bytes[type]; }
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) {
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != DEVICE_COMM_BUFFER) {
       total_host_bytes += a.base_size;
       if (total_host_bytes > max_total_host_bytes) { max_total_host_bytes = total_host_bytes; }
     }
@@ -145,7 +148,9 @@ namespace quda
   {
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) { total_host_bytes -= size; }
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != DEVICE_COMM_BUFFER) {
+      total_host_bytes -= size;
+    }
     if (type == HOST_PINNED) { total_pinned_bytes -= size; }
     alloc[type].erase(ptr);
   }
@@ -358,8 +363,9 @@ namespace quda
     return ptr;
   }
   /**
-   * Allocate shemm device memory. This function should only be called via
-   * device_comms_pinned_malloc_()
+   * Allocate symmetric (shmem) device memory. Called from
+   * comm_buffer_malloc_(QudaCommTypeNVSHMEM, ...) and any other NVSHMEM-
+   * specific allocation point that needs symmetric-heap memory.
    */
 #ifdef NVSHMEM_COMMS
   void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
@@ -379,20 +385,200 @@ namespace quda
 #endif
     return ptr;
   }
+
+  // shmem_free_ is defined further down (next to the other comms-memory frees);
+  // forward-declare it here so the NVSHMEM tag-dispatch free below (which sits
+  // above that definition) has it in scope.
+  void shmem_free_(const char *func, const char *file, int line, void *ptr);
 #endif
 
+  // Tag-dispatched comm-buffer allocator. The P2P body uses the driver
+  // API (cuMemAlloc) directly so the resulting memory is suitable for
+  // cudaIpc handle export (P2P) and avoids the cudaMalloc-runtime-API
+  // hijack risk. NVSHMEM body delegates to shmem_malloc_ (the existing
+  // nvshmem_malloc wrapper).
+
+#ifdef QUDA_MNNVL
+  // Fabric-handle registry for P2P comm buffers allocated via VMM.  Populated
+  // by vmm_alloc_p2p_fabric; queried by comm_create_neighbor_memory when it
+  // exports the local buffer's handle to peer ranks via MPI.
+  static std::map<void *, CUmemFabricHandle> p2p_fabric_handles;
+  static std::map<void *, size_t> p2p_buffer_sizes; // padded base_size per buffer
+  static std::map<void *, CUmemGenericAllocationHandle> p2p_allocation_handles;
+  static std::map<void *, uint64_t> p2p_buffer_generations;
+  static uint64_t p2p_next_generation = 1;
+
   /**
-   * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
-   * device_comms_pinned_malloc macro, defined in malloc_quda.h
+     VMM-backed P2P comm buffer suitable for cross-node P2P within an MNNVL
+     clique.  Properties required by the IMEX path:
+       - CU_MEM_HANDLE_TYPE_FABRIC: the resulting allocation handle can be
+         exported as a CUmemFabricHandle that peer ranks (possibly on other
+         nodes within the clique) import via cuMemImportFromShareableHandle.
+       - gpuDirectRDMACapable: the NIC can DMA into this memory, needed for
+         any non-P2P fallback that routes through MPI/UCX.
+       - Single contiguous virtual mapping (cuMemAddressReserve + cuMemMap
+         of one generic allocation handle).
    */
-  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  static void *vmm_alloc_p2p_fabric(const char *func, const char *file, int line, size_t size)
   {
-#ifdef NVSHMEM_COMMS
-    return shmem_malloc_(func, file, line, size);
+    MemAlloc a(func, file, line);
+    int device_id;
+    if (cudaGetDevice(&device_id) != cudaSuccess) errorQuda("cudaGetDevice failed");
+
+    CUmemAllocationProp prop = {};
+    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.location.id = device_id;
+    prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
+    prop.allocFlags.gpuDirectRDMACapable = 1;
+
+    size_t granularity = 0;
+    CUresult err = cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_RECOMMENDED);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemGetAllocationGranularity failed (%s:%d in %s())", file, line, func);
+    size_t padded = ((size + granularity - 1) / granularity) * granularity;
+
+    CUmemGenericAllocationHandle h;
+    err = cuMemCreate(&h, padded, &prop, 0);
+    if (err != CUDA_SUCCESS)
+      errorQuda("cuMemCreate (FABRIC, size=%zu padded=%zu) failed (%s:%d in %s())", size, padded, file, line, func);
+
+    CUdeviceptr ptr_d = 0;
+    err = cuMemAddressReserve(&ptr_d, padded, granularity, 0, 0);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemAddressReserve failed (%s:%d in %s())", file, line, func);
+    err = cuMemMap(ptr_d, padded, 0, h, 0);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemMap failed (%s:%d in %s())", file, line, func);
+
+    CUmemAccessDesc access = {};
+    access.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    access.location.id = device_id;
+    access.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    err = cuMemSetAccess(ptr_d, padded, &access, 1);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemSetAccess failed (%s:%d in %s())", file, line, func);
+
+    CUmemFabricHandle fh;
+    err = cuMemExportToShareableHandle(&fh, h, CU_MEM_HANDLE_TYPE_FABRIC, 0);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemExportToShareableHandle FABRIC failed (%s:%d in %s())", file, line, func);
+
+    void *ptr = (void *)ptr_d;
+    const uint64_t generation = p2p_next_generation++;
+    p2p_fabric_handles[ptr] = fh;
+    p2p_buffer_sizes[ptr] = padded;
+    p2p_allocation_handles[ptr] = h;
+    p2p_buffer_generations[ptr] = generation;
+    logQuda(QUDA_DEBUG_VERBOSE, "MNNVL P2P allocate: ptr=%p requested=%zu padded=%zu generation=%lu\n", ptr, size,
+            padded, (unsigned long)generation);
+
+    a.size = size;
+    a.base_size = padded;
+    track_malloc(DEVICE_COMM_BUFFER, a, ptr);
+    return ptr;
+  }
+
+  static void vmm_free_p2p_fabric(const char *func, const char *file, int line, void *ptr)
+  {
+    auto it = alloc[DEVICE_COMM_BUFFER].find(ptr);
+    if (it == alloc[DEVICE_COMM_BUFFER].end())
+      errorQuda("vmm_free_p2p_fabric: pointer %p not tracked (%s:%d in %s())", ptr, file, line, func);
+    size_t size = it->second.base_size;
+
+    auto handle_it = p2p_allocation_handles.find(ptr);
+    if (handle_it == p2p_allocation_handles.end())
+      errorQuda("vmm_free_p2p_fabric: no allocation handle for pointer %p (%s:%d in %s())", ptr, file, line, func);
+    auto generation_it = p2p_buffer_generations.find(ptr);
+    if (generation_it == p2p_buffer_generations.end())
+      errorQuda("vmm_free_p2p_fabric: no generation for pointer %p (%s:%d in %s())", ptr, file, line, func);
+
+    logQuda(QUDA_DEBUG_VERBOSE, "MNNVL P2P free: ptr=%p padded=%zu generation=%lu\n", ptr, size,
+            (unsigned long)generation_it->second);
+
+    CUresult err = cuMemUnmap((CUdeviceptr)ptr, size);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemUnmap failed for P2P buffer (%s:%d in %s())", file, line, func);
+    err = cuMemRelease(handle_it->second);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemRelease failed for P2P buffer (%s:%d in %s())", file, line, func);
+    err = cuMemAddressFree((CUdeviceptr)ptr, size);
+    if (err != CUDA_SUCCESS) errorQuda("cuMemAddressFree failed for P2P buffer (%s:%d in %s())", file, line, func);
+
+    p2p_allocation_handles.erase(handle_it);
+    p2p_fabric_handles.erase(ptr);
+    p2p_buffer_sizes.erase(ptr);
+    p2p_buffer_generations.erase(generation_it);
+    track_free(DEVICE_COMM_BUFFER, ptr);
+  }
+
+  CUmemFabricHandle get_p2p_fabric_handle(void *ptr)
+  {
+    auto it = p2p_fabric_handles.find(ptr);
+    if (it == p2p_fabric_handles.end()) errorQuda("get_p2p_fabric_handle: no fabric handle for pointer %p", ptr);
+    return it->second;
+  }
+
+  size_t get_p2p_buffer_size(void *ptr)
+  {
+    auto it = p2p_buffer_sizes.find(ptr);
+    if (it == p2p_buffer_sizes.end()) errorQuda("get_p2p_buffer_size: no size for pointer %p", ptr);
+    return it->second;
+  }
+
+  uint64_t get_p2p_buffer_generation(void *ptr)
+  {
+    auto it = p2p_buffer_generations.find(ptr);
+    if (it == p2p_buffer_generations.end()) errorQuda("get_p2p_buffer_generation: no generation for pointer %p", ptr);
+    return it->second;
+  }
+#endif // QUDA_MNNVL
+
+  static void *cumemalloc_tracked(const char *func, const char *file, int line, size_t size, AllocType kind)
+  {
+    MemAlloc a(func, file, line);
+    void *ptr = nullptr;
+    a.size = a.base_size = size;
+    CUresult err = cuMemAlloc((CUdeviceptr *)&ptr, size);
+    if (err != CUDA_SUCCESS) {
+      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+    }
+    track_malloc(kind, a, ptr);
+    return ptr;
+  }
+
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::DeviceCommBuffer, size_t size)
+  {
+#ifdef QUDA_MNNVL
+    return vmm_alloc_p2p_fabric(func, file, line, size);
 #else
-    return device_pinned_malloc_(func, file, line, size);
+    return cumemalloc_tracked(func, file, line, size, DEVICE_COMM_BUFFER);
 #endif
   }
+
+#ifdef NVSHMEM_COMMS
+  void *comm_buffer_malloc_(const char *func, const char *file, int line, comm::QudaCommTypeNVSHMEM, size_t size)
+  {
+    return shmem_malloc_(func, file, line, size);
+  }
+#endif
+
+  void device_comm_buffer_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) { errorQuda("Attempt to free NULL device comm buffer (%s:%d in %s())\n", file, line, func); }
+    if (!alloc[DEVICE_COMM_BUFFER].count(ptr)) {
+      errorQuda("Attempt to free non-comm-buffer pointer with device_comm_buffer_free (%s:%d in %s())\n", file, line,
+                func);
+    }
+#ifdef QUDA_MNNVL
+    vmm_free_p2p_fabric(func, file, line, ptr);
+#else
+    CUresult err = cuMemFree((CUdeviceptr)ptr);
+    if (err != CUDA_SUCCESS) { printfQuda("Failed to free device comm buffer (%s:%d in %s())\n", file, line, func); }
+    track_free(DEVICE_COMM_BUFFER, ptr);
+#endif
+  }
+
+#ifdef NVSHMEM_COMMS
+  void nvshmem_comm_buffer_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    // shmem_free_ already asserts ptr is in alloc[SHMEM] and calls track_free(SHMEM, ...)
+    shmem_free_(func, file, line, ptr);
+  }
+#endif
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -512,18 +698,6 @@ namespace quda
   }
 #endif
 
-  /**
-   * Free device comms memory allocated with device_comms_pinned_malloc(). This function should only be
-   * called via the device_comms_pinned_free() macro, defined in malloc_quda.h
-   */
-  void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
-  {
-#ifdef NVSHMEM_COMMS
-    shmem_free_(func, file, line, ptr);
-#else
-    device_pinned_free_(func, file, line, ptr);
-#endif
-  }
 
   void printPeakMemUsage()
   {
@@ -531,20 +705,22 @@ namespace quda
     printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
     printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
     printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
+    printfQuda("Device comm buffer memory used = %.1f MiB\n", max_total_bytes[DEVICE_COMM_BUFFER] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
     printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
 
   void assertAllMemFree()
   {
-    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty()
-        || !alloc[HOST_PINNED].empty()) {
+    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty() || !alloc[HOST_PINNED].empty()
+        || !alloc[DEVICE_COMM_BUFFER].empty()) {
       warningQuda("The following internal memory allocations were not freed.");
       printfQuda("\n");
       print_alloc_header();
       print_alloc(DEVICE);
       print_alloc(DEVICE_PINNED);
       print_alloc(SHMEM);
+      print_alloc(DEVICE_COMM_BUFFER);
       print_alloc(HOST);
       print_alloc(HOST_PINNED);
       printfQuda("\n");

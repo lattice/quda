@@ -33,7 +33,11 @@ public:
 
   virtual void TearDown() { dslash_test_wrapper.end(); }
 
-  static void SetUpTestCase() { initQuda(device_ordinal); }
+  static void SetUpTestCase()
+  {
+    initQuda(device_ordinal);
+    check_require_p2p(); // enforce --require-p2p (stream-gated P2P regression)
+  }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.

@@ -7,6 +7,7 @@
 #include <stack>
 #include <algorithm>
 #include <numeric>
+#include <vector>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -14,6 +15,7 @@
 #include <field_cache.h>
 #include <comm_key.h>
 #include <float_vector.h>
+#include <comm_target.h> // target-resolved; provides constexpr comm_build_is_mnnvl()
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
@@ -214,35 +216,34 @@ namespace quda
       if (enable_peer_to_peer_env) {
         enable_peer_to_peer = atoi(enable_peer_to_peer_env);
 
-        switch (std::abs(enable_peer_to_peer)) {
-        case 0:
-          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
-          break;
-        case 1:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
-          break;
-        case 2:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
-          break;
-        case 3:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access\n");
-          break;
-        case 5:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n");
-          break;
-        case 6:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n");
-          break;
-        case 7:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n");
-          break;
-        default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
+        // Bit semantics (QUDA_ENABLE_P2P, magnitude) -- these select the P2P
+        // DATA-MOVEMENT policies the dslash autotuner considers:
+        //   bit 0 (1): copy-engine p2p
+        //   bit 1 (2): direct-load/store p2p
+        //   bit 2 (4): disable non-p2p policies (inverse — set => DEFAULT excluded)
+        //   bit 3 (8): DEPRECATED, ignored.  The completion-signalling
+        //              mechanism (event vs stream-mem-op gated) is no longer a
+        //              P2P policy; choose it with QUDA_P2P_TRANSPORT instead.
+        // Illegal: disable non-p2p (bit 2) without enabling any p2p data-movement
+        // policy (bit 0 or 1) -- that leaves no policy at all.  Catches 4 and,
+        // now that bit 3 is ignored, 12 (=4|8) which previously meant
+        // "stream-gated only".  Stream-gated is selected via QUDA_P2P_TRANSPORT.
+        const int abs_p2p = std::abs(enable_peer_to_peer);
+        if (abs_p2p > 15 || ((abs_p2p & 4) && !(abs_p2p & 3)))
+          errorQuda("Unexpected value QUDA_ENABLE_P2P=%d (bit 2 disables non-p2p but no p2p "
+                    "data-movement policy is enabled; bit 3 is deprecated -- use QUDA_P2P_TRANSPORT)\n",
+                    enable_peer_to_peer);
+        if (getVerbosity() > QUDA_SILENT && rank == 0) {
+          if (abs_p2p == 0) {
+            printf("Disabling peer-to-peer access\n");
+          } else {
+            if (abs_p2p & 1) printf("Enabling peer-to-peer copy engine access\n");
+            if (abs_p2p & 2) printf("Enabling peer-to-peer direct load/store access\n");
+            if (abs_p2p & 4) printf("Disabling non-p2p policies\n");
+            if (abs_p2p & 8)
+              printf("Warning: QUDA_ENABLE_P2P bit 3 (stream-mem-op gated) is deprecated and ignored; "
+                     "use QUDA_P2P_TRANSPORT=stream_gated|events instead\n");
+          }
         }
 
         if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
@@ -253,8 +254,20 @@ namespace quda
         enable_peer_to_peer = std::abs(enable_peer_to_peer);
 
       } else { // !enable_peer_to_peer_env
-        if (getVerbosity() > QUDA_SILENT && rank == 0)
-          printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+        // On MNNVL the direct-load/store (remote-write) P2P policy is unsafe
+        // without a receiver-side flush this device does not provide (see
+        // comm_p2p_remote_write_supported); default the remote-write bit OFF so
+        // the tuner uses the copy-engine path and no spurious "remote-write
+        // requested but no flush" warning is emitted.  Turns the default 7
+        // (3 base + 4 GDR) into 5 (or 1 GDR-off).  An explicit QUDA_ENABLE_P2P
+        // still overrides this.  No-op on non-MNNVL builds (predicate is false).
+        if constexpr (comm_build_is_mnnvl()) enable_peer_to_peer &= ~2; // clear bit 1 (remote-write)
+        if (getVerbosity() > QUDA_SILENT && rank == 0) {
+          if (enable_peer_to_peer & 2)
+            printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+          else
+            printf("Enabling peer-to-peer copy engine access\n");
+        }
       }
 
       if (!peer2peer_init && enable_peer_to_peer) {
@@ -280,47 +293,170 @@ namespace quda
 
         comm_gather_gpuid(gpuid_recv_buf);
 
-        for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
-          for (int dim = 0; dim < 4; ++dim) {
-            int neighbor_rank = comm_neighbor_rank(dir, dim);
-            if (neighbor_rank == comm_rank()) continue;
+        if constexpr (comm_build_is_mnnvl()) {
+          // MNNVL P2P reachability is probed empirically: each rank exports a fabric
+          // handle and every rank tries to import each neighbour's.  A successful import
+          // means the pair can use NVLink-fabric P2P; otherwise the link uses MPI.  (The
+          // NVML clique id is not reliable for this and is not used.)
 
-            // disable peer-to-peer comms in one direction
-            if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
-                && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
-              continue;
+          // Open a probe buffer + extract our local fabric handle.
+          const size_t fhsz = comm_target::fabric_handle_size();
+          std::vector<unsigned char> local_fh(fhsz);
+          void *probe = comm_target::open_fabric_probe(local_fh.data());
 
-            // if the neighbors are on the same
-            if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
-              int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+          // Allgather handles via *member* function so we don't hit the comm
+          // stack (this Communicator may not be pushed yet during init).
+          std::vector<unsigned char> all_fh(fhsz * comm_size());
+          this->comm_gather_fabric_handle(local_fh.data(), all_fh.data(), fhsz);
 
-              bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
-              int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
+          // Probe P2P reachability for our (up to) eight face-neighbours only:
+          // P2P is a nearest-neighbour halo exchange, so reachability to
+          // non-neighbour ranks is irrelevant (the old code imported all N peers
+          // but only ever consulted the 8 neighbours).  local_cap[dir][dim] is
+          // this rank's capability toward that neighbour -- true if we can import
+          // its fabric handle (P2P), false otherwise (MPI).  dir==0 is the -1
+          // (backward) neighbour, dir==1 the +1 (forward) neighbour (see
+          // comm_set_neighbor_ranks).
+          //
+          // Testing knob (environment variable): QUDA_P2P_FAKE_CLIQUE=<ranks-per-clique> soft-partitions the ranks
+          // into contiguous cliques (clique = rank / ranks-per-clique).  A neighbour in a
+          // different clique is left unreachable, so the symmetric-AND below downgrades
+          // that link to MPI.  This exercises the hybrid in-clique-P2P + cross-clique
+          // fallback path without a multi-clique allocation.  Off (<=0) by default; both
+          // endpoints apply the same comparison so the partition stays symmetric.
+          int fake_clique = 0;
+          if (const char *e = getenv("QUDA_P2P_FAKE_CLIQUE")) fake_clique = atoi(e);
+          if (fake_clique > 0 && getVerbosity() > QUDA_SILENT && comm_rank() == 0)
+            printf("MNNVL fabric: QUDA_P2P_FAKE_CLIQUE=%d active (soft %d-rank cliques)\n", fake_clique, fake_clique);
 
-              // enable P2P if we can access the peer or if peer is self
-              // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
-              if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+          bool local_cap[2][4] = {{false, false, false, false}, {false, false, false, false}};
+          for (int dir = 0; dir < 2; ++dir) {
+            for (int dim = 0; dim < 4; ++dim) {
+              if (comm_dim(dim) == 1) continue; // dim not partitioned: no neighbour
+              int R = comm_neighbor_rank(dir, dim);
+              if (R == (int)comm_rank()) continue; // self: no P2P needed
+              if (fake_clique > 0 && R / fake_clique != (int)comm_rank() / fake_clique)
+                continue; // fake cross-clique: leave local_cap false -> MPI
+              local_cap[dir][dim] = comm_target::try_import_fabric_handle(all_fh.data() + R * fhsz);
+            }
+          }
+
+          // Exchange capabilities so both endpoints of every link can agree.  We
+          // only need eight bytes per rank (one capability per face-direction),
+          // so this allgather is O(N) total -- never the old O(N^2) reachability
+          // matrix.  src rank is implied by buffer position and dst is
+          // recomputable from the topology, so neither is sent.  Reuse the
+          // byte-allgather member (this Communicator may not be pushed onto the
+          // stack yet during init).
+          unsigned char my_cap[8];
+          for (int dir = 0; dir < 2; ++dir)
+            for (int dim = 0; dim < 4; ++dim) my_cap[dir * 4 + dim] = local_cap[dir][dim] ? 1 : 0;
+          std::vector<unsigned char> all_cap(8 * comm_size());
+          this->comm_gather_fabric_handle(my_cap, all_cap.data(), sizeof(my_cap));
+
+          // Release the probe buffer only after the allgather above, which is a collective
+          // barrier: every rank has finished importing all peers' handles before any rank
+          // frees, so a peer's import cannot fail on a buffer that was freed too early.
+          comm_target::close_fabric_probe(probe);
+
+          // Enable P2P only where BOTH endpoints are capable (symmetric AND).  An
+          // asymmetric link (one side can import, the other cannot -- degraded
+          // node) is downgraded to MPI on *both* sides; otherwise we would post a
+          // stream-gated P2P send/wait while the peer falls back to MPI and never
+          // writes our slot -> deadlock.  Our (dir,dim) maps to the peer's
+          // reverse direction (1-dir,dim): if R is our +1 neighbour in dim, we
+          // are R's -1 neighbour in dim, so both sides evaluate the same pair and
+          // reach the same verdict.
+          for (int dir = 0; dir < 2; ++dir) {
+            for (int dim = 0; dim < 4; ++dim) {
+              if (comm_dim(dim) == 1) continue;
+              int neighbor_rank = comm_neighbor_rank(dir, dim);
+              if (neighbor_rank == (int)comm_rank()) continue;
+
+              if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
+                  && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
+                continue;
+
+              bool peer_cap = all_cap[neighbor_rank * 8 + (1 - dir) * 4 + dim] != 0;
+              if (local_cap[dir][dim] && peer_cap) {
                 peer2peer_enabled[dir][dim] = true;
                 if (getVerbosity() > QUDA_SILENT) {
-                  printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
-                         "access rank = (%3d)\n",
-                         comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
-                }
-              } else {
-                intranode_enabled[dir][dim] = true;
-                if (getVerbosity() > QUDA_SILENT) {
-                  printf(
-                    "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
-                    "dim=%d\n",
-                    comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                  printf("Peer-to-peer (fabric probe) enabled for rank %3d with neighbor %3d "
+                         "dir=%d, dim=%d\n",
+                         comm_rank(), neighbor_rank, dir, dim);
                 }
               }
+              // else: not mutually importable -- different fabric, MPI only.
+            }
+          }
+        } else {
+          for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
+            for (int dim = 0; dim < 4; ++dim) {
+              int neighbor_rank = comm_neighbor_rank(dir, dim);
+              if (neighbor_rank == comm_rank()) continue;
 
-            } // on the same node
-          }   // different dimensions - x, y, z, t
-        }     // different directions - forward/backward
+              // disable peer-to-peer comms in one direction
+              if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
+                  && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
+                continue;
+
+              // if the neighbors are on the same node
+              if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank],
+                           QUDA_MAX_HOSTNAME_STRING)) {
+                int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+
+                bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
+                int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
+
+                if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+                  peer2peer_enabled[dir][dim] = true;
+                  if (getVerbosity() > QUDA_SILENT) {
+                    printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                           "access rank = (%3d)\n",
+                           comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+                  }
+                } else {
+                  intranode_enabled[dir][dim] = true;
+                  if (getVerbosity() > QUDA_SILENT) {
+                    printf(
+                      "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
+                      "dim=%d\n",
+                      comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                  }
+                }
+
+              } // on the same node
+            }   // different dimensions - x, y, z, t
+          }     // different directions - forward/backward
+        }
 
         host_free(gpuid_recv_buf);
+      }
+
+      // Apply QUDA_DEBUG_P2P_MASK (settable via the test CLI flag --p2p-mask, which
+      // setenvs it before QUDA init).  Bitmask: X=1, Y=2, Z=4, T=8 (OR'd; default 0xF
+      // = all dims as detected by hardware).  For dims whose bit is unset,
+      // peer2peer_enabled is forced to false here, so comm_peer2peer_enabled returns
+      // false even on hardware that supports P2P.  Exercises the hybrid stream-gated +
+      // MPI-fallback path on a single-node system where every direction would
+      // otherwise be intra-node P2P.
+      {
+        const char *p2p_mask_env = getenv("QUDA_DEBUG_P2P_MASK");
+        int p2p_mask = p2p_mask_env ? atoi(p2p_mask_env) : 0xF;
+        if (p2p_mask != 0xF && rank == 0 && getVerbosity() > QUDA_SILENT)
+          printf("QUDA_DEBUG_P2P_MASK=%d in effect (X=%d Y=%d Z=%d T=%d)\n", p2p_mask, !!(p2p_mask & 1),
+                 !!(p2p_mask & 2), !!(p2p_mask & 4), !!(p2p_mask & 8));
+        for (int dim = 0; dim < 4; dim++) {
+          if (!(p2p_mask & (1 << dim))) {
+            for (int dir = 0; dir < 2; dir++) {
+              if (peer2peer_enabled[dir][dim]) {
+                if (getVerbosity() > QUDA_SILENT && rank == 0)
+                  printf("P2P force-disabled for dim=%d dir=%d via QUDA_DEBUG_P2P_MASK\n", dim, dir);
+                peer2peer_enabled[dir][dim] = false;
+              }
+            }
+          }
+        }
       }
 
       peer2peer_init = true;
@@ -718,6 +854,10 @@ namespace quda
   void comm_gather_hostname(char *hostname_recv_buf);
 
   void comm_gather_gpuid(int *gpuid_recv_buf);
+  // Byte-allgather of a fabric handle, used by the MNNVL P2P reachability probe.
+  // A plain collective (MPI_Allgather / QMP / single-rank copy) -- backend-generic,
+  // so declared unconditionally; the CUDA/fabric specifics live behind comm_target::.
+  void comm_gather_fabric_handle(void *send_handle, void *recv_buf, size_t handle_size);
 
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
 

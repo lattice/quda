@@ -8,7 +8,6 @@ namespace quda
 
   namespace device
   {
-
     /**
        @brief Create the device context.  Called by initQuda when
        initializing the library.
