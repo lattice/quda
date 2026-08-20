@@ -16,53 +16,6 @@ namespace {
 template <typename real_t> using matrix = Matrix<3, std::complex<real_t>>;
 
 /**
- * @brief Check whether a matrix and its inverse satisfy the SU(3) tolerance.
- *
- * @param[in] inv Inverse of the matrix.
- * @param[in] u Matrix to check.
- * @param[in] tol Unitarity tolerance.
- */
-template <typename real_t> bool is_unitary(const matrix<real_t> &inv, const matrix<real_t> &u, real_t tol)
-{
-  const auto identity = conj(u) * u;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      if (std::abs(u(i, j).real() - inv(j, i).real()) > tol
-          || std::abs(u(i, j).imag() + inv(j, i).imag()) > tol)
-        return false;
-    }
-    if (std::abs(identity(i, i).real() - static_cast<real_t>(1.0)) > tol || std::abs(identity(i, i).imag()) > tol)
-      return false;
-    for (int j = 0; j < i; j++) {
-      if (std::abs(identity(i, j).real()) > tol || std::abs(identity(i, j).imag()) > tol
-          || std::abs(identity(j, i).real()) > tol || std::abs(identity(j, i).imag()) > tol)
-        return false;
-    }
-  }
-  return true;
-}
-
-/**
- * @brief Project a matrix onto SU(3) using polar decomposition.
- *
- * @param[in,out] u Matrix to project.
- * @param[in] tol Unitarity tolerance.
- */
-template <typename real_t> void polar_su3(matrix<real_t> &u, real_t tol)
-{
-  auto out = u;
-  auto inv = u.inverse();
-  for (int i = 0; !is_unitary(inv, out, tol) && i < 100; i++) {
-    out = static_cast<real_t>(0.5) * (out + conj(inv));
-    inv = out.inverse();
-  }
-
-  const auto det = out.determinant();
-  const auto mod = std::pow(std::norm(det), static_cast<real_t>(-1.0 / 6.0));
-  u = std::polar(mod, -std::arg(det) / static_cast<real_t>(3.0)) * out;
-}
-
-/**
  * @brief Compute the forward and backward APE staples for a link.
  *
  * @param[in] links Extended input gauge links.
