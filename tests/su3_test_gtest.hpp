@@ -6,12 +6,12 @@
 
 #include <gtest/gtest.h>
 
-using plaquette_test_t = std::tuple<QudaPrecision, QudaReconstructType, int>;
+using gauge_observable_test_t = std::tuple<QudaPrecision, QudaReconstructType, int>;
 
 #ifdef MULTI_GPU
-constexpr std::array plaquette_partitions {0, 1, 2, 4, 8, 12, 14, 15};
+constexpr std::array gauge_observable_partitions {0, 1, 2, 4, 8, 12, 14, 15};
 #else
-constexpr std::array plaquette_partitions {0};
+constexpr std::array gauge_observable_partitions {0};
 #endif
 
 std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct);
@@ -24,7 +24,7 @@ std::array<double, 12> topological_charge_density_test(QudaPrecision precision, 
 void topological_charge_and_density_test();
 void gauge_smearing_or_flow_test();
 
-inline std::string plaquette_test_name(testing::TestParamInfo<plaquette_test_t> param)
+inline std::string gauge_observable_test_name(testing::TestParamInfo<gauge_observable_test_t> param)
 {
   const auto precision = testing::get<0>(param.param);
   const auto reconstruct = testing::get<1>(param.param);
@@ -33,7 +33,7 @@ inline std::string plaquette_test_name(testing::TestParamInfo<plaquette_test_t> 
     + std::to_string(partition);
 }
 
-class PlaquetteTest : public ::testing::TestWithParam<plaquette_test_t>
+class GaugeObservableTest : public ::testing::TestWithParam<gauge_observable_test_t>
 {
 protected:
   void SetUp() override
@@ -48,7 +48,7 @@ protected:
   void TearDown() override { quda::commDimPartitionedReset(); }
 };
 
-TEST_P(PlaquetteTest, Verify)
+TEST_P(GaugeObservableTest, Plaquette)
 {
   const auto [precision, reconstruct, partition] = GetParam();
   static_cast<void>(partition);
@@ -60,7 +60,7 @@ TEST_P(PlaquetteTest, Verify)
     EXPECT_LE(deviation[i], getTolerance(precision)) << "Host and QUDA plaquette component " << i << " do not agree";
 }
 
-TEST_P(PlaquetteTest, PlaquetteRectangle)
+TEST_P(GaugeObservableTest, PlaquetteRectangle)
 {
   const auto [precision, reconstruct, partition] = GetParam();
   static_cast<void>(partition);
@@ -73,7 +73,7 @@ TEST_P(PlaquetteTest, PlaquetteRectangle)
       << "Host and QUDA plaquette-rectangle component " << i << " do not agree";
 }
 
-TEST_P(PlaquetteTest, PolyakovLoop)
+TEST_P(GaugeObservableTest, PolyakovLoop)
 {
   const auto [precision, reconstruct, partition] = GetParam();
   static_cast<void>(partition);
@@ -85,7 +85,7 @@ TEST_P(PlaquetteTest, PolyakovLoop)
     EXPECT_LE(deviation[i], getTolerance(precision)) << "Host and QUDA Polyakov-loop component " << i << " do not agree";
 }
 
-TEST_P(PlaquetteTest, DeterminantTrace)
+TEST_P(GaugeObservableTest, DeterminantTrace)
 {
   const auto [precision, reconstruct, partition] = GetParam();
   static_cast<void>(partition);
@@ -97,7 +97,7 @@ TEST_P(PlaquetteTest, DeterminantTrace)
   EXPECT_LE(comparison[2], comparison[3]) << "Host and QUDA mean link trace do not agree";
 }
 
-TEST_P(PlaquetteTest, FieldStrengthTensor)
+TEST_P(GaugeObservableTest, FieldStrengthTensor)
 {
   const auto [precision, reconstruct, partition] = GetParam();
   static_cast<void>(partition);
@@ -109,7 +109,7 @@ TEST_P(PlaquetteTest, FieldStrengthTensor)
     << "Host and QUDA field-strength tensors do not agree";
 }
 
-TEST_P(PlaquetteTest, EnergyAndTopologicalCharge)
+TEST_P(GaugeObservableTest, EnergyAndTopologicalCharge)
 {
   const auto [precision, reconstruct, partition] = GetParam();
   static_cast<void>(partition);
@@ -122,7 +122,7 @@ TEST_P(PlaquetteTest, EnergyAndTopologicalCharge)
       << "Host and QUDA energy/topological-charge comparison " << i << " does not agree";
 }
 
-TEST_P(PlaquetteTest, TopologicalChargeDensity)
+TEST_P(GaugeObservableTest, TopologicalChargeDensity)
 {
   const auto [precision, reconstruct, partition] = GetParam();
   static_cast<void>(partition);
@@ -135,11 +135,11 @@ TEST_P(PlaquetteTest, TopologicalChargeDensity)
       << "Host and QUDA topological-charge-density comparison " << i << " does not agree";
 }
 
-INSTANTIATE_TEST_SUITE_P(Plaquette, PlaquetteTest,
+INSTANTIATE_TEST_SUITE_P(GaugeObservable, GaugeObservableTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                                          testing::ValuesIn(plaquette_partitions)),
-                         plaquette_test_name);
+                                          testing::ValuesIn(gauge_observable_partitions)),
+                         gauge_observable_test_name);
 
 TEST(SU3Test, TopologicalChargeAndDensity) { topological_charge_and_density_test(); }
 
