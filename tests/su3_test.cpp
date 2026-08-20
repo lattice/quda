@@ -145,7 +145,7 @@ std::array<double, 6> run_plaquette_rectangle(Su3Fields &fields, bool verify)
   return deviation;
 }
 
-void run_polyakov_loop(const Su3Fields &fields)
+std::array<double, 2> run_polyakov_loop(const Su3Fields &fields, bool verify)
 {
   long long flops_ploop = 198ll * V + 6 * V / fields.gauge_param.X[3];
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -162,6 +162,18 @@ void run_polyakov_loop(const Su3Fields &fields)
   printfQuda("Computed Polyakov loop gauge precise is %.16e +/- I %.16e , done in %g seconds, %g GFLOPS\n",
              param.ploop[0], param.ploop[1], secs_ploop, perf_ploop);
   param.compute_polyakov_loop = QUDA_BOOLEAN_FALSE;
+
+  std::array<double, 2> deviation {};
+  if (verify) {
+    const auto reference = polyakov_loop_reference(fields.input);
+    for (int i = 0; i < 2; i++) {
+      const double scale = std::max(std::abs(param.ploop[i]), std::abs(reference[i]));
+      deviation[i] = scale == 0.0 ? 0.0 : std::abs(param.ploop[i] - reference[i]) / scale;
+    }
+    printfQuda("Host Polyakov loop is %.16e +/- I %.16e, relative deviations %.3e %.3e\n", reference[0], reference[1],
+               deviation[0], deviation[1]);
+  }
+  return deviation;
 }
 
 void run_topological_charge_and_density()
@@ -247,7 +259,7 @@ void run_all()
   Su3Fields fields(shared_test_input(), prec, link_recon);
   run_plaquette(fields, false);
   run_plaquette_rectangle(fields, false);
-  run_polyakov_loop(fields);
+  run_polyakov_loop(fields, false);
   run_topological_charge_and_density();
   run_gauge_smearing_or_flow(fields);
 }
@@ -263,10 +275,10 @@ std::array<double, 6> plaquette_rectangle_test(QudaPrecision precision, QudaReco
   return run_plaquette_rectangle(fields, true);
 }
 
-void polyakov_loop_test()
+std::array<double, 2> polyakov_loop_test(QudaPrecision precision, QudaReconstructType reconstruct)
 {
-  Su3Fields fields(shared_test_input(), prec, link_recon);
-  run_polyakov_loop(fields);
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
+  return run_polyakov_loop(fields, true);
 }
 
 void topological_charge_and_density_test()

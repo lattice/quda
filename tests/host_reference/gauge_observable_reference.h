@@ -24,3 +24,11 @@ std::array<double, 3> plaquette_reference(const quda::GaugeField &u);
  * @return Plaquette and rectangle values.
  */
 PlaquetteRectangleReference plaquette_rectangle_reference(const quda::GaugeField &u);
+
+/**
+ * @brief Compute the real and imaginary parts of the temporal Polyakov loop on the host.
+ *
+ * @param[in] u QDP-ordered host gauge field.
+ * @return Real and imaginary Polyakov-loop values.
+ */
+std::array<double, 2> polyakov_loop_reference(const quda::GaugeField &u);
