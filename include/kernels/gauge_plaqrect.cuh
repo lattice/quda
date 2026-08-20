@@ -18,8 +18,8 @@ namespace quda
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float, recon>::type Gauge;
 
-    int E[4]; // extended grid dimensions
-    int X[4]; // true grid dimensions
+    int_fastdiv E[4]; // extended grid dimensions
+    int_fastdiv X[4]; // true grid dimensions
     int border[4];
     Gauge U;
 
