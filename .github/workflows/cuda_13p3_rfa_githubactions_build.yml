@@ -54,45 +54,7 @@ jobs:
           -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
       - name: Build
-        run: |
-          set -o pipefail
-          mkdir -p ${{github.workspace}}/monitor
-          LOG=${{github.workspace}}/monitor/resource_usage.log
-
-          # Resource monitor runs in the background and prints straight to this
-          # step's stdout (in addition to $LOG) so the samples are captured by
-          # GitHub's live log streaming even if the runner VM dies mid-build and
-          # no artifact-upload step ever gets to run.
-          (
-            while true; do
-              {
-                echo "===== $(date -u '+%Y-%m-%d %H:%M:%S UTC') (uptime: $(cut -d' ' -f1 /proc/uptime)s) ====="
-                free -h
-                echo "--- load average ---"
-                cat /proc/loadavg
-                echo "--- disk ---"
-                df -h / "${{github.workspace}}"
-                echo "--- top 15 processes by RSS ---"
-                ps -eo pid,ppid,%mem,rss,etimes,cmd --sort=-rss | head -16
-                echo "--- recent kernel messages (oom-kill etc) ---"
-                sudo dmesg -T 2>/dev/null | tail -5
-                echo
-              } | tee -a "$LOG"
-              sleep 20
-            done
-          ) &
-          MONITOR_PID=$!
-          trap 'kill "$MONITOR_PID" 2>/dev/null' EXIT
-
-          cmake --build ${{github.workspace}}/build
-
-      - name: Upload resource usage log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rfa-build-resource-usage
-          path: ${{github.workspace}}/monitor/resource_usage.log
-          if-no-files-found: ignore
+        run: cmake --build ${{github.workspace}}/build
 
       - name: Install
         run: cmake --install ${{github.workspace}}/build
