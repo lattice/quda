@@ -20,7 +20,8 @@ namespace quda
     G u;
     F f;
 
-    int X[4];    // grid dimensions
+    int_fastdiv X[4]; // grid dimensions
+    int_fastdiv E[4]; // extended grid dimensions
     int border[4];
 
     FmunuArg(GaugeField &f, const GaugeField &u) :
@@ -30,6 +31,7 @@ namespace quda
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = f.X()[dir];
+        E[dir] = u.X()[dir];
         border[dir] = (u.X()[dir] - X[dir]) / 2;
       }
     }
@@ -41,12 +43,10 @@ namespace quda
     using Link = Matrix<complex<typename Arg::Float>, 3>;
 
     int x[4];
-    int X[4];
 
     getCoords(x, idx, arg.X, parity);
     for (int dir = 0; dir < 4; ++dir) {
       x[dir] += arg.border[dir];
-      X[dir] = arg.X[dir] + 2 * arg.border[dir];
     }
 
     Link F;
@@ -54,20 +54,20 @@ namespace quda
 
       // load U(x)_(+mu)
       packed_array<int8_t, 4> dx = {};
-      Link U1 = arg.u(mu, linkIndexShift(x, dx, X), parity);
+      Link U1 = arg.u(mu, linkIndexShift(x, dx, arg.E), parity);
 
       // load U(x+mu)_(+nu)
       dx[mu]++;
-      Link U2 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U2 = arg.u(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[mu]--;
 
       // load U(x+nu)_(+mu)
       dx[nu]++;
-      Link U3 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U3 = arg.u(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[nu]--;
 
       // load U(x)_(+nu)
-      Link U4 = arg.u(nu, linkIndexShift(x, dx, X), parity);
+      Link U4 = arg.u(nu, linkIndexShift(x, dx, arg.E), parity);
 
       // compute plaquette
       F = U1 * U2 * conj(U3) * conj(U4);
@@ -77,23 +77,23 @@ namespace quda
 
       // load U(x)_(+nu)
       packed_array<int8_t, 4> dx = {};
-      Link U1 = arg.u(nu, linkIndexShift(x, dx, X), parity);
+      Link U1 = arg.u(nu, linkIndexShift(x, dx, arg.E), parity);
 
       // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
       dx[nu]++;
       dx[mu]--;
-      Link U2 = arg.u(mu, linkIndexShift(x, dx, X), parity);
+      Link U2 = arg.u(mu, linkIndexShift(x, dx, arg.E), parity);
       dx[mu]++;
       dx[nu]--;
 
       // load U(x-mu)_nu
       dx[mu]--;
-      Link U3 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U3 = arg.u(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[mu]++;
 
       // load U(x)_(-mu) = U(x-mu)_(+mu)
       dx[mu]--;
-      Link U4 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U4 = arg.u(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[mu]++;
 
       // sum this contribution to Fmunu
@@ -105,23 +105,23 @@ namespace quda
       // load U(x)_(-nu)
       packed_array<int8_t, 4> dx = {};
       dx[nu]--;
-      Link U1 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U1 = arg.u(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[nu]++;
 
       // load U(x-nu)_(+mu)
       dx[nu]--;
-      Link U2 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U2 = arg.u(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[nu]++;
 
       // load U(x+mu-nu)_(+nu)
       dx[mu]++;
       dx[nu]--;
-      Link U3 = arg.u(nu, linkIndexShift(x, dx, X), parity);
+      Link U3 = arg.u(nu, linkIndexShift(x, dx, arg.E), parity);
       dx[nu]++;
       dx[mu]--;
 
       // load U(x)_(+mu)
-      Link U4 = arg.u(mu, linkIndexShift(x, dx, X), parity);
+      Link U4 = arg.u(mu, linkIndexShift(x, dx, arg.E), parity);
 
       // sum this contribution to Fmunu
       F += conj(U1) * U2 * U3 * conj(U4);
@@ -132,26 +132,26 @@ namespace quda
       // load U(x)_(-mu)
       packed_array<int8_t, 4> dx = {};
       dx[mu]--;
-      Link U1 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U1 = arg.u(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[mu]++;
 
       // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
       dx[mu]--;
       dx[nu]--;
-      Link U2 = arg.u(nu, linkIndexShift(x, dx, X), parity);
+      Link U2 = arg.u(nu, linkIndexShift(x, dx, arg.E), parity);
       dx[nu]++;
       dx[mu]++;
 
       // load U(x-nu)_mu
       dx[mu]--;
       dx[nu]--;
-      Link U3 = arg.u(mu, linkIndexShift(x, dx, X), parity);
+      Link U3 = arg.u(mu, linkIndexShift(x, dx, arg.E), parity);
       dx[nu]++;
       dx[mu]++;
 
       // load U(x)_(-nu) = U(x-nu)_(+nu)
       dx[nu]--;
-      Link U4 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U4 = arg.u(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[nu]++;
 
       // sum this contribution to Fmunu
