@@ -27,38 +27,50 @@
 
 namespace
 {
-  struct Su3Fields {
+  const quda::GaugeField *test_input = nullptr;
+
+  GaugeInputMode default_gauge_input_mode() { return GaugeInputMode::GAUSSIAN_SU3; }
+
+  QudaGaugeParam make_gauge_param(QudaPrecision precision, QudaReconstructType reconstruct)
+  {
+    if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+    if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+
     QudaGaugeParam gauge_param = newQudaGaugeParam();
-    void *gauge[4] {};
+    setWilsonGaugeParam(gauge_param);
+    gauge_param.cuda_prec = precision;
+    gauge_param.reconstruct = reconstruct;
+    gauge_param.t_boundary = QUDA_PERIODIC_T;
+    setDims(gauge_param.X);
+    return gauge_param;
+  }
+
+  const quda::GaugeField &shared_test_input()
+  {
+    if (!test_input) errorQuda("Shared SU(3) test input is not initialized");
+    return *test_input;
+  }
+
+  struct Su3Fields {
+    QudaGaugeParam gauge_param;
+    const quda::GaugeField &input;
     void *new_gauge[4] {};
 
-    Su3Fields(QudaPrecision precision, QudaReconstructType reconstruct, int argc = 0, char **argv = nullptr)
+    Su3Fields(const quda::GaugeField &input, QudaPrecision precision, QudaReconstructType reconstruct) :
+      gauge_param(make_gauge_param(precision, reconstruct)),
+      input(input)
     {
-      if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-      if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
-
-      setWilsonGaugeParam(gauge_param);
-      gauge_param.cuda_prec = precision;
-      gauge_param.reconstruct = reconstruct;
-      gauge_param.t_boundary = QUDA_PERIODIC_T;
-      setDims(gauge_param.X);
-
-      for (int dir = 0; dir < 4; dir++) {
-        gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      for (int dir = 0; dir < 4; dir++)
         new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-      }
 
-      constructHostGaugeField(gauge, gauge_param, argc, argv);
-      loadGaugeQuda((void *)gauge, &gauge_param);
+      const auto input_ptrs = input.data_array<void *>();
+      loadGaugeQuda(const_cast<void **>(input_ptrs.data), &gauge_param);
       saveGaugeQuda(new_gauge, &gauge_param);
     }
 
     ~Su3Fields()
     {
-      for (int dir = 0; dir < 4; dir++) {
-        host_free(gauge[dir]);
-        host_free(new_gauge[dir]);
-      }
+      for (int dir = 0; dir < 4; dir++) host_free(new_gauge[dir]);
       freeGaugeQuda();
     }
   };
@@ -84,12 +96,7 @@ namespace
 
     std::array<double, 3> deviation {};
     if (verify) {
-      quda::GaugeFieldParam field_param(fields.gauge_param, fields.gauge);
-      field_param.location = QUDA_CPU_FIELD_LOCATION;
-      field_param.order = QUDA_QDP_GAUGE_ORDER;
-      field_param.create = QUDA_REFERENCE_FIELD_CREATE;
-      quda::GaugeField host_gauge(field_param);
-      const auto reference = plaquette_reference(host_gauge);
+      const auto reference = plaquette_reference(fields.input);
       for (int i = 0; i < 3; i++) {
         const double scale = std::max(std::abs(param.plaquette[i]), std::abs(reference[i]));
         deviation[i] = scale == 0.0 ? 0.0 : std::abs(param.plaquette[i] - reference[i]) / scale;
@@ -192,13 +199,16 @@ namespace
     host_timer.stop();
     printfQuda("Total time for gauge smearing = %g secs\n", host_timer.last());
 
-    if (verify_results) check_gauge(fields.gauge, fields.new_gauge, 1e-3, fields.gauge_param.cpu_prec);
+    if (verify_results) {
+      const auto input_ptrs = fields.input.data_array<void *>();
+      check_gauge(const_cast<void **>(input_ptrs.data), fields.new_gauge, 1e-3, fields.gauge_param.cpu_prec);
+    }
     delete[] obs_param;
   }
 
-  void run_all(int argc, char **argv)
+  void run_all()
   {
-    Su3Fields fields(prec, link_recon, argc, argv);
+    Su3Fields fields(shared_test_input(), prec, link_recon);
     run_plaquette(fields, false);
     run_polyakov_loop(fields);
     run_topological_charge_and_density();
@@ -208,25 +218,25 @@ namespace
 
 std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct)
 {
-  Su3Fields fields(precision, reconstruct);
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
   return run_plaquette(fields, true);
 }
 
 void polyakov_loop_test()
 {
-  Su3Fields fields(prec, link_recon);
+  Su3Fields fields(shared_test_input(), prec, link_recon);
   run_polyakov_loop(fields);
 }
 
 void topological_charge_and_density_test()
 {
-  Su3Fields fields(prec, link_recon);
+  Su3Fields fields(shared_test_input(), prec, link_recon);
   run_topological_charge_and_density();
 }
 
 void gauge_smearing_or_flow_test()
 {
-  Su3Fields fields(prec, link_recon);
+  Su3Fields fields(shared_test_input(), prec, link_recon);
   run_gauge_smearing_or_flow(fields);
 }
 
@@ -262,6 +272,9 @@ struct su3_test : quda_test {
     printfQuda(" - smearing steps %d\n", gauge_smear_steps);
     printfQuda(" - smearing ignore direction %d\n", gauge_smear_dir_ignore);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
+    const auto input_mode = resolveGaugeInputMode(default_gauge_input_mode());
+    printfQuda(" - gauge input %s\n", getGaugeInputStr(input_mode));
+    if (input_mode == GaugeInputMode::GAUSSIAN_SU3) printfQuda(" - gauge input width %f\n", gauge_input_width);
 
     printfQuda("Grid partition info:     X  Y  Z  T\n");
     printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -281,10 +294,10 @@ int main(int argc, char **argv)
 {
   su3_test test(argc, argv);
   test.init();
-  if (enable_testing)
-    return test.execute();
-  else {
-    run_all(test.argc, test.argv);
-    return 0;
-  }
+  const auto input_param = make_gauge_param(prec, QUDA_RECONSTRUCT_NO);
+  HostGaugeInput input(input_param, test.argc, test.argv, default_gauge_input_mode());
+  test_input = &input.field();
+  const int result = enable_testing ? test.execute() : (run_all(), 0);
+  test_input = nullptr;
+  return result;
 }

@@ -15,6 +15,20 @@ enum class GaugeFieldConstructionType { UNIT_GAUGE, RANDOM_GAUGE, LOAD_GAUGE };
 enum class GaugeInputMode { HAAR, UNIT, GAUSSIAN_SU3, LOAD };
 
 /**
+ * @brief Immutable host gauge input shared by independent test cases.
+ */
+class HostGaugeInput
+{
+  quda::GaugeField input;
+
+public:
+  HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv,
+                 GaugeInputMode default_mode = GaugeInputMode::HAAR);
+
+  const quda::GaugeField &field() const { return input; }
+};
+
+/**
  * @brief Resolve the active gauge-input mode from command-line options.
  */
 GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMode::HAAR);

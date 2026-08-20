@@ -22,6 +22,8 @@
 
 namespace {
 
+const quda::GaugeField *test_input = nullptr;
+
 QudaGaugeSmearParam make_smear_param(QudaGaugeSmearType type, int dir_ignore, bool use_cli, unsigned int rk_order = 3,
                                      double smear_anisotropy = 1.0, unsigned int n_steps = 1)
 {
@@ -50,6 +52,12 @@ bool is_flow(QudaGaugeSmearType type)
 GaugeInputMode default_gauge_input_mode()
 {
   return GaugeInputMode::GAUSSIAN_SU3;
+}
+
+const quda::GaugeField &shared_test_input()
+{
+  if (!test_input) errorQuda("Shared gauge-smear test input is not initialized");
+  return *test_input;
 }
 
 QudaGaugeObservableParam make_disabled_observables()
@@ -99,15 +107,14 @@ quda::GaugeFieldParam make_field_param(const QudaGaugeParam &gauge_param)
 
 struct GaugeSmearFields {
   QudaGaugeParam gauge_param;
-  quda::GaugeField input;
+  const quda::GaugeField &input;
 
-  GaugeSmearFields(QudaPrecision precision, QudaReconstructType reconstruct) :
+  GaugeSmearFields(const quda::GaugeField &input, QudaPrecision precision, QudaReconstructType reconstruct) :
     gauge_param(make_gauge_param(precision, reconstruct)),
-    input(make_field_param(gauge_param))
+    input(input)
   {
-    constructHostGaugeInputField(input, gauge_param, 0, nullptr, default_gauge_input_mode());
     auto input_ptrs = input.data_array<void *>();
-    loadGaugeQuda(input_ptrs.data, &gauge_param);
+    loadGaugeQuda(const_cast<void **>(input_ptrs.data), &gauge_param);
   }
 };
 
@@ -123,7 +130,7 @@ void save_smear_result(quda::GaugeField &result, const QudaGaugeParam &gauge_par
 int verify_one_step(QudaPrecision precision, QudaGaugeSmearParam smear_param,
                     QudaReconstructType reconstruct = QUDA_RECONSTRUCT_INVALID)
 {
-  GaugeSmearFields fields(precision, reconstruct);
+  GaugeSmearFields fields(shared_test_input(), precision, reconstruct);
   run_smear(smear_param);
   quda::GaugeField reference(make_field_param(fields.gauge_param));
   quda::GaugeField result(make_field_param(fields.gauge_param));
@@ -184,7 +191,7 @@ SmearMetrics measure_smear(QudaGaugeSmearParam smear_param, unsigned int n_steps
 SmearMetrics benchmark(QudaPrecision precision, QudaGaugeSmearParam smear_param,
                        QudaReconstructType reconstruct = QUDA_RECONSTRUCT_INVALID)
 {
-  GaugeSmearFields fields(precision, reconstruct);
+  GaugeSmearFields fields(shared_test_input(), precision, reconstruct);
 
   const auto steps = smear_param.n_steps;
 
@@ -272,22 +279,27 @@ int main(int argc, char **argv)
 {
   gauge_smear_test test(argc, argv);
   test.init();
+  const auto input_param = make_gauge_param(prec, QUDA_RECONSTRUCT_NO);
+  HostGaugeInput input(input_param, test.argc, test.argv, default_gauge_input_mode());
+  test_input = &input.field();
+  int result = 0;
   if (enable_testing) {
-    return test.execute();
+    result = test.execute();
   } else {
     if (niter < 1) errorQuda("--niter must be positive");
 
     const auto verify_param = make_smear_param(gauge_smear_type, gauge_smear_dir_ignore, true);
     if (verify_results && !verify_one_step(prec, verify_param)) {
       freeGaugeQuda();
-      return 1;
+      result = 1;
+    } else {
+      const auto benchmark_param
+        = make_smear_param(gauge_smear_type, gauge_smear_dir_ignore, true, 3, 1.0, static_cast<unsigned int>(niter));
+      const auto metrics = benchmark(prec, benchmark_param);
+      report_benchmark(gauge_smear_type, niter, metrics);
+      freeGaugeQuda();
     }
-
-    const auto benchmark_param
-      = make_smear_param(gauge_smear_type, gauge_smear_dir_ignore, true, 3, 1.0, static_cast<unsigned int>(niter));
-    const auto metrics = benchmark(prec, benchmark_param);
-    report_benchmark(gauge_smear_type, niter, metrics);
-    freeGaugeQuda();
-    return 0;
   }
+  test_input = nullptr;
+  return result;
 }

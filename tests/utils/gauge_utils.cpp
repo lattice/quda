@@ -477,6 +477,16 @@ const char *getGaugeInputStr(GaugeInputMode mode)
   return "invalid";
 }
 
+HostGaugeInput::HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv, GaugeInputMode default_mode)
+{
+  quda::GaugeFieldParam field_param(gauge_param);
+  field_param.location = QUDA_CPU_FIELD_LOCATION;
+  field_param.order = QUDA_QDP_GAUGE_ORDER;
+  field_param.create = QUDA_NULL_FIELD_CREATE;
+  input = quda::GaugeField(field_param);
+  constructHostGaugeInputField(input, gauge_param, argc, argv, default_mode);
+}
+
 GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
 {
   const bool explicit_input = !gauge_input.empty();
