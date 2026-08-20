@@ -1,12 +1,20 @@
 #pragma once
 
 #include <array>
+#include <complex>
 
 #include <gauge_field.h>
 
 struct PlaquetteRectangleReference {
   std::array<double, 3> plaquette;
   std::array<double, 3> rectangle;
+};
+
+struct LinkDeterminantTraceReference {
+  std::complex<double> determinant;
+  std::complex<double> trace;
+  double determinant_scale;
+  double trace_scale;
 };
 
 /**
@@ -32,3 +40,11 @@ PlaquetteRectangleReference plaquette_rectangle_reference(const quda::GaugeField
  * @return Real and imaginary Polyakov-loop values.
  */
 std::array<double, 2> polyakov_loop_reference(const quda::GaugeField &u);
+
+/**
+ * @brief Compute mean link determinant and trace values and their mean magnitudes.
+ *
+ * @param[in] u QDP-ordered host gauge field.
+ * @return Determinant and trace values with comparison scales.
+ */
+LinkDeterminantTraceReference link_determinant_trace_reference(const quda::GaugeField &u);

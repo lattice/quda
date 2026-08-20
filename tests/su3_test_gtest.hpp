@@ -17,6 +17,7 @@ constexpr std::array plaquette_partitions {0};
 std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct);
 std::array<double, 6> plaquette_rectangle_test(QudaPrecision precision, QudaReconstructType reconstruct);
 std::array<double, 2> polyakov_loop_test(QudaPrecision precision, QudaReconstructType reconstruct);
+std::array<double, 4> determinant_trace_test(QudaPrecision precision, QudaReconstructType reconstruct);
 void topological_charge_and_density_test();
 void gauge_smearing_or_flow_test();
 
@@ -79,6 +80,18 @@ TEST_P(PlaquetteTest, PolyakovLoop)
   const auto deviation = polyakov_loop_test(precision, reconstruct);
   for (int i = 0; i < 2; i++)
     EXPECT_LE(deviation[i], getTolerance(precision)) << "Host and QUDA Polyakov-loop component " << i << " do not agree";
+}
+
+TEST_P(PlaquetteTest, DeterminantTrace)
+{
+  const auto [precision, reconstruct, partition] = GetParam();
+  static_cast<void>(partition);
+  if (!quda::is_enabled(precision)) GTEST_SKIP();
+  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
+  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
+  const auto comparison = determinant_trace_test(precision, reconstruct);
+  EXPECT_LE(comparison[0], comparison[1]) << "Host and QUDA mean link determinant do not agree";
+  EXPECT_LE(comparison[2], comparison[3]) << "Host and QUDA mean link trace do not agree";
 }
 
 INSTANTIATE_TEST_SUITE_P(Plaquette, PlaquetteTest,

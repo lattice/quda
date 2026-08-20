@@ -191,6 +191,37 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
   }
 };
 
+template <typename real_t> struct LinkDeterminantTraceReferenceCompute {
+  void operator()(std::array<double, 6> &result, const quda::GaugeField &u)
+  {
+    const auto ptrs = u.data_array<void *>();
+    const auto links = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
+    double determinant_real = 0.0;
+    double determinant_imaginary = 0.0;
+    double trace_real = 0.0;
+    double trace_imaginary = 0.0;
+    double determinant_scale = 0.0;
+    double trace_scale = 0.0;
+
+#pragma omp parallel for reduction(+ : determinant_real, determinant_imaginary, trace_real, trace_imaginary,           \
+                                     determinant_scale, trace_scale)
+    for (size_t i = 0; i < u.Volume(); i++) {
+      for (int dir = 0; dir < 4; dir++) {
+        const auto determinant = links[dir][i].determinant();
+        const auto link_trace = trace(links[dir][i]);
+        determinant_real += determinant.real();
+        determinant_imaginary += determinant.imag();
+        trace_real += link_trace.real();
+        trace_imaginary += link_trace.imag();
+        determinant_scale += std::abs(determinant);
+        trace_scale += std::abs(link_trace);
+      }
+    }
+
+    result = {determinant_real, determinant_imaginary, trace_real, trace_imaginary, determinant_scale, trace_scale};
+  }
+};
+
 std::array<double, 3> plaquette_reference(const quda::GaugeField &u)
 {
   quda::lat_dim_t R;
@@ -244,4 +275,17 @@ PlaquetteRectangleReference plaquette_rectangle_reference(const quda::GaugeField
 std::array<double, 2> polyakov_loop_reference(const quda::GaugeField &u)
 {
   return instantiate_host_reduce<PolyakovLoopReferenceCompute, std::array<double, 2>>(u.Precision(), u);
+}
+
+LinkDeterminantTraceReference link_determinant_trace_reference(const quda::GaugeField &u)
+{
+  std::array<double, 6> sums {};
+  instantiate_host<LinkDeterminantTraceReferenceCompute>(u.Precision(), sums, u);
+  for (auto &sum : sums) quda::comm_allreduce_sum(sum);
+
+  const double normalization = 4.0 * u.Volume() * quda::comm_size();
+  return {{sums[0] / normalization, sums[1] / normalization},
+          {sums[2] / normalization, sums[3] / normalization},
+          sums[4] / normalization,
+          sums[5] / normalization};
 }

@@ -10,6 +10,7 @@
 #include <quda.h>
 #include <comm_quda.h>
 #include <instantiate.h>
+#include <pgauge_monte.h>
 
 #include "timer.h"
 #include "util_quda.h"
@@ -176,6 +177,51 @@ std::array<double, 2> run_polyakov_loop(const Su3Fields &fields, bool verify)
   return deviation;
 }
 
+std::array<double, 4> run_determinant_trace(const Su3Fields &fields, bool verify)
+{
+  quda::GaugeFieldParam field_param(fields.gauge_param);
+  field_param.location = QUDA_CUDA_FIELD_LOCATION;
+  field_param.order = QUDA_NATIVE_GAUGE_ORDER;
+  field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  field_param.create = QUDA_NULL_FIELD_CREATE;
+  field_param.setPrecision(fields.gauge_param.cuda_prec, true);
+  quda::GaugeField device_gauge(field_param);
+  device_gauge.copy(fields.input);
+
+  auto determinant = quda::getLinkDeterminant(device_gauge);
+  quda::host_timer_t host_timer;
+  host_timer.start();
+  for (int i = 0; i < niter; i++) determinant = quda::getLinkDeterminant(device_gauge);
+  host_timer.stop();
+  const double determinant_seconds = host_timer.last() / niter;
+
+  auto link_trace = quda::getLinkTrace(device_gauge);
+  host_timer.start();
+  for (int i = 0; i < niter; i++) link_trace = quda::getLinkTrace(device_gauge);
+  host_timer.stop();
+  const double trace_seconds = host_timer.last() / niter;
+
+  printfQuda("Computed mean link determinant %.16e +/- I %.16e in %g seconds\n", determinant.real(), determinant.imag(),
+             determinant_seconds);
+  printfQuda("Computed mean link trace %.16e +/- I %.16e in %g seconds\n", link_trace.real(), link_trace.imag(),
+             trace_seconds);
+
+  std::array<double, 4> comparison {};
+  if (verify) {
+    const auto reference = link_determinant_trace_reference(fields.input);
+    const double tolerance = getTolerance(fields.gauge_param.cuda_prec);
+    comparison[0] = std::abs(determinant - reference.determinant);
+    comparison[1] = tolerance * reference.determinant_scale;
+    comparison[2] = std::abs(link_trace - reference.trace);
+    comparison[3] = tolerance * reference.trace_scale;
+    printfQuda("Host determinant %.16e +/- I %.16e, difference %.3e, threshold %.3e\n", reference.determinant.real(),
+               reference.determinant.imag(), comparison[0], comparison[1]);
+    printfQuda("Host trace %.16e +/- I %.16e, difference %.3e, threshold %.3e\n", reference.trace.real(),
+               reference.trace.imag(), comparison[2], comparison[3]);
+  }
+  return comparison;
+}
+
 void run_topological_charge_and_density()
 {
   double q_charge_check = 0.0;
@@ -260,6 +306,7 @@ void run_all()
   run_plaquette(fields, false);
   run_plaquette_rectangle(fields, false);
   run_polyakov_loop(fields, false);
+  run_determinant_trace(fields, false);
   run_topological_charge_and_density();
   run_gauge_smearing_or_flow(fields);
 }
@@ -279,6 +326,12 @@ std::array<double, 2> polyakov_loop_test(QudaPrecision precision, QudaReconstruc
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   return run_polyakov_loop(fields, true);
+}
+
+std::array<double, 4> determinant_trace_test(QudaPrecision precision, QudaReconstructType reconstruct)
+{
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
+  return run_determinant_trace(fields, true);
 }
 
 void topological_charge_and_density_test()
