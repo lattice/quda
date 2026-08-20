@@ -227,7 +227,7 @@ namespace quda
   void EigenSolver::queryPrec(const QudaPrecision prec)
   {
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in real_t precision\n"); break;
+    case QUDA_DOUBLE_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in double precision\n"); break;
     case QUDA_SINGLE_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in single precision\n"); break;
     case QUDA_HALF_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in half precision\n"); break;
     case QUDA_QUARTER_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in quarter precision\n"); break;

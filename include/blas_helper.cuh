@@ -584,7 +584,7 @@ namespace quda
       if (x.Precision() == QUDA_DOUBLE_PRECISION) {
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
-            errorQuda("QUDA_PRECISION=%d does not enable real_t precision", QUDA_PRECISION);
+            errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
         // always instantiate the double-precision template to allow CPU
         // fields through, and prevent double-precision GPU
         // instantiation using double_mapper
@@ -612,9 +612,9 @@ namespace quda
     /**
        @brief device_type_mapper In general we want to enable double
        precision blas always on the host, e.g., for running unit tests,
-       but may not want to build real_t precision on the device, e.g., if
+       but may not want to build double precision on the device, e.g., if
        we have a pure single precision build with QUDA_PRECISION=4.
-       Thus we do not prevent the real_t precision template from being
+       Thus we do not prevent the double precision template from being
        instantiated when the field precision is queried, but we can
        use device_type_mapper to demote the type prior to any kernel
        being instantiated.
@@ -636,7 +636,7 @@ namespace quda
       @brief host_type_mapper At present we do not support half or
       quarter precision on the host target.  Thus we use
       host_type_mapper to promote any half/quarter precision type to
-      real_t or single to prevent the kernel prior to any kernel being
+      double or single to prevent the kernel prior to any kernel being
       instantiated to reduce template bloat.
      */
     template <typename T> struct host_type_mapper { using type = T; };
