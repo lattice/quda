@@ -3,10 +3,13 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <algorithm>
+#include <array>
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 #include <comm_quda.h>
+#include <instantiate.h>
 
 #include "timer.h"
 #include "util_quda.h"
@@ -14,6 +17,7 @@
 #include "gauge_utils.h"
 #include "command_line_params.h"
 #include "dslash_reference.h"
+#include "gauge_observable_reference.h"
 #include "misc.h"
 #include "test.h"
 
@@ -28,12 +32,14 @@ namespace
     void *gauge[4] {};
     void *new_gauge[4] {};
 
-    Su3Fields(int argc = 0, char **argv = nullptr)
+    Su3Fields(QudaPrecision precision, QudaReconstructType reconstruct, int argc = 0, char **argv = nullptr)
     {
       if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
       if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
       setWilsonGaugeParam(gauge_param);
+      gauge_param.cuda_prec = precision;
+      gauge_param.reconstruct = reconstruct;
       gauge_param.t_boundary = QUDA_PERIODIC_T;
       setDims(gauge_param.X);
 
@@ -57,7 +63,7 @@ namespace
     }
   };
 
-  void run_plaquette()
+  std::array<double, 3> run_plaquette(Su3Fields &fields, bool verify)
   {
     long long flops_plaquette = 6ll * 597 * V;
     QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -75,6 +81,24 @@ namespace
       "Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e), done in %g seconds, %g GFLOPS\n",
       param.plaquette[0], param.plaquette[1], param.plaquette[2], secs_plaquette, perf_plaquette);
     param.compute_plaquette = QUDA_BOOLEAN_FALSE;
+
+    std::array<double, 3> deviation {};
+    if (verify) {
+      quda::GaugeFieldParam field_param(fields.gauge_param, fields.gauge);
+      field_param.location = QUDA_CPU_FIELD_LOCATION;
+      field_param.order = QUDA_QDP_GAUGE_ORDER;
+      field_param.create = QUDA_REFERENCE_FIELD_CREATE;
+      quda::GaugeField host_gauge(field_param);
+      const auto reference = plaquette_reference(host_gauge);
+      for (int i = 0; i < 3; i++) {
+        const double scale = std::max(std::abs(param.plaquette[i]), std::abs(reference[i]));
+        deviation[i] = scale == 0.0 ? 0.0 : std::abs(param.plaquette[i] - reference[i]) / scale;
+      }
+      printfQuda(
+        "Host plaquette reference is %.16e (spatial = %.16e, temporal = %.16e), relative deviations %.3e %.3e %.3e\n",
+        reference[0], reference[1], reference[2], deviation[0], deviation[1], deviation[2]);
+    }
+    return deviation;
   }
 
   void run_polyakov_loop(const Su3Fields &fields)
@@ -174,35 +198,35 @@ namespace
 
   void run_all(int argc, char **argv)
   {
-    Su3Fields fields(argc, argv);
-    run_plaquette();
+    Su3Fields fields(prec, link_recon, argc, argv);
+    run_plaquette(fields, false);
     run_polyakov_loop(fields);
     run_topological_charge_and_density();
     run_gauge_smearing_or_flow(fields);
   }
 } // namespace
 
-void plaquette_test()
+std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct)
 {
-  Su3Fields fields;
-  run_plaquette();
+  Su3Fields fields(precision, reconstruct);
+  return run_plaquette(fields, true);
 }
 
 void polyakov_loop_test()
 {
-  Su3Fields fields;
+  Su3Fields fields(prec, link_recon);
   run_polyakov_loop(fields);
 }
 
 void topological_charge_and_density_test()
 {
-  Su3Fields fields;
+  Su3Fields fields(prec, link_recon);
   run_topological_charge_and_density();
 }
 
 void gauge_smearing_or_flow_test()
 {
-  Su3Fields fields;
+  Su3Fields fields(prec, link_recon);
   run_gauge_smearing_or_flow(fields);
 }
 
