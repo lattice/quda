@@ -1628,6 +1628,11 @@ add_test(NAME gauge_smear
   --dim 2 4 6 8 --enable-testing true
   --gtest_output=xml:gauge_smear_test.xml)
 
+add_test(NAME su3
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:su3_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true --niter 1
+  --gtest_output=xml:su3_test.xml)
+
 foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_DIRAC_STAGGERED)
