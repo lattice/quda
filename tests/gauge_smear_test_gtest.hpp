@@ -62,8 +62,8 @@ inline std::string flow_test_name(testing::TestParamInfo<flow_smear_test_t> para
   const auto dir_ignore = testing::get<3>(param.param);
   const auto partition = testing::get<5>(param.param);
   const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk"
-    + std::to_string(rk_order) + "_" + direction + "_partition" + std::to_string(partition);
+  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk" + std::to_string(rk_order)
+    + "_" + direction + "_partition" + std::to_string(partition);
 }
 
 inline std::string anisotropic_test_name(testing::TestParamInfo<anisotropic_smear_test_t> param)
@@ -85,8 +85,8 @@ inline std::string anisotropic_flow_test_name(testing::TestParamInfo<anisotropic
   const auto dir_ignore = testing::get<3>(param.param);
   const auto partition = testing::get<6>(param.param);
   const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk"
-    + std::to_string(rk_order) + "_aniso_" + direction + "_partition" + std::to_string(partition);
+  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk" + std::to_string(rk_order)
+    + "_aniso_" + direction + "_partition" + std::to_string(partition);
 }
 
 class GaugeSmearTest : public ::testing::TestWithParam<smear_test_t>
@@ -111,31 +111,30 @@ TEST_P(GaugeSmearTest, OneStep)
     << "CPU and QUDA gauge smearing implementations do not agree";
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  APE, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_APE),
-                   testing::Values(-1, 3, 4), testing::ValuesIn(smear_partitions)),
-  test_name);
-INSTANTIATE_TEST_SUITE_P(
-  Stout, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_STOUT),
-                   testing::Values(-1, 3, 4), testing::ValuesIn(smear_partitions)),
-  test_name);
-INSTANTIATE_TEST_SUITE_P(
-  OvrImpStout, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(-1, 3, 4),
-                   testing::ValuesIn(smear_partitions)),
-  test_name);
-INSTANTIATE_TEST_SUITE_P(
-  HYP, GaugeSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_HYP),
-                   testing::Values(-1, 3, 4), testing::ValuesIn(smear_partitions)),
-  test_name);
+INSTANTIATE_TEST_SUITE_P(APE, GaugeSmearTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_APE), testing::Values(-1, 3, 4),
+                                          testing::ValuesIn(smear_partitions)),
+                         test_name);
+INSTANTIATE_TEST_SUITE_P(Stout, GaugeSmearTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_STOUT), testing::Values(-1, 3, 4),
+                                          testing::ValuesIn(smear_partitions)),
+                         test_name);
+INSTANTIATE_TEST_SUITE_P(OvrImpStout, GaugeSmearTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(-1, 3, 4),
+                                          testing::ValuesIn(smear_partitions)),
+                         test_name);
+INSTANTIATE_TEST_SUITE_P(HYP, GaugeSmearTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_HYP), testing::Values(-1, 3, 4),
+                                          testing::ValuesIn(smear_partitions)),
+                         test_name);
 
 class GaugeFlowSmearTest : public ::testing::TestWithParam<flow_smear_test_t>
 {
@@ -159,20 +158,18 @@ TEST_P(GaugeFlowSmearTest, OneStep)
     << "CPU and QUDA gauge smearing implementations do not agree";
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  WilsonFlow, GaugeFlowSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1), testing::Values(3u, 4u),
-                   testing::ValuesIn(smear_partitions)),
-  flow_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  SymanzikFlow, GaugeFlowSmearTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1), testing::Values(3u, 4u),
-                   testing::ValuesIn(smear_partitions)),
-  flow_test_name);
+INSTANTIATE_TEST_SUITE_P(WilsonFlow, GaugeFlowSmearTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1),
+                                          testing::Values(3u, 4u), testing::ValuesIn(smear_partitions)),
+                         flow_test_name);
+INSTANTIATE_TEST_SUITE_P(SymanzikFlow, GaugeFlowSmearTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1),
+                                          testing::Values(3u, 4u), testing::ValuesIn(smear_partitions)),
+                         flow_test_name);
 
 class GaugeSmearAnisotropicTest : public ::testing::TestWithParam<anisotropic_smear_test_t>
 {
@@ -196,25 +193,24 @@ TEST_P(GaugeSmearAnisotropicTest, OneStep)
     << "CPU and QUDA gauge smearing implementations do not agree";
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  APE_Anisotropic, GaugeSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_APE),
-                   testing::Values(4), testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
-  anisotropic_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  Stout_Anisotropic, GaugeSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12), testing::Values(QUDA_GAUGE_SMEAR_STOUT),
-                   testing::Values(4), testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
-  anisotropic_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  OvrImpStout_Anisotropic, GaugeSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(4),
-                   testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
-  anisotropic_test_name);
+INSTANTIATE_TEST_SUITE_P(APE_Anisotropic, GaugeSmearAnisotropicTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_APE), testing::Values(4),
+                                          testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
+                         anisotropic_test_name);
+INSTANTIATE_TEST_SUITE_P(Stout_Anisotropic, GaugeSmearAnisotropicTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_STOUT), testing::Values(4),
+                                          testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
+                         anisotropic_test_name);
+INSTANTIATE_TEST_SUITE_P(OvrImpStout_Anisotropic, GaugeSmearAnisotropicTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(4),
+                                          testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
+                         anisotropic_test_name);
 
 class GaugeFlowSmearAnisotropicTest : public ::testing::TestWithParam<anisotropic_flow_smear_test_t>
 {
@@ -238,17 +234,17 @@ TEST_P(GaugeFlowSmearAnisotropicTest, OneStep)
     << "CPU and QUDA gauge smearing implementations do not agree";
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  WilsonFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1), testing::Values(3u, 4u),
-                   testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
-  anisotropic_flow_test_name);
-INSTANTIATE_TEST_SUITE_P(
-  SymanzikFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1), testing::Values(3u, 4u),
-                   testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
-  anisotropic_flow_test_name);
+INSTANTIATE_TEST_SUITE_P(WilsonFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1),
+                                          testing::Values(3u, 4u), testing::Values(kAnisotropicSmearValue),
+                                          testing::ValuesIn(smear_partitions)),
+                         anisotropic_flow_test_name);
+INSTANTIATE_TEST_SUITE_P(SymanzikFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1),
+                                          testing::Values(3u, 4u), testing::Values(kAnisotropicSmearValue),
+                                          testing::ValuesIn(smear_partitions)),
+                         anisotropic_flow_test_name);

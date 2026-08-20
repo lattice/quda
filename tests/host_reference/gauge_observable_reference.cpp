@@ -8,8 +8,6 @@
 #include "instantiate_host.hpp"
 #include "misc.h"
 
-namespace {
-
 template <typename real_t> using matrix = Matrix<3, std::complex<real_t>>;
 
 template <typename real_t>
@@ -46,8 +44,6 @@ template <typename real_t> struct PlaquetteReference {
     result = {spatial, temporal};
   }
 };
-
-} // namespace
 
 std::array<double, 3> plaquette_reference(const quda::GaugeField &u)
 {

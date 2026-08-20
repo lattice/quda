@@ -20,8 +20,6 @@
 // google test
 #include "gauge_smear_test_gtest.hpp"
 
-namespace {
-
 const quda::GaugeField *test_input = nullptr;
 
 QudaGaugeSmearParam make_smear_param(QudaGaugeSmearType type, int dir_ignore, bool use_cli, unsigned int rk_order = 3,
@@ -49,10 +47,7 @@ bool is_flow(QudaGaugeSmearType type)
   return type == QUDA_GAUGE_SMEAR_WILSON_FLOW || type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW;
 }
 
-GaugeInputMode default_gauge_input_mode()
-{
-  return GaugeInputMode::GAUSSIAN_SU3;
-}
+GaugeInputMode default_gauge_input_mode() { return GaugeInputMode::GAUSSIAN_SU3; }
 
 const quda::GaugeField &shared_test_input()
 {
@@ -110,8 +105,7 @@ struct GaugeSmearFields {
   const quda::GaugeField &input;
 
   GaugeSmearFields(const quda::GaugeField &input, QudaPrecision precision, QudaReconstructType reconstruct) :
-    gauge_param(make_gauge_param(precision, reconstruct)),
-    input(input)
+    gauge_param(make_gauge_param(precision, reconstruct)), input(input)
   {
     auto input_ptrs = input.data_array<void *>();
     loadGaugeQuda(const_cast<void **>(input_ptrs.data), &gauge_param);
@@ -142,19 +136,22 @@ int verify_one_step(QudaPrecision precision, QudaGaugeSmearParam smear_param,
   int check = 1;
   auto max_deviation = 0.0;
   for (int dir = 0; dir < 4; dir++) {
-    max_deviation = std::max(max_deviation, compare_floats_v2(result.data(dir), reference.data(dir), V * gauge_site_size,
-                                                              std::numeric_limits<double>::infinity(), fields.gauge_param.cpu_prec));
-    check &= compare_floats(result.data(dir), reference.data(dir), V * gauge_site_size, tolerance, fields.gauge_param.cpu_prec);
+    max_deviation = std::max(max_deviation,
+                             compare_floats_v2(result.data(dir), reference.data(dir), V * gauge_site_size,
+                                               std::numeric_limits<double>::infinity(), fields.gauge_param.cpu_prec));
+    check &= compare_floats(result.data(dir), reference.data(dir), V * gauge_site_size, tolerance,
+                            fields.gauge_param.cpu_prec);
   }
   logQuda(QUDA_SUMMARIZE,
           "%s one-step %s reconstruct=%s rk_order=%u dir_ignore=%d smear_anisotropy=%.1f: max deviation %.3e, "
           "tolerance %.3e\n",
           get_gauge_smear_str(smear_param.smear_type), get_prec_str(precision),
-          get_recon_str(fields.gauge_param.reconstruct),
-          smear_param.rk_order, smear_param.dir_ignore, smear_param.smear_anisotropy, max_deviation, tolerance);
+          get_recon_str(fields.gauge_param.reconstruct), smear_param.rk_order, smear_param.dir_ignore,
+          smear_param.smear_anisotropy, max_deviation, tolerance);
   auto result_ptrs = result.data_array<void *>();
   auto reference_ptrs = reference.data_array<void *>();
-  strong_check_link(result_ptrs.data, "QUDA result:", reference_ptrs.data, "CPU reference:", V, fields.gauge_param.cpu_prec);
+  strong_check_link(result_ptrs.data, "QUDA result:", reference_ptrs.data, "CPU reference:", V,
+                    fields.gauge_param.cpu_prec);
   return check;
 }
 
@@ -217,8 +214,6 @@ void report_benchmark(QudaGaugeSmearType type, int n_steps, const SmearMetrics &
   printfQuda("Kernel performance: %.3f GFLOP/s, %.3f GB/s, %.3f FLOP/byte\n", gflops, gbytes, intensity);
 }
 
-} // namespace
-
 int smear_verify(QudaPrecision precision, QudaReconstructType reconstruct, QudaGaugeSmearType type, int dir_ignore,
                  double smear_anisotropy)
 {
@@ -256,9 +251,7 @@ struct gauge_smear_test : quda_test {
     {
       const auto input_mode = resolveGaugeInputMode(default_gauge_input_mode());
       printfQuda(" - gauge input %s\n", getGaugeInputStr(input_mode));
-      if (input_mode == GaugeInputMode::GAUSSIAN_SU3) {
-        printfQuda(" - gauge input width %f\n", gauge_input_width);
-      }
+      if (input_mode == GaugeInputMode::GAUSSIAN_SU3) { printfQuda(" - gauge input width %f\n", gauge_input_width); }
     }
     if (!enable_testing) {
       printfQuda(" - benchmark steps (--niter) %d\n", niter);

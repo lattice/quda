@@ -55,12 +55,11 @@ TEST_P(PlaquetteTest, Verify)
     EXPECT_LE(deviation[i], getTolerance(precision)) << "Host and QUDA plaquette component " << i << " do not agree";
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  Plaquette, PlaquetteTest,
-  testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                   testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
-                   testing::ValuesIn(plaquette_partitions)),
-  plaquette_test_name);
+INSTANTIATE_TEST_SUITE_P(Plaquette, PlaquetteTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                          testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
+                                          testing::ValuesIn(plaquette_partitions)),
+                         plaquette_test_name);
 
 TEST(SU3Test, PolyakovLoop) { polyakov_loop_test(); }
 

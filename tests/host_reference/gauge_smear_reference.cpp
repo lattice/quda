@@ -11,8 +11,6 @@
 #include "instantiate_host.hpp"
 #include "misc.h"
 
-namespace {
-
 template <typename real_t> using matrix = Matrix<3, std::complex<real_t>>;
 
 /**
@@ -684,8 +682,6 @@ void wflow_smear_rk4(quda::GaugeField &out, const quda::GaugeField &in, QudaGaug
 {
   instantiate_host<WFlowRK4>(in.Precision(), out, in, gauge_param, R, smear_param, lat);
 }
-
-} // namespace
 
 void gauge_smear_reference(quda::GaugeField &out, const quda::GaugeField &in, const QudaGaugeSmearParam &smear_param)
 {
