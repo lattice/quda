@@ -104,6 +104,47 @@ std::array<double, 3> run_plaquette(Su3Fields &fields, bool verify)
   return deviation;
 }
 
+std::array<double, 6> run_plaquette_rectangle(Su3Fields &fields, bool verify)
+{
+  constexpr long long Nc = 3;
+  const long long flops = 6ll * V * (10 * Nc * Nc * (8 * Nc - 2) + 2 * Nc);
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
+  quda::host_timer_t host_timer;
+
+  param.compute_rectangle = QUDA_BOOLEAN_TRUE;
+  gaugeObservablesQuda(&param);
+
+  host_timer.start();
+  for (int i = 0; i < niter; i++) gaugeObservablesQuda(&param);
+  host_timer.stop();
+  const double seconds = host_timer.last() / niter;
+  const double performance = flops / (seconds * 1024 * 1024 * 1024);
+  printfQuda("Computed plaquette + rectangle is\n"
+             "  plaquette %.16e (spatial %.16e, temporal %.16e)\n"
+             "  rectangle %.16e (spatial %.16e, temporal %.16e)\n"
+             "Done in %g seconds, %g GFLOPS\n",
+             param.plaquette[0], param.plaquette[1], param.plaquette[2], param.rectangle[0], param.rectangle[1],
+             param.rectangle[2], seconds, performance);
+
+  std::array<double, 6> deviation {};
+  if (verify) {
+    const auto reference = plaquette_rectangle_reference(fields.input);
+    for (int i = 0; i < 3; i++) {
+      const double plaquette_scale = std::max(std::abs(param.plaquette[i]), std::abs(reference.plaquette[i]));
+      deviation[i]
+        = plaquette_scale == 0.0 ? 0.0 : std::abs(param.plaquette[i] - reference.plaquette[i]) / plaquette_scale;
+      const double rectangle_scale = std::max(std::abs(param.rectangle[i]), std::abs(reference.rectangle[i]));
+      deviation[i + 3]
+        = rectangle_scale == 0.0 ? 0.0 : std::abs(param.rectangle[i] - reference.rectangle[i]) / rectangle_scale;
+    }
+    printfQuda("Host plaquette + rectangle relative deviations are\n"
+               "  plaquette %.3e %.3e %.3e\n"
+               "  rectangle %.3e %.3e %.3e\n",
+               deviation[0], deviation[1], deviation[2], deviation[3], deviation[4], deviation[5]);
+  }
+  return deviation;
+}
+
 void run_polyakov_loop(const Su3Fields &fields)
 {
   long long flops_ploop = 198ll * V + 6 * V / fields.gauge_param.X[3];
@@ -205,6 +246,7 @@ void run_all()
 {
   Su3Fields fields(shared_test_input(), prec, link_recon);
   run_plaquette(fields, false);
+  run_plaquette_rectangle(fields, false);
   run_polyakov_loop(fields);
   run_topological_charge_and_density();
   run_gauge_smearing_or_flow(fields);
@@ -213,6 +255,12 @@ std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructTyp
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   return run_plaquette(fields, true);
+}
+
+std::array<double, 6> plaquette_rectangle_test(QudaPrecision precision, QudaReconstructType reconstruct)
+{
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
+  return run_plaquette_rectangle(fields, true);
 }
 
 void polyakov_loop_test()

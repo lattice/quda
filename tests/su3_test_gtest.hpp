@@ -15,6 +15,7 @@ constexpr std::array plaquette_partitions {0};
 #endif
 
 std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct);
+std::array<double, 6> plaquette_rectangle_test(QudaPrecision precision, QudaReconstructType reconstruct);
 void polyakov_loop_test();
 void topological_charge_and_density_test();
 void gauge_smearing_or_flow_test();
@@ -53,6 +54,19 @@ TEST_P(PlaquetteTest, Verify)
   const auto deviation = plaquette_test(precision, reconstruct);
   for (int i = 0; i < 3; i++)
     EXPECT_LE(deviation[i], getTolerance(precision)) << "Host and QUDA plaquette component " << i << " do not agree";
+}
+
+TEST_P(PlaquetteTest, PlaquetteRectangle)
+{
+  const auto [precision, reconstruct, partition] = GetParam();
+  static_cast<void>(partition);
+  if (!quda::is_enabled(precision)) GTEST_SKIP();
+  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
+  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
+  const auto deviation = plaquette_rectangle_test(precision, reconstruct);
+  for (int i = 0; i < 6; i++)
+    EXPECT_LE(deviation[i], getTolerance(precision))
+      << "Host and QUDA plaquette-rectangle component " << i << " do not agree";
 }
 
 INSTANTIATE_TEST_SUITE_P(Plaquette, PlaquetteTest,
