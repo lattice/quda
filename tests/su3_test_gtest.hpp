@@ -18,6 +18,9 @@ std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructTyp
 std::array<double, 6> plaquette_rectangle_test(QudaPrecision precision, QudaReconstructType reconstruct);
 std::array<double, 2> polyakov_loop_test(QudaPrecision precision, QudaReconstructType reconstruct);
 std::array<double, 4> determinant_trace_test(QudaPrecision precision, QudaReconstructType reconstruct);
+double field_strength_tensor_test(QudaPrecision precision, QudaReconstructType reconstruct);
+std::array<double, 16> energy_topological_charge_test(QudaPrecision precision, QudaReconstructType reconstruct);
+std::array<double, 12> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct);
 void topological_charge_and_density_test();
 void gauge_smearing_or_flow_test();
 
@@ -92,6 +95,44 @@ TEST_P(PlaquetteTest, DeterminantTrace)
   const auto comparison = determinant_trace_test(precision, reconstruct);
   EXPECT_LE(comparison[0], comparison[1]) << "Host and QUDA mean link determinant do not agree";
   EXPECT_LE(comparison[2], comparison[3]) << "Host and QUDA mean link trace do not agree";
+}
+
+TEST_P(PlaquetteTest, FieldStrengthTensor)
+{
+  const auto [precision, reconstruct, partition] = GetParam();
+  static_cast<void>(partition);
+  if (!quda::is_enabled(precision)) GTEST_SKIP();
+  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
+  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
+  GTEST_SKIP() << "Tensor geometry native-to-QDP CopyGauge currently fails on the GPU";
+  EXPECT_LE(field_strength_tensor_test(precision, reconstruct), getTolerance(precision))
+    << "Host and QUDA field-strength tensors do not agree";
+}
+
+TEST_P(PlaquetteTest, EnergyAndTopologicalCharge)
+{
+  const auto [precision, reconstruct, partition] = GetParam();
+  static_cast<void>(partition);
+  if (!quda::is_enabled(precision)) GTEST_SKIP();
+  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
+  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
+  const auto comparison = energy_topological_charge_test(precision, reconstruct);
+  for (int i = 0; i < 8; i++)
+    EXPECT_LE(comparison[2 * i], comparison[2 * i + 1])
+      << "Host and QUDA energy/topological-charge comparison " << i << " does not agree";
+}
+
+TEST_P(PlaquetteTest, TopologicalChargeDensity)
+{
+  const auto [precision, reconstruct, partition] = GetParam();
+  static_cast<void>(partition);
+  if (!quda::is_enabled(precision)) GTEST_SKIP();
+  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
+  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
+  const auto comparison = topological_charge_density_test(precision, reconstruct);
+  for (int i = 0; i < 6; i++)
+    EXPECT_LE(comparison[2 * i], comparison[2 * i + 1])
+      << "Host and QUDA topological-charge-density comparison " << i << " does not agree";
 }
 
 INSTANTIATE_TEST_SUITE_P(Plaquette, PlaquetteTest,

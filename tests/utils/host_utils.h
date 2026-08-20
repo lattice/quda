@@ -243,6 +243,40 @@ int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, co
                       const std::string &msgB);
 
 /**
+ * @brief Summary returned by logarithmic field-comparison diagnostics.
+ */
+struct StrongCheckResult {
+  double max_deviation; /**< Largest absolute component-wise difference. */
+  int accuracy_level;   /**< Finest base-10 threshold with no failures. */
+};
+
+/**
+ * @brief Compare arbitrary-geometry host fields and print a logarithmic failure histogram.
+ *
+ * @param[in] a First CPU, QDP-ordered field.
+ * @param[in] label_a Label printed for the first field.
+ * @param[in] b Second CPU, QDP-ordered field.
+ * @param[in] label_b Label printed for the second field.
+ * @return Maximum deviation and achieved accuracy level.
+ */
+StrongCheckResult strong_check_field(const quda::GaugeField &a, const std::string &label_a, const quda::GaugeField &b,
+                                     const std::string &label_b);
+
+/**
+ * @brief Compare contiguous scalar fields and print a logarithmic failure histogram.
+ *
+ * @param[in] a First scalar field.
+ * @param[in] label_a Label printed for the first field.
+ * @param[in] b Second scalar field.
+ * @param[in] label_b Label printed for the second field.
+ * @param[in] length Number of scalar elements.
+ * @param[in] precision Scalar precision.
+ * @return Maximum deviation and achieved accuracy level.
+ */
+StrongCheckResult strong_check_scalar(const void *a, const std::string &label_a, const void *b,
+                                      const std::string &label_b, size_t length, QudaPrecision precision);
+
+/**
    @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations
    @param[out] stag_for_oprod Set of four contiguous host spinor fields
    @param[in] precision Precision of field

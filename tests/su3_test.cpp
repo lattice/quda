@@ -5,12 +5,17 @@
 #include <string.h>
 #include <algorithm>
 #include <array>
+#include <memory>
+#include <numeric>
+#include <vector>
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <pgauge_monte.h>
+#include <gauge_tools.h>
+#include <malloc_quda.h>
 
 #include "timer.h"
 #include "util_quda.h"
@@ -69,6 +74,59 @@ struct Su3Fields {
   {
     for (int dir = 0; dir < 4; dir++) host_free(new_gauge[dir]);
     freeGaugeQuda();
+  }
+};
+
+quda::GaugeFieldParam make_tensor_param(const Su3Fields &fields, QudaFieldLocation location, QudaPrecision precision,
+                                        QudaGaugeFieldOrder order)
+{
+  quda::GaugeFieldParam param(fields.input.X(), precision, QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+  param.location = location;
+  param.order = order;
+  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  param.create = QUDA_NULL_FIELD_CREATE;
+  return param;
+}
+
+struct FieldStrengthFields {
+  std::unique_ptr<quda::GaugeField> device_gauge;
+  quda::GaugeField device_fmunu;
+  quda::GaugeField device_qdp_fmunu;
+  quda::GaugeField device_result;
+  quda::GaugeField host_reference;
+
+  FieldStrengthFields(const Su3Fields &fields, bool copy_result = false) :
+    device_fmunu(
+      make_tensor_param(fields, QUDA_CUDA_FIELD_LOCATION, fields.gauge_param.cuda_prec, QUDA_NATIVE_GAUGE_ORDER)),
+    device_qdp_fmunu(
+      make_tensor_param(fields, QUDA_CUDA_FIELD_LOCATION, fields.gauge_param.cpu_prec, QUDA_QDP_GAUGE_ORDER)),
+    device_result(make_tensor_param(fields, QUDA_CPU_FIELD_LOCATION, fields.gauge_param.cpu_prec, QUDA_QDP_GAUGE_ORDER)),
+    host_reference(make_tensor_param(fields, QUDA_CPU_FIELD_LOCATION, fields.gauge_param.cpu_prec, QUDA_QDP_GAUGE_ORDER))
+  {
+    quda::GaugeFieldParam device_param(fields.gauge_param);
+    device_param.location = QUDA_CUDA_FIELD_LOCATION;
+    device_param.order = QUDA_NATIVE_GAUGE_ORDER;
+    device_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    device_param.create = QUDA_NULL_FIELD_CREATE;
+    device_param.setPrecision(fields.gauge_param.cuda_prec, true);
+    quda::GaugeField device(device_param);
+    device.copy(fields.input);
+
+    quda::lat_dim_t R;
+    for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+    static quda::TimeProfile profile("SU3FieldStrengthTest");
+    device_gauge.reset(quda::createExtendedGauge(device, R, profile));
+
+    quda::computeFmunu(device_fmunu, *device_gauge);
+    if (copy_result) {
+      device_qdp_fmunu.copy(device_fmunu);
+      const size_t component_bytes = fields.input.Volume() * gauge_site_size * fields.gauge_param.cpu_prec;
+      for (int component = 0; component < 6; component++)
+        qudaMemcpy(device_result.data(component), device_qdp_fmunu.data(component), component_bytes,
+                   qudaMemcpyDeviceToHost);
+    }
+    compute_fmunu_reference(host_reference, fields.input);
   }
 };
 
@@ -219,6 +277,113 @@ std::array<double, 4> run_determinant_trace(const Su3Fields &fields, bool verify
     printfQuda("Host trace %.16e +/- I %.16e, difference %.3e, threshold %.3e\n", reference.trace.real(),
                reference.trace.imag(), comparison[2], comparison[3]);
   }
+  return comparison;
+}
+
+double field_strength_tensor_test(QudaPrecision precision, QudaReconstructType reconstruct)
+{
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
+  FieldStrengthFields fmunu(fields, true);
+  const auto comparison
+    = strong_check_field(fmunu.device_result, "QUDA Fmunu", fmunu.host_reference, "host Fmunu reference");
+  return comparison.max_deviation;
+}
+
+std::array<double, 16> energy_topological_charge_test(QudaPrecision precision, QudaReconstructType reconstruct)
+{
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
+  FieldStrengthFields fmunu(fields);
+  const auto reference = field_strength_observable_reference(fmunu.host_reference);
+  const double tolerance = getTolerance(precision);
+
+  quda::array<quda::real_t, 3> energy {};
+  const double qcharge = quda::computeQCharge(energy, fmunu.device_fmunu);
+
+  QudaGaugeObservableParam observable = newQudaGaugeObservableParam();
+  observable.compute_qcharge = QUDA_BOOLEAN_TRUE;
+  gaugeObservablesQuda(&observable);
+
+  std::array<double, 16> comparison {};
+  int offset = 0;
+  auto add_comparison = [&](double value, double expected, double scale) {
+    comparison[offset++] = std::abs(value - expected);
+    comparison[offset++] = tolerance * scale;
+  };
+  for (int i = 0; i < 3; i++) add_comparison(energy[i], reference.energy[i], std::abs(reference.energy[i]));
+  add_comparison(qcharge, reference.qcharge, reference.qcharge_scale);
+  for (int i = 0; i < 3; i++) add_comparison(observable.energy[i], reference.energy[i], std::abs(reference.energy[i]));
+  add_comparison(observable.qcharge, reference.qcharge, reference.qcharge_scale);
+  return comparison;
+}
+
+std::vector<double> copy_density_to_double(const void *density, size_t length, QudaPrecision precision,
+                                           QudaFieldLocation location)
+{
+  std::vector<double> result(length);
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    if (location == QUDA_CUDA_FIELD_LOCATION)
+      qudaMemcpy(result.data(), density, length * sizeof(double), qudaMemcpyDeviceToHost);
+    else
+      std::copy_n(static_cast<const double *>(density), length, result.data());
+  } else {
+    std::vector<float> temporary(length);
+    if (location == QUDA_CUDA_FIELD_LOCATION)
+      qudaMemcpy(temporary.data(), density, length * sizeof(float), qudaMemcpyDeviceToHost);
+    else
+      std::copy_n(static_cast<const float *>(density), length, temporary.data());
+    std::copy(temporary.begin(), temporary.end(), result.begin());
+  }
+  return result;
+}
+
+std::array<double, 12> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct)
+{
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
+  FieldStrengthFields fmunu(fields);
+  const auto reference = field_strength_observable_reference(fmunu.host_reference);
+  const double tolerance = getTolerance(precision);
+  const size_t length = fields.input.Volume();
+  const size_t bytes = length * precision;
+
+  void *device_density = device_malloc(bytes);
+  quda::array<quda::real_t, 3> energy {};
+  const double qcharge = quda::computeQChargeDensity(energy, device_density, fmunu.device_fmunu);
+  const auto device_density_host = copy_density_to_double(device_density, length, precision, QUDA_CUDA_FIELD_LOCATION);
+  device_free(device_density);
+
+  std::vector<unsigned char> public_density_storage(bytes);
+  QudaGaugeObservableParam observable = newQudaGaugeObservableParam();
+  observable.compute_qcharge = QUDA_BOOLEAN_TRUE;
+  observable.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
+  observable.qcharge_density = public_density_storage.data();
+  gaugeObservablesQuda(&observable);
+  const auto public_density
+    = copy_density_to_double(public_density_storage.data(), length, precision, QUDA_CPU_FIELD_LOCATION);
+
+  const auto direct_field
+    = strong_check_scalar(device_density_host.data(), "QUDA direct Q density", reference.qdensity.data(),
+                          "host Q density", length, QUDA_DOUBLE_PRECISION);
+  const auto public_field
+    = strong_check_scalar(public_density.data(), "QUDA observable Q density", reference.qdensity.data(),
+                          "host Q density", length, QUDA_DOUBLE_PRECISION);
+
+  double device_density_sum = std::accumulate(device_density_host.begin(), device_density_host.end(), 0.0);
+  double public_density_sum = std::accumulate(public_density.begin(), public_density.end(), 0.0);
+  quda::comm_allreduce_sum(device_density_sum);
+  quda::comm_allreduce_sum(public_density_sum);
+
+  std::array<double, 12> comparison {};
+  int offset = 0;
+  auto add_comparison = [&](double difference, double scale) {
+    comparison[offset++] = difference;
+    comparison[offset++] = tolerance * scale;
+  };
+  add_comparison(direct_field.max_deviation, 1.0);
+  add_comparison(public_field.max_deviation, 1.0);
+  add_comparison(std::abs(qcharge - reference.qcharge), reference.qcharge_scale);
+  add_comparison(std::abs(observable.qcharge - reference.qcharge), reference.qcharge_scale);
+  add_comparison(std::abs(device_density_sum - qcharge), reference.qcharge_scale);
+  add_comparison(std::abs(public_density_sum - observable.qcharge), reference.qcharge_scale);
   return comparison;
 }
 

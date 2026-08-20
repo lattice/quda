@@ -222,6 +222,93 @@ template <typename real_t> struct LinkDeterminantTraceReferenceCompute {
   }
 };
 
+template <typename real_t>
+const matrix<real_t> &shifted_link(const matrix<real_t> *const *links, size_t i, int dir,
+                                   const std::array<int, 4> &shift, const lattice_t &lat)
+{
+  auto dx = shift;
+  return links[dir][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+}
+
+template <typename real_t>
+matrix<real_t> clover_fmunu(const matrix<real_t> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
+{
+  auto link = [&](int dir, int delta_mu, int delta_nu) -> const matrix<real_t> & {
+    std::array<int, 4> dx {};
+    dx[mu] = delta_mu;
+    dx[nu] = delta_nu;
+    return shifted_link(links, i, dir, dx, lat);
+  };
+
+  auto f = link(mu, 0, 0) * link(nu, 1, 0) * conj(link(mu, 0, 1)) * conj(link(nu, 0, 0));
+  f += link(nu, 0, 0) * conj(link(mu, -1, 1)) * conj(link(nu, -1, 0)) * link(mu, -1, 0);
+  f += conj(link(nu, 0, -1)) * link(mu, 0, -1) * link(nu, 1, -1) * conj(link(mu, 0, 0));
+  f += conj(link(mu, -1, 0)) * conj(link(nu, -1, -1)) * link(mu, -1, -1) * link(nu, 0, -1);
+  return static_cast<real_t>(0.125) * (f - conj(f));
+}
+
+template <typename real_t> struct FieldStrengthReferenceCompute {
+  void operator()(quda::GaugeField &out, const quda::GaugeField &u, const lattice_t &lat)
+  {
+    const auto input_ptrs = u.data_array<void *>();
+    auto links = reinterpret_cast<const matrix<real_t> *const *>(input_ptrs.data);
+    const auto output_ptrs = out.data_array<void *>();
+    auto fmunu = reinterpret_cast<matrix<real_t> *const *>(output_ptrs.data);
+    constexpr std::array<std::array<int, 2>, 6> directions {{{1, 0}, {2, 0}, {2, 1}, {3, 0}, {3, 1}, {3, 2}}};
+
+#pragma omp parallel for
+    for (size_t i = 0; i < lat.volume; i++) {
+      for (int component = 0; component < 6; component++)
+        fmunu[component][i] = clover_fmunu(links, i, directions[component][0], directions[component][1], lat);
+    }
+  }
+};
+
+template <typename real_t> struct FieldStrengthObservableReferenceCompute {
+  FieldStrengthObservableReference operator()(const quda::GaugeField &fmunu)
+  {
+    const auto ptrs = fmunu.data_array<void *>();
+    auto field = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
+    const auto identity = Identity<3, std::complex<real_t>>()();
+    constexpr double q_norm = -1.0 / (4.0 * M_PI * M_PI);
+    double spatial_energy = 0.0;
+    double temporal_energy = 0.0;
+    double qcharge = 0.0;
+    double qcharge_scale = 0.0;
+    std::vector<double> density(fmunu.Volume());
+
+#pragma omp parallel for reduction(+ : spatial_energy, temporal_energy, qcharge, qcharge_scale)
+    for (size_t i = 0; i < fmunu.Volume(); i++) {
+      std::array<matrix<real_t>, 6> traceless;
+      for (int component = 0; component < 6; component++) {
+        traceless[component]
+          = field[component][i] - static_cast<real_t>(1.0 / 3.0) * trace(field[component][i]) * identity;
+        const double contribution = -trace(traceless[component] * traceless[component]).real();
+        if (component < 3)
+          spatial_energy += contribution;
+        else
+          temporal_energy += contribution;
+      }
+      const double q_site = q_norm
+        * (trace(traceless[0] * traceless[5]).real() - trace(traceless[1] * traceless[4]).real()
+           + trace(traceless[2] * traceless[3]).real());
+      density[i] = q_site;
+      qcharge += q_site;
+      qcharge_scale += std::abs(q_site);
+    }
+
+    quda::comm_allreduce_sum(spatial_energy);
+    quda::comm_allreduce_sum(temporal_energy);
+    quda::comm_allreduce_sum(qcharge);
+    quda::comm_allreduce_sum(qcharge_scale);
+    const double volume = fmunu.Volume() * quda::comm_size();
+    spatial_energy /= volume;
+    temporal_energy /= volume;
+    return {
+      {spatial_energy + temporal_energy, spatial_energy, temporal_energy}, qcharge, std::move(density), qcharge_scale};
+  }
+};
+
 std::array<double, 3> plaquette_reference(const quda::GaugeField &u)
 {
   quda::lat_dim_t R;
@@ -288,4 +375,24 @@ LinkDeterminantTraceReference link_determinant_trace_reference(const quda::Gauge
           {sums[2] / normalization, sums[3] / normalization},
           sums[4] / normalization,
           sums[5] / normalization};
+}
+
+void compute_fmunu_reference(quda::GaugeField &fmunu, const quda::GaugeField &u)
+{
+  quda::lat_dim_t R;
+  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setGaugeParam(gauge_param);
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  auto u_ex = quda::createExtendedGauge(u.data_array().data, gauge_param, R);
+  lattice_t lat(*u_ex);
+  instantiate_host<FieldStrengthReferenceCompute>(u.Precision(), fmunu, *u_ex, lat);
+  delete u_ex;
+}
+
+FieldStrengthObservableReference field_strength_observable_reference(const quda::GaugeField &fmunu)
+{
+  return instantiate_host_reduce<FieldStrengthObservableReferenceCompute, FieldStrengthObservableReference>(
+    fmunu.Precision(), fmunu);
 }
