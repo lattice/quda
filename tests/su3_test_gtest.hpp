@@ -20,8 +20,7 @@ std::array<double, 2> polyakov_loop_test(QudaPrecision precision, QudaReconstruc
 std::array<double, 4> determinant_trace_test(QudaPrecision precision, QudaReconstructType reconstruct);
 double field_strength_tensor_test(QudaPrecision precision, QudaReconstructType reconstruct);
 std::array<double, 16> energy_topological_charge_test(QudaPrecision precision, QudaReconstructType reconstruct);
-std::array<double, 12> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct);
-void topological_charge_and_density_test();
+std::array<double, 24> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct);
 void gauge_smearing_or_flow_test();
 
 inline std::string gauge_observable_test_name(testing::TestParamInfo<gauge_observable_test_t> param)
@@ -130,7 +129,7 @@ TEST_P(GaugeObservableTest, TopologicalChargeDensity)
   if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
   if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
   const auto comparison = topological_charge_density_test(precision, reconstruct);
-  for (int i = 0; i < 6; i++)
+  for (int i = 0; i < 12; i++)
     EXPECT_LE(comparison[2 * i], comparison[2 * i + 1])
       << "Host and QUDA topological-charge-density comparison " << i << " does not agree";
 }
@@ -140,7 +139,5 @@ INSTANTIATE_TEST_SUITE_P(GaugeObservable, GaugeObservableTest,
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::ValuesIn(gauge_observable_partitions)),
                          gauge_observable_test_name);
-
-TEST(SU3Test, TopologicalChargeAndDensity) { topological_charge_and_density_test(); }
 
 TEST(SU3Test, GaugeSmearingOrFlow) { gauge_smearing_or_flow_test(); }

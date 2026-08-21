@@ -336,7 +336,7 @@ std::vector<double> copy_density_to_double(const void *density, size_t length, Q
   return result;
 }
 
-std::array<double, 12> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct)
+std::array<double, 24> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct)
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   FieldStrengthFields fmunu(fields);
@@ -372,7 +372,7 @@ std::array<double, 12> topological_charge_density_test(QudaPrecision precision, 
   quda::comm_allreduce_sum(device_density_sum);
   quda::comm_allreduce_sum(public_density_sum);
 
-  std::array<double, 12> comparison {};
+  std::array<double, 24> comparison {};
   int offset = 0;
   auto add_comparison = [&](double difference, double scale) {
     comparison[offset++] = difference;
@@ -380,41 +380,14 @@ std::array<double, 12> topological_charge_density_test(QudaPrecision precision, 
   };
   add_comparison(direct_field.max_deviation, 1.0);
   add_comparison(public_field.max_deviation, 1.0);
+  for (int i = 0; i < 3; i++) add_comparison(std::abs(energy[i] - reference.energy[i]), std::abs(reference.energy[i]));
+  for (int i = 0; i < 3; i++)
+    add_comparison(std::abs(observable.energy[i] - reference.energy[i]), std::abs(reference.energy[i]));
   add_comparison(std::abs(qcharge - reference.qcharge), reference.qcharge_scale);
   add_comparison(std::abs(observable.qcharge - reference.qcharge), reference.qcharge_scale);
   add_comparison(std::abs(device_density_sum - qcharge), reference.qcharge_scale);
   add_comparison(std::abs(public_density_sum - observable.qcharge), reference.qcharge_scale);
   return comparison;
-}
-
-void run_topological_charge_and_density()
-{
-  double q_charge_check = 0.0;
-  size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
-  size_t array_size = V * data_size;
-  void *qDensity = host_pinned_malloc(array_size);
-  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
-  quda::host_timer_t host_timer;
-
-  host_timer.start();
-  param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-  param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
-  param.qcharge_density = qDensity;
-  gaugeObservablesQuda(&param);
-  host_timer.stop();
-  printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n", param.energy[0],
-             param.energy[1], param.energy[2], param.qcharge, host_timer.last());
-
-  if (prec == QUDA_DOUBLE_PRECISION) {
-    for (int i = 0; i < V; i++) q_charge_check += ((double *)qDensity)[i];
-  } else {
-    for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
-  }
-
-  host_free(qDensity);
-  quda::comm_allreduce_sum(q_charge_check);
-  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check,
-             param.qcharge - q_charge_check);
 }
 
 void run_gauge_smearing_or_flow(Su3Fields &fields)
@@ -472,7 +445,6 @@ void run_all()
   run_plaquette_rectangle(fields, false);
   run_polyakov_loop(fields, false);
   run_determinant_trace(fields, false);
-  run_topological_charge_and_density();
   run_gauge_smearing_or_flow(fields);
 }
 std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct)
@@ -497,12 +469,6 @@ std::array<double, 4> determinant_trace_test(QudaPrecision precision, QudaRecons
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   return run_determinant_trace(fields, true);
-}
-
-void topological_charge_and_density_test()
-{
-  Su3Fields fields(shared_test_input(), prec, link_recon);
-  run_topological_charge_and_density();
 }
 
 void gauge_smearing_or_flow_test()
