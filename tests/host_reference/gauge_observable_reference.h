@@ -25,6 +25,14 @@ struct LinkDeterminantTraceReference {
 };
 
 /**
+ * @brief Project every local link of a QDP-ordered host gauge field onto SU(3).
+ *
+ * @param[in,out] u Host gauge field to project.
+ * @return Number of links that remain non-unitary after projection.
+ */
+int project_su3_reference(quda::GaugeField &u);
+
+/**
  * @brief Compute the total, spatial, and temporal plaquette on the host.
  *
  * @param[in] u QDP-ordered host gauge field.

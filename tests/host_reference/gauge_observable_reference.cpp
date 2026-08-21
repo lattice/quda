@@ -309,12 +309,40 @@ template <typename real_t> struct FieldStrengthObservableReferenceCompute {
   }
 };
 
+template <typename real_t> struct ProjectSU3Reference {
+  int operator()(quda::GaugeField &u)
+  {
+    const auto ptrs = u.data_array<void *>();
+    auto links = reinterpret_cast<matrix<real_t> *const *>(ptrs.data);
+    const auto tolerance = static_cast<real_t>(u.toleranceSU3());
+    int failures = 0;
+
+#pragma omp parallel for reduction(+ : failures)
+    for (size_t i = 0; i < u.Volume(); i++) {
+      for (int dir = 0; dir < 4; dir++) {
+        auto &link = links[dir][i];
+        polar_su3(link, tolerance);
+        if (!is_unitary(link.inverse(), link, tolerance)) failures++;
+      }
+    }
+
+    return failures;
+  }
+};
+
+int project_su3_reference(quda::GaugeField &u)
+{
+  return instantiate_host_reduce<ProjectSU3Reference, int>(u.Precision(), u);
+}
+
 std::array<double, 3> plaquette_reference(const quda::GaugeField &u)
 {
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
+  gauge_param.cpu_prec = u.Precision();
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   auto u_ex = quda::createExtendedGauge(u.data_array().data, gauge_param, R);
@@ -338,6 +366,8 @@ PlaquetteRectangleReference plaquette_rectangle_reference(const quda::GaugeField
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
+  gauge_param.cpu_prec = u.Precision();
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   auto u_ex = quda::createExtendedGauge(u.data_array().data, gauge_param, R);
@@ -383,6 +413,8 @@ void compute_fmunu_reference(quda::GaugeField &fmunu, const quda::GaugeField &u)
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
+  gauge_param.cpu_prec = u.Precision();
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   auto u_ex = quda::createExtendedGauge(u.data_array().data, gauge_param, R);

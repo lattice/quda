@@ -703,6 +703,8 @@ void gauge_smear_reference(quda::GaugeField &out, const quda::GaugeField &in, co
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
+  gauge_param.cpu_prec = in.Precision();
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   auto input_ex = quda::createExtendedGauge(in.data_array().data, gauge_param, R);

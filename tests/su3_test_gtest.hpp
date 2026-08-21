@@ -7,6 +7,18 @@
 #include <gtest/gtest.h>
 
 using gauge_observable_test_t = std::tuple<QudaPrecision, QudaReconstructType, int>;
+using gauge_smear_observable_test_t = std::tuple<QudaPrecision, QudaReconstructType, QudaGaugeSmearType, bool, int>;
+
+struct GaugeSmearObservableComparison {
+  double field_deviation;
+  double field_tolerance;
+  std::array<double, 3> plaquette_deviation;
+  std::array<double, 3> energy_difference;
+  std::array<double, 3> energy_tolerance;
+  double qcharge_difference;
+  double qcharge_tolerance;
+  int projection_failures;
+};
 
 #ifdef MULTI_GPU
 constexpr std::array gauge_observable_partitions {0, 1, 2, 4, 8, 12, 14, 15};
@@ -21,7 +33,8 @@ std::array<double, 4> determinant_trace_test(QudaPrecision precision, QudaRecons
 double field_strength_tensor_test(QudaPrecision precision, QudaReconstructType reconstruct);
 std::array<double, 16> energy_topological_charge_test(QudaPrecision precision, QudaReconstructType reconstruct);
 std::array<double, 24> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct);
-void gauge_smearing_or_flow_test();
+GaugeSmearObservableComparison run_gauge_smear_observable_test(QudaPrecision precision, QudaReconstructType reconstruct,
+                                                               QudaGaugeSmearType type, bool su_project);
 
 inline std::string gauge_observable_test_name(testing::TestParamInfo<gauge_observable_test_t> param)
 {
@@ -30,6 +43,16 @@ inline std::string gauge_observable_test_name(testing::TestParamInfo<gauge_obser
   const auto partition = testing::get<2>(param.param);
   return std::string(get_prec_str(precision)) + "_r" + get_recon_str(reconstruct) + "_partition"
     + std::to_string(partition);
+}
+
+inline std::string gauge_smear_observable_test_name(testing::TestParamInfo<gauge_smear_observable_test_t> param)
+{
+  const auto precision = testing::get<0>(param.param);
+  const auto reconstruct = testing::get<1>(param.param);
+  const auto su_project = testing::get<3>(param.param);
+  const auto partition = testing::get<4>(param.param);
+  return std::string(get_prec_str(precision)) + "_r" + get_recon_str(reconstruct) + "_project"
+    + std::to_string(su_project) + "_partition" + std::to_string(partition);
 }
 
 class GaugeObservableTest : public ::testing::TestWithParam<gauge_observable_test_t>
@@ -140,4 +163,56 @@ INSTANTIATE_TEST_SUITE_P(GaugeObservable, GaugeObservableTest,
                                           testing::ValuesIn(gauge_observable_partitions)),
                          gauge_observable_test_name);
 
-TEST(SU3Test, GaugeSmearingOrFlow) { gauge_smearing_or_flow_test(); }
+class GaugeSmearObservableTest : public ::testing::TestWithParam<gauge_smear_observable_test_t>
+{
+protected:
+  void SetUp() override
+  {
+    const auto partition = testing::get<4>(GetParam());
+    for (int dir = 0; dir < 4; dir++) {
+      if (partition & (1 << dir)) quda::commDimPartitionedSet(dir);
+    }
+    updateR();
+  }
+
+  void TearDown() override { quda::commDimPartitionedReset(); }
+};
+
+TEST_P(GaugeSmearObservableTest, FiveStep)
+{
+  const auto [precision, reconstruct, type, su_project, partition] = GetParam();
+  static_cast<void>(partition);
+  if (!quda::is_enabled(precision)) GTEST_SKIP();
+  if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
+  if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
+
+  const auto comparison = run_gauge_smear_observable_test(precision, reconstruct, type, su_project);
+  EXPECT_EQ(comparison.projection_failures, 0) << "Host SU(3) projection failed";
+  EXPECT_LE(comparison.field_deviation, comparison.field_tolerance)
+    << "Host and QUDA five-step gauge fields do not agree";
+  for (int i = 0; i < 3; i++) {
+    EXPECT_LE(comparison.plaquette_deviation[i], getTolerance(precision))
+      << "Host and QUDA five-step plaquette component " << i << " do not agree";
+    EXPECT_LE(comparison.energy_difference[i], comparison.energy_tolerance[i])
+      << "Host and QUDA five-step field-energy component " << i << " do not agree";
+  }
+  EXPECT_LE(comparison.qcharge_difference, comparison.qcharge_tolerance)
+    << "Host and QUDA five-step topological charge do not agree";
+}
+
+#define INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST(prefix, type)                                                          \
+  INSTANTIATE_TEST_SUITE_P(prefix, GaugeSmearObservableTest,                                                           \
+                           testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),             \
+                                            testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),                 \
+                                            testing::Values(type), testing::Bool(),                                    \
+                                            testing::ValuesIn(gauge_observable_partitions)),                           \
+                           gauge_smear_observable_test_name)
+
+INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST(APE, QUDA_GAUGE_SMEAR_APE);
+INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST(Stout, QUDA_GAUGE_SMEAR_STOUT);
+INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST(OvrImpStout, QUDA_GAUGE_SMEAR_OVRIMP_STOUT);
+INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST(HYP, QUDA_GAUGE_SMEAR_HYP);
+INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST(WilsonFlow, QUDA_GAUGE_SMEAR_WILSON_FLOW);
+INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST(SymanzikFlow, QUDA_GAUGE_SMEAR_SYMANZIK_FLOW);
+
+#undef INSTANTIATE_GAUGE_SMEAR_OBSERVABLE_TEST

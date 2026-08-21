@@ -1,10 +1,6 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <math.h>
-#include <string.h>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <memory>
 #include <numeric>
 #include <vector>
@@ -22,14 +18,12 @@
 #include "host_utils.h"
 #include "gauge_utils.h"
 #include "command_line_params.h"
-#include "dslash_reference.h"
 #include "gauge_observable_reference.h"
+#include "gauge_smear_reference.h"
 #include "misc.h"
 #include "test.h"
 
 #include "su3_test_gtest.hpp"
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 const quda::GaugeField *test_input = nullptr;
 
@@ -58,23 +52,15 @@ const quda::GaugeField &shared_test_input()
 struct Su3Fields {
   QudaGaugeParam gauge_param;
   const quda::GaugeField &input;
-  void *new_gauge[4] {};
 
   Su3Fields(const quda::GaugeField &input, QudaPrecision precision, QudaReconstructType reconstruct) :
     gauge_param(make_gauge_param(precision, reconstruct)), input(input)
   {
-    for (int dir = 0; dir < 4; dir++) new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-
     const auto input_ptrs = input.data_array<void *>();
     loadGaugeQuda(const_cast<void **>(input_ptrs.data), &gauge_param);
-    saveGaugeQuda(new_gauge, &gauge_param);
   }
 
-  ~Su3Fields()
-  {
-    for (int dir = 0; dir < 4; dir++) host_free(new_gauge[dir]);
-    freeGaugeQuda();
-  }
+  ~Su3Fields() { freeGaugeQuda(); }
 };
 
 quda::GaugeFieldParam make_tensor_param(const Su3Fields &fields, QudaFieldLocation location, QudaPrecision precision,
@@ -84,6 +70,19 @@ quda::GaugeFieldParam make_tensor_param(const Su3Fields &fields, QudaFieldLocati
   param.location = location;
   param.order = order;
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  param.create = QUDA_NULL_FIELD_CREATE;
+  return param;
+}
+
+quda::GaugeFieldParam make_host_gauge_param(const Su3Fields &fields, QudaPrecision precision)
+{
+  auto gauge_param = fields.gauge_param;
+  gauge_param.cpu_prec = precision;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  quda::GaugeFieldParam param(gauge_param);
+  param.location = QUDA_CPU_FIELD_LOCATION;
+  param.order = QUDA_QDP_GAUGE_ORDER;
   param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   param.create = QUDA_NULL_FIELD_CREATE;
   return param;
@@ -390,7 +389,110 @@ std::array<double, 24> topological_charge_density_test(QudaPrecision precision, 
   return comparison;
 }
 
-void run_gauge_smearing_or_flow(Su3Fields &fields)
+QudaGaugeSmearParam make_gauge_smear_observable_param(QudaGaugeSmearType type)
+{
+  QudaGaugeSmearParam param = newQudaGaugeSmearParam();
+  param.smear_type = type;
+  param.n_steps = 5;
+  param.meas_interval = 5;
+  param.alpha = 0.6;
+  param.rho = 0.1;
+  param.epsilon = 0.1;
+  param.alpha1 = 0.75;
+  param.alpha2 = 0.6;
+  param.alpha3 = 0.3;
+  param.smear_anisotropy = 1.0;
+  param.rk_order = 3;
+  param.restart = QUDA_BOOLEAN_FALSE;
+  param.dir_ignore = -1;
+  return param;
+}
+
+bool is_flow(QudaGaugeSmearType type)
+{
+  return type == QUDA_GAUGE_SMEAR_WILSON_FLOW || type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW;
+}
+
+void run_device_smear(QudaGaugeSmearParam &smear_param, QudaGaugeObservableParam *observable)
+{
+  if (is_flow(smear_param.smear_type))
+    performWFlowQuda(&smear_param, observable);
+  else
+    performGaugeSmearQuda(&smear_param, observable);
+}
+
+void save_smear_result(quda::GaugeField &result, const QudaGaugeParam &gauge_param, QudaPrecision precision)
+{
+  auto result_ptrs = result.data_array<void *>();
+  auto save_param = gauge_param;
+  save_param.type = QUDA_SMEARED_LINKS;
+  save_param.cpu_prec = precision;
+  save_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  saveGaugeQuda(result_ptrs.data, &save_param);
+}
+
+GaugeSmearObservableComparison run_gauge_smear_observable_test(QudaPrecision precision, QudaReconstructType reconstruct,
+                                                               QudaGaugeSmearType type, bool su_project)
+{
+  Su3Fields fields(shared_test_input(), precision, reconstruct);
+  auto smear_param = make_gauge_smear_observable_param(type);
+
+  std::array<QudaGaugeObservableParam, 2> observable {newQudaGaugeObservableParam(), newQudaGaugeObservableParam()};
+  observable[1].compute_plaquette = QUDA_BOOLEAN_TRUE;
+  observable[1].compute_qcharge = QUDA_BOOLEAN_TRUE;
+  observable[1].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  pushVerbosity(QUDA_SILENT);
+  run_device_smear(smear_param, observable.data());
+  popVerbosity();
+
+  auto host_param = make_host_gauge_param(fields, precision);
+  quda::GaugeField device_result(host_param);
+  save_smear_result(device_result, fields.gauge_param, precision);
+
+  auto host_current = std::make_unique<quda::GaugeField>(host_param);
+  auto host_next = std::make_unique<quda::GaugeField>(host_param);
+  host_current->copy(fields.input);
+  auto host_step_param = smear_param;
+  host_step_param.n_steps = 1;
+  for (int step = 0; step < 5; step++) {
+    gauge_smear_reference(*host_next, *host_current, host_step_param);
+    std::swap(host_current, host_next);
+  }
+
+  const int projection_failures = su_project ? project_su3_reference(*host_current) : 0;
+  const auto host_plaquette = plaquette_reference(*host_current);
+  quda::GaugeField host_fmunu(make_tensor_param(fields, QUDA_CPU_FIELD_LOCATION, precision, QUDA_QDP_GAUGE_ORDER));
+  compute_fmunu_reference(host_fmunu, *host_current);
+  const auto host_observable = field_strength_observable_reference(host_fmunu);
+
+  GaugeSmearObservableComparison comparison {};
+  comparison.projection_failures = projection_failures;
+  comparison.field_tolerance = getTolerance(precision);
+  for (int dir = 0; dir < 4; dir++) {
+    comparison.field_deviation = std::max(comparison.field_deviation,
+                                          compare_floats_v2(device_result.data(dir), host_current->data(dir),
+                                                            V * gauge_site_size, comparison.field_tolerance, precision));
+  }
+  for (int i = 0; i < 3; i++) {
+    const double plaquette_scale = std::max(std::abs(observable[1].plaquette[i]), std::abs(host_plaquette[i]));
+    comparison.plaquette_deviation[i]
+      = plaquette_scale == 0.0 ? 0.0 : std::abs(observable[1].plaquette[i] - host_plaquette[i]) / plaquette_scale;
+    comparison.energy_difference[i] = std::abs(observable[1].energy[i] - host_observable.energy[i]);
+    comparison.energy_tolerance[i] = getTolerance(precision) * std::abs(host_observable.energy[i]);
+  }
+  comparison.qcharge_difference = std::abs(observable[1].qcharge - host_observable.qcharge);
+  comparison.qcharge_tolerance = getTolerance(precision) * host_observable.qcharge_scale;
+
+  printfQuda("%s five-step %s reconstruct=%s project=%d: field %.3e, plaquette %.3e %.3e %.3e, "
+             "energy %.3e %.3e %.3e, qcharge %.3e\n",
+             get_gauge_smear_str(type), get_prec_str(precision), get_recon_str(reconstruct), su_project,
+             comparison.field_deviation, comparison.plaquette_deviation[0], comparison.plaquette_deviation[1],
+             comparison.plaquette_deviation[2], comparison.energy_difference[0], comparison.energy_difference[1],
+             comparison.energy_difference[2], comparison.qcharge_difference);
+  return comparison;
+}
+
+void run_gauge_smearing_or_flow_cli()
 {
   QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[gauge_smear_steps / measurement_interval + 1];
   for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
@@ -414,27 +516,10 @@ void run_gauge_smearing_or_flow(Su3Fields &fields)
 
   quda::host_timer_t host_timer;
   host_timer.start();
-  switch (smear_param.smear_type) {
-  case QUDA_GAUGE_SMEAR_APE:
-  case QUDA_GAUGE_SMEAR_STOUT:
-  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
-  case QUDA_GAUGE_SMEAR_HYP: performGaugeSmearQuda(&smear_param, obs_param); break;
-  case QUDA_GAUGE_SMEAR_WILSON_FLOW:
-  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
-    for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
-      obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
-    }
-    performWFlowQuda(&smear_param, obs_param);
-    break;
-  default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
-  }
+  run_device_smear(smear_param, obs_param);
   host_timer.stop();
   printfQuda("Total time for gauge smearing = %g secs\n", host_timer.last());
 
-  if (verify_results) {
-    const auto input_ptrs = fields.input.data_array<void *>();
-    check_gauge(const_cast<void **>(input_ptrs.data), fields.new_gauge, 1e-3, fields.gauge_param.cpu_prec);
-  }
   delete[] obs_param;
 }
 
@@ -445,7 +530,7 @@ void run_all()
   run_plaquette_rectangle(fields, false);
   run_polyakov_loop(fields, false);
   run_determinant_trace(fields, false);
-  run_gauge_smearing_or_flow(fields);
+  run_gauge_smearing_or_flow_cli();
 }
 std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct)
 {
@@ -469,12 +554,6 @@ std::array<double, 4> determinant_trace_test(QudaPrecision precision, QudaRecons
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   return run_determinant_trace(fields, true);
-}
-
-void gauge_smearing_or_flow_test()
-{
-  Su3Fields fields(shared_test_input(), prec, link_recon);
-  run_gauge_smearing_or_flow(fields);
 }
 
 struct su3_test : quda_test {

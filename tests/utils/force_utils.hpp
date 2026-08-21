@@ -486,10 +486,11 @@ template <typename real_t> void polar_su3(Matrix<3, std::complex<real_t>> &u, re
 {
   auto out = u;
   auto inv = u.inverse();
-  for (int i = 0; !is_unitary(inv, out, tol) && i < 100; i++) {
+  int i = 0;
+  do {
     out = static_cast<real_t>(0.5) * (out + conj(inv));
     inv = out.inverse();
-  }
+  } while (!is_unitary(inv, out, tol) && ++i < 100);
 
   const auto det = out.determinant();
   const auto mod = std::pow(std::norm(det), static_cast<real_t>(-1.0 / 6.0));
