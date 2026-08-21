@@ -73,7 +73,7 @@ namespace quda {
       restarts(0),
       Vkp1(nullptr)
     {
-      c = reinterpret_cast<complex_t *>(ritzVecs.col(k).data());
+      c = ritzVecs.col(k).data();
     }
 
     inline void ResetArgs()
@@ -233,13 +233,13 @@ namespace quda {
     std::vector<ColorSpinorField *> x_, r_;
     x_.push_back(x), r_.push_back(r);
 
-    blas::legacy::caxpy(reinterpret_cast<complex_t *>(args.eta.data()), Z_, x_);
+    blas::legacy::caxpy(args.eta.data(), Z_, x_);
 
     Vector minusHeta = -(args.H * args.eta);
     Map<Vector, Unaligned> c_(args.c, args.m + 1);
     c_ += minusHeta;
 
-    blas::legacy::caxpy(reinterpret_cast<complex_t *>(minusHeta.data()), V_, r_);
+    blas::legacy::caxpy(minusHeta.data(), V_, r_);
   }
 
   void GMResDR::RestartVZH()
@@ -267,7 +267,7 @@ namespace quda {
     std::vector<ColorSpinorField *> vm(Vm->Components());
 
     RowMajorDenseMatrix Alpha(Qkp1); // convert Qkp1 to Row-major format first
-    blas::legacy::caxpy(static_cast<complex_t *>(Alpha.data()), vm, vkp1);
+    blas::legacy::caxpy(Alpha.data(), vm, vkp1);
 
     for (int i = 0; i < (args.m + 1); i++) {
       if (i < (args.k + 1)) {
@@ -282,7 +282,7 @@ namespace quda {
       std::vector<ColorSpinorField *> vk(args.Vkp1->Components().begin(), args.Vkp1->Components().begin() + args.k);
 
       RowMajorDenseMatrix Beta(Qkp1.topLeftCorner(args.m, args.k));
-      blas::legacy::caxpy(static_cast<complex_t *>(Beta.data()), z, vk);
+      blas::legacy::caxpy(Beta.data(), z, vk);
 
       for (int i = 0; i < (args.m); i++) {
         if (i < (args.k))
