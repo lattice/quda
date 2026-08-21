@@ -26,7 +26,7 @@ namespace quda
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_>(out, in, halo, U, a, x, parity, dagger,
                                                                         comm_override, alpha0, t0),
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-      a(a)
+      a(static_cast<real>(a))
     {
       checkPrecision(U, A);
       checkLocation(U, A);

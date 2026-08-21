@@ -43,7 +43,7 @@ namespace quda {
     QudaTwistGamma5Type twist;
 
     CloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const CloverField &clover,
-              int parity, real kappa = 0.0, real mu = 0.0, real epsilon = 0.0, bool dagger = false,
+              int parity, real_t kappa = 0.0, real_t mu = 0.0, real_t epsilon = 0.0, bool dagger = false,
               QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
       kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(),
                         in.size() * (in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? 2 : 1), in.SiteSubset())),

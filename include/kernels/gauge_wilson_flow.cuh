@@ -34,13 +34,13 @@ namespace quda
     const real coeff1x1;
     const real coeff2x1;
 
-    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, real epsilon, real anisotropy) :
+    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, real_t epsilon, real_t anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
       out(out),
       temp(temp),
       in(in),
-      epsilon(epsilon),
-      anisotropy(anisotropy),
+      epsilon(static_cast<real>(epsilon)),
+      anisotropy(static_cast<real>(anisotropy)),
       coeff1x1(5.0 / 3.0),
       coeff2x1(-1.0 / 12.0)
     {

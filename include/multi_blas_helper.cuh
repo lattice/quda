@@ -166,7 +166,7 @@ namespace quda
     constexpr int max_NXZ_power2(bool reducer, QudaPrecision precision = QUDA_DOUBLE_PRECISION)
     {
 #ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
-      return reducer ? 8 : precision == QUDA_DOUBLE_PRECISION ? 32 : 64;
+      return reducer ? 4 : precision == QUDA_DOUBLE_PRECISION ? 32 : 64;
 #else
       return reducer ? 16 : precision == QUDA_DOUBLE_PRECISION ? 32 : 64;
 #endif

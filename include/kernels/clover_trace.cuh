@@ -23,13 +23,13 @@ namespace quda {
     real mu2_minus_epsilon2;
     const int parity;
 
-    CloverTraceArg(GaugeField &output, const CloverField &clover, double coeff, int parity) :
+    CloverTraceArg(GaugeField &output, const CloverField &clover, real_t coeff, int parity) :
       kernel_param(dim3(output.VolumeCB(), 1, 1)),
       output(output),
       clover(clover, false),
       clover_inv(clover, dynamic_clover ? false : true),
-      coeff(coeff),
-      mu2_minus_epsilon2(clover.Mu2() - clover.Epsilon2()),
+      coeff(static_cast<real>(coeff)),
+      mu2_minus_epsilon2(static_cast<real>(clover.Mu2() - clover.Epsilon2())),
       parity(parity)
     {
     }

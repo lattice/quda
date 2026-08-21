@@ -39,9 +39,9 @@ namespace quda {
 
     GaugeField &out;
     const GaugeField &in;
-    const Float alpha;
+    const real_t alpha;
     const int dir_ignore;
-    const Float anisotropy;
+    const real_t anisotropy;
     const int apeDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
@@ -51,9 +51,9 @@ namespace quda {
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       in(in),
-      alpha(static_cast<Float>(alpha)),
+      alpha(alpha),
       dir_ignore(dir_ignore),
-      anisotropy(static_cast<Float>(anisotropy)),
+      anisotropy(anisotropy),
       apeDim((dir_ignore == 4) ? 4 : 3)
     {
       strcat(aux, ",dir_ignore=");

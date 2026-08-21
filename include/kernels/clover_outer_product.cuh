@@ -56,7 +56,7 @@ namespace quda {
       for (auto i = 0u; i < p.size(); i++) {
         this->p[i] = p[i];
         this->x[i] = x[i];
-        this->coeff[i] = coeff[i];
+        this->coeff[i] = static_cast<real>(coeff[i]);
       }
 
       for (int i=0; i<4; ++i) this->X[i] = U.X()[i];

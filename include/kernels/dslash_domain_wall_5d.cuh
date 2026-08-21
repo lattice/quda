@@ -20,8 +20,8 @@ namespace quda
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger,
                                                           comm_override),
       Ls(in.X(4)),
-      a(a),
-      m_f(m_f)
+      a(static_cast<real>(a)),
+      m_f(static_cast<real>(m_f))
     {
       // remove the batch dimension from these constants, since these are used for 5-d checkerboard indexing
       DslashArg<Float, nDim, DDArg>::dc.X[4] = in.X(4);

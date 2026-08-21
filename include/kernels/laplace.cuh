@@ -49,8 +49,8 @@ namespace quda
       halo_pack(halo),
       halo(halo),
       U(U),
-      a(a),
-      b(b),
+      a(static_cast<real>(a)),
+      b(static_cast<real>(b)),
       dir(dir)
     {
       for (auto i = 0u; i < out.size(); i++) {

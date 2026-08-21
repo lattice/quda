@@ -40,7 +40,7 @@ namespace quda {
     GaugeLoopTraceArg(const GaugeField &u, real_t factor, const paths<1> &p) :
       ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2, p.num_paths), p.num_paths),
       u(u),
-      factor(factor),
+      factor(static_cast<real>(factor)),
       p(p)
     {
       for (int dir = 0; dir < 4; dir++) {

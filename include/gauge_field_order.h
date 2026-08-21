@@ -1041,7 +1041,8 @@ namespace quda {
       real scale;
       real scale_inv;
       Reconstruct(const GaugeField &u) :
-        scale(isFixed<Float>::value ? u.LinkMax() : 1.0), scale_inv(isFixed<Float>::value ? 1.0 / scale : 1.0)
+        scale(isFixed<Float>::value ? static_cast<real>(u.LinkMax()) : static_cast<real>(1.0)),
+        scale_inv(isFixed<Float>::value ? static_cast<real>(1.0) / scale : static_cast<real>(1.0))
       {
       }
 
@@ -1159,7 +1160,7 @@ namespace quda {
         QudaGhostExchange ghostExchange;
 
         Reconstruct(const GaugeField &u) :
-          anisotropy(u.Anisotropy()),
+          anisotropy(static_cast<real>(u.Anisotropy())),
           tBoundary(static_cast<real>(u.TBoundary())),
           firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
@@ -1277,7 +1278,8 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) :
-          reconstruct_12(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+          reconstruct_12(u), scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
+          scale_inv(static_cast<real>(1.0) / scale)
         {
         }
 
@@ -1361,7 +1363,7 @@ namespace quda {
 
         // scale factor is set when using recon-9
         Reconstruct(const GaugeField &u, real scale = 1.0) :
-          anisotropy(u.Anisotropy() * scale, 1.0 / (u.Anisotropy() * scale)),
+          anisotropy(static_cast<real>(u.Anisotropy() * scale), static_cast<real>(1.0 / (u.Anisotropy() * scale))),
           tBoundary(static_cast<real>(u.TBoundary()) * scale, 1.0 / (static_cast<real>(u.TBoundary()) * scale)),
           firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
@@ -1506,7 +1508,8 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) :
-          reconstruct_8(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+          reconstruct_8(u), scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
+          scale_inv(static_cast<real>(1.0) / scale)
         {
         }
 
@@ -2384,8 +2387,8 @@ namespace quda {
       LegacyOrder<Float, length>(u, ghost_),
       gauge(gauge_ ? gauge_ : u.data<Float *>()),
       volumeCB(u.VolumeCB()),
-      anisotropy(u.Anisotropy()),
-      anisotropy_inv(1.0 / anisotropy),
+      anisotropy(static_cast<real>(u.Anisotropy())),
+      anisotropy_inv(static_cast<real>(1.0) / anisotropy),
       geometry(u.Geometry())
     {
       if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
@@ -2514,8 +2517,8 @@ namespace quda {
         LegacyOrder<Float, length>(u, ghost_),
         gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
-        scale(u.Scale()),
-        scale_inv(1.0 / scale)
+        scale(static_cast<real>(u.Scale())),
+        scale_inv(static_cast<real>(1.0) / scale)
       {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
       }
@@ -2582,8 +2585,8 @@ namespace quda {
         gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
         exVolumeCB(1),
-        scale(u.Scale()),
-        scale_inv(1.0 / scale),
+        scale(static_cast<real>(u.Scale())),
+        scale_inv(static_cast<real>(1.0) / scale),
         dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]},
         exDim {u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3]}
       {

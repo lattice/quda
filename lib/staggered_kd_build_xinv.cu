@@ -47,7 +47,7 @@ namespace quda
 
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
-        double max_scale = g.abs_max();
+        auto max_scale = g.abs_max();
         logQuda(QUDA_VERBOSE, "Global U_max = %e\n", max_scale);
         X.Scale(max_scale > 2.0 * mass ? max_scale : 2.0 * mass);
       }

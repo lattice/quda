@@ -115,12 +115,12 @@ TEST_P(StaggeredInvertTest, verify)
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) {
       EXPECT_FALSE(std::isnan(rsd[0])) << "Nan has propagated into the result";
-      verify_tol = checkReasonableHostDeviation(rsd[0], verify_tol, prec, gauge_param.reconstruct);
+      verify_tol = checkReasonableHostDeviation(static_cast<double>(rsd[0]), verify_tol, prec, gauge_param.reconstruct);
       EXPECT_LE(rsd[0], verify_tol);
     }
     if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) {
       EXPECT_FALSE(std::isnan(rsd[1])) << "Nan has propagated into the result";
-      tol_hq = checkReasonableHostDeviation(rsd[1], tol_hq, prec, gauge_param.reconstruct);
+      tol_hq = checkReasonableHostDeviation(static_cast<double>(rsd[1]), tol_hq, prec, gauge_param.reconstruct);
       EXPECT_LE(rsd[1], tol_hq);
     }
   }

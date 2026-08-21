@@ -107,22 +107,28 @@ namespace quda {
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll
-          using device_store_t = typename device_type_mapper<store_t>::type;
-          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
-          using device_real_t = typename mapper<device_y_store_t>::type;
-          Functor<device_real_t> f_(a, b, c);
+          // Double is always kept instantiable so CPU fields work even when GPU
+          // double is disabled (see the CPU branch below). But there's no need to
+          // actually build the GPU kernel for that case: error out at compile time
+          // instead of redundantly compiling a device kernel already built for
+          // whichever precision is actually enabled.
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
+                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+            errorQuda("QUDA_PRECISION=%d does not enable double precision on the GPU", QUDA_PRECISION);
+          } else {
+            if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll
+            using device_real_t = typename mapper<y_store_t>::type;
+            Functor<device_real_t> f_(a, b, c);
 
-          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values 
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
-          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
-          constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
-          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int threads = x.Length() / (nParity * M);
+            constexpr int N = n_vector<store_t, true>(nSpin, site_unroll_check);
+            constexpr int Ny = n_vector<y_store_t, true>(nSpin, site_unroll_check);
+            constexpr int M = site_unroll_check ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+            const int threads = x.Length() / (nParity * M);
 
-          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          BlasArg<device_real_t, M, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, threads, nParity);
-          launch<Blas_>(tp, stream, arg);
+            TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+            BlasArg<device_real_t, M, store_t, N, y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, threads, nParity);
+            launch<Blas_>(tp, stream, arg);
+          }
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER)
             errorQuda("CPU Blas functions expect AoS field order");

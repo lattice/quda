@@ -15,8 +15,8 @@ namespace quda
                    const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t b,
                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
-      a(a),
-      b(dagger ? -b : b) // if dagger flip the twist
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -b : b)) // if dagger flip the twist
     {
     }
   };

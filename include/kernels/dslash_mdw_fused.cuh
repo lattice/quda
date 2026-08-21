@@ -99,8 +99,8 @@ namespace quda {
         parity(parity),
         volume_cb(in.VolumeCB() > out.VolumeCB() ? in.VolumeCB() : out.VolumeCB()),
         volume_4d_cb(volume_cb / Ls_),
-        m_f(m_f_),
-        m_5(m_5_),
+        m_f(static_cast<real>(m_f_)),
+        m_5(static_cast<real>(m_5_)),
         dim {(3 - nParity) * (in.VolumeCB() > out.VolumeCB() ? in.X(0) : out.X(0)),
              in.VolumeCB() > out.VolumeCB() ? in.X(1) : out.X(1), in.VolumeCB() > out.VolumeCB() ? in.X(2) : out.X(2),
              in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
@@ -117,8 +117,8 @@ namespace quda {
 
         if (b_5[0] != b_5[1] || b_5[0].imag() != 0) { errorQuda("zMobius is NOT supported yet.\n"); }
 
-        b = real_t(b_5[0].real());
-        c = real_t(c_5[0].real());
+        b = static_cast<real>(b_5[0].real());
+        c = static_cast<real>(c_5[0].real());
         kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
 
         if (kappa * kappa < 1e-6) { small_kappa = true; }

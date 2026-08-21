@@ -11,10 +11,10 @@ namespace quda
     GaugeField &out;
     const GaugeField &in;
     const bool improved;
-    const Float rho;
-    const Float epsilon;
+    const real_t rho;
+    const real_t epsilon;
     const int dir_ignore;
-    const Float anisotropy;
+    const real_t anisotropy;
     const int stoutDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
@@ -33,10 +33,10 @@ namespace quda
       out(out),
       in(in),
       improved(improved),
-      rho(static_cast<Float>(rho)),
-      epsilon(static_cast<Float>(epsilon)),
+      rho(rho),
+      epsilon(epsilon),
       dir_ignore(dir_ignore),
-      anisotropy(static_cast<Float>(anisotropy)),
+      anisotropy(anisotropy),
       stoutDim((dir_ignore == 4) ? 4 : 3)
     {
       if (improved) strcat(aux, ",improved");

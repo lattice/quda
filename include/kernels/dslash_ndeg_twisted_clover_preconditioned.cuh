@@ -31,10 +31,10 @@ namespace quda
                                                           comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-      a(a),
-      b(dagger ? -0.5 * b : 0.5 * b), // if dagger flip the chiral twist
-      c(0.5 * c),
-      b2_minus_c2(0.25 * (b * b - c * c))
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -0.5 * b : 0.5 * b)), // if dagger flip the chiral twist
+      c(static_cast<real>(0.5 * c)),
+      b2_minus_c2(static_cast<real>(0.25 * (b * b - c * c)))
     {
       checkPrecision(U, A);
       checkLocation(U, A);

@@ -33,7 +33,7 @@ namespace quda {
       kernel_param(dim3(mom.VolumeCB(), 2, 4)),
       mom(mom),
       u(u),
-      epsilon(epsilon),
+      epsilon(static_cast<real>(epsilon)),
       p(p)
     {
       for (int i = 0; i < 4; i++) {

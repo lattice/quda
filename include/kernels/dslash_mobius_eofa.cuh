@@ -61,12 +61,12 @@ namespace quda
         volume_cb(in.VolumeCB()),
         volume_4d_cb(volume_cb / in.X(4)),
         Ls(in.X(4)),
-        m_f(m_f_),
-        m_5(m_5_),
-        a(a_),
-        kappa(kappa_),
-        inv(inv_),
-        sherman_morrison(sherman_morrison_)
+        m_f(static_cast<real>(m_f_)),
+        m_5(static_cast<real>(m_5_)),
+        a(static_cast<real>(a_)),
+        kappa(static_cast<real>(kappa_)),
+        inv(static_cast<real>(inv_)),
+        sherman_morrison(static_cast<real>(sherman_morrison_))
       {
         for (auto i = 0u; i < out.size(); i++) {
           this->out[i] = out[i];

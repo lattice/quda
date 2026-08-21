@@ -188,9 +188,9 @@ namespace quda
       volume_cb(in.VolumeCB()),
       volume_4d_cb(volume_cb / in.X(4)),
       Ls(in.X(4)),
-      m_f(m_f),
-      m_5(m_5),
-      a(a_)
+      m_f(static_cast<real>(m_f)),
+      m_5(static_cast<real>(m_5)),
+      a(static_cast<real>(a_))
     {
       for (auto i = 0u; i < in.size(); i++) {
         this->out[i] = out[i];
