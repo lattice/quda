@@ -175,7 +175,7 @@ const char *getOmpThreadStr()
   return omp_thread_string.c_str();
 }
 
-void errorQuda_(const char *func, const char *file, int line, ...)
+[[noreturn]] void errorQuda_(const char *func, const char *file, int line)
 {
   fprintf(getOutputFile(), " (rank %d, host %s, %s:%d in %s())\n", comm_rank_global(), comm_hostname(), file, line, func);
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", getOutputPrefix(),

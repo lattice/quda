@@ -23,12 +23,12 @@ namespace quda
 
     WilsonCloverHasenbuschTwistPCArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      const ColorSpinorField &halo, const GaugeField &U, const CloverField &A_,
-                                     double a_, double b_, cvector_ref<const ColorSpinorField> &x, int parity,
+                                     real_t a_, real_t b_, cvector_ref<const ColorSpinorField> &x, int parity,
                                      bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a_, x, parity, dagger, comm_override),
       A(A_, false),
       A_inv(A_, dynamic_clover ? false : true),
-      b(dagger ? -0.5 * b_ : 0.5 * b_) // if dynamic clover we don't want the inverse field
+      b(static_cast<real>(dagger ? -0.5 * b_ : 0.5 * b_)) // if dynamic clover we don't want the inverse field
     {
       checkPrecision(U, A_);
       checkLocation(U, A_);

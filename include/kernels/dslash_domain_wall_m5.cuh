@@ -2,7 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <shared_memory_cache_helper.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <index_helper.cuh>
 #include <kernel.h>
 #include <domain_wall_helper.h>
@@ -110,71 +110,89 @@ namespace quda
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
-    void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_mobius_pre(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (b + c * D5) * in
+      const real half = static_cast<real>(0.5);
+      const real four = static_cast<real>(4.0);
+      const real one = static_cast<real>(1.0);
       for (int s = 0; s < Ls; s++) {
-        coeff.beta[s] = b_5[s];
-        coeff.alpha[s] = 0.5 * c_5[s]; // 0.5 from gamma matrices
+        coeff.beta[s] = complex<real>(b_5[s]);
+        coeff.alpha[s] = half * complex<real>(c_5[s]); // 0.5 from gamma matrices
         // xpay
-        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] = half / (complex<real>(b_5[s]) * (m_5 + four) + one);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
       }
     }
 
-    void compute_coeff_mobius(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_mobius(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (1 + kappa * D5) * in
+      const real half = static_cast<real>(0.5);
+      const real four = static_cast<real>(4.0);
+      const real one = static_cast<real>(1.0);
       for (int s = 0; s < Ls; s++) {
-        coeff.kappa[s] = 0.5 * (c_5[s] * (m_5 + 4.0) - 1.0) / (b_5[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        coeff.kappa[s] = half * (complex<real>(c_5[s]) * (m_5 + four) - one)
+          / (complex<real>(b_5[s]) * (m_5 + four) + one); // 0.5 from gamma matrices
         // axpy
-        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] = half / (complex<real>(b_5[s]) * (m_5 + four) + one);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
       }
     }
 
     void compute_coeff_m5inv_dwf()
     {
-      kappa = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
-      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);
+      const real half = static_cast<real>(0.5);
+      const real two = static_cast<real>(2.0);
+      const real five = static_cast<real>(5.0);
+      const real one = static_cast<real>(1.0);
+      kappa = two * (half / (five + m_5)); // 2  * kappa_5
+      inv = half / (one + std::pow(kappa, (int)Ls) * m_f);
     }
 
-    void compute_coeff_m5inv_mobius(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_m5inv_mobius(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (1 + kappa * D5)^-1 * in = M5inv * in
-      kappa = -(c_5[0].real() * (4.0 + m_5) - 1.0) / (b_5[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
-      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                                 // 0.5 from gamma matrices
-      a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);                             // kappa_b * kappa_b * a
+      const real half = static_cast<real>(0.5);
+      const real four = static_cast<real>(4.0);
+      const real one = static_cast<real>(1.0);
+      kappa = -(static_cast<real>(c_5[0].real()) * (four + m_5) - one)
+        / (static_cast<real>(b_5[0].real()) * (four + m_5) + one);                 // kappa = kappa_b / kappa_c
+      inv = half / (one + std::pow(kappa, (int)Ls) * m_f);                         // 0.5 from gamma matrices
+      a *= pow(half / (static_cast<real>(b_5[0].real()) * (m_5 + four) + one), 2); // kappa_b * kappa_b * a
     }
 
-    void compute_coeff_m5inv_zmobius(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_m5inv_zmobius(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (1 + kappa * D5)^-1 * in = M5inv * in
       // Similar to mobius convention, but variadic across 5th dim
-      complex<real> k = 1.0;
+      const real half = static_cast<real>(0.5);
+      const real four = static_cast<real>(4.0);
+      const real one = static_cast<real>(1.0);
+      complex<real> k = one;
       for (int s = 0; s < Ls; s++) {
-        coeff.kappa[s] = -(c_5[s] * (4.0 + m_5) - 1.0) / (b_5[s] * (4.0 + m_5) + 1.0);
+        coeff.kappa[s] = -(complex<real>(c_5[s]) * (four + m_5) - one) / (complex<real>(b_5[s]) * (four + m_5) + one);
         k *= coeff.kappa[s];
       }
-      coeff.inv = static_cast<real>(0.5) / (static_cast<real>(1.0) + k * m_f);
+      coeff.inv = half / (one + k * m_f);
 
       for (int s = 0; s < Ls; s++) { // axpy coefficients
-        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] = half / (complex<real>(b_5[s]) * (m_5 + four) + one);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a);
       }
     }
 
     Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-               cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-               double a_) :
+               cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5,
+               const complex_t *c_5, real_t a_) :
       kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
       nParity(in.SiteSubset()),
       volume_cb(in.VolumeCB()),
       volume_4d_cb(volume_cb / in.X(4)),
       Ls(in.X(4)),
-      m_f(m_f),
-      m_5(m_5),
-      a(a_)
+      m_f(static_cast<real>(m_f)),
+      m_5(static_cast<real>(m_5)),
+      a(static_cast<real>(a_))
     {
       for (auto i = 0u; i < in.size(); i++) {
         this->out[i] = out[i];

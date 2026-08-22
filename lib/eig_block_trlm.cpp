@@ -16,6 +16,7 @@
 
 namespace quda
 {
+
   // Thick Restarted Block Lanczos Method constructor
   BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : TRLM(mat, eig_param)
   {
@@ -44,8 +45,8 @@ namespace quda
     block_data_length = block_size * block_size;
     auto arrow_mat_array_size = block_data_length * n_blocks;
     // Tridiagonal/Arrow matrix
-    block_alpha.resize(arrow_mat_array_size, 0.0);
-    block_beta.resize(arrow_mat_array_size, 0.0);
+    block_alpha.resize(arrow_mat_array_size, real_t(0.0));
+    block_beta.resize(arrow_mat_array_size, real_t(0.0));
 
     // Temp storage used in blockLanczosStep
     jth_block.resize(block_data_length);
@@ -53,7 +54,7 @@ namespace quda
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
+  void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
@@ -81,8 +82,8 @@ namespace quda
     checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
-    double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0].Precision());
+    real_t mat_norm = 0.0;
+    real_t epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -99,21 +100,39 @@ namespace quda
         if (((step - num_keep) / block_size) % std::max(1, ((n_kr - num_keep) / block_size) / 10) == 0)
           logQuda(QUDA_VERBOSE, " starting blockLanczosStep %d\n", step);
         blockLanczosStep(kSpace, step);
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+          char step_tag[64];
+          snprintf(step_tag, sizeof(step_tag), "after blockLanczosStep j=%d", step);
+          logBlockArrowCoeffs(step_tag);
+        }
       }
       iter += (n_kr - num_keep);
 
       // Solve current block tridiag
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+        logBlockArrowCoeffs("before eigensolveFromBlockArrowMat");
+        logQuda(QUDA_DEBUG_VERBOSE, "BLKTRLM scalar coeffs: restart=%d num_locked=%d num_keep=%d n_kr=%d block_size=%d\n",
+                restart_iter, num_locked, num_keep, n_kr, block_size);
+        for (int i = num_locked; i < std::min(n_kr, num_locked + 8); i++) {
+          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, alpha[i], i, beta[i]);
+          if (block_size == 1) {
+            const int ba = (i / block_size) * block_data_length;
+            logQuda(QUDA_DEBUG_VERBOSE, "  block_alpha[%d] = (%+.16e,%+.16e) block_beta[%d] = (%+.16e,%+.16e)\n", i,
+                    block_alpha[ba].real(), block_alpha[ba].imag(), i, block_beta[ba].real(), block_beta[ba].imag());
+          }
+        }
+      }
       eigensolveFromBlockArrowMat();
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated and used for LR
       for (int i = num_locked; i < n_kr; i++)
-        if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+        if (quda::fabs(alpha[i]) > mat_norm) mat_norm = quda::fabs(alpha[i]);
 
       // Lambda that returns mat_norm for LR and returns the relevant alpha
       // (the corresponding Ritz value) for SR
-      auto check_norm = [&](double sr_norm) -> double {
+      auto check_norm = [&](real_t sr_norm) -> real_t {
         if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
           return mat_norm;
         else
@@ -217,6 +236,42 @@ namespace quda
 
   // Block Thick Restart Member functions
   //---------------------------------------------------------------------------
+  void BLKTRLM::logBlockArrowCoeffs(const char *tag) const
+  {
+    const int n_blocks = n_kr / block_size;
+    logQuda(QUDA_DEBUG_VERBOSE, "BLKTRLM %s: restart=%d num_locked=%d num_keep=%d n_kr=%d block_size=%d\n", tag,
+            restart_iter, num_locked, num_keep, n_kr, block_size);
+
+    for (int blk = 0; blk < n_blocks; blk++) {
+      logQuda(QUDA_DEBUG_VERBOSE, "  block_alpha[%d] (row-major b,c):\n", blk);
+      for (int b = 0; b < block_size; b++) {
+        for (int c = 0; c < block_size; c++) {
+          const int idx = blk * block_data_length + b * block_size + c;
+          logQuda(QUDA_DEBUG_VERBOSE, "    (%d,%d) = (%+.16e,%+.16e)\n", b, c, block_alpha[idx].real(),
+                  block_alpha[idx].imag());
+        }
+      }
+    }
+
+    for (int blk = 0; blk < n_blocks; blk++) {
+      logQuda(QUDA_DEBUG_VERBOSE, "  block_beta[%d] (lower-triangular b,c):\n", blk);
+      for (int b = 0; b < block_size; b++) {
+        for (int c = 0; c < block_size; c++) {
+          const int idx = blk * block_data_length + b * block_size + c;
+          if (c <= b) {
+            logQuda(QUDA_DEBUG_VERBOSE, "    (%d,%d) = (%+.16e,%+.16e)\n", b, c, block_beta[idx].real(),
+                    block_beta[idx].imag());
+          }
+        }
+      }
+    }
+
+    real_t beta_sum = 0;
+    const int beta_tail = n_kr * block_size - block_data_length;
+    for (int i = 0; i < block_data_length; i++) beta_sum += abs(block_beta[beta_tail + i]);
+    logQuda(QUDA_DEBUG_VERBOSE, "  beta_sum (tail block at offset %d) = %.16e\n", beta_tail, beta_sum);
+  }
+
   void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField> &v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
@@ -234,7 +289,7 @@ namespace quda
 
     if (j - start > 0) {
       int blocks = (j - start) / block_size;
-      std::vector<Complex> beta_(blocks * block_data_length);
+      std::vector<complex_t> beta_(blocks * block_data_length);
 
       // Switch beta block order from COLUMN to ROW major
       // This switches the block from upper to lower triangular
@@ -256,7 +311,7 @@ namespace quda
 
     // a_j = v_j^dag * r
     // Block dot products stored in alpha_block.
-    std::vector<Complex> block_alpha_(block_size);
+    std::vector<complex_t> block_alpha_(block_size);
     blas::block::cDotProduct(block_alpha_, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
     for (auto i = 0u; i < block_alpha_.size(); i++) block_alpha[arrow_offset + i] = block_alpha_[i];
 
@@ -294,12 +349,12 @@ namespace quda
       // Compute R_{k}
       logQuda(QUDA_DEBUG_VERBOSE, "Orthonormalisation attempt k = %d\n", k);
       for (int b = 0; b < block_size; b++) {
-        double norm = sqrt(blas::norm2(r[b]));
+        real_t norm = sqrt(blas::norm2(r[b]));
         blas::ax(1.0 / norm, r[b]);
         jth_block[b * (block_size + 1)] = norm;
         for (int c = b + 1; c < block_size; c++) {
 
-          Complex cnorm = blas::cDotProduct(r[b], r[c]);
+          complex_t cnorm = blas::cDotProduct(r[b], r[c]);
           blas::caxpy(-cnorm, r[b], r[c]);
 
           idx = c * block_size + b;
@@ -336,9 +391,9 @@ namespace quda
     } else {
       // Compute BetaNew_ac = (R_k)_ab * Beta_bc
       // Use Eigen, it's neater
-      MatrixXcd betaN = MatrixXcd::Zero(block_size, block_size);
-      MatrixXcd beta = MatrixXcd::Zero(block_size, block_size);
-      MatrixXcd Rk = MatrixXcd::Zero(block_size, block_size);
+      MatrixXc betaN = MatrixXc::Zero(block_size, block_size);
+      MatrixXc beta = MatrixXc::Zero(block_size, block_size);
+      MatrixXc Rk = MatrixXc::Zero(block_size, block_size);
       int idx = 0;
 
       // Populate matrices
@@ -376,7 +431,7 @@ namespace quda
     int num_locked_offset = (num_locked / block_size) * block_data_length;
 
     // Eigen objects
-    MatrixXcd T = MatrixXcd::Zero(dim, dim);
+    MatrixXc T = MatrixXc::Zero(dim, dim);
     block_ritz_mat.resize(dim * dim);
     int idx = 0;
 
@@ -426,8 +481,19 @@ namespace quda
       }
     }
 
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+      logQuda(QUDA_DEBUG_VERBOSE,
+              "BLKTRLM arrow matrix: dim=%d blocks=%d arrow_pos=%d block_arrow_pos=%d num_locked_offset=%d\n", dim,
+              blocks, arrow_pos, block_arrow_pos, num_locked_offset);
+      for (int b = 0; b < std::min(dim, 4); b++) {
+        for (int c = 0; c < std::min(dim, 4); c++) {
+          logQuda(QUDA_DEBUG_VERBOSE, "  T(%d,%d) = (%+.16e,%+.16e)\n", b, c, T(b, c).real(), T(b, c).imag());
+        }
+      }
+    }
+
     // Eigensolve the arrow matrix
-    SelfAdjointEigenSolver<MatrixXcd> eigensolver;
+    SelfAdjointEigenSolver<MatrixXc> eigensolver;
     eigensolver.compute(T);
 
     // Populate the alpha array with eigenvalues
@@ -442,15 +508,26 @@ namespace quda
     for (int i = 0; i < dim; i++)
       for (int j = 0; j < dim; j++) block_ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
 
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+      for (int i = 0; i < std::min(dim, 4); i++)
+        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, eigensolver.eigenvalues()[i]);
+    }
+
     // Use Sum of all beta values in the final block for
     // the convergence condition
-    double beta_sum = 0;
-    for (int i = 0; i < block_data_length; i++) beta_sum += fabs(block_beta[n_kr * block_size - block_data_length + i]);
+    real_t beta_sum = 0;
+    for (int i = 0; i < block_data_length; i++) beta_sum += abs(block_beta[n_kr * block_size - block_data_length + i]);
 
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
-        residua[i * block_size + b + num_locked] = fabs(beta_sum * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
+        const int ritz_idx = dim * (i * block_size + b + 1) - 1;
+        residua[i * block_size + b + num_locked] = abs(beta_sum * block_ritz_mat[ritz_idx]);
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2 && i < 2 && b < 2) {
+          logQuda(QUDA_DEBUG_VERBOSE, "  resid estimate i=%d b=%d: beta_sum=%.16e ritz[%d]=(%+.16e,%+.16e) resid=%.16e\n",
+                  i, b, beta_sum, ritz_idx, block_ritz_mat[ritz_idx].real(), block_ritz_mat[ritz_idx].imag(),
+                  residua[i * block_size + b + num_locked]);
+        }
       }
     }
 
@@ -463,7 +540,7 @@ namespace quda
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    std::vector<Complex> ritz_mat_keep(dim * iter_keep);
+    std::vector<complex_t> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
@@ -475,9 +552,9 @@ namespace quda
 
     // Compute new r blocks
     // Use Eigen, it's neater
-    MatrixXcd beta = MatrixXcd::Zero(block_size, block_size);
-    MatrixXcd ri = MatrixXcd::Zero(block_size, block_size);
-    MatrixXcd ritzi = MatrixXcd::Zero(block_size, block_size);
+    MatrixXc beta = MatrixXc::Zero(block_size, block_size);
+    MatrixXc ri = MatrixXc::Zero(block_size, block_size);
+    MatrixXc ritzi = MatrixXc::Zero(block_size, block_size);
     int blocks = iter_keep / block_size;
     int idx = 0;
     int beta_offset = n_kr * block_size - block_data_length;

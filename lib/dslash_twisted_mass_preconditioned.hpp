@@ -74,7 +74,7 @@ namespace quda
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct TwistedMassPreconditionedApply {
     TwistedMassPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
+                                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, real_t a, real_t b,
                                    bool xpay, int parity, bool dagger, bool asymmetric, const int *comm_override,
                                    TimeProfile &profile)
     {

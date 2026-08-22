@@ -22,7 +22,7 @@ namespace quda
   void ApplyCoarseMma<dagger, coarseColor, nVec>(cvector_ref<ColorSpinorField> &out,
                                                  cvector_ref<const ColorSpinorField> &inA,
                                                  cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
-                                                 const GaugeField &X, double kappa, int parity, bool dslash,
+                                                 const GaugeField &X, real_t kappa, int parity, bool dslash,
                                                  bool clover, const int *commDim, QudaPrecision halo_precision)
   {
     if constexpr (is_enabled_multigrid()) {
@@ -42,7 +42,7 @@ namespace quda
   template <>
   void ApplyCoarseMma<dagger, coarseColor, nVec>(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
                                                  cvector_ref<const ColorSpinorField> &, const GaugeField &,
-                                                 const GaugeField &, double, int, bool, bool, const int *, QudaPrecision)
+                                                 const GaugeField &, real_t, int, bool, bool, const int *, QudaPrecision)
   {
     errorQuda("coarseColor = %d is not supported by MMA.\n", coarseColor);
   }

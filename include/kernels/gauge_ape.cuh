@@ -27,13 +27,13 @@ namespace quda
     const real anisotropy;
     const real tolerance;
 
-    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, real anisotropy) :
+    GaugeAPEArg(GaugeField &out, const GaugeField &in, real_t alpha, int dir_ignore, real_t anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),
-      alpha(alpha),
+      alpha(static_cast<real>(alpha)),
       dir_ignore(dir_ignore),
-      anisotropy(anisotropy),
+      anisotropy(static_cast<real>(anisotropy)),
       tolerance(in.toleranceSU3())
     {
       for (int dir = 0; dir < 4; ++dir) {
@@ -67,7 +67,7 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
+      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);

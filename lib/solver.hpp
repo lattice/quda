@@ -19,7 +19,7 @@ namespace quda
      @return Norm of final power iteration result
   */
   template <typename... Args>
-  double Solver::performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
+  real_t Solver::performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
                                         ColorSpinorField &tempvec1, ColorSpinorField &tempvec2, int niter,
                                         int normalize_freq, Args &&...args)
   {
@@ -29,7 +29,7 @@ namespace quda
     // Do niter iterations, normalize every normalize_freq
     for (int i = 0; i < niter; i++) {
       if (normalize_freq > 0 && i % normalize_freq == 0) {
-        double tmpnrm = sqrt(blas::norm2(tempvec1));
+        auto tmpnrm = sqrt(blas::norm2(tempvec1));
         blas::ax(1.0 / tmpnrm, tempvec1);
       }
       diracm(tempvec2, tempvec1, args...);
@@ -39,10 +39,10 @@ namespace quda
       std::swap(tempvec1, tempvec2);
     }
     // Get Rayleigh quotient
-    double tmpnrm = sqrt(blas::norm2(tempvec1));
+    auto tmpnrm = sqrt(blas::norm2(tempvec1));
     blas::ax(1.0 / tmpnrm, tempvec1);
     diracm(tempvec2, tempvec1, args...);
-    double lambda_max = sqrt(blas::norm2(tempvec2));
+    auto lambda_max = sqrt(blas::norm2(tempvec2));
     logQuda(QUDA_VERBOSE, "Power iterations approximate max = %e\n", lambda_max);
 
     return lambda_max;
@@ -62,7 +62,7 @@ namespace quda
   template <typename... Args>
   void Solver::computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<std::vector<ColorSpinorField>> &Ap,
                                     std::vector<std::vector<ColorSpinorField>> &p, int n_krylov, QudaCABasis basis,
-                                    double m_map, double b_map, Args &&...args)
+                                    real_t m_map, real_t b_map, Args &&...args)
   {
     // in some cases p or Ap may be larger
     if (static_cast<int>(p.size()) < n_krylov) errorQuda("Invalid p.size() %lu < n_krylov %d", p.size(), n_krylov);

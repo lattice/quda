@@ -26,6 +26,7 @@
 #include <type_traits>
 #include <quda_arch.h> // for double2 / float2
 #include <math_helper.h>
+#include "dbldbl.h"
 
 namespace quda
 {
@@ -47,6 +48,7 @@ namespace quda
 
   __host__ __device__ inline float conj(float x) { return x; }
   __host__ __device__ inline double conj(double x) { return x; }
+  __host__ __device__ inline doubledouble conj(doubledouble x) { return x; }
 
   template <typename ValueType> struct complex;
 
@@ -964,5 +966,38 @@ namespace quda
     return complex<real>(-a.imag(), a.real());
 #endif
   }
+
+  template <> struct complex<doubledouble> : public doubledouble2 {
+  public:
+    typedef doubledouble value_type;
+
+    complex() = default;
+
+    constexpr complex(const doubledouble &re, const doubledouble &im = doubledouble()) : doubledouble2 {re, im} { }
+
+    __host__ __device__ inline complex &operator+=(const complex<doubledouble> &z)
+    {
+      real(real() + z.real());
+      imag(imag() + z.imag());
+      return *this;
+    }
+
+    __host__ __device__ inline complex &operator-=(const complex<doubledouble> &z)
+    {
+      real(real() - z.real());
+      imag(imag() - z.imag());
+      return *this;
+    }
+
+    constexpr doubledouble real() const { return x; }
+    constexpr doubledouble imag() const { return y; }
+    __host__ __device__ inline void real(doubledouble re) { x = re; }
+    __host__ __device__ inline void imag(doubledouble im) { y = im; }
+
+    template <typename T> inline __host__ __device__ operator complex<T>() const
+    {
+      return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+    }
+  };
 
 } // end namespace quda

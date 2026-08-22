@@ -9,7 +9,6 @@
 #include <color_spinor_field.h>
 #include <qio_field.h>
 #include <eigensolve_quda.h>
-#include <invert_x_update.h>
 #include <madwf_param.h>
 
 namespace quda {
@@ -64,7 +63,7 @@ namespace quda {
     QudaComputeNullVector compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;
 
     /**< Reliable update tolerance */
-    double delta = 0.0;
+    real_t delta = 0.0;
 
     /**< Whether to user alternative reliable updates (CG only at the moment) */
     bool use_alternative_reliable = false;
@@ -109,13 +108,13 @@ namespace quda {
     int pipeline = 0;
 
     /**< Solver tolerance in the L2 residual norm */
-    double tol = 0.0;
+    real_t tol = 0.0;
 
     /**< Solver tolerance in the L2 residual norm */
-    double tol_restart = 0.0;
+    real_t tol_restart = 0.0;
 
     /**< Solver tolerance in the heavy quark residual norm */
-    double tol_hq = 0.0;
+    real_t tol_hq = 0.0;
 
     /**< Whether to compute the true residual post solve */
     bool compute_true_res = true;
@@ -124,10 +123,10 @@ namespace quda {
     bool sloppy_converge = false;
 
     /**< Actual L2 residual norm achieved in solver */
-    vector<double> true_res;
+    vector<real_t> true_res;
 
     /**< Actual heavy quark residual norm achieved in solver */
-    vector<double> true_res_hq;
+    vector<real_t> true_res_hq;
 
     /**< Maximum number of iterations in the linear solver */
     int maxiter = 0;
@@ -166,22 +165,22 @@ namespace quda {
     int num_offset = 0;
 
     /** Offsets for multi-shift solver */
-    array<double, QUDA_MAX_MULTI_SHIFT> offset = {};
+    array<real_t, QUDA_MAX_MULTI_SHIFT> offset = {};
 
     /** Solver tolerance for each offset */
-    array<double, QUDA_MAX_MULTI_SHIFT> tol_offset = {};
+    array<real_t, QUDA_MAX_MULTI_SHIFT> tol_offset = {};
 
     /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
-    array<double, QUDA_MAX_MULTI_SHIFT> tol_hq_offset = {};
+    array<real_t, QUDA_MAX_MULTI_SHIFT> tol_hq_offset = {};
 
     /** Actual L2 residual norm achieved in solver for each offset */
-    array<double, QUDA_MAX_MULTI_SHIFT> true_res_offset = {};
+    array<real_t, QUDA_MAX_MULTI_SHIFT> true_res_offset = {};
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
-    array<double, QUDA_MAX_MULTI_SHIFT> iter_res_offset = {};
+    array<real_t, QUDA_MAX_MULTI_SHIFT> iter_res_offset = {};
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
-    array<double, QUDA_MAX_MULTI_SHIFT> true_res_hq_offset = {};
+    array<real_t, QUDA_MAX_MULTI_SHIFT> true_res_hq_offset = {};
 
     /** Number of steps in s-step algorithms */
     int Nsteps = 0;
@@ -193,31 +192,31 @@ namespace quda {
     int precondition_cycle = 0;
 
     /** Tolerance in the inner solver */
-    double tol_precondition = 0.0;
+    real_t tol_precondition = 0.0;
 
     /** Maximum number of iterations allowed in the inner solver */
     int maxiter_precondition = 0;
 
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
-    double omega = 0.0;
+    real_t omega = 0.0;
 
     /** Basis for CA algorithms */
     QudaCABasis ca_basis = QUDA_INVALID_BASIS;
 
     /** Minimum eigenvalue for Chebyshev CA basis */
-    double ca_lambda_min = 0.0;
+    real_t ca_lambda_min = 0.0;
 
     /** Maximum eigenvalue for Chebyshev CA basis */
-    double ca_lambda_max = 0.0; // -1 -> power iter generate
+    real_t ca_lambda_max = 0.0; // -1 -> power iter generate
 
     /** Basis for CA algorithms in a preconditioner */
     QudaCABasis ca_basis_precondition = QUDA_INVALID_BASIS;
 
     /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner */
-    double ca_lambda_min_precondition = 0.0;
+    real_t ca_lambda_min_precondition = 0.0;
 
     /** Maximum eigenvalue for Chebyshev CA basis in a preconditioner */
-    double ca_lambda_max_precondition = 0.0; // -1 -> power iter generate
+    real_t ca_lambda_max_precondition = 0.0; // -1 -> power iter generate
 
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type = QUDA_INVALID_SCHWARZ;
@@ -240,8 +239,8 @@ namespace quda {
 
     int eigcg_max_restarts = 0;
     int max_restart_num = 0;
-    double inc_tol = 0.0;
-    double eigenval_tol = 0.0;
+    real_t inc_tol = 0.0;
+    real_t eigenval_tol = 0.0;
 
     QudaVerbosity verbosity_precondition = QUDA_SILENT; //! verbosity to use for preconditioner
 
@@ -394,7 +393,7 @@ namespace quda {
     bool recompute_evals
       = false; /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField> evecs = {}; /** Holds the eigenvectors. */
-    std::vector<Complex> evals = {};          /** Holds the eigenvalues. */
+    std::vector<complex_t> evals = {};        /** Holds the eigenvalues. */
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
@@ -409,7 +408,7 @@ namespace quda {
        @param[in] b2 Vector of norms
        @return boolean if all vectors have zero support
     */
-    bool is_zero_src(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, cvector<double> &b2);
+    bool is_zero_src(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, cvector<real_t> &b2);
 
   public:
     Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -448,12 +447,12 @@ namespace quda {
         The default here is a no-op and should not be called.
      */
     virtual void solve_and_collect(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
-                                   cvector_ref<ColorSpinorField> &, int, double)
+                                   cvector_ref<ColorSpinorField> &, int, real_t)
     {
       errorQuda("Not implemented.");
     }
 
-    void set_tol(double tol) { param.tol = tol; }
+    void set_tol(real_t tol) { param.tol = tol; }
     void set_maxiter(int maxiter) { param.maxiter = maxiter; }
 
     const DiracMatrix &M() { return mat; }
@@ -530,11 +529,11 @@ namespace quda {
        @param[in] residual_type The type of residual we want to solve for
        @return L2 stopping condition
     */
-    static vector<double> stopping(double tol, cvector<double> &b2, QudaResidualType residual_type);
+    static vector<real_t> stopping(real_t tol, cvector<real_t> &b2, QudaResidualType residual_type);
 
-    static inline double stopping(double tol, double b2, QudaResidualType residual_type)
+    static inline real_t stopping(real_t tol, real_t b2, QudaResidualType residual_type)
     {
-      return stopping(tol, cvector<double>(b2), residual_type)[0];
+      return stopping(tol, cvector<real_t>(b2), residual_type)[0];
     }
 
     /**
@@ -545,7 +544,7 @@ namespace quda {
        @param[in] hq_tol Solver heavy-quark tolerance
        @return Whether converged
      */
-    bool convergence(cvector<double> &r2, cvector<double> &hq2, cvector<double> &r2_tol, cvector<double> &hq_tol);
+    bool convergence(cvector<real_t> &r2, cvector<real_t> &hq2, cvector<real_t> &r2_tol, cvector<real_t> &hq_tol);
 
     /**
        @brief Test for HQ solver convergence -- ignore L2 residual
@@ -555,7 +554,7 @@ namespace quda {
        @param[in[ hq_tol Solver heavy-quark tolerance
        @return Whether converged
      */
-    bool convergenceHQ(cvector<double> &hq2, cvector<double> &hq_tol);
+    bool convergenceHQ(cvector<real_t> &hq2, cvector<real_t> &hq_tol);
 
     /**
        @brief Test for L2 solver convergence -- ignore HQ residual
@@ -564,7 +563,7 @@ namespace quda {
        @param[in] r2_tol Solver L2 tolerance
        @param[in] hq_tol Solver heavy-quark tolerance
      */
-    bool convergenceL2(cvector<double> &r2, cvector<double> &r2_tol);
+    bool convergenceL2(cvector<real_t> &r2, cvector<real_t> &r2_tol);
 
     /**
        @brief Prints out the running statistics of the solver
@@ -574,7 +573,7 @@ namespace quda {
        @param[in] r2 L2 norm squared of the residual
        @param[in] hq2 Heavy quark residual
      */
-    void PrintStats(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &hq2 = {});
+    void PrintStats(const char *name, int k, cvector<real_t> &r2, cvector<real_t> &b2, cvector<real_t> &hq2 = {});
 
     /**
        @brief Prints out the summary of the solver convergence
@@ -587,8 +586,8 @@ namespace quda {
        @param[in] r2_tol Solver L2 tolerance
        @param[in] hq_tol Solver heavy-quark tolerance
     */
-    void PrintSummary(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &r2_tol,
-                      cvector<double> &hq_tol = {});
+    void PrintSummary(const char *name, int k, cvector<real_t> &r2, cvector<real_t> &b2, cvector<real_t> &r2_tol,
+                      cvector<real_t> &hq_tol = {});
 
     /**
        @brief Returns the epsilon tolerance for a given precision, by default returns
@@ -665,7 +664,7 @@ namespace quda {
        @return Norm of final power iteration result
     */
     template <typename... Args>
-    static double performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
+    static real_t performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
                                          ColorSpinorField &tempvec1, ColorSpinorField &tempvec2, int niter,
                                          int normalize_freq, Args &&...args);
 
@@ -683,13 +682,13 @@ namespace quda {
     template <typename... Args>
     static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<std::vector<ColorSpinorField>> &Ap,
                                      std::vector<std::vector<ColorSpinorField>> &p, int n_krylov, QudaCABasis basis,
-                                     double m_map, double b_map, Args &&...args);
+                                     real_t m_map, real_t b_map, Args &&...args);
 
     // FIXME delete this variant once CA-CG is MRHS aware
     template <typename... Args>
     void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
-                              std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
-                              double b_map, Args &&...args)
+                              std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, real_t m_map,
+                              real_t b_map, Args &&...args)
     {
       std::vector<std::vector<ColorSpinorField>> p2(p.size());
       for (auto i = 0u; i < p.size(); i++) {
@@ -744,7 +743,7 @@ namespace quda {
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
       std::vector<ColorSpinorField> tmp(in.size());
-      operator()(out, in, tmp, vector<double>(in.size(), 0.0));
+      operator()(out, in, tmp, vector<real_t>(in.size(), 0.0));
     }
 
     /**
@@ -756,7 +755,7 @@ namespace quda {
      * @param r2_old_init [description]
      */
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    cvector_ref<const ColorSpinorField> &p_init, cvector<double> &r2_old_init);
+                    cvector_ref<const ColorSpinorField> &p_init, cvector<real_t> &r2_old_init);
 
     void blocksolve(ColorSpinorField &out, ColorSpinorField &in) override;
 
@@ -939,7 +938,7 @@ namespace quda {
        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
     */
     virtual void solve_and_collect(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   cvector_ref<ColorSpinorField> &v_r, int collect_miniter, double collect_tol) override;
+                                   cvector_ref<ColorSpinorField> &v_r, int collect_miniter, real_t collect_tol) override;
 
     virtual bool hermitian() const override { return true; } /** PCG is only Hermitian system */
 
@@ -1000,10 +999,12 @@ namespace quda {
     int pipeline; // pipelining factor for legacyGramSchmidt
 
     // Various coefficients and params needed on each iteration.
-    vector<Complex> rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
-    vector<vector<Complex>> gamma, gamma_prime, gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
-    vector<vector<Complex>> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
-    vector<vector<double>>
+    vector<complex_t> rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
+    vector<vector<complex_t>> gamma, gamma_prime,
+      gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    vector<vector<complex_t>>
+      tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    vector<vector<real_t>>
       sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
 
     std::vector<ColorSpinorField> r_full; //! Full precision residual.
@@ -1027,7 +1028,7 @@ namespace quda {
     /**
        @brief Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
      */
-    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+    int reliable(real_t &rNorm, real_t &maxrx, real_t &maxrr, const real_t &r2, const real_t &delta);
 
     /**
      * @brief Internal routine for performing the MR part of BiCGstab-L
@@ -1115,9 +1116,9 @@ namespace quda {
      */
     int n_krylov;
 
-    std::vector<std::vector<Complex>> alpha;
-    std::vector<std::vector<Complex>> beta;
-    std::vector<std::vector<double>> gamma;
+    std::vector<std::vector<complex_t>> alpha;
+    std::vector<std::vector<complex_t>> beta;
+    std::vector<std::vector<real_t>> gamma;
 
     /**
        Solver uses lazy allocation: this flag to determine whether we have allocated.
@@ -1131,13 +1132,13 @@ namespace quda {
     std::vector<std::vector<ColorSpinorField>> p;  // GCR direction vectors
     std::vector<std::vector<ColorSpinorField>> Ap; // mat * direction vectors
 
-    void computeBeta(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int i, int N, int k);
-    void updateAp(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int begin, int size, int k);
-    void orthoDir(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int k, int pipeline);
-    void backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta, const std::vector<double> &gamma,
-                  std::vector<Complex> &delta, int n);
-    void updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
-                        std::vector<double> &gamma, int k, cvector_ref<ColorSpinorField> &p);
+    void computeBeta(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int i, int N, int k);
+    void updateAp(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int begin, int size, int k);
+    void orthoDir(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int k, int pipeline);
+    void backSubs(const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
+                  const std::vector<real_t> &gamma, std::vector<complex_t> &delta, int n);
+    void updateSolution(ColorSpinorField &x, const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
+                        std::vector<real_t> &gamma, int k, cvector_ref<ColorSpinorField> &p);
 
     /**
        @brief Initiate the fields needed by the solver
@@ -1216,10 +1217,10 @@ namespace quda {
     bool lambda_init;
     QudaCABasis basis;
 
-    std::vector<std::vector<double>> Q_AQandg; // Fused inner product matrix
-    std::vector<std::vector<double>> Q_AS;     // inner product matrix
-    std::vector<std::vector<double>> alpha;    // QAQ^{-1} g
-    std::vector<std::vector<double>> beta;     // QAQ^{-1} QpolyS
+    std::vector<std::vector<real_t>> Q_AQandg; // Fused inner product matrix
+    std::vector<std::vector<real_t>> Q_AS;     // inner product matrix
+    std::vector<std::vector<real_t>> alpha;    // QAQ^{-1} g
+    std::vector<std::vector<real_t>> beta;     // QAQ^{-1} QpolyS
 
     std::vector<ColorSpinorField> r;
 
@@ -1255,7 +1256,7 @@ namespace quda {
     /**
        @brief Check if it's time for a reliable update
     */
-    int reliable(double &rNorm, double &maxrr, int &rUpdate, const double &r2, const double &delta);
+    int reliable(real_t &rNorm, real_t &maxrr, int &rUpdate, const real_t &r2, const real_t &delta);
 
   public:
     CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
@@ -1290,7 +1291,7 @@ namespace quda {
     bool lambda_init;  // whether or not lambda_max has been initialized
     QudaCABasis basis; // CA basis
 
-    std::vector<std::vector<Complex>> alpha; // Solution coefficient vectors
+    std::vector<std::vector<complex_t>> alpha; // Solution coefficient vectors
 
     std::vector<ColorSpinorField> r;
 
@@ -1311,7 +1312,7 @@ namespace quda {
        @param[in] q Search direction vectors with the operator applied
        @param[in] b Source vector against which we are solving
     */
-    void solve(std::vector<Complex> &psi, cvector_ref<ColorSpinorField> &q, ColorSpinorField &b);
+    void solve(std::vector<complex_t> &psi, cvector_ref<ColorSpinorField> &q, ColorSpinorField &b);
 
   public:
     CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
@@ -1434,7 +1435,7 @@ public:
     }
 
     virtual void operator()(std::vector<ColorSpinorField> &out, ColorSpinorField &in) = 0;
-    bool convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const;
+    bool convergence(const std::vector<real_t> &r2, const std::vector<real_t> &r2_tol, int n) const;
   };
 
   /**
@@ -1466,7 +1467,7 @@ public:
      * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
      */
     void operator()(std::vector<ColorSpinorField> &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
-                    std::vector<double> &r2_old_array);
+                    std::vector<real_t> &r2_old_array);
 
     /**
      * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
@@ -1476,7 +1477,7 @@ public:
      */
     void operator()(std::vector<ColorSpinorField> &out, ColorSpinorField &in)
     {
-      std::vector<double> r2_old(out.size());
+      std::vector<real_t> r2_old(out.size());
       std::vector<ColorSpinorField> p;
 
       (*this)(out, in, p, r2_old);
@@ -1508,7 +1509,7 @@ public:
        @param[in] q Search direction vectors with the operator applied
        @param[in] hermitian Whether the linear system is Hermitian or not
     */
-    void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
+    void solve(std::vector<complex_t> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
                const ColorSpinorField &b, bool hermitian);
 
   public:
@@ -1578,8 +1579,8 @@ public:
      */
     void increment(ColorSpinorField &V, int n_ev);
 
-    void RestartVT(const double beta, const double rho);
-    void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
+    void RestartVT(const real_t beta, const real_t rho);
+    void UpdateVm(ColorSpinorField &res, real_t beta, real_t sqrtr2);
     // EigCG solver:
     int eigCGsolve(ColorSpinorField &out, const ColorSpinorField &in);
     // InitCG solver:
@@ -1635,7 +1636,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in);
     //
     //GMRESDR method
-    void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, const double tol_threshold);
+    void RunDeflatedCycles(ColorSpinorField *out, ColorSpinorField *in, const real_t tol_threshold);
     //
     int FlexArnoldiProcedure (const int start_idx, const bool do_givens);
 
@@ -1655,7 +1656,7 @@ public:
  struct deflation_space : public Object {
    bool svd;                            /** Whether this space is for an SVD deflaton */
    std::vector<ColorSpinorField> evecs; /** Container for the eigenvectors */
-   std::vector<Complex> evals;          /** The eigenvalues */
+   std::vector<complex_t> evals;        /** The eigenvalues */
  };
 
  /**

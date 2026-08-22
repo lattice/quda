@@ -9,11 +9,11 @@ namespace quda {
 
   DiracMobius::DiracMobius(const DiracParam &param) : DiracDomainWall(param), zMobius(false)
   {
-    memcpy(b_5, param.b_5, sizeof(Complex) * param.Ls);
-    memcpy(c_5, param.c_5, sizeof(Complex) * param.Ls);
+    memcpy(b_5, param.b_5, sizeof(complex_t) * param.Ls);
+    memcpy(c_5, param.c_5, sizeof(complex_t) * param.Ls);
 
-    double b = b_5[0].real();
-    double c = c_5[0].real();
+    auto b = b_5[0].real();
+    auto c = c_5[0].real();
     mobius_kappa_b = 0.5 / (b * (m5 + 4.) + 1.);
     mobius_kappa_c = 0.5 / (c * (m5 + 4.) - 1.);
 
@@ -67,7 +67,7 @@ namespace quda {
 
   // Modification for the 4D preconditioned Mobius domain wall operator
   void DiracMobius::Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -77,7 +77,7 @@ namespace quda {
   }
 
   void DiracMobius::Dslash4preXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   cvector_ref<const ColorSpinorField> &x, double k) const
+                                   cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -88,7 +88,7 @@ namespace quda {
 
   // The xpay operator bakes in a factor of kappa_b^2
   void DiracMobius::Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                cvector_ref<const ColorSpinorField> &x, double k) const
+                                cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -103,7 +103,7 @@ namespace quda {
     checkFullSpinor(out, in);
 
     // zMobius breaks the following code. Refer to the zMobius check in DiracMobius::DiracMobius(param)
-    double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
+    real_t mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
     auto tmp = getFieldTmp(out);
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
@@ -185,7 +185,7 @@ namespace quda {
 
   // The xpay operator bakes in a factor of kappa_b^2
   void DiracMobiusPC::M5invXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                cvector_ref<const ColorSpinorField> &x, double k) const
+                                cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -216,7 +216,7 @@ namespace quda {
   }
 
   void DiracMobiusPC::Dslash4M5invXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                       const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const
+                                       const QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -226,7 +226,7 @@ namespace quda {
   }
 
   void DiracMobiusPC::Dslash4M5preXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                       const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const
+                                       const QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -236,7 +236,7 @@ namespace quda {
   }
 
   void DiracMobiusPC::Dslash4XpayM5mob(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                       const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const
+                                       const QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -246,7 +246,7 @@ namespace quda {
   }
 
   void DiracMobiusPC::Dslash4M5preXpayM5mob(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                            const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const
+                                            const QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -256,7 +256,7 @@ namespace quda {
   }
 
   void DiracMobiusPC::Dslash4M5invXpayM5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                            const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a,
+                                            const QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t a,
                                             cvector_ref<ColorSpinorField> &y) const
   {
     checkDWF(in, out);
@@ -470,16 +470,16 @@ namespace quda {
 
     if (zMobius) { errorQuda("DiracMobiusEofa doesn't currently support zMobius"); }
 
-    double b = b_5[0].real();
-    double c = c_5[0].real();
+    real_t b = b_5[0].real();
+    real_t c = c_5[0].real();
 
-    double alpha = b + c;
+    double alpha = double(b + c); // intentionally double not real_t
 
-    double eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2. * Ls)
+    real_t eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2. * Ls)
       / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
       / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
 
-    double N = (eofa_pm ? +1. : -1.) * (2. * this->eofa_shift * eofa_norm)
+    real_t N = (eofa_pm ? +1. : -1.) * (2. * this->eofa_shift * eofa_norm)
       * (std::pow(alpha + 1., Ls) + this->mq1 * std::pow(alpha - 1., Ls)) / (b * (m5 + 4.) + 1.);
 
     // Here the signs are somewhat mixed:
@@ -490,7 +490,7 @@ namespace quda {
         = N * std::pow(-1., s) * std::pow(alpha - 1., s) / std::pow(alpha + 1., Ls + s + 1);
     }
 
-    double factor = -mobius_kappa * mass;
+    real_t factor = -mobius_kappa * mass;
     if (eofa_pm) {
       // eofa_pm = plus
       // Computing x
@@ -536,7 +536,7 @@ namespace quda {
   }
 
   void DiracMobiusEofa::m5_eofa_xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                     cvector_ref<const ColorSpinorField> &x, double a) const
+                                     cvector_ref<const ColorSpinorField> &x, real_t a) const
   {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
@@ -555,7 +555,7 @@ namespace quda {
     checkFullSpinor(out, in);
 
     // FIXME broken for variable coefficients
-    double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
+    real_t mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
     auto tmp = getFieldTmp(out);
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
@@ -616,7 +616,7 @@ namespace quda {
   }
 
   void DiracMobiusEofaPC::m5inv_eofa_xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                          cvector_ref<const ColorSpinorField> &x, double a) const
+                                          cvector_ref<const ColorSpinorField> &x, real_t a) const
   {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 

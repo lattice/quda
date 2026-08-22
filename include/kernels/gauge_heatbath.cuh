@@ -589,10 +589,10 @@ namespace quda
     RNGState *rng;
     int mu;
     int parity;
-    MonteArg(GaugeField &data, Float Beta, RNGState *rng, int mu, int parity) :
+    MonteArg(GaugeField &data, real_t Beta, RNGState *rng, int mu, int parity) :
       kernel_param(dim3(data.LocalVolumeCB(), 1, 1)), dataOr(data), rng(rng), mu(mu), parity(parity)
     {
-      BetaOverNc = Beta / (Float)nColor;
+      BetaOverNc = static_cast<Float>(Beta / nColor);
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = data.R()[dir];
         X[dir] = data.X()[dir] - border[dir] * 2;

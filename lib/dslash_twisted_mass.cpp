@@ -5,7 +5,7 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedMassApply {
     TwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, int parity,
+                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, real_t a, real_t b, int parity,
                      bool dagger, const int *comm_override, TimeProfile &profile);
   };
 
@@ -13,7 +13,7 @@ namespace quda
   // out(x) = M*in = (1 + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
   void ApplyTwistedMass(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                        const GaugeField &U, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity,
+                        const GaugeField &U, real_t a, real_t b, cvector_ref<const ColorSpinorField> &x, int parity,
                         bool dagger, const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {

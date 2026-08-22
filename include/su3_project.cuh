@@ -9,7 +9,7 @@
  */
 
 #include <quda_matrix.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 
 namespace quda {
 

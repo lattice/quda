@@ -81,12 +81,12 @@ namespace quda
     {
       const ColorSpinorField &x;
       ColorSpinorField &y;
-      const std::vector<double> &a;
-      const std::vector<double> &b;
+      const std::vector<real_t> &a;
+      const std::vector<real_t> &b;
       unsigned int minThreads() const override { return x.VolumeCB(); }
 
     public:
-      axpby3D(const ColorSpinorField &x, ColorSpinorField &y, const std::vector<double> &a, const std::vector<double> &b) :
+      axpby3D(const ColorSpinorField &x, ColorSpinorField &y, const std::vector<real_t> &a, const std::vector<real_t> &b) :
         TunableKernel2D(x, x.SiteSubset()), x(x), y(y), a(a), b(b)
       {
         apply(device::get_default_stream());
@@ -104,7 +104,7 @@ namespace quda
       long long bytes() const override { return x.Bytes() + 2 * y.Bytes(); }
     };
 
-    void axpby(const std::vector<double> &a, const ColorSpinorField &x, const std::vector<double> &b, ColorSpinorField &y)
+    void axpby(const std::vector<real_t> &a, const ColorSpinorField &x, const std::vector<real_t> &b, ColorSpinorField &y)
     {
       checkPrecision(x, y);
       checkSpin(x, y);
@@ -114,13 +114,12 @@ namespace quda
       if (a.size() != b.size() && a.size() != (unsigned int)x.X()[3])
         errorQuda("Unexpected coeff array sizes a=%lu b=%lu, x[3]=%d", a.size(), b.size(), x.X()[3]);
 
-      // We must give a Lattice field as the first argument
       instantiate<axpby3D>(x, y, a, b);
     }
 
-    void ax(const std::vector<double> &a, ColorSpinorField &x)
+    void ax(const std::vector<real_t> &a, ColorSpinorField &x)
     {
-      std::vector<double> zeros(a.size(), 0.0);
+      std::vector<real_t> zeros(a.size(), 0.0);
       axpby(a, x, zeros, x);
     }
 
@@ -128,13 +127,13 @@ namespace quda
     {
       const ColorSpinorField &x;
       ColorSpinorField &y;
-      const std::vector<Complex> &a;
-      const std::vector<Complex> &b;
+      const std::vector<complex_t> &a;
+      const std::vector<complex_t> &b;
       unsigned int minThreads() const override { return x.VolumeCB(); }
 
     public:
-      caxpby3D(const ColorSpinorField &x, ColorSpinorField &y, const std::vector<Complex> &a,
-               const std::vector<Complex> &b) :
+      caxpby3D(const ColorSpinorField &x, ColorSpinorField &y, const std::vector<complex_t> &a,
+               const std::vector<complex_t> &b) :
         TunableKernel2D(x, x.SiteSubset()), x(x), y(y), a(a), b(b)
       {
         apply(device::get_default_stream());
@@ -152,7 +151,7 @@ namespace quda
       long long bytes() const override { return x.Bytes() + 2 * y.Bytes(); }
     };
 
-    void caxpby(const std::vector<Complex> &a, const ColorSpinorField &x, const std::vector<Complex> &b,
+    void caxpby(const std::vector<complex_t> &a, const ColorSpinorField &x, const std::vector<complex_t> &b,
                 ColorSpinorField &y)
     {
       checkPrecision(x, y);
@@ -171,10 +170,10 @@ namespace quda
     {
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<double> &result;
+      std::vector<real_t> &result;
 
     public:
-      reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<double> &result) :
+      reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<real_t> &result) :
         TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result(result)
       {
         apply(device::get_default_stream());
@@ -191,7 +190,7 @@ namespace quda
       long long bytes() const { return x.Bytes() + y.Bytes(); }
     };
 
-    void reDotProduct(std::vector<double> &result, const ColorSpinorField &x, const ColorSpinorField &y)
+    void reDotProduct(std::vector<real_t> &result, const ColorSpinorField &x, const ColorSpinorField &y)
     {
       checkSpin(x, y);
       checkColor(x, y);
@@ -200,7 +199,6 @@ namespace quda
       if (result.size() != (unsigned int)x.X()[3])
         errorQuda("Unexpected coeff array size a=%lu, x[3]=%d", result.size(), x.X()[3]);
 
-      // We must give a Lattice field as the first argument
       instantiate<reDotProduct3D>(x, y, result);
     }
 
@@ -208,10 +206,10 @@ namespace quda
     {
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<Complex> &result;
+      std::vector<complex_t> &result;
 
     public:
-      cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result) :
+      cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result) :
         TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result(result)
       {
         apply(device::get_default_stream());
@@ -228,7 +226,7 @@ namespace quda
       long long bytes() const { return x.Bytes() + y.Bytes(); }
     };
 
-    void cDotProduct(std::vector<Complex> &result, const ColorSpinorField &x, const ColorSpinorField &y)
+    void cDotProduct(std::vector<complex_t> &result, const ColorSpinorField &x, const ColorSpinorField &y)
     {
       checkSpin(x, y);
       checkColor(x, y);

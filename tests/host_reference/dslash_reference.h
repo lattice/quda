@@ -221,9 +221,9 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
  * @param src_idx The source index we working on (when doing mutil-RHS)
  * @return The residual and HQ residual (if requested)
  */
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
-                                               quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int laplace3D, int src_idx);
+std::array<quda::real_t, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
+                                                     quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                                     QudaInvertParam &inv_param, int laplace3D, int src_idx);
 
 /**
  * @brief Verify a single- or multi-shift staggered inversion on the host
@@ -237,10 +237,10 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda:
  * @param src_idx The source index we working on (when doing mutil-RHS)
  * @return The residual and HQ residual (if requested)
  */
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
-                                               std::vector<quda::ColorSpinorField> &out_vector,
-                                               quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int laplace3D, int src_idx = 0);
+std::array<quda::real_t, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
+                                                     std::vector<quda::ColorSpinorField> &out_vector,
+                                                     quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                                     QudaInvertParam &inv_param, int laplace3D, int src_idx = 0);
 
 /**
  * @brief Verify a staggered-type eigenvector

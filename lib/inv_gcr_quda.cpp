@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <complex>
-
 #include <quda_internal.h>
 #include <blas_quda.h>
 #include <dslash_quda.h>
@@ -21,9 +19,9 @@ namespace quda {
     return ds + 0.000001*dus;
   }
 
-  void GCR::computeBeta(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int i, int N, int k)
+  void GCR::computeBeta(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int i, int N, int k)
   {
-    std::vector<Complex> Beta(N, 0.0);
+    std::vector<complex_t> Beta(N, 0.0);
     blas::block::cDotProduct(Beta, {Ap.begin() + i, Ap.begin() + i + N}, Ap[k]); // vectorized dot product
 
 #if 0
@@ -36,14 +34,14 @@ namespace quda {
     for (int j = 0; j < N; j++) beta[(i + j) * n_krylov + k] = Beta[j];
   }
 
-  void GCR::updateAp(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int begin, int size, int k)
+  void GCR::updateAp(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int begin, int size, int k)
   {
-    std::vector<Complex> beta_(size);
+    std::vector<complex_t> beta_(size);
     for (int i = 0; i < size; i++) beta_[i] = -beta[(i + begin) * n_krylov + k];
     blas::block::caxpy(beta_, {Ap.begin() + begin, Ap.begin() + begin + size}, Ap[k]);
   }
 
-  void GCR::orthoDir(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int k, int pipeline)
+  void GCR::orthoDir(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int k, int pipeline)
   {
     switch (pipeline) {
     case 0: // no kernel fusion
@@ -82,8 +80,8 @@ namespace quda {
     }
   }
 
-  void GCR::backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
-                     const std::vector<double> &gamma, std::vector<Complex> &delta, int n)
+  void GCR::backSubs(const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
+                     const std::vector<real_t> &gamma, std::vector<complex_t> &delta, int n)
   {
     for (int k=n-1; k>=0;k--) {
       delta[k] = alpha[k];
@@ -92,10 +90,10 @@ namespace quda {
     }
   }
 
-  void GCR::updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
-                           std::vector<double> &gamma, int k, cvector_ref<ColorSpinorField> &p)
+  void GCR::updateSolution(ColorSpinorField &x, const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
+                           std::vector<real_t> &gamma, int k, cvector_ref<ColorSpinorField> &p)
   {
-    std::vector<Complex> delta(k);
+    std::vector<complex_t> delta(k);
 
     // Update the solution vector
     backSubs(alpha, beta, gamma, delta, k);
@@ -230,8 +228,8 @@ namespace quda {
       }
     }
 
-    vector<double> b2 = blas::norm2(b); // norm sq of source
-    vector<double> r2;                  // norm sq of residual
+    vector<real_t> b2 = blas::norm2(b); // norm sq of source
+    vector<real_t> r2;                  // norm sq of residual
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
@@ -274,10 +272,10 @@ namespace quda {
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    std::vector<double> heavy_quark_res(b.size()); // heavy quark residual
+    std::vector<real_t> heavy_quark_res(b.size()); // heavy quark residual
     if (use_heavy_quark_res) {
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
     }
 
     int resIncrease = 0;
@@ -291,7 +289,7 @@ namespace quda {
     int total_iter = 0;
     int restart = 0;
     auto r2_old = r2;
-    double maxr_deflate = sqrt(r2[0]);
+    real_t maxr_deflate = sqrt(r2[0]);
     bool l2_converge = false;
 
     int pipeline = param.pipeline;
@@ -328,15 +326,15 @@ namespace quda {
       auto Apr = blas::cDotProductNormA(Ap[k], K ? r_sloppy : p[k]);
 
       for (auto i = 0u; i < b.size(); i++) {
-        gamma[i][k] = sqrt(Apr[i].z); // gamma[k] = Ap[k]
+        gamma[i][k] = sqrt(Apr[i][2]); // gamma[k] = Ap[k]
         if (gamma[i][k] == 0.0) errorQuda("GCR breakdown");
-        alpha[i][k] = Complex(Apr[i].x, Apr[i].y) / gamma[i][k]; // alpha = (1/|Ap|) * (Ap, r)
+        alpha[i][k] = complex_t(Apr[i][0], Apr[i][1]) / gamma[i][k]; // alpha = (1/|Ap|) * (Ap, r)
       }
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      std::vector<double> gamma_k_inv(b.size());
+      std::vector<real_t> gamma_k_inv(b.size());
       for (auto i = 0u; i < gamma_k_inv.size(); i++) gamma_k_inv[i] = 1.0 / gamma[i][k];
-      std::vector<Complex> alpha_k(b.size());
+      std::vector<complex_t> alpha_k(b.size());
       for (auto i = 0u; i < alpha_k.size(); i++) alpha_k[i] = -alpha[i][k];
       r2 = blas::cabxpyzAxNorm(gamma_k_inv, alpha_k, Ap[k], K ? r_sloppy : p[k], K ? r_sloppy : p[k + 1]);
 
@@ -370,7 +368,7 @@ namespace quda {
 
         if (use_heavy_quark_res) {
           auto hq = blas::HeavyQuarkResidualNorm(x, r);
-          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
         }
 
         // break-out check if we have reached the limit of the precision
@@ -421,7 +419,7 @@ namespace quda {
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
       for (auto i = 0u; i < b.size(); i++) {
         param.true_res[i] = sqrt(true_r2[i] / b2[i]);
-        param.true_res_hq[i] = sqrt(hq[i].z);
+        param.true_res_hq[i] = sqrt(hq[i][2]);
       }
     }
 

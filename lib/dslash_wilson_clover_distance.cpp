@@ -10,8 +10,8 @@ namespace quda
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverApply {
     template <bool distance_pc>
     WilsonCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
-                      double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, real_t a,
+                      real_t alpha0, int t0, int parity, bool dagger, const int *comm_override,
                       DistanceType<distance_pc>, TimeProfile &profile);
   };
 
@@ -21,7 +21,7 @@ namespace quda
   // with fwd(t)=\alpha(t+1)/\alpha(t), bwd(t)=\alpha(t+1)/\alpha(t), \alpha(t)=\cosh(\alpha_0*((t-t_0)%L_t-L_t/2))
   // Uses the kappa normalization for the Wilson operator.
   void ApplyWilsonCloverDistance(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                 const GaugeField &U, const CloverField &A, double a, double alpha0, int t0,
+                                 const GaugeField &U, const CloverField &A, real_t a, real_t alpha0, int t0,
                                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                  const int *comm_override, TimeProfile &profile)
   {

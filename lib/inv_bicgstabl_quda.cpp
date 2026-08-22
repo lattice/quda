@@ -3,7 +3,6 @@
 #include <math.h>
 #include <iostream>
 #include <sstream>
-#include <complex>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -34,8 +33,8 @@ namespace quda {
   void BiCGstabL::computeMR(ColorSpinorField &x_sloppy, cvector_ref<ColorSpinorField> &u,
                             cvector_ref<ColorSpinorField> &r, bool fixed_iteration, int src_idx)
   {
-    using matrix = Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>;
-    using vector = Matrix<std::complex<double>, Dynamic, 1>;
+    using matrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;
+    using vector = Matrix<complex_t, Dynamic, 1>;
 
     // Compute gamma: minimize ||r - R \gamma||, where R is an L x R matrix
     // of r_1, r_2, ...
@@ -45,7 +44,7 @@ namespace quda {
     auto r_dagger_vec = {r.begin() + 1, r.begin() + n_krylov + 1};
     auto r_vec = {r.begin(), r.begin() + n_krylov + 1};
 
-    std::vector<Complex> r_dagger_dot_r((n_krylov + 1) * n_krylov);
+    std::vector<complex_t> r_dagger_dot_r((n_krylov + 1) * n_krylov);
     blas::block::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec);
 
     matrix R_dag_R(n_krylov, n_krylov);
@@ -74,7 +73,7 @@ namespace quda {
     // Update omega for the next BiCG iteration
     omega[src_idx] = gamma(n_krylov - 1);
 
-    std::vector<Complex> gamma_(n_krylov);
+    std::vector<complex_t> gamma_(n_krylov);
 
     if (!fixed_iteration) {
       // update u
@@ -90,11 +89,11 @@ namespace quda {
         // r = r[0] - \sum_{j=1}^L \gamma_L r_L
         // we see that if we're a bit clever with zero padding we can
         // reuse r between the two updates.
-        std::vector<Complex> gamma_for_x(n_krylov + 1);
+        std::vector<complex_t> gamma_for_x(n_krylov + 1);
         for (int i = 0; i < n_krylov; i++) gamma_for_x[i] = gamma(i);
         gamma_for_x[n_krylov] = 0; // do not want to update with last r
 
-        std::vector<Complex> gamma_for_r(n_krylov + 1);
+        std::vector<complex_t> gamma_for_r(n_krylov + 1);
         gamma_for_r[0] = 0; // do not want to update with first r
         for (int i = 0; i < n_krylov; i++) gamma_for_r[i + 1] = -gamma(i);
 
@@ -135,7 +134,7 @@ namespace quda {
   // Big change is we need to go from 1 to n_krylov, not 0 to n_krylov-1.
   void BiCGstabL::computeTau(int begin, int size, int j, cvector_ref<ColorSpinorField> &r, int src_idx)
   {
-    std::vector<Complex> Tau(size);
+    std::vector<complex_t> Tau(size);
     blas::block::cDotProduct(Tau, {r.begin() + begin, r.begin() + begin + size}, r[j]); // vectorized dot product
 
     for (int k = 0; k < size; k++) {
@@ -145,7 +144,7 @@ namespace quda {
 
   void BiCGstabL::updateR(int begin, int size, int j, cvector_ref<ColorSpinorField> &r, int src_idx)
   {
-    std::vector<Complex> tau_(size);
+    std::vector<complex_t> tau_(size);
     for (int i = 0; i < size; i++) { tau_[i] = -tau[src_idx][(i + begin) * (n_krylov + 1) + j]; }
 
     auto r_ = {r.begin() + begin, r.begin() + begin + size};
@@ -213,10 +212,10 @@ namespace quda {
       }
 
       // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
-      // rjr.x = Re(<r[j],r[0]), rjr.y = Im(<r[j],r[0]>), rjr.z = <r[j],r[j]>
+      // rjr[0] = Re(<r[j],r[0]), rjr[1] = Im(<r[j],r[0]>), rjr[2] = <r[j],r[j]>
       auto rjr = blas::cDotProductNormA(r[j], r[0]);
-      sigma[src_idx][j] = rjr.z;
-      gamma_prime[src_idx][j] = Complex(rjr.x, rjr.y) / sigma[src_idx][j];
+      sigma[src_idx][j] = rjr[2];
+      gamma_prime[src_idx][j] = complex_t(rjr[0], rjr[1]) / sigma[src_idx][j];
     }
 
     // gamma[n_krylov] = gamma'[n_krylov], omega = gamma[n_krylov]
@@ -246,7 +245,7 @@ namespace quda {
 
     // Update U
     {
-      std::vector<Complex> gamma_(n_krylov);
+      std::vector<complex_t> gamma_(n_krylov);
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[src_idx][i + 1]; }
       blas::block::caxpy(gamma_, {u.begin() + 1, u.end()}, u[0]);
     }
@@ -257,8 +256,8 @@ namespace quda {
       // the alternative way would be un-fusing some calls, which would require
       // loading and saving x twice. In a solve where the sloppy precision is lower than
       // the full precision, this can be a killer.
-      std::vector<Complex> gamma_prime_prime_(n_krylov + 1);
-      std::vector<Complex> gamma_prime_(n_krylov + 1);
+      std::vector<complex_t> gamma_prime_prime_(n_krylov + 1);
+      std::vector<complex_t> gamma_prime_(n_krylov + 1);
       gamma_prime_prime_[0] = gamma[src_idx][1];
       gamma_prime_prime_[n_krylov] = 0.0; // x never gets updated with r[n_krylov]
       gamma_prime_[0] = 0.0;              // r[0] never gets updated with r[0]... obvs.
@@ -295,8 +294,8 @@ namespace quda {
     std::vector<std::vector<ColorSpinorField>> &r;
     std::vector<std::vector<ColorSpinorField>> &u;
 
-    std::vector<Complex> &alpha;
-    std::vector<Complex> &beta;
+    std::vector<complex_t> &alpha;
+    std::vector<complex_t> &beta;
 
     BiCGstabLUpdateType update_type;
 
@@ -315,8 +314,8 @@ namespace quda {
 
   public:
     BiCGstabLUpdate(std::vector<ColorSpinorField> &x, std::vector<std::vector<ColorSpinorField>> &r,
-                    std::vector<std::vector<ColorSpinorField>> &u, std::vector<Complex> &alpha,
-                    std::vector<Complex> &beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
+                    std::vector<std::vector<ColorSpinorField>> &u, std::vector<complex_t> &alpha,
+                    std::vector<complex_t> &beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
       x(x), r(r), u(u), alpha(alpha), beta(beta), update_type(update_type), j_max(j_max), n_update(n_update)
     {
 
@@ -377,7 +376,8 @@ namespace quda {
   // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
   // Technically, there are ways to check both 'x' and 'r' for reliable updates...
   // the current status in BiCGstab is to just look for reliable updates in 'r'.
-  int BiCGstabL::reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+  int BiCGstabL::reliable(real_t &rNorm, real_t &maxrx, real_t &maxrr, const real_t &r2, const real_t &delta)
+  {
     // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
@@ -480,8 +480,8 @@ namespace quda {
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
-    auto b2 = !fixed_iteration ? blas::norm2(b) : vector(b.size(), 1.0); // norm sq of source.
-    vector<double> r2(b.size());                                         // norm sq of residual
+    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<real_t>(b.size(), real_t(1.0)); // norm sq of source.
+    vector<real_t> r2(b.size());                                                         // norm sq of residual
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
@@ -571,14 +571,14 @@ namespace quda {
     for (int i = 1; i <= n_krylov; i++) { blas::zero(r[i]); }
 
     auto stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) :
-                                   vector<double>(b.size(), 0.0); // stopping condition of solver.
+                                   vector<real_t>(b.size(), 0.0); // stopping condition of solver.
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    vector<double> heavy_quark_res(b.size(), 0.0);
+    vector<real_t> heavy_quark_res(b.size(), 0.0);
     if (use_heavy_quark_res) {
       auto hq = blas::HeavyQuarkResidualNorm(x, r_full);
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
@@ -599,10 +599,10 @@ namespace quda {
 
     // Various variables related to reliable updates.
     int rUpdate = 0; // count reliable updates.
-    double delta = param.delta; // delta for reliable updates.
-    double rNorm = sqrt(r2[0]); // The current residual norm.
-    double maxrr = rNorm; // The maximum residual norm since the last reliable update.
-    double maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
+    real_t delta = param.delta; // delta for reliable updates.
+    real_t rNorm = sqrt(r2[0]); // The current residual norm.
+    real_t maxrr = rNorm;       // The maximum residual norm since the last reliable update.
+    real_t maxrx = rNorm;       // The same. Would be different if we did 'x' reliable updates.
 
     PrintStats(solver_name.c_str(), total_iter, r2, b2, heavy_quark_res);
     while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
@@ -622,7 +622,7 @@ namespace quda {
 
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
-        std::vector<Complex> minus_beta(beta.size());
+        std::vector<complex_t> minus_beta(beta.size());
         for (auto i = 0u; i < beta.size(); i++) minus_beta[i] = -beta[i];
         blas::caxpby(1.0, r[j], minus_beta, u[j]);
         if (j > 0)
@@ -644,7 +644,7 @@ namespace quda {
 
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
-        std::vector<Complex> minus_alpha(alpha.size());
+        std::vector<complex_t> minus_alpha(alpha.size());
         for (auto i = 0u; i < alpha.size(); i++) minus_alpha[i] = -alpha[i];
         blas::caxpy(minus_alpha, u[j + 1], r[j]);
         // We can always at least update x.
@@ -678,11 +678,11 @@ namespace quda {
           if (x.Precision() != x_sloppy[0].Precision()) {
             blas::copy(temp, y);
             auto hq = blas::xpyHeavyQuarkResidualNorm(x_sloppy, temp, r[0]);
-            for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+            for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
           } else {
             blas::copy(r_full, r[0]);
             auto hq = blas::xpyHeavyQuarkResidualNorm(x, y, r_full);
-            for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+            for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
           }
         }
       }
@@ -747,10 +747,10 @@ namespace quda {
     if (!param.is_preconditioner && param.compute_true_res) { // do not do the below if this is an inner solver.
       mat(r_full, x);
       auto true_res = blas::xmyNorm(b, r_full);
-      auto hq = use_heavy_quark_res ? blas::HeavyQuarkResidualNorm(x, r[0]) : vector<double3>(b.size(), {});
+      auto hq = use_heavy_quark_res ? blas::HeavyQuarkResidualNorm(x, r[0]) : vector<array<real_t, 3>>(b.size(), {});
       for (auto i = 0u; i < b.size(); i++) {
         param.true_res[i] = sqrt(true_res[i] / b2[i]);
-        param.true_res_hq[i] = sqrt(hq[i].z);
+        param.true_res_hq[i] = sqrt(hq[i][2]);
       }
     }
 

@@ -16,15 +16,15 @@ namespace quda
     real b_inv;      /** inverse twist factor - used to allow early xpay inclusion */
 
     TwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                   const ColorSpinorField &halo, const GaugeField &U, double a, double b, bool xpay,
+                   const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t b, bool xpay,
                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
                                                           comm_override),
-      a(a),
-      b(dagger ? -b : b), // if dagger flip the twist
-      c(0.0),
-      a_inv(1.0 / (a * (1 + b * b))),
-      b_inv(dagger ? b : -b)
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -b : b)), // if dagger flip the twist
+      c(static_cast<real>(0.0)),
+      a_inv(static_cast<real>(1.0 / (a * (1 + b * b)))),
+      b_inv(static_cast<real>(dagger ? b : -b))
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {

@@ -196,7 +196,7 @@ void run(test_t param)
     double method_adj_diff = 0.;
     /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
     for (int i = 0; i < V * 24; i++) {
-      method_adj_diff += pow(fabs(check_safe[j].data<double *>()[i] - check_hier[j].data<double *>()[i]), 2);
+      method_adj_diff += pow(std::fabs(check_safe[j].data<double *>()[i] - check_hier[j].data<double *>()[i]), 2);
     }
     double method_adj_check = sqrt(method_adj_diff) / (V * 24.);
     printf(

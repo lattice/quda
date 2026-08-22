@@ -28,9 +28,10 @@ namespace quda {
     real c;               // flavor twist
 
     GammaArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, int proj = 0,
-             real kappa = 0.0, real mu = 0.0, real epsilon = 0.0, bool dagger = false,
+             real_t kappa = 0.0, real_t mu = 0.0, real_t epsilon = 0.0, bool dagger = false,
              QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
-      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(), in.size(), in.SiteSubset())),
+      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(), in.size(),
+                        in.SiteSubset())),
       d(d),
       proj(proj),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
@@ -54,24 +55,26 @@ namespace quda {
 
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
 	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
+          b = real(2.0 * kappa * mu);
           a = 1.0;
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
+          b = -real(2.0 * kappa * mu);
           a = 1.0 / (1.0 + b * b);
         }
 	c = 0.0;
         if (dagger) b *= -1.0;
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
-          c = -2.0 * kappa * epsilon;
+          b = real(2.0 * kappa * mu);
+          c = -real(2.0 * kappa * epsilon);
           a = 1.0;
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
-          c = 2.0 * kappa * epsilon;
+          b = -real(2.0 * kappa * mu);
+          c = real(2.0 * kappa * epsilon);
           a = 1.0 / (1.0 + b * b - c * c);
-          if (a <= 0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
+          if (a <= 0)
+            errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", static_cast<double>(kappa),
+                      static_cast<double>(mu), static_cast<double>(epsilon));
         }
         if (dagger) b *= -1.0;
       }

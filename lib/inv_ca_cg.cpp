@@ -78,10 +78,10 @@ namespace quda
   }
 
   // template!
-  template <int N> void compute_alpha_N(const std::vector<double> &Q_AQandg, std::vector<double> &alpha)
+  template <int N> void compute_alpha_N(const std::vector<real_t> &Q_AQandg, std::vector<real_t> &alpha)
   {
-    typedef Matrix<double, N, N, RowMajor> matrix;
-    typedef Matrix<double, N, 1> vector;
+    typedef Matrix<real_t, N, N, RowMajor> matrix;
+    typedef Matrix<real_t, N, 1> vector;
 
     matrix matQ_AQ(N, N);
     vector vecg(N);
@@ -121,8 +121,8 @@ namespace quda
       case 12: compute_alpha_N<12>(Q_AQandg[b], alpha[b]); break;
 #endif
     default: // failsafe
-      typedef Matrix<double, Dynamic, Dynamic, RowMajor> matrix;
-      typedef Matrix<double, Dynamic, 1> vector;
+      typedef Matrix<real_t, Dynamic, Dynamic, RowMajor> matrix;
+      typedef Matrix<real_t, Dynamic, 1> vector;
 
       matrix matQ_AQ(N, N);
       vector vecg(N);
@@ -147,9 +147,9 @@ namespace quda
 
   // template!
   template <int N>
-  void compute_beta_N(const std::vector<double> &Q_AQandg, std::vector<double> &Q_AS, std::vector<double> &beta)
+  void compute_beta_N(const std::vector<real_t> &Q_AQandg, std::vector<real_t> &Q_AS, std::vector<real_t> &beta)
   {
-    typedef Matrix<double, N, N, RowMajor> matrix;
+    typedef Matrix<real_t, N, N, RowMajor> matrix;
 
     matrix matQ_AQ(N, N);
     for (int i = 0; i < N; i++) {
@@ -188,7 +188,7 @@ namespace quda
       case 12: compute_beta_N<12>(Q_AQandg[b], Q_AS[b], beta[b]); break;
 #endif
     default: // failsafe
-      typedef Matrix<double, Dynamic, Dynamic, RowMajor> matrix;
+      typedef Matrix<real_t, Dynamic, Dynamic, RowMajor> matrix;
 
       matrix matQ_AQ(N, N);
       for (int i = 0; i < N; i++) {
@@ -210,7 +210,7 @@ namespace quda
   }
 
   // Code to check for reliable updates
-  int CACG::reliable(double &rNorm, double &maxrr, int &rUpdate, const double &r2, const double &delta)
+  int CACG::reliable(real_t &rNorm, real_t &maxrr, int &rUpdate, const real_t &r2, const real_t &delta)
   {
     // reliable updates
     rNorm = sqrt(r2);
@@ -268,8 +268,8 @@ namespace quda
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
-    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<double>(b.size(), 1.0);
-    vector<double> r2(b.size(), 0.0); // if zero source then we will exit immediately doing no work
+    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<real_t>(b.size(), 1.0);
+    vector<real_t> r2(b.size(), 0.0); // if zero source then we will exit immediately doing no work
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space.
@@ -348,7 +348,7 @@ namespace quda
     }
 
     auto stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) :
-                                   vector<double>(b2.size(), 0.0); // stopping condition of solver
+                                   vector<real_t>(b2.size(), 0.0); // stopping condition of solver
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -358,10 +358,10 @@ namespace quda
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    vector<double> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    vector<real_t> heavy_quark_res(b.size(), 0.0); // heavy quark residual
     if (use_heavy_quark_res) {
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
     }
 
     int resIncrease = 0;
@@ -377,14 +377,14 @@ namespace quda
 
     // Various variables related to reliable updates.
     int rUpdate = 0;             // count reliable updates.
-    double delta = param.delta;  // delta for reliable updates.
-    double rNorm = sqrt(r2[0]);  // The current residual norm.
-    double maxrr = rNorm;        // The maximum residual norm since the last reliable update.
-    double maxr_deflate = rNorm; // The maximum residual since the last deflation
+    real_t delta = param.delta;  // delta for reliable updates.
+    real_t rNorm = sqrt(r2[0]);  // The current residual norm.
+    real_t maxrr = rNorm;        // The maximum residual norm since the last reliable update.
+    real_t maxr_deflate = rNorm; // The maximum residual since the last deflation
 
     // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    real_t m_map = 2. / (lambda_max - lambda_min);
+    real_t b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     auto get_i = [](std::vector<std::vector<ColorSpinorField>> &p, int i) {
       vector_ref<ColorSpinorField> p_i;
@@ -528,7 +528,7 @@ namespace quda
 
         if (use_heavy_quark_res) {
           auto hq = blas::HeavyQuarkResidualNorm(x, r);
-          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
         }
 
         // break-out check if we have reached the limit of the precision
@@ -563,7 +563,7 @@ namespace quda
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
       for (auto i = 0u; i < b.size(); i++) {
         param.true_res[i] = sqrt(true_res[i] / b2[i]);
-        param.true_res_hq[i] = sqrt(hq[i].z);
+        param.true_res_hq[i] = sqrt(hq[i][2]);
       }
     }
 

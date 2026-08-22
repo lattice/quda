@@ -4,7 +4,7 @@
 #include <index_helper.cuh>
 #include <matrix_tile.cuh>
 #include <kernel.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 
 namespace quda {
 

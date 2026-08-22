@@ -34,7 +34,7 @@ namespace quda {
     const int coarseVolumeCB; /** Coarse grid volume */
     real two_mass;            /** Two times the staggered mass value */
 
-    CalculateStaggeredYArg(GaugeField &Y, GaugeField &X, const GaugeField &U, double mass) :
+    CalculateStaggeredYArg(GaugeField &Y, GaugeField &X, const GaugeField &U, real_t mass) :
       kernel_param(dim3(U.VolumeCB(), fineColor * fineColor, 2)),
       Y(Y),
       X(X),
