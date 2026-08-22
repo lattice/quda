@@ -112,11 +112,11 @@ GaugeField *extendedGaugeResident = nullptr;
 /**
  * callMultiSrcQuda related gauge split
  * update_split_gauge :
- * - QUDA_UPDATE_SPLITE_GAUGE_TRUE: the input gauge fields will be split and the buffered (split) gauges will be updated
+ * - QUDA_UPDATE_SPLIT_GAUGE_TRUE: the input gauge fields will be split and the buffered (split) gauges will be updated
  accordingly;
- * - QUDA_UPDATE_SPLITE_GAUGE_FALSE: the input gauge fields will not be split and the buffered (split) gauges will be
+ * - QUDA_UPDATE_SPLIT_GAUGE_FALSE: the input gauge fields will not be split and the buffered (split) gauges will be
  used for split grid solves;
- * - QUDA_UPDATE_SPLITE_GAUGE_OFF: nothing will be done.
+ * - QUDA_UPDATE_SPLIT_GAUGE_OFF: nothing will be done.
 
  * split_grid_bkup will be used to check whether split layout is changed or not
  * change in gauge precsions will need loadGaugeQuda which results in re-distribute
@@ -1047,7 +1047,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       createCloverQuda(inv_param);
     }
 
-    for (auto i = 0; i < 2; i++) inv_param->trlogA[i] = cloverPrecise->TrLog()[i];
+    for (auto i = 0; i < 2; i++) inv_param->trlogA[i] = static_cast<double>(cloverPrecise->TrLog()[i]);
 
     // update split gauge when clover field updated
     if (update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_FALSE) { update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE; }
@@ -1619,9 +1619,22 @@ void endQuda(void)
 
 namespace quda {
 
+  static void copy_mobius_coeff(complex_t *dst, const double _Complex *src, int Ls)
+  {
+    for (int i = 0; i < Ls; i++) dst[i] = complex_t(real_t(__real__(src[i])), real_t(__imag__(src[i])));
+  }
+
+  static void copy_evals_to_host(double _Complex *dst, const std::vector<complex_t> &src)
+  {
+    for (size_t i = 0; i < src.size(); i++) {
+      __real__(dst[i]) = to_double(src[i].real());
+      __imag__(dst[i]) = to_double(src[i].imag());
+    }
+  }
+
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
-    double kappa = inv_param->kappa;
+    real_t kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       kappa *= gaugePrecise->Anisotropy();
     }
@@ -1650,12 +1663,8 @@ namespace quda {
       }
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC;
       diracParam.Ls = inv_param->Ls;
-      // check we are safe to cast into a Complex (= std::complex<double>)
-      static_assert(sizeof(Complex) == sizeof(double _Complex),
-                    "Irreconcilable difference between interface and internal complex number conventions");
-
-      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
-      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
+      copy_mobius_coeff(diracParam.b_5, inv_param->b_5, inv_param->Ls);
+      copy_mobius_coeff(diracParam.c_5, inv_param->c_5, inv_param->Ls);
       diracParam.eofa_shift = inv_param->eofa_shift;
       diracParam.eofa_pm = inv_param->eofa_pm;
       diracParam.mq1 = inv_param->mq1;
@@ -1667,11 +1676,8 @@ namespace quda {
 	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
       diracParam.Ls = inv_param->Ls;
-      if (sizeof(Complex) != sizeof(double _Complex)) {
-        errorQuda("Irreconcilable difference between interface and internal complex number conventions");
-      }
-      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
-      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
+      copy_mobius_coeff(diracParam.b_5, inv_param->b_5, inv_param->Ls);
+      copy_mobius_coeff(diracParam.c_5, inv_param->c_5, inv_param->Ls);
       break;
     case QUDA_STAGGERED_DSLASH:
       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
@@ -2380,8 +2386,8 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
+    auto cpu = blas::norm2(in_h);
+    auto gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -2396,8 +2402,8 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
   out_h = out;
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(out_h);
-    double gpu = blas::norm2(out);
+    auto cpu = blas::norm2(out_h);
+    auto gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -2806,7 +2812,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Simple vector for eigenvalues.
-  std::vector<Complex> evals(eig_param->n_conv, 0.0);
+  std::vector<complex_t> evals(eig_param->n_conv, 0.0);
   //------------------------------------------------------
 
   // Sanity checks for operator/eigensolver compatibility.
@@ -2864,7 +2870,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
   // host side gamma basis.
-  memcpy(host_evals, evals.data(), sizeof(Complex) * evals.size());
+  copy_evals_to_host(host_evals, evals);
 
   if (!(eig_param->arpack_check)) {
     for (int i = 0; i < n_eig; i++) host_evecs_[i] = kSpace[i];
@@ -3322,7 +3328,8 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
     // swap to the buffered split gauge
     swapGaugeSplit(true);
     return;
-  } else {
+  } else if (update_split_gauge != QUDA_UPDATE_SPLIT_GAUGE_OFF) {
+    // OFF must survive the split: it is what tells the epilogue to free the buffers again
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   }
 
@@ -3612,7 +3619,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       for (int j = 0; j < num_sub_partition; j++) _h_x[n * num_sub_partition + j].copy(dev_buf[j]);
     }
 
-    // switch back to the original links, detete split gauge if update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_OFF
+    // switch back to the original links, delete split gauge if update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_OFF
     if (update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_OFF) {
       // do not use freeGaugeSplit which have additional swap
       swapGaugeSplit(false);
@@ -3743,7 +3750,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   dirac.prefetch(QUDA_CUDA_FIELD_LOCATION);
   diracSloppy.prefetch(QUDA_CUDA_FIELD_LOCATION);
 
-  std::vector<double> r2_old(param->num_offset);
+  std::vector<real_t> r2_old(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
   const auto X = (param->dslash_type == QUDA_ASQTAD_DSLASH) ? gaugeFatPrecise->X() : gaugePrecise->X();
@@ -3794,12 +3801,12 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   profileInvertMultiShift.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   // Check source norms
-  double nb = blas::norm2(b);
-  if (nb==0.0) errorQuda("Source has zero norm");
+  real_t nb = blas::norm2(b);
+  if (nb == 0.0) errorQuda("Source has zero norm");
   logQuda(QUDA_VERBOSE, "Source: %g\n", nb);
 
   // rescale the source vector to help prevent the onset of underflow
-  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { blas::ax(1.0 / sqrt(nb), b); }
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { blas::ax(1.0 / quda::sqrt(nb), b); }
 
   // backup shifts
   double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
@@ -3931,8 +3938,8 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
             cg(x[i], b);
         }
 
-        solverParam.true_res_offset[i] = static_cast<double>(solverParam.true_res);
-        solverParam.true_res_hq_offset[i] = static_cast<double>(solverParam.true_res_hq);
+        solverParam.true_res_offset[i] = solverParam.true_res[i];
+        solverParam.true_res_hq_offset[i] = solverParam.true_res_hq[i];
         solverParam.updateInvertParam(*param,i);
 
         if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
@@ -3951,15 +3958,15 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   for (int i = 0; i < param->num_offset; i++) param->offset[i] = unscaled_shifts[i];
 
   if (param->compute_action) {
-    Complex action(0);
-    for (int i = 0; i < param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, x[i]);
-    param->action[0] = action.real();
-    param->action[1] = action.imag();
+    complex_t action(0);
+    for (int i = 0; i < param->num_offset; i++) action += real_t(param->residue[i]) * blas::cDotProduct(b, x[i]);
+    param->action[0] = static_cast<double>(action.real());
+    param->action[1] = static_cast<double>(action.imag());
   }
 
   for(int i=0; i < param->num_offset; i++) {
     if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { // rescale the solution
-      blas::ax(sqrt(nb), x[i]);
+      blas::ax(quda::sqrt(nb), x[i]);
     }
 
     logQuda(QUDA_VERBOSE, "Solution %d = %g\n", i, blas::norm2(x[i]));
@@ -4148,7 +4155,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   // wrap 1-d arrays in std::vector
   std::vector<int> path_length_v(num_paths);
-  std::vector<double> loop_coeff_v(num_paths);
+  std::vector<real_t> loop_coeff_v(num_paths);
   for (int i = 0; i < num_paths; i++) {
     path_length_v[i] = path_length[i];
     loop_coeff_v[i] = loop_coeff[i];
@@ -4226,7 +4233,7 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
 
   // wrap 1-d arrays in a std::vector
   std::vector<int> path_length_v(num_paths);
-  std::vector<double> loop_coeff_v(num_paths);
+  std::vector<real_t> loop_coeff_v(num_paths);
   for (int i = 0; i < num_paths; i++) {
     path_length_v[i] = path_length[i];
     loop_coeff_v[i] = loop_coeff[i];
@@ -4802,8 +4809,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<ColorSpinorField> x(nvector), x0(nvector);
-  std::vector<double> force_coeff(nvector);
-  std::vector<array<double, 2>> ferm_epsilon(nvector);
+  std::vector<real_t> force_coeff(nvector);
+  std::vector<array<real_t, 2>> ferm_epsilon(nvector);
 
   QudaParity parity = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
 
@@ -4877,8 +4884,8 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<ColorSpinorField> x(nvector), x0(nvector);
-  std::vector<double> force_coeff(nvector);
-  std::vector<array<double, 2>> ferm_epsilon(nvector);
+  std::vector<real_t> force_coeff(nvector);
+  std::vector<array<real_t, 2>> ferm_epsilon(nvector);
 
   QudaParity parity = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
 
@@ -5109,10 +5116,10 @@ void plaqQuda(double plaq[3])
   updateExtendedGaugeResident(false, R, profilePlaq);
   GaugeField *data = extendedGaugeResident;
 
-  double3 plaq3 = quda::plaquette(*data);
-  plaq[0] = plaq3.x;
-  plaq[1] = plaq3.y;
-  plaq[2] = plaq3.z;
+  auto plaq3 = quda::plaquette(*data);
+  plaq[0] = static_cast<double>(plaq3[0]);
+  plaq[1] = static_cast<double>(plaq3[1]);
+  plaq[2] = static_cast<double>(plaq3[2]);
 }
 
 /*
@@ -6415,7 +6422,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   }
 
   // Array for all decay slices and spins, is zeroed prior to kernel launch
-  std::vector<Complex> result_global(global_decay_dim_slices * num_out_results);
+  std::vector<complex_t> result_global(global_decay_dim_slices * num_out_results);
 
   profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
   for (int mom_idx = 0; mom_idx < n_mom; ++mom_idx) {
@@ -6432,8 +6439,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
           for (size_t t = 0; t < global_decay_dim_slices; t++) {
             for (size_t G_idx = 0; G_idx < num_out_results; G_idx++) {
               int index = 2 * (global_decay_dim_slices * num_out_results * mom_idx + num_out_results * t + G_idx);
-              ((double *)*result)[index + 0] += result_global[num_out_results * t + G_idx].real();
-              ((double *)*result)[index + 1] += result_global[num_out_results * t + G_idx].imag();
+              ((double *)*result)[index + 0] += static_cast<double>(result_global[num_out_results * t + G_idx].real());
+              ((double *)*result)[index + 1] += static_cast<double>(result_global[num_out_results * t + G_idx].imag());
             }
           }
         }
@@ -6573,7 +6580,7 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark
   std::vector<ColorSpinorField> quda_evec(tile_evec, quda_evec_param);
 
   auto Lt = x[3] * comm_dim(3);
-  std::vector<Complex> hostSink(n_quark * n_evec * Lt * 4);
+  std::vector<complex_t> hostSink(n_quark * n_evec * Lt * 4);
 
   for (auto i = 0; i < n_quark; i += tile_quark) {                       // iterate over all quarks
     auto tile_i = std::min(tile_quark, n_quark - i);                     // handle remainder here
@@ -6583,7 +6590,7 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark
       auto tile_j = std::min(tile_evec, n_evec - j);                     // handle remainder here
       for (auto te = 0; te < tile_j; te++) quda_evec[te] = evec[j + te]; // download evecs
 
-      std::vector<Complex> tmp(tile_i * tile_j * x[3] * 4);
+      std::vector<complex_t> tmp(tile_i * tile_j * x[3] * 4);
 
       // We now perform the projection onto the eigenspace. The data
       // is placed in host_sinks in  T, spin order
@@ -6607,6 +6614,10 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark
   comm_allreduce_sum(hostSink);
 
   for (auto i = 0; i < n_quark * n_evec * Lt * 4; i++) { // iterate over all quarks
-    reinterpret_cast<std::complex<double> *>(host_sinks)[i] = hostSink[i];
+    {
+      const auto &z = hostSink[i];
+      reinterpret_cast<std::complex<double> *>(host_sinks)[i]
+        = std::complex<double>(quda::to_double(std::real(z)), quda::to_double(std::imag(z)));
+    }
   }
 }

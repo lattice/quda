@@ -8,7 +8,7 @@ namespace quda
   struct MadwfParam {
 
     /** The diagonal constant to suppress the low modes when performing 5D transfer */
-    double madwf_diagonal_suppressor;
+    real_t madwf_diagonal_suppressor;
 
     /** The target MADWF Ls to be used in the accelerator */
     int madwf_ls;
@@ -17,7 +17,7 @@ namespace quda
     int madwf_null_miniter;
 
     /** The maximum tolerance after which to generate the null vectors for MADWF */
-    double madwf_null_tol;
+    real_t madwf_null_tol;
 
     /** The maximum number of iterations for the training iterations */
     int madwf_train_maxiter;

@@ -14,6 +14,7 @@
 #include <field_cache.h>
 #include <comm_key.h>
 #include <float_vector.h>
+#include "reducer.h"
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
@@ -771,21 +772,19 @@ namespace quda
 
   int comm_query(MsgHandle *mh);
 
-  template <typename T> T deterministic_reduce(T *array, int n)
+  template <typename T> T deterministic_sum_reduce(T *array, int n)
   {
     std::sort(array, array + n); // sort reduction into ascending order for deterministic reduction
-    return std::accumulate(array, array + n, 0.0);
+    return std::accumulate(array, array + n, T(0.0));
   }
 
-  void comm_allreduce_sum_array(double *data, size_t size);
+  template <typename T> void comm_allreduce_sum_array(T *data, size_t size);
+
+  template <typename T> void comm_allreduce_max_array(T *data, size_t size);
 
   void comm_allreduce_sum(size_t &a);
 
-  void comm_allreduce_max_array(double *data, size_t size);
-
-  void comm_allreduce_max_array(deviation_t<double> *data, size_t size);
-
-  void comm_allreduce_min_array(double *data, size_t size);
+  template <typename T> void comm_allreduce_min_array(T *data, size_t size);
 
   void comm_allreduce_int(int &data);
 
@@ -802,7 +801,7 @@ namespace quda
 
   void comm_barrier(void);
 
-  static void comm_abort_(int status);
+  [[noreturn]] static void comm_abort_(int status);
 
   static int comm_rank_global();
 };

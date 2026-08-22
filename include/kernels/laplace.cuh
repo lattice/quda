@@ -43,14 +43,14 @@ namespace quda
     int dir;      /** The direction from which to omit the derivative */
 
     LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-               const ColorSpinorField &halo, const GaugeField &U, int dir, double a, double b,
+               const ColorSpinorField &halo, const GaugeField &U, int dir, real_t a, real_t b,
                cvector_ref<const ColorSpinorField> &x, int parity, const int *comm_override) :
       DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, false, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
-      a(a),
-      b(b),
+      a(static_cast<real>(a)),
+      b(static_cast<real>(b)),
       dir(dir)
     {
       for (auto i = 0u; i < out.size(); i++) {

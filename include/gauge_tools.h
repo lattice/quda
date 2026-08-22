@@ -1,3 +1,4 @@
+#include <quda_internal.h>
 #include <random_quda.h>
 #include <timer.h>
 
@@ -21,27 +22,25 @@ namespace quda
    * @param tol Tolerance to which the iterative algorithm works
    * @param fails Number of link failures (device pointer)
    */
-  void projectSU3(GaugeField &U, double tol, int *fails);
+  void projectSU3(GaugeField &U, real_t tol, int *fails);
 
   /**
      @brief Compute the plaquette of the gauge field
 
      @param[in] U The gauge field upon which to compute the plaquette
-     @return double3 variable returning (plaquette, spatial plaquette,
-     temporal plaquette) site averages normalized such that each
-     plaquette is in the range [0,1]
+     @return (plaquette, spatial plaquette, temporal plaquette) site averages
+     normalized such that each plaquette is in the range [0,1]
    */
-  double3 plaquette(const GaugeField &U);
+  array<real_t, 3> plaquette(const GaugeField &U);
 
   /**
      @brief Compute the plaquette and rectangle (1x2 + 2x1) of the gauge field
 
      @param[in] U The gauge field upon which to compute the plaquette and rectangle
-     @return double4 variable returning (spatial plaquette, temporal plaquette,
-     spatial rectangle, temporal rectangle) site averages normalized such that each
-     plaquette and rectangle is in the range [0,1]
+     @return (spatial plaquette, temporal plaquette, spatial rectangle, temporal rectangle)
+     site averages normalized such that each plaquette and rectangle is in the range [0,1]
    */
-  double4 plaquetteRectangle(const GaugeField &U);
+  array<real_t, 4> plaquetteRectangle(const GaugeField &U);
 
   /**
      @brief Generate Gaussian distributed su(N) or SU(N) fields.  If U
@@ -57,7 +56,7 @@ namespace quda
      @param[in] rngstate random states
      @param[in] sigma Width of Gaussian distrubution
   */
-  void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
+  void gaugeGauss(GaugeField &U, RNG &rngstate, real_t epsilon);
 
   /**
      @brief Generate Gaussian distributed su(N) or SU(N) fields.  If U
@@ -73,7 +72,7 @@ namespace quda
      @param[in] seed The seed used for the RNG
      @param[in] sigma Wdith of the Gaussian distribution
   */
-  void gaugeGauss(GaugeField &U, unsigned long long seed, double epsilon);
+  void gaugeGauss(GaugeField &U, unsigned long long seed, real_t epsilon);
 
   /**
      @brief Generate a random noise gauge field.  This variant allows
@@ -108,7 +107,7 @@ namespace quda
      @param[in] dir_ignore ignored direction
      @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha, int dir_ignore, double smear_anisotropy);
+  void APEStep(GaugeField &dataDs, GaugeField &dataOr, real_t alpha, int dir_ignore, real_t smear_anisotropy);
 
   /**
      @brief Apply STOUT smearing to the gauge field
@@ -119,7 +118,7 @@ namespace quda
      @param[in] dir_ignore ignored direction
      @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, int dir_ignore, double smear_anisotropy);
+  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, real_t rho, int dir_ignore, real_t smear_anisotropy);
 
   /**
      @brief Apply Over Improved STOUT smearing to the gauge field
@@ -131,8 +130,8 @@ namespace quda
      @param[in] dir_ignore ignored direction
      @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore,
-                       double smear_anisotropy);
+  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, real_t rho, real_t epsilon, int dir_ignore,
+                       real_t smear_anisotropy);
 
   /**
      @brief Apply HYP smearing to the gauge field
@@ -143,7 +142,7 @@ namespace quda
      @param[in] alpha3 smearing parameter
      @param[in] dir_ignore ignored direction
   */
-  void HYPStep(GaugeField &dataDs, GaugeField &dataOr, double alpha1, double alpha2, double alpha3, int dir_ignore);
+  void HYPStep(GaugeField &dataDs, GaugeField &dataOr, real_t alpha1, real_t alpha2, real_t alpha3, int dir_ignore);
 
   /**
      @brief Apply Wilson Flow steps to the gauge field.
@@ -159,8 +158,8 @@ namespace quda
      @param[in] smear_anisotropy for anisotropic Wilson or Symanzik flow
      @param[in] rk_order Order of the Runga-Kutta integrator
   */
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
-                 double smear_anisotropy, int rk_order);
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, real_t epsilon, QudaGaugeSmearType smear_type,
+                 real_t smear_anisotropy, int rk_order);
 
   /**
      @brief Apply intermediary Wilson Flow steps W1, W2 or Vt to the gauge field.
@@ -175,7 +174,7 @@ namespace quda
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
      @param[in] step_type Which intermediary Wilson Flow step (W1, W2 or Vt) to perform
   */
-  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
+  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, real_t epsilon, QudaGaugeSmearType smear_type,
                  QudaWFlowStepType step_type);
 
   /**
@@ -220,7 +219,7 @@ namespace quda
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
   void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
+                      const real_t relax_boost, const real_t tolerance, const int reunit_interval, const int stopWtheta);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -236,7 +235,7 @@ namespace quda
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
   void gaugeFixingFFT(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                      const double alpha, const int autotune, const double tolerance, const int stopWtheta);
+                      const real_t alpha, const int autotune, const real_t tolerance, const int stopWtheta);
 
   /**
      @brief Compute the Fmunu tensor
@@ -248,30 +247,30 @@ namespace quda
   /**
      @brief Compute the topological charge and field energy
      @param[out] energy The total, spatial, and temporal field energy
-     @param[out] qcharge The total topological charge
      @param[in] Fmunu The Fmunu tensor, usually calculated from a
      smeared configuration
+     @return The total topological charge
    */
-  void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu);
+  real_t computeQCharge(array<real_t, 3> &energy, const GaugeField &Fmunu);
 
   /**
      @brief Compute the topological charge, field energy and the
      topological charge density per lattice site
      @param[out] energy The total, spatial, and temporal field energy
-     @param[out] qcharge The total topological charge
      @param[out] qdensity The topological charge at each lattice site
      @param[in] Fmunu The Fmunu tensor, usually calculated from a
      smeared configuration
+     @return The total topological charge
   */
-  void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu);
+  real_t computeQChargeDensity(array<real_t, 3> &energy, void *qdensity, const GaugeField &Fmunu);
 
   /**
    * @brief Compute the trace of the Polyakov loop in a given dimension
-   * @param[out] ploop The real and imaginary parts of the Polyakov loop
    * @param[in] gauge The gauge field upon which to compute the Polyakov loop
    * @param[in] dir The direction to compute the Polyakov loop in
    * @param[in] profile TimeProfile instance used for profiling.
+   * @return The real and imaginary parts of the Polyakov loop
    */
-  void gaugePolyakovLoop(double ploop[2], const GaugeField &u, int dir, TimeProfile &profile);
+  array<real_t, 2> gaugePolyakovLoop(const GaugeField &u, int dir, TimeProfile &profile);
 
 } // namespace quda

@@ -100,7 +100,7 @@ namespace quda
   struct NdegTwistedCloverPreconditionedApply {
     NdegTwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
-                                         const CloverField &A, double a, double b, double c, bool xpay, int parity,
+                                         const CloverField &A, real_t a, real_t b, real_t c, bool xpay, int parity,
                                          bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;

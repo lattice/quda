@@ -73,7 +73,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilson(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                   double kappa, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                   real_t kappa, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                    const int *comm_override, TimeProfile &profile);
 
   /**
@@ -100,7 +100,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonDistance(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                           const GaugeField &U, double kappa, double alpha0, int t0,
+                           const GaugeField &U, real_t kappa, real_t alpha0, int t0,
                            cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
                            TimeProfile &profile);
 
@@ -127,7 +127,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                         const GaugeField &U, const CloverField &A, double kappa, cvector_ref<const ColorSpinorField> &x,
+                         const GaugeField &U, const CloverField &A, real_t kappa, cvector_ref<const ColorSpinorField> &x,
                          int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
@@ -154,7 +154,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonCloverDistance(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                 const GaugeField &U, const CloverField &A, double kappa, double alpha0, int t0,
+                                 const GaugeField &U, const CloverField &A, real_t kappa, real_t alpha0, int t0,
                                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                  const int *comm_override, TimeProfile &profile);
 
@@ -182,7 +182,7 @@ namespace quda
        @param[in] profile The TimeProfile used for profiling the dslash
     */
   void ApplyWilsonCloverHasenbuschTwist(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                        const GaugeField &U, const CloverField &A, double kappa, double mu,
+                                        const GaugeField &U, const CloverField &A, real_t kappa, real_t mu,
                                         cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                         const int *comm_override, TimeProfile &profile);
 
@@ -224,7 +224,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                       const GaugeField &U, const CloverField &A, double kappa,
+                                       const GaugeField &U, const CloverField &A, real_t kappa,
                                        cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                        const int *comm_override, TimeProfile &profile);
 
@@ -253,7 +253,7 @@ namespace quda
   */
   void ApplyWilsonCloverHasenbuschTwistPCClovInv(cvector_ref<ColorSpinorField> &out,
                                                  cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                                                 const CloverField &A, double kappa, double mu,
+                                                 const CloverField &A, real_t kappa, real_t mu,
                                                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                                  const int *comm_override, TimeProfile &profile);
 
@@ -282,7 +282,7 @@ namespace quda
   */
   void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(cvector_ref<ColorSpinorField> &out,
                                                    cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                                                   const CloverField &A, double kappa, double mu,
+                                                   const CloverField &A, real_t kappa, real_t mu,
                                                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                                    const int *comm_override, TimeProfile &profile);
 
@@ -327,7 +327,7 @@ namespace quda
   */
   void ApplyWilsonCloverPreconditionedDistance(cvector_ref<ColorSpinorField> &out,
                                                cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                                               const CloverField &A, double kappa, double alpha0, int t0,
+                                               const CloverField &A, real_t kappa, real_t alpha0, int t0,
                                                cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                                const int *comm_override, TimeProfile &profile);
 
@@ -353,7 +353,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyTwistedMass(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                        const GaugeField &U, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity,
+                        const GaugeField &U, real_t a, real_t b, cvector_ref<const ColorSpinorField> &x, int parity,
                         bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
@@ -393,7 +393,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyTwistedMassPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                      const GaugeField &U, double a, double b, bool xpay,
+                                      const GaugeField &U, real_t a, real_t b, bool xpay,
                                       cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, bool asymmetric,
                                       const int *comm_override, TimeProfile &profile);
 
@@ -425,7 +425,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyNdegTwistedMass(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                            const GaugeField &U, double a, double b, double c, cvector_ref<const ColorSpinorField> &x,
+                            const GaugeField &U, real_t a, real_t b, real_t c, cvector_ref<const ColorSpinorField> &x,
                             int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
@@ -475,7 +475,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyNdegTwistedMassPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                          const GaugeField &U, double a, double b, double c, bool xpay,
+                                          const GaugeField &U, real_t a, real_t b, real_t c, bool xpay,
                                           cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                           bool asymmetric, const int *comm_override, TimeProfile &profile);
 
@@ -503,7 +503,7 @@ namespace quda
        @param[in] profile The TimeProfile used for profiling the dslash
     */
   void ApplyTwistedClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                          const GaugeField &U, const CloverField &C, double a, double b,
+                          const GaugeField &U, const CloverField &C, real_t a, real_t b,
                           cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
                           TimeProfile &profile);
 
@@ -545,7 +545,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyTwistedCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                        const GaugeField &U, const CloverField &C, double a, double b, bool xpay,
+                                        const GaugeField &U, const CloverField &C, real_t a, real_t b, bool xpay,
                                         cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                         const int *comm_override, TimeProfile &profile);
 
@@ -578,7 +578,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyNdegTwistedClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                              const GaugeField &U, const CloverField &C, double a, double b, double c,
+                              const GaugeField &U, const CloverField &C, real_t a, real_t b, real_t c,
                               cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
                               TimeProfile &profile);
 
@@ -621,7 +621,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyNdegTwistedCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                            const GaugeField &U, const CloverField &C, double a, double b, double c,
+                                            const GaugeField &U, const CloverField &C, real_t a, real_t b, real_t c,
                                             bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                             const int *comm_override, TimeProfile &profile);
 
@@ -650,7 +650,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyDomainWall5D(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                         const GaugeField &U, double a, double m_f, cvector_ref<const ColorSpinorField> &x, int parity,
+                         const GaugeField &U, real_t a, real_t m_f, cvector_ref<const ColorSpinorField> &x, int parity,
                          bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
@@ -680,44 +680,44 @@ namespace quda
   */
 
   void ApplyDomainWall4D(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                         const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                         const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                          cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
                          TimeProfile &profile);
 
   void ApplyDomainWall4DM5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                              const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                              const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                               cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
-                              bool dagger, const int *comm_override, double m_f, TimeProfile &profile);
+                              bool dagger, const int *comm_override, real_t m_f, TimeProfile &profile);
 
   void ApplyDomainWall4DM5pre(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                              const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                              const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                               cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
-                              bool dagger, const int *comm_override, double m_f, TimeProfile &profile);
+                              bool dagger, const int *comm_override, real_t m_f, TimeProfile &profile);
 
   void ApplyDomainWall4DM5invM5pre(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                                   const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                                    cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
-                                   bool dagger, const int *comm_override, double m_f, TimeProfile &profile);
+                                   bool dagger, const int *comm_override, real_t m_f, TimeProfile &profile);
 
   void ApplyDomainWall4DM5preM5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                                   const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                                    cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
-                                   bool dagger, const int *comm_override, double m_f, TimeProfile &profile);
+                                   bool dagger, const int *comm_override, real_t m_f, TimeProfile &profile);
 
   void ApplyDomainWall4DM5invM5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                                   const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                                    cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
-                                   bool dagger, const int *comm_override, double m_f, TimeProfile &profile);
+                                   bool dagger, const int *comm_override, real_t m_f, TimeProfile &profile);
 
   void ApplyDomainWall4DM5mob(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                              const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                              const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                               cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
-                              bool dagger, const int *comm_override, double m_f, TimeProfile &profile);
+                              bool dagger, const int *comm_override, real_t m_f, TimeProfile &profile);
 
   void ApplyDomainWall4DM5preM5mob(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                                   const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                                    cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
-                                   bool dagger, const int *comm_override, double m_f, TimeProfile &profile);
+                                   bool dagger, const int *comm_override, real_t m_f, TimeProfile &profile);
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
      the M5 inverse operator.  In the current implementation, it is
@@ -734,16 +734,16 @@ namespace quda
      @param[in] type Type of dslash we are applying
   */
   void ApplyDslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5,
-                    const Complex *c_5, double a, bool dagger, Dslash5Type type);
+                    cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5,
+                    const complex_t *c_5, real_t a, bool dagger, Dslash5Type type);
 
   // The EOFA stuff
   namespace mobius_eofa
   {
     void apply_dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                       cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5,
-                       const Complex *c_5, double a, int eofa_pm, double inv, double kappa, const double *eofa_u,
-                       const double *eofa_x, const double *eofa_y, double sherman_morrison, bool dagger,
+                       cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5,
+                       const complex_t *c_5, real_t a, int eofa_pm, real_t inv, real_t kappa, const real_t *eofa_u,
+                       const real_t *eofa_x, const real_t *eofa_y, real_t sherman_morrison, bool dagger,
                        Dslash5Type type);
   }
 
@@ -770,7 +770,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyLaplace(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                    int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity,
+                    int dir, real_t a, real_t b, cvector_ref<const ColorSpinorField> &x, int parity,
                     const int *comm_override, TimeProfile &profile);
 
   /**
@@ -819,7 +819,7 @@ namespace quda
      @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
   */
   void ApplyStaggered(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                      double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                      real_t a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                       const int *comm_override, TimeProfile &profile);
 
   /**
@@ -835,7 +835,7 @@ namespace quda
      @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
   */
   void ApplyImprovedStaggered(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                              const GaugeField &U, const GaugeField &L, double a, cvector_ref<const ColorSpinorField> &x,
+                              const GaugeField &U, const GaugeField &L, real_t a, cvector_ref<const ColorSpinorField> &x,
                               int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
@@ -876,8 +876,8 @@ namespace quda
      @param[in] dagger Whether we are applying the dagger or not
      @param[in] twist The type of kernel we are doing
   */
-  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa,
-                       double mu, double epsilon, int dagger, QudaTwistGamma5Type type);
+  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, real_t kappa,
+                       real_t mu, real_t epsilon, int dagger, QudaTwistGamma5Type type);
 
   /**
      @brief Apply twisted clover-matrix field to a color-spinor field
@@ -894,7 +894,7 @@ namespace quda
        else if (twist == QUDA_TWIST_GAMMA5_INVERSE) apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
   */
   void ApplyTwistClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                        const CloverField &clover, double kappa, double mu, double epsilon, int parity, int dagger,
+                        const CloverField &clover, real_t kappa, real_t mu, real_t epsilon, int parity, int dagger,
                         QudaTwistGamma5Type twist);
 
   /**
@@ -913,8 +913,8 @@ namespace quda
      @param[in] stream Which stream are we executing in
   */
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in,
-                 MemoryLocation location, int nFace, bool dagger, int parity, bool spin_project, double a, double b,
-                 double c, int shmem, const qudaStream_t &stream);
+                 MemoryLocation location, int nFace, bool dagger, int parity, bool spin_project, real_t a, real_t b,
+                 real_t c, int shmem, const qudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

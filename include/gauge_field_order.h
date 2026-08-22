@@ -11,7 +11,7 @@
 #include <limits>
 
 #include <register_traits.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <convert.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>
@@ -342,7 +342,7 @@ namespace quda {
         errorQuda("Not implemented for order=%d", order);
       }
 
-      void resetScale(Float) { }
+      void resetScale(real_t) { }
 
       __device__ __host__ complex<Float> &operator()(int, int, int, int, int) const { return dummy; }
     };
@@ -355,7 +355,7 @@ namespace quda {
         errorQuda("Not implemented for order=%d", order);
       }
 
-      void resetScale(Float) { }
+      void resetScale(real_t) { }
 
       __device__ __host__ complex<Float> &operator()(int, int, int, int, int) const { return dummy; }
     };
@@ -382,8 +382,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -420,7 +421,7 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
+      __host__ auto transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int lower = (dim == -1) ? 0 : dim;
@@ -464,8 +465,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -497,8 +499,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -539,7 +542,7 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
+      __host__ auto transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
@@ -586,8 +589,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -678,8 +682,9 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
 	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
@@ -720,7 +725,7 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
+      __host__ auto transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto start = (dim == -1) ? 0 : dim;
@@ -764,10 +769,11 @@ namespace quda {
         resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
-        accessor.resetScale(max);
+        accessor.resetScale(max_);
         if (fixed) {
+          const Float max = static_cast<Float>(max_);
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -853,12 +859,13 @@ namespace quda {
         if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("GaugeField ordering not supported with reconstruction");
 	}
 
-	void resetScale(double max) {
-	  accessor.resetScale(max);
+        void resetScale(real_t max)
+        {
+          accessor.resetScale(max);
 	  ghostAccessor.resetScale(max);
-	}
+        }
 
-	static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
+        static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
 
         /**
          * accessor function
@@ -965,12 +972,13 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L1 norm
 	 */
-	__host__ double norm1(int dim=-1, bool global=true) const {
+        __host__ real_t norm1(int dim = -1, bool global = true) const
+        {
           commGlobalReductionPush(global);
-          double nrm1 = accessor.template transform_reduce<plus<double>>(location, dim,
-                                                                         abs_<double, storeFloat>(accessor.scale_inv));
+          auto nrm1 = accessor.template transform_reduce<plus<device_reduce_t>>(
+            location, dim, abs_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
-          return nrm1;
+          return reduction_to_real(nrm1);
         }
 
         /**
@@ -978,13 +986,13 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
          * @return L2 norm squared
          */
-        __host__ double norm2(int dim = -1, bool global = true) const
+        __host__ real_t norm2(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.template transform_reduce<plus<double>>(
+          auto nrm2 = accessor.template transform_reduce<plus<device_reduce_t>>(
             location, dim, square_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
-          return nrm2;
+          return reduction_to_real(nrm2);
         }
 
         /**
@@ -1035,7 +1043,8 @@ namespace quda {
       real scale;
       real scale_inv;
       Reconstruct(const GaugeField &u) :
-        scale(isFixed<Float>::value ? u.LinkMax() : 1.0), scale_inv(isFixed<Float>::value ? 1.0 / scale : 1.0)
+        scale(isFixed<Float>::value ? static_cast<real>(u.LinkMax()) : static_cast<real>(1.0)),
+        scale_inv(isFixed<Float>::value ? static_cast<real>(1.0) / scale : static_cast<real>(1.0))
       {
       }
 
@@ -1153,7 +1162,7 @@ namespace quda {
         QudaGhostExchange ghostExchange;
 
         Reconstruct(const GaugeField &u) :
-          anisotropy(u.Anisotropy()),
+          anisotropy(static_cast<real>(u.Anisotropy())),
           tBoundary(static_cast<real>(u.TBoundary())),
           firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
@@ -1271,7 +1280,9 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) :
-          reconstruct_12(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+          reconstruct_12(u),
+          scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
+          scale_inv(static_cast<real>(1.0) / scale)
         {
         }
 
@@ -1355,7 +1366,7 @@ namespace quda {
 
         // scale factor is set when using recon-9
         Reconstruct(const GaugeField &u, real scale = 1.0) :
-          anisotropy(u.Anisotropy() * scale, 1.0 / (u.Anisotropy() * scale)),
+          anisotropy(static_cast<real>(u.Anisotropy() * scale), static_cast<real>(1.0 / (u.Anisotropy() * scale))),
           tBoundary(static_cast<real>(u.TBoundary()) * scale, 1.0 / (static_cast<real>(u.TBoundary()) * scale)),
           firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
@@ -1500,7 +1511,9 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) :
-          reconstruct_8(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+          reconstruct_8(u),
+          scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
+          scale_inv(static_cast<real>(1.0) / scale)
         {
         }
 
@@ -2378,8 +2391,8 @@ namespace quda {
       LegacyOrder<Float, length>(u, ghost_),
       gauge(gauge_ ? gauge_ : u.data<Float *>()),
       volumeCB(u.VolumeCB()),
-      anisotropy(u.Anisotropy()),
-      anisotropy_inv(1.0 / anisotropy),
+      anisotropy(static_cast<real>(u.Anisotropy())),
+      anisotropy_inv(static_cast<real>(1.0) / anisotropy),
       geometry(u.Geometry())
     {
       if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
@@ -2508,8 +2521,8 @@ namespace quda {
         LegacyOrder<Float, length>(u, ghost_),
         gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
-        scale(u.Scale()),
-        scale_inv(1.0 / scale)
+        scale(static_cast<real>(u.Scale())),
+        scale_inv(static_cast<real>(1.0) / scale)
       {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
       }
@@ -2576,8 +2589,8 @@ namespace quda {
         gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
         exVolumeCB(1),
-        scale(u.Scale()),
-        scale_inv(1.0 / scale),
+        scale(static_cast<real>(u.Scale())),
+        scale_inv(static_cast<real>(1.0) / scale),
         dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]},
         exDim {u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3]}
       {

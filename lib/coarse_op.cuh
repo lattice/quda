@@ -971,15 +971,15 @@ namespace quda {
      @param need_bidirectional[in] If we need to force bi-directional build or not. Required
      if some previous level was preconditioned, even if this one isn't
    */
-  template <bool use_mma, QudaFieldLocation location, bool from_coarse, typename Float, typename store_t, int fineSpin, int fineColor, int coarseSpin,
-            int coarseColor, typename avSpinor, typename uvSpinor, typename vSpinor, typename coarseGauge, typename coarseGaugeAtomic,
-            typename fineGauge, typename fineClover>
-  void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, uvSpinor &UV,
-                  avSpinor &AV, vSpinor &V, fineGauge &G, fineGauge &L, fineGauge &K, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
-                  GaugeField &Y_atomic_, GaugeField &X_atomic_, ColorSpinorField &uv, ColorSpinorField &av,
-                  const ColorSpinorField &v, double kappa, double mass, double mu,
-                  double mu_factor, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
-                  const int *fine_to_coarse, const int *coarse_to_fine)
+  template <bool use_mma, QudaFieldLocation location, bool from_coarse, typename Float, typename store_t, int fineSpin,
+            int fineColor, int coarseSpin, int coarseColor, typename avSpinor, typename uvSpinor, typename vSpinor,
+            typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineClover>
+  void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
+                  uvSpinor &UV, avSpinor &AV, vSpinor &V, fineGauge &G, fineGauge &L, fineGauge &K, fineClover &C,
+                  fineClover &Cinv, GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
+                  ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v, real_t kappa, real_t mass,
+                  real_t mu, real_t mu_factor, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc,
+                  bool need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine)
   {
     // For coarsening un-preconditioned operators we use uni-directional
     // coarsening to reduce the set up code.  For debugging we can force
@@ -1090,11 +1090,11 @@ namespace quda {
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 	// this is just a trivial rescaling kernel, find the maximum
-	complex<Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
-	complex<Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
-	double max = std::max({abs(fp.real()), abs(fp.imag()), abs(fm.real()), abs(fm.imag())}) * v.Scale();
-	logQuda(QUDA_DEBUG_VERBOSE, "tm max %e\n", max);
-	av.Scale(max);
+        complex_t fp(1. / (1. + arg.mu * arg.mu), -arg.mu / (1. + arg.mu * arg.mu));
+        complex_t fm(1. / (1. + arg.mu * arg.mu), +arg.mu / (1. + arg.mu * arg.mu));
+        real_t max = std::max({abs(fp.real()), abs(fp.imag()), abs(fm.real()), abs(fm.imag())}) * v.Scale();
+        logQuda(QUDA_DEBUG_VERBOSE, "tm max %e\n", double(max));
+        av.Scale(max);
 	arg.AV.resetScale(max);
       }
 
@@ -1222,21 +1222,22 @@ namespace quda {
         }
 
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          printfQuda("Y2[%d] (atomic) = %e\n", 4+d, Y_atomic_.norm2((4+d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
+          printfQuda("Y2[%d] (atomic) = %e\n", 4 + d,
+                     double(Y_atomic_.norm2((4 + d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint())));
 
         // now convert from atomic to application computation format if necessary for Y[d]
         if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint()) {
 
           if (coarseGauge::fixedPoint()) {
-            double y_max = Y_atomic_.abs_max((4+d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
+            real_t y_max = Y_atomic_.abs_max((4 + d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
 
             if (!set_scale) {
-              Y_.Scale(1.1*y_max); // slightly oversize to avoid unnecessary rescaling
+              Y_.Scale(static_cast<real_t>(1.1) * y_max); // slightly oversize to avoid unnecessary rescaling
               arg.Y.resetScale(Y_.Scale());
               set_scale = true;
             } else if (y_max > Y_.Scale()) {
               // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
-              arg.rescale = Y_.Scale() / y_max; // how much we need to shrink the elements by
+              arg.rescale = double(Y_.Scale() / y_max); // how much we need to shrink the elements by
               y.setComputeType(COMPUTE_RESCALE);
 
               for (int d_=0; d_<d; d_++) {
@@ -1248,14 +1249,15 @@ namespace quda {
               Y_.Scale(y_max);
               arg.Y.resetScale(Y_.Scale());
             }
-            logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
+            logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4 + d, double(y_max), 4 + d,
+                    double(Y_.Scale()));
           }
 
           y.setComputeType(COMPUTE_CONVERT);
           y.apply(device::get_default_stream());
         }
 
-        logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
+        logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", 4 + d, double(Y_.norm2(4 + d)));
       }
     }
 
@@ -1324,21 +1326,22 @@ namespace quda {
       }
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("Y2[%d] (atomic) = %e\n", d, Y_atomic_.norm2(d%arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
+        printfQuda("Y2[%d] (atomic) = %e\n", d,
+                   double(Y_atomic_.norm2(d % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint())));
 
       // now convert from atomic to application computation format if necessary for Y[d]
       if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint() ) {
 
         if (coarseGauge::fixedPoint()) {
-          double y_max = Y_atomic_.abs_max(d % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
+          real_t y_max = Y_atomic_.abs_max(d % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
 
           if (!set_scale) {
-            Y_.Scale(1.1*y_max); // slightly oversize to avoid unnecessary rescaling
+            Y_.Scale(static_cast<real_t>(1.1) * y_max); // slightly oversize to avoid unnecessary rescaling
             arg.Y.resetScale(Y_.Scale());
             set_scale = true;
           } else if (y_max > Y_.Scale()) {
             // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
-            arg.rescale = Y_.Scale() / y_max; // how much we need to shrink the elements by
+            arg.rescale = double(Y_.Scale() / y_max); // how much we need to shrink the elements by
             y.setComputeType(COMPUTE_RESCALE);
 
             // update all prior compute Y links
@@ -1360,17 +1363,18 @@ namespace quda {
             Y_.Scale(y_max);
             arg.Y.resetScale(Y_.Scale());
           }
-          logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, y_max, d, Y_.Scale());
+          logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, double(y_max), d,
+                  double(Y_.Scale()));
         }
 
         y.setComputeType(COMPUTE_CONVERT);
         y.apply(device::get_default_stream());
       }
 
-      logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", d, Y_.norm2( d ));
+      logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", d, double(Y_.norm2(d)));
     }
 
-    logQuda(QUDA_VERBOSE, "X2 = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", double(X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint())));
 
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
@@ -1409,7 +1413,7 @@ namespace quda {
       y.setComputeType(COMPUTE_VUV); // compute X += VCV
       y.apply(device::get_default_stream());
       if (getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("X2 (atomic) = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
+        printfQuda("X2 (atomic) = %e\n", double(X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint())));
 
     } else if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) {
       logQuda(QUDA_VERBOSE, "Summing staggered mass contribution to coarse clover\n");
@@ -1447,16 +1451,16 @@ namespace quda {
       y.setDirection(QUDA_BACKWARDS);
 
       if (coarseGauge::fixedPoint()) {
-        double x_max = X_atomic_.abs_max(0, coarseGaugeAtomic::fixedPoint());
-        X_.Scale(x_max);
+        real_t x_max = X_atomic_.abs_max(0, coarseGaugeAtomic::fixedPoint());
         arg.X.resetScale(x_max);
+        X_.Scale(x_max);
       }
 
       y.setComputeType(COMPUTE_CONVERT);
       y.apply(device::get_default_stream());
     }
 
-    logQuda(QUDA_VERBOSE, "X2 = %e\n", X_.norm2(0));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", double(X_.norm2(0)));
 
     pool_device_free(arg.max_d);
     pool_host_pinned_free(arg.max_h);

@@ -488,13 +488,20 @@ extern "C" {
     /** Type of eigensolver algorithm to employ **/
     QudaEigType eig_type;
 
-    /** Use Polynomial Acceleration **/
+    /** Use Polynomial Acceleration.  The Chebyshev polynomial applied by the
+        eigensolver is small on [a_min, a_max] and large only below a_min, so it
+        accelerates the smallest-real spectrum alone.  Combining this with
+        spectrum = QUDA_SPECTRUM_LR_EIG is an error. **/
     QudaBoolean use_poly_acc;
 
     /** Degree of the Chebysev polynomial **/
     int poly_deg;
 
-    /** Range used in polynomial acceleration **/
+    /** Range suppressed by the polynomial acceleration.  a_max should bound the
+        largest eigenvalue of the operator from above; if it is zero it is estimated
+        by power iteration.  a_min is the cut below which eigenvalues are amplified,
+        and should be strictly positive -- a_min = 0 yields a degenerate polynomial
+        that neither suppresses nor amplifies. **/
     double a_min;
     double a_max;
 

@@ -11,7 +11,7 @@ namespace quda
   struct TwistedCloverPreconditionedApply {
     TwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C,
-                                     double a, double b, bool xpay, int parity, bool dagger, const int *comm_override,
+                                     real_t a, real_t b, bool xpay, int parity, bool dagger, const int *comm_override,
                                      TimeProfile &profile);
   };
 
@@ -21,7 +21,7 @@ namespace quda
     out = x + a*A^{-1} D * in = x + a*(C + i*b*gamma_5)^{-1}*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   */
   void ApplyTwistedCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                        const GaugeField &U, const CloverField &C, double a, double b, bool xpay,
+                                        const GaugeField &U, const CloverField &C, real_t a, real_t b, bool xpay,
                                         cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                         const int *comm_override, TimeProfile &profile)
   {

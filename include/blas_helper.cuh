@@ -11,7 +11,7 @@
 #include <convert.h>
 #include <float_vector.h>
 #include <array.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include "instantiate.h"
 
 //#define QUAD_SUM
@@ -221,7 +221,7 @@ namespace quda
          @brief Dummy implementation of store_norm for non fixed-point fields
          @tparam is_fixed Whether fixed point
          @tparam real Precision of vector we wish to store from
-         @tparam n Complex vector length
+         @tparam n complex_t vector length
       */
       template <bool is_fixed, typename real, int n>
       __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const array<complex<real>, n> &, norm_t &) const
@@ -233,9 +233,9 @@ namespace quda
          @brief Implementation of store_norm for fixed-point fields
          @tparam is_fixed Whether fixed point
          @tparam real Precision of vector we wish to store from
-         @tparam n Complex vector length
+         @tparam n complex_t vector length
          @param[in] v elements we wish to find the max abs of for storing
-         @param[in] norm The norm we are 
+         @param[in] norm The norm we are
          @return The scale factor to be applied when packing into fixed point
       */
       template <bool is_fixed, typename real, int n>
@@ -255,7 +255,7 @@ namespace quda
       /**
          @brief Load spinor function
          @tparam real Precision of vector we wish to store from
-         @tparam n Complex vector length
+         @tparam n complex_t vector length
          @param[in] v output vector now loaded
          @param[in] x checkerboard site index
          @param[in] parity site parity
@@ -376,7 +376,7 @@ namespace quda
       /**
          @brief Save spinor function
          @tparam real Precision of vector we wish to store from
-         @tparam n Complex vector length
+         @tparam n complex_t vector length
          @param[in] v input vector we wish to store
          @param[in] x checkerboard site index
          @param[in] parity site parity

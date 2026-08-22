@@ -338,7 +338,7 @@ void gauge_loop_test(loop_test_t loop_param)
   // 6 loops of length 4, 12 loops of length 6 + 18 paths worth of traces and rescales
   int flops = (4 * 6 + 6 * 12) * 198 + 18 * 8;
 
-  std::vector<quda::Complex> traces_ref(num_paths);
+  std::vector<quda::complex_t> traces_ref(num_paths);
 
   if (verify_results) {
     quda::host_timer_t verify_timer;
@@ -349,32 +349,51 @@ void gauge_loop_test(loop_test_t loop_param)
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {
-      double *t_ptr = (double *)(&traces[i]);
-      std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-      auto diff = std::abs(traces_ref[i] - traces_);
-      auto norm = std::abs(traces_ref[i]);
+      std::complex<double> traces_(__real__(traces[i]), __imag__(traces[i]));
+      std::complex<double> ref_d(double(traces_ref[i].real()), double(traces_ref[i].imag()));
+      auto diff = std::abs(ref_d - traces_);
+      auto norm = std::abs(ref_d);
       loop_deviation += diff / norm;
       logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(),
-              traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), diff / norm);
+              traces_.imag(), double(traces_ref[i].real()), double(traces_ref[i].imag()), diff / norm);
     }
 
-    // Second check: we can reconstruct the plaquette from the first six loops we calculated
-    double plaq_factor = 1. / (V * U_qdp.Ncolor() * quda::comm_size());
-    std::vector<quda::Complex> plaq_components(6);
-    for (int i = 0; i < 6; i++) plaq_components[i] = traces_ref[i] / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
+    // Second check: reconstruct plaquette from the first six 1x1 loop traces.
+    // Undo path coeff and global scale, then apply 1/(Nc^2*V*comm) as in GaugePlaq. Sum the
+    // Nc-1 oriented plaquettes per component (equivalent to develop's mean with 1/(V*Nc*comm)).
+    const auto Nc = U_qdp.Ncolor();
+    const double plaq_factor = 1. / (Nc * Nc * V * quda::comm_size());
+    std::vector<std::complex<double>> plaq_components(6);
+    for (int i = 0; i < 6; i++) {
+      std::complex<double> trace_quda(__real__(traces[i]), __imag__(traces[i]));
+      plaq_components[i] = trace_quda / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
+    }
 
     double plaq_loop[3];
-    // spatial: xy, xz, yz
-    plaq_loop[1] = ((plaq_components[0] + plaq_components[1] + plaq_components[3]) / 3.).real();
+    // spatial: xy, xz, yz — sum (not average) matches GaugePlaq spatial sum before normalization
+    plaq_loop[1] = (plaq_components[0] + plaq_components[1] + plaq_components[3]).real();
     // temporal: xt, yt, zt
-    plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / 3.).real();
+    plaq_loop[2] = (plaq_components[2] + plaq_components[4] + plaq_components[5]).real();
     plaq_loop[0] = 0.5 * (plaq_loop[1] + plaq_loop[2]);
 
-    plaq_deviation = std::abs(obsParam.plaquette[0] - plaq_loop[0]) / std::abs(obsParam.plaquette[0]);
-    logQuda(QUDA_VERBOSE,
-            "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
-            plaq_loop[0], plaq_loop[1], plaq_loop[2], obsParam.plaquette[0], obsParam.plaquette[1],
-            obsParam.plaquette[2], plaq_deviation);
+    const double plaq_diff = obsParam.plaquette[0] - plaq_loop[0];
+    const double plaq_ratio = (std::abs(obsParam.plaquette[0]) > 0) ? plaq_loop[0] / obsParam.plaquette[0] : 0.0;
+    plaq_deviation = std::abs(plaq_diff) / std::abs(obsParam.plaquette[0]);
+
+    printfQuda("Plaquette cross-check (absolute values):\n");
+    printfQuda("  dedicated plaquette: total % .16e  spatial % .16e  temporal % .16e\n", obsParam.plaquette[0],
+               obsParam.plaquette[1], obsParam.plaquette[2]);
+    printfQuda("  from loop traces:    total % .16e  spatial % .16e  temporal % .16e\n", plaq_loop[0], plaq_loop[1],
+               plaq_loop[2]);
+    printfQuda("  difference (dedicated - loop): % .16e\n", plaq_diff);
+    printfQuda("  ratio (loop / dedicated):      % .16e\n", plaq_ratio);
+    printfQuda("  relative deviation:              % .16e  (tolerance % .16e)\n", plaq_deviation,
+               getTolerance(cuda_prec));
+    printfQuda("  plaq_factor = % .16e  (1 / (Nc^2 * V * comm_size), Nc = %d, V = %d)\n", plaq_factor, Nc, V);
+    for (int i = 0; i < 6; i++) {
+      printfQuda("  loop %d: trace % .16e + I % .16e  -> component % .16e + I % .16e\n", i, __real__(traces[i]),
+                 __imag__(traces[i]), plaq_components[i].real(), plaq_components[i].imag());
+    }
 
     verify_timer.stop();
     printfQuda("Verification time = %.2f ms\n", verify_timer.last());

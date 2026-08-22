@@ -311,8 +311,8 @@ namespace quda
 
     if (param.compute_action) {
       auto action = blas::cDotProduct(b, x);
-      param.action[0] = action[0].real();
-      param.action[1] = action[0].imag();
+      param.action[0] = static_cast<std::remove_cvref_t<decltype(param.action[0])>>(action[0].real());
+      param.action[1] = static_cast<std::remove_cvref_t<decltype(param.action[1])>>(action[0].imag());
     }
 
     distanceReweight(x, param, false);

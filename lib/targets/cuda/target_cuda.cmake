@@ -279,6 +279,15 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
 # ######################################################################################################################
 # cuda specific compile options
+
+set(QUDA_CUDA_NVCC_EXTRA_FLAGS "" CACHE STRING "")
+mark_as_advanced(QUDA_CUDA_NVCC_EXTRA_FLAGS)
+
+if(NOT QUDA_CUDA_NVCC_EXTRA_FLAGS STREQUAL "" AND QUDA_CUDA_BUILD_TYPE STREQUAL "NVCC")
+  separate_arguments(_quda_cuda_nvcc_extra_flags UNIX_COMMAND "${QUDA_CUDA_NVCC_EXTRA_FLAGS}")
+  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:${_quda_cuda_nvcc_extra_flags}>)
+endif()
+
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -522,7 +531,7 @@ endif()
 CPMAddPackage(
     NAME CCCL
     GITHUB_REPOSITORY nvidia/cccl
-    GIT_TAG v3.1.4 # Fetches this tagged commit
+    GIT_TAG v3.3.4 # Fetches this tagged commit
 )
 target_link_libraries(quda PRIVATE CCCL::CCCL)
 

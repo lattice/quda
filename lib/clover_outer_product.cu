@@ -17,7 +17,7 @@ namespace quda {
     const ColorSpinorField &p_halo;
     cvector_ref<const ColorSpinorField> &x;
     const ColorSpinorField &x_halo;
-    const std::vector<double> &coeff;
+    const std::vector<real_t> &coeff;
     const bool doublet; // whether we applying the operator to a doublet
     const int n_flavor;
     OprodKernelType kernel;
@@ -31,7 +31,7 @@ namespace quda {
   public:
     CloverOprod(const GaugeField &U, GaugeField &force, cvector_ref<const ColorSpinorField> &p,
                 const ColorSpinorField &p_halo, cvector_ref<const ColorSpinorField> &x, const ColorSpinorField &x_halo,
-                const std::vector<double> &coeff) :
+                const std::vector<real_t> &coeff) :
       TunableKernel3D(force, x.SiteSubset(), 4),
       force(force),
       U(U),
@@ -177,7 +177,7 @@ namespace quda {
   }
 
   void computeCloverOprod(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
-                          cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff)
+                          cvector_ref<const ColorSpinorField> &p, const std::vector<real_t> &coeff)
   {
     if constexpr (is_enabled_clover()) {
       if (x.size() > get_max_multi_rhs()) {

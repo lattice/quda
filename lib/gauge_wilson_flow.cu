@@ -9,13 +9,12 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowStep : TunableKernel3D
   {
-    using real = typename mapper<Float>::type;
     static constexpr int wflow_dim = 4; // apply flow in all dims
     GaugeField &out;
     GaugeField &temp;
     const GaugeField &in;
-    const real epsilon;
-    const real anisotropy;
+    const real_t epsilon;
+    const real_t anisotropy;
     const QudaGaugeSmearType wflow_type;
     const QudaWFlowStepType step_type;
 
@@ -35,14 +34,14 @@ namespace quda
     }
 
   public:
-    GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, double epsilon, double anisotropy,
+    GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, real_t eps, real_t aniso,
                    QudaGaugeSmearType wflow_type, QudaWFlowStepType step_type) :
       TunableKernel3D(in, 2, wflow_dim),
       out(out),
       temp(temp),
       in(in),
-      epsilon(epsilon),
-      anisotropy(anisotropy),
+      epsilon(eps),
+      anisotropy(aniso),
       wflow_type(wflow_type),
       step_type(step_type)
     {
@@ -210,8 +209,8 @@ namespace quda
     }
   }; // GaugeWFlowStep
 
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
-                 double smear_anisotropy, int rk_order)
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, real_t epsilon, QudaGaugeSmearType smear_type,
+                 real_t smear_anisotropy, int rk_order)
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);
@@ -260,7 +259,7 @@ namespace quda
     }
   }
 
-  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
+  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, real_t epsilon, QudaGaugeSmearType smear_type,
                  QudaWFlowStepType step_type)
   {
     checkPrecision(out, temp, in);
@@ -270,7 +269,7 @@ namespace quda
     if (!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW))
       errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
 
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, 1.0, smear_type, step_type);
+    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, static_cast<real_t>(1.0), smear_type, step_type);
     out.exchangeExtendedGhost(out.R(), false);
   }
 } // namespace quda

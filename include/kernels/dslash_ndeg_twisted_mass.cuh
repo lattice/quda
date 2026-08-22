@@ -13,12 +13,12 @@ namespace quda
     real c; /** this is the flavor twist factor */
 
     NdegTwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                       const ColorSpinorField &halo, const GaugeField &U, double a, double b, double c,
+                       const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t b, real_t c,
                        cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
-      a(a),
-      b(dagger ? -b : b), // if dagger flip the chiral twist
-      c(c)
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -b : b)), // if dagger flip the chiral twist
+      c(static_cast<real>(c))
     {
     }
   };

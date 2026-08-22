@@ -137,7 +137,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(staggered_phase_applied, INVALID_INT);
   P(i_mu, INVALID_DOUBLE);
   P(overlap, INVALID_INT);
-  P(use_split_gauge_bkup, QUDA_BOOLEAN_FALSE);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_INVALID);
 #endif
 
 #if defined INIT_PARAM

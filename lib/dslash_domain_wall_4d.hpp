@@ -40,8 +40,8 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall4DApply {
     DomainWall4DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_5,
-                      const Complex *b_5, const Complex *c_5, int parity, bool dagger, const int *comm_override,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, real_t a, real_t m_5,
+                      const complex_t *b_5, const complex_t *c_5, int parity, bool dagger, const int *comm_override,
                       TimeProfile &profile)
     {
       constexpr int nDim = 4;

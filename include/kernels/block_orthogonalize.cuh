@@ -1,6 +1,6 @@
 #include <multigrid_helper.cuh>
 
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <color_spinor_field_order.h>
 #include <block_reduce_helper.h>
 #include <fast_intdiv.h>

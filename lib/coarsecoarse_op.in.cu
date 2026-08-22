@@ -9,9 +9,11 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   template <>
-  void CoarseCoarseOp<fineColor, coarseColor, use_mma>(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                                                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu,
-                                                       double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
+  void CoarseCoarseOp<fineColor, coarseColor, use_mma>(GaugeField &Y, GaugeField &X, const Transfer &T,
+                                                       const GaugeField &gauge, const GaugeField &clover,
+                                                       const GaugeField &cloverInv, real_t kappa, real_t mass,
+                                                       real_t mu, real_t mu_factor, QudaDiracType dirac,
+                                                       QudaMatPCType matpc, bool need_bidirectional)
   {
     QudaFieldLocation location = checkLocation(X, Y, gauge, clover, cloverInv);
 

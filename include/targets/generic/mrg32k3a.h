@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
-#include <math_helper.cuh>
+#include <math_helper.h>
 
 namespace quda
 {
