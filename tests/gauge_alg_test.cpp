@@ -84,7 +84,7 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
       if (comm_dim_partitioned(d)) R[d] = 2;
     }
     static TimeProfile GaugeFix("GaugeFix");
-    int *reunit_fails_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+    int *reunit_fails_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
     int *reunit_fails_d = static_cast<int *>(get_mapped_device_pointer(reunit_fails_h));
 
     GaugeFieldParam gauge_field_param(param, nullptr);
@@ -118,7 +118,7 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
       functional_old = functional;
       functional = quality[0];
       theta = quality[1];
-      diff = fabs((functional - functional_old) / functional_old);
+      diff = quda::fabs((functional - functional_old) / functional_old);
       criterion = use_theta ? theta : diff;
       iter++;
       if (iter % reunit_interval == 0) {
@@ -341,8 +341,8 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
       gaugeFixOVR_v2(*U, gf_gauge_dir, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition,
                      gf_reunit_interval, gf_verbosity_interval);
       auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
       ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
       // Save if output string is specified
       if (gauge_store) save_gauge();
@@ -452,8 +452,8 @@ TEST_P(GaugeAlgTest, Landau_Overrelaxation_v2)
     gaugeFixOVR_v2(*U, 4, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_reunit_interval,
                    gf_verbosity_interval);
     auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
@@ -465,8 +465,8 @@ TEST_P(GaugeAlgTest, Coulomb_Overrelaxation_v2)
     gaugeFixOVR_v2(*U, 3, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_reunit_interval,
                    gf_verbosity_interval);
     auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }

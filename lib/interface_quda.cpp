@@ -6184,7 +6184,7 @@ void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, Qud
   auto profile = pushProfile(profileGaugeFix);
   checkGaugeParam(param);
   checkGaugeFixParam(fix_param);
-  int *reunit_fails_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  int *reunit_fails_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
   int *reunit_fails_d = static_cast<int *>(get_mapped_device_pointer(reunit_fails_h));
   lat_dim_t R1;
   for (int d = 0; d < 4; d++) { R1[d] = (redundant_comms || commDimPartitioned(d)); }
@@ -6234,7 +6234,7 @@ void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, Qud
     functional_old = functional;
     functional = quality[0];
     theta = quality[1];
-    diff = fabs((functional - functional_old) / functional_old);
+    diff = quda::abs((functional - functional_old) / functional_old);
     criterion = use_theta ? theta : diff;
     iter++;
     if (iter % fix_param->reunit_interval == 0) {
