@@ -93,11 +93,14 @@ mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
 
 # ######################################################################################################################
 # HIP specific variables
-set_target_properties(quda PROPERTIES HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
+set_property(TARGET quda PROPERTY HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
+
+# scalar spelling of the architecture list, for identifiers that cannot hold a ";"
+string(JOIN "+" QUDA_GPU_ARCH_TAG ${QUDA_GPU_ARCH})
 
 # QUDA_HASH for tunecache
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},hip_version=${CMAKE_HIP_COMPILER_VERSION})
-set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
+set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH_TAG},hip_version=${CMAKE_HIP_COMPILER_VERSION})
+set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH_TAG}")
 
 
 
