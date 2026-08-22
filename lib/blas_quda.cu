@@ -290,7 +290,12 @@ namespace quda {
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
       if (x.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("This kernel cannot be run on CPU fields");
-      // conv() in caxpyxmazMR_ reads this TU's bin_device_buffer (not via ReduceArg).
+      // Blas (unlike Reduce/MultiReduce) derives from TunableKernel3D_base, not
+      // TunableReduction2D/TunableMultiReduction, so it never goes through
+      // TunableReduction2D::launch_device's automatic per-TU RFA bin init.
+      // caxpyxmazMR_'s conv() reads this TU's bin_device_buffer directly (via
+      // the async-reduction completion path, not ReduceArg::complete()), so
+      // this call must stay here explicitly.
       reducer::init_rfa_device_bins<device_reduce_t>();
       instantiateBlas<caxpyxmazMR_, false>(a, cvector<real_t>(), cvector<real_t>(), x, y, z, y, y);
     }
