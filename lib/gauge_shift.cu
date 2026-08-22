@@ -65,7 +65,7 @@ namespace quda
     GaugeFieldParam param(in);
     param.create = QUDA_NULL_FIELD_CREATE;
     GaugeField out(param);
-    const_cast<real_t&>(out.LinkMax()) = in.LinkMax();
+    const_cast<real_t &>(out.LinkMax()) = in.LinkMax();
     out.is_shifted = true;
 
     instantiate<GaugeShifter>(out, in, shift, false);

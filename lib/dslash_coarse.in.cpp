@@ -26,9 +26,8 @@ namespace quda
  #else
   template <bool dagger, int Nc, int nVec, int... N>
   void ApplyCoarseMma(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
-                      cvector_ref<const ColorSpinorField> &, const GaugeField &, const GaugeField &, real_t,
-                      int, bool, bool, const int *, QudaPrecision,
-                      IntList<nVec, N...>)
+                      cvector_ref<const ColorSpinorField> &, const GaugeField &, const GaugeField &, real_t, int, bool,
+                      bool, const int *, QudaPrecision, IntList<nVec, N...>)
   {
     errorQuda("MMA not instantiated");
   }

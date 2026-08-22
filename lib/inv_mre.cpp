@@ -12,8 +12,8 @@ namespace quda
 
   /* Solve the equation A p_k psi_k = b by minimizing the residual and
      using Eigen's SVD algorithm for numerical stability */
-  void MinResExt::solve(std::vector<complex_t> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
-                        const ColorSpinorField &b, bool hermitian)
+  void MinResExt::solve(std::vector<complex_t> &psi_, std::vector<ColorSpinorField> &p,
+                        std::vector<ColorSpinorField> &q, const ColorSpinorField &b, bool hermitian)
   {
     typedef Matrix<complex_t, Dynamic, Dynamic> matrix;
     typedef Matrix<complex_t, Dynamic, 1> vector;
@@ -128,8 +128,7 @@ namespace quda
       ColorSpinorField r(b);
       for (auto &a : alpha) a = -a;
       blas::block::caxpy(alpha, q, r);
-      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N,
-                 sqrt(blas::norm2(r) / blas::norm2(b)));
+      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_CHRONO);

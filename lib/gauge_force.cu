@@ -15,11 +15,7 @@ namespace quda {
 
   public:
     ForceGauge(const GaugeField &u, GaugeField &mom, real_t epsilon, const paths<4> &p) :
-      TunableKernel3D(u, 2, 4),
-      u(u),
-      mom(mom),
-      epsilon(epsilon),
-      p(p)
+      TunableKernel3D(u, 2, 4), u(u), mom(mom), epsilon(epsilon), p(p)
     {
       strcat(aux, ",num_paths=");
       strcat(aux, std::to_string(p.num_paths).c_str());
@@ -45,8 +41,8 @@ namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon_u> using GaugePath = ForceGauge<Float,nColor,recon_u,false>;
 
-  void gaugeForce(GaugeField& mom, const GaugeField& u, real_t epsilon, std::vector<int**>& input_path,
-                  std::vector<int>& length, std::vector<real_t>& path_coeff, int num_paths, int path_max_length)
+  void gaugeForce(GaugeField &mom, const GaugeField &u, real_t epsilon, std::vector<int **> &input_path,
+                  std::vector<int> &length, std::vector<real_t> &path_coeff, int num_paths, int path_max_length)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(mom, u);
@@ -60,9 +56,9 @@ namespace quda {
     p.free();
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-  
-  void gaugePath(GaugeField& out, const GaugeField& u, real_t coeff, std::vector<int**>& input_path,
-		 std::vector<int>& length, std::vector<real_t>& path_coeff, int num_paths, int path_max_length)
+
+  void gaugePath(GaugeField &out, const GaugeField &u, real_t coeff, std::vector<int **> &input_path,
+                 std::vector<int> &length, std::vector<real_t> &path_coeff, int num_paths, int path_max_length)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(out, u);

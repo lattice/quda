@@ -84,10 +84,7 @@ namespace quda {
     array<real_t, 2> &ploop;
 
   public:
-    GaugePolyakovLoopTrace(const GaugeField &u, array<real_t, 2> &ploop) :
-      TunableReduction2D(u),
-      u(u),
-      ploop(ploop)
+    GaugePolyakovLoopTrace(const GaugeField &u, array<real_t, 2> &ploop) : TunableReduction2D(u), u(u), ploop(ploop)
     {
       if (u.Geometry() != QUDA_SCALAR_GEOMETRY && u.Geometry() != QUDA_VECTOR_GEOMETRY)
         errorQuda("Invalid geometry %d in Polyakov loop calculation", u.Geometry());
@@ -131,7 +128,8 @@ namespace quda {
     instantiate<GaugeInsertTimeslice>(u, s, timeslice);
   }
 
-  array<real_t, 2> gaugePolyakovLoop(const GaugeField& u, int dir, TimeProfile &profile) {
+  array<real_t, 2> gaugePolyakovLoop(const GaugeField &u, int dir, TimeProfile &profile)
+  {
 
     if (dir != 3) errorQuda("Unsupported direction %d", dir);
 

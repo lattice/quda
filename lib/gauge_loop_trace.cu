@@ -16,12 +16,8 @@ namespace quda {
 
   public:
     // max block size of 8 is arbitrary for now
-    GaugeLoopTrace(const GaugeField &u, std::vector<reduce_t> &loop_traces, real_t factor, const paths<1>& p) :
-      TunableMultiReduction(u, 2u, p.num_paths, 8),
-      u(u),
-      loop_traces(loop_traces),
-      factor(factor),
-      p(p)
+    GaugeLoopTrace(const GaugeField &u, std::vector<reduce_t> &loop_traces, real_t factor, const paths<1> &p) :
+      TunableMultiReduction(u, 2u, p.num_paths, 8), u(u), loop_traces(loop_traces), factor(factor), p(p)
     {
       if (p.num_paths != static_cast<int>(loop_traces.size())) errorQuda("Loop traces size %lu != number of paths %d", loop_traces.size(), p.num_paths);
 
@@ -53,8 +49,9 @@ namespace quda {
     }
   };
 
-  void gaugeLoopTrace(const GaugeField& u, std::vector<complex_t>& loop_traces, real_t factor, std::vector<int**>& input_path,
-		 std::vector<int>& length, std::vector<real_t>& path_coeff, int num_paths, int path_max_length)
+  void gaugeLoopTrace(const GaugeField &u, std::vector<complex_t> &loop_traces, real_t factor,
+                      std::vector<int **> &input_path, std::vector<int> &length, std::vector<real_t> &path_coeff,
+                      int num_paths, int path_max_length)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     paths<1> p(input_path, length, path_coeff, num_paths, path_max_length);

@@ -29,7 +29,8 @@ namespace quda
                                                                         comm_override, alpha0, t0),
       A(A, false),
       a(static_cast<real>(a)),
-      b(static_cast<real>(dagger ? -0.5 * b : 0.5 * b)) // factor of 1/2 comes from clover normalization we need to correct for
+      b(static_cast<real>(dagger ? -0.5 * b :
+                                   0.5 * b)) // factor of 1/2 comes from clover normalization we need to correct for
     {
       checkPrecision(U, A);
       checkLocation(U, A);

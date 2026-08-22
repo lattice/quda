@@ -145,8 +145,8 @@ namespace quda
           // either side is a disabled double precision: just error out at compile time
           // rather than redundantly compiling a device kernel already built for
           // whichever precision is actually enabled.
-          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
-                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)&&!is_enabled(
+                          QUDA_DOUBLE_PRECISION)) {
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
           } else {
             if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
@@ -159,7 +159,7 @@ namespace quda
             const int length = x0.Length() / M;
 
             MultiReduceArg<device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW,
-                                                                                                length, nParity);
+                                                                                               length, nParity);
 
             std::vector<host_reduce_t> result_(NXZ * arg.NYW);
 

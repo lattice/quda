@@ -149,8 +149,8 @@ namespace quda {
           // either side is a disabled double precision: just error out at compile time
           // rather than redundantly compiling a device kernel already built for
           // whichever precision is actually enabled.
-          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
-                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)&&!is_enabled(
+                          QUDA_DOUBLE_PRECISION)) {
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
           } else {
             if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
@@ -170,21 +170,21 @@ namespace quda {
               switch (tp.aux.x) {
               case 1:
                 Launch(tp, stream,
-                       MultiBlasArg<1, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(
-                         x, y, z, w, f_, NYW, length));
+                       MultiBlasArg<1, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(x, y, z, w, f_,
+                                                                                                       NYW, length));
                 break;
               case 2:
                 if constexpr (enable_warp_split()) {
                   Launch(tp, stream,
-                         MultiBlasArg<2, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(
-                           x, y, z, w, f_, NYW, length));
+                         MultiBlasArg<2, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(x, y, z, w, f_,
+                                                                                                         NYW, length));
                   break;
                 }
               case 4:
                 if constexpr (enable_warp_split()) {
                   Launch(tp, stream,
-                         MultiBlasArg<4, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(
-                           x, y, z, w, f_, NYW, length));
+                         MultiBlasArg<4, device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(f_)>(x, y, z, w, f_,
+                                                                                                         NYW, length));
                   break;
                 }
               default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
@@ -396,21 +396,22 @@ namespace quda {
 
       template <>
       void axpy<complex_t>(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
-                         cvector_ref<ColorSpinorField> &y)
+                           cvector_ref<ColorSpinorField> &y)
       {
         // Enter a recursion.
         // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
         axpy_recurse<multicaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 0);
       }
 
-      void caxpy(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
+      void caxpy(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
+                 cvector_ref<ColorSpinorField> &y)
       {
         axpy(a, std::move(x), std::move(y));
       }
 
       template <>
       void axpy_U<complex_t>(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
-                           cvector_ref<ColorSpinorField> &y)
+                             cvector_ref<ColorSpinorField> &y)
       {
         // Enter a recursion.
         // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
@@ -431,7 +432,7 @@ namespace quda {
 
       template <>
       void axpy_L<complex_t>(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
-                           cvector_ref<ColorSpinorField> &y)
+                             cvector_ref<ColorSpinorField> &y)
       {
         // Enter a recursion.
         // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular

@@ -84,10 +84,7 @@ namespace quda {
     int volume;
 
     GaugeFixArg(GaugeField &data, real_t alpha) :
-      kernel_param(dim3(data.VolumeCB(), 2, 1)),
-      data(data),
-      alpha(static_cast<Float>(alpha)),
-      volume(data.Volume())
+      kernel_param(dim3(data.VolumeCB(), 2, 1)), data(data), alpha(static_cast<Float>(alpha)), volume(data.Volume())
     {
       for (int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       invpsq = (Float*)device_malloc(sizeof(Float) * volume);

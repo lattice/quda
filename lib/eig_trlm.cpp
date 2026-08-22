@@ -91,8 +91,7 @@ namespace quda
         logQuda(QUDA_DEBUG_VERBOSE, "TRLM before eigensolveFromArrowMat: restart=%d num_locked=%d num_keep=%d n_kr=%d\n",
                 restart_iter, num_locked, num_keep, n_kr);
         for (int i = num_locked; i < std::min(n_kr, num_locked + 8); i++)
-          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, alpha[i], i,
-                  beta[i]);
+          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, alpha[i], i, beta[i]);
       }
       eigensolveFromArrowMat();
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
@@ -114,8 +113,8 @@ namespace quda
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i,
-                  residua[i + num_locked], epsilon * check_norm(alpha[i + num_locked]));
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -127,8 +126,8 @@ namespace quda
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i,
-                  residua[i + num_locked], tol * check_norm(alpha[i + num_locked]));
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -155,8 +154,7 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
       logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
       for (int i = 0; i < n_kr; i++) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i,
-                residua[i]);
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
       }
 
       // Check for convergence
@@ -188,8 +186,7 @@ namespace quda
 
       // Dump all Ritz values and residua
       for (int i = 0; i < n_conv; i++) {
-        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0,
-                residua[i]);
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
       }
 
       // Compute eigenvalues/singular values
@@ -311,9 +308,8 @@ namespace quda
     }
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
-      logQuda(QUDA_DEBUG_VERBOSE,
-              "TRLM arrow matrix: dim=%d arrow_pos=%d num_locked=%d num_keep=%d reverse=%d\n", dim, arrow_pos,
-              num_locked, num_keep, (int)reverse);
+      logQuda(QUDA_DEBUG_VERBOSE, "TRLM arrow matrix: dim=%d arrow_pos=%d num_locked=%d num_keep=%d reverse=%d\n", dim,
+              arrow_pos, num_locked, num_keep, (int)reverse);
       for (int b = 0; b < std::min(dim, 4); b++) {
         for (int c = 0; c < std::min(dim, 4); c++) {
           logQuda(QUDA_DEBUG_VERBOSE, "  A(%d,%d) = %+.16e\n", b, c, A(b, c));

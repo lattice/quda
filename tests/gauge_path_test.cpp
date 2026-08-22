@@ -391,8 +391,8 @@ void gauge_loop_test(loop_test_t loop_param)
                getTolerance(cuda_prec));
     printfQuda("  plaq_factor = % .16e  (1 / (Nc^2 * V * comm_size), Nc = %d, V = %d)\n", plaq_factor, Nc, V);
     for (int i = 0; i < 6; i++) {
-      printfQuda("  loop %d: trace % .16e + I % .16e  -> component % .16e + I % .16e\n", i,
-                 __real__(traces[i]), __imag__(traces[i]), plaq_components[i].real(), plaq_components[i].imag());
+      printfQuda("  loop %d: trace % .16e + I % .16e  -> component % .16e + I % .16e\n", i, __real__(traces[i]),
+                 __imag__(traces[i]), plaq_components[i].real(), plaq_components[i].imag());
     }
 
     verify_timer.stop();

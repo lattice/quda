@@ -35,8 +35,7 @@ namespace quda {
   }
 
   void DiracImprovedStaggered::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                          const QudaParity parity, cvector_ref<const ColorSpinorField> &x,
-                                          real_t k) const
+                                          const QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {    
     checkParitySpinor(in, out);
 
@@ -132,7 +131,7 @@ namespace quda {
     } else {
       ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
     }
-  }  
+  }
 
   void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass,
                                               real_t, real_t, bool allow_truncation) const

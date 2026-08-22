@@ -27,12 +27,12 @@ namespace quda {
 
    using DynamicStride   = Stride<Dynamic, Dynamic>;
 
-   using DenseMatrix     = MatrixXc;
-   using VectorSet       = MatrixXc;
-   using Vector          = VectorXc;
-   using RealVector      = VectorX;
+   using DenseMatrix = MatrixXc;
+   using VectorSet = MatrixXc;
+   using Vector = VectorXc;
+   using RealVector = VectorX;
 
-//special types needed for compatibility with QUDA blas:
+   // special types needed for compatibility with QUDA blas:
    using RowMajorDenseMatrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
@@ -153,12 +153,13 @@ namespace quda {
      SelfAdjointEigenSolver<DenseMatrix> es_tm(args.Tm);
      args.ritzVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
      //Solve m-1 dim eigenproblem:
-     SelfAdjointEigenSolver<DenseMatrix> es_tm1(Map<DenseMatrix, Unaligned, DynamicStride >(args.Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
-     Block<DenseMatrix>(args.ritzVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
+     SelfAdjointEigenSolver<DenseMatrix> es_tm1(
+       Map<DenseMatrix, Unaligned, DynamicStride>(args.Tm.data(), (m - 1), (m - 1), DynamicStride(m, 1)));
+     Block<DenseMatrix>(args.ritzVecs.derived(), 0, k, m - 1, k) = es_tm1.eigenvectors().leftCols(k);
      args.ritzVecs.block(m-1, k, 1, k).setZero();
 
-     DenseMatrix Q2k(DenseMatrix::Identity(m, 2*k));
-     HouseholderQR<DenseMatrix> ritzVecs2k_qr( Map<DenseMatrix, Unaligned >(args.ritzVecs.data(), m, 2*k) );
+     DenseMatrix Q2k(DenseMatrix::Identity(m, 2 * k));
+     HouseholderQR<DenseMatrix> ritzVecs2k_qr(Map<DenseMatrix, Unaligned>(args.ritzVecs.data(), m, 2 * k));
      Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ() );
 
      //2. Construct H = QH*Tm*Q :
@@ -166,7 +167,7 @@ namespace quda {
 
      /* solve the small evecm1 2n_ev x 2n_ev eigenproblem */
      SelfAdjointEigenSolver<DenseMatrix> es_h2k(args.H2k);
-     Block<DenseMatrix>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
+     Block<DenseMatrix>(args.ritzVecs.derived(), 0, 0, m, 2 * k) = Q2k * es_h2k.eigenvectors();
      args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
 
      return;
@@ -273,7 +274,7 @@ namespace quda {
     }
   }
 
- void IncEigCG::RestartVT(const real_t beta, const real_t rho)
+  void IncEigCG::RestartVT(const real_t beta, const real_t rho)
   {
     EigCGArgs &args = *eigcg_args;
 
@@ -443,7 +444,7 @@ namespace quda {
 
     real_t heavy_quark_res = 0.0; // heavy quark res idual
 
-    if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     real_t pAp;
     real_t alpha = 1.0, alpha_inv = 1.0, beta = 0.0, alpha_old_inv = 1.0;
@@ -677,7 +678,7 @@ namespace quda {
        r2 = blas::xmyNorm(in, r);
 
        param.true_res = sqrt(r2 / b2);
-       param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r)[2]);
+       param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out, r)[2]);
        PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
        if( getVerbosity() >= QUDA_VERBOSE ) { 

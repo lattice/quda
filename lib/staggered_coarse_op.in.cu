@@ -42,11 +42,7 @@ namespace quda {
 
   public:
     CalculateStaggeredY(GaugeField &Y, GaugeField &X, const GaugeField &g, const real_t mass) :
-      TunableKernel3D(g, fineColor*fineColor, 2),
-      Y(Y),
-      X(X),
-      g(g),
-      mass(mass)
+      TunableKernel3D(g, fineColor * fineColor, 2), Y(Y), X(X), g(g), mass(mass)
     {
       checkPrecision(Y, X);
       checkLocation(Y, X, g);
@@ -79,8 +75,8 @@ namespace quda {
 
       apply(device::get_default_stream());
 
-      for (int d = 0; d < nDim; d++) logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", 4+d, double(Y.norm2( 4+d )));
-      for (int d = 0; d < nDim; d++) logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", d, double(Y.norm2( d )));
+      for (int d = 0; d < nDim; d++) logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", 4 + d, double(Y.norm2(4 + d)));
+      for (int d = 0; d < nDim; d++) logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", d, double(Y.norm2(d)));
 
       logQuda(QUDA_VERBOSE, "X2 = %e\n", double(X.norm2(0)));
     }
@@ -104,9 +100,9 @@ namespace quda {
   };
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin, int uvSpin>
-  void aggregateStaggeredY(GaugeField &Y, GaugeField &X,
-                        const Transfer &T, const GaugeField &g, const GaugeField &l, const GaugeField &XinvKD,
-                        real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+  void aggregateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
+                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac,
+                           QudaMatPCType matpc)
   {
     // Actually create the temporaries like UV, etc.
     auto location = Y.Location();
@@ -143,7 +139,7 @@ namespace quda {
     // Moving along to the build
 
     const real_t kappa = -1.; // cancels a minus sign factor for kappa w/in the dslash application
-    const real_t mu_dummy = 0.; 
+    const real_t mu_dummy = 0.;
     const real_t mu_factor_dummy = 0.;
     constexpr bool use_mma = false;
     
@@ -232,7 +228,8 @@ namespace quda {
   // template on UV spin, which can be 1 for the non-KD ops but needs to be 2 for the KD op
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void aggregateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac,
+                           QudaMatPCType matpc)
   {
     if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) {
       // uvSpin == 1
@@ -249,7 +246,8 @@ namespace quda {
   // and actual aggregation
   template <typename Float, typename vFloat, int fineColor, int coarseColor>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac,
+                           QudaMatPCType matpc)
   {
     if (T.Vectors().Nspin() != 1) errorQuda("Unsupported number of spins %d", T.Vectors().Nspin());
     constexpr int fineSpin = 1;
@@ -271,7 +269,8 @@ namespace quda {
 
   template <int fineColor, int coarseColor>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac,
+                           QudaMatPCType matpc)
   {
     if constexpr (is_enabled_multigrid() && is_enabled_spin(1)) {
       logQuda(QUDA_SUMMARIZE, "Computing Y field......\n");

@@ -364,8 +364,7 @@ namespace quda {
          @param[in] h The helper functor which acts as the transformer
          in transform_reduce
        */
-      template <typename reducer, typename helper>
-      auto transform_reduce(QudaFieldLocation location, helper h) const
+      template <typename reducer, typename helper> auto transform_reduce(QudaFieldLocation location, helper h) const
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
         return ::quda::transform_reduce<reducer>(location, reinterpret_cast<const complex<Float> *>(a), offset_cb, h);
@@ -416,8 +415,7 @@ namespace quda {
          @param[in] h The helper functor which acts as the transformer
          in transform_reduce
        */
-      template <typename reducer, typename helper>
-      auto transform_reduce(QudaFieldLocation location, helper h) const
+      template <typename reducer, typename helper> auto transform_reduce(QudaFieldLocation location, helper h) const
       {
         return ::quda::transform_reduce<reducer>(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h);
       }
@@ -499,7 +497,8 @@ namespace quda {
         {
           commGlobalReductionPush(global);
           real_t nrm1 = real_t(accessor.scale())
-            * reduction_to_real(accessor.template transform_reduce<plus<device_reduce_t>>(location, abs_<double, Float>()));
+            * reduction_to_real(
+                          accessor.template transform_reduce<plus<device_reduce_t>>(location, abs_<double, Float>()));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -513,7 +512,8 @@ namespace quda {
         {
           commGlobalReductionPush(global);
           real_t nrm2 = real_t(accessor.scale()) * real_t(accessor.scale())
-            * reduction_to_real(accessor.template transform_reduce<plus<device_reduce_t>>(location, square_<double, Float>()));
+            * reduction_to_real(accessor.template transform_reduce<plus<device_reduce_t>>(location,
+                                                                                          square_<double, Float>()));
           commGlobalReductionPop();
           return nrm2;
         }
@@ -526,7 +526,8 @@ namespace quda {
         auto abs_max(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          real_t absmax = real_t(accessor.scale() * accessor.template transform_reduce<maximum<Float>>(location, abs_max_<Float, Float>()));
+          real_t absmax = real_t(
+            accessor.scale() * accessor.template transform_reduce<maximum<Float>>(location, abs_max_<Float, Float>()));
           commGlobalReductionPop();
           return absmax;
         }
@@ -539,7 +540,8 @@ namespace quda {
         auto abs_min(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          real_t absmin = real_t(accessor.scale() * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>()));
+          real_t absmin = real_t(
+            accessor.scale() * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>()));
           commGlobalReductionPop();
           return absmin;
         }
@@ -594,8 +596,9 @@ namespace quda {
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr) :
           recon(double(clover.Diagonal())),
-          nrm(static_cast<norm_type>(clover.max_element(is_inverse)
-              / (2 * (isFixed<Float>::value ? fixedMaxValue<Float>::value : 1)))), // factor of two in normalization
+          nrm(static_cast<norm_type>(
+            clover.max_element(is_inverse)
+            / (2 * (isFixed<Float>::value ? fixedMaxValue<Float>::value : 1)))), // factor of two in normalization
           nrm_inv(1.0 / nrm),
           is_inverse(is_inverse),
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),

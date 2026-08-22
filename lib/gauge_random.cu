@@ -19,11 +19,7 @@ namespace quda {
 
   public:
     GaugeGauss(GaugeField &U, RNG &rng, real_t sigma) :
-      TunableKernel2D(U, 2),
-      U(U),
-      rng(rng),
-      sigma(sigma),
-      group(U.LinkType() == QUDA_SU3_LINKS)
+      TunableKernel2D(U, 2), U(U), rng(rng), sigma(sigma), group(U.LinkType() == QUDA_SU3_LINKS)
     {
       if (group) {
         logQuda(QUDA_SUMMARIZE, "Creating Gaussian distributed Lie group field with sigma = %e\n", double(sigma));

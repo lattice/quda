@@ -43,10 +43,10 @@ namespace quda
     bool fuse_m5inv_m5pre;
 
     DomainWall4DFusedM5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                           const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5,
-                           const complex_t *c_5, bool xpay, cvector_ref<const ColorSpinorField> &x,
-                           cvector_ref<ColorSpinorField> &y, int parity, bool dagger, const int *comm_override,
-                           real_t m_f) :
+                           const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t m_5,
+                           const complex_t *b_5, const complex_t *c_5, bool xpay,
+                           cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
+                           bool dagger, const int *comm_override, real_t m_f) :
       DomainWall4DArg(out, in, halo, U, a, m_5, b_5, c_5, xpay, x, parity, dagger, comm_override),
       Dslash5Arg(out, in, x, m_f, m_5, b_5, c_5, a)
     {

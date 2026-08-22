@@ -235,7 +235,7 @@ namespace quda
          @tparam real Precision of vector we wish to store from
          @tparam n complex_t vector length
          @param[in] v elements we wish to find the max abs of for storing
-         @param[in] norm The norm we are 
+         @param[in] norm The norm we are
          @return The scale factor to be applied when packing into fixed point
       */
       template <bool is_fixed, typename real, int n>

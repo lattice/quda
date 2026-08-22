@@ -11,10 +11,7 @@ namespace quda {
     array<real_t, 2> &plq;
 
   public:
-    GaugePlaq(const GaugeField &u, array<real_t, 2> &plq) :
-      TunableReduction2D(u),
-      u(u),
-      plq(plq)
+    GaugePlaq(const GaugeField &u, array<real_t, 2> &plq) : TunableReduction2D(u), u(u), plq(plq)
     {
       apply(device::get_default_stream());
     }
@@ -38,7 +35,7 @@ namespace quda {
   array<real_t, 3> plaquette(const GaugeField &U)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    array<real_t, 2> plq{0.0, 0.0};
+    array<real_t, 2> plq {0.0, 0.0};
     instantiate<GaugePlaq, ReconstructGauge>(U, plq);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return {0.5 * (plq[0] + plq[1]), plq[0], plq[1]};

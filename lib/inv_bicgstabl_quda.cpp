@@ -376,7 +376,8 @@ namespace quda {
   // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
   // Technically, there are ways to check both 'x' and 'r' for reliable updates...
   // the current status in BiCGstab is to just look for reliable updates in 'r'.
-  int BiCGstabL::reliable(real_t &rNorm, real_t &maxrx, real_t &maxrr, const real_t &r2, const real_t &delta) {
+  int BiCGstabL::reliable(real_t &rNorm, real_t &maxrx, real_t &maxrr, const real_t &r2, const real_t &delta)
+  {
     // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
@@ -480,7 +481,7 @@ namespace quda {
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
     auto b2 = !fixed_iteration ? blas::norm2(b) : vector<real_t>(b.size(), real_t(1.0)); // norm sq of source.
-    vector<real_t> r2(b.size());                                         // norm sq of residual
+    vector<real_t> r2(b.size());                                                         // norm sq of residual
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
@@ -600,8 +601,8 @@ namespace quda {
     int rUpdate = 0; // count reliable updates.
     real_t delta = param.delta; // delta for reliable updates.
     real_t rNorm = sqrt(r2[0]); // The current residual norm.
-    real_t maxrr = rNorm; // The maximum residual norm since the last reliable update.
-    real_t maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
+    real_t maxrr = rNorm;       // The maximum residual norm since the last reliable update.
+    real_t maxrx = rNorm;       // The same. Would be different if we did 'x' reliable updates.
 
     PrintStats(solver_name.c_str(), total_iter, r2, b2, heavy_quark_res);
     while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {

@@ -14,8 +14,8 @@
 #endif
 
 #if (CUDA_VERSION >= 11070) && defined(QUDA_CUDA_CC) && !defined(_NVHPC_CUDA)
-#define BUILTIN_ASSUME(x) \
-  bool p = x;             \
+#define BUILTIN_ASSUME(x)                                                                                              \
+  bool p = x;                                                                                                          \
   __builtin_assume(p);
 #else
 #define BUILTIN_ASSUME(x)
@@ -23,18 +23,17 @@
 
 #define FTZ
 
-namespace quda {
+namespace quda
+{
 
   inline __host__ __device__ float abs(const float a) { return fabsf(a); }
   inline __host__ __device__ double abs(const double a) { return ::fabs(a); }
 
-  template <typename T>
-  __host__ __device__ inline std::enable_if_t<std::is_same_v<T, float>, float> fabs(const T a)
+  template <typename T> __host__ __device__ inline std::enable_if_t<std::is_same_v<T, float>, float> fabs(const T a)
   {
     return fabsf(a);
   }
-  template <typename T>
-  __host__ __device__ inline std::enable_if_t<std::is_same_v<T, double>, double> fabs(const T a)
+  template <typename T> __host__ __device__ inline std::enable_if_t<std::is_same_v<T, double>, double> fabs(const T a)
   {
     return ::fabs(a);
   }
@@ -84,8 +83,7 @@ namespace quda {
    * @param a first number
    * @param b second number
    */
-  template<typename T>
-  inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
+  template <typename T> inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
 
   /**
    * @brief Maximum of two numbers (float specialization)
@@ -99,17 +97,15 @@ namespace quda {
    * @param a first number
    * @param b second number
    */
-  template<typename T>
-  inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
-
+  template <typename T> inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
 
   template <bool is_device> struct sincos_impl {
-    template <typename T> inline void operator()(const T& a, T *s, T *c) { ::sincos(a, s, c); }
+    template <typename T> inline void operator()(const T &a, T *s, T *c) { ::sincos(a, s, c); }
   };
 
 #ifdef QUDA_CUDA_CC
   template <> struct sincos_impl<true> {
-    template <typename T> __device__ inline void operator()(const T& a, T *s, T *c)
+    template <typename T> __device__ inline void operator()(const T &a, T *s, T *c)
     {
       BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
       sincos(a, s, c);
@@ -123,16 +119,18 @@ namespace quda {
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
    */
-  template<typename T>
-  inline __host__ __device__ void sincos(const T& a, T *s, T *c) { target::dispatch<sincos_impl>(a, s, c); }
+  template <typename T> inline __host__ __device__ void sincos(const T &a, T *s, T *c)
+  {
+    target::dispatch<sincos_impl>(a, s, c);
+  }
 
   template <bool is_device> struct sincosf_impl {
-    inline void operator()(const float& a, float *s, float *c) { ::sincosf(a, s, c); }
+    inline void operator()(const float &a, float *s, float *c) { ::sincosf(a, s, c); }
   };
 
 #ifdef QUDA_CUDA_CC
   template <> struct sincosf_impl<true> {
-    __device__ inline void operator()(const float& a, float *s, float *c) { __sincosf(a, s, c); }
+    __device__ inline void operator()(const float &a, float *s, float *c) { __sincosf(a, s, c); }
   };
 #endif
 
@@ -144,17 +142,18 @@ namespace quda {
    *
    * Specialization to float arguments. Device function calls CUDA intrinsic
    */
-  template<>
-  inline __host__ __device__ void sincos(const float& a, float *s, float *c) { target::dispatch<sincosf_impl>(a, s, c); }
-
+  template <> inline __host__ __device__ void sincos(const float &a, float *s, float *c)
+  {
+    target::dispatch<sincosf_impl>(a, s, c);
+  }
 
   template <bool is_device> struct sincospi_impl {
-    template <typename T> inline void operator()(const T& a, T *s, T *c) { ::sincos(a * static_cast<T>(M_PI), s, c); }
+    template <typename T> inline void operator()(const T &a, T *s, T *c) { ::sincos(a * static_cast<T>(M_PI), s, c); }
   };
 
 #ifdef QUDA_CUDA_CC
   template <> struct sincospi_impl<true> {
-    template <typename T> __device__ inline void operator()(const T& a, T *s, T *c) { sincospi(a, s, c); }
+    template <typename T> __device__ inline void operator()(const T &a, T *s, T *c) { sincospi(a, s, c); }
   };
 #endif
 
@@ -164,8 +163,10 @@ namespace quda {
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
    */
-  template<typename T>
-  inline __host__ __device__ void sincospi(const T& a, T *s, T *c) { target::dispatch<sincospi_impl>(a, s, c); }
+  template <typename T> inline __host__ __device__ void sincospi(const T &a, T *s, T *c)
+  {
+    target::dispatch<sincospi_impl>(a, s, c);
+  }
 
   /**
    * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
@@ -175,14 +176,18 @@ namespace quda {
    *
    * Specialization to float arguments.  Use sincos so that Device function calls CUDA intrinsic.
    */
-  template<>
-  inline __host__ __device__ void sincospi(const float& a, float *s, float *c) { quda::sincos(a * static_cast<float>(M_PI), s, c); }
+  template <> inline __host__ __device__ void sincospi(const float &a, float *s, float *c)
+  {
+    quda::sincos(a * static_cast<float>(M_PI), s, c);
+  }
 
   template <bool is_device> struct sinpi_impl {
     template <typename T> inline T operator()(T a) { return ::sin(a * static_cast<T>(M_PI)); }
   };
 #ifdef QUDA_CUDA_CC
-  template <> struct sinpi_impl<true> { template <typename T> __device__ inline T operator()(T a) { return ::sinpi(a); } };
+  template <> struct sinpi_impl<true> {
+    template <typename T> __device__ inline T operator()(T a) { return ::sinpi(a); }
+  };
 #endif
 
   /**
@@ -190,12 +195,15 @@ namespace quda {
    * @param a the angle
    * @return result of the sin(a * pi)
    */
-  template<typename T> inline __host__ __device__ T sinpi(T a) { return target::dispatch<sinpi_impl>(a); }
+  template <typename T> inline __host__ __device__ T sinpi(T a) { return target::dispatch<sinpi_impl>(a); }
 
-
-  template <bool is_device> struct sinpif_impl { inline float operator()(float a) { return ::sinf(a * static_cast<float>(M_PI)); } };
+  template <bool is_device> struct sinpif_impl {
+    inline float operator()(float a) { return ::sinf(a * static_cast<float>(M_PI)); }
+  };
 #ifdef QUDA_CUDA_CC
-  template <> struct sinpif_impl<true> { __device__ inline float operator()(float a) { return __sinf(a * static_cast<float>(M_PI)); } };
+  template <> struct sinpif_impl<true> {
+    __device__ inline float operator()(float a) { return __sinf(a * static_cast<float>(M_PI)); }
+  };
 #endif
 
   /**
@@ -205,7 +213,7 @@ namespace quda {
    *
    * Specialization to float.  Device function will call CUDA intrinsic.
    */
-  template<> inline __host__ __device__ float sinpi(float a) { return target::dispatch<sinpif_impl>(a); }
+  template <> inline __host__ __device__ float sinpi(float a) { return target::dispatch<sinpif_impl>(a); }
 
   template <bool is_device> struct cospi_impl {
     template <typename T> inline T operator()(T a) { return ::cos(a * static_cast<T>(M_PI)); }
@@ -221,12 +229,15 @@ namespace quda {
    * @param a the angle
    * @return result of the cos(a * pi)
    */
-  template<typename T> inline __host__ __device__ T cospi(T a) { return target::dispatch<cospi_impl>(a); }
+  template <typename T> inline __host__ __device__ T cospi(T a) { return target::dispatch<cospi_impl>(a); }
 
-
-  template <bool is_device> struct cospif_impl { inline float operator()(float a) { return ::cosf(a * static_cast<float>(M_PI)); } };
+  template <bool is_device> struct cospif_impl {
+    inline float operator()(float a) { return ::cosf(a * static_cast<float>(M_PI)); }
+  };
 #ifdef QUDA_CUDA_CC
-  template <> struct cospif_impl<true> { __device__ inline float operator()(float a) { return __cosf(a * static_cast<float>(M_PI)); } };
+  template <> struct cospif_impl<true> {
+    __device__ inline float operator()(float a) { return __cosf(a * static_cast<float>(M_PI)); }
+  };
 #endif
 
   /**
@@ -236,8 +247,7 @@ namespace quda {
    *
    * Specialization to float.  Device function will call CUDA intrinsic.
    */
-  template<> inline __host__ __device__ float cospi(float a) { return target::dispatch<cospif_impl>(a); }
-
+  template <> inline __host__ __device__ float cospi(float a) { return target::dispatch<cospif_impl>(a); }
 
   template <bool is_device> struct rsqrt_impl {
     template <typename T> inline T operator()(T a) { return static_cast<T>(1.0) / sqrt(a); }
@@ -256,10 +266,11 @@ namespace quda {
    * some math libraries provide a fast inverse sqrt() function.
    * this implementation uses the CUDA builtins
    */
-  template<typename T> inline __host__ __device__ T rsqrt(T a) { return target::dispatch<rsqrt_impl>(a); }
+  template <typename T> inline __host__ __device__ T rsqrt(T a) { return target::dispatch<rsqrt_impl>(a); }
 
-
-  template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); } };
+  template <bool is_device> struct fpow_impl {
+    template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); }
+  };
 
 #ifdef QUDA_CUDA_CC
   template <> struct fpow_impl<true> {
@@ -280,7 +291,10 @@ namespace quda {
     @param b power that we want to raise a to
     @return pow(a,b)
   */
-  template <typename real> __device__ __host__ inline real fpow(real a, int b) { return target::dispatch<fpow_impl>(a, b); }
+  template <typename real> __device__ __host__ inline real fpow(real a, int b)
+  {
+    return target::dispatch<fpow_impl>(a, b);
+  }
 
   template <bool is_device> struct fdivide_impl {
     inline float operator()(float a, float b) { return a / b; }
@@ -400,7 +414,6 @@ namespace quda {
   */
   __device__ __host__ inline double dmul_rn(double a, double b) { return target::dispatch<dmul_rn_impl>(a, b); }
 
-
   template <bool is_device> struct dadd_rn_impl {
     inline double operator()(double a, double b) { return a + b; }
   };
@@ -415,7 +428,6 @@ namespace quda {
   */
   __device__ __host__ inline double dadd_rn(double a, double b) { return target::dispatch<dadd_rn_impl>(a, b); }
 
-
   template <bool is_device> struct fma_rn_impl {
     inline double operator()(double a, double b, double c) { return std::fma(a, b, c); }
   };
@@ -428,7 +440,10 @@ namespace quda {
   /**
      @brief IEEE double precision fused multiply add
   */
-  __device__ __host__ inline double fma_rn(double a, double b, double c) { return target::dispatch<fma_rn_impl>(a, b, c); }
+  __device__ __host__ inline double fma_rn(double a, double b, double c)
+  {
+    return target::dispatch<fma_rn_impl>(a, b, c);
+  }
 
 #ifdef QUDA_USE_QUAD_SCALAR
 #include <crt/device_fp128_functions.h>
@@ -452,14 +467,14 @@ namespace quda {
   };
   inline __host__ __device__ float128_t sqrt(float128_t a) { return target::dispatch<sqrt_fp128_impl>(a); }
 
-#define QUDA_FP128_UNARY_CUDA(FUNC, HOSTFN, DEVICEFN)                                                                \
-  template <bool is_device> struct fp128_##FUNC##_impl;                                                              \
-  template <> struct fp128_##FUNC##_impl<false> {                                                                    \
-    __host__ float128_t operator()(float128_t a) { return HOSTFN(a); }                                               \
-  };                                                                                                                 \
-  template <> struct fp128_##FUNC##_impl<true> {                                                                     \
-    __device__ float128_t operator()(float128_t a) { return DEVICEFN(a); }                                            \
-  };                                                                                                                 \
+#define QUDA_FP128_UNARY_CUDA(FUNC, HOSTFN, DEVICEFN)                                                                  \
+  template <bool is_device> struct fp128_##FUNC##_impl;                                                                \
+  template <> struct fp128_##FUNC##_impl<false> {                                                                      \
+    __host__ float128_t operator()(float128_t a) { return HOSTFN(a); }                                                 \
+  };                                                                                                                   \
+  template <> struct fp128_##FUNC##_impl<true> {                                                                       \
+    __device__ float128_t operator()(float128_t a) { return DEVICEFN(a); }                                             \
+  };                                                                                                                   \
   inline __host__ __device__ float128_t FUNC(float128_t a) { return target::dispatch<fp128_##FUNC##_impl>(a); }
 
   template <bool is_device> struct fp128_cbrt_impl;
@@ -485,10 +500,10 @@ namespace quda {
 #define QUDA_FP128_PRED_CUDA(FUNC, HOSTFN, DEVICEFN)                                                                   \
   template <bool is_device> struct fp128_##FUNC##_impl;                                                                \
   template <> struct fp128_##FUNC##_impl<false> {                                                                      \
-    __host__ bool operator()(float128_t a) { return HOSTFN(a); }                                                        \
+    __host__ bool operator()(float128_t a) { return HOSTFN(a); }                                                       \
   };                                                                                                                   \
-  template <> struct fp128_##FUNC##_impl<true> {                                                                      \
-    __device__ bool operator()(float128_t a) { return DEVICEFN(a); }                                                    \
+  template <> struct fp128_##FUNC##_impl<true> {                                                                       \
+    __device__ bool operator()(float128_t a) { return DEVICEFN(a); }                                                   \
   };                                                                                                                   \
   inline __host__ __device__ bool FUNC(float128_t a) { return target::dispatch<fp128_##FUNC##_impl>(a); }
 
@@ -498,7 +513,7 @@ namespace quda {
 
 #endif
 
-}
+} // namespace quda
 
 #undef QUDA_CUDA_CC
 

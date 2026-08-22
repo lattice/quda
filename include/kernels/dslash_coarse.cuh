@@ -18,8 +18,7 @@ namespace quda {
   };
 
 #ifdef MULTIGRID_DSLASH_PROMOTE
-  template <typename store_t>
-  using compute_prec = real_t;
+  template <typename store_t> using compute_prec = real_t;
 #else
   template <typename store_t>
   using compute_prec = typename mapper<store_t>::type;

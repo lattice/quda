@@ -395,7 +395,7 @@ namespace quda {
     */
     real_t iMu() const { return i_mu; }
 
-    const real_t& LinkMax() const { return fat_link_max; }
+    const real_t &LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
 
     /**

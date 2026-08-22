@@ -830,8 +830,8 @@ std::array<real_t, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
 
     printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e, "
                "host = %9.6e\n",
-               inv_param.tol, inv_param.true_res[src_idx], double(l2r), inv_param.tol_hq, inv_param.true_res_hq[src_idx],
-               double(hqr));
+               inv_param.tol, inv_param.true_res[src_idx], double(l2r), inv_param.tol_hq,
+               inv_param.true_res_hq[src_idx], double(hqr));
 
     l2r_max = l2r;
     hqr_max = hqr;

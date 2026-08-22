@@ -10,8 +10,8 @@ namespace quda
   using namespace blas;
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
-  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<complex_t*>(pool_host_pinned_malloc(bytes)); };
-  static auto pinned_deleter   = [] (complex_t *hptr) { pool_host_pinned_free(hptr); };
+  static auto pinned_allocator = [](size_t bytes) { return static_cast<complex_t *>(pool_host_pinned_malloc(bytes)); };
+  static auto pinned_deleter = [](complex_t *hptr) { pool_host_pinned_free(hptr); };
 
   Deflation::Deflation(DeflationParam &param, TimeProfile &profile) :
     param(param),
@@ -83,13 +83,16 @@ namespace quda
     const int n_evs_to_print = param.cur_dim;
     if (n_evs_to_print == 0) errorQuda("Incorrect size of current deflation space");
 
-    std::unique_ptr<complex_t, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(complex_t)), pinned_deleter);
+    std::unique_ptr<complex_t, decltype(pinned_deleter)> projm(
+      pinned_allocator(param.ld * param.cur_dim * sizeof(complex_t)), pinned_deleter);
 
-if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
-      Map<MatrixXc, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-      Map<MatrixXc, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+    if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
+      Map<MatrixXc, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim,
+                                                     DynamicStride(param.ld, 1));
+      Map<MatrixXc, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim,
+                                                     DynamicStride(param.ld, 1));
 
-      SelfAdjointEigenSolver<MatrixXc> es_projm( projm_ );
+      SelfAdjointEigenSolver<MatrixXc> es_projm(projm_);
       evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
     } else {
       errorQuda("Library type %d is currently not supported", param.eig_global.extlib_type);
@@ -120,7 +123,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
 
     if(param.cur_dim == 0) return;//nothing to do
 
-    std::unique_ptr<complex_t[] > vec(new complex_t[param.ld]);
+    std::unique_ptr<complex_t[]> vec(new complex_t[param.ld]);
 
     auto check_nrm2 = norm2(b);
 
@@ -138,7 +141,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     if (!param.use_inv_ritz) {
       if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
         Map<MatrixXc, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim,
-                                                        DynamicStride(param.ld, 1));
+                                                       DynamicStride(param.ld, 1));
         Map<VectorXc, Unaligned> vec_(vec.get(), param.cur_dim);
 
         VectorXc vec2_(param.cur_dim);

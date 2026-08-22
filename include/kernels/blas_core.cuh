@@ -179,7 +179,8 @@ namespace quda
       complex<real> a[MAX_MULTI_RHS] = {};
       axy_(cvector<complex_t> &a, cvector<complex_t> &, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
       }
 
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &, int j) const
@@ -194,12 +195,13 @@ namespace quda
        Functor to perform the operator y += a*x (complex-valued)
     */
     template <typename real> struct caxpyz_ : public BlasFunctor {
-      static constexpr memory_access<1, 1, 0, 0, 0> read{ };
-      static constexpr memory_access<0, 0, 0, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 0, 0, 0> read {};
+      static constexpr memory_access<0, 0, 0, 0, 1> write {};
       complex<real> a[MAX_MULTI_RHS] = {};
       caxpyz_(cvector<complex_t> &a, cvector<complex_t> &, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &z, int j) const
       {
@@ -235,8 +237,10 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpby_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &, int j) const
       {
@@ -331,14 +335,16 @@ namespace quda
        Functor performing the operation w[i] = a * x[i] + b * y[i] + z[i]
     */
     template <typename real> struct caxpbypzw_ : public BlasFunctor {
-      static constexpr memory_access<1, 1, 1, 0, 0> read{ };
-      static constexpr memory_access<0, 0, 0, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 1, 0, 0> read {};
+      static constexpr memory_access<0, 0, 0, 0, 1> write {};
       complex<real> a[MAX_MULTI_RHS] = {};
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpbypzw_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &w, int j) const
       {
@@ -361,8 +367,10 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpyBzpx_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
@@ -385,8 +393,10 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpyBxpz_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
@@ -409,8 +419,10 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpbypzYmbw_(cvector<complex_t> &a, cvector<complex_t> &b, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &, int j) const
       {
@@ -462,7 +474,8 @@ namespace quda
       complex<real> a[MAX_MULTI_RHS] = {};
       caxpyxmaz_(cvector<complex_t> &a, cvector<complex_t> &, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
@@ -488,7 +501,8 @@ namespace quda
     }
 
     template <typename real>
-    __device__ __host__ inline complex<real> mr_alpha_from_cdot_norm(const cdot_norm_buf_t &ar4, const complex<real> &omega)
+    __device__ __host__ inline complex<real> mr_alpha_from_cdot_norm(const cdot_norm_buf_t &ar4,
+                                                                     const complex<real> &omega)
     {
       const complex<reduction_t> cdot {to_reduction_scalar(ar4[0]), to_reduction_scalar(ar4[1])};
       const reduction_t scale = omega.real() / to_reduction_scalar(ar4[2]);

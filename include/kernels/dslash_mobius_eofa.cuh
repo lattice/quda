@@ -53,9 +53,9 @@ namespace quda
       eofa_coeff<real> coeff;
 
       Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                 cvector_ref<const ColorSpinorField> &x, const real_t m_f_, const real_t m_5_, const complex_t * /*b_5_*/,
-                 const complex_t * /*c_5_*/, real_t a_, real_t inv_, real_t kappa_, const real_t *eofa_u,
-                 const real_t *eofa_x, const real_t *eofa_y, real_t sherman_morrison_) :
+                 cvector_ref<const ColorSpinorField> &x, const real_t m_f_, const real_t m_5_,
+                 const complex_t * /*b_5_*/, const complex_t * /*c_5_*/, real_t a_, real_t inv_, real_t kappa_,
+                 const real_t *eofa_u, const real_t *eofa_x, const real_t *eofa_y, real_t sherman_morrison_) :
         kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
         nParity(in.SiteSubset()),
         volume_cb(in.VolumeCB()),

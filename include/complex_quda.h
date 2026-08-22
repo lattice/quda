@@ -973,10 +973,7 @@ namespace quda
 
     complex() = default;
 
-    constexpr complex(const doubledouble &re, const doubledouble &im = doubledouble()) :
-      doubledouble2 {re, im}
-    {
-    }
+    constexpr complex(const doubledouble &re, const doubledouble &im = doubledouble()) : doubledouble2 {re, im} { }
 
     __host__ __device__ inline complex &operator+=(const complex<doubledouble> &z)
     {

@@ -112,8 +112,8 @@ namespace quda {
           // actually build the GPU kernel for that case: error out at compile time
           // instead of redundantly compiling a device kernel already built for
           // whichever precision is actually enabled.
-          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
-                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)&&!is_enabled(
+                          QUDA_DOUBLE_PRECISION)) {
             errorQuda("QUDA_PRECISION=%d does not enable double precision on the GPU", QUDA_PRECISION);
           } else {
             if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll

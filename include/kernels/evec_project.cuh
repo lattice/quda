@@ -7,7 +7,7 @@
 #include <reduction_kernel.h>
 
 namespace quda {
-  
+
   using spinor_array = array<device_reduce_t, 8>;
 
   constexpr unsigned long max_nx = 4;
@@ -90,7 +90,7 @@ namespace quda {
         result_local[2 * mu + 0] = prod.real();
         result_local[2 * mu + 1] = prod.imag();
       }
-      
+
       return operator()(result, result_local);
     }
   };

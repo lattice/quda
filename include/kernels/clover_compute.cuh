@@ -21,12 +21,9 @@ namespace quda {
     const Fmunu f;
     int X[4]; // grid dimensions
     real coeff;
-    
+
     CloverArg(CloverField &clover, const GaugeField &f, real_t coeff) :
-      kernel_param(dim3(f.VolumeCB(), 2, 1)),
-      clover(clover, 0),
-      f(f),
-      coeff(static_cast<real>(coeff))
+      kernel_param(dim3(f.VolumeCB(), 2, 1)), clover(clover, 0), f(f), coeff(static_cast<real>(coeff))
     { 
       for (int dir=0; dir<4; ++dir) X[dir] = f.X()[dir];
     }

@@ -163,8 +163,7 @@ namespace quda
     }
 
     template <typename... Args>
-    [[noreturn]] inline void errorQudaImpl(const char *func, const char *file, int line, const char *fmt,
-                                           Args &&...args)
+    [[noreturn]] inline void errorQudaImpl(const char *func, const char *file, int line, const char *fmt, Args &&...args)
     {
       fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());
       if constexpr (sizeof...(Args) == 0) {
@@ -186,7 +185,7 @@ namespace quda
   } // namespace printf_detail
 } // namespace quda
 
-#define errorQuda(...)                                                                                                \
+#define errorQuda(...)                                                                                                 \
   quda::printf_detail::errorQudaImpl(__PRETTY_FUNCTION__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__)
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\

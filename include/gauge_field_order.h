@@ -859,12 +859,13 @@ namespace quda {
         if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("GaugeField ordering not supported with reconstruction");
 	}
 
-	void resetScale(real_t max) {
-	  accessor.resetScale(max);
+        void resetScale(real_t max)
+        {
+          accessor.resetScale(max);
 	  ghostAccessor.resetScale(max);
-	}
+        }
 
-	static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
+        static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
 
         /**
          * accessor function
@@ -971,7 +972,8 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L1 norm
 	 */
-	__host__ real_t norm1(int dim=-1, bool global=true) const {
+        __host__ real_t norm1(int dim = -1, bool global = true) const
+        {
           commGlobalReductionPush(global);
           auto nrm1 = accessor.template transform_reduce<plus<device_reduce_t>>(
             location, dim, abs_<double, storeFloat>(accessor.scale_inv));
@@ -1278,7 +1280,8 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) :
-          reconstruct_12(u), scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
+          reconstruct_12(u),
+          scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
           scale_inv(static_cast<real>(1.0) / scale)
         {
         }
@@ -1508,7 +1511,8 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) :
-          reconstruct_8(u), scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
+          reconstruct_8(u),
+          scale(u.Scale() == 0 ? static_cast<real>(1.0) : static_cast<real>(u.Scale())),
           scale_inv(static_cast<real>(1.0) / scale)
         {
         }

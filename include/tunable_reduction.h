@@ -58,8 +58,7 @@ namespace quda
      */
     virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_block_size(); }
 
-    template <typename T, typename U>
-    void copy(T &out, const U &in)
+    template <typename T, typename U> void copy(T &out, const U &in)
     {
       using out_t = typename T::value_type;
       using in_t = typename U::value_type;
@@ -68,9 +67,11 @@ namespace quda
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element_in = in.size() * sizeof(in_t) / sizeof(get_scalar_t<in_t>);
       const int n_element_out = out.size() * sizeof(out_t) / sizeof(get_scalar_t<out_t>);
-      if (n_element_in != n_element_out) errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
-      for (auto i = 0; i < n_element_in; i++) reinterpret_cast<get_scalar_t<out_t>*>(&out[0])[i] =
-                                                static_cast<get_scalar_t<out_t>>(reinterpret_cast<const get_scalar_t<in_t>*>(&in[0])[i]);
+      if (n_element_in != n_element_out)
+        errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
+      for (auto i = 0; i < n_element_in; i++)
+        reinterpret_cast<get_scalar_t<out_t> *>(&out[0])[i]
+          = static_cast<get_scalar_t<out_t>>(reinterpret_cast<const get_scalar_t<in_t> *>(&in[0])[i]);
     }
 
     /**

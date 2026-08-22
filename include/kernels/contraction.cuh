@@ -119,8 +119,8 @@ namespace quda
       for (int i = 0; i < 4; i++)
         Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
 
-      complex<real> phase = {static_cast<real>(cospi(Sum_dXi_dot_Pi * 2.)),
-                             static_cast<real>(-sinpi(Sum_dXi_dot_Pi * 2.))};
+      complex<real> phase
+        = {static_cast<real>(cospi(Sum_dXi_dot_Pi * 2.)), static_cast<real>(-sinpi(Sum_dXi_dot_Pi * 2.))};
 
       // Collect vector data
       int parity = 0;
@@ -230,7 +230,8 @@ namespace quda
       }
 
       complex<real> phased = phase * complex<real> {prop_prod.real(), prop_prod.imag()};
-      const array<reduction_t, 2> local {static_cast<reduction_t>(phased.real()), static_cast<reduction_t>(phased.imag())};
+      const array<reduction_t, 2> local {static_cast<reduction_t>(phased.real()),
+                                         static_cast<reduction_t>(phased.imag())};
       return operator()(result, local);
     }
   };

@@ -6,9 +6,8 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
-    public ReduceArg<array<device_reduce_t, 3>>
-  {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false>
+  struct QChargeArg : public ReduceArg<array<device_reduce_t, 3>> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");

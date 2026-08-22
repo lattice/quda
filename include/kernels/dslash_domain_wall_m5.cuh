@@ -132,7 +132,8 @@ namespace quda
       const real four = static_cast<real>(4.0);
       const real one = static_cast<real>(1.0);
       for (int s = 0; s < Ls; s++) {
-        coeff.kappa[s] = half * (complex<real>(c_5[s]) * (m_5 + four) - one) / (complex<real>(b_5[s]) * (m_5 + four) + one); // 0.5 from gamma matrices
+        coeff.kappa[s] = half * (complex<real>(c_5[s]) * (m_5 + four) - one)
+          / (complex<real>(b_5[s]) * (m_5 + four) + one); // 0.5 from gamma matrices
         // axpy
         coeff.a[s] = half / (complex<real>(b_5[s]) * (m_5 + four) + one);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
@@ -155,9 +156,10 @@ namespace quda
       const real half = static_cast<real>(0.5);
       const real four = static_cast<real>(4.0);
       const real one = static_cast<real>(1.0);
-      kappa = -(static_cast<real>(c_5[0].real()) * (four + m_5) - one) / (static_cast<real>(b_5[0].real()) * (four + m_5) + one); // kappa = kappa_b / kappa_c
-      inv = half / (one + std::pow(kappa, (int)Ls) * m_f);                                                                        // 0.5 from gamma matrices
-      a *= pow(half / (static_cast<real>(b_5[0].real()) * (m_5 + four) + one), 2);                                                // kappa_b * kappa_b * a
+      kappa = -(static_cast<real>(c_5[0].real()) * (four + m_5) - one)
+        / (static_cast<real>(b_5[0].real()) * (four + m_5) + one);                 // kappa = kappa_b / kappa_c
+      inv = half / (one + std::pow(kappa, (int)Ls) * m_f);                         // 0.5 from gamma matrices
+      a *= pow(half / (static_cast<real>(b_5[0].real()) * (m_5 + four) + one), 2); // kappa_b * kappa_b * a
     }
 
     void compute_coeff_m5inv_zmobius(const complex_t *b_5, const complex_t *c_5)
@@ -181,8 +183,8 @@ namespace quda
     }
 
     Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-               cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5, const complex_t *c_5,
-               real_t a_) :
+               cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5,
+               const complex_t *c_5, real_t a_) :
       kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
       nParity(in.SiteSubset()),
       volume_cb(in.VolumeCB()),

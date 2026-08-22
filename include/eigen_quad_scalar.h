@@ -19,8 +19,7 @@ namespace Eigen
 
   using quda::float128_t;
 
-  template <> struct NumTraits<float128_t> : GenericNumTraits<float128_t>
-  {
+  template <> struct NumTraits<float128_t> : GenericNumTraits<float128_t> {
     typedef float128_t Real;
     typedef float128_t NonInteger;
     typedef float128_t Nested;
@@ -55,8 +54,7 @@ namespace Eigen
     static inline int digits10() { return 33; }
   };
 
-  template <> struct NumTraits<std::complex<float128_t>> : NumTraits<float128_t>
-  {
+  template <> struct NumTraits<std::complex<float128_t>> : NumTraits<float128_t> {
     enum { IsComplex = 1 };
     typedef float128_t Real;
   };
@@ -64,18 +62,15 @@ namespace Eigen
   namespace internal
   {
 
-    template <> struct cast_impl<float128_t, float128_t>
-    {
+    template <> struct cast_impl<float128_t, float128_t> {
       static inline float128_t run(const float128_t &x) { return x; }
     };
 
-    template <> struct cast_impl<double, float128_t>
-    {
+    template <> struct cast_impl<double, float128_t> {
       static inline float128_t run(const double &x) { return static_cast<float128_t>(x); }
     };
 
-    template <> struct cast_impl<float128_t, double>
-    {
+    template <> struct cast_impl<float128_t, double> {
       static inline double run(const float128_t &x) { return static_cast<double>(x); }
     };
 

@@ -12,7 +12,8 @@
  */
 
 // whether to use cooperative groups (or cub)
-#if !(_NVHPC_CUDA || (defined(__clang__) && defined(__CUDA__))) && !defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE) // neither nvc++ or clang-cuda yet support CG
+#if !(_NVHPC_CUDA || (defined(__clang__) && defined(__CUDA__)))                                                        \
+  && !defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE) // neither nvc++ or clang-cuda yet support CG
 // FIXME add CG support for reproducible reductions (can't naively break up the operation)
 #define USE_CG
 #endif
@@ -64,11 +65,13 @@ namespace quda
     using type = typename T::ftype;
   };
 
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> {
+  template <typename T>
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> {
     using type = typename atomic_type<typename T::value_type>::type;
   };
 
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<typename T::value_type>>>> {
+  template <typename T>
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<typename T::value_type>>>> {
     using type = typename atomic_type<typename T::value_type>::type;
   };
 
@@ -136,8 +139,7 @@ namespace quda
   template <typename T, typename Enable = void> struct is_reduce_array : std::false_type {
   };
   template <typename T>
-  struct is_reduce_array<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> :
-    std::true_type {
+  struct is_reduce_array<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> : std::true_type {
   };
 
   /**

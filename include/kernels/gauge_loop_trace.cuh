@@ -18,7 +18,7 @@ namespace quda {
   constexpr unsigned int max_n_batch_block_loop_trace() { return 8; }
 
   template <typename store_t, int nColor_, QudaReconstructType recon_>
-  struct GaugeLoopTraceArg : public ReduceArg<array<device_reduce_t, 2>>  {
+  struct GaugeLoopTraceArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<store_t>::type;
     static constexpr unsigned int max_n_batch_block = max_n_batch_block_loop_trace();
     static constexpr int nColor = nColor_;
@@ -29,7 +29,7 @@ namespace quda {
 
     const Gauge u;
 
-    const real factor; // overall scaling factor for all loops
+    const real factor;                // overall scaling factor for all loops
     static constexpr int nParity = 2; // always true for gauge fields
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters

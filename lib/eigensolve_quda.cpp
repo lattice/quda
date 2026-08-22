@@ -187,7 +187,7 @@ namespace quda
   {
     resize(kSpace, n_kr + block_size, QUDA_ZERO_FIELD_CREATE); // increase Krylov space to n_kr + block_size
     resize(r, block_size, QUDA_ZERO_FIELD_CREATE, kSpace[0]);  // create residual
-    evals.resize(n_kr, real_t(0.0));                                   // increase evals space to n_ev
+    evals.resize(n_kr, real_t(0.0));                           // increase evals space to n_ev
   }
 
   void EigenSolver::printEigensolverSetup()
@@ -361,14 +361,13 @@ namespace quda
         auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
-            logQuda(QUDA_SUMMARIZE, "Norm <%d|%d>^2 = ||(%e,%e)|| = %e\n", i, j, cnorm.real(),
-                    cnorm.imag(), abs(cnorm));
+            logQuda(QUDA_SUMMARIZE, "Norm <%d|%d>^2 = ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
           if (abs(Unit - cnorm) > 5.0 * epsilon) {
-            logQuda(QUDA_SUMMARIZE, "1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(),
-                    cnorm.imag(), abs(Unit - cnorm));
+            logQuda(QUDA_SUMMARIZE, "1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(),
+                    abs(Unit - cnorm));
             orthed = false;
           }
         }
@@ -591,8 +590,7 @@ namespace quda
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
-  void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
-                                 std::vector<complex_t> &evals, int size)
+  void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<complex_t> &evals, int size)
   {
     if (size == 0) size = n_conv;
     auto batch_size = eig_param->compute_evals_batch_size;
@@ -630,9 +628,8 @@ namespace quda
       // If size = n_conv, this routine is called post sort
       if (size == n_conv) {
         for (int j = lower; j < upper; j++) {
-          logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", j,
-                  evals[j].real(), evals[j].imag(), abs(evals[j]),
-                  residua[j]);
+          logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", j, evals[j].real(),
+                  evals[j].imag(), abs(evals[j]), residua[j]);
         }
       }
     }
@@ -668,8 +665,7 @@ namespace quda
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
-  void EigenSolver::loadFromFile(std::vector<ColorSpinorField> &kSpace,
-                                 std::vector<complex_t> &evals)
+  void EigenSolver::loadFromFile(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     // Set suggested parity of fields
     const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
@@ -795,8 +791,12 @@ namespace quda
      arithmetic (real or complex)
    */
   template <class T> struct eigen_matrix_map;
-  template <> struct eigen_matrix_map<real_t> { using type = MatrixX; };
-  template <> struct eigen_matrix_map<complex_t> { using type = MatrixXc; };
+  template <> struct eigen_matrix_map<real_t> {
+    using type = MatrixX;
+  };
+  template <> struct eigen_matrix_map<complex_t> {
+    using type = MatrixXc;
+  };
   template <class T> using eigen_matrix_t = typename eigen_matrix_map<T>::type;
 
   template <typename T>
@@ -930,7 +930,7 @@ namespace quda
                                                 int locked);
 
   template void EigenSolver::rotateVecs<complex_t>(std::vector<ColorSpinorField> &kSpace,
-                                                 const std::vector<complex_t> &rot_array, int offset, int dim, int keep,
-                                                 int locked);
+                                                   const std::vector<complex_t> &rot_array, int offset, int dim,
+                                                   int keep, int locked);
 
 } // namespace quda

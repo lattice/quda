@@ -225,18 +225,38 @@ namespace quda {
 
   // demote vector type to underlying scalar type
   template <class T, class Enable = void> struct get_scalar;
-  template <> struct get_scalar<float> { using type = float; };
-  template <> struct get_scalar<double> { using type = double; };
-  template <> struct get_scalar<double2> { using type = double; };
-  template <> struct get_scalar<doubledouble> { using type = doubledouble; };
-  template <> struct get_scalar<doubledouble2> { using type = doubledouble; };
+  template <> struct get_scalar<float> {
+    using type = float;
+  };
+  template <> struct get_scalar<double> {
+    using type = double;
+  };
+  template <> struct get_scalar<double2> {
+    using type = double;
+  };
+  template <> struct get_scalar<doubledouble> {
+    using type = doubledouble;
+  };
+  template <> struct get_scalar<doubledouble2> {
+    using type = doubledouble;
+  };
 #ifdef QUDA_USE_QUAD_SCALAR
-  template <> struct get_scalar<float128_t> { using type = float128_t; };
+  template <> struct get_scalar<float128_t> {
+    using type = float128_t;
+  };
 #endif
-  template <> struct get_scalar<complex<float>> { using type = float; };
-  template <> struct get_scalar<complex<double>> { using type = double; };
-  template <> struct get_scalar<complex_t> { using type = real_t; };
-  template <class T, int n> struct get_scalar<array<T, n>> { using type = typename get_scalar<T>::type; };
+  template <> struct get_scalar<complex<float>> {
+    using type = float;
+  };
+  template <> struct get_scalar<complex<double>> {
+    using type = double;
+  };
+  template <> struct get_scalar<complex_t> {
+    using type = real_t;
+  };
+  template <class T, int n> struct get_scalar<array<T, n>> {
+    using type = typename get_scalar<T>::type;
+  };
 
   template <class T> using get_scalar_t = typename get_scalar<T>::type;
 

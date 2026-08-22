@@ -156,7 +156,8 @@ void packTest()
   auto cuda_spinor_norm = blas::norm2(*cudaSpinor);
   auto spinor2_norm = blas::norm2(*spinor2);
 
-  printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", double(spinor_norm), double(cuda_spinor_norm), double(spinor2_norm));
+  printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", double(spinor_norm), double(cuda_spinor_norm),
+             double(spinor2_norm));
 
   ColorSpinorField::Compare(*spinor, *spinor2, 1);
 }

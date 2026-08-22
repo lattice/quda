@@ -108,8 +108,8 @@ namespace quda
           // actually build the GPU kernel for that case: error out at compile time
           // instead of redundantly compiling a device kernel already built for
           // whichever precision is actually enabled.
-          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
-                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)&&!is_enabled(
+                          QUDA_DOUBLE_PRECISION)) {
             errorQuda("QUDA_PRECISION=%d does not enable double precision on the GPU", QUDA_PRECISION);
           } else {
             if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll
@@ -122,7 +122,7 @@ namespace quda
             const int length = x.Length() / M;
 
             ReductionArg<device_real_t, M, store_t, N, y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length,
-                                                                                         nParity);
+                                                                                        nParity);
             launch<Reduce_>(result, tp, stream, arg);
           }
         } else {
@@ -137,15 +137,15 @@ namespace quda
           Reducer<device_reduce_t, host_real_t> r_(a, b);
 
           // redefine site_unroll with host_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value
-            || decltype(r)::site_unroll;
+          constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value
+            || isFixed<host_store_t>::value || decltype(r)::site_unroll;
           constexpr int N = n_vector<host_store_t, false>(nSpin, site_unroll);
           constexpr int Ny = n_vector<host_y_store_t, false>(nSpin, site_unroll);
           constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
           const int length = x.Length() / M;
 
           ReductionArg<host_real_t, M, host_store_t, N, host_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length,
-                                                                                             nParity);
+                                                                                              nParity);
           launch_host<Reduce_>(result, tp, stream, arg);
         }
       }
@@ -172,8 +172,8 @@ namespace quda
 
       long long bytes() const override
       {
-        return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes() + (r.read.Z + r.write.Z) * z.Bytes()
-          + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
+        return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes()
+          + (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
       }
     };
 
@@ -260,8 +260,8 @@ namespace quda
     }
 
     template <typename store_t>
-    cvector<real_t> caxpbyNorm_impl(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &b,
-                                    cvector_ref<ColorSpinorField> &y)
+    cvector<real_t> caxpbyNorm_impl(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
+                                    cvector<complex_t> &b, cvector_ref<ColorSpinorField> &y)
     {
       return to_real_vector(instantiateReduce<store_t, caxpyNorm2, true>(a, b, cvector<complex_t>(0.0), x, y, x, x, x));
     }
@@ -270,8 +270,8 @@ namespace quda
     cvector<real_t> cabxpyzAxNorm_impl(cvector<real_t> &a, cvector<complex_t> &b, cvector_ref<ColorSpinorField> &x,
                                        cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z)
     {
-      return to_real_vector(
-        instantiateReduce<store_t, cabxpyzaxnorm, false>(cvector<complex_t>(a), b, cvector<complex_t>(0.0), x, y, z, x, x));
+      return to_real_vector(instantiateReduce<store_t, cabxpyzaxnorm, false>(cvector<complex_t>(a), b,
+                                                                             cvector<complex_t>(0.0), x, y, z, x, x));
     }
 
     template <typename store_t>
@@ -290,8 +290,8 @@ namespace quda
                                        cvector_ref<ColorSpinorField> &y, cvector_ref<const ColorSpinorField> &z)
     {
       vector<complex_t> cdot(x.size());
-      auto c = instantiateReduce<store_t, caxpydotzy, false>(a, cvector<complex_t>(0.0), cvector<complex_t>(0.0), x, y, z,
-                                                             x, x);
+      auto c = instantiateReduce<store_t, caxpydotzy, false>(a, cvector<complex_t>(0.0), cvector<complex_t>(0.0), x, y,
+                                                             z, x, x);
       for (auto i = 0u; i < x.size(); i++) cdot[i] = complex_t(reduction_to_real(c[i][0]), reduction_to_real(c[i][1]));
       return cdot;
     }
@@ -308,13 +308,15 @@ namespace quda
     }
 
     template <typename store_t>
-    cvector<array<real_t, 3>> caxpbypzYmbwcDotProductUYNormY_impl(
-      cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &b,
-      cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z, cvector_ref<const ColorSpinorField> &w,
-      cvector_ref<const ColorSpinorField> &v)
+    cvector<array<real_t, 3>>
+    caxpbypzYmbwcDotProductUYNormY_impl(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
+                                        cvector<complex_t> &b, cvector_ref<ColorSpinorField> &y,
+                                        cvector_ref<ColorSpinorField> &z, cvector_ref<const ColorSpinorField> &w,
+                                        cvector_ref<const ColorSpinorField> &v)
     {
       vector<array<real_t, 3>> abs(x.size());
-      auto ab = instantiateReduce<store_t, caxpbypzYmbwcDotProductUYNormY_, true>(a, b, cvector<complex_t>(), x, z, y, w, v);
+      auto ab
+        = instantiateReduce<store_t, caxpbypzYmbwcDotProductUYNormY_, true>(a, b, cvector<complex_t>(), x, z, y, w, v);
       for (auto i = 0u; i < x.size(); i++) abs[i] = reduction_to_array<3>(ab[i]);
       return abs;
     }
@@ -354,8 +356,8 @@ namespace quda
     {
       vector<array<real_t, 3>> norm(x.size(), {});
       if (x.Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
-        auto n = instantiateReduce<store_t, xpyHeavyQuarkResidualNorm_, true>(
-          cvector<real_t>(0.0), cvector<real_t>(0.0), cvector<real_t>(0.0), x, y, r, r, r);
+        auto n = instantiateReduce<store_t, xpyHeavyQuarkResidualNorm_, true>(cvector<real_t>(0.0), cvector<real_t>(0.0),
+                                                                              cvector<real_t>(0.0), x, y, r, r, r);
         const auto scale = real_t(1.0) / real_t(x.Volume() * comm_size());
         for (auto i = 0u; i < x.size(); i++) {
           norm[i] = reduction_to_array<3>(n[i]);

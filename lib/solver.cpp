@@ -472,8 +472,8 @@ namespace quda {
         logQuda(QUDA_VERBOSE, "%s: %5d iterations, %s<r,r> = %9.6e, |r|/|b| = %9.6e, heavy-quark residual = %9.6e\n",
                 name, k, rhs_str.c_str(), r2[i], sqrt(r2[i] / b2[i]), hq2[i]);
       } else {
-        logQuda(QUDA_VERBOSE, "%s: %5d iterations, %s<r,r> = %9.6e, |r|/|b| = %9.6e\n", name, k, rhs_str.c_str(),
-                r2[i], sqrt(r2[i] / b2[i]));
+        logQuda(QUDA_VERBOSE, "%s: %5d iterations, %s<r,r> = %9.6e, |r|/|b| = %9.6e\n", name, k, rhs_str.c_str(), r2[i],
+                sqrt(r2[i] / b2[i]));
       }
 
       if (std::isnan(r2[i]) || std::isinf(r2[i])) errorQuda("Solver appears to have diverged for n = %d", i);
@@ -495,22 +495,21 @@ namespace quda {
           logQuda(QUDA_SUMMARIZE,
                   "%s: Convergence at %d iterations, %sL2 relative residual: iterated = %9.6e, true = %9.6e "
                   "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-                  name, k, rhs_str.c_str(), sqrt(r2[i] / b2[i]), param.true_res[i],
-                  sqrt(r2_tol[i] / b2[i]), param.true_res_hq[i], hq_tol[i]);
+                  name, k, rhs_str.c_str(), sqrt(r2[i] / b2[i]), param.true_res[i], sqrt(r2_tol[i] / b2[i]),
+                  param.true_res_hq[i], hq_tol[i]);
         } else {
           logQuda(QUDA_SUMMARIZE,
                   "%s: Convergence at %d iterations, %sL2 relative residual: iterated = %9.6e, true = %9.6e "
                   "(requested = %9.6e)\n",
-                  name, k, rhs_str.c_str(), sqrt(r2[i] / b2[i]), param.true_res[i],
-                  sqrt(r2_tol[i] / b2[i]));
+                  name, k, rhs_str.c_str(), sqrt(r2[i] / b2[i]), param.true_res[i], sqrt(r2_tol[i] / b2[i]));
         }
       } else {
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           logQuda(QUDA_SUMMARIZE,
                   "%s: Convergence at %d iterations, %sL2 relative residual: iterated = %9.6e "
                   "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-                  name, k, rhs_str.c_str(), sqrt(r2[i] / b2[i]), sqrt(r2_tol[i] / b2[i]),
-                  param.true_res_hq[i], hq_tol[i]);
+                  name, k, rhs_str.c_str(), sqrt(r2[i] / b2[i]), sqrt(r2_tol[i] / b2[i]), param.true_res_hq[i],
+                  hq_tol[i]);
         } else {
           logQuda(QUDA_SUMMARIZE,
                   "%s: Convergence at %d iterations, %sL2 relative residual: iterated = %9.6e (requested = %9.6e)\n",
@@ -599,14 +598,20 @@ namespace quda {
       param.true_res_hq[i] = static_cast<std::remove_cvref_t<decltype(param.true_res_hq[i])>>(true_res_hq[i]);
     param.iter += iter;
     if (offset >= 0) {
-      param.true_res_offset[offset] = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[0])>>(true_res_offset[offset]);
-      param.iter_res_offset[offset] = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[0])>>(iter_res_offset[offset]);
-      param.true_res_hq_offset[offset] = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[0])>>(true_res_hq_offset[offset]);
+      param.true_res_offset[offset]
+        = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[0])>>(true_res_offset[offset]);
+      param.iter_res_offset[offset]
+        = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[0])>>(iter_res_offset[offset]);
+      param.true_res_hq_offset[offset]
+        = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[0])>>(true_res_hq_offset[offset]);
     } else {
       for (int i = 0; i < num_offset; i++) {
-        param.true_res_offset[i] = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[i])>>(true_res_offset[i]);
-        param.iter_res_offset[i] = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[i])>>(iter_res_offset[i]);
-        param.true_res_hq_offset[i] = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[i])>>(true_res_hq_offset[i]);
+        param.true_res_offset[i]
+          = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[i])>>(true_res_offset[i]);
+        param.iter_res_offset[i]
+          = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[i])>>(iter_res_offset[i]);
+        param.true_res_hq_offset[i]
+          = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[i])>>(true_res_hq_offset[i]);
       }
     }
     // for incremental eigCG:

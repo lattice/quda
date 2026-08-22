@@ -60,9 +60,8 @@ namespace quda {
   void forceRecord(array<reduction_t, 2> &force, double dt, const char *fname)
   {
     if (comm_rank()==0) {
-      force_stream << fname << "\t" << std::setprecision(5) << double(force[0]) << "\t"
-                   << std::setprecision(5) << double(force[1]) << "\t"
-                   << std::setprecision(5) << dt << std::endl;
+      force_stream << fname << "\t" << std::setprecision(5) << double(force[0]) << "\t" << std::setprecision(5)
+                   << double(force[1]) << "\t" << std::setprecision(5) << dt << std::endl;
       if (++force_count % force_flush == 0) flushForceMonitor();
     }
   }
