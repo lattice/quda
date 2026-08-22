@@ -281,7 +281,6 @@ std::unordered_map<std::string, std::string> enum_map
      {"QUDA_MEMORY_DEVICE_PINNED", std::to_string(QUDA_MEMORY_DEVICE_PINNED)},
      {"QUDA_MEMORY_HOST", std::to_string(QUDA_MEMORY_HOST)},
      {"QUDA_MEMORY_HOST_PINNED", std::to_string(QUDA_MEMORY_HOST_PINNED)},
-     {"QUDA_MEMORY_MAPPED", std::to_string(QUDA_MEMORY_MAPPED)},
      {"QUDA_MEMORY_MANAGED", std::to_string(QUDA_MEMORY_MANAGED)},
      {"QUDA_MEMORY_INVALID", std::to_string(QUDA_MEMORY_INVALID)},
      {"QUDA_CUSOLVE_EXTLIB", std::to_string(QUDA_CUSOLVE_EXTLIB)},
@@ -515,14 +514,6 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
   initQuda(device);
 }
 
-static int getLinkPadding(const int dim[4])
-{
-  int padding = MAX(dim[1] * dim[2] * dim[3] / 2, dim[0] * dim[2] * dim[3] / 2);
-  padding = MAX(padding, dim[0] * dim[1] * dim[3] / 2);
-  padding = MAX(padding, dim[0] * dim[1] * dim[2] / 2);
-  return padding;
-}
-
 /**
  * @brief      Creates a new quda parameter struct
  *
@@ -586,7 +577,6 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructTy
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
   param.anisotropy = 1.0;                 /* 1.0 means not anisotropic */
-  param.ga_pad = getLinkPadding(param.X); /* Why this? */
 
   return param;
 }

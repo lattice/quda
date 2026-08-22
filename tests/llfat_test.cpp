@@ -17,6 +17,8 @@
 
 #define TDIFF(a, b) (b.tv_sec - a.tv_sec + 0.000001 * (b.tv_usec - a.tv_usec))
 
+// Note: this test manually overrides the precision to double precision
+//       because the reference code is written in double precision...
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static void llfat_test()
@@ -51,16 +53,15 @@ static void llfat_test()
   qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  qudaGaugeParam.ga_pad = 0;
 
-  void *fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  void *longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *fatlink = host_pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *longlink = host_pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   void *sitelink[4];
-  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) sitelink[i] = host_pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
   void *sitelink_ex[4];
-  for (int i = 0; i < 4; i++) sitelink_ex[i] = pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) sitelink_ex[i] = host_pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
 
   void *milc_sitelink;
   milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
@@ -69,22 +70,15 @@ static void llfat_test()
   milc_sitelink_ex = (void *)safe_malloc(4 * V_ex * gauge_site_size * host_gauge_data_type_size);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, SiteLinkType::SITELINK_PHASE_MILC);
-
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    for (int i = 0; i < V; ++i) {
-      for (int dir = 0; dir < 4; ++dir) {
-        char *src = (char *)sitelink[dir];
-        memcpy((char *)milc_sitelink + (i * 4 + dir) * gauge_site_size * host_gauge_data_type_size,
-               src + i * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
-      }
-    }
-  }
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER)
+    reorderQDPtoMILC(milc_sitelink, sitelink, V, gauge_site_size, qudaGaugeParam.cpu_prec, qudaGaugeParam.cpu_prec);
 
   int X1 = Z[0];
   int X2 = Z[1];
   int X3 = Z[2];
   int X4 = Z[3];
 
+#pragma omp parallel for
   for (int i = 0; i < V_ex; i++) {
     int sid = i;
     int oddBit = 0;
@@ -225,23 +219,16 @@ static void llfat_test()
     memset(mylonglink[i], 0, V * gauge_site_size * host_gauge_data_type_size);
   }
 
-  for (int i = 0; i < V; i++) {
-    for (int dir = 0; dir < 4; dir++) {
-      char *src = ((char *)fatlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
-      char *dst = ((char *)myfatlink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
-      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
-
-      src = ((char *)longlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
-      dst = ((char *)mylonglink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
-      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
-    }
-  }
+  reorderMILCtoQDP(myfatlink, fatlink, V, gauge_site_size, qudaGaugeParam.cpu_prec, qudaGaugeParam.cpu_prec);
+  reorderMILCtoQDP(mylonglink, longlink, V, gauge_site_size, qudaGaugeParam.cpu_prec, qudaGaugeParam.cpu_prec);
 
   if (verify_results) {
+    double tol = 1e-3;
+
     printfQuda("Checking fat links...\n");
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {
-      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V * gauge_site_size, tol, qudaGaugeParam.cpu_prec);
     }
 
     strong_check_link(myfatlink, "GPU results: ", fat_reflink, "CPU reference results:", V, qudaGaugeParam.cpu_prec);
@@ -251,7 +238,7 @@ static void llfat_test()
     printfQuda("Checking long links...\n");
     res = 1;
     for (int dir = 0; dir < 4; ++dir) {
-      res &= compare_floats(long_reflink[dir], mylonglink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(long_reflink[dir], mylonglink[dir], V * gauge_site_size, tol, qudaGaugeParam.cpu_prec);
     }
 
     strong_check_link(mylonglink, "GPU results: ", long_reflink, "CPU reference results:", V, qudaGaugeParam.cpu_prec);

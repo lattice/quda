@@ -494,7 +494,7 @@ namespace quda
     template <typename T = void *> auto data() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return reinterpret_cast<T>(v.data());
+      return static_cast<T>(v.data());
     }
 
     /**
@@ -878,7 +878,6 @@ namespace quda
 
     /**
      * @brief Print the site vector
-     * @param[in] a The field we are printing from
      * @param[in] parity Parity index
      * @param[in] x_cb Checkerboard space-time index
      * @param[in] rank The rank we are requesting from (default is rank = 0)

@@ -25,18 +25,19 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     CovDev(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-           const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+           const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay) errorQuda("Covariant derivative operator only defined without xpay");
       if (arg.nParity != 2) errorQuda("Covariant derivative operator only defined for full field");
 
@@ -86,7 +87,7 @@ namespace quda
 
     long long bytes() const override
     {
-      int gauge_bytes = Arg::shift ? 0 : arg.reconstruct * in.Precision();
+      int gauge_bytes = Arg::shift ? 0 : static_cast<int>(arg.reconstruct) * static_cast<int>(in.Precision());
       int spinor_bytes
         = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = gauge_bytes + 3 * spinor_bytes; // 3 since we have to load the partial
@@ -145,21 +146,21 @@ namespace quda
       if (in.Nspin() == 4) {
         if (shift) {
           CovDevArg<Float, 4, nColor, DDArg, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-          CovDev<decltype(arg)> covDev(arg, out, in, halo);
+          CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         } else {
           CovDevArg<Float, 4, nColor, DDArg, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-          CovDev<decltype(arg)> covDev(arg, out, in, halo);
+          CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         }
       } else if (in.Nspin() == 1) {
         if (shift) {
           CovDevArg<Float, 1, nColor, DDArg, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-          CovDev<decltype(arg)> covDev(arg, out, in, halo);
+          CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         } else {
           CovDevArg<Float, 1, nColor, DDArg, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-          CovDev<decltype(arg)> covDev(arg, out, in, halo);
+          CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         }
       } else {

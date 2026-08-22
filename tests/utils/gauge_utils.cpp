@@ -433,6 +433,7 @@ template <typename real_t> struct ApplyRandomU1Phase {
     auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     for (int dir = 0; dir < 4; dir++) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         for (int parity = 0; parity < 2; parity++) {
           // create a random phase
@@ -493,6 +494,7 @@ template <typename real_t> struct ConstructRandomMatrixGaugeField {
     };
 
     for (int dir = 0; dir < 4; dir++) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         for (int parity = 0; parity < 2; parity++) {
           real_t *link = gauge[dir] + (parity * Vh + i) * gauge_site_size;

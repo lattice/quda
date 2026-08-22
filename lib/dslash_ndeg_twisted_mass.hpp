@@ -19,18 +19,19 @@ namespace quda
     using Dslash = Dslash<nDegTwistedMass, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     NdegTwistedMass(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                    const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay)
         Dslash::template instantiate<packShmem, true>(tp, stream);
       else
@@ -61,7 +62,7 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, b, c, x, parity, dagger,
                                                                 comm_override);
-      NdegTwistedMass<decltype(arg)> twisted(arg, out, in, halo);
+      NdegTwistedMass<decltype(arg)> twisted(arg, out, in, halo, U);
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };

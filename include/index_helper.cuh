@@ -234,46 +234,14 @@ namespace quda {
     array<int, nDim> gx = {};   // nDim global lattice coordinates
     array<int, nDim> gDim = {}; // global lattice dimensions
     int x_cb;    // checkerboard lattice site index
+    int x_cb_0;  // value of x_cb on first thread in block
     int s;       // fifth dimension coord
     int X;       // full lattice site index
     constexpr const int& operator[](int i) const { return x[i]; }
     constexpr int& operator[](int i) { return x[i]; }
-    array_2d<bool, 2, nDim> in_boundary = {};
+    array_2d<int, 2, nDim> in_boundary = {};
     constexpr int size() const { return nDim; }
   };
-
-  /**
-     @brief Compute the checkerboard 1-d index for the nearest
-     neighbor
-     @param[in] lattice coordinates
-     @param[in] mu dimension in which to add 1
-     @param[in] dir direction (+1 or -1)
-     @param[in] arg parameter struct
-     @return 1-d checkboard index
-   */
-  template <typename Coord, typename Arg>
-  __device__ __host__ inline int getNeighborIndexCB(const Coord &x, int mu, int dir, const Arg &arg)
-  {
-    switch (dir) {
-    case +1: // positive direction
-      switch (mu) {
-      case 0: return (x.in_boundary[1][0] ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
-      case 1: return (x.in_boundary[1][1] ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
-      case 2: return (x.in_boundary[1][2] ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
-      case 3: return (x.in_boundary[1][3] ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
-      case 4: return (x.in_boundary[1][4] ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
-      }
-    case -1:
-      switch (mu) {
-      case 0: return (x.in_boundary[0][0] ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
-      case 1: return (x.in_boundary[0][1] ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
-      case 2: return (x.in_boundary[0][2] ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
-      case 3: return (x.in_boundary[0][3] ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
-      case 4: return (x.in_boundary[0][4] ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
-      }
-    }
-    return 0; // should never reach here
-  }
 
   /**
      Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
@@ -458,40 +426,40 @@ namespace quda {
     case 0:
       switch(dir) {
       case 0:
-	index = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+	index = ((((x[0] * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
 	break;
       case 1:
-	index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+	index = (((((x[0] - X[0] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
 	break;
       }
       break;
     case 1:
       switch(dir) {
       case 0:
-	index = (x[1]*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
+	index = ((((x[1] * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
+	index = (((((x[1] - X[1] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
     case 2:
       switch(dir) {
       case 0:
-	index = (x[2]*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	index = ((((x[2] * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
+	index = (((((x[2] - X[2] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
     case 3:
       switch(dir) {
       case 0:
-	index = (x[3]*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	index = ((((x[3] * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+	index = (((((x[3] - X[3] + nFace) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
@@ -519,56 +487,40 @@ namespace quda {
     case 0:
       switch (dir) {
       case 0:
-        index = ((x[0] + nFace - 1) * X[4] * X[3] * X[2] * X[1] + x[4] * X[3] * X[2] * X[1] + x[3] * (X[2] * X[1])
-                    + x[2] * X[1] + x[1])
-            >> 1;
+        index = (((((x[0] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
         break;
       case 1:
-        index = ((x[0] - X[0] + nFace) * X[4] * X[3] * X[2] * X[1] + x[4] * X[3] * X[2] * X[1] + x[3] * (X[2] * X[1])
-                    + x[2] * X[1] + x[1])
-            >> 1;
+        index = (((((x[0] - X[0] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
         break;
       }
       break;
     case 1:
       switch (dir) {
       case 0:
-        index = ((x[1] + nFace - 1) * X[4] * X[3] * X[2] * X[0] + x[4] * X[3] * X[2] * X[0] + x[3] * X[2] * X[0]
-                    + x[2] * X[0] + x[0])
-            >> 1;
+        index = (((((x[1] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[1] - X[1] + nFace) * X[4] * X[3] * X[2] * X[0] + x[4] * X[3] * X[2] * X[0] + x[3] * X[2] * X[0]
-                    + x[2] * X[0] + x[0])
-            >> 1;
+        index = (((((x[1] - X[1] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
     case 2:
       switch (dir) {
       case 0:
-        index = ((x[2] + nFace - 1) * X[4] * X[3] * X[1] * X[0] + x[4] * X[3] * X[1] * X[0] + x[3] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[2] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[2] - X[2] + nFace) * X[4] * X[3] * X[1] * X[0] + x[4] * X[3] * X[1] * X[0] + x[3] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[2] - X[2] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
     case 3:
       switch (dir) {
       case 0:
-        index = ((x[3] + nFace - 1) * X[4] * X[2] * X[1] * X[0] + x[4] * X[2] * X[1] * X[0] + x[2] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[3] + nFace - 1) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[3] - X[3] + nFace) * X[4] * X[2] * X[1] * X[0] + x[4] * X[2] * X[1] * X[0] + x[2] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[3] + nFace - X[3]) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
@@ -839,7 +791,7 @@ namespace quda {
   // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
 
   template <int nDim, typename Arg>
-  constexpr int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
+  __host__ __device__ inline int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
     const auto &V4 = arg.dc.volume_4d;   // 4-d volume
@@ -854,7 +806,7 @@ namespace quda {
     int s = face_idx_in / arg.dc.face_XYZT[dim];
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
 
-    int dims[3] = {};
+    std::remove_const_t<std::remove_reference_t<decltype(arg.dc.X[0])>> dims[3] = {};
     int d1 = 0;
 #pragma unroll 4
     for (int d2 = 0; d2 < 4; d2++) { // this will evaluate at compile time
@@ -898,7 +850,7 @@ namespace quda {
   }
 
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  constexpr int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+  __host__ __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
   {
     return indexFromFaceIndexStaggered<nDim>(dim, face_num, face_idx_in, parity, nLayers, type, arg);
   }

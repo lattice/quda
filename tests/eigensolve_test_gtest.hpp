@@ -64,7 +64,9 @@ TEST_P(EigensolveTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
-  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-5 : 1e-12;
+  auto prec = ::testing::get<0>(GetParam());
+  auto tol = getTolerance(prec);
+  ASSERT_TRUE(tol != 0.0) << "Unexpected precision " << prec;
   eig_param.tol = tol;
   eig_param.require_convergence = QUDA_BOOLEAN_FALSE;
 
@@ -88,7 +90,11 @@ TEST_P(EigensolveTest, verify)
   auto dof = 24lu * dim[0] * dim[1] * dim[2] * dim[3] * (is_chiral(dslash_type) ? Lsdim : 1);
   tol *= (1 + log(quda::comm_size()) / log(dof));
 
-  for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
+  for (auto rsd : eigensolve(GetParam())) {
+    EXPECT_FALSE(std::isnan(rsd)) << "Nan has propagated into the result";
+    tol = checkReasonableHostDeviation(rsd, tol, prec);
+    EXPECT_LE(rsd, tol);
+  }
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)

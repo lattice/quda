@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
 #include <nvml.h>
+#include <algorithm>
 #include "monitor.h"
 
 static cudaDeviceProp deviceProp;
@@ -160,7 +161,15 @@ namespace quda
     auto get_temperature()
     {
       unsigned int temp = 0;
+#if defined(nvmlTemperature_v1)
+      nvmlTemperature_t temperature;
+      temperature.version = nvmlTemperature_v1;
+      temperature.sensorType = NVML_TEMPERATURE_GPU;
+      NVML_CHECK(nvmlDeviceGetTemperatureV(monitor_device_id, &temperature));
+      temp = static_cast<unsigned int>(temperature.temperature);
+#else
       NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
+#endif
       return temp;
     }
 
@@ -340,7 +349,17 @@ namespace quda
       static int max_shared_bytes = 0;
       if (!max_shared_bytes)
         CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid()));
+      // If the user has set QUDA_MAX_SHARED_MEMORY at cmake time, cap the runtime-queried value.
+      // This ensures that cuKernelSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, ...) never records
+      // a value larger than the override into APIC traces (or actually requests more than the
+      // user-specified limit), making traces portable across chip families with different smem caps.
+      // Note: qudaLaunchKernel already subtracts static shared memory from this value before
+      // passing it to cuKernelSetAttribute, so the total (static + dynamic) stays within the limit.
+#if defined(QUDA_MAX_SHARED_MEMORY_OVERRIDE) && QUDA_MAX_SHARED_MEMORY_OVERRIDE > 0
+      return std::min(max_shared_bytes, static_cast<int>(QUDA_MAX_SHARED_MEMORY_OVERRIDE));
+#else
       return max_shared_bytes;
+#endif
     }
 
     unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }

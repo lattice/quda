@@ -176,7 +176,7 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
       param.t_boundary = QUDA_PERIODIC_T;
 
       // Reunitarization setup
-      int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+      int *num_failures_h = (int *)host_pinned_malloc(sizeof(int));
       int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
       SetReunitarizationConsts();
 

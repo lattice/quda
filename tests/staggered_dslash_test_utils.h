@@ -316,7 +316,6 @@ struct StaggeredDslashTestWrapper {
     freeGaugeQuda();
     cpuFat = {};
     cpuLong = {};
-    commDimPartitionedReset();
   }
 
   static void destroy()
