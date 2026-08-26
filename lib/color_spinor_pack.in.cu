@@ -212,7 +212,8 @@ namespace quda {
   {
     if (!is_enabled_spin(a.Nspin())) errorQuda("nSpin=%d not enabled for this build", a.Nspin());
 
-    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+    // maybe_unused since no spin is instantiated below if this build has no spin enabled
+    [[maybe_unused]] IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
     if (a.Nspin() == 4) {
       if constexpr (is_enabled_spin(4))
         genericPackGhost<Float, ghostFloat, 4, native>(ghost, a, parity, nFace, dagger, destination, shmem, v, fineColors);
