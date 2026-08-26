@@ -48,16 +48,16 @@ namespace quda
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_WILSON;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-              const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
-              const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
+              const GaugeField &U, real_t a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+              const int *comm_override, real_t alpha0 = 0.0, int t0 = -1) :
       DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, spin_project,
                                     comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
       Uback(dslash_double_store() ? U.shift(1) : U),
-      a(a),
-      alpha0(alpha0),
+      a(static_cast<real>(a)),
+      alpha0(static_cast<real>(alpha0)),
       t0(t0)
     {
       for (auto i = 0u; i < out.size(); i++) {

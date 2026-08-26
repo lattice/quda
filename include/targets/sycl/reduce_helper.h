@@ -30,10 +30,12 @@ namespace quda
 
   private:
     const int n_reduce; /** number of reductions of length n_item */
+    bool reset = false; /** reset the counter post completion (required for multiple calls with the same arg instance */
     T *partial;         /** device buffer */
     T *result_d;        /** device-mapped host buffer */
     T *result_h;        /** host buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
+    bool consumed; // check to ensure that we don't complete more than once unless we explicitly reset
     T *device_output_async_buffer = nullptr; // Optional device output buffer for the reduction result
 
   public:
@@ -41,9 +43,16 @@ namespace quda
        @brief Constructor for ReduceArg
        @param[in] threads The number threads partaking in the kernel
        @param[in] n_reduce The number of reductions
+       @param[in] reset Whether to reset the atomics after the
+       reduction has completed; required if the same ReduceArg
+       instance will be used for multiple reductions.
     */
-    ReduceArg(dim3 threads, int n_reduce = 1, bool = false) :
-      kernel_param<use_kernel_arg>(threads), launch_error(QUDA_ERROR_UNINITIALIZED), n_reduce(n_reduce)
+    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
+      kernel_param<use_kernel_arg>(threads),
+      launch_error(QUDA_ERROR_UNINITIALIZED),
+      n_reduce(n_reduce),
+      reset(reset),
+      consumed(false)
     {
       reducer::init(n_reduce, sizeof(*partial));
       // these buffers may be allocated in init, so we can't set the local copies until now
@@ -73,25 +82,34 @@ namespace quda
 
     /**
        @brief Finalize the reduction, returning the computed reduction
-       into result.  The generic path posts an event after the kernel
-       and then polls on completion of the event.
-       @param[out] result The reduction result is copied here
-       @param[in] stream The stream on which we the reduction is being done
-     */
-    template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t stream = device::get_default_stream())
+       into result.  With heterogeneous atomics this means we poll the
+       atomics until their value differs from the init_value.
+       @param[in] stream The stream on which the reduction is being done
+       @return The reduction result
+    */
+    auto complete(const qudaStream_t stream = device::get_default_stream())
     {
-      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      std::vector<T> result(n_reduce);
+      using device_t = typename atomic_type<T>::type;
+      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
+      if (launch_error == QUDA_ERROR) return result; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
+      if (consumed) errorQuda("Cannot call complete more than once for each construction");
+      if (!reset) consumed = true;
+
       auto q = device::get_target_stream(stream);
       q.wait();
 
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
-      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      std::vector<device_t> scalar_result(n_element);
+      for (int i = 0; i < n_element; i++) scalar_result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      for (int i = 0; i < n_reduce; i++) {
+        const auto offset = static_cast<size_t>(i) * n_element / n_reduce;
+        // Deserialize flat atomic words (e.g. double components of RFA / doubledouble)
+        std::memcpy(static_cast<void *>(&result[i]), static_cast<const void *>(&scalar_result[offset]), sizeof(T));
+      }
+      return result;
     }
 
     void debug()

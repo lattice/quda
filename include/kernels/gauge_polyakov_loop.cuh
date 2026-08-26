@@ -10,7 +10,7 @@ namespace quda {
 
   template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct GaugeInsertTimesliceArg : public kernel_param<> {
-    using real = typename::mapper<store_t>::type;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
@@ -166,7 +166,7 @@ namespace quda {
   };
 
   template <typename store_t, int nColor_, QudaReconstructType recon_>
-  struct GaugePolyakovLoopTraceArg : public ReduceArg<array<double, 2>> {
+  struct GaugePolyakovLoopTraceArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -195,7 +195,6 @@ namespace quda {
         X[dir] = U_.X()[dir] - 2 * border[dir];
       }
     }
-
   };
 
   template <typename Arg> struct PolyakovLoopTrace : plus<typename Arg::reduce_t> {
@@ -212,7 +211,6 @@ namespace quda {
       using HighPrecLink = typename Arg::HighPrecLink;
 
       HighPrecLink polyloop;
-      reduce_t ploop{0, 0};
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -232,10 +230,7 @@ namespace quda {
 
       // accumulate trace
       auto tr = getTrace( polyloop );
-      ploop[0] = tr.real();
-      ploop[1] = tr.imag();
-
-      return operator()(ploop, value);
+      return operator()(value, {tr.real(), tr.imag()});
     }
 
   };

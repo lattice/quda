@@ -452,8 +452,8 @@ namespace quda
    */
   void comm_barrier_global(void);
 
-  void comm_abort(int status);
-  void comm_abort_(int status);
+  [[noreturn]] void comm_abort(int status);
+  [[noreturn]] void comm_abort_(int status);
 
   int commDim(int);
   int commCoords(int);

@@ -11,10 +11,10 @@ namespace quda
     GaugeField &out;
     const GaugeField &in;
     const bool improved;
-    const Float rho;
-    const Float epsilon;
+    const real_t rho;
+    const real_t epsilon;
     const int dir_ignore;
-    const Float anisotropy;
+    const real_t anisotropy;
     const int stoutDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
@@ -27,14 +27,14 @@ namespace quda
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon, int dir_ignore,
-               double anisotropy) :
+    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, real_t rho, real_t epsilon, int dir_ignore,
+               real_t anisotropy) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       in(in),
       improved(improved),
-      rho(static_cast<Float>(rho)),
-      epsilon(static_cast<Float>(epsilon)),
+      rho(rho),
+      epsilon(epsilon),
       dir_ignore(dir_ignore),
       anisotropy(anisotropy),
       stoutDim((dir_ignore == 4) ? 4 : 3)
@@ -92,7 +92,7 @@ namespace quda
     }
   };
 
-  void STOUTStep(GaugeField &out, GaugeField &in, double rho, int dir_ignore, double smear_anisotropy)
+  void STOUTStep(GaugeField &out, GaugeField &in, real_t rho, int dir_ignore, real_t smear_anisotropy)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
@@ -108,8 +108,8 @@ namespace quda
     out.exchangeExtendedGhost(out.R(), false);
   }
 
-  void OvrImpSTOUTStep(GaugeField &out, GaugeField &in, double rho, double epsilon, int dir_ignore,
-                       double smear_anisotropy)
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField &in, real_t rho, real_t epsilon, int dir_ignore,
+                       real_t smear_anisotropy)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);

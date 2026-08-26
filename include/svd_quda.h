@@ -1,7 +1,7 @@
 #pragma once
 
 #include <float.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11

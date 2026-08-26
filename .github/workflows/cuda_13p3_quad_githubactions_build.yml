@@ -1,0 +1,60 @@
+name: cuda_13p3_quad_build_ubuntu24.04
+
+on:
+  pull_request:
+    branches: [ "develop" ]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  BUILD_TYPE: STRICT
+  CCACHE_COMPILERCHECK: content
+
+jobs:
+    build:
+      strategy:
+        matrix:
+          compiler: [g++-14]
+      runs-on: ubuntu-24.04
+
+      steps:
+      - name: Install software
+        run: |
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends libopenmpi-dev  cuda-compiler-13-3 cuda-libraries-dev-13-3 cuda-nvml-dev-13-3
+
+      - uses: actions/checkout@v4
+
+      - name: Ccache for gh actions
+        uses: hendrikmuhs/ccache-action@v1.2.17
+        with:
+          key: ${{ github.job }}-${{ matrix.compiler }}
+          max-size: 2000M
+
+      - name: Configure CMake
+        run: >
+          cmake
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.3/bin/nvcc
+          -DCMAKE_CXX_COMPILER=${{matrix.compiler}}
+          -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DQUDA_GPU_ARCH=sm_100 -DQUDA_GPU_ARCH_SUFFIX=virtual -DQUDA_JITIFY=OFF
+          -DQUDA_DIRAC_LAPLACE=OFF -DQUDA_DIRAC_CLOVER_HASENBUSCH=OFF -DQUDA_DIRAC_COVDEV=OFF
+          -DQUDA_MULTIGRID=ON
+          -DQUDA_MULTIGRID_NVEC_LIST=24
+          -DQUDA_MDW_FUSED_LS_LIST=4
+          -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON
+          -DQUDA_SCALAR_TYPE=float128 -DQUDA_REDUCTION_TYPE=doubledouble -DQUDA_REDUCTION_ALGORITHM=NAIVE
+          -DQUDA_PRECISION=4 -DQUDA_RECONSTRUCT=4 -DQUDA_FAST_COMPILE_REDUCE=ON
+          -GNinja
+          -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build
+
+      - name: Install
+        run: cmake --install ${{github.workspace}}/build

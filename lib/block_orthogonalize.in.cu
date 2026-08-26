@@ -62,7 +62,7 @@ namespace quda {
     int nBlock;
     bool two_pass;
     int iter;
-    double max;
+    real_t max;
 
   public:
     BlockOrtho(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,

@@ -30,12 +30,12 @@ namespace quda
     const int dir_ignore;
     const real tolerance;
 
-    GaugeHYPArg(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int dir_ignore) :
+    GaugeHYPArg(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, real_t alpha, int dir_ignore) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, hypDim)),
       out(out),
       tmp {*tmp[0], *tmp[1], *tmp[2], *tmp[3]},
       in(in),
-      alpha(alpha),
+      alpha(static_cast<real>(alpha)),
       dir_ignore(dir_ignore),
       tolerance(in.toleranceSU3())
     {

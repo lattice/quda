@@ -2,10 +2,17 @@
 
 #include <quda_arch.h>
 #include <quda_api.h>
+#include <quda_define.h>
 
 #include <string>
-#include <complex>
 #include <vector>
+
+#ifdef QUDA_USE_QUAD_SCALAR
+#include "float128_t.h"
+#include "quad_scalar.h"
+#endif
+
+#include <complex>
 
 #if ((defined(QMP_COMMS) || defined(MPI_COMMS)) && !defined(MULTI_GPU))
 #error "MULTI_GPU must be enabled to use MPI or QMP"
@@ -50,10 +57,36 @@
 #include <device.h>
 #include <array.h>
 #include "timer.h"
+#include "dbldbl.h"
 
 namespace quda {
 
-  using Complex = std::complex<double>;
+  /**
+     Scalar real variable type on the host
+  */
+#ifdef QUDA_USE_QUAD_SCALAR
+  using real_t = float128_t;
+#else
+  using real_t = QUDA_SCALAR_TYPE;
+#endif
+
+  /**
+     Scalar complex variable type on the host
+  */
+  using complex_t = std::complex<real_t>;
+
+#ifdef QUDA_USE_QUAD_SCALAR
+  inline complex_t operator/(const complex_t &z, double x) { return z / real_t(x); }
+  inline complex_t operator*(double x, const complex_t &z) { return real_t(x) * z; }
+  inline complex_t operator*(const complex_t &z, double x) { return z * real_t(x); }
+#else
+  inline double to_double(real_t x) { return x; }
+#endif
+
+  /**
+     Underlying type to use for reductions
+  */
+  using reduction_t = QUDA_REDUCTION_TYPE;
 
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 13000
   using double4 = ::double4_32a;

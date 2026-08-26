@@ -23,11 +23,8 @@ namespace quda {
     RNGState *rng;
     real sigma; // where U = exp(sigma * H)
 
-    GaugeGaussArg(const GaugeField &U, RNGState *rng, double sigma) :
-      kernel_param(dim3(U.LocalVolumeCB(), 2, 1)),
-      U(U),
-      rng(rng),
-      sigma(sigma)
+    GaugeGaussArg(const GaugeField &U, RNGState *rng, real_t sigma) :
+      kernel_param(dim3(U.LocalVolumeCB(), 2, 1)), U(U), rng(rng), sigma(static_cast<real>(sigma))
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = U.R()[dir];

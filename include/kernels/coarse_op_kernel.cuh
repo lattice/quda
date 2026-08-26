@@ -11,7 +11,7 @@
 #include <target_device.h>
 #include <kernel.h>
 #include <shared_memory_cache_helper.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 
 namespace quda {
 
@@ -164,17 +164,33 @@ namespace quda {
        @param[in] coarse_to_fine Pointer to coarse-to-fine look-up table (memory space is same compute)
        @param[in] bidirectional Whether the operator we are coarsening requires bi-directional coarsening
      */
-    CalculateYArg(coarseGauge &Y, coarseGauge &X,
-      coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
-      fineSpinorUV &UV, fineSpinorAV &AV, const fineGauge &U, const fineGauge &L, const fineGauge &K, const fineSpinorV &V,
-      const fineClover &C, const fineClover &Cinv, const ColorSpinorField &v, double kappa, double mass, double mu, double mu_factor,
-      const int *x_size_, const int *xc_size_, int spin_bs_,
-      const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
-      : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
-      UV(UV), AV(AV), U(U), L(L), K(K), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
-      kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
-      fineVolumeCB(v.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
-      fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+    CalculateYArg(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
+                  fineSpinorUV &UV, fineSpinorAV &AV, const fineGauge &U, const fineGauge &L, const fineGauge &K,
+                  const fineSpinorV &V, const fineClover &C, const fineClover &Cinv, const ColorSpinorField &v,
+                  real_t kappa, real_t mass, real_t mu, real_t mu_factor, const int *x_size_, const int *xc_size_,
+                  int spin_bs_, const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional) :
+      Y(Y),
+      X(X),
+      Y_atomic(Y_atomic),
+      X_atomic(X_atomic),
+      UV(UV),
+      AV(AV),
+      U(U),
+      L(L),
+      K(K),
+      V(V),
+      C(C),
+      Cinv(Cinv),
+      spin_bs(spin_bs_),
+      spin_map(),
+      kappa(static_cast<Float>(kappa)),
+      mass(static_cast<Float>(mass)),
+      mu(static_cast<Float>(mu)),
+      mu_factor(static_cast<Float>(mu_factor)),
+      fineVolumeCB(v.VolumeCB()),
+      coarseVolumeCB(X.VolumeCB()),
+      fine_to_coarse(fine_to_coarse),
+      coarse_to_fine(coarse_to_fine),
       bidirectional(bidirectional)
     {
       if (v.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)

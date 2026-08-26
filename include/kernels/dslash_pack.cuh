@@ -80,7 +80,7 @@ namespace quda
     static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in, int nFace, int parity,
-            int work_items, double a, double b, double c, unsigned int block, unsigned int grid,
+            int work_items, real_t a, real_t b, real_t c, unsigned int block, unsigned int grid,
 #ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
@@ -92,9 +92,9 @@ namespace quda
       parity(parity),
       nParity(in.SiteSubset()),
       dc(halo.getDslashConstant()),
-      twist_a(a),
-      twist_b(b),
-      twist_c(c),
+      twist_a(static_cast<real>(a)),
+      twist_b(static_cast<real>(b)),
+      twist_c(static_cast<real>(c)),
       work_items(work_items),
       sites_per_block((work_items + grid - 1) / grid),
       n_src(in.size()),

@@ -52,10 +52,10 @@ namespace quda {
     std::vector<ColorSpinorField> &p;
     std::vector<ColorSpinorField> &x;
 
-    std::vector<double> &alpha;
-    std::vector<double> &beta;
-    std::vector<double> &zeta;
-    std::vector<double> &zeta_old;
+    std::vector<real_t> &alpha;
+    std::vector<real_t> &beta;
+    std::vector<real_t> &zeta;
+    std::vector<real_t> &zeta_old;
 
     const int j_low;
     int n_shift;
@@ -70,8 +70,8 @@ namespace quda {
 
   public:
     ShiftUpdate(ColorSpinorField &r, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &x,
-                std::vector<double> &alpha, std::vector<double> &beta, std::vector<double> &zeta,
-                std::vector<double> &zeta_old, int j_low, int n_shift) :
+                std::vector<real_t> &alpha, std::vector<real_t> &beta, std::vector<real_t> &zeta,
+                std::vector<real_t> &zeta_old, int j_low, int n_shift) :
       r(r),
       p(p),
       x(x),
@@ -167,18 +167,18 @@ namespace quda {
   /**
      Compute the new values of alpha and zeta
    */
-  void updateAlphaZeta(std::vector<double> &alpha, std::vector<double> &zeta, std::vector<double> &zeta_old,
-                       const std::vector<double> &r2, const std::vector<double> &beta, double pAp,
-                       const array<double, QUDA_MAX_MULTI_SHIFT> &offset, const int nShift, const int j_low)
+  void updateAlphaZeta(std::vector<real_t> &alpha, std::vector<real_t> &zeta, std::vector<real_t> &zeta_old,
+                       const std::vector<real_t> &r2, const std::vector<real_t> &beta, real_t pAp,
+                       const array<real_t, QUDA_MAX_MULTI_SHIFT> &offset, const int nShift, const int j_low)
   {
-    std::vector<double> alpha_old(alpha);
+    std::vector<real_t> alpha_old(alpha);
 
     alpha[0] = r2[0] / pAp;
     zeta[0] = 1.0;
     for (int j=1; j<nShift; j++) {
-      double c0 = zeta[j] * zeta_old[j] * alpha_old[j_low];
-      double c1 = alpha[j_low] * beta[j_low] * (zeta_old[j]-zeta[j]);
-      double c2 = zeta_old[j] * alpha_old[j_low] * (1.0 + (offset[j] - offset[0]) * alpha[j_low]);
+      real_t c0 = zeta[j] * zeta_old[j] * alpha_old[j_low];
+      real_t c1 = alpha[j_low] * beta[j_low] * (zeta_old[j] - zeta[j]);
+      real_t c2 = zeta_old[j] * alpha_old[j_low] * (real_t(1.0) + (offset[j] - offset[0]) * alpha[j_low]);
 
       zeta_old[j] = zeta[j];
       zeta[j] = (c1 + c2 != 0.0) ? c0 / (c1 + c2) : 0.0;
@@ -187,7 +187,7 @@ namespace quda {
   }
 
   void MultiShiftCG::operator()(std::vector<ColorSpinorField> &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
-                                std::vector<double> &r2_old_array)
+                                std::vector<real_t> &r2_old_array)
   {
     pushOutputPrefix("MultiShiftCG: ");
     create(x, b, p);
@@ -196,7 +196,7 @@ namespace quda {
 
     auto &offset = param.offset;
 
-    const double b2 = blas::norm2(b);
+    const real_t b2 = blas::norm2(b);
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       warningQuda("inverting on zero-field source");
@@ -216,17 +216,21 @@ namespace quda {
     const double sloppy_tol= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() :
       ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-17));
     const double fine_tol = pow(10.,(-2*(int)b.Precision()+1));
-    std::vector<double> prec_tol(num_offset);
+    std::vector<real_t> prec_tol(num_offset);
 
     prec_tol[0] = mixed ? sloppy_tol : fine_tol;
     for (int i=1; i<num_offset; i++) {
-      prec_tol[i] = std::min(sloppy_tol,std::max(fine_tol,sqrt(param.tol_offset[i]*sloppy_tol)));
+      {
+        real_t pt = sqrt(param.tol_offset[i] * real_t(sloppy_tol));
+        real_t hi = pt > real_t(fine_tol) ? pt : real_t(fine_tol);
+        prec_tol[i] = hi < real_t(sloppy_tol) ? hi : real_t(sloppy_tol);
+      }
     }
 
-    std::vector<double> zeta(num_offset, 1.0);
-    std::vector<double> zeta_old(num_offset, 1.0);
-    std::vector<double> alpha(num_offset, 1.0);
-    std::vector<double> beta(num_offset, 0.0);
+    std::vector<real_t> zeta(num_offset, 1.0);
+    std::vector<real_t> zeta_old(num_offset, 1.0);
+    std::vector<real_t> alpha(num_offset, 1.0);
+    std::vector<real_t> beta(num_offset, 0.0);
 
     int j_low = 0;
     int num_offset_now = num_offset;
@@ -234,22 +238,22 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // stopping condition of each shift
-    std::vector<double> r2(num_offset, b2);
-    std::vector<double> stop(num_offset);
+    std::vector<real_t> r2(num_offset, b2);
+    std::vector<real_t> stop(num_offset);
     for (int i = 0; i < num_offset; i++) stop[i] = Solver::stopping(param.tol_offset[i], b2, param.residual_type);
 
     std::vector<int> iter(num_offset + 1, 0); // record how many iterations for each shift
     iter[num_offset] = 1;                     // this initial condition ensures that the heaviest shift can be removed
 
-    double r2_old;
-    double pAp;
+    real_t r2_old;
+    real_t pAp;
 
-    std::vector<double> rNorm(num_offset);
+    std::vector<real_t> rNorm(num_offset);
     for (int i = 0; i < num_offset; i++) rNorm[i] = sqrt(r2[i]);
-    std::vector<double> r0Norm(rNorm);
-    std::vector<double> maxrx(rNorm);
-    std::vector<double> maxrr(rNorm);
-    double delta = param.delta;
+    std::vector<real_t> r0Norm(rNorm);
+    std::vector<real_t> maxrx(rNorm);
+    std::vector<real_t> maxrr(rNorm);
+    real_t delta = param.delta;
 
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
@@ -296,9 +300,9 @@ namespace quda {
       r2_old = r2[0];
       r2_old_array[0] = r2_old;
 
-      double2 cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
-      r2[0] = cg_norm.x;
-      double zn = cg_norm.y;
+      array<real_t, 2> cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
+      r2[0] = cg_norm[0];
+      real_t zn = cg_norm[1];
 
       // reliable update conditions
       rNorm[0] = sqrt(r2[0]);
@@ -369,7 +373,7 @@ namespace quda {
 
 	// explicitly restore the orthogonality of the gradient vector
 	for (int j=0; j<num_offset_now; j++) {
-          Complex rp = blas::cDotProduct(r_sloppy, p[j]) / (r2[0]);
+          complex_t rp = blas::cDotProduct(r_sloppy, p[j]) / (r2[0]);
           blas::caxpy(-rp, r_sloppy, p[j]);
         }
 
@@ -456,12 +460,12 @@ namespace quda {
           } else if (i != 0) {
             blas::axpy(offset[i] - offset[0], x[i], r); // Offset it.
           }
-          double true_res = blas::xmyNorm(b, r);
+          real_t true_res = blas::xmyNorm(b, r);
           param.true_res_offset[i] = sqrt(true_res / b2);
-          param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(x[i], r).z);
+          param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(x[i], r)[2]);
         } else {
-          param.true_res_offset[i] = std::numeric_limits<double>::infinity();
-          param.true_res_hq_offset[i] = std::numeric_limits<double>::infinity();
+          param.true_res_offset[i] = std::numeric_limits<real_t>::infinity();
+          param.true_res_hq_offset[i] = std::numeric_limits<real_t>::infinity();
         }
         param.iter_res_offset[i] = sqrt(r2[i] / b2);
       }

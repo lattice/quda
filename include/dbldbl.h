@@ -45,7 +45,8 @@
 
 #pragma once
 
-#include <math_helper.cuh>
+#include <cmath>
+#include <math_helper.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -64,7 +65,7 @@ typedef double2 dbldbl;
    requirement. To create a double-double from two arbitrary double-precision
    numbers, use add_double_to_dbldbl().
 */
-__device__ __forceinline__ dbldbl make_dbldbl (double head, double tail)
+__device__ __host__ __forceinline__ dbldbl make_dbldbl (double head, double tail)
 {
     dbldbl z;
     z.x = tail;
@@ -73,42 +74,42 @@ __device__ __forceinline__ dbldbl make_dbldbl (double head, double tail)
 }
 
 /* Return the head of a double-double number */
-__device__ __forceinline__ double get_dbldbl_head (dbldbl a)
+__device__ __host__ __forceinline__ double get_dbldbl_head (dbldbl a)
 {
     return a.y;
 }
 
 /* Return the tail of a double-double number */
-__device__ __forceinline__ double get_dbldbl_tail (dbldbl a)
+__device__ __host__ __forceinline__ double get_dbldbl_tail (dbldbl a)
 {
     return a.x;
 }
 
 /* Compute error-free sum of two unordered doubles. See Knuth, TAOCP vol. 2 */
-__device__ __forceinline__ dbldbl add_double_to_dbldbl (double a, double b)
+__device__ __host__ __forceinline__ dbldbl add_double_to_dbldbl (double a, double b)
 {
     double t1, t2;
     dbldbl z;
-    z.y = __dadd_rn (a, b);
-    t1 = __dadd_rn (z.y, -a);
-    t2 = __dadd_rn (z.y, -t1);
-    t1 = __dadd_rn (b, -t1);
-    t2 = __dadd_rn (a, -t2);
-    z.x = __dadd_rn (t1, t2);
+    z.y = quda::dadd_rn (a, b);
+    t1 = quda::dadd_rn (z.y, -a);
+    t2 = quda::dadd_rn (z.y, -t1);
+    t1 = quda::dadd_rn (b, -t1);
+    t2 = quda::dadd_rn (a, -t2);
+    z.x = quda::dadd_rn (t1, t2);
     return z;
 }
 
 /* Compute error-free product of two doubles. Take full advantage of FMA */
-__device__ __forceinline__ dbldbl mul_double_to_dbldbl (double a, double b)
+__device__ __host__ __forceinline__ dbldbl mul_double_to_dbldbl (double a, double b)
 {
     dbldbl z;
-    z.y = __dmul_rn (a, b);
-    z.x = __fma_rn (a, b, -z.y);
+    z.y = quda::dmul_rn (a, b);
+    z.x = quda::fma_rn (a, b, -z.y);
     return z;
 }
 
 /* Negate a double-double number, by separately negating head and tail */
-__device__ __forceinline__ dbldbl neg_dbldbl (dbldbl a)
+__device__ __host__ __forceinline__ dbldbl neg_dbldbl (dbldbl a)
 {
     dbldbl z;
     z.y = -a.y;
@@ -123,22 +124,22 @@ __device__ __forceinline__ dbldbl neg_dbldbl (dbldbl a)
    Floating-Point Numbers for GPU Computation. Retrieved on 7/12/2011
    from http://andrewthall.org/papers/df64_qf128.pdf.
 */
-__device__ __forceinline__ dbldbl add_dbldbl (dbldbl a, dbldbl b)
+__device__ __host__ __forceinline__ dbldbl add_dbldbl (dbldbl a, dbldbl b)
 {
     dbldbl z;
     double t1, t2, t3, t4, t5, e;
-    t1 = __dadd_rn (a.y, b.y);
-    t2 = __dadd_rn (t1, -a.y);
-    t3 = __dadd_rn (__dadd_rn (a.y, t2 - t1), __dadd_rn (b.y, -t2));
-    t4 = __dadd_rn (a.x, b.x);
-    t2 = __dadd_rn (t4, -a.x);
-    t5 = __dadd_rn (__dadd_rn (a.x, t2 - t4), __dadd_rn (b.x, -t2));
-    t3 = __dadd_rn (t3, t4);
-    t4 = __dadd_rn (t1, t3);
-    t3 = __dadd_rn (t1 - t4, t3);
-    t3 = __dadd_rn (t3, t5);
-    z.y = e = __dadd_rn (t4, t3);
-    z.x = __dadd_rn (t4 - e, t3);
+    t1 = quda::dadd_rn (a.y, b.y);
+    t2 = quda::dadd_rn (t1, -a.y);
+    t3 = quda::dadd_rn (quda::dadd_rn (a.y, t2 - t1), quda::dadd_rn (b.y, -t2));
+    t4 = quda::dadd_rn (a.x, b.x);
+    t2 = quda::dadd_rn (t4, -a.x);
+    t5 = quda::dadd_rn (quda::dadd_rn (a.x, t2 - t4), quda::dadd_rn (b.x, -t2));
+    t3 = quda::dadd_rn (t3, t4);
+    t4 = quda::dadd_rn (t1, t3);
+    t3 = quda::dadd_rn (t1 - t4, t3);
+    t3 = quda::dadd_rn (t3, t5);
+    z.y = e = quda::dadd_rn (t4, t3);
+    z.x = quda::dadd_rn (t4 - e, t3);
     return z;
 }
 
@@ -149,22 +150,22 @@ __device__ __forceinline__ dbldbl add_dbldbl (dbldbl a, dbldbl b)
    Floating-Point Numbers for GPU Computation. Retrieved on 7/12/2011
    from http://andrewthall.org/papers/df64_qf128.pdf.
 */
-__device__ __forceinline__ dbldbl sub_dbldbl (dbldbl a, dbldbl b)
+__device__ __host__ __forceinline__ dbldbl sub_dbldbl (dbldbl a, dbldbl b)
 {
     dbldbl z;
     double t1, t2, t3, t4, t5, e;
-    t1 = __dadd_rn (a.y, -b.y);
-    t2 = __dadd_rn (t1, -a.y);
-    t3 = __dadd_rn (__dadd_rn (a.y, t2 - t1), - __dadd_rn (b.y, t2));
-    t4 = __dadd_rn (a.x, -b.x);
-    t2 = __dadd_rn (t4, -a.x);
-    t5 = __dadd_rn (__dadd_rn (a.x, t2 - t4), - __dadd_rn (b.x, t2));
-    t3 = __dadd_rn (t3, t4);
-    t4 = __dadd_rn (t1, t3);
-    t3 = __dadd_rn (t1 - t4, t3);
-    t3 = __dadd_rn (t3, t5);
-    z.y = e = __dadd_rn (t4, t3);
-    z.x = __dadd_rn (t4 - e, t3);
+    t1 = quda::dadd_rn (a.y, -b.y);
+    t2 = quda::dadd_rn (t1, -a.y);
+    t3 = quda::dadd_rn (quda::dadd_rn (a.y, t2 - t1), - quda::dadd_rn (b.y, t2));
+    t4 = quda::dadd_rn (a.x, -b.x);
+    t2 = quda::dadd_rn (t4, -a.x);
+    t5 = quda::dadd_rn (quda::dadd_rn (a.x, t2 - t4), - quda::dadd_rn (b.x, t2));
+    t3 = quda::dadd_rn (t3, t4);
+    t4 = quda::dadd_rn (t1, t3);
+    t3 = quda::dadd_rn (t1 - t4, t3);
+    t3 = quda::dadd_rn (t3, t5);
+    z.y = e = quda::dadd_rn (t4, t3);
+    z.x = quda::dadd_rn (t4 - e, t3);
     return z;
 }
 
@@ -173,17 +174,17 @@ __device__ __forceinline__ dbldbl sub_dbldbl (dbldbl a, dbldbl b)
    relative error observed with 10 billion test cases was 5.238480533564479e-32
    (~= 2**-103.9125).
 */
-__device__ __forceinline__ dbldbl mul_dbldbl (dbldbl a, dbldbl b)
+__device__ __host__ __forceinline__ dbldbl mul_dbldbl (dbldbl a, dbldbl b)
 {
     dbldbl t, z;
     double e;
-    t.y = __dmul_rn (a.y, b.y);
-    t.x = __fma_rn (a.y, b.y, -t.y);
-    t.x = __fma_rn (a.x, b.x, t.x);
-    t.x = __fma_rn (a.y, b.x, t.x);
-    t.x = __fma_rn (a.x, b.y, t.x);
-    z.y = e = __dadd_rn (t.y, t.x);
-    z.x = __dadd_rn (t.y - e, t.x);
+    t.y = quda::dmul_rn (a.y, b.y);
+    t.x = quda::fma_rn (a.y, b.y, -t.y);
+    t.x = quda::fma_rn (a.x, b.x, t.x);
+    t.x = quda::fma_rn (a.y, b.x, t.x);
+    t.x = quda::fma_rn (a.x, b.y, t.x);
+    z.y = e = quda::dadd_rn (t.y, t.x);
+    z.x = quda::dadd_rn (t.y - e, t.x);
     return z;
 }
 
@@ -195,22 +196,22 @@ __device__ __forceinline__ dbldbl mul_dbldbl (dbldbl a, dbldbl b)
    maximum relative error observed with 10 billion test cases was
    1.0161322480099059e-31 (~= 2**-102.9566).
 */
-__device__ __forceinline__ dbldbl div_dbldbl (dbldbl a, dbldbl b)
+__device__ __host__ __forceinline__ dbldbl div_dbldbl (dbldbl a, dbldbl b)
 {
     dbldbl t, z;
     double e, r;
     r = 1.0 / b.y;
-    t.y = __dmul_rn (a.y, r);
-    e = __fma_rn (b.y, -t.y, a.y);
-    t.y = __fma_rn (r, e, t.y);
-    t.x = __fma_rn (b.y, -t.y, a.y);
-    t.x = __dadd_rn (a.x, t.x);
-    t.x = __fma_rn (b.x, -t.y, t.x);
-    e = __dmul_rn (r, t.x);
-    t.x = __fma_rn (b.y, -e, t.x);
-    t.x = __fma_rn (r, t.x, e);
-    z.y = e = __dadd_rn (t.y, t.x);
-    z.x = __dadd_rn (t.y - e, t.x);
+    t.y = quda::dmul_rn (a.y, r);
+    e = quda::fma_rn (b.y, -t.y, a.y);
+    t.y = quda::fma_rn (r, e, t.y);
+    t.x = quda::fma_rn (b.y, -t.y, a.y);
+    t.x = quda::dadd_rn (a.x, t.x);
+    t.x = quda::fma_rn (b.x, -t.y, t.x);
+    e = quda::dmul_rn (r, t.x);
+    t.x = quda::fma_rn (b.y, -e, t.x);
+    t.x = quda::fma_rn (r, t.x, e);
+    z.y = e = quda::dadd_rn (t.y, t.x);
+    z.x = quda::dadd_rn (t.y - e, t.x);
     return z;
 }
 
@@ -221,25 +222,25 @@ __device__ __forceinline__ dbldbl div_dbldbl (dbldbl a, dbldbl b)
    relative error observed with 10 billion test cases was
    3.7564109505601846e-32 (~= 2**-104.3923).
 */
-__device__ __forceinline__ dbldbl sqrt_dbldbl (dbldbl a)
+__device__ __host__ __forceinline__ dbldbl sqrt_dbldbl (dbldbl a)
 {
     dbldbl t, z;
     double e, y, s, r;
     r = quda::rsqrt(a.y);
     if (a.y == 0.0) r = 0.0;
-    y = __dmul_rn (a.y, r);
-    s = __fma_rn (y, -y, a.y);
-    r = __dmul_rn (0.5, r);
-    z.y = e = __dadd_rn (s, a.x);
-    z.x = __dadd_rn (s - e, a.x);
-    t.y = __dmul_rn (r, z.y);
-    t.x = __fma_rn (r, z.y, -t.y);
-    t.x = __fma_rn (r, z.x, t.x);
-    r = __dadd_rn (y, t.y);
-    s = __dadd_rn (y - r, t.y);
-    s = __dadd_rn (s, t.x);
-    z.y = e = __dadd_rn (r, s);
-    z.x = __dadd_rn (r - e, s);
+    y = quda::dmul_rn (a.y, r);
+    s = quda::fma_rn (y, -y, a.y);
+    r = quda::dmul_rn (0.5, r);
+    z.y = e = quda::dadd_rn (s, a.x);
+    z.x = quda::dadd_rn (s - e, a.x);
+    t.y = quda::dmul_rn (r, z.y);
+    t.x = quda::fma_rn (r, z.y, -t.y);
+    t.x = quda::fma_rn (r, z.x, t.x);
+    r = quda::dadd_rn (y, t.y);
+    s = quda::dadd_rn (y - r, t.y);
+    s = quda::dadd_rn (s, t.x);
+    z.y = e = quda::dadd_rn (r, s);
+    z.x = quda::dadd_rn (r - e, s);
     return z;
 }
 
@@ -248,27 +249,84 @@ __device__ __forceinline__ dbldbl sqrt_dbldbl (dbldbl a)
    the maximum relative error observed with 10 billion test cases was
    6.4937771666026349e-32 (~= 2**-103.6026)
 */
-__device__ __forceinline__ dbldbl rsqrt_dbldbl (dbldbl a)
+__device__ __host__ __forceinline__ dbldbl rsqrt_dbldbl (dbldbl a)
 {
     dbldbl z;
     double r, s, e;
     r = quda::rsqrt(a.y);
-    e = __dmul_rn (a.y, r);
-    s = __fma_rn (e, -r, 1.0);
-    e = __fma_rn (a.y, r, -e);
-    s = __fma_rn (e, -r, s);
-    e = __dmul_rn (a.x, r);
-    s = __fma_rn (e, -r, s);
+    e = quda::dmul_rn (a.y, r);
+    s = quda::fma_rn (e, -r, 1.0);
+    e = quda::fma_rn (a.y, r, -e);
+    s = quda::fma_rn (e, -r, s);
+    e = quda::dmul_rn (a.x, r);
+    s = quda::fma_rn (e, -r, s);
     e = 0.5 * r;
-    z.y = __dmul_rn (e, s);
-    z.x = __fma_rn (e, s, -z.y);
-    s = __dadd_rn (r, z.y);
-    r = __dadd_rn (r, -s);
-    r = __dadd_rn (r, z.y);
-    r = __dadd_rn (r, z.x);
-    z.y = e = __dadd_rn (s, r);
-    z.x = __dadd_rn (s - e, r);
+    z.y = quda::dmul_rn (e, s);
+    z.x = quda::fma_rn (e, s, -z.y);
+    s = quda::dadd_rn (r, z.y);
+    r = quda::dadd_rn (r, -s);
+    r = quda::dadd_rn (r, z.y);
+    r = quda::dadd_rn (r, z.x);
+    z.y = e = quda::dadd_rn (s, r);
+    z.x = quda::dadd_rn (s - e, r);
     return z;
+}
+
+__device__ __host__ __forceinline__ dbldbl abs_dbldbl(dbldbl a)
+{
+  if (a.y < 0.0) return neg_dbldbl(a);
+  return a;
+}
+
+__device__ __host__ __forceinline__ int dbldbl_cmp(dbldbl a, dbldbl b)
+{
+  if (a.y > b.y) return 1;
+  if (a.y < b.y) return -1;
+  if (a.x > b.x) return 1;
+  if (a.x < b.x) return -1;
+  return 0;
+}
+
+/* Scaled hypot: |ax| * sqrt(1 + (|ay|/|ax|)^2) with |ax| >= |ay|, avoiding overflow in squares. */
+__device__ __host__ __forceinline__ dbldbl hypot_dbldbl(dbldbl x, dbldbl y)
+{
+  dbldbl scale = make_dbldbl(1.0, 0.0);
+  dbldbl inv_scale = make_dbldbl(1.0, 0.0);
+
+  dbldbl ax = abs_dbldbl(x);
+  dbldbl ay = abs_dbldbl(y);
+  if (dbldbl_cmp(ay, ax) > 0) {
+    dbldbl t = ax;
+    ax = ay;
+    ay = t;
+  }
+
+  if (ax.y == 0.0 && ax.x == 0.0) return ax;
+
+  if (quda::abs(ax.y) > 0x1.0p510) {
+    scale = make_dbldbl(0x1.0p-256, 0.0);
+    inv_scale = make_dbldbl(0x1.0p256, 0.0);
+  } else if (ax.y > 0.0 && ax.y < 0x1.0p-510) {
+    scale = make_dbldbl(0x1.0p256, 0.0);
+    inv_scale = make_dbldbl(0x1.0p-256, 0.0);
+  }
+
+  if (scale.y != 1.0 || scale.x != 0.0) {
+    x = mul_dbldbl(x, scale);
+    y = mul_dbldbl(y, scale);
+    ax = abs_dbldbl(x);
+    ay = abs_dbldbl(y);
+    if (dbldbl_cmp(ay, ax) > 0) {
+      dbldbl t = ax;
+      ax = ay;
+      ay = t;
+    }
+  }
+
+  const dbldbl r = div_dbldbl(ay, ax);
+  const dbldbl t = add_dbldbl(make_dbldbl(1.0, 0.0), mul_dbldbl(r, r));
+  const dbldbl h = mul_dbldbl(ax, sqrt_dbldbl(t));
+  return mul_dbldbl(h, inv_scale);
 }
 
 #if defined(__cplusplus)
@@ -283,67 +341,159 @@ struct doubledouble {
 
   dbldbl a;
 
-  __device__ __host__ doubledouble() { a.x = 0.0; a.y = 0.0; }
-  __device__ __host__ doubledouble(const doubledouble &a) : a(a.a) { }
-  __device__ __host__ doubledouble(const dbldbl &a) : a(a) { }
-  __device__ __host__ doubledouble(const double &head, const double &tail) { a.y = head; a.x = tail; }
-  __device__ __host__ doubledouble(const double &head) { a.y = head; a.x = 0.0; }
+  doubledouble() = default;
+  constexpr doubledouble(const doubledouble &a) = default;
+  constexpr doubledouble &operator=(const doubledouble &a) = default;
+  constexpr doubledouble(const dbldbl &b) : a(b) { }
+  constexpr doubledouble(const double &head, const double &tail) : a{tail, head} { }
+  constexpr doubledouble(const double &head) : a{0.0, head} { }
 
   __device__ __host__ doubledouble& operator=(const double &head) {
     this->a.y = head;
     this->a.x = 0.0;
+    return *this;
   }
 
-  __device__ doubledouble& operator+=(const doubledouble &a) {
+  __device__ __host__ doubledouble& operator+=(const doubledouble &a) {
     this->a = add_dbldbl(this->a, a.a);
     return *this;
   }
 
-  __device__ __host__ double head() const { return a.y; }
-  __device__ __host__ double tail() const { return a.x; }
+  __device__ __host__ doubledouble& operator-=(const doubledouble &a) {
+    this->a = sub_dbldbl(this->a, a.a);
+    return *this;
+  }
+
+  __device__ __host__ void operator*=(const doubledouble &a)
+  {
+    this->a = mul_dbldbl(this->a, a.a);
+  }
+
+  __device__ __host__ void operator/=(const doubledouble &a)
+  {
+    this->a = div_dbldbl(this->a, a.a);
+  }
+
+  constexpr double head() const { return a.y; }
+  constexpr double tail() const { return a.x; }
 
   __device__ __host__ void print() const { printf("scalar: %16.14e + %16.14e\n", head(), tail()); }
 
+#ifdef QUDA_USE_QUAD_SCALAR
+  explicit constexpr operator quda::float128_t() const { return quda::float128_t(head()) + quda::float128_t(tail()); }
+#endif
+  explicit constexpr operator double() const { return head(); }
+  explicit constexpr operator float() const { return static_cast<float>(head()); }
+  explicit constexpr operator int() const { return static_cast<int>(head()); }
 };
 
-__device__  inline bool operator>(const doubledouble &a, const double &b) {
-  return a.head() > b;
+__device__ __host__ inline doubledouble sqrt(const doubledouble &a) { return doubledouble(sqrt_dbldbl(a.a)); }
+
+__device__ __host__ inline doubledouble operator-(const doubledouble &a) { return doubledouble(neg_dbldbl(a.a)); }
+
+__device__ __host__ inline doubledouble abs(const doubledouble &a) { return doubledouble(abs_dbldbl(a.a)); }
+
+__device__ __host__ inline bool isinf(const doubledouble &a) { return std::isinf(a.head()); }
+
+__device__ __host__ inline bool isnan(const doubledouble &a) { return std::isnan(a.head()); }
+
+__device__ __host__ inline bool isfinite(const doubledouble &a) { return std::isfinite(a.head()); }
+
+__device__ __host__  inline bool operator>(const doubledouble &a, const doubledouble &b)
+{
+  if (a.head() > b.head()) {
+    return true;
+  } else if (a.head() == b.head() && a.tail() > b.tail()) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
-__device__  inline doubledouble operator+(const doubledouble &a, const doubledouble &b) {
+__device__ __host__  inline bool operator>=(const doubledouble &a, const doubledouble &b)
+{
+  if (a.head() > b.head()) {
+    return true;
+  } else if (a.head() == b.head() && a.tail() >= b.tail()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+__device__ __host__  inline bool operator<(const doubledouble &a, const doubledouble &b)
+{
+  if (a.head() < b.head()) {
+    return true;
+  } else if (a.head() == b.head() && a.tail() < b.tail()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+__device__ __host__  inline bool operator<=(const doubledouble &a, const doubledouble &b)
+{
+  if (a.head() < b.head()) {
+    return true;
+  } else if (a.head() == b.head() && a.tail() <= b.tail()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+__device__ __host__  inline bool operator==(const doubledouble &a, const doubledouble &b) {
+  return (a.head() == b.head() && a.tail() == b.tail());
+}
+
+__device__ __host__  inline bool operator!=(const doubledouble &a, const doubledouble &b) {
+  return !(a == b);
+}
+
+__device__ __host__  inline bool operator>(const doubledouble &a, const double &b) {
+  return a.head() > b || (a.head() == b && a.tail() > 0);
+}
+
+__device__ __host__  inline doubledouble operator+(const doubledouble &a, const doubledouble &b) {
   return doubledouble(add_dbldbl(a.a,b.a));
 }
 
-__device__  inline doubledouble operator-(const doubledouble &a, const doubledouble &b) {
+__device__ __host__  inline doubledouble operator-(const doubledouble &a, const doubledouble &b) {
   return doubledouble(sub_dbldbl(a.a,b.a));
 }
 
-__device__ inline doubledouble operator*(const doubledouble &a, const doubledouble &b) {
+__device__ __host__ inline doubledouble operator*(const doubledouble &a, const doubledouble &b) {
   return  doubledouble(mul_dbldbl(a.a,b.a));
 }
 
-__device__ inline doubledouble operator/(const doubledouble &a, const doubledouble &b) {
+__device__ __host__ inline doubledouble operator/(const doubledouble &a, const doubledouble &b) {
   return doubledouble(div_dbldbl(a.a,b.a));
 }
 
-__device__ inline doubledouble add_double_to_doubledouble(const double &a, const double &b) {
-  return doubledouble(add_double_to_dbldbl(a,b));
+__device__ __host__ inline doubledouble hypot(const doubledouble &x, const doubledouble &y)
+{
+  return doubledouble(hypot_dbldbl(x.a, y.a));
 }
 
-__device__ inline doubledouble mul_double_to_doubledouble(const double &a, const double &b) {
-  return doubledouble(mul_double_to_dbldbl(a,b));
-}
+/**
+   @brief This isn't really an fma for double-double, but just
+   provides a convenient overload to ensure that when using native
+   floating point types that we consistently use an fma.
+*/
+__device__ __host__ inline doubledouble fma(const doubledouble &a, const doubledouble &b, const doubledouble &c) { return a * b + c; }
 
 struct doubledouble2 {
   doubledouble x;
   doubledouble y;
 
-  __device__ __host__ doubledouble2() : x(), y() { }
-  __device__ __host__ doubledouble2(const doubledouble2 &a) : x(a.x), y(a.y) { }
-  __device__ __host__ doubledouble2(const double2 &a) : x(a.x), y(a.y) { }
-  __device__ __host__ doubledouble2(const doubledouble &x, const doubledouble &y) : x(x), y(y) { }
+  doubledouble2() = default;
+  constexpr doubledouble2(const doubledouble2 &a) = default;
+  constexpr doubledouble2 &operator=(const doubledouble2 &a) = default;
+  constexpr doubledouble2(const double2 &a) : x(a.x), y(a.y) { }
+  constexpr doubledouble2(const doubledouble &x, const doubledouble &y) : x(x), y(y) { }
 
-  __device__ doubledouble2& operator+=(const doubledouble2 &a) {
+  __device__ __host__ doubledouble2& operator+=(const doubledouble2 &a) {
     x += a.x;
     y += a.y;
     return *this;
@@ -352,28 +502,11 @@ struct doubledouble2 {
   __device__ __host__ void print() const { printf("vec2: (%16.14e + %16.14e) (%16.14e + %16.14e)\n", x.head(), x.tail(), y.head(), y.tail()); }
 };
 
-struct doubledouble3 {
-  doubledouble x;
-  doubledouble y;
-  doubledouble z;
-
-  __device__ __host__ doubledouble3() : x(), y() { }
-  __device__ __host__ doubledouble3(const doubledouble3 &a) : x(a.x), y(a.y), z(a.z) { }
-  __device__ __host__ doubledouble3(const double3 &a) : x(a.x), y(a.y), z(a.z) { }
-  __device__ __host__ doubledouble3(const doubledouble &x, const doubledouble &y, const doubledouble &z) : x(x), y(y), z(z) { }
-
-  __device__ doubledouble3& operator+=(const doubledouble3 &a) {
-    x += a.x;
-    y += a.y;
-    z += a.z;
-    return *this;
-  }
-
-  __device__ __host__ void print() const { printf("vec3: (%16.14e + %16.14e) (%16.14e + %16.14e) (%16.14e + %16.14e)\n", x.head(), x.tail(), y.head(), y.tail(), z.head(), z.tail()); }
-};
-
-__device__ doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &b)
+__device__ __host__ inline doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &b)
 { return doubledouble2(a.x + b.x, a.y + b.y); }
 
-__device__ doubledouble3 operator+(const doubledouble3 &a, const doubledouble3 &b)
-{ return doubledouble3(a.x + b.x, a.y + b.y, a.z + b.z); }
+inline std::ostream &operator<<(std::ostream &output, const doubledouble &a)
+{
+  output << "{" << a.head() << ", " << a.tail() << "}";
+  return output;
+}

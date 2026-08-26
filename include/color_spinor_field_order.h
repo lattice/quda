@@ -622,10 +622,11 @@ namespace quda
 
       GhostOrder &operator=(const GhostOrder &) = default;
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (block_float_ghost && max != static_cast<Float>(1.0))
-          errorQuda("Block-float accessor requires max=1.0 not max=%e", max);
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", max_);
         if constexpr (ghost_fixed && !block_float_ghost) {
           ghost.scale = static_cast<Float>(std::numeric_limits<ghostFloat>::max() / max);
           ghost.scale_inv = static_cast<Float>(max / std::numeric_limits<ghostFloat>::max());
@@ -717,8 +718,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
-        auto nrm2 = transform_reduce<plus<double>>(dim, field.Location(), field.SiteSubset(),
-                                                   square_<double, ghostFloat>(scale_inv));
+        real_t nrm2 = real_t(transform_reduce<plus<device_reduce_t>>(dim, field.Location(), field.SiteSubset(),
+                                                                     square_<double, ghostFloat>(scale_inv)));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -735,8 +736,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
-        auto absmax = transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
-                                                       abs_max_<Float, ghostFloat>(scale_inv));
+        real_t absmax = real_t(transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
+                                                                abs_max_<Float, ghostFloat>(scale_inv)));
         commGlobalReductionPop();
         return absmax;
       }
@@ -808,15 +809,16 @@ namespace quda
 
       FieldOrderCB &operator=(const FieldOrderCB &) = default;
 
-      void resetScale(Float max)
+      void resetScale(real_t max_)
       {
+        const Float max = static_cast<Float>(max_);
         if (block_float && max != static_cast<Float>(1.0))
-          errorQuda("Block-float accessor requires max=1.0 not max=%e", max);
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", max_);
         if constexpr (fixed && !block_float) {
           v.scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
           v.scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
         }
-        if constexpr (GhostOrder::supports_ghost_zone) GhostOrder::resetScale(max);
+        if constexpr (GhostOrder::supports_ghost_zone) GhostOrder::resetScale(max_);
       }
 
       /**
@@ -947,8 +949,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
-        auto nrm2
-          = transform_reduce<plus<double>>(field.Location(), field.SiteSubset(), square_<double, storeFloat>(scale_inv));
+        real_t nrm2 = real_t(transform_reduce<plus<device_reduce_t>>(field.Location(), field.SiteSubset(),
+                                                                     square_<double, storeFloat>(scale_inv)));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -964,8 +966,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
-        auto absmax = transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
-                                                       abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax = real_t(transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
+                                                              abs_max_<Float, storeFloat>(scale_inv)));
         commGlobalReductionPop();
         return absmax;
       }

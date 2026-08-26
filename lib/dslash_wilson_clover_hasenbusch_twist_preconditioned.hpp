@@ -121,7 +121,7 @@ namespace quda
     WilsonCloverHasenbuschTwistPCNoClovInvApply(cvector_ref<ColorSpinorField> &out,
                                                 cvector_ref<const ColorSpinorField> &in,
                                                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
-                                                const CloverField &A, double a, double b, int parity, bool dagger,
+                                                const CloverField &A, real_t a, real_t b, int parity, bool dagger,
                                                 const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -250,7 +250,7 @@ namespace quda
   struct WilsonCloverHasenbuschTwistPCClovInvApply {
     WilsonCloverHasenbuschTwistPCClovInvApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                               cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
-                                              const CloverField &A, double kappa, double mu, int parity, bool dagger,
+                                              const CloverField &A, real_t kappa, real_t mu, int parity, bool dagger,
                                               const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;

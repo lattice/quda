@@ -55,8 +55,8 @@ namespace quda {
     QudaTboundary t_boundary = QUDA_INVALID_T_BOUNDARY;
     QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO;
 
-    double anisotropy = 1.0;
-    double tadpole = 1.0;
+    real_t anisotropy = 1.0;
+    real_t tadpole = 1.0;
     GaugeField *field = nullptr; // pointer to a pre-allocated field
     void *gauge = nullptr;       // used when we use a reference to an external field
 
@@ -76,7 +76,7 @@ namespace quda {
     bool staggeredPhaseApplied = false;
 
     /** Imaginary chemical potential */
-    double i_mu = 0.0;
+    real_t i_mu = 0.0;
 
     /** Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_offset = 0;
@@ -190,9 +190,9 @@ namespace quda {
     QudaLinkType link_type = QUDA_INVALID_LINKS;
     QudaTboundary t_boundary = QUDA_INVALID_T_BOUNDARY;
 
-    double anisotropy = 0.0;
-    double tadpole = 0.0;
-    double fat_link_max = 0.0;
+    real_t anisotropy = 0.0;
+    real_t tadpole = 0.0;
+    real_t fat_link_max = 0.0;
 
     mutable std::unique_ptr<GaugeField> shifted
       = nullptr;             // shifted copy of the gauge field, used for double-store enabled dslash
@@ -215,7 +215,7 @@ namespace quda {
     /**
        Imaginary chemical potential
     */
-    double i_mu = 0.0;
+    real_t i_mu = 0.0;
 
     /**
        Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
@@ -362,8 +362,8 @@ namespace quda {
     int Ncolor() const { return nColor; }
     QudaReconstructType Reconstruct() const { return reconstruct; }
     QudaGaugeFieldOrder Order() const { return order; }
-    double Anisotropy() const { return anisotropy; }
-    double Tadpole() const { return tadpole; }
+    real_t Anisotropy() const { return anisotropy; }
+    real_t Tadpole() const { return tadpole; }
     QudaTboundary TBoundary() const { return t_boundary; }
     QudaLinkType LinkType() const { return link_type; }
     QudaGaugeFixed GaugeFixed() const { return fixed; }
@@ -393,9 +393,9 @@ namespace quda {
     /**
        Return the imaginary chemical potential applied to this field
     */
-    double iMu() const { return i_mu; }
+    real_t iMu() const { return i_mu; }
 
-    const double& LinkMax() const { return fat_link_max; }
+    const real_t &LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
 
     /**
@@ -537,28 +537,28 @@ namespace quda {
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L1 norm
      */
-    double norm1(int dim = -1, bool fixed = false) const;
+    real_t norm1(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L2 norm squared
      */
-    double norm2(int dim = -1, bool fixed = false) const;
+    real_t norm2(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute maximum value
      */
-    double abs_max(int dim = -1, bool fixed = false) const;
+    real_t abs_max(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute minimum value
      */
-    double abs_min(int dim = -1, bool fixed = false) const;
+    real_t abs_min(int dim = -1, bool fixed = false) const;
 
     /**
        Compute checksum of this gauge field: this uses a XOR-based checksum method
@@ -701,7 +701,7 @@ namespace quda {
      @param u The gauge field that we want the norm of
      @return The L1 norm of the gauge field
   */
-  double norm1(const GaugeField &u);
+  real_t norm1(const GaugeField &u);
 
   /**
      @brief This is a debugging function, where we cast a gauge field
@@ -709,14 +709,14 @@ namespace quda {
      @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const GaugeField &u);
+  real_t norm2(const GaugeField &u);
 
   /**
      @brief Scale the gauge field by the scalar a.
      @param[in] a scalar multiplier
      @param[in] u The gauge field we want to multiply
    */
-  void ax(const double &a, GaugeField &u);
+  void ax(const real_t &a, GaugeField &u);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

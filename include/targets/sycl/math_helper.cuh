@@ -6,9 +6,13 @@ namespace quda
   inline int abs(const int a) { return sycl::abs(a); }
   inline float abs(const float a) { return sycl::fabs(a); }
   inline double abs(const double a) { return sycl::fabs(a); }
+  inline float fabs(const float a) { return sycl::fabs(a); }
+  inline double fabs(const double a) { return sycl::fabs(a); }
 
   template <typename T> inline int rint(const T a) { return (int)sycl::round(a); }
   template <typename T> inline T fmod(const T a, const T b) { return sycl::fmod(a, b); }
+  inline __host__ __device__ bool isnan(float a) { return sycl::isnan(a); }
+  inline __host__ __device__ bool isnan(double a) { return sycl::isnan(a); }
 
   /**
    * @brief Maximum of two numbers
@@ -91,6 +95,9 @@ namespace quda
   template <typename T> inline T sinh(const T a) { return sycl::sinh(a); }
   template <typename T> inline T cosh(const T a) { return sycl::cosh(a); }
 
+  template <typename T> inline T acosh(const T a) { return sycl::acosh(a); }
+  template <typename T> inline T asinh(const T a) { return sycl::asinh(a); }
+
   /**
    * @brief Square root function (sqrt)
    * @param a the argument
@@ -153,5 +160,20 @@ namespace quda
   {
     return {a.x * b.x + c.x, a.y * b.y + c.y};
   }
+
+  /**
+     @brief IEEE double precision multiplication
+  */
+  __device__ __host__ inline double dmul_rn(double a, double b) { return a * b; }
+
+  /**
+     @brief IEEE double precision addition
+  */
+  __device__ __host__ inline double dadd_rn(double a, double b) { return a + b; }
+
+  /**
+     @brief IEEE double precision fused multiply add
+  */
+  __device__ __host__ inline double fma_rn(double a, double b, double c) { return a * b + c; }
 
 } // namespace quda

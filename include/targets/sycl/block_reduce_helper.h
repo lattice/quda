@@ -48,6 +48,11 @@ namespace quda
     using type = float;
   };
 
+  template <typename T>
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<typename T::value_type>>>> {
+    using type = typename atomic_type<typename T::value_type>::type;
+  };
+
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
 
@@ -204,8 +209,8 @@ namespace quda
   static constexpr bool needsFullBlockImpl<BlockReduce<T, block_dim, batch_size>> = true;
   template <typename T, int block_dim, int batch_size>
   static constexpr bool needsSharedMemImpl<BlockReduce<T, block_dim, batch_size>> = true;
-} // namespace quda
 
-static_assert(needsFullBlock<KernelOps<BlockReduce<double, 1>>> == true);
-static_assert(BlockReduce<double, 1>::shared_mem_size(dim3 {8, 8, 8}) > 0);
-static_assert(needsSharedMem<KernelOps<BlockReduce<double, 1>>> == true);
+  static_assert(needsFullBlock<KernelOps<BlockReduce<double, 1>>> == true);
+  static_assert(BlockReduce<double, 1>::shared_mem_size(dim3 {8, 8, 8}) > 0);
+  static_assert(needsSharedMem<KernelOps<BlockReduce<double, 1>>> == true);
+} // namespace quda

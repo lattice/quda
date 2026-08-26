@@ -32,7 +32,7 @@ void create_random_traceless_antiherm(real_t mat[10], int i, int parity, real_t 
   // out[8] = complex(0.0, in[8]);
 
   // Normalization for generators on the diagonal
-  real_t inv_sqrt3 = sqrt(1. / 3.);
+  real_t inv_sqrt3 = quda::sqrt(1. / 3.);
   real_t r3 = max_val * random_gaussian_host(i, parity);
   real_t r8 = max_val * random_gaussian_host(i, parity);
 

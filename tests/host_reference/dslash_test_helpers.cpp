@@ -29,7 +29,7 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in), blas::norm2(in_h));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", double(blas::norm2(in)), double(blas::norm2(in_h)));
 
   ColorSpinorField out(cudaParam);
 
@@ -60,7 +60,7 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", double(blas::norm2(out_h)), double(blas::norm2(out)));
 
   popVerbosity();
 }
@@ -83,7 +83,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", double(blas::norm2(in_h)), double(blas::norm2(in)));
 
   ColorSpinorField out(cudaParam);
 
@@ -110,7 +110,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", double(blas::norm2(out_h)), double(blas::norm2(out)));
   popVerbosity();
 }
 
@@ -133,8 +133,7 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-    printfQuda("In CPU %16.12e CUDA %12.12e\n", blas::norm2(in_h), blas::norm2(in));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %16.12e CUDA %12.12e\n", double(blas::norm2(in_h)), double(blas::norm2(in)));
 
   ColorSpinorField out(cudaParam);
 
@@ -160,7 +159,6 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-    printfQuda("In CPU %16.12e CUDA %12.12e\n", blas::norm2(out_h), blas::norm2(out));
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %16.12e CUDA %12.12e\n", double(blas::norm2(out_h)), double(blas::norm2(out)));
   popVerbosity();
 }

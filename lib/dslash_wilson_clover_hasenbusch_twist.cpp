@@ -7,7 +7,7 @@ namespace quda
   struct WilsonCloverHasenbuschTwistApply {
     WilsonCloverHasenbuschTwistApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
-                                     double a, double b, int parity, bool dagger, const int *comm_override,
+                                     real_t a, real_t b, int parity, bool dagger, const int *comm_override,
                                      TimeProfile &profile);
   };
 
@@ -15,7 +15,7 @@ namespace quda
   // out(x) = M*in = (A(x) + a * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
   void ApplyWilsonCloverHasenbuschTwist(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                        const GaugeField &U, const CloverField &A, double a, double b,
+                                        const GaugeField &U, const CloverField &A, real_t a, real_t b,
                                         cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                         const int *comm_override, TimeProfile &profile)
   {

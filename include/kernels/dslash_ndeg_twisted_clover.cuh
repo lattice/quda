@@ -21,16 +21,16 @@ namespace quda
     real c; /** this is the flavor twist factor */
 
     NdegTwistedCloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                         const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a, double b,
-                         double c, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                         const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, real_t a, real_t b,
+                         real_t c, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                          const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       A(A, false),
-      a(a),
+      a(static_cast<real>(a)),
       // if dagger flip the chiral twist
       // factor of 1/2 comes from clover normalization
-      b(dagger ? -0.5 * b : 0.5 * b),
-      c(c)
+      b(static_cast<real>(dagger ? -0.5 * b : 0.5 * b)),
+      c(static_cast<real>(c))
     {
       checkPrecision(U, A);
       checkLocation(U, A);

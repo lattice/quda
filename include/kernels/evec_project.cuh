@@ -7,8 +7,8 @@
 #include <reduction_kernel.h>
 
 namespace quda {
-  
-  using spinor_array = array<double, 8>;
+
+  using spinor_array = array<device_reduce_t, 8>;
 
   constexpr unsigned long max_nx = 4;
   constexpr unsigned long max_ny = 4;
@@ -84,14 +84,14 @@ namespace quda {
       Vector1 y = arg.y[j](idx_cb, parity);
 
       // Compute the inner product over colour
-      reduce_t result_local;
+      array<real, nSpinX * 2> result_local;
       for (int mu = 0; mu < nSpinX; mu++) {
         complex<real> prod = innerProduct(y, x, 0, mu);
         result_local[2 * mu + 0] = prod.real();
         result_local[2 * mu + 1] = prod.imag();
       }
-      
-      return plus::operator()(result_local, result);
+
+      return operator()(result, result_local);
     }
   };
 }

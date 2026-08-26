@@ -73,9 +73,10 @@ auto laph_test(test_t param)
     spinorNoise(e, rng, QUDA_NOISE_GAUSS);
   }
 
-  // host reference [nSink][nEv][Lt][nSpin][complexity]
+  // host reference [nSink][nEv][Lt][nSpin][complexity] (CPU fields are double precision)
+  using host_complex = std::complex<double>;
   auto Lt = tdim * comm_dim(3);
-  std::vector<Complex> hostRes(nSink * nEv * Lt * nSpin, 0.);
+  std::vector<host_complex> hostRes(nSink * nEv * Lt * nSpin, host_complex(0., 0.));
 
   // #pragma omp parallel for collapse(4)
   for (int iEv = 0; iEv < nEv; ++iEv) {
@@ -92,8 +93,8 @@ auto laph_test(test_t param)
 
                 for (int iCol = 0; iCol < nColor; ++iCol)
                   hostRes[iSpin + nSpin * (globT + Lt * (iEv + nEv * iSink))]
-                    += conj(evList[iEv].data<Complex *>()[iCol + nColor * linInd])
-                    * sinkList[iSink].data<Complex *>()[iCol + nColor * (iSpin + nSpin * linInd)];
+                    += std::conj(evList[iEv].data<host_complex *>()[iCol + nColor * linInd])
+                    * sinkList[iSink].data<host_complex *>()[iCol + nColor * (iSpin + nSpin * linInd)];
               }
             }
           }
@@ -111,20 +112,20 @@ auto laph_test(test_t param)
   std::vector<void *> evPtr(nEv);
   for (int iEv = 0; iEv < nEv; ++iEv) evPtr[iEv] = evList[iEv].data();
 
-  std::vector<Complex> qudaRes(nSink * nEv * Lt * nSpin, 0.);
+  std::vector<host_complex> qudaRes(nSink * nEv * Lt * nSpin, host_complex(0., 0.));
 
   int X[4] = {xdim, ydim, zdim, tdim};
-  laphSinkProject((__complex__ double *)qudaRes.data(), snkPtr.data(), nSink, tileSink, evPtr.data(), nEv, tileEv,
-                  &invParam, X);
+  laphSinkProject(reinterpret_cast<double _Complex *>(qudaRes.data()), snkPtr.data(), nSink, tileSink, evPtr.data(),
+                  nEv, tileEv, &invParam, X);
   printfQuda("laphSinkProject Done: %g secs, %g Gflops\n", invParam.secs, invParam.gflops / invParam.secs);
 
   auto tol = getTolerance(cuda_prec);
   int rtn = 0;
   for (unsigned int i = 0; i < qudaRes.size(); i++) {
-    auto deviation = abs(qudaRes[i] - hostRes[i]) / abs(hostRes[i]);
+    auto deviation = std::abs(qudaRes[i] - hostRes[i]) / std::abs(hostRes[i]); // both double-complex
     if (deviation > tol) {
-      printfQuda("EV projection test failed at iEl=%d: (%f,%f) [QUDA], (%f,%f) [host]\n", i, qudaRes[i].real(),
-                 qudaRes[i].imag(), hostRes[i].real(), hostRes[i].imag());
+      printfQuda("EV projection test failed at iEl=%d: (%f,%f) [QUDA], (%f,%f) [host]\n", i, double(qudaRes[i].real()),
+                 double(qudaRes[i].imag()), double(hostRes[i].real()), double(hostRes[i].imag()));
       EXPECT_LE(deviation, tol);
       rtn = 1;
     }
