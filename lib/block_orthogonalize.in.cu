@@ -20,7 +20,11 @@ namespace quda {
 #ifndef QUDA_FAST_COMPILE_REDUCE
     using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
+#if defined(QUDA_TARGET_SYCL)
+    using array_type = PowerOfTwoArray<device::max_block_size() / 2, device::max_block_size()>;
+#else
     using array_type = PowerOfTwoArray<device::max_block_size(), device::max_block_size()>;
+#endif
 #endif
     static constexpr array_type block = array_type();
 
@@ -156,6 +160,31 @@ namespace quda {
       }
     }
 
+#if 0
+#if defined(QUDA_TARGET_SYCL)
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    {
+      using sum_t = double;
+      int mVec = quda::tile_size<nColor, nVec>(tp.block.x);
+      int vsize = 2 * sizeof(sum_t) * mVec;
+      return vsize * (tp.block.x * tp.block.y * tp.block.z) / device::warp_size();
+    }
+#endif
+#else
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    {
+      constexpr bool disable_ghost = true;
+      using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
+      using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER, bFloat, bFloat, disable_ghost,
+                                      isFixed<bFloat>::value>;
+      using Args = Arg<true, Rotator, Vector>;
+      Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
+      auto sizeOps = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
+      return sizeOps;
+    }
+#endif
+
 #ifdef SWIZZLE
     bool advanceAux(TuneParam &param) const
     {
@@ -188,6 +217,7 @@ namespace quda {
       param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
       param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, 1, chiral_blocks);
       param.aux.x = 1; // swizzle factor
+      setSharedBytes(param);
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }

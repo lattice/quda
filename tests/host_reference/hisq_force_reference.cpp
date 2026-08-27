@@ -718,7 +718,7 @@ template <typename real_t> struct HisqStaplesForce {
     const int loop_count = is_multi_gpu() ? Vh_ex : volume / 2;
 
     LoadStore<real_t> ls(volume);
-#pragma omp parallel for
+    //#pragma omp parallel for
     for (int site = 0; site < loop_count; ++site) {
 
       computeAllLinkSite<0>(site, dim, oprod, Qprev, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
