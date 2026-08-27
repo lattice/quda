@@ -615,9 +615,9 @@ namespace quda
       }
     }
 
-    void finalize()
+    void destroy()
     {
-      // Pairs with init() to satisfy the target-agnostic pool::finalize()
+      // Pairs with init() to satisfy the target-agnostic pool::destroy()
       // declaration.  The HIP target bootstraps no NVSHMEM in init(), so there
       // is nothing to tear down here -- this is a deliberate no-op stub (the
       // CUDA target finalizes NVSHMEM in its counterpart).

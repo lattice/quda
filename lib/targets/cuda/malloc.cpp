@@ -666,7 +666,7 @@ namespace quda
 #endif
     }
 
-    void finalize()
+    void destroy()
     {
 #if defined(NVSHMEM_COMMS)
       // Pairs with the NVSHMEM bootstrap in init().  NVSHMEM 3.7.0 defers the
