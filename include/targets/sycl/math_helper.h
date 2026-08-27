@@ -1,1 +1,179 @@
-#include <math_helper.cuh>
+#pragma once
+
+namespace quda
+{
+
+  inline int abs(const int a) { return sycl::abs(a); }
+  inline float abs(const float a) { return sycl::fabs(a); }
+  inline double abs(const double a) { return sycl::fabs(a); }
+  inline float fabs(const float a) { return sycl::fabs(a); }
+  inline double fabs(const double a) { return sycl::fabs(a); }
+
+  template <typename T> inline int rint(const T a) { return (int)sycl::round(a); }
+  template <typename T> inline T fmod(const T a, const T b) { return sycl::fmod(a, b); }
+  inline __host__ __device__ bool isnan(float a) { return sycl::isnan(a); }
+  inline __host__ __device__ bool isnan(double a) { return sycl::isnan(a); }
+
+  /**
+   * @brief Maximum of two numbers
+   * @param a first number
+   * @param b second number
+   */
+  template <typename T> inline __host__ __device__ T max(const T a, const T b) { return a > b ? a : b; }
+
+  /**
+   * @brief Minimum of two numbers
+   * @param a first number
+   * @param b second number
+   */
+  template <typename T> inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
+
+  /**
+   * @brief Sine calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the sin(a)
+   */
+  template <typename T> inline T sin(T a) { return sycl::sin(a); }
+
+  /**
+   * @brief Cosine calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the cos(a)
+   */
+  template <typename T> inline T cos(T a) { return sycl::cos(a); }
+
+  /**
+   * @brief Combined sin and cos colculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   *
+   */
+  template <typename T> inline void sincos(const T a, T *s, T *c)
+  {
+    //*s = sycl::sincos(a, c);
+    *s = sycl::sin(a);
+    *c = sycl::cos(a);
+  }
+
+  /**
+   * @brief Sine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   */
+  template <typename T> inline T sinpi(T a) { return sycl::sinpi(a); }
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   */
+  template <typename T> inline T cospi(T a) { return sycl::cospi(a); }
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   */
+  template <typename T> inline void sincospi(const T &a, T *s, T *c)
+  {
+    //*s = sycl::sincos(static_cast<T>(M_PI)*a, c);
+    *s = sycl::sinpi(a);
+    *c = sycl::cospi(a);
+  }
+
+  /**
+   * @brief Arc cosine calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the acos(a)
+   */
+  template <typename T> inline T acos(const T a) { return sycl::acos(a); }
+
+  template <typename T> inline T atan2(const T a, const T b) { return sycl::atan2(a, b); }
+
+  template <typename T> inline T sinh(const T a) { return sycl::sinh(a); }
+  template <typename T> inline T cosh(const T a) { return sycl::cosh(a); }
+
+  template <typename T> inline T acosh(const T a) { return sycl::acosh(a); }
+  template <typename T> inline T asinh(const T a) { return sycl::asinh(a); }
+
+  /**
+   * @brief Square root function (sqrt)
+   * @param a the argument
+   */
+  template <typename T> inline __host__ __device__ T sqrt(T a) { return sycl::sqrt(a); }
+
+  /**
+   * @brief Reciprocal square root function (rsqrt)
+   * @param a the argument
+   */
+  template <typename T> inline __host__ __device__ T rsqrt(T a) { return sycl::rsqrt(a); }
+
+  template <typename T> inline T hypot(const T a, const T b) { return sycl::hypot(a, b); }
+
+  /**
+   * @brief Exponential function
+   * @param a the argument
+   */
+  template <typename T> inline __host__ __device__ T exp(T a) { return sycl::exp(a); }
+
+  /**
+   * @brief Natural log function
+   * @param a the argument
+   */
+  template <typename T> inline __host__ __device__ T log(T a) { return sycl::log(a); }
+
+  /*
+    @brief Power function
+    @param a argument we want to raise to some power
+    @param b power that we want to raise a to
+    @return pow(a,b)
+  */
+  template <typename real> __device__ __host__ inline real pow(real a, real b) { return sycl::pow(a, b); }
+  template <typename real> __device__ __host__ inline real pow(real a, int b) { return sycl::pown(a, b); }
+
+  /*
+    @brief Fast power function that works for negative "a" argument
+    @param a argument we want to raise to some power
+    @param b power that we want to raise a to
+    @return pow(a,b)
+  */
+  template <typename real> __device__ __host__ inline real fpow(real a, int b) { return sycl::pown(a, b); }
+
+  /**
+     @brief Optimized division routine on the device
+  */
+  // inline float fdivide(float a, float b) { return sycl::native::divide(a, b); } FIXME causes
+  // dslash_staggered_matpc_policytune to fail (barely)
+  inline float fdivide(float a, float b) { return a / b; }
+  inline double fdivide(double a, double b) { return a / b; }
+
+  __device__ __host__ inline float2 add2(float2 a, float2 b) { return {a.x + b.x, a.y + b.y}; }
+  __device__ __host__ inline double2 add2(double2 a, double2 b) { return {a.x + b.x, a.y + b.y}; }
+
+  __device__ __host__ inline float2 mul2(float2 a, float2 b) { return {a.x * b.x, a.y * b.y}; }
+  __device__ __host__ inline double2 mul2(double2 a, double2 b) { return {a.x * b.x, a.y * b.y}; }
+
+  __device__ __host__ inline float2 fma2(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
+  __device__ __host__ inline double2 fma2(double2 a, double2 b, double2 c)
+  {
+    return {a.x * b.x + c.x, a.y * b.y + c.y};
+  }
+
+  /**
+     @brief IEEE double precision multiplication
+  */
+  __device__ __host__ inline double dmul_rn(double a, double b) { return a * b; }
+
+  /**
+     @brief IEEE double precision addition
+  */
+  __device__ __host__ inline double dadd_rn(double a, double b) { return a + b; }
+
+  /**
+     @brief IEEE double precision fused multiply add
+  */
+  __device__ __host__ inline double fma_rn(double a, double b, double c) { return a * b + c; }
+
+} // namespace quda
