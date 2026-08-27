@@ -1,7 +1,7 @@
 #pragma once
 
 //#ifdef __SYCL_DEVICE_ONLY__
-#if 0
+#if 0 // need to deal with early thread exit
 
 #include <quda_sycl.h>
 

@@ -160,6 +160,7 @@ namespace quda {
       }
     }
 
+#if 0
 #if defined(QUDA_TARGET_SYCL)
     unsigned int sharedBytesPerBlock(const TuneParam &tp) const
     {
@@ -167,6 +168,20 @@ namespace quda {
       int mVec = quda::tile_size<nColor, nVec>(tp.block.x);
       int vsize = 2 * sizeof(sum_t) * mVec;
       return vsize * (tp.block.x * tp.block.y * tp.block.z) / device::warp_size();
+    }
+#endif
+#else
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    {
+      constexpr bool disable_ghost = true;
+      using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
+      using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER, bFloat, bFloat, disable_ghost,
+                                      isFixed<bFloat>::value>;
+      using Args = Arg<true, Rotator, Vector>;
+      Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
+      auto sizeOps = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
+      return sizeOps;
     }
 #endif
 

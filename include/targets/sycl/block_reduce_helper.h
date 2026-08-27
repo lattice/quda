@@ -9,8 +9,8 @@
 /**
    @file block_reduce_helper.h
 
-   @section This files contains the CUDA device specializations for
-   warp- and block-level reductions, using the CUB library
+   @section This files contains the device specializations for
+   warp- and block-level reductions
  */
 
 namespace quda
