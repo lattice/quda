@@ -1447,7 +1447,7 @@ namespace quda
       using Accessor = SpaceColorSpinorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      static const int length = 2 * Ns * Nc;
+      static constexpr int length = 2 * Ns * Nc;
       Float *field;
       size_t offset;
       Float *ghost[8];
@@ -1531,7 +1531,7 @@ namespace quda
       using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      static const int length = 2 * Ns * Nc;
+      static constexpr int length = 2 * Ns * Nc;
       Float *field;
       size_t offset;
       Float *ghost[8];
@@ -1606,7 +1606,7 @@ namespace quda
       using Accessor = PaddedSpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      static const int length = 2 * Ns * Nc;
+      static constexpr int length = 2 * Ns * Nc;
       Float *field;
       size_t offset;
       Float *ghost[8];
@@ -1766,7 +1766,7 @@ namespace quda
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
 
-      static const int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
+      static constexpr int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
       Float *field;
       size_t offset;
       Float *ghost[8];
