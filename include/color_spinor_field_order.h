@@ -200,7 +200,7 @@ namespace quda
       AccessorCB() { errorQuda("Not implemented"); }
       AccessorCB(const AccessorCB &) { errorQuda("Not implemented"); }
       AccessorCB &operator=(const AccessorCB &) { errorQuda("Not implemented"); }
-      constexpr int index(int, int, int, int, int, int) const { return 0; }
+      constexpr index_t index(int, int, int, int, int, int) const { return 0; }
     };
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct GhostAccessorCB {
@@ -213,7 +213,7 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
-      int offset_cb = 0;
+      index_t offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;
       AccessorCB(const AccessorCB &) = default;
@@ -229,9 +229,10 @@ namespace quda
        * @param c color index
        * @param v vector index
        */
-      constexpr int index(int parity, int x_cb, int s, int c, int v, int) const
+      constexpr index_t index(int parity, int x_cb, int s, int c, int v, int) const
       {
-        return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
+        return static_cast<index_t>(parity) * offset_cb
+          + (((static_cast<index_t>(x_cb) * nSpin + s) * nColor + c) * nVec + v);
       }
 
       template <int nSpinBlock>
@@ -271,8 +272,8 @@ namespace quda
       }
     };
 
-    template <int nSpin, int nColor, int nVec, int N> // note this will not work for N=1
-    constexpr int indexFloatN(int x_cb, int s, int c, int v, int stride)
+    template <typename Index, int nSpin, int nColor, int nVec, int N> // note this will not work for N=1
+    constexpr Index indexFloatN(int x_cb, int s, int c, int v, int stride)
     {
       // complex-valued indexing
       constexpr int length = nColor * nSpin * nVec;
@@ -283,21 +284,22 @@ namespace quda
       int j = k / (N / 2);
       int i = k % (N / 2);
       int Nvec = (Nrem == 0 || j < M) ? N / 2 : Nrem;
-      return j * stride * (N / 2) + x_cb * Nvec + i;
+      return static_cast<Index>(j) * stride * (N / 2) + static_cast<Index>(x_cb) * Nvec + i;
     };
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER> {
       static constexpr int N = colorspinor::get_vector_order<Float>(nSpin * nColor * nVec * 2);
-      int offset_cb = 0;
+      index_t offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;
       AccessorCB(const AccessorCB &) = default;
       AccessorCB &operator=(const AccessorCB &) = default;
 
-      constexpr int index(int parity, int x_cb, int s, int c, int v, int stride) const
+      constexpr index_t index(int parity, int x_cb, int s, int c, int v, int stride) const
       {
-        return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, N>(x_cb, s, c, v, stride);
+        return static_cast<index_t>(parity) * offset_cb
+          + indexFloatN<index_t, nSpin, nColor, nVec, N>(x_cb, s, c, v, stride);
       }
 
       template <int nSpinBlock>
@@ -331,15 +333,16 @@ namespace quda
 
     // specialized variant for packed half precision staggered
     template <> struct AccessorCB<short, 1, 3, 1, QUDA_NATIVE_FIELD_ORDER> {
-      int offset_cb = 0;
+      index_t offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<short>)) { }
       AccessorCB() = default;
       AccessorCB(const AccessorCB &) = default;
       AccessorCB &operator=(const AccessorCB &) = default;
 
-      constexpr int index(int parity, int x_cb, int s, int c, int v, int stride) const
+      constexpr index_t index(int parity, int x_cb, int s, int c, int v, int stride) const
       {
-        return parity * offset_cb + ((s * 3 + c) * 1 + v) * stride + x_cb;
+        return static_cast<index_t>(parity) * offset_cb
+          + static_cast<index_t>((s * 3 + c) * 1 + v) * stride + x_cb;
       }
 
       template <int nSpinBlock>
@@ -368,7 +371,8 @@ namespace quda
 
       constexpr int index(int dim, int parity, int x_cb, int s, int c, int v) const
       {
-        return parity * ghostOffset[dim] + indexFloatN<nSpin, nColor, nVec, N>(x_cb, s, c, v, faceVolumeCB[dim]);
+        return parity * ghostOffset[dim]
+          + indexFloatN<int, nSpin, nColor, nVec, N>(x_cb, s, c, v, faceVolumeCB[dim]);
       }
     };
 
@@ -391,7 +395,7 @@ namespace quda
       using value_type = Float;      /**< Compute type */
       using store_t = storeFloat;    /**< Storage type */
       complex<storeFloat> *v;        /**< Field memory address this wrapper encompasses */
-      const int idx;                 /**< Index into field */
+      const index_t idx;             /**< Index into field */
     private:
       const Float scale;             /**< Float to fixed-point scale factor */
       const Float scale_inv;         /**< Fixed-point to float scale factor */
@@ -406,7 +410,7 @@ namespace quda
          @brief fieldorder_wrapper constructor
          @param idx Field index
       */
-      __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv,
+      __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, index_t idx, Float scale, Float scale_inv,
                                                     norm_t *norm = nullptr, int norm_idx = 0, bool norm_write = false) :
         v(v), idx(idx), scale(scale), scale_inv(scale_inv), norm(norm), norm_idx(norm_idx), norm_write(norm_write)
       {
