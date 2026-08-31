@@ -20,14 +20,14 @@ namespace quda
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, ghost, false,
                                     QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type;
 
     using real = typename mapper<Float>::type;

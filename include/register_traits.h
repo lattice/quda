@@ -7,6 +7,8 @@
  *
  */
 
+#include <cstdint>
+
 #include <quda_internal.h>
 #include <complex_quda.h>
 #include <target_device.h>
@@ -259,5 +261,11 @@ namespace quda {
   };
 
   template <class T> using get_scalar_t = typename get_scalar<T>::type;
+
+#ifdef QUDA_64BIT_INDEXING
+  using index_t = uint64_t;
+#else
+  using index_t = uint32_t;
+#endif
 
 } // namespace quda

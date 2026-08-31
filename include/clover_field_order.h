@@ -557,17 +557,12 @@ namespace quda {
        @tparam add_rho Whether to add the constant rho onto the
        diagonal.  This is used to enable Hasenbusch mass
        preconditioning.
-       @tparam huge_alloc Template parameter that enables 64-bit
-       pointer arithmetic for huge allocations (e.g., packed set of
-       vectors).  Default is to use 32-bit pointer arithmetic.
     */
-      template <typename Float, int length, bool add_rho = false, bool enable_reconstruct_ = clover::reconstruct(),
-                bool huge_alloc = false>
+      template <typename Float, int length, bool add_rho = false, bool enable_reconstruct_ = clover::reconstruct()>
       struct FloatNOrder {
         static constexpr bool enable_reconstruct = enable_reconstruct_;
-        using Accessor = FloatNOrder<Float, length, add_rho, enable_reconstruct, huge_alloc>;
+        using Accessor = FloatNOrder<Float, length, add_rho, enable_reconstruct>;
         using real = typename mapper<Float>::type;
-        using index_t = std::conditional_t<huge_alloc, uint64_t, uint32_t>;
         typedef float norm_type;
         static constexpr int Ns = 4;
         static constexpr int Nc = 3;

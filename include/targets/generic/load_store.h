@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 #include <register_traits.h>
 #include <target_device.h>
 #include <tma_helper.hpp>
@@ -41,10 +43,11 @@ namespace quda
     return value_a;
   }
 
-  template <typename scalar_t, int N, size_t prefetch = 0>
-  __device__ __host__ inline array<scalar_t, N> vector_load(const scalar_t *ptr, unsigned int offset, int idx)
+  template <typename scalar_t, int N, size_t prefetch = 0, typename index_t>
+  __device__ __host__ inline array<scalar_t, N> vector_load(const scalar_t *ptr, index_t offset,
+                                                           std::type_identity_t<index_t> idx)
   {
-    return vector_load<scalar_t, N, prefetch>(ptr + (offset + N * idx), 0);
+    return vector_load<scalar_t, N, prefetch>(ptr + (offset + static_cast<index_t>(N) * idx), 0);
   }
 
   /**
@@ -72,10 +75,11 @@ namespace quda
     vector_store<vector_t>(ptr, idx, value_v);
   }
 
-  template <typename scalar_t, int N>
-  __device__ __host__ inline void vector_store(scalar_t *ptr, unsigned offset, int idx, const array<scalar_t, N> &value_a)
+  template <typename scalar_t, int N, typename index_t>
+  __device__ __host__ inline void vector_store(scalar_t *ptr, index_t offset, std::type_identity_t<index_t> idx,
+                                              const array<scalar_t, N> &value_a)
   {
-    vector_store<scalar_t, N>(ptr + (offset + N * idx), 0, value_a);
+    vector_store<scalar_t, N>(ptr + (offset + static_cast<index_t>(N) * idx), 0, value_a);
   }
 
   template <bool is_device> struct prefetch_cache_line_imp {

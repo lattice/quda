@@ -21,9 +21,9 @@ namespace quda
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
 
     static constexpr QudaReconstructType reconstruct_u = reconstruct_u_;
     static constexpr QudaReconstructType reconstruct_l = reconstruct_l_;
@@ -32,10 +32,10 @@ namespace quda
     static constexpr bool use_inphase = improved_ ? false : true;
     static constexpr QudaStaggeredPhase phase = phase_;
     template <bool shifted>
-    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase,
+    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, ghost, use_inphase,
                                      QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
     template <bool shifted>
-    using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost,
+    using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, ghost,
                                      use_inphase, QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
 
     F out[MAX_MULTI_RHS];  /** output vector field */

@@ -14,7 +14,7 @@ namespace quda
     static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
     static constexpr int n_flavor = doublet ? 2 : 1;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, false, false, true>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, false, true>::type;
 
     const unsigned int n_rhs;
 

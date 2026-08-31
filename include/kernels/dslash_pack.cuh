@@ -31,8 +31,8 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     static constexpr bool packkernel = true;
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type F;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
 
     F in[MAX_MULTI_RHS]; // field we are packing
     Ghost halo_pack;

@@ -21,8 +21,8 @@ namespace quda {
     static constexpr int nSpinX = 4;
     static constexpr int nSpinY = 1;
 
-    typedef typename colorspinor_mapper<Float, nSpinX, nColor, false, false, true>::type F4;
-    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, false, true>::type F1;
+    typedef typename colorspinor_mapper<Float, nSpinX, nColor, false, true>::type F4;
+    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, true>::type F1;
     
     static constexpr unsigned int max_n_batch_block = 8;
     int_fastdiv nx;

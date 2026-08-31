@@ -19,8 +19,8 @@ namespace quda
     static constexpr bool gauge_direct_load = false;
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     template <bool shifted>
-    using G = typename gauge_mapper<store_t, recon, 2 * nColor * nColor, QUDA_STAGGERED_PHASE_NO, gauge_direct_load,
-                                    ghost, false, QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
+    using G = typename gauge_mapper<store_t, recon, 2 * nColor * nColor, QUDA_STAGGERED_PHASE_NO, ghost, false,
+                                    QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
     static constexpr bool verify = verify_;
 
     int X[4]; // true grid dimensions
