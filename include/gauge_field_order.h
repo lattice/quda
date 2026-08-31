@@ -7,6 +7,7 @@
  */
 
 #include <cassert>
+#include <cstdint>
 #include <type_traits>
 #include <limits>
 
@@ -1616,7 +1617,7 @@ namespace quda {
         static constexpr QudaReconstructType recon = recon_;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        typedef typename AllocType<huge_alloc>::type AllocInt;
+        using index_t = std::conditional_t<huge_alloc, uint64_t, uint32_t>;
         Reconstruct<length, Float, recon, ghostExchange_, stag_phase, shifted> reconstruct;
         static constexpr int reconLen = recon;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
@@ -1626,7 +1627,7 @@ namespace quda {
         static constexpr int Nrem = reconLen - hasPhase - M * N;
         static_assert(Nrem == 0 || (Nrem > 0 && (Nrem & (Nrem - 1)) == 0), "Nrem must be a power of 2");
         Float *gauge;
-        const AllocInt offset;
+        const index_t offset;
         Float *ghost[4];
         QudaGhostExchange ghostExchange;
         int coords[QUDA_MAX_DIM];
@@ -1634,9 +1635,9 @@ namespace quda {
         int R[QUDA_MAX_DIM];
         const unsigned int volumeCB;
         int faceVolumeCB[4];
-        const int stride;
+        const index_t stride;
         const int geometry;
-        const AllocInt phaseOffset;
+        const index_t phaseOffset;
         size_t bytes;
         gauge::tensor_desc_t tensor_desc;
         const real combined_scale; // Precomputed scale for copy_and_scale: fixedInvMaxValue * reconstruct.scale

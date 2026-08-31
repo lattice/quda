@@ -11,7 +11,9 @@
  *  also.
  */
 
+#include <cstdint>
 #include <limits>
+#include <type_traits>
 #include <register_traits.h>
 #include <convert.h>
 #include <complex_quda.h>
@@ -1127,10 +1129,10 @@ namespace quda
       using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      using AllocInt = typename AllocType<huge_alloc>::type;
+      using index_t = std::conditional_t<huge_alloc, uint64_t, uint32_t>;
       using norm_t = float;
       Float *field = nullptr;
-      AllocInt offset = 0; // offset can be 32-bit or 64-bit
+      index_t offset = 0; // offset can be 32-bit or 64-bit
       int volumeCB = 0;
 
       FloatNOrder() = default;
@@ -1358,10 +1360,10 @@ namespace quda
       using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      using AllocInt = typename AllocType<huge_alloc>::type;
+      using index_t = std::conditional_t<huge_alloc, uint64_t, uint32_t>;
       using norm_type = float;
       Float *field = nullptr;
-      AllocInt offset = 0; // offset can be 32-bit or 64-bit
+      index_t offset = 0; // offset can be 32-bit or 64-bit
       int volumeCB = 0;
 
       FloatNOrder() = default;

@@ -6,7 +6,9 @@
  *
  */
 
+#include <cstdint>
 #include <limits>
+#include <type_traits>
 #include <register_traits.h>
 #include <convert.h>
 #include <clover_field.h>
@@ -565,7 +567,7 @@ namespace quda {
         static constexpr bool enable_reconstruct = enable_reconstruct_;
         using Accessor = FloatNOrder<Float, length, add_rho, enable_reconstruct, huge_alloc>;
         using real = typename mapper<Float>::type;
-        typedef typename AllocType<huge_alloc>::type AllocInt;
+        using index_t = std::conditional_t<huge_alloc, uint64_t, uint32_t>;
         typedef float norm_type;
         static constexpr int Ns = 4;
         static constexpr int Nc = 3;
@@ -583,7 +585,7 @@ namespace quda {
         norm_type nrm_inv;
 
         const bool is_inverse;
-        const AllocInt offset; // offset can be 32-bit or 64-bit
+        const index_t offset; // offset can be 32-bit or 64-bit
         const int volumeCB;
 
         const QudaTwistFlavorType twist_flavor;

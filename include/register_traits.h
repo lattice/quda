@@ -260,8 +260,4 @@ namespace quda {
 
   template <class T> using get_scalar_t = typename get_scalar<T>::type;
 
-  template<bool large_alloc> struct AllocType { };
-  template<> struct AllocType<true> { typedef size_t type; };
-  template<> struct AllocType<false> { typedef int type; };
-
 } // namespace quda
