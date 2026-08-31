@@ -666,6 +666,18 @@ namespace quda
 #endif
     }
 
+    void destroy()
+    {
+#if defined(NVSHMEM_COMMS)
+      // Pairs with the NVSHMEM bootstrap in init().  NVSHMEM 3.7.0 defers the
+      // transport-plugin dlclose to an atexit handler, so without an explicit
+      // finalize the proxy progress thread outlives the transport module and
+      // segfaults when atexit dlcloses it.  Finalize here (collective, with the
+      // GPU context and MPI still live) before the transport is torn down.
+      nvshmem_finalize();
+#endif
+    }
+
     void *host_pinned_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
       void *ptr = nullptr;
