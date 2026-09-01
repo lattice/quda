@@ -780,6 +780,18 @@ namespace quda {
 	param.block.x = arg.fineVolumeCB/(2*arg.coarseVolumeCB); // checker-boarded block size
 	param.grid.x = 2*arg.coarseVolumeCB;
       }
+
+      if constexpr (!use_mma) {
+        // The coarse-color wave swaps the logical x grid into the physical y grid at launch.  Since VUV / VLV do not
+        // tune block.x, increase the default block size until the post-swap y grid will satisfy the device limit.
+        if ((type == COMPUTE_VUV || type == COMPUTE_VLV) && param.aux.w == 0) {
+          while (param.grid.x > device::max_grid_size(1)) {
+            if (!Tunable::advanceBlockDim(param))
+              errorQuda("Unable to construct a legal coarse-color-wave launch: grid.x=%u exceeds max grid.y=%u",
+                        param.grid.x, device::max_grid_size(1));
+          }
+        }
+      }
     }
 
     TuneKey tuneKey() const override
