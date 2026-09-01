@@ -341,8 +341,7 @@ namespace quda
 
       constexpr index_t index(int parity, int x_cb, int s, int c, int v, int stride) const
       {
-        return static_cast<index_t>(parity) * offset_cb
-          + static_cast<index_t>((s * 3 + c) * 1 + v) * stride + x_cb;
+        return static_cast<index_t>(parity) * offset_cb + static_cast<index_t>((s * 3 + c) * 1 + v) * stride + x_cb;
       }
 
       template <int nSpinBlock>
@@ -371,8 +370,7 @@ namespace quda
 
       constexpr int index(int dim, int parity, int x_cb, int s, int c, int v) const
       {
-        return parity * ghostOffset[dim]
-          + indexFloatN<int, nSpin, nColor, nVec, N>(x_cb, s, c, v, faceVolumeCB[dim]);
+        return parity * ghostOffset[dim] + indexFloatN<int, nSpin, nColor, nVec, N>(x_cb, s, c, v, faceVolumeCB[dim]);
       }
     };
 
@@ -392,17 +390,17 @@ namespace quda
        and scaling when writing to a fixed-point field.
     */
     template <typename Float, typename storeFloat, bool block_float_, typename norm_t> struct fieldorder_wrapper {
-      using value_type = Float;      /**< Compute type */
-      using store_t = storeFloat;    /**< Storage type */
-      complex<storeFloat> *v;        /**< Field memory address this wrapper encompasses */
-      const index_t idx;             /**< Index into field */
+      using value_type = Float;   /**< Compute type */
+      using store_t = storeFloat; /**< Storage type */
+      complex<storeFloat> *v;     /**< Field memory address this wrapper encompasses */
+      const index_t idx;          /**< Index into field */
     private:
-      const Float scale;             /**< Float to fixed-point scale factor */
-      const Float scale_inv;         /**< Fixed-point to float scale factor */
+      const Float scale;     /**< Float to fixed-point scale factor */
+      const Float scale_inv; /**< Fixed-point to float scale factor */
     public:
-      norm_t *norm;                  /**< Address of norm field (if it exists) */
-      const int norm_idx;            /**< Index into norm field */
-      const bool norm_write;         /**< Whether we need to write to the norm field */
+      norm_t *norm;                                                   /**< Address of norm field (if it exists) */
+      const int norm_idx;                                             /**< Index into norm field */
+      const bool norm_write;                                          /**< Whether we need to write to the norm field */
       static constexpr bool fixed = fixed_point<Float, storeFloat>(); /**< Whether this is a fixed point field */
       static constexpr bool block_float = block_float_;               /**< Whether this is a block float field */
 
@@ -1033,8 +1031,9 @@ namespace quda
       __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
       {
         real v[length_ghost];
-        norm_type nrm
-          = isFixed<Float>::value ? vector_load<float, 1>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x)[0] : 0.0;
+        norm_type nrm = isFixed<Float>::value ?
+          vector_load<float, 1>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x)[0] :
+          0.0;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
@@ -1347,8 +1346,7 @@ namespace quda
        @tparam spin_project Whether the ghosts are spin projected or not
      */
     template <bool spin_project, bool disable_ghost>
-    struct FloatNOrder<short, 1, 3, spin_project, disable_ghost>
-      : GhostNOrder<short, 1, 3, spin_project, disable_ghost> {
+    struct FloatNOrder<short, 1, 3, spin_project, disable_ghost> : GhostNOrder<short, 1, 3, spin_project, disable_ghost> {
       using Float = short;
       static constexpr int Ns = 1;
       static constexpr int Nc = 3;
@@ -1833,8 +1831,7 @@ namespace quda
 
   } // namespace colorspinor
 
-  template <typename T, int Ns, int Nc, bool project = false, bool disable_ghost = false>
-  struct colorspinor_mapper {
+  template <typename T, int Ns, int Nc, bool project = false, bool disable_ghost = false> struct colorspinor_mapper {
     typedef colorspinor::FloatNOrder<T, Ns, Nc, project, disable_ghost> type;
   };
 
