@@ -15,11 +15,9 @@ namespace quda {
     static constexpr int nSpin = 1;
     static constexpr int nColor = nColor_;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // seems to be legacy, copied from dslash_staggered.cuh
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type;
 
     static constexpr QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO;
-    static constexpr bool gauge_direct_load = false; // seems to be legacy, copied from dslash_staggered.cuh
     using X = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, QUDA_GHOST_EXCHANGE_PAD>::type;
 
     static constexpr bool dagger = dagger_;

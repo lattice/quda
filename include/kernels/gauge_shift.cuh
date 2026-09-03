@@ -16,7 +16,6 @@ namespace quda
     using RawLink = array<store_t, recon>;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
 
-    static constexpr bool gauge_direct_load = false;
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     template <bool shifted>
     using G = typename gauge_mapper<store_t, recon, 2 * nColor * nColor, QUDA_STAGGERED_PHASE_NO, ghost, false,
