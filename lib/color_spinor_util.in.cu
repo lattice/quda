@@ -18,8 +18,8 @@ namespace quda {
   template <class T>
   void random(T &t) {
     for (int parity=0; parity<t.Nparity(); parity++) {
-      for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
-      	for (int s=0; s<t.Nspin(); s++) {
+      for (index_t x_cb = 0; x_cb < t.VolumeCB(); x_cb++) {
+        for (int s=0; s<t.Nspin(); s++) {
       	  for (int c=0; c<t.Ncolor(); c++) {
             t(parity,x_cb,s,c) = complex<typename T::real>(comm_drand(), comm_drand());
       	  }
@@ -41,8 +41,8 @@ namespace quda {
   template <class T>
   void constant(T &t, int k, int s, int c) {
     for (int parity=0; parity<t.Nparity(); parity++) {
-      for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
-      	// set all color-spin components to zero
+      for (index_t x_cb = 0; x_cb < t.VolumeCB(); x_cb++) {
+        // set all color-spin components to zero
       	for (int s2=0; s2<t.Nspin(); s2++) {
       	  for (int c2=0; c2<t.Ncolor(); c2++) {
       	    t(parity,x_cb,s2,c2) = 0.0;
@@ -63,7 +63,7 @@ namespace quda {
     X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
 
     for (int parity=0; parity<p.Nparity(); parity++) {
-      for (int x_cb=0; x_cb<p.VolumeCB(); x_cb++) {
+      for (index_t x_cb = 0; x_cb < p.VolumeCB(); x_cb++) {
         getCoords(coord, x_cb, X, parity);
 
         double mode = n * (double)coord[d] / X[d];
@@ -91,7 +91,7 @@ namespace quda {
     X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
 
     for (int parity=0; parity<p.Nparity(); parity++) {
-      for (int x_cb=0; x_cb<p.VolumeCB(); x_cb++) {
+      for (index_t x_cb = 0; x_cb < p.VolumeCB(); x_cb++) {
 
         // get coords
         getCoords(coord, x_cb, X, parity);
@@ -199,9 +199,9 @@ namespace quda {
     for (int i=0; i<N; i++) iter[i] = 0;
 
     for (int parity=0; parity<v.Nparity(); parity++) {
-      for (int x_cb=0; x_cb<u.VolumeCB(); x_cb++) {
+      for (index_t x_cb = 0; x_cb < u.VolumeCB(); x_cb++) {
 
-	for (int s=0; s<u.Nspin(); s++) {
+        for (int s=0; s<u.Nspin(); s++) {
 	  for (int c=0; c<u.Ncolor(); c++) {
             complex<double> u_ = u(parity, x_cb, s, c);
             complex<double> v_ = v(parity, x_cb, s, c);
