@@ -188,7 +188,7 @@ namespace quda {
 
       if (!allthreads || alive) {
         if (target::thread_idx().x == 0) {
-          const int parity_coarse = x_coarse >= arg.out[src_idx].VolumeCB() ? 1 : 0;
+          const int parity_coarse = static_cast<index_t>(x_coarse) >= arg.out[src_idx].VolumeCB() ? 1 : 0;
           const int x_coarse_cb = x_coarse - parity_coarse * arg.out[src_idx].VolumeCB();
 
 #pragma unroll

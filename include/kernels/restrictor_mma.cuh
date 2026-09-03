@@ -305,7 +305,7 @@ namespace quda
       }
     }
 
-    const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
+    const int parity_coarse = static_cast<index_t>(x_coarse) >= arg.out.VolumeCB() ? 1 : 0;
     const int x_coarse_cb = x_coarse - parity_coarse * arg.out.VolumeCB();
 
     auto c_gmem = arg.out(parity_coarse, x_coarse_cb, coarse_spin, 0, 0);
