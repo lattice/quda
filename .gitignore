@@ -20,3 +20,5 @@ include/jitify_options.hpp
 autom4te.cache/*
 .vscode
 cmake/CPM_*.cmake
+Testing/
+build/

@@ -2643,6 +2643,26 @@ public:
   void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
                           const bool pc_solve);
 
+  /**
+   * @brief Create Dirac operators with an eigen operator, optionally from the
+   *        smeared gauge field.
+   *
+   * Extended overload of createDiracWithEig that exposes the Dirac-eig gauge
+   * choice. Used by the HMC / eigentracking path where the caller needs to
+   * distinguish the un-smeared gauge used for fermion-force construction from
+   * any smeared variant used for the eigen-operator preconditioner.
+   *
+   * @param[out] d                 Created Dirac operator
+   * @param[out] dSloppy           Created sloppy Dirac operator
+   * @param[out] dPre              Created precondition Dirac operator
+   * @param[out] dEig              Created Dirac operator for the eigensolver
+   * @param[in]  param             Inverter parameters
+   * @param[in]  pc_solve          Whether or not to use even/odd preconditioning
+   * @param[in]  use_smeared_gauge If true, build dEig from the smeared gauge
+   */
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param, bool pc_solve,
+                          bool use_smeared_gauge);
+
 } // namespace quda
 
 #ifdef __CUDACC__

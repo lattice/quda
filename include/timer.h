@@ -2,6 +2,10 @@
 
 #include <sys/time.h>
 #include <stack>
+#include <vector>
+#include <map>
+#include <string>
+#include <utility>
 #include <quda_internal.h>
 #include <util_quda.h>
 #include <device.h>
@@ -17,31 +21,31 @@ namespace quda {
    * otherwise in the constructor.
    */
   template <bool device = false> struct Timer {
-    /**< The cumulative sum of time */
+    /** The cumulative sum of time */
     double time;
 
-    /**< The last recorded time interval */
+    /** The last recorded time interval */
     double last_interval;
 
-    /**< Used to store when the timer was last started */
+    /** Used to store when the timer was last started */
     timeval host_start;
 
-    /**< Used to store when the timer was last stopped */
+    /** Used to store when the timer was last stopped */
     timeval host_stop;
 
-    /**< Used to store when the timer was last started */
+    /** Used to store when the timer was last started */
     qudaEvent_t device_start;
 
-    /**< Used to store when the timer was last stopped */
+    /** Used to store when the timer was last stopped */
     qudaEvent_t device_stop;
 
-    /**< Which stream are we recording on */
+    /** Which stream are we recording on */
     qudaStream_t stream;
 
-    /**< Are we currently timing? */
+    /** Are we currently timing? */
     bool running;
 
-    /**< Keep track of number of calls */
+    /** Keep track of number of calls */
     int count;
 
     Timer(qudaStream_t stream = device::get_default_stream()) :
@@ -137,7 +141,7 @@ namespace quda {
   using device_timer_t = Timer<true>;
   using host_timer_t = Timer<false>;
 
-  /**< Enumeration type used for writing a simple but extensible profiling framework. */
+  /** Enumeration type used for writing a simple but extensible profiling framework. */
   enum QudaProfileType {
     QUDA_PROFILE_H2D,          /**< host -> device transfers */
     QUDA_PROFILE_D2H,          /**< The time in seconds for device -> host transfers */
@@ -203,6 +207,12 @@ namespace quda {
 
     std::stack<QudaProfileType> pt_stack; /**< A stack used for recursive profiling */
 
+    /** Per-child-profile delegated time, populated by pushProfile when
+       a nested child profile pops. Each entry is (cumulative seconds,
+       call count). Lets compound operations like hmcTrajectoryQuda show
+       a per-child-profile breakdown in their per-profile Print output. */
+    std::map<std::string, std::pair<double, int>> child_times;
+
     static void StopGlobal(const char *func, const char *file, int line, QudaProfileType idx);
     static void StartGlobal(const char *func, const char *file, int line, QudaProfileType idx);
 
@@ -225,6 +235,36 @@ namespace quda {
 
     void Start_(const char *func, const char *file, int line, QudaProfileType idx);
     void Stop_(const char *func, const char *file, int line, QudaProfileType idx);
+
+    /**
+       @brief Pause every running sub-phase (excluding TOTAL) and append
+       its index to @p out. The global aggregate counters for those
+       phases are also stopped, so wall-clock attribution is preserved
+       across cross-profile boundaries. Used by pushProfile to suspend
+       the parent profile's active sub-phases when a child is pushed.
+    */
+    void PauseRunning(std::vector<QudaProfileType> &out, const char *func, const char *file, int line);
+
+    /**
+       @brief Restart sub-phases previously paused by PauseRunning, in
+       reverse order. The list is consumed (cleared on return).
+    */
+    void ResumeRunning(std::vector<QudaProfileType> &paused, const char *func, const char *file, int line);
+
+    /**
+       @brief Credit @p secs and one call to a delegated child profile
+       named @p name. Called by pushProfile when a nested profile is
+       popped, so that compound operations (e.g. hmcTrajectoryQuda) show
+       per-child-profile breakdowns alongside their own sub-phases.
+       These delegated entries don't contribute to the global aggregate
+       (they're already counted under the child's own profile).
+    */
+    void AddChildTime(const std::string &name, double secs)
+    {
+      auto &entry = child_times[name];
+      entry.first += secs;
+      entry.second++;
+    }
 
     void Reset_(const char *func, const char *file, int line) {
       for (int idx = 0; idx < QUDA_PROFILE_COUNT; idx++) profile[idx].reset(func, file, line);
@@ -252,6 +292,16 @@ namespace quda {
     bool active = false;
     size_t monitor_start;
     size_t monitor_end;
+
+    /** Parent profile whose sub-phases were paused on push (nullptr if
+       no pause was performed, e.g. when the new profile equals the
+       current top of the profile stack). */
+    TimeProfile *parent_profile = nullptr;
+
+    /** Sub-phases on @p parent_profile that were running at push time
+       and must be resumed on pop. Owned by this pushProfile instance so
+       that nested pushes don't interfere. */
+    std::vector<QudaProfileType> parent_paused;
 
     pushProfile(TimeProfile &profile, QudaInvertParam *param = nullptr);
     pushProfile(TimeProfile &profile, QudaQuarkSmearParam *param);
