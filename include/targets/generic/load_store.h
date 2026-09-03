@@ -18,14 +18,14 @@ namespace quda
   */
   template <bool is_device> struct vector_load_impl {
     template <typename T, size_t prefetch_size>
-    __device__ __host__ inline void operator()(T &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
+    __device__ __host__ inline void operator()(T &value, const void *ptr, index_t idx, const prefetch_t<prefetch_size> &)
     {
       value = reinterpret_cast<const T *>(ptr)[idx];
     }
   };
 
   template <typename vector_t, size_t prefetch = 0>
-  __device__ __host__ inline vector_t vector_load_internal(const void *ptr, int idx)
+  __device__ __host__ inline vector_t vector_load_internal(const void *ptr, index_t idx)
   {
     vector_t value;
     target::dispatch<vector_load_impl>(value, ptr, idx, prefetch_t<prefetch>());
@@ -33,7 +33,7 @@ namespace quda
   }
 
   template <typename scalar_t, int N, size_t prefetch = 0>
-  __device__ __host__ inline array<scalar_t, N> vector_load(const void *ptr, int idx)
+  __device__ __host__ inline array<scalar_t, N> vector_load(const void *ptr, index_t idx)
   {
     using vector_t = typename VectorType<scalar_t, N>::type;
     auto value_v = vector_load_internal<vector_t, prefetch>(ptr, idx);
@@ -43,7 +43,7 @@ namespace quda
     return value_a;
   }
 
-  template <typename scalar_t, int N, size_t prefetch = 0, typename index_t>
+  template <typename scalar_t, int N, typename index_t, size_t prefetch = 0>
   __device__ __host__ inline array<scalar_t, N> vector_load(const scalar_t *ptr, index_t offset,
                                                            std::type_identity_t<index_t> idx)
   {
@@ -54,19 +54,19 @@ namespace quda
      @brief Non-specialized store operation
   */
   template <bool is_device> struct vector_store_impl {
-    template <typename T> __device__ __host__ inline void operator()(void *ptr, int idx, const T &value)
+    template <typename T> __device__ __host__ inline void operator()(void *ptr, index_t idx, const T &value)
     {
       reinterpret_cast<T *>(ptr)[idx] = value;
     }
   };
 
-  template <typename vector_t> __device__ __host__ inline void vector_store(void *ptr, int idx, const vector_t &value)
+  template <typename vector_t> __device__ __host__ inline void vector_store(void *ptr, index_t idx, const vector_t &value)
   {
     target::dispatch<vector_store_impl>(ptr, idx, value);
   }
 
   template <typename scalar_t, int N>
-  __device__ __host__ inline void vector_store(void *ptr, int idx, const array<scalar_t, N> &value_a)
+  __device__ __host__ inline void vector_store(void *ptr, index_t idx, const array<scalar_t, N> &value_a)
   {
     using vector_t = typename VectorType<scalar_t, N>::type;
     vector_t value_v;
