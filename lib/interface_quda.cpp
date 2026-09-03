@@ -1545,6 +1545,11 @@ void endQuda(void)
     initialized = false;
 
     assertAllMemFree();
+
+    // Destroy the pool subsystem (and, with NVSHMEM, finalize NVSHMEM itself)
+    // while the GPU context and MPI are still live, before the device is torn down.
+    pool::destroy();
+
     device::destroy();
   }
 

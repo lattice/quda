@@ -115,6 +115,12 @@ namespace quda {
     void init();
 
     /**
+       @brief Destroy the memory pool subsystem.  Pairs with init(); when built
+       with NVSHMEM it also finalizes NVSHMEM (init() bootstraps NVSHMEM).
+    */
+    void destroy();
+
+    /**
        @brief Allocate device-memory.  If free pre-existing allocation exists
        reuse this.
        @param size Size of allocation
