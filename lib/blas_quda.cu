@@ -188,6 +188,12 @@ namespace quda {
               typename W, typename V>
     void instantiateBlas(const coeff_t &a, const coeff_t &b, const coeff_t &c, X &x, Y &y, Z &z, W &w, V &v)
     {
+      // besides being a no-op, this keeps a non-recursive path that returns
+      // for builds where the instantiation below is entirely disabled at
+      // compile time, e.g., a build with no nSpin enabled: without it the
+      // compiler flags the splitting below as infinite recursion
+      if (x.size() == 0) return;
+
       if (x.size() > get_max_multi_rhs()) {
         instantiateBlas<Functor, mixed, coeff_t, X, Y, Z, W, V>(
           a, b, c, {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2},
