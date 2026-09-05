@@ -607,3 +607,4 @@ extern bool enable_testing;
 extern bool detratio;
 
 extern int covdev_mu;
+extern bool covdev_shift;

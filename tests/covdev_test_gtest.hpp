@@ -2,7 +2,7 @@
 #include <quda_arch.h>
 #include <cmath>
 
-using test_t = ::testing::tuple<QudaPrecision, QudaDagType, int>;
+using test_t = ::testing::tuple<QudaPrecision, QudaDagType, int, bool>;
 
 bool skip_test(test_t param)
 {
@@ -41,6 +41,7 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
   str += get_prec_str(::testing::get<0>(param.param));
   str += std::string("_") + get_dag_str(::testing::get<1>(param.param));
   str += std::string("_mu") + std::to_string(::testing::get<2>(param.param));
+  if (::testing::get<3>(param.param)) str += std::string("_shift");
 
   return str;
 }
@@ -51,5 +52,6 @@ using ::testing::Values;
 auto precisions = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION);
 auto dagger_opt = Values(QUDA_DAG_YES, QUDA_DAG_NO);
 auto mu_values = Values(0, 1, 2, 3);
+auto shift_values = Values(false, true);
 
-INSTANTIATE_TEST_SUITE_P(covdevtst, CovDevTest, Combine(precisions, dagger_opt, mu_values), gettestname);
+INSTANTIATE_TEST_SUITE_P(covdevtst, CovDevTest, Combine(precisions, dagger_opt, mu_values, shift_values), gettestname);

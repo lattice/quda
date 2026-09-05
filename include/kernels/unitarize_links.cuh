@@ -30,10 +30,9 @@ namespace quda {
     const double svd_abs_error;
     const static bool check_unitarization = true;
 
-    UnitarizeArg(GaugeField &out, const GaugeField &in, int* fails, int max_iter,
-                 double unitarize_eps, double max_error, int reunit_allow_svd,
-                 int reunit_svd_only, double svd_rel_error, double svd_abs_error) :
-      kernel_param(dim3(in.VolumeCB(), 2, 4)),
+    UnitarizeArg(GaugeField &out, const GaugeField &in, int *fails, int max_iter, double unitarize_eps, double max_error,
+                 int reunit_allow_svd, int reunit_svd_only, double svd_rel_error, double svd_abs_error) :
+      kernel_param(dim3(in.VolumeCB(), 2, in.Geometry())),
       out(out),
       in(in),
       fails(fails),

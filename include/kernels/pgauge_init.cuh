@@ -13,10 +13,11 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, QudaReconstructType recon_>
+  template <typename Float, int nColor_, QudaReconstructType recon_, QudaFieldGeometry geom_>
   struct InitGaugeColdArg : kernel_param<> {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
+    static constexpr QudaFieldGeometry geom = geom_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
     int X[4]; // grid dimensions
@@ -38,14 +39,15 @@ namespace quda {
     {
       Matrix<complex<typename Arg::real>, Arg::nColor> U;
       setIdentity(&U);
-      for ( int d = 0; d < 4; d++ ) arg.U(d, x_cb, parity) = U;
+      for (int d = 0; d < Arg::geom; d++) arg.U(d, x_cb, parity) = U;
     }
   };
 
-  template <typename Float, int nColor_, QudaReconstructType recon_>
+  template <typename Float, int nColor_, QudaReconstructType recon_, QudaFieldGeometry geom_>
   struct InitGaugeHotArg : kernel_param<> {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
+    static constexpr QudaFieldGeometry geom = geom_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
     int X[4]; // grid dimensions
@@ -213,7 +215,7 @@ namespace quda {
         getCoords(x, x_cb, arg.X, parity);
         for (int dr = 0; dr < 4; dr++) x[dr] += arg.border[dr];
         int e_cb = linkIndex(x, X);
-        for (int d = 0; d < 4; d++) {
+        for (int d = 0; d < Arg::geom; d++) {
           Matrix<complex<typename Arg::real>, Arg::nColor> U;
           U = randomize<typename Arg::real, Arg::nColor>(localState);
           arg.U(d, e_cb, parity) = U;
