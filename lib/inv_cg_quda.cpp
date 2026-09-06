@@ -16,6 +16,7 @@
 
 #include <reliable_updates.h>
 #include <invert_x_update.h>
+#include <cg_tracker.h>
 
 namespace quda {
 
@@ -302,6 +303,20 @@ namespace quda {
 
       if (!ru.trigger()) {
         for (auto i = 0u; i < beta.size(); i++) beta[i] = sigma[i] / r2_old[i]; // use the alternative beta computation
+
+        // CG-Lanczos tracking: record alpha, beta, and the normalized residual
+        // for zero-cost Ritz extraction after the solve. The activeCGTracker
+        // global (cg_tracker.h) is null unless eigentracking has explicitly
+        // attached a tracker for this solve, so this hot-loop branch is
+        // predict-not-taken and effectively free for users who don't use
+        // eigentracking. The global is only READ here; the tracker itself is
+        // thread-safe for the single-writer single-reader pattern used by HMC.
+        // Guard against multi-RHS solves: the Lanczos recurrence records
+        // per-iteration scalars for a single system only (mirrors the GCR
+        // tracker's b.size() == 1 guard).
+        if (activeCGTracker && b.size() == 1) {
+          activeCGTracker->recordIteration(x_update_batch[0].get_current_alpha(), beta[0], r_sloppy[0]);
+        }
 
         if (advanced_feature && param.pipeline && !breakdown) {
 

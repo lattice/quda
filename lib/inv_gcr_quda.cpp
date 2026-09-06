@@ -8,6 +8,7 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <color_spinor_field.h>
+#include <gcr_tracker.h>
 
 #include <sys/time.h>
 
@@ -337,6 +338,14 @@ namespace quda {
       std::vector<complex_t> alpha_k(b.size());
       for (auto i = 0u; i < alpha_k.size(); i++) alpha_k[i] = -alpha[i][k];
       r2 = blas::cabxpyzAxNorm(gamma_k_inv, alpha_k, Ap[k], K ? r_sloppy : p[k], K ? r_sloppy : p[k + 1]);
+
+      // Eigentracking hook (gcr_tracker.h). Cost when inactive: a single
+      // null-pointer compare. When active: one normalised copy of the
+      // updated residual into a capped FIFO. The residual just rewritten
+      // by the cabxpyzAxNorm above lives in r_sloppy when we have a
+      // preconditioner and in p[k+1] otherwise; mirror the same
+      // conditional the GCR loop uses elsewhere.
+      if (activeGCRTracker && b.size() == 1) { activeGCRTracker->recordIteration(K ? r_sloppy[0] : p[k + 1][0]); }
 
       k++;
       total_iter++;
