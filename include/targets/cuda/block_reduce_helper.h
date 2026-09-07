@@ -12,7 +12,9 @@
  */
 
 // whether to use cooperative groups (or cub)
-#if !(_NVHPC_CUDA || (defined(__clang__) && defined(__CUDA__))) // neither nvc++ or clang-cuda yet support CG
+#if !(_NVHPC_CUDA || (defined(__clang__) && defined(__CUDA__)))                                                        \
+  && !defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE) // neither nvc++ or clang-cuda yet support CG
+// FIXME add CG support for reproducible reductions (can't naively break up the operation)
 #define USE_CG
 #endif
 
@@ -22,8 +24,6 @@
 #if defined(__clang__) && defined(__CUDA__)
 #define CUB_USE_COOPERATIVE_GROUPS
 #endif
-
-using namespace quda;
 
 #include <cub/block/block_reduce.cuh>
 #include <cub/block/block_scan.cuh>
@@ -45,37 +45,34 @@ namespace quda
    */
   template <typename T, typename Enable = void> struct atomic_type;
 
-  template <> struct atomic_type<device_reduce_t> {
-    using type = device_reduce_t;
+  template <> struct atomic_type<doubledouble> {
+    using type = double; // must break up 128-bit types into doubles
+  };
+
+  template <> struct atomic_type<double> {
+    using type = double;
   };
 
   template <> struct atomic_type<float> {
     using type = float;
   };
 
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<device_reduce_t, T::N>>>> {
-    using type = device_reduce_t;
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>>> {
+    using type = typename atomic_type<typename T::value_type>::type;
+  };
+
+  template <typename T> struct atomic_type<T, std::enable_if_t<is_rfa<T>::value>> {
+    using type = typename T::ftype;
   };
 
   template <typename T>
-  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<array<device_reduce_t, T::value_type::N>, T::N>>>> {
-    using type = device_reduce_t;
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> {
+    using type = typename atomic_type<typename T::value_type>::type;
   };
 
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<double>, T::N>>>> {
-    using type = double;
-  };
-
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<float>, T::N>>>> {
-    using type = float;
-  };
-
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<float>>>> {
-    using type = float;
-  };
-
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<double>>>> {
-    using type = double;
+  template <typename T>
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<typename T::value_type>>>> {
+    using type = typename atomic_type<typename T::value_type>::type;
   };
 
   // pre-declaration of warp_reduce that we wish to specialize
@@ -104,9 +101,10 @@ namespace quda
       typename warp_reduce_t::TempStorage dummy_storage;
       warp_reduce_t warp_reduce(dummy_storage);
       T value = {};
-      if constexpr (reducer_t::do_sum) {
+      if constexpr (reducer_t::do_sum && !is_rfa<T>::value) {
         value = warp_reduce.Sum(value_);
       } else {
+        // CUB Sum uses cuda::std::plus; RFA types need quda::plus via Reduce
         value = warp_reduce.Reduce(value_, r);
       }
 
@@ -130,6 +128,19 @@ namespace quda
   template <typename T, typename U> constexpr auto get_cg_reducer(const plus<U> &) { return cg::plus<T>(); }
   template <typename T, typename U> constexpr auto get_cg_reducer(const maximum<U> &) { return cg::greater<T>(); }
   template <typename T, typename U> constexpr auto get_cg_reducer(const minimum<U> &) { return cg::less<T>(); }
+
+  /**
+     @brief Trait that detects a quda::array reduction type.  Used to
+     choose a semantically-correct decomposition of large reduction
+     types (splitting on the array element boundary) rather than the
+     raw atomic-word boundary, which would break compound accumulators
+     such as doubledouble.
+  */
+  template <typename T, typename Enable = void> struct is_reduce_array : std::false_type {
+  };
+  template <typename T>
+  struct is_reduce_array<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> : std::true_type {
+  };
 
   /**
      @brief CUDA specialization of warp_reduce, utilizing cooperative groups
@@ -167,9 +178,40 @@ namespace quda
     }
 
     /**
+       @brief Perform a warp-wide reduction using cooperative groups
+       for a large array reduction type.  We split on the array element
+       boundary and reduce each element with the element-wise reducer,
+       so compound accumulators (e.g. doubledouble) retain their
+       arithmetic semantics.  This is required for correctness: naively
+       splitting into atomic words would sum the head/tail components of
+       a doubledouble as independent doubles, degrading the result to
+       plain double precision.
+       @param[in] value_ thread-local value to be reduced
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       warp (all = false).
+       @param[in] r The reduction operation we want to apply
+       @return The warp-wide reduced value
+     */
+    template <typename T, typename reducer_t, typename param_t>
+    std::enable_if_t<(sizeof(T) > 32) && is_reduce_array<T>::value, T> __device__ inline
+    operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
+    {
+      using Acc = typename T::value_type;
+      T value;
+#pragma unroll
+      for (int i = 0; i < T::N; i++) value[i] = operator()(value_[i], all, get_reducer<Acc>(r), param_t());
+      return value;
+    }
+
+    /**
        @brief Perform a warp-wide reduction using cooperative groups.
        This is a wrapper that split up large values into atomic-size
-       pieces, since cg doens't support > 32 byte types.
+       pieces, since cg doens't support > 32 byte types.  This path is
+       only valid for reduction types whose atomic-word decomposition is
+       also arithmetically valid (i.e. not compound accumulators such as
+       doubledouble); array reduction types are handled by the overload
+       above.
        @param[in] value_ thread-local value to be reduced
        @param[in] all Whether we want all threads to have visibility
        to the result (all = true) or just the first thread in the
@@ -178,10 +220,20 @@ namespace quda
        @return The warp-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
-    std::enable_if_t<(sizeof(T) > 32), T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r,
-                                                                       const param_t &)
+    std::enable_if_t<(sizeof(T) > 32) && !is_reduce_array<T>::value, T> __device__ inline
+    operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
       using atomic_t = typename atomic_type<T>::type;
+      // This path sums each atomic word independently, which is only
+      // arithmetically valid when the reduction's fundamental scalar IS
+      // the atomic word.  Compound accumulators (e.g. doubledouble,
+      // rfa_t) have a scalar wider than their atomic word: summing the
+      // words independently discards the coupling between them and
+      // silently degrades precision / breaks reproducibility.  Such
+      // types must be split on their semantic element boundary instead.
+      static_assert(sizeof(get_scalar_t<T>) == sizeof(atomic_t) && !is_rfa<get_scalar_t<T>>::value,
+                    "atomic-word warp reduction is invalid for compound accumulators; "
+                    "provide a semantic-element split (see is_reduce_array overload)");
       constexpr size_t n = sizeof(T) / sizeof(atomic_t);
       static_assert(sizeof(T) == n * sizeof(atomic_t));
       atomic_t sum_tmp[n];

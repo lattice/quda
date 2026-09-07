@@ -19,15 +19,13 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type F;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
-    static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, ghost, false,
                                   QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type G;
 
     typedef typename mapper<Float>::type real;
@@ -43,14 +41,14 @@ namespace quda
     int dir;      /** The direction from which to omit the derivative */
 
     LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-               const ColorSpinorField &halo, const GaugeField &U, int dir, double a, double b,
+               const ColorSpinorField &halo, const GaugeField &U, int dir, real_t a, real_t b,
                cvector_ref<const ColorSpinorField> &x, int parity, const int *comm_override) :
       DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, false, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
-      a(a),
-      b(b),
+      a(static_cast<real>(a)),
+      b(static_cast<real>(b)),
       dir(dir)
     {
       for (auto i = 0u; i < out.size(); i++) {

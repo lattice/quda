@@ -70,7 +70,7 @@ namespace quda {
   }
 
   void DiracTwistedClover::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                      QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                      QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
@@ -142,13 +142,13 @@ namespace quda {
     clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
   }
 
-  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
-                                          double mu, double mu_factor, bool) const
+  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t,
+                                          real_t mu, real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
-    double a = 2.0 * kappa * mu * static_cast<double>(T.Vectors().TwistFlavor());
+    real_t a = 2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
     CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, mu_factor, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
@@ -196,7 +196,7 @@ namespace quda {
   }
 
   void DiracTwistedCloverPC::WilsonDslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                              QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                              QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       DiracWilson::DslashXpay(out, in, parity, x, k);
@@ -236,7 +236,7 @@ namespace quda {
 
   // xpay version of the above
   void DiracTwistedCloverPC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                        QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                        QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     assertNoDD(out, in); // TODO: DD not supported yet
     checkParitySpinor(in, out);
@@ -264,7 +264,7 @@ namespace quda {
   void DiracTwistedCloverPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     assertNoDD(out, in); // TODO: DD not supported yet
-    double kappa2 = -kappa*kappa;
+    real_t kappa2 = -kappa * kappa;
     auto tmp = getFieldTmp(out);
 
     if (!symmetric) { // asymmetric preconditioning
@@ -332,13 +332,13 @@ namespace quda {
     TwistCloverInv(x(other_parity), tmp, other_parity);
   }
 
-  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
-                                            double mu, double mu_factor, bool) const
+  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t,
+                                            real_t mu, real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
-    double a = -2.0 * kappa * mu * static_cast<double>(T.Vectors().TwistFlavor());
+    real_t a = -2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
     CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, -mu_factor, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
   }
 

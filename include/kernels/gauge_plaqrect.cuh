@@ -11,7 +11,7 @@ namespace quda
 {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqRectArg : public ReduceArg<array<double, 4>> {
+  struct GaugePlaqRectArg : public ReduceArg<array<device_reduce_t, 4>> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -107,7 +107,7 @@ namespace quda
     // return the rectangle and plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t plaqRect {0, 0, 0, 0};
+      reduce_t plaqRect {};
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
@@ -125,7 +125,7 @@ namespace quda
         plaqRect[1] += tmp.x; // Temporal plaquette
         plaqRect[3] += tmp.y; // Temporal rectangle
       }
-      return operator()(plaqRect, value);
+      return operator()(value, plaqRect);
     }
   };
 } // namespace quda

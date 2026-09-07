@@ -53,6 +53,7 @@ jobs:
             -DQUDA_DOWNLOAD_USQCD=ON \
             -DQUDA_OPENMP=OFF \
             -DQUDA_MULTIGRID=ON \
+            -DQUDA_MULTIGRID_NVEC_LIST=24 \
             -DQUDA_DOWNLOAD_EIGEN=ON \
             -DQUDA_PRECISION=8 \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \

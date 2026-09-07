@@ -5,7 +5,7 @@
 #include <dslash_quda.h>
 #include <index_helper.cuh>
 #include <inline_ptx.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <shared_memory_cache_helper.h>
 
 #include <quda_fp16.cuh>

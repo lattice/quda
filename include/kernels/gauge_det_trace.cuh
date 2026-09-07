@@ -9,7 +9,7 @@ namespace quda {
   enum struct compute_type { determinant, trace };
 
   template <typename Float, int nColor_, QudaReconstructType recon_, compute_type type_>
-  struct KernelArg : public ReduceArg<array<double, 2>> {
+  struct KernelArg : public ReduceArg<array<device_reduce_t, 2>> {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     static constexpr compute_type type = type_;
@@ -52,14 +52,15 @@ namespace quda {
         x[dr] += arg.border[dr];
         X[dr] += 2*arg.border[dr];
       }
+
+      complex<double> local = {};
 #pragma unroll
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
-        auto local = Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
-        value = operator()(value, reduce_t{local.real(), local.imag()});
+        local += Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
       }
 
-      return value;
+      return operator()(value, {local.real(), local.imag()});
     }
   };
 

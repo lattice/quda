@@ -81,14 +81,10 @@ namespace quda {
   template<typename Float, int nColor, QudaReconstructType recon>
   class GaugePolyakovLoopTrace : public TunableReduction2D {
     const GaugeField &u;
-    using reduce_t = array<double, 2>;
-    reduce_t &ploop;
+    array<real_t, 2> &ploop;
 
   public:
-    GaugePolyakovLoopTrace(const GaugeField &u, array<double, 2> &ploop) :
-      TunableReduction2D(u),
-      u(u),
-      ploop(ploop)
+    GaugePolyakovLoopTrace(const GaugeField &u, array<real_t, 2> &ploop) : TunableReduction2D(u), u(u), ploop(ploop)
     {
       if (u.Geometry() != QUDA_SCALAR_GEOMETRY && u.Geometry() != QUDA_VECTOR_GEOMETRY)
         errorQuda("Invalid geometry %d in Polyakov loop calculation", u.Geometry());
@@ -132,12 +128,13 @@ namespace quda {
     instantiate<GaugeInsertTimeslice>(u, s, timeslice);
   }
 
-  void gaugePolyakovLoop(double ploop[2], const GaugeField& u, int dir, TimeProfile &profile) {
+  array<real_t, 2> gaugePolyakovLoop(const GaugeField &u, int dir, TimeProfile &profile)
+  {
 
     if (dir != 3) errorQuda("Unsupported direction %d", dir);
 
     // output array
-    array<double, 2> loop = {};
+    array<real_t, 2> loop = {};
 
     std::unique_ptr<GaugeField> condensed_field;
 
@@ -250,12 +247,11 @@ namespace quda {
     // Trace over remaining bits
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePolyakovLoopTrace>(G, loop);
-    // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
-    auto vol3d = u.LocalVolume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / (u.X()[3] - 2 * u.R()[3]);
-    ploop[0] = loop[0] / vol3d;
-    ploop[1] = loop[1] / vol3d;
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+    // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
+    auto vol3d = u.LocalVolume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / (u.X()[3] - 2 * u.R()[3]);
+    return {loop[0] / vol3d, loop[1] / vol3d};
   }
 
 } // namespace quda

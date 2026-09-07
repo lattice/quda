@@ -15,7 +15,7 @@ namespace quda
     int _j;                            /**< the current index */
     int _next;                         /**< the next index */
     std::vector<ColorSpinorField> _ps; /**< the container for the p-vectors */
-    std::vector<double> _alphas;       /**< @param _alphas the alpha's */
+    std::vector<real_t> _alphas;       /**< @param _alphas the alpha's */
 
     XUpdateBatch() = default;
 
@@ -54,7 +54,10 @@ namespace quda
     */
     void accumulate_x(ColorSpinorField &x)
     {
-      blas::block::axpy<double>({_alphas.begin(), _alphas.begin() + _j + 1}, {_ps.begin(), _ps.begin() + _j + 1}, x);
+      std::vector<real_t> a(_alphas.begin(), _alphas.begin() + _j + 1);
+      cvector_ref<const ColorSpinorField> ps(_ps.begin(), _ps.begin() + _j + 1);
+      vector_ref<ColorSpinorField> y(x);
+      blas::block::axpy<real_t>(a, ps, y);
     }
 
     /**
@@ -85,12 +88,12 @@ namespace quda
     /**
       @brief Get the current alpha
      */
-    double &get_current_alpha() { return _alphas[_j]; }
+    real_t &get_current_alpha() { return _alphas[_j]; }
 
     /**
       @brief Get the current alpha
      */
-    const double &get_current_alpha() const { return _alphas[_j]; }
+    const real_t &get_current_alpha() const { return _alphas[_j]; }
 
     /**
       @brief increase the counter by one (modulo _Np)

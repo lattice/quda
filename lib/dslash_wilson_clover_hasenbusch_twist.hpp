@@ -77,7 +77,7 @@ namespace quda
   struct WilsonCloverHasenbuschTwistApply {
     WilsonCloverHasenbuschTwistApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
-                                     double a, double b, int parity, bool dagger, const int *comm_override,
+                                     real_t a, real_t b, int parity, bool dagger, const int *comm_override,
                                      TimeProfile &profile)
     {
       constexpr int nDim = 4;

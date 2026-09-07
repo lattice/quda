@@ -1,4 +1,4 @@
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <kernel.h>

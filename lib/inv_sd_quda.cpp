@@ -34,8 +34,8 @@ namespace quda {
 
     create(x, b);
 
-    vector<double> b2 = blas::norm2(b);
-    vector<double> r2;
+    vector<real_t> b2 = blas::norm2(b);
+    vector<real_t> r2;
 
     // Check to see that we're not trying to invert on a zero-field source
     if (is_zero_src(x, b, b2)) return;
@@ -59,10 +59,10 @@ namespace quda {
     while (k < param.maxiter) {
       mat(Ar, r);
       auto rAr = blas::cDotProductNormA(r, Ar);
-      vector<double> alpha(b.size());
+      vector<real_t> alpha(b.size());
       for (auto i = 0u; i < b.size(); i++) {
-        alpha[i] = rAr[i].z / rAr[i].x;
-        r2[i] = rAr[i].z; // this is r2 from the prior iteration
+        alpha[i] = rAr[i][2] / rAr[i][0];
+        r2[i] = rAr[i][2]; // this is r2 from the prior iteration
       }
 
       PrintStats("SD", k, r2, b2);

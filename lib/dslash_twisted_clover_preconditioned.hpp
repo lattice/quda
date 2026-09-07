@@ -117,7 +117,7 @@ namespace quda
   struct TwistedCloverPreconditionedApply {
     TwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C,
-                                     double a, double b, bool xpay, int parity, bool dagger, const int *comm_override,
+                                     real_t a, real_t b, bool xpay, int parity, bool dagger, const int *comm_override,
                                      TimeProfile &profile)
     {
       constexpr int nDim = 4;

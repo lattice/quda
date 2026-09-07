@@ -58,7 +58,7 @@ namespace quda
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
     if (ortho_block_size < 0) errorQuda("block_size=%d must be positive or zero", ortho_block_size);
 
-    residua.resize(n_kr, 0.0);
+    residua.resize(n_kr, real_t(0.0));
 
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
@@ -75,12 +75,13 @@ namespace quda
     if (spectrum.compare(0, 1, "L") == 0 && !eig_param->use_poly_acc) {
       reverse = true;
     } else if (spectrum.compare(0, 1, "S") == 0 && eig_param->use_poly_acc) {
+      // The polynomial in chebyOp() is small on [a_min, a_max] and large below a_min,
+      // so the smallest-real eigenvalues of the operator are the largest-real
+      // eigenvalues of the accelerated operator.
       reverse = true;
       spectrum[0] = 'L';
-    } else if (spectrum.compare(0, 1, "L") == 0 && eig_param->use_poly_acc) {
-      reverse = true;
-      spectrum[0] = 'S';
     }
+    // LR under polynomial acceleration is rejected in EigenSolver::create().
 
     // For normal operators (MdagM, MMdag) the SVD of the
     // underlying operators (M, Mdag) is computed.
@@ -127,6 +128,10 @@ namespace quda
     if (eig_param->use_poly_acc) {
       if (!mat.hermitian()) errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
       if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
+      // chebyOp() builds a polynomial that is small on [a_min, a_max] and large only
+      // below a_min, so it can accelerate the smallest-real spectrum alone.
+      if (eig_param->spectrum != QUDA_SPECTRUM_SR_EIG)
+        errorQuda("Polynomial acceleration is supported for the smallest-real (SR) spectrum only");
     }
 
     // Cannot solve for imaginary spectrum of hermitian systems
@@ -174,19 +179,24 @@ namespace quda
     if (eig_param->use_poly_acc) {
       if (eig_param->a_max <= 0.0) {
         // Use part of the kSpace as temps
-        eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
+        eig_param->a_max = static_cast<std::remove_cvref_t<decltype(eig_param->a_max)>>(
+          estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]));
         logQuda(QUDA_SUMMARIZE, "Chebyshev maximum estimate: %e.\n", eig_param->a_max);
       }
+      if (!std::isfinite(eig_param->a_max))
+        errorQuda("Chebyshev maximum estimate is not finite (a_max = %e)", eig_param->a_max);
       if (eig_param->a_min >= eig_param->a_max)
         errorQuda("Invalid a_min = %e a_max = %e combination", eig_param->a_min, eig_param->a_max);
+      if (eig_param->a_min <= 0.0)
+        warningQuda("Chebyshev minimum a_min = %e is non-positive. Acceleration may be ineffective.", eig_param->a_min);
     }
   }
 
-  void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
+  void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     resize(kSpace, n_kr + block_size, QUDA_ZERO_FIELD_CREATE); // increase Krylov space to n_kr + block_size
     resize(r, block_size, QUDA_ZERO_FIELD_CREATE, kSpace[0]);  // create residual
-    evals.resize(n_kr, 0.0);                                   // increase evals space to n_ev
+    evals.resize(n_kr, real_t(0.0));                           // increase evals space to n_ev
   }
 
   void EigenSolver::printEigensolverSetup()
@@ -210,9 +220,9 @@ namespace quda
     }
   }
 
-  double EigenSolver::setEpsilon(const QudaPrecision prec)
+  real_t EigenSolver::setEpsilon(const QudaPrecision prec)
   {
-    double eps = 0.0;
+    real_t eps = 0.0;
     switch (prec) {
     case QUDA_DOUBLE_PRECISION: eps = DBL_EPSILON; break;
     case QUDA_SINGLE_PRECISION: eps = FLT_EPSILON; break;
@@ -234,7 +244,7 @@ namespace quda
     }
   }
 
-  void EigenSolver::cleanUpEigensolver(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
+  void EigenSolver::cleanUpEigensolver(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     r.clear();
 
@@ -272,15 +282,15 @@ namespace quda
     if (eig_param->poly_deg == 0) errorQuda("Polynomial acceleration requested with zero polynomial degree");
 
     // Compute the polynomial accelerated operator.
-    double a = eig_param->a_min;
-    double b = eig_param->a_max;
-    double delta = (b - a) / 2.0;
-    double theta = (b + a) / 2.0;
-    double sigma1 = -delta / theta;
-    double sigma;
-    double d1 = sigma1 / delta;
-    double d2 = 1.0;
-    double d3;
+    real_t a = eig_param->a_min;
+    real_t b = eig_param->a_max;
+    real_t delta = (b - a) / 2.0;
+    real_t theta = (b + a) / 2.0;
+    real_t sigma1 = -delta / theta;
+    real_t sigma;
+    real_t d1 = sigma1 / delta;
+    real_t d2 = 1.0;
+    real_t d3;
 
     // out = d2 * in + d1 * out
     // C_1(x) = x
@@ -299,7 +309,7 @@ namespace quda
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
 
-    double sigma_old = sigma1;
+    real_t sigma_old = sigma1;
 
     // construct C_{m+1}(x)
     for (int i = 2; i < eig_param->poly_deg; i++) {
@@ -322,24 +332,22 @@ namespace quda
     for (auto i = 0u; i < in.size(); i++) std::swap(out[i], tmp2[i]);
   }
 
-  double EigenSolver::estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in)
+  real_t EigenSolver::estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in)
   {
     RNG rng(in, 1234);
     spinorNoise(in, rng, QUDA_NOISE_UNIFORM);
 
     // Power iteration
-    double norm = 0.0;
+    real_t norm = 0.0;
     for (int i = 0; i < 100; i++) {
-      if ((i + 1) % 10 == 0) {
-        norm = sqrt(blas::norm2(in));
-        blas::ax(1.0 / norm, in);
-      }
+      norm = sqrt(blas::norm2(in));
+      blas::ax(1.0 / norm, in);
       mat(out, in);
       std::swap(out, in);
     }
 
     // Compute spectral radius estimate
-    double result = blas::reDotProduct(out, in);
+    real_t result = blas::reDotProduct(out, in);
 
     // Increase final result by 10% for safety
     return result * 1.10;
@@ -348,12 +356,12 @@ namespace quda
   bool EigenSolver::orthoCheck(std::vector<ColorSpinorField> &vecs, int size)
   {
     bool orthed = true;
-    const Complex Unit(1.0, 0.0);
+    const complex_t Unit(1.0, 0.0);
 
-    std::vector<Complex> H(size * size);
+    std::vector<complex_t> H(size * size);
     blas::block::hDotProduct(H, {vecs.begin(), vecs.begin() + size}, {vecs.begin(), vecs.begin() + size});
 
-    double epsilon = setEpsilon(vecs[0].Precision());
+    real_t epsilon = setEpsilon(vecs[0].Precision());
 
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
@@ -385,14 +393,14 @@ namespace quda
         if (i - j < h_block_size) array_size = i - j;
         logQuda(QUDA_DEBUG_VERBOSE, "Current block size = %d\n", array_size);
 
-        std::vector<Complex> s(array_size);
+        std::vector<complex_t> s(array_size);
         blas::block::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size},
                                  vecs[i]); // <j|i> with i normalised.
         for (auto k = 0; k < array_size; k++) s[k] *= -1.0;
         blas::block::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size},
                            vecs[i]); // i = i - proj_{j}(i) = i - <j|i> * j
       }
-      double norm = sqrt(blas::norm2(vecs[i]));
+      real_t norm = sqrt(blas::norm2(vecs[i]));
       blas::ax(1.0 / norm, vecs[i]); // i/<i|i>
     }
   }
@@ -407,7 +415,7 @@ namespace quda
       auto array_size = block_array_size * rvecs.size();
       logQuda(QUDA_DEBUG_VERBOSE, "Current block array size = %d\n", block_array_size);
 
-      std::vector<Complex> s(array_size);
+      std::vector<complex_t> s(array_size);
 
       // Block dot products stored in s.
       blas::block::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
@@ -498,7 +506,7 @@ namespace quda
     }
   }
 
-  void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, bool dagger)
+  void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<complex_t> &evals, bool dagger)
   {
     logQuda(QUDA_SUMMARIZE, "Computing SVD of M\n");
 
@@ -546,7 +554,7 @@ namespace quda
 
       for (auto j = 0u; j < sigma.size(); j++) {
         logQuda(QUDA_SUMMARIZE, "Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i + j, sigma[j],
-                sigma[j] - sqrt(abs(evals[i + j].real())));
+                sigma[j] - sqrt(std::abs(evals[i + j].real())));
         evals[i + j] = sigma[j];
       }
     }
@@ -554,7 +562,7 @@ namespace quda
 
   // Deflate vec, place result in vec_defl
   void EigenSolver::deflateSVD(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
-                               cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+                               cvector_ref<const ColorSpinorField> &evecs, const std::vector<complex_t> &evals,
                                bool accumulate) const
   {
     // number of evecs
@@ -574,7 +582,7 @@ namespace quda
     // for all i computed eigenvectors and values.
 
     // 1. Take block inner product: L_i^dag * vec = A_i
-    std::vector<Complex> s(n_defl * src.size());
+    std::vector<complex_t> s(n_defl * src.size());
     blas::block::cDotProduct(s, {evecs.begin() + eig_param->n_conv, evecs.begin() + eig_param->n_conv + n_defl},
                              {src.begin(), src.end()});
 
@@ -589,8 +597,7 @@ namespace quda
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
-  void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
-                                 std::vector<Complex> &evals, int size)
+  void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<complex_t> &evals, int size)
   {
     if (size == 0) size = n_conv;
     auto batch_size = eig_param->compute_evals_batch_size;
@@ -620,7 +627,7 @@ namespace quda
       auto v2 = blas::norm2({evecs.begin() + lower, evecs.begin() + upper});
       for (auto j = 0u; j < v2.size(); j++) evals[i + j] = vtAv[j] / sqrt(v2[j]);
       // Measure ||lambda_i*v_i - A*v_i||
-      Complex n_unit(-1.0, 0.0);
+      complex_t n_unit(-1.0, 0.0);
       auto res = blas::caxpbyNorm({evals.begin() + lower, evals.begin() + upper},
                                   {evecs.begin() + lower, evecs.begin() + upper}, n_unit, temp);
       for (auto j = 0u; j < v2.size(); j++) residua[i + j] = sqrt(res[j]);
@@ -637,7 +644,7 @@ namespace quda
 
   // Deflate vec, place result in vec_defl
   void EigenSolver::deflate(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
-                            cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+                            cvector_ref<const ColorSpinorField> &evecs, const std::vector<complex_t> &evals,
                             bool accumulate) const
   {
     // number of evecs
@@ -653,7 +660,7 @@ namespace quda
     // for all i computed eigenvectors and values.
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    std::vector<Complex> s(n_defl * src.size());
+    std::vector<complex_t> s(n_defl * src.size());
     blas::block::cDotProduct(s, {evecs.begin(), evecs.begin() + n_defl}, {src.begin(), src.end()});
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
@@ -665,8 +672,7 @@ namespace quda
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
-  void EigenSolver::loadFromFile(std::vector<ColorSpinorField> &kSpace,
-                                 std::vector<Complex> &evals)
+  void EigenSolver::loadFromFile(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     // Set suggested parity of fields
     const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
@@ -686,7 +692,7 @@ namespace quda
     computeEvals(kSpace, evals);
   }
 
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y)
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<complex_t> &x, std::vector<complex_t> &y)
   {
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       switch (spec_type) {
@@ -700,79 +706,73 @@ namespace quda
       }
     }
 
-    std::vector<std::pair<Complex, Complex>> array(n);
-    for (int i = 0; i < n; i++) array[i] = {x[i], y[i]};
+    // Sort indices rather than (x, y) pairs so std::sort never passes
+    // pair<complex_t, complex_t> by value (GCC -Wpsabi on _Float128).
+    std::vector<int> idx(n);
+    for (int i = 0; i < n; i++) idx[i] = i;
 
     switch (spec_type) {
     case QUDA_SPECTRUM_LM_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
-                  return (abs(a.first) < abs(b.first));
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return abs(x[i]) < abs(x[j]); });
       break;
     case QUDA_SPECTRUM_SM_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
-                  return (abs(a.first) > abs(b.first));
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return abs(x[i]) > abs(x[j]); });
       break;
     case QUDA_SPECTRUM_LR_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
-                  return (a.first).real() < (b.first).real();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].real() < x[j].real(); });
       break;
     case QUDA_SPECTRUM_SR_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
-                  return (a.first).real() > (b.first).real();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].real() > x[j].real(); });
       break;
     case QUDA_SPECTRUM_LI_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
-                  return (a.first).imag() < (b.first).imag();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].imag() < x[j].imag(); });
       break;
     case QUDA_SPECTRUM_SI_EIG:
-      std::sort(array.begin(), array.begin() + n,
-                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
-                  return (a.first).imag() > (b.first).imag();
-                });
+      std::sort(idx.begin(), idx.end(), [&x](int i, int j) { return x[i].imag() > x[j].imag(); });
       break;
     default: errorQuda("Undefined spectrum type %d given", spec_type);
     }
 
-    // Repopulate x and y arrays with sorted elements
+    std::vector<complex_t> x_sorted(n), y_sorted(n);
     for (int i = 0; i < n; i++) {
-      x[i] = array[i].first;
-      y[i] = array[i].second;
+      x_sorted[i] = x[idx[i]];
+      y_sorted[i] = y[idx[i]];
     }
+    // n may be a prefix (e.g. num_shifts < residua.size()); only
+    // exchange the whole vector when sizes match.
+    if (static_cast<int>(x.size()) == n)
+      x.swap(x_sorted);
+    else
+      std::move(x_sorted.begin(), x_sorted.end(), x.begin());
+    if (static_cast<int>(y.size()) == n)
+      y.swap(y_sorted);
+    else
+      std::move(y_sorted.begin(), y_sorted.end(), y.begin());
   }
 
   // Overloaded version of sortArrays to deal with real y array.
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y)
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<complex_t> &x, std::vector<real_t> &y)
   {
-    std::vector<Complex> y_tmp(n, 0.0);
+    std::vector<complex_t> y_tmp(n, 0.0);
     for (int i = 0; i < n; i++) y_tmp[i].real(y[i]);
     sortArrays(spec_type, n, x, y_tmp);
     for (int i = 0; i < n; i++) y[i] = y_tmp[i].real();
   }
 
   // Overloaded version of sortArrays to deal with real x array.
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y)
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<real_t> &x, std::vector<complex_t> &y)
   {
-    std::vector<Complex> x_tmp(n, 0.0);
+    std::vector<complex_t> x_tmp(n, 0.0);
     for (int i = 0; i < n; i++) x_tmp[i].real(x[i]);
     sortArrays(spec_type, n, x_tmp, y);
     for (int i = 0; i < n; i++) x[i] = x_tmp[i].real();
   }
 
   // Overloaded version of sortArrays to deal with real x and y array.
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y)
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<real_t> &x, std::vector<real_t> &y)
   {
-    std::vector<Complex> x_tmp(n, 0.0);
-    std::vector<Complex> y_tmp(n, 0.0);
+    std::vector<complex_t> x_tmp(n, 0.0);
+    std::vector<complex_t> y_tmp(n, 0.0);
     for (int i = 0; i < n; i++) {
       x_tmp[i].real(x[i]);
       y_tmp[i].real(y[i]);
@@ -785,9 +785,9 @@ namespace quda
   }
 
   // Overloaded version of sortArrays to deal with complex x and integer y array.
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<int> &y)
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<complex_t> &x, std::vector<int> &y)
   {
-    std::vector<Complex> y_tmp(n, 0.0);
+    std::vector<complex_t> y_tmp(n, 0.0);
     for (int i = 0; i < n; i++) y_tmp[i].real(y[i]);
     sortArrays(spec_type, n, x, y_tmp);
     for (int i = 0; i < n; i++) y[i] = (int)(y_tmp[i].real());
@@ -798,8 +798,12 @@ namespace quda
      arithmetic (real or complex)
    */
   template <class T> struct eigen_matrix_map;
-  template <> struct eigen_matrix_map<double> { using type = MatrixXd; };
-  template <> struct eigen_matrix_map<Complex> { using type = MatrixXcd; };
+  template <> struct eigen_matrix_map<real_t> {
+    using type = MatrixX;
+  };
+  template <> struct eigen_matrix_map<complex_t> {
+    using type = MatrixXc;
+  };
   template <class T> using eigen_matrix_t = typename eigen_matrix_map<T>::type;
 
   template <typename T>
@@ -928,12 +932,12 @@ namespace quda
     }
   }
 
-  template void EigenSolver::rotateVecs<double>(std::vector<ColorSpinorField> &kSpace,
-                                                const std::vector<double> &rot_array, int offset, int dim, int keep,
+  template void EigenSolver::rotateVecs<real_t>(std::vector<ColorSpinorField> &kSpace,
+                                                const std::vector<real_t> &rot_array, int offset, int dim, int keep,
                                                 int locked);
 
-  template void EigenSolver::rotateVecs<Complex>(std::vector<ColorSpinorField> &kSpace,
-                                                 const std::vector<Complex> &rot_array, int offset, int dim, int keep,
-                                                 int locked);
+  template void EigenSolver::rotateVecs<complex_t>(std::vector<ColorSpinorField> &kSpace,
+                                                   const std::vector<complex_t> &rot_array, int offset, int dim,
+                                                   int keep, int locked);
 
 } // namespace quda

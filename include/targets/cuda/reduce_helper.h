@@ -116,6 +116,8 @@ namespace quda
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
 
+      reducer::init_rfa_device_bins<T>();
+
       if (!commAsyncReduction()) {
         // initialize the result buffer so we can test for completion
         for (int i = 0; i < n_reduce * n_item; i++) {
@@ -148,13 +150,15 @@ namespace quda
        @brief Finalize the reduction, returning the computed reduction
        into result.  With heterogeneous atomics this means we poll the
        atomics until their value differs from the init_value.
-       @param[out] result The reduction result is copied here
-       @param[in] stream The stream on which we the reduction is being done
-     */
-    template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t = device::get_default_stream())
+       @param[in] stream The stream on which the reduction is being done
+       @return The reduction result
+    */
+    auto complete(const qudaStream_t = device::get_default_stream())
     {
-      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      std::vector<T> result(n_reduce);
+      using device_t = typename atomic_type<T>::type;
+      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
+      if (launch_error == QUDA_ERROR) return result; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
@@ -164,10 +168,13 @@ namespace quda
 
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
-      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      std::vector<device_t> scalar_result(n_element);
+      for (int i = 0; i < n_element; i++) scalar_result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      for (int i = 0; i < n_reduce; i++) {
+        const auto offset = static_cast<size_t>(i) * n_element / n_reduce;
+        // Deserialize flat atomic words (e.g. double components of RFA / doubledouble)
+        std::memcpy(static_cast<void *>(&result[i]), static_cast<const void *>(&scalar_result[offset]), sizeof(T));
+      }
 
       if (!reset) {
         consumed = true;
@@ -178,6 +185,7 @@ namespace quda
         }
         cuda::std::atomic_thread_fence(cuda::std::memory_order_release);
       }
+      return result;
     }
   };
 
@@ -201,21 +209,32 @@ namespace quda
     if (arg.result_d) { // write to host mapped memory
       constexpr bool coalesced_write = true;
       if constexpr (coalesced_write) {
-        static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
-        auto mask = __ballot_sync(0xffffffff, tid < n);
-        if (tid < n) {
+        if (tid < device::warp_size()) { // only first warp takes part in write
+
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 
-          atomic_t s = sum_tmp[0];
+          constexpr auto m = (n + device::warp_size() - 1) / device::warp_size();
 #pragma unroll
-          for (int i = 1; i < n; i++) {
-            auto si = __shfl_sync(mask, sum_tmp[i], 0);
-            if (i == tid) s = si;
-          }
+          for (auto j = 0; j < m; j++) {
 
-          s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
-          arg.result_d[n * idx + tid].store(s, cuda::std::memory_order_relaxed);
+            auto t = j * device::warp_size() + tid; // effective thread index
+            atomic_t s = sum_tmp[j * device::warp_size()];
+            auto mask = __ballot_sync(0xffffffff, t < n);
+
+            if (t < n) {
+#pragma unroll
+              for (auto i = 1; i < device::warp_size(); i++) {
+                if (j * device::warp_size() + i < n) {
+                  auto si = __shfl_sync(mask, sum_tmp[j * device::warp_size() + i], 0);
+                  if (i == tid) s = si; // j * device::warp_size() cancels out on both sides
+                }
+              }
+
+              s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
+              arg.result_d[n * idx + t].store(s, cuda::std::memory_order_relaxed);
+            }
+          }
         }
       } else {
         // write out the final reduced value

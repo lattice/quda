@@ -161,9 +161,9 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
 
   int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
   mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-  double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-  double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-  double l2r = sqrt(nrm2 / src2);
+  auto nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  auto src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  auto l2r = sqrt(nrm2 / src2);
 
   printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n",
              inv_param.tol, inv_param.true_res[src_idx], l2r, inv_param.tol_hq, inv_param.true_res_hq[src_idx]);
@@ -234,9 +234,9 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
       axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, vol * spinor_site_size * inv_param.Ls,
            inv_param.cpu_prec);
       mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-      double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-      double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-      double l2r = sqrt(nrm2 / src2);
+      auto nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+      auto src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+      auto l2r = sqrt(nrm2 / src2);
       l2r_max = std::max(l2r, l2r_max);
 
       printfQuda("Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, "
@@ -405,9 +405,9 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
     }
 
     mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-    double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-    double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-    double l2r = sqrt(nrm2 / src2);
+    auto nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+    auto src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+    auto l2r = sqrt(nrm2 / src2);
     l2r_max = l2r;
 
     printfQuda(
@@ -729,12 +729,10 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
   }
 
   // Compute M * x_left - \sigma * x_right
-  double nrm2, src2, l2r;
   caxpy(-sigma, spinor_right, spinorTmp, spinor_length, cpu_prec);
-  nrm2 = norm_2(spinorTmp, spinor_length, cpu_prec);
-
-  src2 = norm_2(spinor_left, spinor_length, cpu_prec);
-  l2r = sqrt(nrm2 / src2);
+  auto nrm2 = norm_2(spinorTmp, spinor_length, cpu_prec);
+  auto src2 = norm_2(spinor_left, spinor_length, cpu_prec);
+  auto l2r = sqrt(nrm2 / src2);
 
   printfQuda("Singular vector pair %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
 
@@ -742,7 +740,7 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
   return l2r;
 }
 
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
+std::array<real_t, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                                QudaInvertParam &inv_param, int laplace3D, int src_idx)
 {
@@ -751,14 +749,14 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda:
   return verifyStaggeredInversion(in, out_vector, fat_link, long_link, inv_param, laplace3D, src_idx);
 }
 
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
+std::array<real_t, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
                                                std::vector<quda::ColorSpinorField> &out_vector,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                                QudaInvertParam &inv_param, int laplace3D, int src_idx)
 {
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   double l2r_max = 0.0;
-  double hqr_max = 0.0;
+  real_t hqr_max = 0.0;
 
   // Create temporary spinors
   quda::ColorSpinorParam csParam(in);
@@ -784,16 +782,17 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
       stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type, laplace3D);
 
       mxpy(in.data(), ref.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-      double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-      double src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-      double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
-      double l2r = sqrt(nrm2 / src2);
+      auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+      auto src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+      auto hq_norm = quda::blas::HeavyQuarkResidualNorm(out, ref);
+      auto hqr = quda::sqrt(hq_norm[2]);
+      auto l2r = sqrt(nrm2 / src2);
 
       printfQuda("%dth solution: mass=%f, ", i, mass);
       printfQuda("Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, "
                  "QUDA = %9.6e, host = %9.6e\n",
-                 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
-                 inv_param.true_res_hq_offset[i], hqr);
+                 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], double(l2r), inv_param.tol_hq_offset[i],
+                 inv_param.true_res_hq_offset[i], double(hqr));
       // Empirical: if the cpu residue is more than 1 order the target accuracy, then it fails to converge
       if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[i]) {
         printfQuda("Shift %2d has empirically failed to converge\n", i);
@@ -823,14 +822,16 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
     }
 
     mxpy(in.data(), ref.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
-    double l2r = sqrt(nrm2 / src2);
+    auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto hq_norm = quda::blas::HeavyQuarkResidualNorm(out, ref);
+    auto hqr = quda::sqrt(hq_norm[2]);
+    auto l2r = sqrt(nrm2 / src2);
 
     printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e, "
                "host = %9.6e\n",
-               inv_param.tol, inv_param.true_res[src_idx], l2r, inv_param.tol_hq, inv_param.true_res_hq[src_idx], hqr);
+               inv_param.tol, inv_param.true_res[src_idx], double(l2r), inv_param.tol_hq,
+               inv_param.true_res_hq[src_idx], double(hqr));
 
     l2r_max = l2r;
     hqr_max = hqr;
@@ -914,9 +915,9 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, const std:
   } else {
     // Compute M * x - \lambda * x
     caxpy(-lambda[0], spinor.data(), ref.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double src2 = norm_2(spinor.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double l2r = sqrt(nrm2 / src2);
+    auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto src2 = norm_2(spinor.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto l2r = sqrt(nrm2 / src2);
     printfQuda("Eigenvector %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
     return l2r;
   }
@@ -943,9 +944,9 @@ double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, qu
 
   // Compute M * x_left - \sigma * x_right
   caxpy(-sigma[0], spinor_right.data(), ref.data(), spinor_right.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(spinor_left.data(), spinor_left.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double l2r = sqrt(nrm2 / src2);
+  auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  auto src2 = norm_2(spinor_left.data(), spinor_left.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  auto l2r = sqrt(nrm2 / src2);
 
   printfQuda("Singular vector pair %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
 
@@ -958,7 +959,7 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
     errorQuda("Spinor distance reweighting should only apply to double precision field");
   }
 
-  alpha0 = abs(alpha0);
+  alpha0 = std::abs(alpha0);
 
   quda::ColorSpinorParam csParam(spinor);
   csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -982,9 +983,9 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
   spinorDistanceReweight(spinorTmp1, -alpha0, t0);
 
   mxpy(spinorTmp1.data(), spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
-  double nrm2 = norm_2(spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
-  double src2 = norm_2(spinorTmp1.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
-  double l2r = sqrt(nrm2 / src2);
+  auto nrm2 = norm_2(spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  auto src2 = norm_2(spinorTmp1.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  auto l2r = sqrt(nrm2 / src2);
   printfQuda("Apply distance reweighting: alpha0 = %.2e, t0 = %d, host residual = %.15e\n", -alpha0, t0, l2r);
 
   spinorDistanceReweight(spinorTmp1, alpha0, t0);

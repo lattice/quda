@@ -10,12 +10,12 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct NdegTwistedCloverApply {
     NdegTwistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                           cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
-                           double b, double c, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+                           cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, real_t a,
+                           real_t b, real_t c, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
   };
 
   void ApplyNdegTwistedClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                              const GaugeField &U, const CloverField &A, double a, double b, double c,
+                              const GaugeField &U, const CloverField &A, real_t a, real_t b, real_t c,
                               cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
                               TimeProfile &profile)
   {

@@ -6,7 +6,9 @@
  *
  */
 
+#include <cstdint>
 #include <limits>
+#include <type_traits>
 #include <register_traits.h>
 #include <convert.h>
 #include <clover_field.h>
@@ -292,9 +294,9 @@ namespace quda {
          @tparam helper The helper functor which acts as the transformer
          in transform_reduce
       */
-      template <typename reducer, typename helper> constexpr double transform_reduce(QudaFieldLocation, helper) const
+      template <typename reducer, typename helper> constexpr auto transform_reduce(QudaFieldLocation, helper) const
       {
-        return 0.0;
+        return real_t(0.0);
       }
     };
 
@@ -319,7 +321,7 @@ namespace quda {
         stride(A.VolumeCB()),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         compressed_block_size(A.compressed_block_size()),
-        recon(A.Diagonal())
+        recon(double(A.Diagonal()))
       {
       }
 
@@ -364,8 +366,7 @@ namespace quda {
          @param[in] h The helper functor which acts as the transformer
          in transform_reduce
        */
-      template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h) const
+      template <typename reducer, typename helper> auto transform_reduce(QudaFieldLocation location, helper h) const
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
         return ::quda::transform_reduce<reducer>(location, reinterpret_cast<const complex<Float> *>(a), offset_cb, h);
@@ -416,8 +417,7 @@ namespace quda {
          @param[in] h The helper functor which acts as the transformer
          in transform_reduce
        */
-      template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h) const
+      template <typename reducer, typename helper> auto transform_reduce(QudaFieldLocation location, helper h) const
       {
         return ::quda::transform_reduce<reducer>(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h);
       }
@@ -495,11 +495,12 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */
-        __host__ double norm1(int = -1, bool global = true) const
+        auto norm1(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm1
-            = accessor.scale() * accessor.template transform_reduce<plus<double>>(location, abs_<double, Float>());
+          real_t nrm1 = real_t(accessor.scale())
+            * reduction_to_real(
+                          accessor.template transform_reduce<plus<device_reduce_t>>(location, abs_<double, Float>()));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -509,11 +510,12 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
          * @return L1 norm
          */
-        __host__ double norm2(int = -1, bool global = true) const
+        auto norm2(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.scale() * accessor.scale()
-            * accessor.template transform_reduce<plus<double>>(location, square_<double, Float>());
+          real_t nrm2 = real_t(accessor.scale()) * real_t(accessor.scale())
+            * reduction_to_real(accessor.template transform_reduce<plus<device_reduce_t>>(location,
+                                                                                          square_<double, Float>()));
           commGlobalReductionPop();
           return nrm2;
         }
@@ -523,11 +525,11 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
          * @return Linfinity norm
          */
-        __host__ double abs_max(int = -1, bool global = true) const
+        auto abs_max(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmax
-            = accessor.scale() * accessor.template transform_reduce<maximum<Float>>(location, abs_max_<Float, Float>());
+          real_t absmax = real_t(
+            accessor.scale() * accessor.template transform_reduce<maximum<Float>>(location, abs_max_<Float, Float>()));
           commGlobalReductionPop();
           return absmax;
         }
@@ -537,11 +539,11 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
          * @return Minimum norm
          */
-        __host__ double abs_min(int = -1, bool global = true) const
+        auto abs_min(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmin
-            = accessor.scale() * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>());
+          real_t absmin = real_t(
+            accessor.scale() * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>()));
           commGlobalReductionPop();
           return absmin;
         }
@@ -555,17 +557,12 @@ namespace quda {
        @tparam add_rho Whether to add the constant rho onto the
        diagonal.  This is used to enable Hasenbusch mass
        preconditioning.
-       @tparam huge_alloc Template parameter that enables 64-bit
-       pointer arithmetic for huge allocations (e.g., packed set of
-       vectors).  Default is to use 32-bit pointer arithmetic.
     */
-      template <typename Float, int length, bool add_rho = false, bool enable_reconstruct_ = clover::reconstruct(),
-                bool huge_alloc = false>
+      template <typename Float, int length, bool add_rho = false, bool enable_reconstruct_ = clover::reconstruct()>
       struct FloatNOrder {
         static constexpr bool enable_reconstruct = enable_reconstruct_;
-        using Accessor = FloatNOrder<Float, length, add_rho, enable_reconstruct, huge_alloc>;
+        using Accessor = FloatNOrder<Float, length, add_rho, enable_reconstruct>;
         using real = typename mapper<Float>::type;
-        typedef typename AllocType<huge_alloc>::type AllocInt;
         typedef float norm_type;
         static constexpr int Ns = 4;
         static constexpr int Nc = 3;
@@ -583,7 +580,7 @@ namespace quda {
         norm_type nrm_inv;
 
         const bool is_inverse;
-        const AllocInt offset; // offset can be 32-bit or 64-bit
+        const index_t offset; // offset can be 32-bit or 64-bit
         const int volumeCB;
 
         const QudaTwistFlavorType twist_flavor;
@@ -595,9 +592,10 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr) :
-          recon(clover.Diagonal()),
-          nrm(clover.max_element(is_inverse)
-              / (2 * (isFixed<Float>::value ? fixedMaxValue<Float>::value : 1))), // factor of two in normalization
+          recon(double(clover.Diagonal())),
+          nrm(static_cast<norm_type>(
+            clover.max_element(is_inverse)
+            / (2 * (isFixed<Float>::value ? fixedMaxValue<Float>::value : 1)))), // factor of two in normalization
           nrm_inv(1.0 / nrm),
           is_inverse(is_inverse),
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),
@@ -865,8 +863,8 @@ namespace quda {
           if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          offdiag = clover_ ? ((Float **)clover_)[0] : clover.data<Float **>(inverse)[0];
-          diag = clover_ ? ((Float **)clover_)[1] : clover.data<Float **>(inverse)[1];
+          offdiag = clover_ ? reinterpret_cast<Float **>(clover_)[0] : clover.data<Float **>(inverse)[0];
+          diag = clover_ ? reinterpret_cast<Float **>(clover_)[1] : clover.data<Float **>(inverse)[1];
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }

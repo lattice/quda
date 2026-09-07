@@ -72,7 +72,7 @@ static void *df_preconditioner = nullptr;
 static void *preserved_deflation_space[2] = {nullptr, nullptr};
 static double preserved_evals_mass[2] = {-1.0, -1.0};
 // Cache zero-mass eigenvalues instead of recomputing every time the mass is changed
-static std::vector<quda::Complex> preserved_evals_zero_mass;
+static std::vector<quda::complex_t> preserved_evals_zero_mass;
 
 using namespace quda;
 using namespace quda::fermion_force;
@@ -1241,7 +1241,7 @@ void qudaProject(int external_precision, void **source, void **solution, int nve
     for (int i = 0; i < nvec; i++) blas::zero(tmp[i]);
 
     // 1. Take block inner product: (V_i)^dag * src = s_i
-    std::vector<Complex> s(n_evec * src.size());
+    std::vector<complex_t> s(n_evec * src.size());
     blas::block::cDotProduct(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {src.begin(), src.end()});
 
     // 2. Build projected component: Sum_i V_i * s_i = tmp
@@ -1289,7 +1289,8 @@ void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int N
 
   // Copy eigenvalues if requested
   if (evals)
-    for (int i = 0; i < Nvecs; i++) evals[i] = space->evals[i].real();
+    for (int i = 0; i < Nvecs; i++)
+      evals[i] = static_cast<std::remove_cvref_t<decltype(evals[i])>>(space->evals[i].real());
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaGetDeflationSpace
@@ -1367,7 +1368,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       preserved_evals_zero_mass.resize(space0->evals.size());
       double m2_shift = 4.0 * mass * mass;
       for (size_t i = 0; i < space0->evals.size(); i++)
-        preserved_evals_zero_mass[i] = space0->evals[i] - Complex(m2_shift, 0.0);
+        preserved_evals_zero_mass[i] = space0->evals[i] - complex_t(m2_shift, 0.0);
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Stored zero-mass eigenvalues (back-shifted from mass %e)\n", mass);
@@ -1410,7 +1411,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     std::vector<ColorSpinorField> temps;
     resize(temps, batch_size, gpuParam);
 
-    Complex n_unit(-1.0, 0.0);
+    complex_t n_unit(-1.0, 0.0);
 
     for (int i = 0; i < n_evecs; i += batch_size) {
       auto lo = i;
@@ -1421,8 +1422,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       dEig->Dslash({temps.begin(), temps.begin() + bs},
                    {other_parity_space->evecs.begin() + lo, other_parity_space->evecs.begin() + hi}, parity);
       auto t_norms = blas::norm2({temps.begin(), temps.begin() + bs});
-      quda::vector<Complex> scales(bs);
-      for (int j = 0; j < bs; j++) scales[j] = 1.0 / sqrt(t_norms[j]);
+      quda::vector<complex_t> scales(static_cast<uint64_t>(bs));
+      for (int j = 0; j < bs; j++) scales[j] = 1.0 / quda::sqrt(t_norms[j]);
       blas::axy(scales, {temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
 
       if (!preserved_evals_zero_mass.empty()) {
@@ -1431,7 +1432,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
           errorQuda("preserved_evals_zero_mass has %lu entries, need at least %d", preserved_evals_zero_mass.size(),
                     n_evecs);
         for (int j = 0; j < bs; j++)
-          space->evals[lo + j] = preserved_evals_zero_mass[lo + j] + Complex(4.0 * mass * mass, 0.0);
+          space->evals[lo + j] = preserved_evals_zero_mass[lo + j] + complex_t(4.0 * mass * mass, 0.0);
 
         // Opt-in residual sanity check
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -1441,16 +1442,16 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                                       {temps.begin(), temps.begin() + bs});
           for (int j = 0; j < bs; j++)
             printfQuda("Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e (shifted)\n", lo + j,
-                       space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
+                       space->evals[lo + j].real(), space->evals[lo + j].imag(), quda::sqrt(res[j]));
         }
       } else {
         // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
         dEig->M({temps.begin(), temps.begin() + bs}, {space->evecs.begin() + lo, space->evecs.begin() + hi});
-        if (fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
+        if (std::fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
           auto vtAv = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi},
                                         {temps.begin(), temps.begin() + bs});
           auto v2 = blas::norm2({space->evecs.begin() + lo, space->evecs.begin() + hi});
-          for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / sqrt(v2[j]);
+          for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / quda::sqrt(v2[j]);
         } else { // re-use other parity eigenvalues by default
           for (int j = 0; j < bs; j++) space->evals[lo + j] = other_parity_space->evals[lo + j];
         }
@@ -1461,7 +1462,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                                     {temps.begin(), temps.begin() + bs});
         for (int j = 0; j < bs; j++)
           logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
-                  space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
+                  space->evals[lo + j].real(), space->evals[lo + j].imag(), quda::sqrt(res[j]));
       }
     }
     delete dEig;
@@ -1504,7 +1505,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     std::vector<ColorSpinorField> temps;
     resize(temps, batch_size, gpuParam);
 
-    Complex n_unit(-1.0, 0.0);
+    complex_t n_unit(-1.0, 0.0);
 
     // MILC sends pointer to full parity evecs, but QUDA uses single parity vectors
     // so for odd parity, need to use offset
@@ -1529,7 +1530,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       auto vtAv
         = blas::cDotProduct({space->evecs.begin() + lo, space->evecs.begin() + hi}, {temps.begin(), temps.begin() + bs});
       auto v2 = blas::norm2({space->evecs.begin() + lo, space->evecs.begin() + hi});
-      for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / sqrt(v2[j]);
+      for (int j = 0; j < bs; j++) space->evals[lo + j] = vtAv[j] / quda::sqrt(v2[j]);
 
       // Compute residual, res^2 = |\lambda*v - A*v|
       auto res = blas::caxpbyNorm({space->evals.begin() + lo, space->evals.begin() + hi},
@@ -1537,7 +1538,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
                                   {temps.begin(), temps.begin() + bs});
       for (int j = 0; j < bs; j++)
         logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", lo + j,
-                space->evals[lo + j].real(), space->evals[lo + j].imag(), sqrt(res[j]));
+                space->evals[lo + j].real(), space->evals[lo + j].imag(), quda::sqrt(res[j]));
     }
 
     delete dEig;
@@ -1657,8 +1658,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
     resize(acc2_odd, 4, accParam);
   }
 
-  double m_l, m_s, m_u, m_d, dl, ds, du, dd;
-  double zscale = 0.0, zscale2 = 0.0;
+  real_t m_l, m_s, m_u, m_d, dl, ds, du, dd;
+  real_t zscale = 0.0, zscale2 = 0.0;
 
   // Loop over eigenvectors
   for (int i = 0; i < n_evecs; i++) {
@@ -1735,7 +1736,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
     qudaMemcpy(h_result, acc.data(), data_bytes / 2, qudaMemcpyDeviceToHost);
     for (size_t x = 0; x < vol_cb; x++) {
       double im = device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag()) :
-                                  reinterpret_cast<const Complex *>(h_result)[x].imag();
+                                  reinterpret_cast<const std::complex<double> *>(h_result)[x].imag();
       if (host_single)
         reinterpret_cast<float *>(arr)[base + 4 * x + mu] += static_cast<float>(im);
       else
@@ -2033,7 +2034,7 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
     }
     // Check that preserved eigenvalues are for this mass
     double epsilon = device_precision == QUDA_DOUBLE_PRECISION ? __DBL_EPSILON__ : __FLT_EPSILON__;
-    if (fabs(mass - preserved_evals_mass[local_parity]) > epsilon) {
+    if (std::fabs(mass - preserved_evals_mass[local_parity]) > epsilon) {
       // If not, shift to correct mass using cached zero-mass eigenvalues
       // NAIK CAVEAT: shifted evals are only approximate when inv_args.naik_epsilon != 0
       if (!preserved_evals_zero_mass.empty()) {
@@ -2046,7 +2047,7 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
                     space->evals.size());
         double m2_shift = 4.0 * mass * mass;
         for (size_t i = 0; i < space->evals.size(); i++)
-          space->evals[i] = preserved_evals_zero_mass[i] + Complex(m2_shift, 0.0);
+          space->evals[i] = preserved_evals_zero_mass[i] + complex_t(m2_shift, 0.0);
 
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
           printfQuda("Shifted eigenvalues (parity %d, mass %e)\n", local_parity, mass);
@@ -2098,7 +2099,7 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
       preserved_evals_zero_mass.resize(space->evals.size());
       double m2_shift = 4.0 * mass * mass;
       for (size_t i = 0; i < space->evals.size(); i++)
-        preserved_evals_zero_mass[i] = space->evals[i] - Complex(m2_shift, 0.0);
+        preserved_evals_zero_mass[i] = space->evals[i] - complex_t(m2_shift, 0.0);
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Stored zero-mass eigenvalues (back-shifted from parity %d, mass %e)\n", local_parity, mass);

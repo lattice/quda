@@ -8,7 +8,7 @@ namespace quda
     WilsonCloverHasenbuschTwistPCNoClovInvApply(cvector_ref<ColorSpinorField> &out,
                                                 cvector_ref<const ColorSpinorField> &in,
                                                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
-                                                const CloverField &A, double a, double b, int parity, bool dagger,
+                                                const CloverField &A, real_t a, real_t b, int parity, bool dagger,
                                                 const int *comm_override, TimeProfile &profile);
   };
 
@@ -16,7 +16,7 @@ namespace quda
   struct WilsonCloverHasenbuschTwistPCClovInvApply {
     WilsonCloverHasenbuschTwistPCClovInvApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                               cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
-                                              const CloverField &A, double kappa, double mu, int parity, bool dagger,
+                                              const CloverField &A, real_t kappa, real_t mu, int parity, bool dagger,
                                               const int *comm_override, TimeProfile &profile);
   };
 
@@ -25,7 +25,7 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator.
   void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(cvector_ref<ColorSpinorField> &out,
                                                    cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                                                   const CloverField &A, double a, double b,
+                                                   const CloverField &A, real_t a, real_t b,
                                                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                                    const int *comm_override, TimeProfile &profile)
   {
@@ -42,7 +42,7 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator.
   void ApplyWilsonCloverHasenbuschTwistPCClovInv(cvector_ref<ColorSpinorField> &out,
                                                  cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                                                 const CloverField &A, double a, double b,
+                                                 const CloverField &A, real_t a, real_t b,
                                                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                                  const int *comm_override, TimeProfile &profile)
   {

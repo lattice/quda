@@ -147,7 +147,7 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
     ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                           cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, double a,
+                           cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, real_t a,
                            int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;

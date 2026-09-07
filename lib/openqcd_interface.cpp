@@ -852,7 +852,7 @@ int openQCD_qudaIndexIup(const int *x, const int mu)
 double openQCD_qudaNorm(void *h_in)
 {
   ColorSpinorField *in = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2D(h_in));
-  double norm2 = in_comm() ? blas::norm2(*in) : 0.0;
+  double norm2 = in_comm() ? static_cast<double>(blas::norm2(*in)) : 0.0;
   openQCD_qudaSpinorFree((void**) &in);
   if (!qudaState.init.two_grids_equal) {
     MPI_Bcast(&norm2, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
@@ -861,7 +861,7 @@ double openQCD_qudaNorm(void *h_in)
 }
 
 double openQCD_qudaNorm_NoLoads(void *d_in) {
-  double norm2 = in_comm() ? blas::norm2(*reinterpret_cast<ColorSpinorField *>(d_in)) : 0.0;
+  double norm2 = in_comm() ? static_cast<double>(blas::norm2(*reinterpret_cast<ColorSpinorField *>(d_in))) : 0.0;
   if (!qudaState.init.two_grids_equal) {
     MPI_Bcast(&norm2, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
   }

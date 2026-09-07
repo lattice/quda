@@ -72,8 +72,8 @@ namespace quda
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverApply {
     template <bool distance_pc>
     WilsonCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
-                      double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, real_t a,
+                      real_t alpha0, int t0, int parity, bool dagger, const int *comm_override,
                       DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;

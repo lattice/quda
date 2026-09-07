@@ -18,9 +18,8 @@ namespace quda {
   constexpr unsigned int max_n_batch_block_loop_trace() { return 8; }
 
   template <typename store_t, int nColor_, QudaReconstructType recon_>
-  struct GaugeLoopTraceArg : public ReduceArg<array<double, 2>>  {
+  struct GaugeLoopTraceArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<store_t>::type;
-    using reduce_t = array<double, 2>;
     static constexpr unsigned int max_n_batch_block = max_n_batch_block_loop_trace();
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
@@ -30,7 +29,7 @@ namespace quda {
 
     const Gauge u;
 
-    const double factor; // overall scaling factor for all loops
+    const real factor;                // overall scaling factor for all loops
     static constexpr int nParity = 2; // always true for gauge fields
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
@@ -38,10 +37,10 @@ namespace quda {
 
     const paths<1> p;
 
-    GaugeLoopTraceArg(const GaugeField &u, double factor, const paths<1> &p) :
+    GaugeLoopTraceArg(const GaugeField &u, real_t factor, const paths<1> &p) :
       ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2, p.num_paths), p.num_paths),
       u(u),
-      factor(factor),
+      factor(static_cast<real>(factor)),
       p(p)
     {
       for (int dir = 0; dir < 4; dir++) {
@@ -64,16 +63,14 @@ namespace quda {
     {
       using Link = typename Arg::Link;
 
-      reduce_t loop_trace{0, 0};
-
       int x[4] = {0, 0, 0, 0};
       getCoords(x, x_cb, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
       packed_array<int8_t, 4> dx = {};
 
-      double coeff_loop = arg.factor * arg.p.path_coeff[path_id];
-      if (coeff_loop == 0) return operator()(loop_trace, value);
+      auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
+      if (coeff_loop == 0) return value;
 
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;
 
@@ -83,10 +80,10 @@ namespace quda {
       // compute trace
       auto trace = getTrace(link_prod);
 
+      reduce_t loop_trace {};
       loop_trace[0] = coeff_loop * trace.real();
       loop_trace[1] = coeff_loop * trace.imag();
-
-      return operator()(loop_trace, value);
+      return operator()(value, loop_trace);
     }
   };
 }
