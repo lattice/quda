@@ -38,7 +38,7 @@ namespace quda
        @param[in] x Left vector field
        @param[in] y Right vector field
      */
-    void reDotProduct(std::vector<double> &result, const ColorSpinorField &x, const ColorSpinorField &y);
+    void reDotProduct(std::vector<real_t> &result, const ColorSpinorField &x, const ColorSpinorField &y);
 
     /**
        @brief Compute a set of complex-valued inner products <x, y>, where each inner
@@ -47,14 +47,14 @@ namespace quda
        @param[in] x Left vector field
        @param[in] y Right vector field
      */
-    void cDotProduct(std::vector<Complex> &result, const ColorSpinorField &a, const ColorSpinorField &b);
+    void cDotProduct(std::vector<complex_t> &result, const ColorSpinorField &a, const ColorSpinorField &b);
 
     /**
        @brief Timeslice real-valued scaling of the field
        @param[in] a Vector of scale factors (length = local temporary extent)
        @param[in] x Field we we wish to scale
      */
-    void ax(std::vector<double> &a, ColorSpinorField &x);
+    void ax(std::vector<real_t> &a, ColorSpinorField &x);
 
     /**
        @brief Timeslice real-valued axpby computation
@@ -63,7 +63,7 @@ namespace quda
        @param[in] b Vector of scale factors (length = local temporary extent)
        @param[in,out] y Field we are updating
      */
-    void axpby(const std::vector<double> &a, const ColorSpinorField &x, const std::vector<double> &b,
+    void axpby(const std::vector<real_t> &a, const ColorSpinorField &x, const std::vector<real_t> &b,
                ColorSpinorField &y);
 
     /**
@@ -73,7 +73,7 @@ namespace quda
        @param[in] b Vector of scale factors (length = local temporary extent)
        @param[in,out] y Field we are updating
      */
-    void caxpby(const std::vector<Complex> &a, const ColorSpinorField &x, const std::vector<Complex> &b,
+    void caxpby(const std::vector<complex_t> &a, const ColorSpinorField &x, const std::vector<complex_t> &b,
                 ColorSpinorField &y);
 
   } // namespace blas3d

@@ -159,7 +159,7 @@ void heatbath_test()
 {
   using quda::GaugeField;
 
-  quda::quda_ptr num_failures(QUDA_MEMORY_MAPPED, sizeof(int), false);
+  quda::quda_ptr num_failures(QUDA_MEMORY_HOST_PINNED, sizeof(int), false);
   int &num_failures_h = *static_cast<int *>(num_failures.data_host());
   int &num_failures_d = *static_cast<int *>(num_failures.data_device());
   num_failures_h = 0;

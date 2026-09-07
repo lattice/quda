@@ -216,7 +216,7 @@ namespace quda
       // Initialize barrier. All `blockDim.x` threads in block participate.
       init(bar, blockDim.x * blockDim.y * blockDim.z);
       // Make initialized barrier visible in async proxy.
-      cde::fence_proxy_async_shared_cta();
+      cuda::ptx::fence_proxy_async();
     }
     // Syncthreads so initialized barrier is visible to all threads.
     __syncthreads();

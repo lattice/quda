@@ -28,6 +28,7 @@ set (QUDA_OBJS
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
+  gauge_shift.cu
   gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu gauge_plaqrect.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cgnr.cpp inv_cgne.cpp
@@ -73,8 +74,11 @@ set (QUDA_OBJS
   laplace.cpp
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
-  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu reduce_helper.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cpp
+  reduce_quda_double.cu reduce_quda_single.cu reduce_quda_half.cu reduce_quda_quarter.cu
+  multi_reduce_quda.cpp
+  multi_reduce_quda_double.cu multi_reduce_quda_single.cu multi_reduce_quda_half.cu multi_reduce_quda_quarter.cu
+  reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
@@ -429,8 +433,44 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   mark_as_advanced(QUDA_GITDIR)
 endif()
 
+set(_quda_scalar_help "set the host scalar coefficient type (double, doubledouble, float128)")
+set(QUDA_SCALAR_TYPE
+    double
+    CACHE STRING "${_quda_scalar_help}")
+set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble float128)
+set_property(CACHE QUDA_SCALAR_TYPE PROPERTY HELPSTRING "${_quda_scalar_help}")
+
+# Canonical name is float128. Keep accepting the compiler spellings.
+if(QUDA_SCALAR_TYPE STREQUAL "__float128" OR QUDA_SCALAR_TYPE STREQUAL "_Float128")
+  set(QUDA_SCALAR_TYPE float128 CACHE STRING "${_quda_scalar_help}" FORCE)
+endif()
+
+if(QUDA_SCALAR_TYPE STREQUAL "float128")
+  set(QUDA_USE_QUAD_SCALAR 1)
+  set(QUDA_USE_QUAD_SCALAR 1 PARENT_SCOPE)
+elseif(QUDA_SCALAR_TYPE STREQUAL "doubledouble")
+  set(QUDA_SCALAR_IS_DOUBLEDOUBLE 1)
+endif()
+
+if(QUDA_USE_QUAD_SCALAR)
+  include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles(
+    "typedef __float128 q; int main() { return q(0) == q(0); }"
+    QUDA_COMPILER_HAS_GNU_FLOAT128)
+  check_cxx_source_compiles(
+    "typedef _Float128 q; int main() { return q(0) == q(0); }"
+    QUDA_COMPILER_HAS_IEC_FLOAT128)
+  if(NOT QUDA_COMPILER_HAS_GNU_FLOAT128 AND NOT QUDA_COMPILER_HAS_IEC_FLOAT128)
+    message(FATAL_ERROR "QUDA_SCALAR_TYPE=float128 requires __float128 or _Float128")
+  endif()
+endif()
+
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
+
+if(QUDA_USE_QUAD_SCALAR AND QUDA_COMPILER_HAS_GNU_FLOAT128)
+  target_link_libraries(quda_cpp PUBLIC quadmath)
+endif()
 
 # add comms and QIO
 target_sources(
@@ -502,20 +542,35 @@ mark_as_advanced(QUDA_ORDER_HALF)
 mark_as_advanced(QUDA_ORDER_QUARTER)
 
 # set the percentage of I2F conversions that use the alternative conversion path (using FFMA)
-set(QUDA_ALTERNATIVE_I_TO_F 0 CACHE STRING "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100)")
+if(NOT DEFINED QUDA_ALTERNATIVE_I_TO_F_DEFAULT)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+set(QUDA_ALTERNATIVE_I_TO_F
+    "${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}"
+    CACHE STRING
+        "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100); CUDA builds with sm_100+ default to 25")
 set(VALID_I2F_VALUES "0" "25" "50" "75" "100")
 if(NOT QUDA_ALTERNATIVE_I_TO_F IN_LIST VALID_I2F_VALUES)
     message(FATAL_ERROR "Invalid value for QUDA_ALTERNATIVE_I_TO_F: '${QUDA_ALTERNATIVE_I_TO_F}'\n"
                         "Valid values are: ${VALID_I2F_VALUES}")
 endif()
 set_property(CACHE QUDA_ALTERNATIVE_I_TO_F PROPERTY STRINGS ${VALID_I2F_VALUES})
-message(STATUS "QUDA_ALTERNATIVE_I_TO_F set to: ${QUDA_ALTERNATIVE_I_TO_F}%")
+message(
+  STATUS
+  "QUDA_ALTERNATIVE_I_TO_F is ${QUDA_ALTERNATIVE_I_TO_F}% (alternative integer-to-float conversion path)")
 mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 # Set the maximum multi-RHS per kernel if not already set by the target
 if(NOT DEFINED QUDA_MAX_MULTI_RHS)
   set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
   message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+endif()
+
+# Disable dslash prefetching if not already set
+if(NOT QUDA_DSLASH_PREFETCH_TYPE)
+  set(QUDA_DSLASH_PREFETCH_TYPE "NONE" CACHE STRING "enable Dslash prefetching" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions" FORCE)
 endif()
 
 # make one library
@@ -557,6 +612,9 @@ target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_link_libraries(quda PRIVATE $<BUILD_INTERFACE:Eigen>)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
+# dbldbl.h includes <math_helper.h> from targets/generic; expose to dependents (tests, etc.)
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/targets/generic>
+                                       $<INSTALL_INTERFACE:include/targets/generic>)
 
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
@@ -593,6 +651,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 target_link_libraries(quda PUBLIC Threads::Threads)
+if(QUDA_USE_QUAD_SCALAR AND QUDA_COMPILER_HAS_GNU_FLOAT128)
+  target_link_libraries(quda PUBLIC quadmath)
+endif()
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
@@ -716,6 +777,10 @@ endif()
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+target_compile_definitions(
+  quda
+  PRIVATE "QUDA_BLAS_UNROLL_STREAMING=${QUDA_BLAS_UNROLL_STREAMING}"
+          "QUDA_BLAS_UNROLL_REDUCE=${QUDA_BLAS_UNROLL_REDUCE}")
 
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)
@@ -737,6 +802,31 @@ if(QUDA_BACKWARDS)
     APPEND
     PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
+endif()
+
+set(QUDA_REDUCTION_TYPE
+    double
+    CACHE STRING "set the reduction computation type (double, doubledouble)")
+set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble)
+if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
+  set(QUDA_REDUCTION_IS_DOUBLEDOUBLE 1)
+endif()
+
+set(QUDA_REDUCTION_ALGORITHM
+    NAIVE
+    CACHE STRING "set the reduction algorithm (NAIVE, KAHAN, REPRODUCIBLE)")
+set_property(CACHE QUDA_REDUCTION_ALGORITHM PROPERTY STRINGS NAIVE KAHAN REPRODUCIBLE)
+if(${QUDA_REDUCTION_ALGORITHM} STREQUAL "NAIVE")
+  set(QUDA_REDUCTION_ALGORITHM_NAIVE 1)
+elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "KAHAN")
+  # Keep KAHAN in STRINGS so it remains visible, but reject until kahan_t exists.
+  message(FATAL_ERROR "QUDA_REDUCTION_ALGORITHM=KAHAN is not implemented yet "
+                      "(no kahan_t definition). Use NAIVE or REPRODUCIBLE.")
+elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "REPRODUCIBLE")
+  set(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE 1)
+else()
+  message(FATAL_ERROR "Invalid value for QUDA_REDUCTION_ALGORITHM: '${QUDA_REDUCTION_ALGORITHM}'. "
+                      "Allowed: NAIVE, REPRODUCIBLE (KAHAN reserved but not implemented).")
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)

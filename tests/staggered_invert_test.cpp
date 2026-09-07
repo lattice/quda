@@ -248,7 +248,7 @@ void init()
   //-----------------------------------------------------------------------------------
 }
 
-std::vector<std::array<double, 2>> solve(test_t param)
+std::vector<std::array<quda::real_t, 2>> solve(test_t param)
 {
   inv_param.inv_type = ::testing::get<0>(param);
   inv_param.solution_type = ::testing::get<1>(param);
@@ -438,7 +438,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // Compute timings
   if (!use_multi_src) performanceStats(time, gflops, iter);
 
-  std::vector<std::array<double, 2>> res(Nsrc);
+  std::vector<std::array<quda::real_t, 2>> res(Nsrc);
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int n = 0; n < Nsrc; n++) {

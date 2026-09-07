@@ -13,20 +13,17 @@ env:
   CCACHE_COMPILERCHECK: content
 
 jobs:
-    build:
-      strategy:
-        matrix:
-          compiler: [g++-12, clang++-14]
-      runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-      steps:
+    steps:
       - name: Install software
         run: |
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
           sudo dpkg -i cuda-keyring_1.0-1_all.deb
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran clang-14
-     
+          sudo apt-get install -y --no-install-recommends ninja-build cmake libopenmpi-dev gfortran g++-12
+
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
@@ -37,14 +34,14 @@ jobs:
       - name: Ccache for gh actions
         uses: hendrikmuhs/ccache-action@v1.2.16
         with:
-          key: ${{ github.job }}-${{ matrix.compiler }}
+          key: ${{ github.job }}-g++-12-cuda-12.1
           max-size: 2000M
 
       - name: Configure CMake
         run: >
-          cmake 
+          cmake
           -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc
-          -DCMAKE_CXX_COMPILER=${{matrix.compiler}}
+          -DCMAKE_CXX_COMPILER=g++-12
           -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DQUDA_GPU_ARCH=sm_80 -DQUDA_GPU_ARCH_SUFFIX=virtual -DQUDA_JITIFY=ON
@@ -52,14 +49,13 @@ jobs:
           -DQUDA_MULTIGRID=ON
           -DQUDA_MULTIGRID_NVEC_LIST=24
           -DQUDA_MDW_FUSED_LS_LIST=4
-          -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON 
+          -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON
           -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON -DQUDA_FAST_COMPILE_REDUCE=ON
           -GNinja
-          -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
       - name: Build
-        run: cmake --build ${{github.workspace}}/build
+        run: cmake --build ${{ github.workspace }}/build
 
       - name: Install
-        run: cmake --install ${{github.workspace}}/build 
-
+        run: cmake --install ${{ github.workspace }}/build

@@ -34,7 +34,7 @@ mark_as_advanced(CMAKE_CUDA_ARCHITECTURES)
 set(CMAKE_CUDA_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
     CACHE FILEPATH "Host compiler to be used by nvcc")
-set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
@@ -149,6 +149,16 @@ else()
   set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 endif()
 
+# Default I2F alternative-path percentage: Blackwell and newer (sm_100+).
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "25")
+else()
+  set(QUDA_ALTERNATIVE_I_TO_F_DEFAULT "0")
+endif()
+message(
+  STATUS
+  "I2F alternative-path cache default: ${QUDA_ALTERNATIVE_I_TO_F_DEFAULT}% (QUDA_COMPUTE_CAPABILITY=${QUDA_COMPUTE_CAPABILITY})")
+
 # large arg support requires CUDA 12.1 and Volta+
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
   "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"
@@ -158,7 +168,7 @@ mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
 
 # single-precision vectorization presently disabled by default
 cmake_dependent_option(QUDA_VECTORIZE_SINGLE "use vector instructions for single precision device code" ON
-  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 99.0 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.2 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
   OFF)
 message(STATUS "Single-precision vectorization support: ${QUDA_VECTORIZE_SINGLE}")
 mark_as_advanced(QUDA_VECTORIZE_SINGLE)
@@ -176,12 +186,108 @@ option(QUDA_SHARED_MEMORY_SPILL "enable shared memory spilling?" OFF)
 mark_as_advanced(QUDA_SHARED_MEMORY_SPILL)
 message(STATUS "Shared memory spilling: ${QUDA_SHARED_MEMORY_SPILL}")
 
+
+# ---------------------------
+# Set Dslash prefetching
+# ---------------------------
+
+# Arch-dependent defaults
+set(_dslash_double_store_default OFF)
+set(_dslash_prefetch_type_default NONE)
+set(_dslash_prefetch_dist_w_default 0)
+set(_dslash_prefetch_dist_s_default 0)
+
+# These are expected Blackwell+ defaults
+if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100)
+  set(_dslash_double_store_default ON)
+  set(_dslash_prefetch_type_default BULK)
+  set(_dslash_prefetch_dist_w_default 2)
+  set(_dslash_prefetch_dist_s_default 2)
+endif()
+
+# Cache variables (set only if not already defined)
+if(NOT DEFINED QUDA_DSLASH_DOUBLE_STORE)
+  set(QUDA_DSLASH_DOUBLE_STORE ${_dslash_double_store_default}
+      CACHE BOOL "store a forwards shifted copy of the gauge fields for simplified Dslash indexing")
+endif()
+mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
+message(STATUS "QUDA_DSLASH_DOUBLE_STORE: ${QUDA_DSLASH_DOUBLE_STORE}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_TYPE)
+  set(QUDA_DSLASH_PREFETCH_TYPE ${_dslash_prefetch_type_default}
+      CACHE STRING "enable Dslash prefetching (NONE, THREAD, BULK, TENSOR)")
+endif()
+set_property(CACHE QUDA_DSLASH_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK TENSOR)
+mark_as_advanced(QUDA_DSLASH_PREFETCH_TYPE)
+message(STATUS "QUDA_DSLASH_PREFETCH_TYPE: ${QUDA_DSLASH_PREFETCH_TYPE}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON ${_dslash_prefetch_dist_w_default}
+      CACHE STRING "Dslash prefetch distance for Wilson kernels")
+endif()
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+message(STATUS "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON: ${QUDA_DSLASH_PREFETCH_DISTANCE_WILSON}")
+
+if(NOT DEFINED QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED ${_dslash_prefetch_dist_s_default}
+      CACHE STRING "Dslash prefetch distance for Staggered kernels")
+endif()
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+message(STATUS "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED: ${QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED}")
+
+# Validate prefetch type
+set(_valid_prefetch NONE THREAD BULK TENSOR)
+if(NOT QUDA_DSLASH_PREFETCH_TYPE IN_LIST _valid_prefetch)
+  message(FATAL_ERROR
+    "Invalid QUDA_DSLASH_PREFETCH_TYPE='${QUDA_DSLASH_PREFETCH_TYPE}'. "
+    "Allowed: ${_valid_prefetch}")
+endif()
+
+# TMA prefetching requires double-store
+set(_tma_modes BULK TENSOR)
+
+# TMA prefetching requires double store
+if(QUDA_DSLASH_PREFETCH_TYPE IN_LIST _tma_modes AND NOT QUDA_DSLASH_DOUBLE_STORE)
+  message(FATAL_ERROR
+    "QUDA_DSLASH_PREFETCH_TYPE=${QUDA_DSLASH_PREFETCH_TYPE} "
+    "requires QUDA_DSLASH_DOUBLE_STORE=ON")
+endif()
+
+# TMA prefetching requires sm_90+
+if(QUDA_DSLASH_PREFETCH_TYPE IN_LIST _tma_modes AND QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR
+    "QUDA_DSLASH_PREFETCH_TYPE=${QUDA_DSLASH_PREFETCH_TYPE} "
+    "requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
+
+# validate prefetching distances
+if(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON GREATER 7)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON is greater than pipeline length")
+endif()
+if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
+endif()
+
+# BLAS bulk prefetch uses cp.async.bulk on CUDA Hopper+
+if(QUDA_BLAS_PREFETCH_TYPE STREQUAL "BULK" AND QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
+
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
 # ######################################################################################################################
 # cuda specific compile options
+
+set(QUDA_CUDA_NVCC_EXTRA_FLAGS "" CACHE STRING "")
+mark_as_advanced(QUDA_CUDA_NVCC_EXTRA_FLAGS)
+
+if(NOT QUDA_CUDA_NVCC_EXTRA_FLAGS STREQUAL "" AND QUDA_CUDA_BUILD_TYPE STREQUAL "NVCC")
+  separate_arguments(_quda_cuda_nvcc_extra_flags UNIX_COMMAND "${QUDA_CUDA_NVCC_EXTRA_FLAGS}")
+  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:${_quda_cuda_nvcc_extra_flags}>)
+endif()
+
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -313,6 +419,9 @@ set(QUDA_MAX_SHARED_MEMORY "0" CACHE STRING "Max shared memory per block, 0 corr
 mark_as_advanced(QUDA_MAX_SHARED_MEMORY)
 configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/device.in.hpp
                ${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp @ONLY)
+# Expose the override to C++ translation units (e.g. device.cpp) that cannot
+# include the CUDA-only generated device.hpp but need to cap runtime queries.
+target_compile_definitions(quda_cpp PRIVATE QUDA_MAX_SHARED_MEMORY_OVERRIDE=${QUDA_MAX_SHARED_MEMORY})
 install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp" DESTINATION include/)
 
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
@@ -419,6 +528,22 @@ if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
 
+option(QUDA_DOWNLOAD_CCCL "Download CCCL v3.3.4 via CPM; OFF = use the CUDA toolkit's CCCL" ON)
+if(QUDA_DOWNLOAD_CCCL)
+  CPMAddPackage(
+      NAME CCCL
+      GITHUB_REPOSITORY nvidia/cccl
+      GIT_TAG v3.3.4 # Fetches this tagged commit
+  )
+else()
+  # Use the CUDA toolkit's CCCL (the same one NVSHMEM 3.x's config find_dependency
+  # resolves to) so QUDA and NVSHMEM share ONE CCCL -> no libcudacxx/cub clash.
+  # QUDA requires CUDAToolkit, so CUDAToolkit_LIBRARY_ROOT points at the toolkit.
+  find_package(CCCL REQUIRED CONFIG
+      HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl")
+endif()
+target_link_libraries(quda PRIVATE CCCL::CCCL)
+
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
@@ -472,10 +597,13 @@ if(QUDA_NVSHMEM)
     if("${QUDA_NVSHMEM_HOME}" STREQUAL "")
       message(FATAL_ERROR "QUDA_NVSHMEM_HOME must be defined if QUDA_NVSHMEM is set")
     endif()
-    find_library(
-      NVSHMEM_LIBS
-      NAMES nvshmem
-      PATHS "${QUDA_NVSHMEM_HOME}/lib/")
+    # NVSHMEM 3.x config-package linking (QUDA/NCI patch)
+    # NVSHMEM 3.x ships split host/device libs + a CMake config package. Its
+    # NVSHMEMConfig.cmake does find_dependency(CCCL); QUDA is built against the
+    # SAME (CUDA toolkit) CCCL just above (see the CCCL find_package patch), so
+    # this reuses it -> one consistent CCCL, no version clash.
+    find_package(NVSHMEM REQUIRED CONFIG
+      HINTS "${QUDA_NVSHMEM_HOME}/lib/cmake/nvshmem")
     find_path(
       NVSHMEM_INCLUDE
       NAMES nvshmem.h
@@ -484,11 +612,20 @@ if(QUDA_NVSHMEM)
 
   mark_as_advanced(NVSHMEM_LIBS)
   mark_as_advanced(NVSHMEM_INCLUDE)
-  add_library(nvshmem_lib STATIC IMPORTED)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LOCATION ${NVSHMEM_LIBS})
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
+  # Resolve NVSHMEM device/host targets across NVSHMEM 3.x config layouts.
+  if(TARGET nvshmem::nvshmem_device)
+    set(QUDA_NVSHMEM_DEVICE_TGT nvshmem::nvshmem_device)
+  elseif(TARGET nvshmem::nvshmem)
+    set(QUDA_NVSHMEM_DEVICE_TGT nvshmem::nvshmem)
+  else()
+    message(FATAL_ERROR "NVSHMEM config package found but no device target "
+                        "(nvshmem::nvshmem_device) is defined")
+  endif()
+  if(TARGET nvshmem::nvshmem_host)
+    set(QUDA_NVSHMEM_HOST_TGT nvshmem::nvshmem_host)
+  else()
+    set(QUDA_NVSHMEM_HOST_TGT ${QUDA_NVSHMEM_DEVICE_TGT})
+  endif()
 
   # set_target_properties(quda_pack PROPERTIES CUDA_ARCHITECTURES ${QUDA_COMPUTE_CAPABILITY})
   target_include_directories(quda_pack PRIVATE dslash_core)
@@ -510,8 +647,14 @@ if(QUDA_NVSHMEM)
     add_dependencies(quda_cpp NVSHMEM)
     add_dependencies(quda_pack NVSHMEM)
   endif()
-  get_filename_component(NVSHMEM_LIBPATH ${NVSHMEM_LIBS} DIRECTORY)
-  target_link_libraries(quda PUBLIC -L${NVSHMEM_LIBPATH} -lnvshmem)
+  # Device lib into quda_pack (device code) AND quda (device link); host into quda.
+  # PRIVATE, not PUBLIC: libquda.so is shared and fully absorbs the nvshmem
+  # device symbols + gets a DT_NEEDED on libnvshmem_host, so consumers (MILC via
+  # find_package(QUDA)) must NOT see nvshmem::* in QUDA's exported interface
+  # (PUBLIC leaked nvshmem::nvshmem_host into QUDATargets.cmake -> MILC configure
+  # failed: "target nvshmem::nvshmem_host not found").
+  target_link_libraries(quda_pack PRIVATE ${QUDA_NVSHMEM_DEVICE_TGT})
+  target_link_libraries(quda PRIVATE ${QUDA_NVSHMEM_HOST_TGT} ${QUDA_NVSHMEM_DEVICE_TGT})
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${NVSHMEM_INCLUDE}>)
 endif()
 

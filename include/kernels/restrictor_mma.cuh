@@ -174,11 +174,7 @@ namespace quda
       // block all-reduce thread_max
       using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, Arg::block_y, Arg::block_z>;
       __shared__ typename block_reduce_t::TempStorage temp_storage;
-#if CUDA_VERSION >= 12090
       float block_max = block_reduce_t(temp_storage).Reduce(thread_max, ::cuda::maximum());
-#else
-      float block_max = block_reduce_t(temp_storage).Reduce(thread_max, ::cub::Max());
-#endif
 
       __shared__ float block_max_all;
       if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
@@ -309,7 +305,7 @@ namespace quda
       }
     }
 
-    const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
+    const int parity_coarse = static_cast<index_t>(x_coarse) >= arg.out.VolumeCB() ? 1 : 0;
     const int x_coarse_cb = x_coarse - parity_coarse * arg.out.VolumeCB();
 
     auto c_gmem = arg.out(parity_coarse, x_coarse_cb, coarse_spin, 0, 0);

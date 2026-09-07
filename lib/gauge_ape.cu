@@ -10,19 +10,19 @@ namespace quda {
   {
     GaugeField &out;
     const GaugeField &in;
-    const Float alpha;
+    const real_t alpha;
     const int dir_ignore;
-    const Float anisotropy;
+    const real_t anisotropy;
     const int apeDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeAPE(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, double anisotropy) :
+    GaugeAPE(GaugeField &out, const GaugeField &in, real_t alpha, int dir_ignore, real_t anisotropy) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       in(in),
-      alpha(static_cast<Float>(alpha)),
+      alpha(alpha),
       dir_ignore(dir_ignore),
       anisotropy(anisotropy),
       apeDim((dir_ignore == 4) ? 4 : 3)
@@ -54,13 +54,16 @@ namespace quda {
 
     long long bytes() const // 6 links per dim, 1 in, 1 out.
     {
-      return ((1 + (apeDim - 1) * 6) * in.Reconstruct() * in.Precision() +
-              out.Reconstruct() * out.Precision()) * apeDim * in.LocalVolume();
+      const long long in_bytes
+        = static_cast<long long>(static_cast<int>(in.Reconstruct()) * static_cast<int>(in.Precision()));
+      const long long out_bytes
+        = static_cast<long long>(static_cast<int>(out.Reconstruct()) * static_cast<int>(out.Precision()));
+      return ((1 + (apeDim - 1) * 6) * in_bytes + out_bytes) * apeDim * in.LocalVolume();
     }
 
   }; // GaugeAPE
 
-  void APEStep(GaugeField &out, GaugeField &in, double alpha, int dir_ignore, double smear_anisotropy)
+  void APEStep(GaugeField &out, GaugeField &in, real_t alpha, int dir_ignore, real_t smear_anisotropy)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);

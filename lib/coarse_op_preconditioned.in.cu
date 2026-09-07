@@ -41,12 +41,13 @@ namespace quda
       Xinv(Xinv)
     {
       if (Arg::compute_max) {
-        arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
+        arg.max_h = static_cast<Float*>(pool_host_pinned_malloc(sizeof(Float)));
         if (location == QUDA_CUDA_FIELD_LOCATION) arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
         arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
       }
 
-      if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
+      if (location == QUDA_CUDA_FIELD_LOCATION)
+        strcat(aux, Y.MemType() == QUDA_MEMORY_HOST_PINNED ? ",GPU-mapped" : ",GPU-device");
       strcat(aux, comm_dim_partitioned_string());
       if constexpr (use_mma) {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -71,7 +72,7 @@ namespace quda
     {
       if (Arg::compute_max) {
         if (location == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
-        pool_pinned_free(arg.max_h);
+        pool_host_pinned_free(arg.max_h);
       }
     }
 
@@ -229,7 +230,7 @@ namespace quda
         // XXX: This doesn't work for double precision since hard-coded to single precision
         using gCoarseInv = gauge::FieldOrder<float, N, 1, gOrder_milc, use_native_ghosts, float>;
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_aos->norm2(0));
+        logQuda(QUDA_VERBOSE, "Xinv = %e\n", double(Xinv_aos->norm2(0)));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           CalculateYhat<location, Float, storeFloat, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true, true>
@@ -252,7 +253,7 @@ namespace quda
         // use spin-ignorant accessor to make multiplication simpler
         using gCoarse = typename gauge::FieldOrder<Float, N, 1, gOrder, true, storeFloat>;
         using gPreconditionedCoarse = typename gauge::FieldOrder<Float, N, 1, gOrder, true, storeFloat>;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
+        logQuda(QUDA_VERBOSE, "Xinv = %e\n", double(Xinv.norm2(0)));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           CalculateYhat<location, Float, storeFloat, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true, false>
@@ -274,11 +275,9 @@ namespace quda
     // links and not overwrite the backwards ghost
     Yhat.exchangeGhost(QUDA_LINK_FORWARDS);
 
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      for (int d = 0; d < 8; d++)
-        printfQuda("Yhat[%d] = %e (%e < %e x %e)\n", d, Yhat.norm2(d), Yhat.abs_max(d), Y.abs_max(d), Xinv.abs_max(0));
-    }
-
+    for (int d = 0; d < 8; d++)
+      logQuda(QUDA_VERBOSE, "Yhat[%d] = %e (%e < %e x %e)\n", d, double(Yhat.norm2(d)), double(Yhat.abs_max(d)),
+              double(Y.abs_max(d)), double(Xinv.abs_max(0)));
   }
 
   template <typename storeFloat, typename Float, int N>

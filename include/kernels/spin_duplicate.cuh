@@ -10,7 +10,7 @@ namespace quda {
     using real = typename mapper<store_t>::type;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
-    using V = typename colorspinor_mapper<store_t, nSpin, nColor, false, false, true>::type;
+    using V = typename colorspinor_mapper<store_t, nSpin, nColor, false, true>::type;
     V v[nSpin];
     V src;
 

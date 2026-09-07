@@ -244,14 +244,11 @@ struct StaggeredGSmearTestWrapper { //
 
     if (gtest_type == gsmear_test_type::GaussianSmear) {
       // Specific gauge parameters for MILC
-      int link_pad = 3 * gauge_param.ga_pad;
-
       gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
       gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
       gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
 
       gauge_param.type = QUDA_WILSON_LINKS; // QUDA_ASQTAD_LONG_LINKS;
-      gauge_param.ga_pad = link_pad;
       gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
     }
     //

@@ -80,7 +80,7 @@ namespace quda
   {
     int x = parity * arg.out.VolumeCB() + x_cb;
     int x_coarse = arg.geo_map[x];
-    int parity_coarse = (x_coarse >= arg.in.VolumeCB()) ? 1 : 0;
+    int parity_coarse = (static_cast<index_t>(x_coarse) >= arg.in.VolumeCB()) ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse * arg.in.VolumeCB();
     int spinor_parity = (arg.nParity == 2) ? parity : 0;
     int v_parity = (arg.v.Nparity() == 2) ? parity : 0;

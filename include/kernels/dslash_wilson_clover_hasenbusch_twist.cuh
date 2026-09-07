@@ -20,13 +20,14 @@ namespace quda
     const real b; /** chiral twist factor (twisted-clover only) */
 
     WilsonCloverHasenbuschTwistArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a,
-                                   double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                   const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, real_t a,
+                                   real_t b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                    const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       A(A, false),
-      a(a),
-      b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -0.5 * b :
+                                   0.5 * b)) // factor of 1/2 comes from clover normalization we need to correct for
     {
       checkPrecision(U, A);
       checkLocation(U, A);

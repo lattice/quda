@@ -20,19 +20,20 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
     const CloverField &A;
 
   public:
     WilsonCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                               const ColorSpinorField &halo, const CloverField &A) :
-      Dslash(arg, out, in, halo), A(A)
+                               const ColorSpinorField &halo, const GaugeField &U, const CloverField &A) :
+      Dslash(arg, out, in, halo), U(U), A(A)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       // specialize here to constrain the template instantiation
       if (arg.nParity == 1) {
         if (arg.xpay) {
@@ -119,14 +120,14 @@ namespace quda
     template <bool distance_pc>
     WilsonCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
-                                    double a, double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                                    real_t a, real_t alpha0, int t0, int parity, bool dagger, const int *comm_override,
                                     DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
       WilsonCloverArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, halo, U, A, a, x, parity, dagger,
                                                                           comm_override, alpha0, t0);
-      WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in, halo, A);
+      WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in, halo, U, A);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }

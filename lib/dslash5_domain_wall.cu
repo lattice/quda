@@ -12,11 +12,11 @@ namespace quda
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
     cvector_ref<const ColorSpinorField> &x;
-    double m_f;
-    double m_5;
-    const Complex *b_5;
-    const Complex *c_5;
-    double a;
+    real_t m_f;
+    real_t m_5;
+    const complex_t *b_5;
+    const complex_t *c_5;
+    real_t a;
     bool dagger;
     bool xpay;
     Dslash5Type type;
@@ -95,8 +95,8 @@ namespace quda
 
   public:
     Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-            cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-            double a, bool dagger, Dslash5Type type) :
+            cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5, const complex_t *c_5,
+            real_t a, bool dagger, Dslash5Type type) :
       TunableKernel3D(in[0], in.size() * in.X(4), in.SiteSubset()),
       out(out),
       in(in),
@@ -174,8 +174,8 @@ namespace quda
   // Apply the 5th dimension dslash operator to a colorspinor field
   // out = Dslash5*in
   void ApplyDslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5,
-                    const Complex *c_5, double a, bool dagger, Dslash5Type type)
+                    cvector_ref<const ColorSpinorField> &x, real_t m_f, real_t m_5, const complex_t *b_5,
+                    const complex_t *c_5, real_t a, bool dagger, Dslash5Type type)
   {
     if (is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>()) {
       if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");

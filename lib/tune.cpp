@@ -39,8 +39,7 @@ namespace quda
     float time;
 
     long device_bytes;
-    long pinned_bytes;
-    long mapped_bytes;
+    long host_pinned_bytes;
     long host_bytes;
 
     TraceKey() {}
@@ -49,8 +48,7 @@ namespace quda
       key(key),
       time(time),
       device_bytes(device_allocated_peak()),
-      pinned_bytes(pinned_allocated_peak()),
-      mapped_bytes(mapped_allocated_peak()),
+      host_pinned_bytes(host_pinned_allocated_peak()),
       host_bytes(host_allocated_peak())
     {
     }
@@ -339,8 +337,7 @@ namespace quda
 
       out << std::setw(12) << it->time << "\t";
       out << std::setw(12) << it->device_bytes << "\t";
-      out << std::setw(12) << it->pinned_bytes << "\t";
-      out << std::setw(12) << it->mapped_bytes << "\t";
+      out << std::setw(12) << it->host_pinned_bytes << "\t";
       out << std::setw(12) << it->host_bytes << "\t";
       out << std::setw(16) << key.volume << "\t";
       if (is_policy_kernel) out << "\t";
@@ -746,7 +743,7 @@ namespace quda
   }
 
   static std::string carve_out_step_str;
-  static int carve_out_step = 25; // default is 25% increment
+  static int carve_out_step = 100; // default is 100% increment
 
   void set_carve_out_step()
   {

@@ -34,13 +34,13 @@ namespace quda
     const real coeff1x1;
     const real coeff2x1;
 
-    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, real epsilon, real anisotropy) :
+    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, real_t epsilon, real_t anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
       out(out),
       temp(temp),
       in(in),
-      epsilon(epsilon),
-      anisotropy(anisotropy),
+      epsilon(static_cast<real>(epsilon)),
+      anisotropy(static_cast<real>(anisotropy)),
       coeff1x1(5.0 / 3.0),
       coeff2x1(-1.0 / 12.0)
     {
@@ -74,14 +74,14 @@ namespace quda
     static_assert(Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW);
     if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, arg.E, parity, dir, Z, Arg::wflow_dim, arg.anisotropy);
+      computeStaple(arg, x, arg.E, parity, dir, Z, Arg::wflow_dim);
     } else if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
       typename computeStapleOpsWF<Arg>::StapOp Stap {ftor};
       typename computeStapleOpsWF<Arg>::RectOp Rect {ftor};
-      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim, arg.anisotropy);
+      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
     }
     return Z;

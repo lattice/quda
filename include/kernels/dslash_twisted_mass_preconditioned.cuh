@@ -16,15 +16,15 @@ namespace quda
     real b_inv;      /** inverse twist factor - used to allow early xpay inclusion */
 
     TwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                   const ColorSpinorField &halo, const GaugeField &U, double a, double b, bool xpay,
+                   const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t b, bool xpay,
                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
                                                           comm_override),
-      a(a),
-      b(dagger ? -b : b), // if dagger flip the twist
-      c(0.0),
-      a_inv(1.0 / (a * (1 + b * b))),
-      b_inv(dagger ? b : -b)
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -b : b)), // if dagger flip the twist
+      c(static_cast<real>(0.0)),
+      a_inv(static_cast<real>(1.0 / (a * (1 + b * b)))),
+      b_inv(static_cast<real>(dagger ? b : -b))
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
@@ -63,7 +63,7 @@ namespace quda
       if (arg.dd_in.doHopping(coord, d, +1)) {
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
-        const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
@@ -101,7 +101,7 @@ namespace quda
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = back_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
-        const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours

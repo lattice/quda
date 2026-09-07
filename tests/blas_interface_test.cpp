@@ -185,10 +185,10 @@ double gemm_test(test_t test_param)
     refC_size = blas_param.ldc * blas_param.m; // C_mn
   }
 
-  void *refA = pinned_malloc(batches * refA_size * 2 * data_in_size);
-  void *refB = pinned_malloc(batches * refB_size * 2 * data_in_size);
-  void *refC = pinned_malloc(batches * refC_size * 2 * data_in_size);
-  void *refCcopy = pinned_malloc(batches * refC_size * 2 * data_in_size);
+  void *refA = host_pinned_malloc(batches * refA_size * 2 * data_in_size);
+  void *refB = host_pinned_malloc(batches * refB_size * 2 * data_in_size);
+  void *refC = host_pinned_malloc(batches * refC_size * 2 * data_in_size);
+  void *refCcopy = host_pinned_malloc(batches * refC_size * 2 * data_in_size);
 
   prepare_ref_array(refA, batches, refA_size, data_in_size, blas_data_type);
   prepare_ref_array(refB, batches, refB_size, data_in_size, blas_data_type);
@@ -224,10 +224,10 @@ double gemm_test(test_t test_param)
   default: errorQuda("Unrecognised data type %d\n", blas_data_type);
   }
 
-  arrayA = pinned_malloc(batches * refA_size * re_im * data_out_size);
-  arrayB = pinned_malloc(batches * refB_size * re_im * data_out_size);
-  arrayC = pinned_malloc(batches * refC_size * re_im * data_out_size);
-  arrayCcopy = pinned_malloc(batches * refC_size * re_im * data_out_size);
+  arrayA = host_pinned_malloc(batches * refA_size * re_im * data_out_size);
+  arrayB = host_pinned_malloc(batches * refB_size * re_im * data_out_size);
+  arrayC = host_pinned_malloc(batches * refC_size * re_im * data_out_size);
+  arrayCcopy = host_pinned_malloc(batches * refC_size * re_im * data_out_size);
 
   copy_array(arrayA, refA, batches, refA_size, data_out_size, blas_data_type);
   copy_array(arrayB, refB, batches, refB_size, data_out_size, blas_data_type);
@@ -279,8 +279,8 @@ double lu_inv_test(test_t test_param)
   uint64_t array_size = blas_param.inv_mat_size * blas_param.inv_mat_size;
 
   // Create host data reference arrays
-  void *ref_array = pinned_malloc(batches * array_size * 2 * data_in_size);
-  void *ref_array_inv = pinned_malloc(batches * array_size * 2 * data_in_size);
+  void *ref_array = host_pinned_malloc(batches * array_size * 2 * data_in_size);
+  void *ref_array_inv = host_pinned_malloc(batches * array_size * 2 * data_in_size);
   prepare_ref_array(ref_array, batches, array_size, data_in_size, blas_data_type);
 
   // Create device array appropriate for the requested problem.
@@ -298,8 +298,8 @@ double lu_inv_test(test_t test_param)
   default: errorQuda("Unsupported data type %d\n", blas_data_type);
   }
 
-  dev_array = pinned_malloc(batches * array_size * re_im * data_out_size);
-  dev_array_inv = pinned_malloc(batches * array_size * re_im * data_out_size);
+  dev_array = host_pinned_malloc(batches * array_size * re_im * data_out_size);
+  dev_array_inv = host_pinned_malloc(batches * array_size * re_im * data_out_size);
 
   copy_array(dev_array, ref_array, batches, array_size, data_out_size, blas_data_type);
 

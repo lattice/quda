@@ -5,8 +5,6 @@
 namespace quda
 {
 
-  // using namespace quda;
-
   DECLARE_ENUM(DD, // name of the enum class
 
                reset, // No domain decomposition. It sets all flags to zero.
@@ -39,8 +37,7 @@ namespace quda
       flags[(int)flag] = true;
 
       if ((int)flag == (int)DD::reset) {
-#pragma unroll
-        for (auto i = 0u; i < (int)DD::size; i++) flags[i] = 0;
+        flags = {};
         type = QUDA_DD_NO;
       } else if ((int)flag >= (int)DD::red_black_type) {
         type = QUDA_DD_RED_BLACK;

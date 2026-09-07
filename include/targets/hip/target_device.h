@@ -144,6 +144,25 @@ namespace quda
       }
     }
 
+    template <int dim = 3> __device__ __host__ inline bool is_thread_zero()
+    {
+      return thread_idx_linear<dim>() == 0;
+    }
+
+    __device__ __host__ inline bool is_lane_zero()
+    {
+      return (thread_idx_linear<3>() % 64) == 0; // switch this to warp_size
+    }
+
+    /**
+       @brief Return the warp uniform variant of a given operand.
+       This is used to suggest to a compiler that a variable is
+       constant across the warp.  Dummy for HIP.
+       @param[in] t The input value we want to make warp uniform
+       @return The warp uniform variant
+    */
+    template <typename T> constexpr bool uniform(const T &t) { return t; }
+
   } // namespace target
 
   namespace device

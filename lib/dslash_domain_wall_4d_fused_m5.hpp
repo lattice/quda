@@ -20,6 +20,7 @@ namespace quda
     using Dslash::aux_base;
     using Dslash::in;
     cvector_ref<ColorSpinorField> &y;
+    const GaugeField &U;
 
     inline std::string get_app_base()
     {
@@ -42,8 +43,8 @@ namespace quda
 
   public:
     DomainWall4DFusedM5(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                        const ColorSpinorField &halo, cvector_ref<ColorSpinorField> &y) :
-      Dslash(arg, out, in, halo, get_app_base()), y(y)
+                        const ColorSpinorField &halo, cvector_ref<ColorSpinorField> &y, const GaugeField &U) :
+      Dslash(arg, out, in, halo, get_app_base()), y(y), U(U)
     {
       TunableKernel3D::resizeStep(in.X(4), 1); // keep Ls local to the thread block
     }
@@ -51,7 +52,7 @@ namespace quda
     void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       Dslash::template instantiate<packShmem>(tp, stream);
     }
 
@@ -121,15 +122,15 @@ namespace quda
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
     DomainWall4DApplyFusedM5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                              cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
-                             cvector_ref<ColorSpinorField> &y, const Complex *b_5, const Complex *c_5, double a,
-                             double m_5, int parity, bool dagger, const int *comm_override, double m_f,
+                             cvector_ref<ColorSpinorField> &y, const complex_t *b_5, const complex_t *c_5, real_t a,
+                             real_t m_5, int parity, bool dagger, const int *comm_override, real_t m_f,
                              Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, DDArg, recon, dslash5_type_impl>;
       Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
-      DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y);
+      DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y, U);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, out, in, halo, profile);
     }
   };

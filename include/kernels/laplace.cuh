@@ -19,15 +19,14 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type F;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
-    static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
+    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, ghost, false,
+                                  QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type G;
 
     typedef typename mapper<Float>::type real;
 
@@ -36,20 +35,20 @@ namespace quda
     const Ghost halo_pack; /** accessor used for writing the halo field */
     const Ghost halo;      /** accessor used for reading the halo field */
     F x[MAX_MULTI_RHS];    /** input vector field for xpay*/
-    const G U;    /** the gauge field */
+    mutable G U;           /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
 
     LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-               const ColorSpinorField &halo, const GaugeField &U, int dir, double a, double b,
+               const ColorSpinorField &halo, const GaugeField &U, int dir, real_t a, real_t b,
                cvector_ref<const ColorSpinorField> &x, int parity, const int *comm_override) :
       DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, false, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
-      a(a),
-      b(b),
+      a(static_cast<real>(a)),
+      b(static_cast<real>(b)),
       dir(dir)
     {
       for (auto i = 0u; i < out.size(); i++) {
@@ -86,11 +85,10 @@ namespace quda
       if (d != dir) {
         if (arg.dd_in.doHopping(coord, d, +1)) {
           // Forward gather - compute fwd offset for vector fetch
-          const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+          const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
           if (doHalo<kernel_type>(d) && ghost) {
 
-            // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -111,11 +109,10 @@ namespace quda
           const int back_idx = linkIndexM1(coord, arg.dc.X, d);
           const int gauge_idx = back_idx;
 
-          const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+          const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
           if (doHalo<kernel_type>(d) && ghost) {
 
-            // const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dc.X, d, arg.nFace);
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);

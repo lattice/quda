@@ -26,7 +26,7 @@ namespace quda {
       TunableKernel2D(in, 2, location),
       compute_diagonal(out.Reconstruct() && !in.Reconstruct()), // if writing to a compressed field, we need to compute the diagonal
       diagonal_d(compute_diagonal ? static_cast<real*>(pool_device_malloc(sizeof(real))) : nullptr),
-      diagonal_h(compute_diagonal ? static_cast<real*>(pool_pinned_malloc(sizeof(real))) : nullptr),
+      diagonal_h(compute_diagonal ? static_cast<real*>(pool_host_pinned_malloc(sizeof(real))) : nullptr),
       out(out),
       in(in),
       inverse(inverse),
@@ -47,7 +47,7 @@ namespace quda {
 
     virtual ~CopyClover()
     {
-      if (diagonal_h) pool_pinned_free(diagonal_h);
+      if (diagonal_h) pool_host_pinned_free(diagonal_h);
       if (diagonal_d) pool_device_free(diagonal_d);
     }
 

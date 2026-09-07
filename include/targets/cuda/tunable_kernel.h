@@ -57,6 +57,13 @@ namespace quda
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       checkSharedBytes<Functor>(tp, arg);
+      const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
+      if constexpr (grid_stride) {
+        const_cast<Arg &>(arg).x_batch_stride = static_cast<unsigned int>(tp.grid.x * tp.block.x);
+      } else {
+        const_cast<Arg &>(arg).x_batch_stride = 0u;
+      }
+      if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
@@ -66,7 +73,7 @@ namespace quda
       return launch_error;
     }
 
-    template <typename Arg, size_t arg_size = sizeof(Arg)> void check_arg_size(Arg&)
+    template <typename Arg, size_t arg_size = sizeof(Arg)> void check_arg_size(Arg &)
     {
       static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
     }
@@ -76,6 +83,13 @@ namespace quda
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       checkSharedBytes<Functor>(tp, arg);
+      const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
+      if constexpr (grid_stride) {
+        const_cast<Arg &>(arg).x_batch_stride = static_cast<unsigned int>(tp.grid.x * tp.block.x);
+      } else {
+        const_cast<Arg &>(arg).x_batch_stride = 0u;
+      }
+      if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
 #ifdef JITIFY
       // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
@@ -99,6 +113,8 @@ namespace quda
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg) const
     {
       checkSharedBytes<Functor>(tp, arg);
+      const_cast<Arg &>(arg).block_size = tp.block.x * tp.block.y * tp.block.z;
+      if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
       constexpr bool grid_stride = false;
       const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }

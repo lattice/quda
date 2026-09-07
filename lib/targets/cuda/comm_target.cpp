@@ -169,13 +169,28 @@ void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
   }
 }
 
-void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &, array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                 array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
 {
   for (int dim = 0; dim < 4; ++dim) {
     if (comm_dim(dim) == 1) continue;
     for (int dir = 0; dir < 2; dir++) {
+      if (!comm_peer2peer_enabled(dir, dim)) continue;
+      // First close our imported view of the neighbour's event (the
+      // counterpart to cudaIpcOpenEventHandle in
+      // comm_create_neighbor_event).  Without this, every IPC reset
+      // leaks the imported handle.
+      cudaEvent_t &remote_event = reinterpret_cast<cudaEvent_t &>(remote[dim][dir].event);
+      if (remote_event) {
+        CHECK_CUDA_ERROR(cudaEventDestroy(remote_event));
+        remote[dim][dir].event = nullptr;
+      }
+      // Then destroy the local interprocess event we exported.
       cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(local[dim][dir].event);
-      if (comm_peer2peer_enabled(dir, dim)) CHECK_CUDA_ERROR(cudaEventDestroy(event));
+      if (event) {
+        CHECK_CUDA_ERROR(cudaEventDestroy(event));
+        local[dim][dir].event = nullptr;
+      }
     }
   } // iterate over dim
 }

@@ -10,8 +10,12 @@
 namespace quda
 {
 
+  using compute_t = reduction_t;
+
   namespace blas
   {
+
+    constexpr unsigned int multi_reduce_unroll = QUDA_BLAS_UNROLL_REDUCE;
 
     /**
        @brief Return the batch block size used for multi reductions.
@@ -38,6 +42,7 @@ namespace quda
       using real = real_;
       using Reducer = Reducer_;
       using reduce_t = array<typename Reducer_::reduce_t, NXZ_>;
+      static constexpr unsigned int work_item_unroll = QUDA_BLAS_UNROLL_REDUCE;
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
@@ -99,24 +104,39 @@ namespace quda
         unsigned int i = tid - parity * arg.length_cb;
 
         vec x, y, z, w;
-        if (arg.f.read.Y) arg.Y[k].load(y, i, parity);
-        if (arg.f.read.W) arg.W[k].load(w, i, parity);
+        if constexpr (Arg::Reducer::read.Y) arg.Y[k].load(y, i, parity);
+        if constexpr (Arg::Reducer::read.W) arg.W[k].load(w, i, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < Arg::NXZ; l++) {
-          if (arg.f.read.X) arg.X[l].load(x, i, parity);
-          if (arg.f.read.Z) arg.Z[l].load(z, i, parity);
+          if constexpr (Arg::Reducer::read.X) arg.X[l].load(x, i, parity);
+          if constexpr (Arg::Reducer::read.Z) arg.Z[l].load(z, i, parity);
 
           arg.f(sum[l], x, y, z, w, k, l);
 
         }
-        if (arg.f.write.Y) arg.Y[k].save(y, i, parity);
-        if (arg.f.write.W) arg.W[k].save(w, i, parity);
+        if constexpr (Arg::Reducer::write.Y) arg.Y[k].save(y, i, parity);
+        if constexpr (Arg::Reducer::write.W) arg.W[k].save(w, i, parity);
 
         return sum;
+      }
+
+      __device__ __host__ inline void prefetch(int tid, int, int k) const
+      {
+        if constexpr (blas_prefetch_enabled_v) {
+          const unsigned int parity = tid >= arg.length_cb ? 1u : 0u;
+          const unsigned int i = tid - parity * static_cast<unsigned int>(arg.length_cb);
+          if constexpr (Arg::Reducer::read.Y) arg.Y[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          if constexpr (Arg::Reducer::read.W) arg.W[k].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+#pragma unroll
+          for (int l = 0; l < Arg::NXZ; l++) {
+            if constexpr (Arg::Reducer::read.X) arg.X[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+            if constexpr (Arg::Reducer::read.Z) arg.Z[l].template prefetch<typename Arg::real, Arg::n / 2>(i, parity);
+          }
+        }
       }
     };
 
@@ -141,11 +161,10 @@ namespace quda
     /**
        Return the real dot product of x and y
     */
-    template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
+    template <typename reduce_t, typename T> __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
     {
-      sum += static_cast<reduce_t>(a.real()) * static_cast<reduce_t>(b.real());
-      sum += static_cast<reduce_t>(a.imag()) * static_cast<reduce_t>(b.imag());
+      auto d = reduce_t(a.real()) * reduce_t(b.real());
+      return fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
     }
 
     template <typename reduce_t, typename real>
@@ -159,7 +178,7 @@ namespace quda
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
+        for (int k = 0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, dot_<compute_t>(x[k], y[k]));
       }
 
       constexpr int flops() const { return 2; }   //! flops per element
@@ -168,14 +187,14 @@ namespace quda
     /**
        Returns complex-valued dot product of x and y
     */
-    template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
+    template <typename reduce_t, typename T> __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
     {
-      using scalar = typename reduce_t::value_type;
-      sum[0] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.real());
-      sum[0] += static_cast<scalar>(a.imag()) * static_cast<scalar>(b.imag());
-      sum[1] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.imag());
-      sum[1] -= static_cast<scalar>(a.imag()) * static_cast<scalar>(b.real());
+      using scalar_t = typename reduce_t::value_type;
+      auto r = scalar_t(a.real()) * scalar_t(b.real());
+      r = fma(scalar_t(a.imag()), scalar_t(b.imag()), r);
+      auto i = scalar_t(a.real()) * scalar_t(b.imag());
+      i = fma(-scalar_t(a.imag()), scalar_t(b.real()), i);
+      return reduce_t {r, i};
     }
 
     template <typename real_reduce_t, typename real>
@@ -190,7 +209,7 @@ namespace quda
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
+        for (int k = 0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, cdot_<array<compute_t, 2>>(x[k], y[k]));
       }
 
       constexpr int flops() const { return 4; }   //! flops per element
@@ -209,7 +228,7 @@ namespace quda
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
-          cdot_<reduce_t, real>(sum, x[k], y[k]);
+          sum = plus<reduce_t>::apply(sum, cdot_<reduce_t>(x[k], y[k]));
           if (i == j) w[k] = y[k];
         }
       }

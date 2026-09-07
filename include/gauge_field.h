@@ -1,9 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
-
 #include <comm_key.h>
 
 namespace quda {
@@ -55,8 +55,8 @@ namespace quda {
     QudaTboundary t_boundary = QUDA_INVALID_T_BOUNDARY;
     QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO;
 
-    double anisotropy = 1.0;
-    double tadpole = 1.0;
+    real_t anisotropy = 1.0;
+    real_t tadpole = 1.0;
     GaugeField *field = nullptr; // pointer to a pre-allocated field
     void *gauge = nullptr;       // used when we use a reference to an external field
 
@@ -76,7 +76,7 @@ namespace quda {
     bool staggeredPhaseApplied = false;
 
     /** Imaginary chemical potential */
-    double i_mu = 0.0;
+    real_t i_mu = 0.0;
 
     /** Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_offset = 0;
@@ -147,6 +147,7 @@ namespace quda {
   class GaugeField : public LatticeField {
 
     friend std::ostream &operator<<(std::ostream &output, const GaugeField &param);
+    friend GaugeField shift(const GaugeField &in, int shift);
 
   private:
     /**
@@ -189,12 +190,15 @@ namespace quda {
     QudaLinkType link_type = QUDA_INVALID_LINKS;
     QudaTboundary t_boundary = QUDA_INVALID_T_BOUNDARY;
 
-    double anisotropy = 0.0;
-    double tadpole = 0.0;
-    double fat_link_max = 0.0;
+    real_t anisotropy = 0.0;
+    real_t tadpole = 0.0;
+    real_t fat_link_max = 0.0;
 
-    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost
-      = {}; // stores the ghost zone of the gauge field (non-native fields only)
+    mutable std::unique_ptr<GaugeField> shifted
+      = nullptr;             // shifted copy of the gauge field, used for double-store enabled dslash
+    bool is_shifted = false; // whether this instance is a shifted one
+
+    mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost = {}; // ghost zone (separate allocation when QUDA_GHOST_EXCHANGE_PAD)
 
     mutable array<int, QUDA_MAX_DIM> ghostFace = {}; // the size of each face
 
@@ -211,7 +215,7 @@ namespace quda {
     /**
        Imaginary chemical potential
     */
-    double i_mu = 0.0;
+    real_t i_mu = 0.0;
 
     /**
        Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
@@ -358,8 +362,8 @@ namespace quda {
     int Ncolor() const { return nColor; }
     QudaReconstructType Reconstruct() const { return reconstruct; }
     QudaGaugeFieldOrder Order() const { return order; }
-    double Anisotropy() const { return anisotropy; }
-    double Tadpole() const { return tadpole; }
+    real_t Anisotropy() const { return anisotropy; }
+    real_t Tadpole() const { return tadpole; }
     QudaTboundary TBoundary() const { return t_boundary; }
     QudaLinkType LinkType() const { return link_type; }
     QudaGaugeFixed GaugeFixed() const { return fixed; }
@@ -389,9 +393,9 @@ namespace quda {
     /**
        Return the imaginary chemical potential applied to this field
     */
-    double iMu() const { return i_mu; }
+    real_t iMu() const { return i_mu; }
 
-    const double& LinkMax() const { return fat_link_max; }
+    const real_t &LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
 
     /**
@@ -502,11 +506,7 @@ namespace quda {
 
     virtual int full_dim(int d) const { return x[d]; }
 
-    auto &Ghost() const
-    {
-      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return ghost;
-    }
+    auto &Ghost() const { return ghost; }
 
     /**
        @return The offset into the struct to the start of the gauge
@@ -528,36 +528,37 @@ namespace quda {
     /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
+     * @param[in] scale Arbitrary scale factor we want to apply
      */
-    void copy(const GaugeField &src);
+    void copy(const GaugeField &src, double scale = 1.0);
 
     /**
        @brief Compute the L1 norm of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L1 norm
      */
-    double norm1(int dim = -1, bool fixed = false) const;
+    real_t norm1(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L2 norm squared
      */
-    double norm2(int dim = -1, bool fixed = false) const;
+    real_t norm2(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute maximum value
      */
-    double abs_max(int dim = -1, bool fixed = false) const;
+    real_t abs_max(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute minimum value
      */
-    double abs_min(int dim = -1, bool fixed = false) const;
+    real_t abs_min(int dim = -1, bool fixed = false) const;
 
     /**
        Compute checksum of this gauge field: this uses a XOR-based checksum method
@@ -648,6 +649,20 @@ namespace quda {
     }
 
     /**
+       @brief Return the shifted gauge field by shift in each
+       dimension.  Shifted field is cached for subsequent reuse.
+       @param[in] shift value (1 or 3 supported).  If no argument
+       passed the shift is set to Nface.
+       @return Reference to shifted field
+    */
+    GaugeField &shift(int shift = -1) const;
+
+    /**
+       @brief Resets the shifted field (if it exists).
+    */
+    void shift_reset() const;
+
+    /**
      * @brief Print the site data
      * @param[in] parity Parity index
      * @param[in] dim The dimension in which we are printing
@@ -670,12 +685,23 @@ namespace quda {
   void genericPrintMatrix(const GaugeField &a, int dim, int parity, unsigned int x_cb, int rank = 0);
 
   /**
+     @brief Shift the gauge field by shift in each dimension and store
+     the resulting shifted field.  This is used to move the backwards
+     links on to this site.  The input field must be a padded field
+     with the ghost pre-exchanged if communications are enabled.
+     @param[in] in Input shifted field
+     @param[in] shift value (1 or 3 supported)
+     @return Shifted field
+   */
+  GaugeField shift(const GaugeField &in, int shift);
+
+  /**
      @brief This is a debugging function, where we cast a gauge field
      into a spinor field so we can compute its L1 norm.
      @param u The gauge field that we want the norm of
      @return The L1 norm of the gauge field
   */
-  double norm1(const GaugeField &u);
+  real_t norm1(const GaugeField &u);
 
   /**
      @brief This is a debugging function, where we cast a gauge field
@@ -683,14 +709,14 @@ namespace quda {
      @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const GaugeField &u);
+  real_t norm2(const GaugeField &u);
 
   /**
      @brief Scale the gauge field by the scalar a.
      @param[in] a scalar multiplier
      @param[in] u The gauge field we want to multiply
    */
-  void ax(const double &a, GaugeField &u);
+  void ax(const real_t &a, GaugeField &u);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
@@ -698,14 +724,15 @@ namespace quda {
      @param out The output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
      @param ghostOut The output ghost buffer (optional)
      @param ghostIn The input ghost buffer (optional)
      @param type The type of copy we doing (0 body and ghost else ghost only)
   */
-  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
-                        void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                        void *Out = 0, void *In = 0, void **ghostOut = 0, void **ghostIn = 0, int type = 0);
 
   /**
     @brief This function is used for copying from a source gauge field to a destination gauge field
@@ -723,11 +750,12 @@ namespace quda {
      @param out The extended output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param scale Arbitrary scale factor applied when copying (default 1.0)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
   */
-  void copyExtendedGauge(GaugeField &out, const GaugeField &in,
-			 QudaFieldLocation location, void *Out=0, void *In=0);
+  void copyExtendedGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale = 1.0,
+                         void *Out = 0, void *In = 0);
 
   /**
      This function is used for creating an exteneded gauge field from the input,

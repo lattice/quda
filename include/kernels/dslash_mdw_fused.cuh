@@ -36,11 +36,10 @@ namespace quda {
       static constexpr int min_blocks = min_blocks_per_SM;
       static constexpr bool reload = reload_;
       static constexpr bool spin_project = true;
-      static constexpr bool spinor_direct_load = true; // false means texture load
-      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load>::type; // color spin field order
-      static constexpr bool gauge_direct_load = true;                          // false means texture load
+      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, true>::type; // color spin field order
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_EXTENDED; // gauge field used is an extended one
-      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type; // gauge field order
+      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, ghost, false,
+                                      QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type; // gauge field order
 
       F out;      // output vector field
       const F in; // input vector field
@@ -87,7 +86,7 @@ namespace quda {
       const bool comm[4];
 
       FusedDslashArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                     const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
+                     const ColorSpinorField &x, real_t m_f_, real_t m_5_, const complex_t *b_5, const complex_t *c_5,
                      int parity, int shift_[4], int halo_shift_[4]) :
         out(out),
         in(in),
@@ -98,8 +97,8 @@ namespace quda {
         parity(parity),
         volume_cb(in.VolumeCB() > out.VolumeCB() ? in.VolumeCB() : out.VolumeCB()),
         volume_4d_cb(volume_cb / Ls_),
-        m_f(m_f_),
-        m_5(m_5_),
+        m_f(static_cast<real>(m_f_)),
+        m_5(static_cast<real>(m_5_)),
         dim {(3 - nParity) * (in.VolumeCB() > out.VolumeCB() ? in.X(0) : out.X(0)),
              in.VolumeCB() > out.VolumeCB() ? in.X(1) : out.X(1), in.VolumeCB() > out.VolumeCB() ? in.X(2) : out.X(2),
              in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
@@ -116,8 +115,8 @@ namespace quda {
 
         if (b_5[0] != b_5[1] || b_5[0].imag() != 0) { errorQuda("zMobius is NOT supported yet.\n"); }
 
-        b = b_5[0].real();
-        c = c_5[0].real();
+        b = static_cast<real>(b_5[0].real());
+        c = static_cast<real>(c_5[0].real());
         kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
 
         if (kappa * kappa < 1e-6) { small_kappa = true; }

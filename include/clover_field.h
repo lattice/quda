@@ -218,7 +218,7 @@ namespace quda {
 
     bool inverse = false;
     double diagonal = 0.0;
-    array<double, 2> max = {};
+    array<real_t, 2> max = {};
 
     double csw = 0.0;
     double coeff = 0.0;
@@ -229,7 +229,7 @@ namespace quda {
 
     QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER;
 
-    mutable array<double, 2> trlog = {};
+    mutable array<real_t, 2> trlog = {};
 
     bool init = false;
 
@@ -445,25 +445,25 @@ namespace quda {
        @brief Compute the L1 norm of the field
        @return L1 norm
      */
-    double norm1(bool inverse = false) const;
+    real_t norm1(bool inverse = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @return L2 norm squared
      */
-    double norm2(bool inverse = false) const;
+    real_t norm2(bool inverse = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @return Absolute maximum value
      */
-    double abs_max(bool inverse = false) const;
+    real_t abs_max(bool inverse = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @return Absolute minimum value
      */
-    double abs_min(bool inverse = false) const;
+    real_t abs_min(bool inverse = false) const;
 
     /**
        @brief Backs up the CloverField
@@ -519,7 +519,7 @@ namespace quda {
      @param a The clover field that we want the norm of
      @return The L1 norm of the gauge field
   */
-  double norm1(const CloverField &u, bool inverse=false);
+  real_t norm1(const CloverField &u, bool inverse = false);
 
   /**
      This is a debugging function, where we cast a clover field into a
@@ -527,7 +527,7 @@ namespace quda {
      @param a The clover field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const CloverField &a, bool inverse=false);
+  real_t norm2(const CloverField &a, bool inverse = false);
 
   /**
      @brief Driver for computing the clover field from the field
@@ -536,7 +536,7 @@ namespace quda {
      @param[in] fmunu Field strength tensor
      @param[in] coefft Clover coefficient
   */
-  void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
+  void computeClover(CloverField &clover, const GaugeField &fmunu, real_t coeff);
 
   /**
      @brief This generic function is used for copying the clover field where
@@ -584,7 +584,7 @@ namespace quda {
   */
   void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
                           const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
-                          const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+                          const std::vector<real_t> &coeff, const std::vector<array<real_t, 2>> &epsilon,
                           double sigma_coeff, bool detratio, QudaInvertParam &param);
 
   /**
@@ -606,7 +606,7 @@ namespace quda {
      @param coeff Multiplicative coefficient (e.g., dt * residue)
    */
   void computeCloverOprod(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
-                          cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff);
+                          cvector_ref<const ColorSpinorField> &p, const std::vector<real_t> &coeff);
   /**
      @brief Compute the outer product from the solver solution fields
      arising from the diagonal term of the fermion bilinear in
@@ -618,7 +618,7 @@ namespace quda {
      @coeff coeff[in] Multiplicative coefficient (e.g., dt * residiue), one for each parity
   */
   void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
-                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff);
+                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<real_t, 2>> &coeff);
   /**
      @brief Compute the matrix tensor field necessary for the force calculation from
      the clover trace action.  This computes a tensor field [mu,nu].
@@ -628,7 +628,7 @@ namespace quda {
      @param coeff  Scalar coefficient multiplying the result (e.g., stepsize)
      @param parity The field parity we are working on
    */
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity);
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, real_t coeff, int parity);
 
   /**
      @brief Compute the derivative of the clover matrix in the direction
@@ -640,7 +640,7 @@ namespace quda {
      @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
    */
-  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff);
+  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, real_t coeff);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field

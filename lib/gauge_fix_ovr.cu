@@ -62,7 +62,7 @@ namespace quda {
   template<typename Float, QudaReconstructType recon, int gauge_dir>
   class GaugeFix : TunableKernel2D {
     GaugeField &u;
-    double relax_boost;
+    real_t relax_boost;
     int *borderpoints[2];
     int parity;
     unsigned long threads;
@@ -102,11 +102,11 @@ namespace quda {
     unsigned int minThreads() const { return threads; }
 
   public:
-    GaugeFix(GaugeField &u, double relax_boost, int *borderpoints[2], bool halo, int threads) :
+    GaugeFix(GaugeField &u, real_t relax_boost, int *borderpoints[2], bool halo, int threads) :
       TunableKernel2D(u, 8),
       u(u),
       relax_boost(relax_boost),
-      borderpoints{borderpoints[0], borderpoints[1]},
+      borderpoints {borderpoints[0], borderpoints[1]},
       parity(0),
       halo(halo)
     {
@@ -196,12 +196,16 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<FixQualityOVR>(arg.result, tp, stream, arg);
 
-      arg.result[0] /= static_cast<double>(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
-      arg.result[1] /= static_cast<double>(3 * 2 * arg.threads.x * comm_size());
+      arg.result[0] /= static_cast<real_t>(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
+      arg.result[1] /= static_cast<real_t>(3 * 2 * arg.threads.x * comm_size());
     }
 
     long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }
-    long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
+    long long bytes() const
+    {
+      return 2LL * Arg::gauge_dir * meta.Volume() * static_cast<long long>(static_cast<int>(meta.Reconstruct()))
+             * static_cast<int>(meta.Precision());
+    }
   };
 
   template <typename Float, QudaReconstructType recon, bool pack, bool top>
@@ -233,9 +237,8 @@ namespace quda {
   };
 
   template <typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
-                      const double relax_boost, const double tolerance,
-                      const int reunit_interval, const int stopWtheta)
+  void gaugeFixingOVR(GaugeField &data, const int Nsteps, const int verbose_interval, const real_t relax_boost,
+                      const real_t tolerance, const int reunit_interval, const int stopWtheta)
   {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
@@ -244,8 +247,8 @@ namespace quda {
     double byte = 0;
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("\tOverrelaxation boost parameter: %e\n", relax_boost);
-      printfQuda("\tTolerance: %le\n", tolerance);
+      printfQuda("\tOverrelaxation boost parameter: %e\n", double(relax_boost));
+      printfQuda("\tTolerance: %le\n", double(tolerance));
       printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
       printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
       printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
@@ -262,7 +265,7 @@ namespace quda {
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
 
-    int *num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
+    int *num_failures_h = static_cast<int*>(host_pinned_malloc(sizeof(int)));
     int *num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
 
     GaugeFixQualityOVRArg<Float, recon, gauge_dir> argQ(data);
@@ -294,7 +297,7 @@ namespace quda {
         recv_d[d] = device_malloc(bytes[d]);
         sendg_d[d] = device_malloc(bytes[d]);
         recvg_d[d] = device_malloc(bytes[d]);
-        hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
+        hostbuffer_h[d] = (void*)host_pinned_malloc(4 * bytes[d]);
       }
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;
@@ -322,8 +325,9 @@ namespace quda {
     GaugeFixQuality.apply(device::get_default_stream());
     flop += (double)GaugeFixQuality.flops();
     byte += (double)GaugeFixQuality.bytes();
-    double action0 = argQ.getAction();
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    real_t action0 = argQ.getAction();
+    logQuda(QUDA_VERBOSE, "Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, double(argQ.getAction()),
+            double(argQ.getTheta()));
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
@@ -420,10 +424,11 @@ namespace quda {
       flop += (double)GaugeFixQuality.flops();
       byte += (double)GaugeFixQuality.bytes();
 
-      double action = argQ.getAction();
-      double diff = abs(action0 - action);
+      real_t action = argQ.getAction();
+      real_t diff = quda::fabs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+        printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, double(argQ.getAction()),
+                   double(argQ.getTheta()), double(diff));
       if (stopWtheta) {
         if (argQ.getTheta() < tolerance) break;
       } else {
@@ -444,9 +449,10 @@ namespace quda {
       GaugeFixQuality.apply(device::get_default_stream());
       flop += (double)GaugeFixQuality.flops();
       byte += (double)GaugeFixQuality.bytes();
-      double action = argQ.getAction();
-      double diff = abs(action0 - action);
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      real_t action = argQ.getAction();
+      real_t diff = quda::fabs(action0 - action);
+      logQuda(QUDA_VERBOSE, "Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, double(argQ.getAction()),
+              double(argQ.getTheta()), double(diff));
     }
 
     for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
@@ -479,8 +485,8 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
-  GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                 const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
+    GaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                   const real_t relax_boost, const real_t tolerance, const int reunit_interval, const int stopWtheta)
     {
       if (gauge_dir == 4) {
 	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing...\n");
@@ -505,8 +511,8 @@ namespace quda {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
-  void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-                      const double tolerance, const int reunit_interval, const int stopWtheta)
+  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const real_t relax_boost, const real_t tolerance, const int reunit_interval, const int stopWtheta)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);

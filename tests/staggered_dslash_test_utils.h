@@ -527,11 +527,12 @@ struct StaggeredDslashTestWrapper {
 
         bool failed = false;
         // Catching nans is weird.
-        if (std::isnan(spinor_ref_norm)) { failed = true; }
-        if (std::isnan(spinor_out_norm)) { failed = true; }
+        if (std::isnan(double(spinor_ref_norm))) { failed = true; }
+        if (std::isnan(double(spinor_out_norm))) { failed = true; }
 
+        auto rel_dev = real_t(1.0) - quda::sqrt(spinor_out_norm / spinor_ref_norm);
         printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                   spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation[0]);
+                   double(spinor_ref_norm), double(spinor_out_norm), double(rel_dev), double(max_deviation[0]));
         deviation = std::max(deviation, pow(10.0, -(double)(ColorSpinorField::Compare(spinorRef[0], vp_spinor_out[n]))));
         if (failed) { deviation = 1.0; }
       }
@@ -550,12 +551,13 @@ struct StaggeredDslashTestWrapper {
 
         bool failed = false;
         // Catching nans is weird.
-        if (std::isnan(spinor_ref_norm)) { failed = true; }
-        if (std::isnan(spinor_out_norm)) { failed = true; }
+        if (std::isnan(double(spinor_ref_norm))) { failed = true; }
+        if (std::isnan(double(spinor_out_norm))) { failed = true; }
 
+        auto rel_dev = real_t(1.0) - quda::sqrt(spinor_out_norm / spinor_ref_norm);
         printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                   spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation[0]);
-        deviation = pow(10, -(double)(ColorSpinorField::Compare(spinorRef[i], spinorOut[i])));
+                   double(spinor_ref_norm), double(spinor_out_norm), double(rel_dev), double(max_deviation[0]));
+        deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[i], spinorOut[i])));
         if (failed) { deviation = 1.0; }
       }
     }

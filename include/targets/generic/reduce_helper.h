@@ -46,8 +46,10 @@ namespace quda
        @param[in] threads The number threads partaking in the kernel
        @param[in] n_reduce The number of reductions
     */
-    ReduceArg(dim3 threads, int n_reduce = 1, bool = false) :
-      kernel_param<use_kernel_arg>(threads), launch_error(QUDA_ERROR_UNINITIALIZED), n_reduce(n_reduce)
+    ReduceArg(dim3 threads, int n_reduce = 1, bool = false, unsigned work_unroll = 1u) :
+      kernel_param<use_kernel_arg>(threads, work_unroll),
+      launch_error(QUDA_ERROR_UNINITIALIZED),
+      n_reduce(n_reduce)
     {
       reducer::init(n_reduce, sizeof(*partial));
       // these buffers may be allocated in init, so we can't set the local copies until now
@@ -55,6 +57,8 @@ namespace quda
       result_d = static_cast<decltype(result_d)>(reducer::get_mapped_buffer());
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
+
+      reducer::init_rfa_device_bins<T>();
 
       if (commAsyncReduction()) result_d = partial;
     }
@@ -82,21 +86,17 @@ namespace quda
        @param[out] result The reduction result is copied here
        @param[in] stream The stream on which we the reduction is being done
      */
-    template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t stream = device::get_default_stream())
+    auto complete(const qudaStream_t stream = device::get_default_stream())
     {
-      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      std::vector<T> result(n_reduce);
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
-      auto event = reducer::get_event();
-      qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) { }
-
-      // copy back result element by element and convert if necessary to host reduce type
-      // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
-      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      if (launch_error != QUDA_ERROR) {
+        auto event = reducer::get_event();
+        qudaEventRecord(event, stream);
+        while (!qudaEventQuery(event)) { }
+        memcpy(result.data(), result_h, n_reduce * sizeof(T));
+      }
+      return result;
     }
   };
 

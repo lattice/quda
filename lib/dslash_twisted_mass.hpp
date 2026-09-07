@@ -18,18 +18,19 @@ namespace quda
     using Dslash = Dslash<twistedMass, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     TwistedMass(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+                const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay)
         Dslash::template instantiate<packShmem, true>(tp, stream);
       else
@@ -53,13 +54,13 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedMassApply {
     TwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, int parity,
+                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, real_t a, real_t b, int parity,
                      bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
       TwistedMassArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, b, x, parity, dagger, comm_override);
-      TwistedMass<decltype(arg)> twisted(arg, out, in, halo);
+      TwistedMass<decltype(arg)> twisted(arg, out, in, halo, U);
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };

@@ -73,8 +73,8 @@ namespace quda
 
     if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    vector<double> b2 = blas::norm2(b); // Save norm of b
-    vector<double> r2;
+    vector<real_t> b2 = blas::norm2(b); // Save norm of b
+    vector<real_t> r2;
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
@@ -99,9 +99,9 @@ namespace quda
 
       int k = 0;
 
-      vector<double> scale(b.size(), 1.0);
-      vector<double> scale_inv(b.size(), 1.0);
-      vector<double> delta2(b.size(), param.delta * param.delta);
+      vector<real_t> scale(b.size(), 1.0);
+      vector<real_t> scale_inv(b.size(), 1.0);
+      vector<real_t> delta2(b.size(), param.delta * param.delta);
 
       if (!param.do_block_schwarz() && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ
           && (node_parity + step) % 2 == 0) {
@@ -142,10 +142,10 @@ namespace quda
 
           if (param.global_reduction) {
             auto Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
-            vector<Complex> alpha(b.size());
+            vector<complex_t> alpha(b.size());
             for (auto i = 0u; i < b.size(); i++) {
-              alpha[i] = Complex(Ar4[i].x, Ar4[i].y) / Ar4[i].z;
-              r2[i] = Ar4[i].w;
+              alpha[i] = complex_t(Ar4[i][0], Ar4[i][1]) / Ar4[i][2];
+              r2[i] = Ar4[i][3];
             }
             PrintStats("MR (inner)", iter, r2, b2);
 

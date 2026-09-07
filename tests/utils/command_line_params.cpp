@@ -238,7 +238,9 @@ bool eig_use_dagger = false;
 bool eig_use_pc = false;
 bool eig_compute_svd = false;
 bool eig_compute_gamma5 = false;
-QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
+// SR is the default because polynomial acceleration, which defaults to on above,
+// supports the smallest-real spectrum only.
+QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_SR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
 std::string eig_arpack_logfile = "arpack_logfile.log";
@@ -358,19 +360,6 @@ bool detratio = false;
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
-
-  CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
-                                                       {"clover", QUDA_CLOVER_WILSON_DSLASH},
-                                                       {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
-                                                       {"twisted-clover", QUDA_TWISTED_CLOVER_DSLASH},
-                                                       {"clover-hasenbusch-twist", QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH},
-                                                       {"staggered", QUDA_STAGGERED_DSLASH},
-                                                       {"asqtad", QUDA_ASQTAD_DSLASH},
-                                                       {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
-                                                       {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
-                                                       {"mobius", QUDA_MOBIUS_DWF_DSLASH},
-                                                       {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
-                                                       {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {
     {"singlet", QUDA_TWIST_SINGLET}, {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET}, {"no", QUDA_TWIST_NO}};
@@ -815,7 +804,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
                       "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
-  opgroup->add_option("--eig-poly-deg", eig_poly_deg, "TODO");
+  opgroup->add_option("--eig-poly-deg", eig_poly_deg,
+                      "Degree of the Chebyshev polynomial used for acceleration (default 100)");
   opgroup->add_option(
     "--eig-require-convergence",
     eig_require_convergence, "If true, the solver will error out if convergence is not attained. If false, a warning will be given (default true)");
@@ -851,7 +841,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--eig-use-pc", eig_use_pc,
     "Solve the Even-Odd preconditioned problem (default false for Wilson-type, true for staggered-type)");
-  opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
+  opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc,
+                      "Use Chebyshev polynomial acceleration in the eigensolver (smallest-real spectrum only)");
 }
 
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
