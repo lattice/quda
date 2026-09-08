@@ -99,6 +99,24 @@ typedef enum OpenQCDFieldType_s {
 } OpenQCDFieldType;
 
 /**
+ * Selects which of QUDA's multigrid preconditioner update tiers
+ * openQCD_qudaSolverUpdate() should perform the next time it runs for a
+ * given solver. The cadence/drift policy (when a refresh or reset is
+ * actually warranted) is decided entirely by openQxD; this only selects
+ * the mechanism to use once openQxD has made that decision.
+ */
+typedef enum {
+  OPENQCD_MG_UPDATE_AUTO = 0,      /** Skip the update if nothing changed (REUSE), otherwise rebuild the fine Dirac
+                                        operators and coarse links from the current gauge/clover/kappa/mu (Fat-UPDATE) */
+  OPENQCD_MG_UPDATE_FORCE_UPDATE,  /** Always do a Fat-UPDATE (as above), even if QUDA's own change-detection thinks
+                                        nothing changed */
+  OPENQCD_MG_UPDATE_FORCE_REFRESH, /** Do a Fat-UPDATE and additionally refine the near-null space with the
+                                        configured number of extra setup-solver iterations (Fat-REFRESH) */
+  OPENQCD_MG_UPDATE_FORCE_RESET    /** Destroy and fully rebuild the multigrid hierarchy from scratch, including a
+                                        fresh random near-null space (Destroy) */
+} openQCD_QudaMgUpdateTier;
+
+/**
  * Parameters related to problem size and machine topology. They should hold the
  * numbers in quda format, i.e. xyzt convention. For example L[0] = L1, L[1] =
  * L2, ...
@@ -309,6 +327,20 @@ void openQCD_qudaDw_NoLoads(double mu, void *d_in, void *d_out);
  */
 
 void *openQCD_qudaSolverGetHandle(int id);
+
+/**
+ * @brief      Request a specific multigrid update tier for the next
+ *             openQCD_qudaSolverUpdate() call for this solver (triggered via
+ *             openQCD_qudaSolverGetHandle()). The request is consumed by
+ *             that call and reset to OPENQCD_MG_UPDATE_AUTO afterwards; if
+ *             openQCD_qudaSolverUpdate() determines no update is due at all
+ *             (e.g. the gauge field isn't set yet), the request stays
+ *             queued for the next call where an update is possible.
+ *
+ * @param[in]  id    The solver identifier, as passed to openQCD_qudaSolverGetHandle()
+ * @param[in]  tier  The update tier to request
+ */
+void openQCD_qudaSetMgUpdateTier(int id, openQCD_QudaMgUpdateTier tier);
 
 /**
  * @brief      Return a hash from a subset of the settings in the
