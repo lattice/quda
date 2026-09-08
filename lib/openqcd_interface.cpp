@@ -79,6 +79,10 @@ typedef struct openQCD_QudaSolver_s {
   double mg_su3csw;             /** SU(3) csw coefficient corresponding to the current mg-instance in QUDA */
   double mg_u1csw;              /** U(1) csw coefficient corresponding to the current mg-instance in QUDA */
   int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
+  openQCD_QudaMgUpdateTier pending_mg_tier;  /** MG update tier requested via openQCD_qudaSetMgUpdateTier(),
+                                                  consumed and reset to AUTO once an update actually runs */
+  int mg_refresh_maxiter[QUDA_MAX_MG_LEVEL]; /** Per-level setup-solver iteration budget used for a Fat-REFRESH,
+                                                  applied to mg_param->setup_maxiter_refresh only for that one call */
 } openQCD_QudaSolver;
 
 static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, false, 1, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, MPI_COMM_NULL, MPI_COMM_NULL }, {}, {}, nullptr, {}, {}, ""};
@@ -1109,11 +1113,11 @@ static void openQCD_qudaSolverUpdate(void *param_)
   bool do_gauge_transfer = (!gauge_field_get_up2date() && !gauge_field_get_unset())
     || additional_prop->qhat != dp.qhat;
   bool do_clover_update = !clover_field_get_up2date() && !gauge_field_get_unset();
+  bool force_update = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_UPDATE;
+  bool force_refresh = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_REFRESH;
+  bool force_reset = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_RESET;
   bool do_multigrid_update = param_ != qudaState.dirac_handle && param->inv_type_precondition == QUDA_MG_INVERTER
-    && !mg_get_up2date(param) && !gauge_field_get_unset();
-  bool do_multigrid_fat_update = false; // do_multigrid_update
-    // && (do_gauge_transfer || additional_prop->mg_ud_rev != qudaState.ud_rev
-        // || additional_prop->mg_ad_rev != qudaState.ad_rev);
+    && !gauge_field_get_unset() && (!mg_get_up2date(param) || force_update || force_refresh || force_reset);
 
   if (do_gauge_transfer) {
     if (qudaState.layout.h_gauge == nullptr) { WITH_COMM(errorQuda("qudaState.layout.h_gauge is not set.")); }
@@ -1215,12 +1219,15 @@ static void openQCD_qudaSolverUpdate(void *param_)
     }
   }
 
-  /* setup/update the multigrid instance or do nothing */
+  /* setup/update the multigrid instance, or do nothing (REUSE) */
   if (do_multigrid_update) {
     QudaMultigridParam *mg_param = additional_prop->mg_param;
 
     if (mg_param == nullptr) { WITH_COMM(errorQuda("No multigrid parameter struct set.")); }
-    if (do_multigrid_fat_update && param->preconditioner != nullptr) {
+
+    additional_prop->pending_mg_tier = OPENQCD_MG_UPDATE_AUTO; /* consume the request */
+
+    if (force_reset && param->preconditioner != nullptr) {
       WITH_COMM(logQuda(QUDA_VERBOSE, "Destroying existing multigrid instance ...\n"));
       PUSH_RANGE("destroyMultigridQuda", 4);
       WITH_COMM(destroyMultigridQuda(param->preconditioner));
@@ -1242,10 +1249,25 @@ static void openQCD_qudaSolverUpdate(void *param_)
         param->preconditioner = newMultigridQuda(mg_param);
         POP_RANGE;
       } else {
-        logQuda(QUDA_VERBOSE, "Updating existing multigrid instance ...\n");
+        /* Thin is retired from the automatic path: its mu/kappa/c_sw gap
+         * (see updateMultigridQuda()'s thin_update_only branch in
+         * interface_quda.cpp) makes it unsafe as a silent default. */
+        mg_param->thin_update_only = QUDA_BOOLEAN_FALSE;
+
+        if (force_refresh) {
+          for (int i = 0; i < mg_param->n_level; i++)
+            mg_param->setup_maxiter_refresh[i] = additional_prop->mg_refresh_maxiter[i];
+        }
+
+        logQuda(QUDA_VERBOSE,
+                force_refresh ? "Refreshing multigrid instance ...\n" : "Updating multigrid instance ...\n");
         PUSH_RANGE("updateMultigridQuda", 4);
         updateMultigridQuda(param->preconditioner, mg_param);
         POP_RANGE;
+
+        if (force_refresh) {
+          for (int i = 0; i < mg_param->n_level; i++) mg_param->setup_maxiter_refresh[i] = 0;
+        }
       }
     }
     mg_set_revision(param);
@@ -1609,9 +1631,38 @@ static void *openQCD_qudaSolverReadIn(int id)
   additional_prop->mg_param = multigrid_param;
   additional_prop->u1csw = 0.0;
   additional_prop->qhat = 0.0;
+
+  /* setup_maxiter_refresh is only meant to apply to a single, explicitly
+   * requested Fat-REFRESH update (see openQCD_qudaSetMgUpdateTier() /
+   * OPENQCD_MG_UPDATE_FORCE_REFRESH), not to every updateMultigridQuda()
+   * call. Stash the ini-configured per-level budget and reset the live
+   * field to 0; openQCD_qudaSolverUpdate() repopulates it only for the one
+   * call where a refresh was requested. */
+  if (param->inv_type_precondition == QUDA_MG_INVERTER) {
+    for (int i = 0; i < multigrid_param->n_level; i++) {
+      additional_prop->mg_refresh_maxiter[i] = multigrid_param->setup_maxiter_refresh[i];
+      multigrid_param->setup_maxiter_refresh[i] = 0;
+    }
+  }
+
   param->additional_prop = reinterpret_cast<void *>(additional_prop);
 
   return (void *)param;
+}
+
+void openQCD_qudaSetMgUpdateTier(int id, openQCD_QudaMgUpdateTier tier)
+{
+  check_solver_id(id);
+
+  void *ptr = id == -1 ? qudaState.dirac_handle : qudaState.inv_handles[id];
+  if (ptr == nullptr) {
+    WITH_COMM(errorQuda("Solver (id=%d) not initialized; call openQCD_qudaSolverGetHandle first.", id));
+    return;
+  }
+
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(ptr);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
+  additional_prop->pending_mg_tier = tier;
 }
 
 void *openQCD_qudaSolverGetHandle(int id)
@@ -1807,6 +1858,12 @@ void openQCD_qudaSolverPrintSetup(int id)
     printfQuda("additional_prop->mg_su3csw = %.6e\n", additional_prop->mg_su3csw);
     printfQuda("additional_prop->mg_u1csw = %.6e\n", additional_prop->mg_u1csw);
     printfQuda("additional_prop->mg_qhat = %d\n", additional_prop->mg_qhat);
+    printfQuda("additional_prop->pending_mg_tier = %d\n", additional_prop->pending_mg_tier);
+    if (param->inv_type_precondition == QUDA_MG_INVERTER) {
+      for (int i = 0; i < additional_prop->mg_param->n_level; i++) {
+        printfQuda("additional_prop->mg_refresh_maxiter[%d] = %d\n", i, additional_prop->mg_refresh_maxiter[i]);
+      }
+    }
     printfQuda("handle = %p\n", param);
     printfQuda("hash = %d\n", openQCD_qudaSolverGetHash(id));
 
