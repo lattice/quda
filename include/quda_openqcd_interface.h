@@ -106,14 +106,10 @@ typedef enum OpenQCDFieldType_s {
  * the mechanism to use once openQxD has made that decision.
  */
 typedef enum {
-  OPENQCD_MG_UPDATE_AUTO = 0,      /** Skip the update if nothing changed (REUSE), otherwise rebuild the fine Dirac
-                                        operators and coarse links from the current gauge/clover/kappa/mu (Fat-UPDATE) */
-  OPENQCD_MG_UPDATE_FORCE_UPDATE,  /** Always do a Fat-UPDATE (as above), even if QUDA's own change-detection thinks
-                                        nothing changed */
-  OPENQCD_MG_UPDATE_FORCE_REFRESH, /** Do a Fat-UPDATE and additionally refine the near-null space with the
-                                        configured number of extra setup-solver iterations (Fat-REFRESH) */
-  OPENQCD_MG_UPDATE_FORCE_RESET    /** Destroy and fully rebuild the multigrid hierarchy from scratch, including a
-                                        fresh random near-null space (Destroy) */
+  OPENQCD_MG_UPDATE_AUTO = 0,      // < Skip update if nothing changed, otherwise rebuild the fine Dirac operators and coarse links from the current gauge/clover/kappa/mu
+  OPENQCD_MG_UPDATE_FORCE_UPDATE,  // < Force rebuild of the fine Dirac operators and coarse links from current gauge/clover/kappa/mu
+  OPENQCD_MG_UPDATE_FORCE_REFRESH, // < Force rebuild of the fine Dirac operators and coarse links from current gauge/clover/kappa/mu, additionally refine the near-null space with the configured number of extra setup-solver iterations.
+  OPENQCD_MG_UPDATE_FORCE_RESET    // < Destroy and rebuild the solver (used to be fat update)
 } openQCD_QudaMgUpdateTier;
 
 /**
