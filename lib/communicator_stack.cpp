@@ -2,6 +2,7 @@
 #include <map>
 #include <array.h>
 #include <lattice_field.h>
+#include <tune_quda.h>
 
 namespace quda
 {
@@ -49,17 +50,59 @@ namespace quda
   void push_communicator(const CommKey &split_key)
   {
     if (comm_nvshmem_enabled())
-      errorQuda(
-        "Split-grid is currently not supported with NVSHMEM. Please set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
+      errorQuda("Split-grid is currently not supported with NVSHMEM. Set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
+
+    // if reverting to global, we will need to join the tunecaches
+    bool join_tune_cache = split_key == default_comm_key;
+    int local_rank = comm_rank();
+    int local_tune_rank = 0;
+
+    // used to store the size of the tunecache at the point of splitting
+    static size_t tune_cache_size = 0;
+
+    // destroy any message handles associate with the prior communicator
+    LatticeField::freeGhostBuffer();
+    ColorSpinorField::freeGhostBuffer();
+    FieldTmp<ColorSpinorField>::destroy();
+
     auto search = communicator_stack.find(split_key);
     if (search == communicator_stack.end()) {
       communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(split_key),
                                  std::forward_as_tuple(get_default_communicator(), split_key.data()));
     }
 
-    LatticeField::freeGhostBuffer(); // Destroy the (IPC) Comm buffers with the old communicator.
-
+    auto split_key_old = current_key;
     current_key = split_key;
+
+    // we are returning to global so we need to join any diverged tunecaches
+    if (join_tune_cache) {
+      // has this tunecache been updated?
+      int tune_cache_update = tune_cache_size != getTuneCache().size();
+      // have any of tunecaches across the split grid been updated?
+      comm_allreduce_int(tune_cache_update);
+
+      if (tune_cache_update) {
+        auto num_sub_partition = split_key_old.product(); // the number of caches we need to merge
+        int sub_partition_dims[] = {comm_dim(0) / split_key_old[0], comm_dim(1) / split_key_old[1],
+                                    comm_dim(2) / split_key_old[2], comm_dim(3) / split_key_old[3]};
+        int sub_partition_coords[] = {comm_coord(0) / sub_partition_dims[0], comm_coord(1) / sub_partition_dims[1],
+                                      comm_coord(2) / sub_partition_dims[2], comm_coord(3) / sub_partition_dims[3]};
+        auto sub_partition_idx = sub_partition_coords[split_key_old.n_dim - 1];
+        for (auto d = split_key_old.n_dim - 2; d >= 0; d--)
+          sub_partition_idx = sub_partition_idx * split_key_old[d] + sub_partition_coords[d];
+
+        std::vector<int> global_tune_ranks(num_sub_partition);
+        for (auto i = 0; i < num_sub_partition; i++) {
+          global_tune_ranks[i] = (sub_partition_idx == i && local_tune_rank == local_rank) ? comm_rank() : 0;
+          comm_allreduce_int(global_tune_ranks[i]);
+        }
+        // we now have a list of all the global tune ranks so we can join them
+        joinTuneCache(global_tune_ranks);
+      }
+    } else if (!join_tune_cache) {
+      // record size of tunecache when first splitting the grid
+      tune_cache_size = getTuneCache().size();
+    }
   }
 
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
@@ -70,7 +113,13 @@ namespace quda
 
   int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 
+  bool comm_dim_cstar(int dim) { return get_current_communicator().comm_dim_cstar(dim); }
+
+  int comm_dim_global(int dim) { return get_default_communicator().comm_dim(dim); }
+
   int comm_coord(int dim) { return get_current_communicator().comm_coord(dim); }
+
+  int comm_coord_global(int dim) { return get_default_communicator().comm_coord(dim); }
 
   int comm_rank_from_coords(const int *coords) { return get_current_communicator().comm_rank_from_coords(coords); }
 
@@ -189,7 +238,12 @@ namespace quda
 
 #undef CHECK_MH
 
-  void comm_allreduce_sum_array(double *data, size_t size)
+  template <typename T> void comm_allreduce_sum_array(T *data, size_t size)
+  {
+    get_current_communicator().comm_allreduce_sum_array(data, size);
+  }
+
+  template <> void comm_allreduce_sum_array<device_reduce_t>(device_reduce_t *data, size_t size)
   {
     get_current_communicator().comm_allreduce_sum_array(data, size);
   }
@@ -199,41 +253,96 @@ namespace quda
     comm_allreduce_sum_array(a.data(), a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<double2>>(std::vector<double2> &a)
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                                  \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
+  // maximum<reduction_t> uses reduction_t (doubledouble), distinct from device_reduce_t wrapper types.
+  template <> void comm_allreduce_sum<std::vector<doubledouble>>(std::vector<doubledouble> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
+    comm_allreduce_sum_array(a.data(), a.size());
+  }
+#endif
+
+#if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)                          \
+  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE))
+  template <> void comm_allreduce_sum<std::vector<device_reduce_t>>(std::vector<device_reduce_t> &a)
+  {
+    comm_allreduce_sum_array(a.data(), a.size());
+  }
+#endif
+
+  template <> void comm_allreduce_sum<std::vector<complex_t>>(std::vector<complex_t> &a)
+  {
+    comm_allreduce_sum_array(reinterpret_cast<real_t *>(a.data()), 2 * a.size());
   }
 
+#if defined(QUDA_USE_QUAD_SCALAR)
+  template <> void comm_allreduce_sum<std::vector<real_t>>(std::vector<real_t> &a)
+  {
+    comm_allreduce_sum_array(a.data(), a.size());
+  }
+#endif
+
+#if defined(QUDA_USE_QUAD_SCALAR)
   template <> void comm_allreduce_sum<std::vector<std::complex<double>>>(std::vector<std::complex<double>> &a)
   {
     comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
   }
+#endif
 
-  template <> void comm_allreduce_sum<std::vector<array<double, 2>>>(std::vector<array<double, 2>> &a)
+  template <> void comm_allreduce_sum<std::vector<array<device_reduce_t, 2>>>(std::vector<array<device_reduce_t, 2>> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
+    comm_allreduce_sum_array(reinterpret_cast<device_reduce_t *>(a.data()), 2 * a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<array<double, 3>>>(std::vector<array<double, 3>> &a)
+  template <> void comm_allreduce_sum<std::vector<array<device_reduce_t, 3>>>(std::vector<array<device_reduce_t, 3>> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 3 * a.size());
+    comm_allreduce_sum_array(reinterpret_cast<device_reduce_t *>(a.data()), 3 * a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<array<double, 4>>>(std::vector<array<double, 4>> &a)
+  template <> void comm_allreduce_sum<std::vector<array<device_reduce_t, 4>>>(std::vector<array<device_reduce_t, 4>> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 4 * a.size());
+    comm_allreduce_sum_array(reinterpret_cast<device_reduce_t *>(a.data()), 4 * a.size());
   }
 
   template <> void comm_allreduce_sum<double>(double &a) { comm_allreduce_sum_array(&a, 1); }
 
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                                  \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
+  template <> void comm_allreduce_sum<doubledouble>(doubledouble &a)
+  {
+    get_current_communicator().comm_allreduce_sum_array(&a, 1);
+  }
+#endif
+
+#if defined(QUDA_USE_QUAD_SCALAR)
+  template <> void comm_allreduce_sum<real_t>(real_t &a) { get_current_communicator().comm_allreduce_sum_array(&a, 1); }
+#endif
+
+#if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)                          \
+  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE))
+  template <> void comm_allreduce_sum<device_reduce_t>(device_reduce_t &a)
+  {
+    get_current_communicator().comm_allreduce_sum_array(&a, 1);
+  }
+#endif
+
   template <> void comm_allreduce_sum<size_t>(size_t &a) { get_current_communicator().comm_allreduce_sum(a); }
 
-  void comm_allreduce_max_array(double *data, size_t size)
+  template <typename T> void comm_allreduce_max_array(T *data, size_t size)
   {
     get_current_communicator().comm_allreduce_max_array(data, size);
   }
 
   template <> void comm_allreduce_max<double>(double &a) { comm_allreduce_max_array(&a, 1); }
+
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                                  \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
+  template <> void comm_allreduce_max<doubledouble>(doubledouble &a) { comm_allreduce_max_array(&a, 1); }
+#endif
+
+#if defined(QUDA_USE_QUAD_SCALAR)
+  template <> void comm_allreduce_max<real_t>(real_t &a) { comm_allreduce_max_array(&a, 1); }
+#endif
 
   template <> void comm_allreduce_max<float>(float &a)
   {
@@ -241,6 +350,21 @@ namespace quda
     comm_allreduce_max_array(&a_, 1);
     a = a_;
   }
+
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)                                                                                  \
+  && (defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE))
+  template <> void comm_allreduce_max<std::vector<doubledouble>>(std::vector<doubledouble> &a)
+  {
+    comm_allreduce_max_array(a.data(), a.size());
+  }
+#endif
+
+#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
+  template <> void comm_allreduce_max<std::vector<device_reduce_t>>(std::vector<device_reduce_t> &a)
+  {
+    comm_allreduce_max_array(a.data(), a.size());
+  }
+#endif
 
   template <> void comm_allreduce_max<std::vector<double>>(std::vector<double> &a)
   {
@@ -255,12 +379,12 @@ namespace quda
     for (unsigned int i = 0; i < a.size(); i++) a[i] = a_[i];
   }
 
-  template <> void comm_allreduce_max<std::vector<array<double, 2>>>(std::vector<array<double, 2>> &a)
+  template <> void comm_allreduce_max<std::vector<array<reduction_t, 2>>>(std::vector<array<reduction_t, 2>> &a)
   {
-    comm_allreduce_max_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
+    comm_allreduce_max_array(reinterpret_cast<reduction_t *>(a.data()), 2 * a.size());
   }
 
-  template <> void comm_allreduce_max<deviation_t<double>>(deviation_t<double> &a)
+  template <> void comm_allreduce_max<deviation_t<reduction_t>>(deviation_t<reduction_t> &a)
   {
     get_current_communicator().comm_allreduce_max_array(&a, 1);
   }
@@ -269,6 +393,13 @@ namespace quda
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }
+
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE)
+  template <> void comm_allreduce_max<std::vector<deviation_t<doubledouble>>>(std::vector<deviation_t<doubledouble>> &a)
+  {
+    get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
+  }
+#endif
 
   void comm_allreduce_min_array(double *data, size_t size)
   {
@@ -318,7 +449,9 @@ namespace quda
 
   void comm_barrier(void) { get_current_communicator().comm_barrier(); }
 
-  void comm_abort_(int status) { Communicator::comm_abort_(status); };
+  void comm_barrier_global(void) { get_default_communicator().comm_barrier(); }
+
+  [[noreturn]] void comm_abort_(int status) { Communicator::comm_abort_(status); };
 
   int commDim(int dim) { return get_current_communicator().commDim(dim); }
 

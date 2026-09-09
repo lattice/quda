@@ -3,16 +3,18 @@
 #include <cstring>
 
 #include <quda.h>
+#include <gauge_field.h>
+#include <ks_improved_force.h>
+#include <momentum.h>
+#include <timer.h>
+#include <gtest/gtest.h>
+
 #include "host_utils.h"
-#include <command_line_params.h>
-#include "gauge_field.h"
+#include "momentum_utils.h"
+#include "command_line_params.h"
 #include "misc.h"
 #include "test.h"
 #include "hisq_force_reference.h"
-#include "ks_improved_force.h"
-#include "momentum.h"
-#include <timer.h>
-#include <gtest/gtest.h>
 
 using namespace quda;
 
@@ -73,8 +75,8 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool h
   // total IO counting for the middle/side/all link kernels
   // Explanation about these numbers can be founed in the corresponding kernel functions in
   // the hisq kernel core file
-  long long linksize = prec * recon;
-  long long cmsize = prec * 18ll;
+  long long linksize = static_cast<long long>(static_cast<int>(prec)) * static_cast<int>(recon);
+  long long cmsize = static_cast<long long>(static_cast<int>(prec)) * 18ll;
 
   // FLOPS for matrix multiply, matrix add, matrix rescale, and anti-Hermitian projection
   long long matrix_flops[4] = {198ll, 18ll, 18ll, 23ll};
@@ -204,16 +206,6 @@ static void hisq_force_startup()
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
 
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[2] * qudaGaugeParam_ex.X[3] / 2;
-  int y_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[2] * qudaGaugeParam_ex.X[3] / 2;
-  int z_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[3] / 2;
-  int t_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[2] / 2;
-  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
-#endif
-  qudaGaugeParam_ex.ga_pad = 3 * pad_size; // long links
-
   GaugeFieldParam gParam_ex;
   GaugeFieldParam gParam;
 
@@ -253,9 +245,10 @@ static void hisq_force_startup()
   } // set halo region for CPU
   cpuGauge_ex = new GaugeField(gParam_ex);
 
-  auto generated_link_type = (link_recon == QUDA_RECONSTRUCT_NO ?
-                                SITELINK_PHASE_NO :
-                                (link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_MILC));
+  auto generated_link_type
+    = (link_recon == QUDA_RECONSTRUCT_NO ?
+         SiteLinkType::SITELINK_PHASE_NO :
+         (link_recon == QUDA_RECONSTRUCT_13 ? SiteLinkType::SITELINK_PHASE_U1 : SiteLinkType::SITELINK_PHASE_MILC));
   createSiteLinkCPU(*cpuGauge, qudaGaugeParam.cpu_prec, generated_link_type);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 

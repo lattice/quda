@@ -25,24 +25,25 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     CovDev(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-           const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+           const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay) errorQuda("Covariant derivative operator only defined without xpay");
       if (arg.nParity != 2) errorQuda("Covariant derivative operator only defined for full field");
 
+      constexpr bool dagger = false;
       constexpr bool xpay = false;
-      constexpr int nParity = 2;
-      Dslash::template instantiate<packStaggeredShmem, nParity, xpay>(tp, stream);
+      Dslash::template instantiate<packStaggeredShmem, xpay, dagger>(tp, stream);
     }
 
     long long flops() const override
@@ -86,9 +87,9 @@ namespace quda
 
     long long bytes() const override
     {
-      int gauge_bytes = arg.reconstruct * in.Precision();
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() +
-        (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
+      int gauge_bytes = static_cast<int>(arg.reconstruct) * static_cast<int>(in.Precision());
+      int spinor_bytes
+        = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = gauge_bytes + 3 * spinor_bytes; // 3 since we have to load the partial
       int dim = arg.mu % 4;
       long long bytes_ = 0;
@@ -132,7 +133,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct CovDevApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct CovDevApply {
 
     CovDevApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                 cvector_ref<const ColorSpinorField> &, const GaugeField &U, int mu, int parity, bool dagger,
@@ -140,15 +141,15 @@ namespace quda
 
     {
       constexpr int nDim = 4;
-      auto halo = ColorSpinorField::create_comms_batch(in);
+      auto halo = ColorSpinorField::create_comms_batch(in, 1, false);
       if (in.Nspin() == 4) {
-        CovDevArg<Float, 4, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-        CovDev<decltype(arg)> covDev(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+        CovDevArg<Float, 4, nColor, DDArg, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
       } else if (in.Nspin() == 1) {
-        CovDevArg<Float, 1, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-        CovDev<decltype(arg)> covDev(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+        CovDevArg<Float, 1, nColor, DDArg, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
       } else {
         errorQuda("Spin not supported");
       }

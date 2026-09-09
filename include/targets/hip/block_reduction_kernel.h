@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <constant_kernel_arg.h>
 #include <reduce_helper.h>
 
 namespace quda
@@ -42,9 +43,9 @@ namespace quda
      size to be set statically at launch time in the actual argument
      class that is passed to the kernel.
    */
-  template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
+  template <unsigned int block_size, typename Arg_> struct BlockKernelArg : Arg_ {
     using Arg = Arg_;
-    static constexpr unsigned int block_size = block_size_;
+    static constexpr unsigned int block_size_cxpr = block_size;
     BlockKernelArg(const Arg &arg) : Arg(arg) { }
   };
 
@@ -88,7 +89,7 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __launch_bounds__(Arg::block_size)
+  __launch_bounds__(Arg::block_size_cxpr)
     __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && (Arg::launch_bounds), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
@@ -131,7 +132,7 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __launch_bounds__(Arg::block_size)
+  __launch_bounds__(Arg::block_size_cxpr)
     __global__ std::enable_if_t<(!device::use_kernel_arg<Arg>()) && (Arg::launch_bounds), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");

@@ -81,7 +81,7 @@ void initFields(QudaPrecision prec)
   gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 1;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.order = QUDA_NATIVE_GAUGE_ORDER;
   gParam.geometry = QUDA_COARSE_GEOMETRY;
   gParam.nFace = 1;
 
@@ -175,7 +175,7 @@ TEST(multi_rhs_test, verify)
     auto l2_dev = blas::xmyNorm(xD[i], x_ref);
 
     // require that the relative L2 norm differs by no more than 2e-6/4e-5
-    EXPECT_LE(sqrt(l2_dev / x2), prec_sloppy == QUDA_SINGLE_PRECISION ? 2e-6 : 4e-5);
+    EXPECT_LE(std::sqrt(static_cast<double>(l2_dev / x2)), prec_sloppy == QUDA_SINGLE_PRECISION ? 2e-6 : 4e-5);
     // require that each component differs by no more than 1e-3/4e-3
     EXPECT_LE(max_dev[1], prec_sloppy == QUDA_SINGLE_PRECISION ? 1e-3 : 4e-3);
   }

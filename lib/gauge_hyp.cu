@@ -12,21 +12,20 @@ namespace quda
     GaugeField &out;
     GaugeField *tmp[4];
     const GaugeField &in;
-    const Float alpha;
+    const real_t alpha;
     const int level;
     const int dir_ignore;
     const int hypDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeHYP(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int level, int dir_ignore) :
+    GaugeHYP(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, real_t alpha, int level, int dir_ignore) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       tmp {tmp[0], tmp[1], tmp[2], tmp[3]},
       in(in),
-      alpha(static_cast<Float>(alpha)),
+      alpha(alpha),
       level(level),
       dir_ignore(dir_ignore),
       hypDim((dir_ignore == 4) ? 4 : 3)
@@ -78,27 +77,27 @@ namespace quda
 
     long long bytes() const
     {
+      const auto link_bytes = [](const GaugeField &g) {
+        return static_cast<long long>(static_cast<int>(g.Reconstruct()) * static_cast<int>(g.Precision()));
+      };
+      const long long in_lp = link_bytes(in);
+      const long long tmp0_lp = link_bytes(*tmp[0]);
+      const long long out_lp = link_bytes(out);
+
       long long bytes = 0;
       if ((hypDim == 4 && level == 1) || (hypDim == 3 && level == 1)) { // 6 links per dim, 1 in, hypDim-1 tmp
-        bytes += (in.Reconstruct() * in.Precision() + (hypDim - 1) * 6 * in.Reconstruct() * in.Precision()
-                  + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
-          * hypDim * in.LocalVolume();
+        bytes += (in_lp + (hypDim - 1) * 6 * in_lp + (hypDim - 1) * tmp0_lp) * hypDim * in.LocalVolume();
       } else if (hypDim == 4 && level == 2) { // 6 links per dim, 1 in, hypDim-1 tmp
-        bytes += (in.Reconstruct() * in.Precision()
-                  + (hypDim - 1) * (hypDim - 2) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
-                  + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
-          * hypDim * in.LocalVolume();
+        bytes += (in_lp + (hypDim - 1) * (hypDim - 2) * 6 * tmp0_lp + (hypDim - 1) * tmp0_lp) * hypDim * in.LocalVolume();
       } else if ((hypDim == 4 && level == 3) || (hypDim == 3 && level == 2)) { // 6 links per dim, 1 in, 1 out
-        bytes += (in.Reconstruct() * in.Precision() + (hypDim - 1) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
-                  + out.Reconstruct() * out.Precision())
-          * hypDim * in.LocalVolume();
+        bytes += (in_lp + (hypDim - 1) * 6 * tmp0_lp + out_lp) * hypDim * in.LocalVolume();
       }
       return bytes;
     }
 
-  }; // GaugeAPE
+  }; // GaugeHYP
 
-  void HYPStep(GaugeField &out, GaugeField &in, double alpha1, double alpha2, double alpha3, int dir_ignore)
+  void HYPStep(GaugeField &out, GaugeField &in, real_t alpha1, real_t alpha2, real_t alpha3, int dir_ignore)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);

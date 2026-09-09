@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <math_helper.h>
 
 namespace quda
 {
@@ -191,14 +191,14 @@ namespace quda
       constexpr double uniform(MRG32k3a &prn)
       {
         double p1 = a12 * (double)(prn.s1[1]) - a13n * (double)(prn.s1[0]);
-        p1 = std::fmod(p1, m1);
+        p1 = fmod(p1, m1);
         if (p1 < 0.0) p1 += m1;
         prn.s1[0] = prn.s1[1];
         prn.s1[1] = prn.s1[2];
         prn.s1[2] = static_cast<uint32_t>(p1);
 
         double p2 = a21 * (double)(prn.s2[2]) - a23n * (double)(prn.s2[0]);
-        p2 = std::fmod(p2, m2);
+        p2 = fmod(p2, m2);
         if (p2 < 0.0) p2 += m2;
         prn.s2[0] = prn.s2[1];
         prn.s2[1] = prn.s2[2];
@@ -216,9 +216,9 @@ namespace quda
         R v, p, r;
         v = (R)uniform(prn);
         p = (R)uniform(prn) * (R)2.0 * (R)3.141592653589793238462643383279502884;
-        r = std::sqrt((R)(-2.0) * std::log(v + TINY));
-        x = r * std::sin(p);
-        y = r * std::cos(p);
+        r = sqrt((R)(-2.0) * log(v + TINY));
+        x = r * sin(p);
+        y = r * cos(p);
       }
     } // namespace rng
   }   // namespace target

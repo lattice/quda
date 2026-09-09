@@ -53,6 +53,10 @@ bool skip_test(test_t param)
     // MR struggles with the staggered and asqtad spectrum, it's not MR's fault
     if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_MR_INVERTER)
       return true;
+
+    // BiCGStab-L is unstable with staggered operator with low precision
+    // we could likely restore this when 20-bit quark fields are merged in
+    if (inverter_type == QUDA_BICGSTABL_INVERTER && prec_sloppy < QUDA_SINGLE_PRECISION) return true;
   }
 
   // CG3 is rather unstable with low precision
@@ -66,7 +70,7 @@ bool skip_test(test_t param)
   return false;
 }
 
-std::vector<std::array<double, 2>> solve(test_t param);
+std::vector<std::array<quda::real_t, 2>> solve(test_t param);
 
 TEST_P(StaggeredInvertTest, verify)
 {
@@ -103,12 +107,22 @@ TEST_P(StaggeredInvertTest, verify)
   auto ca_basis_tmp = inv_param.ca_basis;
   if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER) inv_param.ca_basis = QUDA_POWER_BASIS;
 
-  // Single precision needs a tiny bump due to small host/device precision deviations
-  if (prec == QUDA_SINGLE_PRECISION) verify_tol *= 1.01;
+  // account for summation error scaling with number of processors
+  auto dof = 6lu * dim[0] * dim[1] * dim[2] * dim[3];
+  verify_tol *= (1 + std::log(quda::comm_size()) / std::log(dof));
+  tol_hq *= (1 + std::log(quda::comm_size()) / std::log(dof));
 
   for (auto rsd : solve(GetParam())) {
-    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], verify_tol); }
-    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }
+    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) {
+      EXPECT_FALSE(std::isnan(rsd[0])) << "Nan has propagated into the result";
+      verify_tol = checkReasonableHostDeviation(static_cast<double>(rsd[0]), verify_tol, prec, gauge_param.reconstruct);
+      EXPECT_LE(rsd[0], verify_tol);
+    }
+    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) {
+      EXPECT_FALSE(std::isnan(rsd[1])) << "Nan has propagated into the result";
+      tol_hq = checkReasonableHostDeviation(static_cast<double>(rsd[1]), tol_hq, prec, gauge_param.reconstruct);
+      EXPECT_LE(rsd[1], tol_hq);
+    }
   }
 
   inv_param.ca_basis = ca_basis_tmp;

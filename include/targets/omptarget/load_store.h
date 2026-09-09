@@ -14,24 +14,31 @@ namespace quda
   // pre-declaration of vector_load that we wish to specialize
   template <bool> struct vector_load_impl;
 
-  // CUDA specializations of the vector_load
+  template <size_t prefetch> struct prefetch_t;
+
+  // OpenMP specializations of vector_load
   template <> struct vector_load_impl<true> {
-    template <typename T> __device__ inline void operator()(T &value, const void *ptr, int idx)
+    template <typename T, size_t prefetch_size>
+    __device__ inline void operator()(T &value, const void *ptr, index_t idx, const prefetch_t<prefetch_size> &)
     {
       memcpy(&value, reinterpret_cast<const T *>(ptr) + idx, sizeof(T));
     }
 
-    __device__ inline void operator()(short8 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(short8 &value, const void *ptr, index_t idx,
+                                      const prefetch_t<prefetch_size> &prefetch)
     {
       float4 tmp;
-      operator()(tmp, ptr, idx);
+      operator()(tmp, ptr, idx, prefetch);
       memcpy(&value, &tmp, sizeof(float4));
     }
 
-    __device__ inline void operator()(char8 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(char8 &value, const void *ptr, index_t idx,
+                                      const prefetch_t<prefetch_size> &prefetch)
     {
       float2 tmp;
-      operator()(tmp, ptr, idx);
+      operator()(tmp, ptr, idx, prefetch);
       memcpy(&value, &tmp, sizeof(float2));
     }
   };
@@ -39,24 +46,24 @@ namespace quda
   // pre-declaration of vector_store that we wish to specialize
   template <bool> struct vector_store_impl;
 
-  // CUDA specializations of the vector_store using inline ptx
+  // OpenMP specializations of vector_store
   template <> struct vector_store_impl<true> {
-    template <typename T> __device__ inline void operator()(void *ptr, int idx, const T &value)
+    template <typename T> __device__ inline void operator()(void *ptr, index_t idx, const T &value)
     {
       memcpy(reinterpret_cast<T *>(ptr) + idx, &value, sizeof(T));
     }
 
-    __device__ inline void operator()(void *ptr, int idx, const short8 &value)
+    __device__ inline void operator()(void *ptr, index_t idx, const short8 &value)
     {
       memcpy(reinterpret_cast<float4 *>(ptr) + idx, &value, sizeof(float4));
     }
 
-    __device__ inline void operator()(void *ptr, int idx, const char8 &value)
+    __device__ inline void operator()(void *ptr, index_t idx, const char8 &value)
     {
       memcpy(reinterpret_cast<float2 *>(ptr) + idx, &value, sizeof(float2));
     }
 
-    __device__ inline void operator()(void *ptr, int idx, const char4 &value)
+    __device__ inline void operator()(void *ptr, index_t idx, const char4 &value)
     {
       memcpy(reinterpret_cast<short2 *>(ptr) + idx, &value, sizeof(short2));
     }

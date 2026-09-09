@@ -52,7 +52,7 @@ namespace quda {
   }
 
   void DiracDomainWall::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                   QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -69,6 +69,7 @@ namespace quda {
 
   void DiracDomainWall::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -123,8 +124,9 @@ namespace quda {
   // Apply the even-odd preconditioned clover-improved Dirac operator
   void DiracDomainWallPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkDWF(out, in);
-    double kappa2 = -kappa5*kappa5;
+    real_t kappa2 = -kappa5 * kappa5;
     auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -140,6 +142,7 @@ namespace quda {
 
   void DiracDomainWallPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);

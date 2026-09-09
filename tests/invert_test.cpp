@@ -9,10 +9,11 @@
 #include <color_spinor_field.h> // convenient quark field container
 
 // External headers
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
 #include "test.h"
 
 QudaGaugeParam gauge_param;
@@ -120,6 +121,7 @@ void init(int argc, char **argv)
 {
   // Set QUDA's internal parameters
   gauge_param = newQudaGaugeParam();
+  gauge_param.use_split_gauge_bkup = use_split_gauge_bkup == 1;
   setWilsonGaugeParam(gauge_param);
 
   inv_param = newQudaInvertParam();
@@ -367,12 +369,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
         inv_param.true_res_hq[j + i] = inv_param.true_res_hq[i];
       }
 
-      quda::comm_allreduce_int(inv_param.iter);
-      inv_param.iter /= quda::comm_size() / num_sub_partition;
-      quda::comm_allreduce_sum(inv_param.gflops);
-      inv_param.gflops /= quda::comm_size() / num_sub_partition;
-      quda::comm_allreduce_max(inv_param.secs);
-      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+      printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
                  inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
       if (inv_param.energy > 0) {
         printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n",
@@ -470,9 +467,10 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t {prec, prec_sloppy, inv_type, solution_type, solve_type, multishift, solution_accumulator_pipeline,
-                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
-                  inv_param.residual_type});
+    for (int rep = 0; rep < nrepeat; rep++)
+      solve(test_t {prec, prec_sloppy, inv_type, solution_type, solve_type, multishift, solution_accumulator_pipeline,
+                    schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
+                    inv_param.residual_type});
   }
 
   // finalize the QUDA library

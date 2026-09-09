@@ -171,9 +171,9 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
 
   fill_buffers<Float, 2>(buffs, X, dof);
 
-  for (int s = 0; s < nprops; ++s, off += spinor_field_floats * sizeof(Float)) {
-    spinorX[s] = (void *)((uintptr_t)buffs[0].data() + off);
-    spinorY[s] = (void *)((uintptr_t)buffs[1].data() + off);
+  for (int s = 0; s < nprops; ++s, off += spinor_field_floats) {
+    spinorX[s] = static_cast<void *>(buffs[0].data() + off);
+    spinorY[s] = static_cast<void *>(buffs[1].data() + off);
   }
   // Perform GPU contraction:
   void *d_result_ = static_cast<void *>(d_result.data());
@@ -181,9 +181,8 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
   contractFTQuda(spinorX.data(), spinorY.data(), &d_result_, cType, (void *)(&cs_param), src_colors, X.data(),
                  source_position.data(), n_mom, mom.data(), fft_type.data());
   // Check results:
-  int faults
-    = contractionFT_reference<Float>((Float **)spinorX.data(), (Float **)spinorY.data(), d_result.data(), cType,
-                                     src_colors, X.data(), source_position.data(), n_mom, mom.data(), fft_type.data());
+  int faults = contractionFT_reference<Float>(spinorX.data(), spinorY.data(), d_result.data(), cType, src_colors,
+                                              X.data(), source_position.data(), n_mom, mom.data(), fft_type.data());
 
   return faults;
 }

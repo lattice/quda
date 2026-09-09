@@ -58,7 +58,7 @@ template <typename Float> inline void FourierPhase(Float z[2], const Float theta
 };
 
 template <typename Float>
-void contractFTHost(Float **h_prop_array_flavor_1, Float **h_prop_array_flavor_2, double *h_result,
+void contractFTHost(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, double *h_result,
                     const QudaContractType cType, const int src_colors, const int *X, const int *const source_position,
                     const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type)
 {
@@ -79,7 +79,7 @@ void contractFTHost(Float **h_prop_array_flavor_1, Float **h_prop_array_flavor_2
 
   // Array for all momenta, reduction slices, and channels. It is zeroed prior to kernel launch.
   std::vector<std::complex<double>> result_global(n_mom * global_reduct_slices * num_out_results);
-  std::fill(result_global.begin(), result_global.end(), Complex {0.0, 0.0});
+  std::fill(result_global.begin(), result_global.end(), std::complex<double> {0.0, 0.0});
 
   // Strides for computing local coordinates
   int strides[4] {1, X[0], X[1] * X[0], X[2] * X[1] * X[0]};
@@ -126,8 +126,8 @@ void contractFTHost(Float **h_prop_array_flavor_1, Float **h_prop_array_flavor_2
         for (int c1 = 0; c1 < src_colors; c1++) {
           // color contraction
           size_t off = nSpin * 3 * 2 * (Vh * parity + cb_idx);
-          contractColors<Float>(h_prop_array_flavor_1[s1 * src_colors + c1] + off,
-                                h_prop_array_flavor_2[s2 * src_colors + c1] + off, nSpin, M.data());
+          contractColors<Float>(static_cast<Float *>(h_prop_array_flavor_1[s1 * src_colors + c1]) + off,
+                                static_cast<Float *>(h_prop_array_flavor_2[s2 * src_colors + c1]) + off, nSpin, M.data());
 
           // apply gamma matrices here
 
@@ -158,7 +158,7 @@ void contractFTHost(Float **h_prop_array_flavor_1, Float **h_prop_array_flavor_2
 };
 
 template <typename Float>
-int contractionFT_reference(Float **spinorX, Float **spinorY, const double *const d_result, const QudaContractType cType,
+int contractionFT_reference(void **spinorX, void **spinorY, const double *const d_result, const QudaContractType cType,
                             const int src_colors, const int *X, const int *const source_position, const int n_mom,
                             const int *const mom_modes, const QudaFFTSymmType *const fft_type)
 {
@@ -190,7 +190,7 @@ int contractionFT_reference(Float **spinorX, Float **spinorY, const double *cons
   std::vector<int> fails(ntol, 0.0);
 
   for (size_t idx = 0; idx < n_floats; ++idx) {
-    double rel = abs(d_result[idx] - h_result[idx]);
+    double rel = std::abs(d_result[idx] - h_result[idx]);
     // printfQuda("%5ld: %10.3e %10.3e: %10.3e\n", idx, d_result[idx], h_result[idx], rel);
     for (int d = 0; d < ntol; ++d)
       if (rel > tolerance[d]) ++fails[d];

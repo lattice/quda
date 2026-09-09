@@ -16,7 +16,7 @@
 #include <targets/sycl/quda_sycl.h>
 
 #elif defined(QUDA_TARGET_OMPTARGET)
-#include <omp.h>
+#include <targets/omptarget/quda_api.h>
 #endif
 
 #ifdef QUDA_OPENMP

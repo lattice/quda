@@ -1,4 +1,4 @@
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <color_spinor_field_order.h>
 #include <random_helper.h>
 #include <kernel.h>
@@ -12,7 +12,7 @@ namespace quda {
     using real = real_;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
-    static constexpr QudaFieldOrder order = colorspinor::getNative<real>(nSpin);
+    static constexpr QudaFieldOrder order = QUDA_NATIVE_FIELD_ORDER;
     static constexpr QudaNoiseType noise = noise_;
     using V = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order>;
     V v;

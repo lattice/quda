@@ -1,10 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include "invert_quda.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <string>
+
+#include <util_quda.h>
+#include <invert_quda.h>
+#include <enum_quda.h>
+
 #include "misc.h"
-#include <assert.h>
-#include "util_quda.h"
-#include <host_utils.h>
 
 const char *get_verbosity_str(QudaVerbosity type)
 {
@@ -221,6 +224,7 @@ const char *get_eig_type_str(QudaEigType type)
   switch (type) {
   case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
   case QUDA_EIG_BLK_TR_LANCZOS: ret = "blktrlm"; break;
+  case QUDA_EIG_TR_LANCZOS_3D: ret = "trlm_3d"; break;
   case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
   case QUDA_EIG_BLK_IR_ARNOLDI: ret = "blkiram"; break;
   default: ret = "unknown eigensolver"; break;
@@ -236,10 +240,10 @@ const char *get_gauge_smear_str(QudaGaugeSmearType type)
   switch (type) {
   case QUDA_GAUGE_SMEAR_APE: ret = "APE"; break;
   case QUDA_GAUGE_SMEAR_STOUT: ret = "Stout"; break;
-  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over Improved"; break;
+  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over_Improved"; break;
   case QUDA_GAUGE_SMEAR_HYP: ret = "HYP"; break;
-  case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson Flow"; break;
-  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik Flow"; break;
+  case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson_Flow"; break;
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik_Flow"; break;
   default: ret = "unknown"; break;
   }
 
@@ -404,7 +408,6 @@ const char *get_memory_type_str(QudaMemoryType type)
   case QUDA_MEMORY_DEVICE_PINNED: s = "device_pinned"; break;
   case QUDA_MEMORY_HOST: s = "host"; break;
   case QUDA_MEMORY_HOST_PINNED: s = "host_pinned"; break;
-  case QUDA_MEMORY_MAPPED: s = "mapped"; break;
   default: fprintf(stderr, "Error: invalid memory type\n"); exit(1);
   }
 

@@ -38,7 +38,7 @@ namespace quda {
 
     long long flops() const { return in.size() * in.Volume() * 504ll; }
 
-    long long bytes() const { return out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset()); }
+    long long bytes() const { return out.Bytes() + in.Bytes() + in.size() * clover.Bytes() / (3 - in.SiteSubset()); }
   };
 
   //Apply the clover matrix field to a colorspinor field
@@ -57,9 +57,9 @@ namespace quda {
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
     const CloverField &clover;
-    double kappa;
-    double mu;
-    double epsilon;
+    real_t kappa;
+    real_t mu;
+    real_t epsilon;
     int parity;
     bool inverse;
     int dagger;
@@ -77,7 +77,7 @@ namespace quda {
 
   public:
     TwistClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const CloverField &clover,
-                double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist) :
+                real_t kappa, real_t mu, real_t epsilon, int parity, int dagger, QudaTwistGamma5Type twist) :
       TunableKernel3D(in[0], in.size() * in.TwistFlavor(), in.SiteSubset()),
       out(out),
       in(in),
@@ -132,7 +132,7 @@ namespace quda {
 
   //Apply the twisted-clover matrix field to a colorspinor field
   void ApplyTwistClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                        const CloverField &clover, double kappa, double mu, double epsilon, int parity, int dagger,
+                        const CloverField &clover, real_t kappa, real_t mu, real_t epsilon, int parity, int dagger,
                         QudaTwistGamma5Type twist)
   {
     if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {

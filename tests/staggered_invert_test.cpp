@@ -140,6 +140,7 @@ void init()
 {
   // Set QUDA internal parameters
   gauge_param = newQudaGaugeParam();
+  gauge_param.use_split_gauge_bkup = use_split_gauge_bkup == 1;
   setStaggeredGaugeParam(gauge_param);
   QudaGaugeSmearParam smear_param;
   if (gauge_smear) {
@@ -203,7 +204,7 @@ void init()
   cpuFatMILC = GaugeField(cpuParam);
 
   cpuParam.link_type = QUDA_ASQTAD_LONG_LINKS;
-  cpuParam.nFace = 3;
+  cpuParam.nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuLongQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
@@ -216,7 +217,7 @@ void init()
 
   // Reorder gauge fields to MILC order
   cpuFatMILC = cpuFatQDP;
-  cpuLongMILC = cpuLongQDP;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) cpuLongMILC = cpuLongQDP;
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
@@ -237,16 +238,17 @@ void init()
 
   // now copy back to QDP aliases, since these are used for the reference dslash
   cpuFatQDP = cpuFatMILC;
-  cpuLongQDP = cpuLongMILC;
-  // ensure QDP alias has exchanged ghosts
   cpuFatQDP.exchangeGhost();
-  cpuLongQDP.exchangeGhost();
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    cpuLongQDP = cpuLongMILC;
+    cpuLongQDP.exchangeGhost();
+  }
 
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
 }
 
-std::vector<std::array<double, 2>> solve(test_t param)
+std::vector<std::array<quda::real_t, 2>> solve(test_t param)
 {
   inv_param.inv_type = ::testing::get<0>(param);
   inv_param.solution_type = ::testing::get<1>(param);
@@ -421,12 +423,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
         inv_param.true_res_hq[j + i] = inv_param.true_res_hq[i];
       }
 
-      quda::comm_allreduce_int(inv_param.iter);
-      inv_param.iter /= comm_size() / num_sub_partition;
-      quda::comm_allreduce_sum(inv_param.gflops);
-      inv_param.gflops /= comm_size() / num_sub_partition;
-      quda::comm_allreduce_max(inv_param.secs);
-      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+      printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
                  inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
       if (inv_param.energy > 0) {
         printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
@@ -441,7 +438,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // Compute timings
   if (!use_multi_src) performanceStats(time, gflops, iter);
 
-  std::vector<std::array<double, 2>> res(Nsrc);
+  std::vector<std::array<quda::real_t, 2>> res(Nsrc);
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int n = 0; n < Nsrc; n++) {
@@ -450,9 +447,9 @@ std::vector<std::array<double, 2>> solve(test_t param)
         // Create an appropriate subset of the full out_multishift vector
         std::vector<quda::ColorSpinorField> out_subset
           = {out_multishift.begin() + n * multishift, out_multishift.begin() + (n + 1) * multishift};
-        res[n] = verifyStaggeredInversion(in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param);
+        res[n] = verifyStaggeredInversion(in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param, laplace3D);
       } else {
-        res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param, n);
+        res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param, laplace3D, n);
       }
     }
   }
@@ -510,7 +507,8 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (is_laplace(dslash_type))
+      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_DIRAC_LAPLACE=ON");
     if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
@@ -535,7 +533,17 @@ int main(int argc, char **argv)
       changes = true;
     }
 
-    double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-5 : 1e-6;
+    auto getStaggeredInvertTolerance = [](QudaPrecision prec) {
+      switch (prec) {
+      case QUDA_SINGLE_PRECISION: return 1e-5;
+      case QUDA_DOUBLE_PRECISION: return 1e-6;
+      default: return 0.0;
+      }
+    };
+
+    double expected_tol = getStaggeredInvertTolerance(prec);
+    if (expected_tol == 0.0) errorQuda("Unexpected precision %d", prec);
+
     if (tol != expected_tol) {
       tol = expected_tol;
       changes = true;
@@ -552,8 +560,10 @@ int main(int argc, char **argv)
     if (changes) {
       printfQuda("For gtest, various defaults are changed:\n");
       printfQuda("  --compute-fat-long true\n");
-      printfQuda("  --tol (1e-6 for double, 1e-5 for single)\n");
-      printfQuda("  --tol-hq (1e-6 for double, 1e-5 for single)\n");
+      printfQuda("  --tol (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
+      printfQuda("  --tol-hq (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
       printfQuda("  --niter 1000\n");
     }
   }
@@ -566,9 +576,10 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
-                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
-                  inv_param.residual_type});
+    for (int rep = 0; rep < nrepeat; rep++)
+      solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
+                    schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
+                    inv_param.residual_type});
   }
 
   cleanup();

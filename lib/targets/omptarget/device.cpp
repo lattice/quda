@@ -25,41 +25,39 @@
 
 static char ompdevname[] = "OpenMP Target Device";
 static char omphostname[] = "OpenMP Host Device";
-struct DeviceProp{
-  char*name;
+struct DeviceProp {
+  char *name;
   int id;
   unsigned int num_procs;
   unsigned int max_teams;
   unsigned int max_threads;
 };
 
-static void getDeviceProperties(DeviceProp*p,int dev)
+static void getDeviceProperties(DeviceProp *p, int dev)
 {
   constexpr int max_threads = quda::device::max_block_size();
   int m = 0;
 
-  if(dev>=0 && dev<=omp_get_num_devices())
+  if (dev >= 0 && dev <= omp_get_num_devices())
     p->name = ompdevname;
   else
     p->name = omphostname;
 
   p->id = dev;
-  #pragma omp target teams device(dev) thread_limit(max_threads) map(from:m)
-  if(omp_get_team_num()==0)
-    m = omp_get_num_procs();
+#pragma omp target teams device(dev) thread_limit(max_threads) map(from : m)
+  if (omp_get_team_num() == 0) m = omp_get_num_procs();
   p->num_procs = m;
 
-/*
-  #pragma omp target device(dev) map(from:m)
-  m = omp_get_max_teams();
-  p->max_teams = m;
-*/
+  /*
+    #pragma omp target device(dev) map(from:m)
+    m = omp_get_max_teams();
+    p->max_teams = m;
+  */
   p->max_teams = QUDA_OMP_MAX_TEAMS;
 
-  #pragma omp target teams device(dev) thread_limit(max_threads) map(from:m)
-  if(omp_get_team_num()==0)
-    m = omp_get_max_threads();
-  p->max_threads= m;
+#pragma omp target teams device(dev) thread_limit(max_threads) map(from : m)
+  if (omp_get_team_num() == 0) m = omp_get_max_threads();
+  p->max_threads = m;
 }
 
 static DeviceProp deviceProp;
@@ -73,6 +71,10 @@ namespace quda
     static bool initialized = false;
 
     static int device_id = -1;
+
+    // OpenMP does not expose a portable device driver or runtime version query.
+    int get_driver_version() { return 0; }
+    int get_runtime_version() { return 0; }
 
     void print_device(DeviceProp dp)
     {
@@ -112,8 +114,7 @@ namespace quda
       static int device_count = -1;
       if (device_count < 0) {
         device_count = omp_get_num_devices();
-        if (device_count == 0)
-          warningQuda("No non-host devices found");
+        if (device_count == 0) warningQuda("No non-host devices found");
       }
       return device_count;
     }
@@ -123,11 +124,11 @@ namespace quda
       constexpr int len = 128;
       char *device_order_env = getenv("ZE_AFFINITY_MASK");
       char *oneapi_device_env = getenv("ONEAPI_DEVICE_SELECTOR");
-      if(oneapi_device_env && device_order_env)
+      if (oneapi_device_env && device_order_env)
         snprintf(device_list_string, len, "%s%s", oneapi_device_env, device_order_env);
-      else if(oneapi_device_env)
+      else if (oneapi_device_env)
         snprintf(device_list_string, len, "%s", oneapi_device_env);
-      else if(device_order_env)
+      else if (device_order_env)
         snprintf(device_list_string, len, "%s", device_order_env);
     }
 
@@ -144,20 +145,11 @@ namespace quda
 
     void destroy() { }
 
-    qudaStream_t get_stream(unsigned int i)
-    {
-      return qudaStream_t{static_cast<int>(i)};
-    }
+    qudaStream_t get_stream(unsigned int i) { return qudaStream_t {static_cast<int>(i)}; }
 
-    qudaStream_t get_default_stream()
-    {
-      return qudaStream_t{0};
-    }
+    qudaStream_t get_default_stream() { return qudaStream_t {0}; }
 
-    unsigned int get_default_stream_idx()
-    {
-      return 0;
-    }
+    unsigned int get_default_stream_idx() { return 0; }
 
     bool managed_memory_supported() { return false; }
 
@@ -176,6 +168,8 @@ namespace quda
     unsigned int max_grid_size(int i) { return deviceProp.max_teams; }
 
     unsigned int processor_count() { return QUDA_PROCESSOR_COUNT; }
+
+    bool shared_carve_out_supported() { return false; }
 
     unsigned int max_blocks_per_processor() { return QUDA_MAX_BLOCKS_PER_PROCESSOR; }
 

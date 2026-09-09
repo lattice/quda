@@ -6,10 +6,12 @@ namespace quda {
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2@;
   constexpr bool use_mma = true;
 
-  template<>
-  void CoarseCoarseOp<fineColor, coarseColor, use_mma>(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                                                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass,
-                                                       double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
+  template <>
+  void CoarseCoarseOp<fineColor, coarseColor, use_mma>(GaugeField &Y, GaugeField &X, const Transfer &T,
+                                                       const GaugeField &gauge, const GaugeField &clover,
+                                                       const GaugeField &cloverInv, real_t kappa, real_t mass,
+                                                       real_t mu, real_t mu_factor, QudaDiracType dirac,
+                                                       QudaMatPCType matpc, bool need_bidirectional)
   {
     QudaFieldLocation location = checkLocation(X, Y, gauge, clover, cloverInv);
     if (location == QUDA_CPU_FIELD_LOCATION) errorQuda("use_mma = true does not go with QUDA_CPU_FIELD_LOCATION.");
@@ -18,11 +20,11 @@ namespace quda {
     //structure to V but double the number of spins so we can store
     //the four distinct block chiral multiplications in a single UV
     //computation.
-    ColorSpinorParam UVparam(T.Vectors(location));
+    ColorSpinorParam UVparam(T.Vectors());
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
     UVparam.nSpin *= 2; // so nSpin == 4
-    UVparam.setPrecision(T.Vectors(location).Precision());
+    UVparam.setPrecision(T.Vectors().Precision());
     UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);

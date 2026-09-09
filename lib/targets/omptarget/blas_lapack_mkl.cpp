@@ -7,7 +7,7 @@
 #include <malloc_quda.h>
 #endif
 
-//#define _DEBUG
+// #define _DEBUG
 
 #ifdef _DEBUG
 #include <eigen_helper.h>
@@ -22,8 +22,8 @@ namespace quda
     namespace native
     {
 
-      void init() {}
-      void destroy() {}
+      void init() { }
+      void destroy() { }
 
 #ifdef _DEBUG
       template <typename EigenMatrix, typename Float>
@@ -66,14 +66,14 @@ namespace quda
 #ifdef _DEBUG
         // Debug code: Copy original A matrix to host
         if (prec == QUDA_SINGLE_PRECISION) {
-          std::complex<float> *A_h
-            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
-                                                      static_cast<std::complex<float> *>(A_d));
+          std::complex<float> *A_h = (location == QUDA_CUDA_FIELD_LOCATION ?
+                                        static_cast<std::complex<float> *>(pool_host_pinned_malloc(size)) :
+                                        static_cast<std::complex<float> *>(A_d));
           if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
         } else if (prec == QUDA_DOUBLE_PRECISION) {
-          std::complex<double> *A_h
-            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<double> *>(pool_pinned_malloc(size)) :
-                                                      static_cast<std::complex<double> *>(A_d));
+          std::complex<double> *A_h = (location == QUDA_CUDA_FIELD_LOCATION ?
+                                         static_cast<std::complex<double> *>(pool_host_pinned_malloc(size)) :
+                                         static_cast<std::complex<double> *>(A_d));
           if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
         } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);
@@ -82,7 +82,7 @@ namespace quda
 
         MKL_INT *dipiv = static_cast<MKL_INT *>(pool_device_malloc(batch * n * sizeof(MKL_INT)));
         MKL_INT *dinfo_array = static_cast<MKL_INT *>(pool_device_malloc(batch * sizeof(MKL_INT)));
-        MKL_INT *info_array = static_cast<MKL_INT *>(pool_pinned_malloc(batch * sizeof(MKL_INT)));
+        MKL_INT *info_array = static_cast<MKL_INT *>(pool_host_pinned_malloc(batch * sizeof(MKL_INT)));
         memset(info_array, '0', batch * sizeof(MKL_INT)); // silence memcheck warnings
 
         MKL_INT n_array = n;
@@ -91,8 +91,9 @@ namespace quda
 
         if (prec == QUDA_SINGLE_PRECISION) {
           typedef MKL_Complex8 C;
-          #pragma omp dispatch is_device_ptr(A_d, dipiv, dinfo_array)
-          cgetrf_batch_strided(&n_array, &n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size, dinfo_array);
+#pragma omp dispatch is_device_ptr(A_d, dipiv, dinfo_array)
+          cgetrf_batch_strided(&n_array, &n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size,
+                               dinfo_array);
           flops += batch * FLOPS_CGETRF(n, n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -105,8 +106,9 @@ namespace quda
             }
           }
 
-          #pragma omp dispatch is_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
-          cgetri_oop_batch_strided(&n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, (C *)Ainv_d, &n_array, &stride_array, &batch_size, dinfo_array);
+#pragma omp dispatch is_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
+          cgetri_oop_batch_strided(&n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, (C *)Ainv_d, &n_array,
+                                   &stride_array, &batch_size, dinfo_array);
           flops += batch * FLOPS_CGETRI(n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -122,17 +124,18 @@ namespace quda
 
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
-          std::complex<float> *Ainv_h = static_cast<std::complex<float> *>(pool_pinned_malloc(size));
+          std::complex<float> *Ainv_h = static_cast<std::complex<float> *>(pool_host_pinned_malloc(size));
           qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
 
           for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
-          pool_pinned_free(Ainv_h);
-          pool_pinned_free(A_h);
+          pool_host_pinned_free(Ainv_h);
+          pool_host_pinned_free(A_h);
 #endif
         } else if (prec == QUDA_DOUBLE_PRECISION) {
           typedef MKL_Complex16 Z;
-          #pragma omp dispatch is_device_ptr(A_d, dipiv, dinfo_array)
-          zgetrf_batch_strided(&n_array, &n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size, dinfo_array);
+#pragma omp dispatch is_device_ptr(A_d, dipiv, dinfo_array)
+          zgetrf_batch_strided(&n_array, &n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size,
+                               dinfo_array);
           flops += batch * FLOPS_ZGETRF(n, n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -145,8 +148,9 @@ namespace quda
             }
           }
 
-          #pragma omp dispatch is_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
-          zgetri_oop_batch_strided(&n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, (Z *)Ainv_d, &n_array, &stride_array, &batch_size, dinfo_array);
+#pragma omp dispatch is_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
+          zgetri_oop_batch_strided(&n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, (Z *)Ainv_d, &n_array,
+                                   &stride_array, &batch_size, dinfo_array);
           flops += batch * FLOPS_CGETRI(n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -161,12 +165,12 @@ namespace quda
 
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
-          std::complex<double> *Ainv_h = static_cast<std::complex<double> *>(pool_pinned_malloc(size));
+          std::complex<double> *Ainv_h = static_cast<std::complex<double> *>(pool_host_pinned_malloc(size));
           qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
 
           for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcd, double>(A_h, Ainv_h, n, i); }
-          pool_pinned_free(Ainv_h);
-          pool_pinned_free(A_h);
+          pool_host_pinned_free(Ainv_h);
+          pool_host_pinned_free(A_h);
 #endif
         } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);
@@ -180,7 +184,7 @@ namespace quda
 
         pool_device_free(dipiv);
         pool_device_free(dinfo_array);
-        pool_pinned_free(info_array);
+        pool_host_pinned_free(info_array);
 
         qudaDeviceSynchronize();
         gettimeofday(&stop, NULL);
@@ -357,7 +361,7 @@ namespace quda
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
 
           typedef MKL_Complex16 Z;
-          static_assert(sizeof(Z)==sizeof(double2), "MKL_Complex16 and double2 must be the same.");
+          static_assert(sizeof(Z) == sizeof(double2), "MKL_Complex16 and double2 must be the same.");
 
           const double2 alpha = make_double2((double)(static_cast<std::complex<double>>(blas_param.alpha).real()),
                                              (double)(static_cast<std::complex<double>>(blas_param.alpha).imag()));
@@ -366,22 +370,22 @@ namespace quda
                                             (double)(static_cast<std::complex<double>>(blas_param.beta).imag()));
 
           if (batch > 1) {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
-            cblas_zgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                      &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_zgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
+                                      (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
                                       (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
                                       (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
             cblas_zgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                        (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
-                        blas_param.ldb, &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
+                        (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset, blas_param.ldb,
+                        &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
           typedef MKL_Complex8 C;
-          static_assert(sizeof(C)==sizeof(float2), "MKL_Complex8 and float2 must be the same.");
+          static_assert(sizeof(C) == sizeof(float2), "MKL_Complex8 and float2 must be the same.");
 
           const float2 alpha = make_float2((float)(static_cast<std::complex<double>>(blas_param.alpha).real()),
                                            (float)(static_cast<std::complex<double>>(blas_param.alpha).imag()));
@@ -390,16 +394,16 @@ namespace quda
                                           (float)(static_cast<std::complex<double>>(blas_param.beta).imag()));
 
           if (batch > 1) {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
-            cblas_cgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                      &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_cgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
+                                      (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
                                       (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
                                       (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
             cblas_cgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                        (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
-                        blas_param.ldb, &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
+                        (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset, blas_param.ldb,
+                        &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
@@ -410,16 +414,16 @@ namespace quda
           const D beta = (D)(static_cast<std::complex<double>>(blas_param.beta).real());
 
           if (batch > 1) {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
-            cblas_dgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                      alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_dgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                      (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
                                       (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
                                       (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
             cblas_dgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-                        (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
-                        blas_param.ldb, beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
+                        (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset, blas_param.ldb,
+                        beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
@@ -430,16 +434,16 @@ namespace quda
           const S beta = (S)(static_cast<std::complex<float>>(blas_param.beta).real());
 
           if (batch > 1) {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
-            cblas_sgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                      alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_sgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                      (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
                                       (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
                                       (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+#pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
             cblas_sgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-                        (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
-                        blas_param.ldb, beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
+                        (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset, blas_param.ldb,
+                        beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else {
@@ -485,5 +489,5 @@ namespace quda
 #endif
 
     } // namespace native
-  }   // namespace blas_lapack
+  } // namespace blas_lapack
 } // namespace quda

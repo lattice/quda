@@ -1,5 +1,4 @@
 #include <color_spinor_field_order.h>
-#include <constant_kernel_arg.h>
 #include <kernel.h>
 
 namespace quda {
@@ -29,7 +28,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr QudaDilutionType type = type_;
     static constexpr int max_dilution_size = get_size<nSpin, nColor>(type);
-    using V = typename colorspinor_mapper<store_t, nSpin, nColor, false, false, true>::type;
+    using V = typename colorspinor_mapper<store_t, nSpin, nColor, false, true>::type;
     int dilution_size;
     V v[max_dilution_size];
     V src;

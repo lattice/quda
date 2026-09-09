@@ -4,16 +4,16 @@
 #include <tunable_nd.h>
 #include <kernels/reduce_init.cuh>
 
-// These are used for reduction kernels
-static device_reduce_t *d_reduce = nullptr;
-static device_reduce_t *h_reduce = nullptr;
-static device_reduce_t *hd_reduce = nullptr;
-
-static count_t *reduce_count = nullptr;
-static qudaEvent_t reduceEnd;
-
 namespace quda
 {
+
+  // These are used for reduction kernels
+  static device_reduce_t *d_reduce = nullptr;
+  static device_reduce_t *h_reduce = nullptr;
+  static device_reduce_t *hd_reduce = nullptr;
+
+  static count_t *reduce_count = nullptr;
+  static qudaEvent_t reduceEnd;
 
   namespace reducer
   {
@@ -27,6 +27,20 @@ namespace quda
     static size_t allocated_bytes = 0;
     static int allocated_n_reduce = 0;
     static bool init_event = false;
+
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+    static bool init_rfa = false;
+    static reproducible::RFA_bins<reduction_t> bins;
+
+    reproducible::RFA_bins<reduction_t> &get_rfa_bins()
+    {
+      if (!init_rfa) {
+        bins.initialize_bins();
+        init_rfa = true;
+      }
+      return bins;
+    }
+#endif
 
     template <typename T>
     struct init_reduce : public TunableKernel1D {
@@ -44,7 +58,7 @@ namespace quda
       void apply(const qudaStream_t &stream)
       {
         // intentionally do not autotune, since this can be called inside a tuning region
-        auto tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+        auto tp = tuneLaunch(*this, false, getVerbosity());
         launch_device<init_count>(tp, stream, init_arg<T>(reduce_count, n_reduce));
       }
     };
@@ -55,27 +69,25 @@ namespace quda
       auto bytes = max_reduce_blocks * n_reduce * reduce_size;
 
       if (allocated_bytes < bytes) {
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          printfQuda("reducer::init buffer resizing for n_reduce = %d, reduce_size = %lu, bytes = %lu\n",
-                     n_reduce, reduce_size, bytes);
+        logQuda(QUDA_VERBOSE, "reducer::init buffer resizing for n_reduce = %d, reduce_size = %lu, bytes = %lu\n",
+                n_reduce, reduce_size, bytes);
         if (d_reduce) device_free(d_reduce);
         d_reduce = static_cast<device_reduce_t *>(device_malloc(bytes));
 
         if (h_reduce) host_free(h_reduce);
-        h_reduce = static_cast<device_reduce_t *>(mapped_malloc(bytes));
+        h_reduce = static_cast<device_reduce_t *>(host_pinned_malloc(bytes));
         hd_reduce = static_cast<device_reduce_t *>(get_mapped_device_pointer(h_reduce)); // set the matching device pointer
 
         using system_atomic_t = device_reduce_t;
         size_t n_reduce = bytes / sizeof(system_atomic_t);
         auto *atomic_buf = reinterpret_cast<system_atomic_t *>(h_reduce);
-        for (size_t i = 0; i < n_reduce; i++) new (atomic_buf + i) system_atomic_t {0}; // placement new constructor
+        for (size_t i = 0; i < n_reduce; i++) new (atomic_buf + i) system_atomic_t {}; // placement new constructor
 
         allocated_bytes = bytes;
       }
 
       if (allocated_n_reduce < n_reduce) {
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          printfQuda("reducer::init count resizing for n_reduce = %d\n", n_reduce);
+        logQuda(QUDA_DEBUG_VERBOSE, "reducer::init count resizing for n_reduce = %d\n", n_reduce);
         if (reduce_count) device_free(reduce_count);
         reduce_count = static_cast<count_t *>(device_malloc(n_reduce * sizeof(count_t)));
         init_reduce<count_t> init(reduce_count, n_reduce);

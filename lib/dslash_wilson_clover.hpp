@@ -20,19 +20,20 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
     const CloverField &A;
 
   public:
     WilsonClover(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                 const ColorSpinorField &halo, const CloverField &A) :
-      Dslash(arg, out, in, halo), A(A)
+                 const ColorSpinorField &halo, const GaugeField &U, const CloverField &A) :
+      Dslash(arg, out, in, halo), U(U), A(A)
     {
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay)
         Dslash::template instantiate<packShmem, true>(tp, stream);
       else
@@ -68,24 +69,20 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverApply {
-
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverApply {
     template <bool distance_pc>
     WilsonCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
-                      double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, real_t a,
+                      real_t alpha0, int t0, int parity, bool dagger, const int *comm_override,
                       DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      WilsonCloverArg<Float, nColor, nDim, recon, false, distance_pc> arg(out, in, halo, U, A, a, 0.0, x, parity,
-                                                                          dagger, comm_override, alpha0, t0);
-      WilsonClover<decltype(arg)> wilson(arg, out, in, halo, A);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon, false, distance_pc> arg(out, in, halo, U, A, a, 0.0, x, parity,
+                                                                                 dagger, comm_override, alpha0, t0);
+      WilsonClover<decltype(arg)> wilson(arg, out, in, halo, U, A);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

@@ -28,7 +28,8 @@ namespace quda
      parameter struct as an explicit kernel argument or from constant
      memory
    */
-  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE> struct ReduceArg : kernel_param<use_kernel_arg> {
+  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE>
+  struct ReduceArg : kernel_param<use_kernel_arg> {
     static constexpr ThreadsSync requires_threads_sync = ThreadsSyncAll;
     using reduce_t = T;
 
@@ -40,9 +41,9 @@ namespace quda
 
   private:
     const int n_reduce; /** number of reductions of length n_item */
-    T *partial; /** device buffer */
-    T *result_d; /** device-mapped host buffer */
-    T *result_h; /** host buffer */
+    T *partial;         /** device buffer */
+    T *result_d;        /** device-mapped host buffer */
+    T *result_h;        /** host buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
     T *device_output_async_buffer = nullptr; // Optional device output buffer for the reduction result
 
@@ -52,8 +53,8 @@ namespace quda
        @param[in] threads The number threads partaking in the kernel
        @param[in] n_reduce The number of reductions
     */
-    ReduceArg(dim3 threads, int n_reduce = 1, bool = false) :
-      kernel_param<use_kernel_arg>(threads), launch_error(QUDA_ERROR_UNINITIALIZED), n_reduce(n_reduce)
+    ReduceArg(dim3 threads, int n_reduce = 1, bool = false, unsigned work_unroll = 1u) :
+      kernel_param<use_kernel_arg>(threads, work_unroll), launch_error(QUDA_ERROR_UNINITIALIZED), n_reduce(n_reduce)
     {
       reducer::init(n_reduce, sizeof(*partial));
       // these buffers may be allocated in init, so we can't set the local copies until now
@@ -61,6 +62,8 @@ namespace quda
       result_d = static_cast<decltype(result_d)>(reducer::get_mapped_buffer());
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
+
+      reducer::init_rfa_device_bins<T>();
 
       if (commAsyncReduction()) result_d = partial;
     }
@@ -83,26 +86,21 @@ namespace quda
 
     /**
        @brief Finalize the reduction, returning the computed reduction
-       into result.  The generic path posts an event after the kernel
+       as a vector.  The OpenMP path posts an event after the kernel
        and then polls on completion of the event.
-       @param[out] result The reduction result is copied here
        @param[in] stream The stream on which we the reduction is being done
      */
-    template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t stream = device::get_default_stream())
+    auto complete(const qudaStream_t stream = device::get_default_stream())
     {
-      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      std::vector<T> result(n_reduce);
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
-      auto event = reducer::get_event();
-      qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) { }
-
-      // copy back result element by element and convert if necessary to host reduce type
-      // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
-      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      if (launch_error != QUDA_ERROR) {
+        auto event = reducer::get_event();
+        qudaEventRecord(event, stream);
+        while (!qudaEventQuery(event)) { }
+        memcpy(result.data(), result_h, n_reduce * sizeof(T));
+      }
+      return result;
     }
   };
 
@@ -130,12 +128,15 @@ namespace quda
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     // bool isLastBlockDone[n_batch_block];
-    static_assert(sizeof(bool)*n_batch_block <= sizeof(device::get_shared_cache()[0])*64, "Shared cache not large enough for isLastBlockDone");  // FIXME arbitrary, 128 is used in block_reduce_helper.h:/tempStorage/
-    bool *isLastBlockDone = (bool*)device::get_shared_cache();
-    bool *hasLastBlockDone = (bool*)&device::get_shared_cache()[64];
+    static_assert(
+      sizeof(bool) * n_batch_block <= sizeof(device::get_shared_cache()[0]) * 64,
+      "Shared cache not large enough for isLastBlockDone"); // FIXME arbitrary, 128 is used in block_reduce_helper.h:/tempStorage/
+    bool *isLastBlockDone = (bool *)device::get_shared_cache();
+    bool *hasLastBlockDone = (bool *)&device::get_shared_cache()[64];
     // printf("team %d thread %d isLastBlockDone %p\n", omp_get_team_num(), omp_get_thread_num(), isLastBlockDone);
 
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    KernelOps<BlockReduce> ops {};
+    T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
     // printf("team %d thread %d  r %g  aggregate %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&in), *(double*)(&aggregate));
 
     if (target::thread_idx_linear<2>() == 0) {
@@ -146,18 +147,21 @@ namespace quda
       // auto value = atomicInc(&arg.count[idx], target::grid_dim().x);
       unsigned int value = 0u;
       unsigned int *c = &arg.count[idx];
-      #pragma omp atomic capture
-      { value = *c; *c = *c + 1; }
+#pragma omp atomic capture acq_rel
+      {
+        value = *c;
+        *c = *c + 1;
+      }
 
       // determine if last block
       isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
     }
-    #pragma omp barrier
-    #pragma omp single
+#pragma omp barrier
+#pragma omp single
     {
       *hasLastBlockDone = 0;
-      for(int i=0;i<target::block_dim().z;++i)
-        if(isLastBlockDone[i]){
+      for (int i = 0; i < target::block_dim().z; ++i)
+        if (isLastBlockDone[i]) {
           *hasLastBlockDone = 1;
           break;
         }
@@ -180,7 +184,7 @@ namespace quda
         }
       }
 
-      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+      sum = BlockReduce(ops, target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
       if (thisSubBlock) {
@@ -194,8 +198,8 @@ namespace quda
           arg.count[idx] = 0; // set to zero for next time
         }
       }
-      #pragma omp barrier
-    }  // hasLastBlockDone
+#pragma omp barrier
+    } // hasLastBlockDone
   }
 
 } // namespace quda

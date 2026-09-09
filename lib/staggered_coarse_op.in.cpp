@@ -1,14 +1,12 @@
 #include "multigrid.h"
+#include <int_list.hpp>
 
 namespace quda
 {
 
-  template <int...> struct IntList {
-  };
-
   template <int fineColor, int coarseColor, int... N>
   void StaggeredCoarseOp2(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                          const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                          const GaugeField &longGauge, const GaugeField &XinvKD, real_t mass, bool allow_truncation,
                           QudaDiracType dirac, QudaMatPCType matpc, IntList<coarseColor, N...>)
   {
     if (Y.Ncolor() / 2 == coarseColor) {
@@ -25,7 +23,7 @@ namespace quda
 
   template <int fineColor, int... N>
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, real_t mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc, IntList<fineColor, N...>)
   {
     if (gauge.Ncolor() == fineColor) {
@@ -44,7 +42,7 @@ namespace quda
   }
 
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, real_t mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc)
   {
     if constexpr (is_enabled_spin(1) && is_enabled_multigrid()) {

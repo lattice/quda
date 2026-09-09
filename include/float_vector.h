@@ -12,28 +12,61 @@
 #include <array.h>
 #include <limits>
 #include <type_traits>
+#include "dbldbl.h"
+#include "rfa_traits.h"
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+#include "reproducible_floating_accumulator.hpp"
+#endif
 
 namespace quda {
 
-  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y)
+#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE)
+  using device_reduce_t = reduction_t;
+#elif defined(QUDA_REDUCTION_ALGORITHM_KAHAN)
+  using device_reduce_t = kahan_t<reduction_t>;
+#elif defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  using device_reduce_t = rfa_t<reduction_t>;
+  // nvcc does not match get_scalar through the rfa_t alias template
+  template <> struct get_scalar<device_reduce_t> {
+    using type = device_reduce_t;
+  };
+#endif
+
+  /** Convert a device reduction value to a scalar (host or device). */
+  template <typename T = real_t> __host__ __device__ inline T reduction_to_scalar(const device_reduce_t &x)
   {
-    return make_double2(x.x + y.x, x.y + y.y);
+#if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+    return static_cast<T>(x.conv());
+#else
+    return static_cast<T>(x);
+#endif
   }
+
+  /** Convert a device reduction value to host scalar real_t. */
+  __host__ inline real_t reduction_to_real(const device_reduce_t &x) { return reduction_to_scalar<real_t>(x); }
+
+  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y) { return {x.x + y.x, x.y + y.y}; }
 
   __host__ __device__ inline double3 operator+(const double3 &x, const double3 &y)
   {
-    return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
+    return {x.x + y.x, x.y + y.y, x.z + y.z};
   }
 
   __host__ __device__ inline double4 operator+(const double4 &x, const double4 &y)
   {
-    return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
+    return {x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w};
   }
 
-  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y)
+  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y) { return {x.x + y.x, x.y + y.y}; }
+
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+  __host__ __device__ inline device_reduce_t operator+(const device_reduce_t &x, const device_reduce_t &y)
   {
-    return make_float2(x.x + y.x, x.y + y.y);
+    device_reduce_t z = x;
+    z.operator+=(y);
+    return z;
   }
+#endif
 
   template <typename T, int n>
   __device__ __host__ inline array<T, n> operator+(const array<T, n> &a, const array<T, n> &b)
@@ -42,6 +75,21 @@ namespace quda {
 #pragma unroll
     for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
     return c;
+  }
+
+  template <typename T, int n> __device__ __host__ inline array<T, n> &operator+=(array<T, n> &a, const array<T, n> &b)
+  {
+#pragma unroll
+    for (int i = 0; i < n; i++) a[i] += b[i];
+    return a;
+  }
+
+  template <typename T, int n, typename S>
+  __device__ __host__ inline array<T, n> &operator*=(array<T, n> &a, const S &b)
+  {
+#pragma unroll
+    for (int i = 0; i < n; i++) a[i] *= b;
+    return a;
   }
 
   template <typename T> constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> zero() { return static_cast<T>(0); }
@@ -112,8 +160,14 @@ namespace quda {
      computing an infinity norm
    */
   template <typename T> struct deviation_t {
+    using value_type = T;
+
     T diff;
     T ref;
+  };
+
+  template <class T> struct get_scalar<deviation_t<T>> {
+    using type = typename get_scalar<T>::type;
   };
 
   template <typename T> constexpr specialize<T, deviation_t<double>> zero() { return {0.0, 0.0}; }
@@ -142,8 +196,19 @@ namespace quda {
     static inline __host__ __device__ deviation_t<T> value() { return {low<T>::value(), low<T>::value()}; }
   };
 
+  template <> struct low<doubledouble> {
+    static inline __host__ __device__ doubledouble value()
+    {
+      return doubledouble(std::numeric_limits<double>::lowest());
+    }
+  };
+
   template <typename T> struct high {
     static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::max(); }
+  };
+
+  template <> struct high<doubledouble> {
+    static inline __host__ __device__ doubledouble value() { return doubledouble(std::numeric_limits<double>::max()); }
   };
 
   template <typename T> struct RealType {

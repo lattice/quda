@@ -165,7 +165,11 @@ namespace quda
     */
     constexpr int max_NXZ_power2(bool reducer, QudaPrecision precision = QUDA_DOUBLE_PRECISION)
     {
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+      return reducer ? 4 : precision == QUDA_DOUBLE_PRECISION ? 32 : 64;
+#else
       return reducer ? 16 : precision == QUDA_DOUBLE_PRECISION ? 32 : 64;
+#endif
     }
 
     /**
@@ -369,7 +373,8 @@ namespace quda
     */
     template <typename T> inline auto bisect_col(T &x, size_t width, size_t height0, size_t height1)
     {
-      auto x_ = std::make_pair( T(width * height0), T(width * height1) );
+      using U = typename std::remove_const<T>::type;
+      auto x_ = std::make_pair(U(width * height0), U(width * height1));
 
       unsigned int count = 0;
       unsigned count0 = 0;

@@ -2,7 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <shared_memory_cache_helper.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <domain_wall_helper.h>
 #include <kernel.h>
 #include <dslash_quda.h>
@@ -29,7 +29,7 @@ namespace quda
       static constexpr bool xpay = xpay_;
       static constexpr Dslash5Type type = type_;
 
-      using F = typename colorspinor_mapper<storage_type, 4, nColor, false, false, true>::type;
+      using F = typename colorspinor_mapper<storage_type, 4, nColor, false, true>::type;
       using real = typename mapper<storage_type>::type;
 
       F out[MAX_MULTI_RHS];   // output vector field
@@ -53,20 +53,20 @@ namespace quda
       eofa_coeff<real> coeff;
 
       Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                 cvector_ref<const ColorSpinorField> &x, const double m_f_, const double m_5_, const Complex * /*b_5_*/,
-                 const Complex * /*c_5_*/, double a_, double inv_, double kappa_, const double *eofa_u,
-                 const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
+                 cvector_ref<const ColorSpinorField> &x, const real_t m_f_, const real_t m_5_,
+                 const complex_t * /*b_5_*/, const complex_t * /*c_5_*/, real_t a_, real_t inv_, real_t kappa_,
+                 const real_t *eofa_u, const real_t *eofa_x, const real_t *eofa_y, real_t sherman_morrison_) :
         kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
         nParity(in.SiteSubset()),
         volume_cb(in.VolumeCB()),
         volume_4d_cb(volume_cb / in.X(4)),
         Ls(in.X(4)),
-        m_f(m_f_),
-        m_5(m_5_),
-        a(a_),
-        kappa(kappa_),
-        inv(inv_),
-        sherman_morrison(sherman_morrison_)
+        m_f(static_cast<real>(m_f_)),
+        m_5(static_cast<real>(m_5_)),
+        a(static_cast<real>(a_)),
+        kappa(static_cast<real>(kappa_)),
+        inv(static_cast<real>(inv_)),
+        sherman_morrison(static_cast<real>(sherman_morrison_))
       {
         for (auto i = 0u; i < out.size(); i++) {
           this->out[i] = out[i];
@@ -78,13 +78,13 @@ namespace quda
 
         switch (type) {
         case Dslash5Type::M5_EOFA:
-          for (int s = 0; s < Ls; s++) { coeff.u[s] = eofa_u[s]; }
+          for (int s = 0; s < Ls; s++) { coeff.u[s] = real(eofa_u[s]); }
           break;
         case Dslash5Type::M5INV_EOFA:
           for (int s = 0; s < Ls; s++) {
-            coeff.u[s] = eofa_u[s];
-            coeff.x[s] = eofa_x[s];
-            coeff.y[s] = eofa_y[s];
+            coeff.u[s] = real(eofa_u[s]);
+            coeff.x[s] = real(eofa_x[s]);
+            coeff.y[s] = real(eofa_y[s]);
           }
           break;
         default: errorQuda("Unexpected EOFA Dslash5Type %d", static_cast<int>(type));
@@ -92,6 +92,8 @@ namespace quda
       }
     };
 
+    template <typename Arg>
+    using eofa_dslash5Ops = KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the D5 operator at given site
       @param[in] arg    Argument struct containing any meta data and accessors
@@ -99,12 +101,17 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5 {
+    template <typename Arg> struct eofa_dslash5 : eofa_dslash5Ops<Arg> {
       const Arg &arg;
-      constexpr eofa_dslash5(const Arg &arg) : arg(arg) {}
+      using typename eofa_dslash5Ops<Arg>::KernelOpsT;
+      template <typename... Ops>
+      constexpr eofa_dslash5(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+      {
+      }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity)
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity, bool alive = true)
       {
         QUDA_RT_CONSTS;
         using real = typename Arg::real;
@@ -113,10 +120,10 @@ namespace quda
         int src_idx = src_s / arg.Ls;
         int s = src_s % arg.Ls;
 
-        SharedMemoryCache<Vector> cache;
+        SharedMemoryCache<Vector> cache {*this};
 
         Vector out;
-        cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
+        if (!allthreads || alive) { cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity)); }
         cache.sync();
 
         auto Ls = arg.Ls;
@@ -160,14 +167,18 @@ namespace quda
           }
 
           if (Arg::xpay) { // really axpy
-            Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
-            out = arg.a * x + out;
+            if (!allthreads || alive) {
+              Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+              out = arg.a * x + out;
+            }
           }
         }
-        arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
+        if (!allthreads || alive) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
       }
     };
 
+    template <typename Arg>
+    using eofa_dslash5invOps = KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the M5 inverse operator at a given site on the
       lattice.  This is the original algorithm as described in Kim and
@@ -180,12 +191,17 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5inv {
+    template <typename Arg> struct eofa_dslash5inv : eofa_dslash5invOps<Arg> {
       const Arg &arg;
-      constexpr eofa_dslash5inv(const Arg &arg) : arg(arg) {}
+      using typename eofa_dslash5invOps<Arg>::KernelOpsT;
+      template <typename... Ops>
+      constexpr eofa_dslash5inv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+      {
+      }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity)
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity, bool alive = true)
       {
         QUDA_RT_CONSTS;
         using real = typename Arg::real;
@@ -195,8 +211,8 @@ namespace quda
         int s = src_s % arg.Ls;
 
         const auto sherman_morrison = arg.sherman_morrison;
-        SharedMemoryCache<Vector> cache;
-        cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
+        SharedMemoryCache<Vector> cache {*this};
+        if (!allthreads || alive) { cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity)); }
         cache.sync();
 
         Vector out;
@@ -223,10 +239,12 @@ namespace quda
           }
         }
         if (Arg::xpay) { // really axpy
-          Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
-          out = x + arg.a * out;
+          if (!allthreads || alive) {
+            Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+            out = x + arg.a * out;
+          }
         }
-        arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
+        if (!allthreads || alive) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
       }
     };
 

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef NATIVE_FFT_LIB
+#include "../generic/FFT_Plans.h"
+#else
+
 #include <quda_cuda_api.h>
 #include <quda_internal.h>
 #include <cufft.h>
@@ -28,12 +32,18 @@ static const char *cufftGetErrorEnum(cufftResult error)
   case CUFFT_SETUP_FAILED: return "CUFFT_SETUP_FAILED";
   case CUFFT_INVALID_SIZE: return "CUFFT_INVALID_SIZE";
   case CUFFT_UNALIGNED_DATA: return "CUFFT_UNALIGNED_DATA";
+#if CUDA_VERSION <= 12090
   case CUFFT_INCOMPLETE_PARAMETER_LIST: return "CUFFT_INCOMPLETE_PARAMETER_LIST";
+#endif
   case CUFFT_INVALID_DEVICE: return "CUFFT_INVALID_DEVICE";
+#if CUDA_VERSION <= 12090
   case CUFFT_PARSE_ERROR: return "CUFFT_PARSE_ERROR";
+#endif
   case CUFFT_NO_WORKSPACE: return "CUFFT_NO_WORKSPACE";
   case CUFFT_NOT_IMPLEMENTED: return "CUFFT_NOT_IMPLEMENTED";
+#if CUDA_VERSION <= 12090
   case CUFFT_LICENSE_ERROR: return "CUFFT_LICENSE_ERROR";
+#endif
   case CUFFT_NOT_SUPPORTED: return "CUFFT_NOT_SUPPORTED";
   default: return "<unknown error>";
   }
@@ -123,3 +133,5 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
 inline void FFTDestroyPlan(FFTPlanHandle &plan) { CUFFT_SAFE_CALL(cufftDestroy(plan)); }
 
 } // namespace quda
+
+#endif // ifndef NATIVE_FFT_LIB

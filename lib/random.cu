@@ -51,21 +51,33 @@ namespace quda {
       printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                  size * sizeof(RNGState) / (float)(1048576));
 
+    // Initialize the RNG; this ordering is important to avoid an error
+    // when RNG.State() gets called in RNGInit's "apply" method
+    is_initialized = true;
     RNGInit(*this, meta, seed);
   }
 
-  /*! @brief Backup CURAND array states initialization */
+  /*! @brief Backup RAND array states initialization */
   void RNG::backup()
   {
+    if (!isInitialized()) errorQuda("RNG is not initialized");
     backup_state = (RNGState *)safe_malloc(size * sizeof(RNGState));
     qudaMemcpy(backup_state, state.get(), size * sizeof(RNGState), qudaMemcpyDeviceToHost);
   }
 
-  /*! @brief Restore CURAND array states initialization */
+  /*! @brief Restore RAND array states initialization */
   void RNG::restore()
   {
+    if (!isInitialized()) errorQuda("RNG is not initialized");
     qudaMemcpy(state.get(), backup_state, size * sizeof(RNGState), qudaMemcpyHostToDevice);
     host_free(backup_state);
+  }
+
+  /*! @brief Get pointer to RNGState */
+  RNGState *RNG::State()
+  {
+    if (!isInitialized()) errorQuda("RNG is not initialized");
+    return state.get();
   }
 
 } // namespace quda

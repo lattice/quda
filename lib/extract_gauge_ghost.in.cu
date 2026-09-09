@@ -1,6 +1,7 @@
 #include <gauge_field_order.h>
 #include <extract_gauge_ghost_helper.cuh>
 #include "multigrid.h"
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -110,17 +111,22 @@ namespace quda {
           errorQuda("TIFR interface has not been built");
         }
 
+      } else if (u.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+
+        if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, OpenQCDOrder<Float, length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("OpenQCD interface has not been built");
+        }
+
       } else {
         errorQuda("Gauge field %d order not supported", u.Order());
       }
-
     }
   };
 
   template <int nColor>
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset);
-
-  template <int...> struct IntList { };
 
   template <int nColor, int...N>
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset, IntList<nColor, N...>)

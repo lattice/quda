@@ -11,12 +11,17 @@
 #include <cuda/std/climits>
 #include <cuda/std/type_traits>
 #include <cuda/std/limits>
-#include <cuda/std/atomic>
+#include <cuda/atomic>
 using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 
 namespace quda
 {
 
+// By default we use negative infinity as the sentinel for testing for
+// reduction completion.  On some compilers we may need to use finite
+// numbers, so the alternative approach uses negative zero (set with CMake
+// option QUDA_HETEROGENEOUS_ATOMIC_INF_INIT).
+#ifdef HETEROGENEOUS_ATOMIC_INF_INIT
   /**
      @brief The initialization value we used to check for completion
    */
@@ -27,6 +32,31 @@ namespace quda
      case the computed reduction is equal to the initialization
   */
   template <typename T> constexpr T terminate_value() { return cuda::std::numeric_limits<T>::infinity(); }
+
+  /**
+     @brief Test if the result is complete (e.g., is not equal to the sentinel)
+   */
+  template <class T> bool is_complete(const T &result) { return result != init_value<T>(); }
+#else
+  /**
+     @brief The initialization value we used to check for completion
+   */
+  template <typename T> constexpr T init_value() { return -static_cast<T>(0.0); }
+
+  /**
+     @brief The termination value we use to prevent a possible hang in
+     case the computed reduction is equal to the initialization
+  */
+  template <typename T> constexpr T terminate_value() { return static_cast<T>(0.0); }
+
+  /**
+     @brief Test if the result is complete (e.g., is not equal to the sentinel)
+   */
+  template <class T> bool is_complete(const T &result)
+  {
+    return !(result == static_cast<T>(0.0) && std::signbit(result));
+  }
+#endif
 
   // declaration of reduce function
   template <typename Reducer, typename Arg, typename T>
@@ -72,8 +102,8 @@ namespace quda
        reduction has completed; required if the same ReduceArg
        instance will be used for multiple reductions.
     */
-    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
-      kernel_param<use_kernel_arg>(threads),
+    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false, unsigned work_unroll = 1u) :
+      kernel_param<use_kernel_arg>(threads, work_unroll),
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       reset(reset),
@@ -85,6 +115,8 @@ namespace quda
       result_d = static_cast<decltype(result_d)>(reducer::get_mapped_buffer());
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
+
+      reducer::init_rfa_device_bins<T>();
 
       if (!commAsyncReduction()) {
         // initialize the result buffer so we can test for completion
@@ -118,26 +150,31 @@ namespace quda
        @brief Finalize the reduction, returning the computed reduction
        into result.  With heterogeneous atomics this means we poll the
        atomics until their value differs from the init_value.
-       @param[out] result The reduction result is copied here
-       @param[in] stream The stream on which we the reduction is being done
-     */
-    template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t = device::get_default_stream())
+       @param[in] stream The stream on which the reduction is being done
+       @return The reduction result
+    */
+    auto complete(const qudaStream_t = device::get_default_stream())
     {
-      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      std::vector<T> result(n_reduce);
+      using device_t = typename atomic_type<T>::type;
+      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
+      if (launch_error == QUDA_ERROR) return result; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
       for (int i = 0; i < n_reduce * n_item; i++) {
-        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
+        while (!is_complete(result_h[i].load(cuda::std::memory_order_relaxed))) { }
       }
 
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
-      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      std::vector<device_t> scalar_result(n_element);
+      for (int i = 0; i < n_element; i++) scalar_result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      for (int i = 0; i < n_reduce; i++) {
+        const auto offset = static_cast<size_t>(i) * n_element / n_reduce;
+        // Deserialize flat atomic words (e.g. double components of RFA / doubledouble)
+        std::memcpy(static_cast<void *>(&result[i]), static_cast<const void *>(&scalar_result[offset]), sizeof(T));
+      }
 
       if (!reset) {
         consumed = true;
@@ -148,6 +185,7 @@ namespace quda
         }
         cuda::std::atomic_thread_fence(cuda::std::memory_order_release);
       }
+      return result;
     }
   };
 
@@ -169,27 +207,34 @@ namespace quda
     auto tid = target::thread_idx_linear<2>();
 
     if (arg.result_d) { // write to host mapped memory
-#ifdef _NVHPC_CUDA      // WAR for nvc++
-      constexpr bool coalesced_write = false;
-#else
       constexpr bool coalesced_write = true;
-#endif
       if constexpr (coalesced_write) {
-        static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
-        auto mask = __ballot_sync(0xffffffff, tid < n);
-        if (tid < n) {
+        if (tid < device::warp_size()) { // only first warp takes part in write
+
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 
-          atomic_t s = sum_tmp[0];
+          constexpr auto m = (n + device::warp_size() - 1) / device::warp_size();
 #pragma unroll
-          for (int i = 1; i < n; i++) {
-            auto si = __shfl_sync(mask, sum_tmp[i], 0);
-            if (i == tid) s = si;
-          }
+          for (auto j = 0; j < m; j++) {
 
-          s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
-          arg.result_d[n * idx + tid].store(s, cuda::std::memory_order_relaxed);
+            auto t = j * device::warp_size() + tid; // effective thread index
+            atomic_t s = sum_tmp[j * device::warp_size()];
+            auto mask = __ballot_sync(0xffffffff, t < n);
+
+            if (t < n) {
+#pragma unroll
+              for (auto i = 1; i < device::warp_size(); i++) {
+                if (j * device::warp_size() + i < n) {
+                  auto si = __shfl_sync(mask, sum_tmp[j * device::warp_size() + i], 0);
+                  if (i == tid) s = si; // j * device::warp_size() cancels out on both sides
+                }
+              }
+
+              s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
+              arg.result_d[n * idx + t].store(s, cuda::std::memory_order_relaxed);
+            }
+          }
         }
       } else {
         // write out the final reduced value
@@ -257,7 +302,8 @@ namespace quda
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
 
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    KernelOps<BlockReduce> ops {};
+    T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 
     if (target::grid_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction
       write_result(arg, aggregate, idx);
@@ -300,7 +346,7 @@ namespace quda
           i += target::block_size<2>();
         }
 
-        sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+        sum = BlockReduce(ops, target::thread_idx().z).Reduce(sum, r);
 
         write_result(arg, sum, idx);
       }

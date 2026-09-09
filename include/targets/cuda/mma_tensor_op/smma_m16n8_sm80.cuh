@@ -392,7 +392,7 @@ namespace quda
                                                   gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag,
                                                   op_t op)
       {
-        using store_t = typename gmem_op_t::store_type;
+        using store_t = typename gmem_op_t::store_t;
         using complex_t = complex<store_t>;
 
         auto *C = reinterpret_cast<complex_t *>(cc.data());
@@ -413,7 +413,7 @@ namespace quda
                 for (int wm = 0; wm < warp_m; wm++) {
                   int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
                   int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                  if (!check_bounds || (m < N && n < M)) {
+                  if (!check_bounds || (m < M && n < N)) {
                     int reg_index = (wn * warp_m + wm) * thread_count + tm * thread_n + tn;
                     if constexpr (gmem_op_t::fixed) {
                       auto scale = cc.get_scale();

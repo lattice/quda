@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
 #include <nvml.h>
+#include <algorithm>
 #include "monitor.h"
 
 static cudaDeviceProp deviceProp;
@@ -35,21 +36,30 @@ namespace quda
 
     static nvmlDevice_t monitor_device_id;
 
+    int get_driver_version()
+    {
+      int driver_version;
+      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
+      return driver_version;
+    }
+
+    int get_runtime_version()
+    {
+      int runtime_version;
+      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
+      return runtime_version;
+    }
+
     void init(int dev)
     {
       if (initialized) return;
       initialized = true;
 
-      int driver_version;
-      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
-      printfQuda("CUDA Driver version = %d\n", driver_version);
-
-      int runtime_version;
-      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
-      printfQuda("CUDA Runtime version = %d\n", runtime_version);
+      printfQuda("CUDA Driver version = %d\n", get_driver_version());
+      printfQuda("CUDA Runtime version = %d\n", get_runtime_version());
 
 #ifdef QUDA_LARGE_KERNEL_ARG
-      if (driver_version < 12010) errorQuda("Large kernel arguments not supported on pre CUDA 12.1 driver");
+      if (get_driver_version() < 12010) errorQuda("Large kernel arguments not supported on pre CUDA 12.1 driver");
 #endif
 
       NVML_CHECK(nvmlInit());
@@ -117,11 +127,13 @@ namespace quda
 
       device_id = dev;
 
-      NVML_CHECK(nvmlDeviceGetHandleByIndex(device_id, &monitor_device_id));
+      char pciBusId[13];
+      CHECK_CUDA_ERROR(cudaDeviceGetPCIBusId(pciBusId, 13, device_id));
+      NVML_CHECK(nvmlDeviceGetHandleByPciBusId(pciBusId, &monitor_device_id));
       char name[NVML_DEVICE_NAME_BUFFER_SIZE];
       NVML_CHECK(nvmlDeviceGetName(monitor_device_id, name, NVML_DEVICE_NAME_BUFFER_SIZE));
 
-      printfQuda("Initializing monitoring on device %d: %s\n", device_id, name);
+      printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
       monitor::init();
     }
 
@@ -149,7 +161,15 @@ namespace quda
     auto get_temperature()
     {
       unsigned int temp = 0;
+#if defined(nvmlTemperature_v1)
+      nvmlTemperature_t temperature;
+      temperature.version = nvmlTemperature_v1;
+      temperature.sensorType = NVML_TEMPERATURE_GPU;
+      NVML_CHECK(nvmlDeviceGetTemperatureV(monitor_device_id, &temperature));
+      temp = static_cast<unsigned int>(temperature.temperature);
+#else
       NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
+#endif
       return temp;
     }
 
@@ -217,13 +237,16 @@ namespace quda
         printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
                    deviceProp.totalConstMem / (float)1024);
         printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
-        printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
         printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
+#if CUDA_VERSION <= 12090
         printfQuda("%d - kernelExecTimeoutEnabled %s\n", device,
                    (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
+#endif
         printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
         printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
-        switch (deviceProp.computeMode) {
+        int deviceComputeMode;
+        CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&deviceComputeMode, cudaDevAttrComputeMode, device));
+        switch (deviceComputeMode) {
         case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
         case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
         case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
@@ -245,7 +268,9 @@ namespace quda
         default: errorQuda("Unknown deviceProp.asyncEngineCount.");
         }
         printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
+#if CUDA_VERSION <= 12090
         printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
+#endif
         printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
         printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
         printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);
@@ -324,7 +349,17 @@ namespace quda
       static int max_shared_bytes = 0;
       if (!max_shared_bytes)
         CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid()));
+      // If the user has set QUDA_MAX_SHARED_MEMORY at cmake time, cap the runtime-queried value.
+      // This ensures that cuKernelSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, ...) never records
+      // a value larger than the override into APIC traces (or actually requests more than the
+      // user-specified limit), making traces portable across chip families with different smem caps.
+      // Note: qudaLaunchKernel already subtracts static shared memory from this value before
+      // passing it to cuKernelSetAttribute, so the total (static + dynamic) stays within the limit.
+#if defined(QUDA_MAX_SHARED_MEMORY_OVERRIDE) && QUDA_MAX_SHARED_MEMORY_OVERRIDE > 0
+      return std::min(max_shared_bytes, static_cast<int>(QUDA_MAX_SHARED_MEMORY_OVERRIDE));
+#else
       return max_shared_bytes;
+#endif
     }
 
     unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }
@@ -344,6 +379,8 @@ namespace quda
         CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid()));
       return max_blocks_per_sm;
     }
+
+    bool shared_carve_out_supported() { return true; }
 
     namespace profile
     {

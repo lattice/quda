@@ -32,23 +32,23 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 
   // inlink in different format
-  void *milc_inlink = pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size);
+  void *milc_inlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size);
   reorderQDPtoMILC(milc_inlink, qdp_inlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   // Paths for step 1:
-  void *milc_vlink = pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // V links
-  void *milc_wlink = pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // W links
+  void *milc_vlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // V links
+  void *milc_wlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // W links
 
   // Paths for step 2:
-  void *milc_fatlink = pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size);  // final fat ("X") links
-  void *milc_longlink = pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // final long links
+  void *milc_fatlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size);  // final fat ("X") links
+  void *milc_longlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // final long links
 
   // Place to accumulate Naiks, step 3:
   void *milc_fatlink_eps = nullptr;
   void *milc_longlink_eps = nullptr;
   if (n_naiks > 1) {
-    milc_fatlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size);  // epsilon fat links
-    milc_longlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // epsilon long naiks
+    milc_fatlink_eps = host_pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size);  // epsilon fat links
+    milc_longlink_eps = host_pinned_malloc(4 * V * gauge_site_size * gauge_data_type_size); // epsilon long naiks
   }
 
   // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
@@ -294,19 +294,6 @@ void computeStaggeredPlaquetteQDPOrder(void **qdp_link, double plaq[3], const Qu
 
   gauge_param.anisotropy = 1;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
-  pad_size = pad_size > z_face_size ? pad_size : z_face_size;
-  pad_size = pad_size > t_face_size ? pad_size : t_face_size;
-  gauge_param.ga_pad = pad_size;
-#endif
 
   loadGaugeQuda(qdp_link, &gauge_param);
   plaqQuda(plaq);

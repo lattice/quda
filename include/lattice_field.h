@@ -7,6 +7,7 @@
 #include <object.h>
 #include <quda_api.h>
 #include <reference_wrapper_helper.h>
+#include <domain_decomposition.h>
 
 /**
  * @file lattice_field.h
@@ -84,7 +85,7 @@ namespace quda {
     lat_dim_t r = {};
 
     /** For fixed-point fields that need a global scaling factor */
-    double scale = 1.0;
+    real_t scale = 1.0;
 
     /**
        @brief Default constructor for LatticeFieldParam
@@ -227,7 +228,7 @@ namespace quda {
     mutable bool ghost_precision_reset = false;
 
     /** For fixed-point fields that need a global scaling factor */
-    double scale = 0.0;
+    real_t scale = 0.0;
 
     /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset = QUDA_INVALID_SITE_SUBSET;
@@ -275,7 +276,7 @@ namespace quda {
     inline static array<void *, 2> ghost_pinned_recv_buffer_hd = {};
 
     /**
-       Remove ghost pointer for sending to
+       Remote ghost pointer for sending to
     */
     inline static array_3d<void *, 2, QUDA_MAX_DIM, 2> ghost_remote_send_buffer_d;
 
@@ -676,13 +677,13 @@ namespace quda {
     /**
        @return The global scaling factor for a fixed-point field
     */
-    double Scale() const { return scale; }
+    real_t Scale() const { return scale; }
 
     /**
        @brief Set the scale factor for a fixed-point field
        @param[in] scale_ The new scale factor
     */
-    void Scale(double scale_) { scale = scale_; }
+    void Scale(real_t scale_) { scale = scale_; }
 
     /**
        @return Field subset type
@@ -903,6 +904,40 @@ namespace quda {
 #define checkPrecision(...) Precision_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
+     @brief Helper function for determining if the color of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If color is unique return the number of colors
+   */
+  template <typename T1, typename T2>
+  inline int Color_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
+    int nColor = 0;
+    if (a.Ncolor() == b.Ncolor())
+      nColor = a.Ncolor();
+    else
+      errorQuda("Color %d %d do not match (%s:%d in %s())", a.Ncolor(), b.Ncolor(), file, line, func);
+    return nColor;
+  }
+
+  /**
+     @brief Helper function for determining if the color of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check color on
+     @return If colors is unique return the number of colors
+   */
+  template <typename T1, typename T2, typename... Args>
+  inline int Color_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &...args)
+  {
+    return Color_(func, file, line, a, b) & Color_(func, file, line, a, args...);
+  }
+
+#define checkColor(...) Color_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
      @brief Helper function for determining if the field is in native order
      @param[in] a Input field
      @return true if field is in native order
@@ -927,6 +962,66 @@ namespace quda {
   }
 
 #define checkNative(...) Native_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+     @brief Helper function for determining if the domain decomposition of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return true if all fields match
+   */
+  template <typename T1, typename T2>
+  inline bool DD_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
+    if (!a.DD().check(a, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!b.DD().check(b, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!a.DD().match(b.DD(), true)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for determining if the domain decomposition of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check domain decomposition on
+     @return true if all fields match
+   */
+  template <typename T1, typename T2, typename... Args>
+  inline bool DD_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &...args)
+  {
+    // checking all possible pairs
+    return (DD_(func, file, line, a, b) && DD_(func, file, line, a, args...) && DD_(func, file, line, b, args...));
+  }
+
+#define checkDD(...) DD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+   @brief Helper function for signalling that DD is not supported
+   @param[in] a Input field
+   @return true if all fields are supported
+ */
+  template <typename T1> inline bool NoDD_(const char *func, const char *file, int line, const T1 &a_)
+  {
+    const unwrap_t<T1> &a(a_);
+    if (!a.DD() == false) errorQuda("DD not supported (%s:%d in %s())", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for signalling that DD is not supported
+     @param[in] a Input field
+     @param[in] args List of additional fields to check domain decomposition on
+     @return true if all fields match
+   */
+  template <typename T1, typename... Args>
+  inline bool NoDD_(const char *func, const char *file, int line, const T1 &a, const Args &...args)
+  {
+    // checking all possible pairs
+    return (NoDD_(func, file, line, a) && NoDD_(func, file, line, args...));
+  }
+
+#define assertNoDD(...) NoDD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Return whether data is reordered on the CPU or GPU.  This can set

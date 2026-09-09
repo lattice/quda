@@ -29,7 +29,7 @@ namespace quda
     };
 
     template <typename Arg>
-    inline __device__ auto computeYhatMMA(Arg &arg, int d, int x_cb, int parity, int m, int n)
+    inline __device__ auto computeYhatMMA(const Arg &arg, int d, int x_cb, int parity, int m, int n)
     {
       using real = typename Arg::Float;
       constexpr int nDim = 4;
@@ -38,7 +38,7 @@ namespace quda
 
       real yHatMax = 0.0;
 
-      using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
+      using mma_t = typename mma::mg_mma_setup_t<typename Arg::store_t>::type;
       using Config = MmaConfig<mma_t, Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, Arg::bM, Arg::bN, Arg::bK,
                                Arg::block_y, Arg::block_z>;
 
@@ -84,8 +84,8 @@ namespace quda
     }
 
     template <typename Arg> struct CalculateYhatMMA {
-      Arg &arg;
-      constexpr CalculateYhatMMA(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr CalculateYhatMMA(const Arg &arg) : arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __forceinline__ void operator()()
@@ -102,7 +102,7 @@ namespace quda
         int n = (mn % t_n) * Arg::bN;
         int m = (mn / t_n) * Arg::bM;
 
-        if (x_cb >= arg.Y.VolumeCB()) return;
+        if (static_cast<unsigned>(x_cb) >= arg.Y.VolumeCB()) return;
 
         int parity = blockIdx.y;
         int d = blockIdx.z;
@@ -117,7 +117,8 @@ namespace quda
         }
         if (Arg::compute_max) {
           constexpr int block_dim = 3;
-          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
+          KernelOps<BlockReduce<unsigned, block_dim>> ops {};
+          unsigned aggregate = BlockReduce<unsigned, block_dim> {ops}.Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }

@@ -2,6 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
+#include <kernel_ops.h>
 
 /**
    @file block_reduce_helper.h
@@ -17,99 +18,101 @@ namespace quda
 
   namespace target
   {
-    template <typename T>
-    constexpr bool enough_shared_mem(void)
+    template <typename T> constexpr bool enough_shared_mem(void)
     {
       constexpr auto max_nthr = device::max_block_size();
-      return max_nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(device::get_shared_cache()[0])*128;  // FIXME arbitrary, the number is arbitrary, offset 128 below & in reduce_helper.h:/reduce
+      return max_nthr * sizeof(T) <= device::max_shared_memory_size()
+        - sizeof(device::get_shared_cache()[0])
+          * 128; // FIXME arbitrary, the number is arbitrary, offset 128 below & in reduce_helper.h:/reduce
     }
     /**
        @brief OpenMP reduction over a group of consecutive threads smaller than omp_num_threads()
      */
     template <typename T, typename reducer_t>
-    inline T any_reduce_impl(const reducer_t &r, const T &value_, const int batch, const int block_size, const bool all, const bool async)
+    inline T any_reduce_impl(const reducer_t &r, const T &value_, const int batch, const int block_size, const bool all,
+                             const bool async)
     {
       static_assert(enough_shared_mem<T>(), "Shared cache not large enough for tempStorage");
-      T *storage = (T*)&device::get_shared_cache()[128];  // FIXME arbitrary
+      T *storage = (T *)&device::get_shared_cache()[128]; // FIXME arbitrary
       const int tid = omp_get_thread_num();
-      const auto& v0 = r.init();
+      const auto &v0 = r.init();
 #if 1
-      const auto batch_begin = block_size*batch;
-      const auto batch_end = batch_begin+block_size;
+      const auto batch_begin = block_size * batch;
+      const auto batch_end = batch_begin + block_size;
       auto value = value_;
-      for(int offset=1;offset<block_size;offset*=2){
-        if(offset>1 || !async){ // only synchronize if we are not pipelining
-          #pragma omp barrier
+      for (int offset = 1; offset < block_size; offset *= 2) {
+        if (offset > 1 || !async) { // only synchronize if we are not pipelining
+#pragma omp barrier
         }
         storage[tid] = value;
-        const auto j = tid+offset;
-        #pragma omp barrier
-        if(j<batch_end)
+        const auto j = tid + offset;
+#pragma omp barrier
+        if (j < batch_end)
           value = r(value, storage[j]);
         else
           value = r(value, v0);
       }
-      if(all){
-        if(tid==block_size*batch)
-          storage[tid] = value;
-        #pragma omp barrier
-        value = storage[block_size*batch];
-        if(!async){
-          #pragma omp barrier
+      if (all) {
+        if (tid == block_size * batch) storage[tid] = value;
+#pragma omp barrier
+        value = storage[block_size * batch];
+        if (!async) {
+#pragma omp barrier
         }
       }
 #else
       const int nthr = omp_get_num_threads();
-      if(!async){ // only synchronize if we are not pipelining
-        #pragma omp barrier
+      if (!async) { // only synchronize if we are not pipelining
+#pragma omp barrier
       }
       storage[tid] = value_;
-      #pragma omp barrier
-      for(int offset=1;offset<block_size;offset*=2){
-        #pragma omp for
-        for(int i=0;i<nthr;i+=2*offset){
-          const auto j = i+offset;
-          const auto batch_end = block_size*(1+i/block_size);
-          const auto& u = storage[i];
-          const auto& v = j<batch_end ? storage[j] : v0;
-          const auto& z = r(u, v);
+#pragma omp barrier
+      for (int offset = 1; offset < block_size; offset *= 2) {
+#pragma omp for
+        for (int i = 0; i < nthr; i += 2 * offset) {
+          const auto j = i + offset;
+          const auto batch_end = block_size * (1 + i / block_size);
+          const auto &u = storage[i];
+          const auto &v = j < batch_end ? storage[j] : v0;
+          const auto &z = r(u, v);
           storage[i] = z;
         }
       }
-      const auto& value = storage[block_size*batch];
+      const auto &value = storage[block_size * batch];
 #endif
       return value;
     }
     template <typename T, typename R>
-    inline T any_reduce(const R &r, const T &value_, const int batch, const int block_size, const bool all, const bool async)
+    inline T any_reduce(const R &r, const T &value_, const int batch, const int block_size, const bool all,
+                        const bool async)
     {
       if constexpr (enough_shared_mem<T>())
         return any_reduce_impl(r, value_, batch, block_size, all, async);
-      else{
+      else {
         using V = typename T::value_type;
         constexpr auto N = T::N;
-        if constexpr (
-            std::is_same_v<typename R::reducer_t,plus<typename R::reduce_t>> &&
-            std::is_same_v<T,typename R::reduce_t> &&
-            std::is_same_v<T,array<V,N>>){
+        if constexpr (std::is_same_v<typename R::reducer_t, plus<typename R::reduce_t>>
+                      && std::is_same_v<T, typename R::reduce_t> && std::is_same_v<T, array<V, N>>) {
           // make sure the implementation is still compatible: ../../array.h
-          constexpr auto N0 = N/2;
-          constexpr auto N1 = N-N0;
-          using T0 = array<V,N0>;
-          using T1 = array<V,N1>;
+          constexpr auto N0 = N / 2;
+          constexpr auto N1 = N - N0;
+          using T0 = array<V, N0>;
+          using T1 = array<V, N1>;
           const constexpr plus<T0> r0 {};
           const constexpr plus<T1> r1 {};
           auto value = value_;
           // recurse to myself
-          reinterpret_cast<T0&>(value[0]) = any_reduce(r0, reinterpret_cast<const T0&>(value_[0]), batch, block_size, all, async);
+          reinterpret_cast<T0 &>(value[0])
+            = any_reduce(r0, reinterpret_cast<const T0 &>(value_[0]), batch, block_size, all, async);
           // recurse with async==false
-          reinterpret_cast<T1&>(value[N0]) = any_reduce(r1, reinterpret_cast<const T1&>(value_[N0]), batch, block_size, all, false);
+          reinterpret_cast<T1 &>(value[N0])
+            = any_reduce(r1, reinterpret_cast<const T1 &>(value_[N0]), batch, block_size, all, false);
           return value;
-        }else
-          static_assert(sizeof(T)==0, "unimplemented reduction");  // let me fail at compile time
+        } else
+          static_assert(sizeof(T) == 0, "unimplemented reduction"); // let me fail at compile time
       }
     }
-  }
+  } // namespace target
 
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
@@ -131,19 +134,30 @@ namespace quda
     template <typename T, typename reducer_t, typename param_t>
     __device__ inline T operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
-      constexpr int block_size = device::warp_size();
+      constexpr int block_size = param_t::width;
       const int batch = omp_get_thread_num() / block_size;
       return target::any_reduce(r, value_, batch, block_size, all, false);
     }
   };
 
   // pre-declaration of block_reduce that we wish to specialize
-  template <bool> struct block_reduce;
+  template <int block_dim_, int batch_size_ = 1> struct block_reduce_param {
+    static constexpr int block_dim = block_dim_;
+    static constexpr int batch_size = batch_size_;
+  };
+
+  template <bool is_device> struct block_reduce_impl {
+    template <typename T, typename reducer_t, typename param_t>
+    T operator()(const T &value, bool, int, bool, const reducer_t &, const param_t &)
+    {
+      return value;
+    }
+  };
 
   /**
      @brief OpenMP target  specialization of block_reduce
   */
-  template <> struct block_reduce<true> {
+  template <> struct block_reduce_impl<true> {
 
     /**
        @brief Perform a block-wide reduction
@@ -162,6 +176,20 @@ namespace quda
     {
       const auto block_size = target::block_size<param_t::block_dim>();
       return target::any_reduce(r, value_, batch, block_size, all, async);
+    }
+  };
+
+  template <typename T, int block_dim, int batch_size> struct block_reduce {
+    template <typename Ops> __device__ __host__ inline block_reduce(Ops &) {};
+    template <typename... Arg> static constexpr size_t shared_mem_size(dim3, Arg &...)
+    {
+      return 0; // the OpenMP arena is statically allocated per team
+    }
+    template <typename reducer_t>
+    __device__ __host__ inline T apply(const T &value, bool async, int batch, bool all, const reducer_t &r)
+    {
+      return target::dispatch<block_reduce_impl>(value, async, batch, all, r,
+                                                 block_reduce_param<block_dim, batch_size>());
     }
   };
 

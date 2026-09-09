@@ -21,9 +21,15 @@
 #elif defined CHECK_PARAM
 #define P(x, val) if (param->x == val) errorQuda("Parameter " #x " undefined")
 #elif defined PRINT_PARAM
-#define P(x, val)							\
-  { if (val == INVALID_DOUBLE) printfQuda(#x " = %g\n", (double)param->x); \
-    else printfQuda(#x " = %d\n", (int)param->x); }
+#include <type_traits>
+#define P(x, val)                                                                                      \
+  do {                                                                                                 \
+    if constexpr (std::is_same_v<std::remove_cvref_t<decltype((val))>, double>) {                       \
+      printfQuda(#x " = %g\n", (double)(param->x));                                                    \
+    } else {                                                                                           \
+      printfQuda(#x " = %d\n", (int)(param->x));                                                       \
+    }                                                                                                  \
+  } while (0)
 #else
 #error INIT_PARAM, CHECK_PARAM, and PRINT_PARAM all undefined in check_params.h
 #endif
@@ -104,18 +110,26 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
+
+#ifndef CHECK_PARAM
+  P(ga_pad, 0);
+#elif defined CHECK_PARAM
   P(ga_pad, INVALID_INT);
+  param->ga_pad = 0;
+#endif
 
 #if defined INIT_PARAM
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_NO);
   P(staggered_phase_applied, 0);
   P(i_mu, 0.0);
   P(overlap, 0);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_TRUE);
 #else
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
   P(staggered_phase_applied, INVALID_INT);
   P(i_mu, INVALID_DOUBLE);
   P(overlap, INVALID_INT);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_INVALID);
 #endif
 
 #if defined INIT_PARAM
@@ -175,6 +189,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(preserve_deflation, QUDA_BOOLEAN_FALSE);
   P(preserve_deflation_space, 0);
   P(preserve_evals, QUDA_BOOLEAN_TRUE);
+  P(use_smeared_gauge, false);
   P(use_dagger, QUDA_BOOLEAN_FALSE);
   P(use_norm_op, QUDA_BOOLEAN_FALSE);
   P(compute_svd, QUDA_BOOLEAN_FALSE);
@@ -211,6 +226,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(require_convergence, QUDA_BOOLEAN_INVALID);
+  P(spectrum, QUDA_SPECTRUM_INVALID);
   P(n_ev, INVALID_INT);
   P(n_kr, INVALID_INT);
   P(n_conv, INVALID_INT);
@@ -578,6 +594,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   // domain decomposition parameters
   //P(inv_type_sloppy, QUDA_INVALID_INVERTER); // disable since invalid means no preconditioner
 #if defined INIT_PARAM
+  P(dslash_type_precondition, QUDA_INVALID_DSLASH);
   P(inv_type_precondition, QUDA_INVALID_INVERTER);
   P(preconditioner, 0);
   P(tol_precondition, INVALID_DOUBLE);
@@ -758,16 +775,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-#ifdef NVSHMEM_COMMS
-  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
-#else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
-#endif
 #else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
+  P(additional_prop, 0);
   P(distance_pc_alpha0, 0.0);
   P(distance_pc_t0, -1);
 #else
@@ -876,9 +890,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_use_mma[i], QUDA_BOOLEAN_FALSE);
 #endif
     P(dslash_use_mma[i], QUDA_BOOLEAN_FALSE);
+    P(transfer_use_mma[i], QUDA_BOOLEAN_FALSE);
 #else
     P(setup_use_mma[i], QUDA_BOOLEAN_INVALID);
     P(dslash_use_mma[i], QUDA_BOOLEAN_INVALID);
+    P(transfer_use_mma[i], QUDA_BOOLEAN_INVALID);
 #endif
 #ifdef INIT_PARAM
     P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
@@ -1022,12 +1038,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
   }
 
-#ifdef INIT_PARAM
-  P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
-#else
-  P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
-#endif
-
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(generate_all_levels, QUDA_BOOLEAN_INVALID);
 
@@ -1112,6 +1122,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #ifdef INIT_PARAM
   P(su_project, QUDA_BOOLEAN_FALSE);
   P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_rectangle, QUDA_BOOLEAN_FALSE);
   P(compute_polyakov_loop, QUDA_BOOLEAN_FALSE);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_FALSE);
   P(traces, nullptr);
@@ -1128,6 +1139,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #else
   P(su_project, QUDA_BOOLEAN_INVALID);
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_rectangle, QUDA_BOOLEAN_INVALID);
   P(compute_polyakov_loop, QUDA_BOOLEAN_INVALID);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_INVALID);
   if (param->compute_gauge_loop_trace == QUDA_BOOLEAN_TRUE) {
@@ -1161,6 +1173,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
 #if defined CHECK_PARAM
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
     errorQuda("Unexpected QudaGaugeSmearParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+
 #else
   P(struct_size, (size_t)INVALID_INT);
 #endif
@@ -1173,7 +1186,11 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, 0.0);
   P(rho, 0.0);
   P(epsilon, 0.0);
+  P(smear_anisotropy, 1.0);
+  P(rk_order, 3);
   P(restart, QUDA_BOOLEAN_FALSE);
+  P(adj_n_save, 5);
+  P(hier_threshold, 6);
   P(t0, 0.0);
   P(alpha1, 0.0);
   P(alpha2, 0.0);
@@ -1185,7 +1202,11 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, INVALID_DOUBLE);
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
+  P(smear_anisotropy, INVALID_DOUBLE);
+  P(rk_order, (unsigned int)INVALID_INT);
   P(restart, QUDA_BOOLEAN_INVALID);
+  P(adj_n_save, (unsigned int)INVALID_INT);
+  P(hier_threshold, (unsigned int)INVALID_INT);
   P(t0, INVALID_DOUBLE);
   P(alpha1, INVALID_DOUBLE);
   P(alpha2, INVALID_DOUBLE);

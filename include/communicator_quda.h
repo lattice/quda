@@ -14,6 +14,7 @@
 #include <field_cache.h>
 #include <comm_key.h>
 #include <float_vector.h>
+#include "reducer.h"
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
@@ -41,6 +42,7 @@ namespace quda
     int (*coords)[QUDA_MAX_DIM];
     int my_rank;
     int my_coords[QUDA_MAX_DIM];
+    int cstar; // number of C* direction as per openQxD convention
     // It might be worth adding communicators to allow for efficient reductions:
     //   #if defined(MPI_COMMS)
     //     MPI_Comm comm;
@@ -126,9 +128,26 @@ namespace quda
   inline int comm_rank_displaced(const Topology *topo, const int displacement[])
   {
     int coords[QUDA_MAX_DIM];
+    int shift_integer;
 
-    for (int i = 0; i < QUDA_MAX_DIM; i++) {
-      coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
+    int Nx_displacement = 0;
+    for (int i = QUDA_MAX_DIM - 1; i >= 0; i--) {
+      // cstar shift[x] shift[y] shift[z] shift[t]
+      // 0     0        0        0        0
+      // 1     0        0        0        0
+      // 2     0        1        0        0
+      // 3     0        1        1        0
+      if (i < topo->ndim && ((i == 1 && topo->cstar >= 2) || (i == 2 && topo->cstar >= 3))) {
+        // if we go over the boundary and have a shifted boundary condition,
+        // we shift Nx/2 ranks in x-direction:
+        // shift_integer       in { 0, 1, 2}
+        // (shift_integer - 1) in {-1, 0, 1}
+        shift_integer = (comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i]) / comm_dims(topo)[i];
+        Nx_displacement += (shift_integer - 1) * (comm_dims(topo)[0] / 2);
+      }
+      coords[i] = (i < topo->ndim) ?
+        mod(comm_coords(topo)[i] + displacement[i] + (i == 0 ? Nx_displacement : 0), comm_dims(topo)[i]) :
+        0;
     }
 
     return comm_rank_from_coords(topo, coords);
@@ -137,7 +156,7 @@ namespace quda
   inline void check_displacement(const int displacement[], int ndim)
   {
     for (int i = 0; i < ndim; i++) {
-      if (abs(displacement[i]) > max_displacement) {
+      if (std::abs(displacement[i]) > max_displacement) {
         errorQuda("Requested displacement[%d] = %d is greater than maximum allowed", i, displacement[i]);
       }
     }
@@ -232,7 +251,7 @@ namespace quda
           disable_peer_to_peer_bidir = true;
         }
 
-        enable_peer_to_peer = abs(enable_peer_to_peer);
+        enable_peer_to_peer = std::abs(enable_peer_to_peer);
 
       } else { // !enable_peer_to_peer_env
         if (getVerbosity() > QUDA_SILENT && rank == 0)
@@ -388,6 +407,12 @@ namespace quda
     {
       Topology *topo = comm_default_topology();
       return comm_dims(topo)[dim];
+    }
+
+    bool comm_dim_cstar(int dim)
+    {
+      Topology *topo = comm_default_topology();
+      return (topo->cstar >= 2 && dim == 1) || (topo->cstar >= 3 && dim == 2);
     }
 
     int comm_coord(int dim)
@@ -747,21 +772,19 @@ namespace quda
 
   int comm_query(MsgHandle *mh);
 
-  template <typename T> T deterministic_reduce(T *array, int n)
+  template <typename T> T deterministic_sum_reduce(T *array, int n)
   {
     std::sort(array, array + n); // sort reduction into ascending order for deterministic reduction
-    return std::accumulate(array, array + n, 0.0);
+    return std::accumulate(array, array + n, T(0.0));
   }
 
-  void comm_allreduce_sum_array(double *data, size_t size);
+  template <typename T> void comm_allreduce_sum_array(T *data, size_t size);
+
+  template <typename T> void comm_allreduce_max_array(T *data, size_t size);
 
   void comm_allreduce_sum(size_t &a);
 
-  void comm_allreduce_max_array(double *data, size_t size);
-
-  void comm_allreduce_max_array(deviation_t<double> *data, size_t size);
-
-  void comm_allreduce_min_array(double *data, size_t size);
+  template <typename T> void comm_allreduce_min_array(T *data, size_t size);
 
   void comm_allreduce_int(int &data);
 
@@ -778,7 +801,7 @@ namespace quda
 
   void comm_barrier(void);
 
-  static void comm_abort_(int status);
+  [[noreturn]] static void comm_abort_(int status);
 
   static int comm_rank_global();
 };

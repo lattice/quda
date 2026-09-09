@@ -2,6 +2,52 @@
 
 #include "host_utils.h"
 
+// taken from include/index_helper.cuh
+
+/**
+ * @brief Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
+ *
+ * @param[out] x Computed spatial index
+ * @param[in] cb_index 1-d checkerboarded index
+ * @param[in] X Full lattice dimensions
+ * @param[in] X0h Half of x-dim lattice dimension
+ * @param[in] parity Site parity
+ * @return Full linear lattice index
+ */
+template <typename Coord, typename I, typename J>
+inline int getCoordsCB(Coord &x, int cb_index, const I &X, J X0h, int parity)
+{
+  // x[3] = cb_index/(X[2]*X[1]*X[0]/2);
+  // x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
+  // x[1] = (cb_index/(X[0]/2)) % X[1];
+  // x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+
+  int za = (cb_index / X0h);
+  int zb = (za / X[1]);
+  x[1] = (za - zb * X[1]);
+  x[3] = (zb / X[2]);
+  x[2] = (zb - x[3] * X[2]);
+  int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
+  int x_idx = 2 * cb_index + x1odd;
+  x[0] = (x_idx - za * X[0]);
+  return x_idx;
+}
+
+/**
+ * @brief Compute the 4-d spatial index from the checkerboarded 1-d index
+ *        at parity parity.  Wrapper around getCoordsCB.
+ *
+ * @param[out] x Computed spatial index
+ * @param[in] cb_index 1-d checkerboarded index
+ * @param[in] X Full lattice dimensions
+ * @param[in] parity Site parity
+ * @return Full linear lattice index
+ */
+template <typename Coord, typename I> inline int getCoords(Coord &x, int cb_index, const I &X, int parity)
+{
+  return getCoordsCB(x, cb_index, X, X[0] >> 1, parity);
+}
+
 /**
  * @brief Calculate the full index from the checkerboard index and a parity
  *

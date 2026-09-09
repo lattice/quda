@@ -186,7 +186,9 @@ namespace quda {
   {
     LatticeField::setTuningString();
     std::stringstream aux_ss;
-    aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor;
+    aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor << ",order=" << order;
+    if (isNative()) aux_ss << ",N=" << clover::get_vector_order(precision, 128);
+    if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
     aux_string = aux_ss.str();
     if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }
@@ -221,11 +223,6 @@ namespace quda {
   }
 
   CloverField *CloverField::Create(const CloverFieldParam &param) { return new CloverField(param); }
-
-  void CloverField::setRho(double rho_)
-  {
-    rho = rho_;
-  }
 
   void CloverField::copy(const CloverField &src, bool is_inverse)
   {
@@ -280,12 +277,12 @@ namespace quda {
       if (src.Location() == QUDA_CUDA_FIELD_LOCATION) {
         copyGenericClover(*this, src, is_inverse, QUDA_CUDA_FIELD_LOCATION, 0, src_v);
       } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
-        void *packClover = pool_pinned_malloc(bytes);
+        void *packClover = pool_host_pinned_malloc(bytes);
 
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, packClover, src_v);
         qudaMemcpy(data(is_inverse), packClover, bytes, qudaMemcpyHostToDevice);
 
-        pool_pinned_free(packClover);
+        pool_host_pinned_free(packClover);
       } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
         void *packClover = pool_device_malloc(src.Bytes());
 
@@ -298,12 +295,12 @@ namespace quda {
       if (src.Location() == QUDA_CPU_FIELD_LOCATION) {
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, 0, src_v);
       } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        void *packClover = pool_pinned_malloc(src.Bytes());
+        void *packClover = pool_host_pinned_malloc(src.Bytes());
 
         qudaMemcpy(packClover, src_v, src.Bytes(), qudaMemcpyDeviceToHost);
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, 0, packClover);
 
-        pool_pinned_free(packClover);
+        pool_host_pinned_free(packClover);
       } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) {
         void *packClover = pool_device_malloc(bytes);
 
@@ -395,12 +392,12 @@ namespace quda {
     output << "inverse = "   << param.inverse << std::endl;
     output << "clover = "    << param.clover << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;
-    output << "csw = "       << param.csw << std::endl;
-    output << "coeff = " << param.coeff << std::endl;
+    output << "csw = " << double(param.csw) << std::endl;
+    output << "coeff = " << double(param.coeff) << std::endl;
     output << "twist_flavor = " << param.twist_flavor << std::endl;
-    output << "mu2 = " << param.mu2 << std::endl;
-    output << "epsilon2 = " << param.epsilon2 << std::endl;
-    output << "rho = " << param.rho << std::endl;
+    output << "mu2 = " << double(param.mu2) << std::endl;
+    output << "epsilon2 = " << double(param.epsilon2) << std::endl;
+    output << "rho = " << double(param.rho) << std::endl;
     output << "order = " << param.order << std::endl;
     output << "create = " << param.create << std::endl;
     return output;  // for multiple << operators.
@@ -419,7 +416,7 @@ namespace quda {
     spinor_param.setPrecision(a.Precision());
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = colorspinor::getNative(a.Precision(), a.Nspin());
+    spinor_param.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = a.data(inverse);
@@ -428,14 +425,14 @@ namespace quda {
   }
 
   // Return the L2 norm squared of the clover field
-  double norm2(const CloverField &a, bool inverse)
+  real_t norm2(const CloverField &a, bool inverse)
   {
     ColorSpinorField b(colorSpinorParam(a, inverse));
     return blas::norm2(b);
   }
 
   // Return the L1 norm of the clover field
-  double norm1(const CloverField &a, bool inverse)
+  real_t norm1(const CloverField &a, bool inverse)
   {
     ColorSpinorField b(colorSpinorParam(a, inverse));
     return blas::norm1(b);

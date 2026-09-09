@@ -4,12 +4,13 @@
 #include <math.h>
 #include <string.h>
 
-#include <util_quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+
+#include "util_quda.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
 
 int main(int argc, char **argv)
 {

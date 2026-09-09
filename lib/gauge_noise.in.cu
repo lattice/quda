@@ -4,6 +4,7 @@
 #include <instantiate.h>
 #include <tunable_nd.h>
 #include <kernels/gauge_noise.cuh>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -46,8 +47,6 @@ namespace quda {
     void postTune() { rng.restore(); }
   };
 
-  template <int...> struct IntList { };
-
   template <typename real, int nColor, int...N>
   void gaugeNoise(GaugeField &U, RNG &rng, QudaNoiseType type, IntList<nColor, N...>)
   {
@@ -73,7 +72,7 @@ namespace quda {
         U_.Reconstruct() != QUDA_RECONSTRUCT_NO || !U_.isNative()) {
       QudaPrecision prec = std::max(U_.Precision(), QUDA_SINGLE_PRECISION);
       param.setPrecision(prec, true);
-      if (param.order != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Unexpected order %d", param.order);
+      if (param.order != QUDA_NATIVE_GAUGE_ORDER) errorQuda("Unexpected order %d", param.order);
       param.create = QUDA_NULL_FIELD_CREATE;
       param.location = QUDA_CUDA_FIELD_LOCATION;
       U = GaugeField::Create(param);

@@ -9,9 +9,11 @@ namespace quda {
 
   using namespace gauge;
 
-  template <typename Float, int nColor_, typename Gauge, bool extract_>
+  template <typename store_t_, int nColor_, typename Gauge_, bool extract_, bool fine_grain>
   struct ExtractGhostArg : kernel_param<> {
-    using real = typename mapper<Float>::type;
+    using store_t = store_t_;
+    using real = typename mapper<store_t>::type;
+    using Gauge = Gauge_;
     static constexpr int nDim = 4;
     static constexpr int nColor = nColor_;
     static constexpr bool extract = extract_;
@@ -24,17 +26,12 @@ namespace quda {
     int f[nDim][nDim];
     bool localParity[nDim];
     int faceVolumeCB[nDim];
-    int comm_dim[QUDA_MAX_DIM];
     const int offset;
-    ExtractGhostArg(const GaugeField &u, Float **Ghost, int offset, uint64_t size) :
-      kernel_param(dim3(size, 1, 1)),
-      u(u, 0, Ghost),
-      nFace(u.Nface()),
-      offset(offset)
+    ExtractGhostArg(const GaugeField &u, store_t **Ghost, int offset, uint64_t size) :
+      kernel_param(dim3(size, fine_grain ? nColor : 1, 2 * nDim)), u(u, 0, Ghost), nFace(u.Nface()), offset(offset)
     {
       for (int d=0; d<nDim; d++) {
 	X[d] = u.X()[d];
-	comm_dim[d] = comm_dim_partitioned(d);
 	faceVolumeCB[d] = u.SurfaceCB(d)*u.Nface();
       }
 
@@ -79,7 +76,7 @@ namespace quda {
       int dim = parity_dim % Arg::nDim;
 
       // for now we never inject unless we have partitioned in that dimension
-      if (!arg.comm_dim[dim] && !Arg::extract) return;
+      if (!arg.comms_dim_partitioned[dim] && !Arg::extract) return;
 
       // linear index used for writing into ghost buffer
       if (X >= 2*arg.faceVolumeCB[dim]) return;
@@ -94,17 +91,29 @@ namespace quda {
       d += arg.X[dim]-arg.nFace;
 
       // index is a checkboarded spacetime coordinate
-      int indexCB = (a*arg.f[dim][0] + b*arg.f[dim][1] + c*arg.f[dim][2] + d*arg.f[dim][3]) >> 1;
+      int x_cb = (a * arg.f[dim][0] + b * arg.f[dim][1] + c * arg.f[dim][2] + d * arg.f[dim][3]) >> 1;
       // we only do the extraction for parity we are currently working on
       int oddness = (a+b+c+d)&1;
       if (oddness == parity) {
-        if (Arg::extract) {
-          // load the ghost element from the bulk
-          Matrix<complex<real>, nColor> u = arg.u(dim+arg.offset, indexCB, parity);
-          arg.u.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1) = u;
-        } else { // injection
-          Matrix <complex<real>, nColor> u = arg.u.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1);
-          arg.u(dim+arg.offset, indexCB, parity) = u; // save the ghost element to the bulk
+        if constexpr (Arg::Gauge::is_native) { // native format so use raw bit stream
+          using RawLink = array<typename Arg::store_t, Arg::Gauge::recon>;
+          RawLink link;
+          if (Arg::extract) { // load the ghost element from the bulk
+            arg.u.raw_load(link, x_cb, dim + arg.offset, parity);
+            arg.u.raw_save_ghost(link, X >> 1, dim, (parity + arg.localParity[dim]) & 1);
+          } else { // injection - save the ghost element to the bulk
+            arg.u.raw_load_ghost(link, X >> 1, dim, (parity + arg.localParity[dim]) & 1);
+            arg.u.raw_save(link, x_cb, dim + arg.offset, parity);
+          }
+        } else { // not native so just load elements as per normal
+          if (Arg::extract) {
+            // load the ghost element from the bulk
+            Matrix<complex<real>, nColor> u = arg.u(dim + arg.offset, x_cb, parity);
+            arg.u.Ghost(dim, X >> 1, (parity + arg.localParity[dim]) & 1) = u;
+          } else { // injection
+            Matrix<complex<real>, nColor> u = arg.u.Ghost(dim, X >> 1, (parity + arg.localParity[dim]) & 1);
+            arg.u(dim + arg.offset, x_cb, parity) = u; // save the ghost element to the bulk
+          }
         }
       } // oddness == parity
     }
@@ -128,7 +137,7 @@ namespace quda {
       int dim = parity_dim % Arg::nDim;
 
       // for now we never inject unless we have partitioned in that dimension
-      if (!arg.comm_dim[dim] && !Arg::extract) return;
+      if (!arg.comms_dim_partitioned[dim] && !Arg::extract) return;
 
       // linear index used for writing into ghost buffer
       if (X >= 2*arg.faceVolumeCB[dim]) return;

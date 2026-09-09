@@ -38,7 +38,7 @@ namespace quda
   }
 
   void DiracImprovedStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
-                                            QudaParity, cvector_ref<const ColorSpinorField> &, double) const
+                                            QudaParity, cvector_ref<const ColorSpinorField> &, real_t) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
   }
@@ -50,7 +50,7 @@ namespace quda
     // (  2m     -D_eo ) (x_e) = (b_e)
     // ( -D_oe   2m    ) (x_o) = (b_o)
     // ... but under the hood we need to catch the zero mass case.
-
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
 
     auto tmp = getFieldTmp(out);
@@ -83,6 +83,7 @@ namespace quda
 
   void DiracImprovedStaggeredKD::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
@@ -162,8 +163,8 @@ namespace quda
     longGauge = long_gauge_in;
   }
 
-  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
-                                                double, double, bool allow_truncation) const
+  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass,
+                                                real_t, real_t, bool allow_truncation) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");

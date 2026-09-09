@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <constant_kernel_arg.h>
 #include <kernel_helper.h>
 #include <block_reduce_helper.h>
 
@@ -64,7 +65,7 @@ namespace quda
   template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
     static constexpr ThreadsSync requires_threads_sync = ThreadsSyncYZ;
     using Arg = Arg_;
-    static constexpr unsigned int block_size = block_size_;
+    static constexpr unsigned int block_size_cxpr = block_size_;
     BlockKernelArg(const Arg &arg) : Arg(arg) { }
   };
 
@@ -72,7 +73,7 @@ namespace quda
      @brief BlockKernel2D_impl is the implementation of the Generic
      block kernel.  Here, we split the block (CTA) and thread indices
      and pass them separately to the transform functor.  The x thread
-     dimension is templated (Arg::block_size), e.g., for efficient
+     dimension is templated (Arg::block_size_cxpr), e.g., for efficient
      reductions.
 
      @tparam Functor Kernel functor that defines the kernel
@@ -111,12 +112,12 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __launch_bounds__(Arg::launch_bounds ?
-                      Arg::block_size :
+                      Arg::block_size_cxpr :
                       0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     QUDA_OMPTARGET_KERNEL_BEGIN(arg)
-      BlockKernel2D_impl<Functor, Arg>(arg);
+    BlockKernel2D_impl<Functor, Arg>(arg);
     QUDA_OMPTARGET_KERNEL_END
   }
 
@@ -136,13 +137,13 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __launch_bounds__(Arg::launch_bounds ?
-                      Arg::block_size :
+                      Arg::block_size_cxpr :
                       0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg *argp)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     QUDA_OMPTARGET_KERNEL_BEGIN_PTR(argp)
-      BlockKernel2D_impl<Functor, Arg>(*argp);
+    BlockKernel2D_impl<Functor, Arg>(*argp);
     QUDA_OMPTARGET_KERNEL_END
   }
 
-}
+} // namespace quda

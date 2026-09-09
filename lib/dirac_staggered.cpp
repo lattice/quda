@@ -28,7 +28,7 @@ namespace quda {
   }
 
   void DiracStaggered::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                  QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                  QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {    
     checkParitySpinor(in, out);
 
@@ -69,6 +69,7 @@ namespace quda {
 
   void DiracStaggered::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out.Even());
 
     //even
@@ -98,8 +99,8 @@ namespace quda {
     // do nothing
   }
 
-  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
-                                      double, bool) const
+  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass, real_t,
+                                      real_t, bool) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
@@ -109,9 +110,8 @@ namespace quda {
 
     StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
-
-  void DiracStaggered::SmearOp(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, double,
-                               double, int t0, QudaParity parity) const
+  void DiracStaggered::SmearOp(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, real_t,
+                               real_t, int t0, QudaParity parity) const
   {
     checkSpinorAlias(in, out);
 
@@ -174,6 +174,7 @@ namespace quda {
 
   void DiracStaggeredPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
 
     QudaParity parity = QUDA_INVALID_PARITY;
@@ -245,8 +246,8 @@ namespace quda {
     blas::ax(-0.5 / mass, x(other_parity));
   }
 
-  void DiracStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
-                                        double, bool) const
+  void DiracStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass, real_t,
+                                        real_t, bool) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");

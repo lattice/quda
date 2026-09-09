@@ -1,10 +1,8 @@
 #include "multigrid.h"
+#include <int_list.hpp>
 
 namespace quda
 {
-
-  template <int...> struct IntList {
-  };
 
   template <int Nc, int... N>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma,

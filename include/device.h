@@ -42,6 +42,16 @@ namespace quda
     state_t get_state();
 
     /**
+       @brief Get device driver version
+     */
+    int get_driver_version();
+
+    /**
+       @brief Get device runtime version
+     */
+    int get_runtime_version();
+
+    /**
        @brief Get number of devices present on node
     */
     int get_device_count();
@@ -155,6 +165,11 @@ namespace quda
      * @return The maximum number of simultaneously resident blocks per SM
      */
     unsigned int max_blocks_per_processor();
+
+    /**
+       @return Whether shared carve out configuration is supported
+    */
+    bool shared_carve_out_supported();
 
     namespace profile
     {

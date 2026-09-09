@@ -11,17 +11,17 @@ namespace quda {
     GaugeField &output;
     const CloverField &clover;
     const bool twisted;
-    Float coeff;
+    real_t coeff;
     const int parity;
     unsigned int minThreads() const override { return clover.VolumeCB(); }
 
   public:
-    CloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity) :
+    CloverSigmaTrace(GaugeField &output, const CloverField &clover, real_t coeff, int parity) :
       TunableKernel1D(output),
       output(output),
       clover(clover),
       twisted(clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-      coeff(static_cast<Float>(coeff)),
+      coeff(coeff),
       parity(parity)
     {
       if (twisted) strcat(aux, ",twisted");
@@ -45,7 +45,7 @@ namespace quda {
     long long bytes() const override { return clover.Bytes() + output.Bytes(); }
   };
 
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity)
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, real_t coeff, int parity)
   {
     if constexpr (is_enabled_clover()) {
       checkNative(output, clover);

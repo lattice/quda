@@ -9,7 +9,7 @@
 #endif
 
 #ifndef QUDA_MAX_SHARED_MEMORY_SIZE
-#define QUDA_MAX_SHARED_MEMORY_SIZE 64*1024
+#define QUDA_MAX_SHARED_MEMORY_SIZE 64 * 1024
 #endif
 
 #ifndef QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD
@@ -21,115 +21,135 @@
 #define QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD 0
 #endif
 
-#if QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==0
+#if QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD == 0
 
-  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
-    _Pragma("omp parallel num_threads(ld)") \
-    { target::omptarget::launch_param_device_set(grid, block);
+#define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld, grid, block)                                                                \
+  _Pragma("omp parallel num_threads(ld)")                                                                              \
+  {                                                                                                                    \
+    target::omptarget::launch_param_device_set(grid, block);
 
-#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==1
+#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD == 1
 
-  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
-    _Pragma("omp parallel num_threads(ld)") \
-    { if(omp_get_thread_num()==0) \
-        target::omptarget::launch_param_device_set(grid, block); \
-      _Pragma("omp barrier")
+#define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld, grid, block)                                                                \
+  _Pragma("omp parallel num_threads(ld)")                                                                              \
+  {                                                                                                                    \
+    if (omp_get_thread_num() == 0) target::omptarget::launch_param_device_set(grid, block);                            \
+    _Pragma("omp barrier")
 
-#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==2
+#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD == 2
 
-  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
-    _Pragma("omp parallel num_threads(ld)") \
-    { _Pragma("omp single") \
-      target::omptarget::launch_param_device_set(grid, block);
+#define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld, grid, block)                                                                \
+  _Pragma("omp parallel num_threads(ld)")                                                                              \
+  {                                                                                                                    \
+    _Pragma("omp single") target::omptarget::launch_param_device_set(grid, block);
 
-#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==3
+#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD == 3
 
-  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
-    target::omptarget::launch_param_device_set(grid, block); \
-    _Pragma("omp parallel num_threads(ld)") \
-    {
+#define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld, grid, block)                                                                \
+  target::omptarget::launch_param_device_set(grid, block);                                                             \
+  _Pragma("omp parallel num_threads(ld)")                                                                              \
+  {
 
 #else
 
-  #error "Allowed values for QUDA_OMPTARGET_LAUNCH_METHOD are 0, 1, 2, or 3."
+#error "Allowed values for QUDA_OMPTARGET_LAUNCH_METHOD are 0, 1, 2, or 3."
 
 #endif
 
-#define QUDA_OMPTARGET_KERNEL_BEGIN(arg) \
-    const dim3 grid = target::omptarget::launch_param_grid(); \
-    const dim3 block = target::omptarget::launch_param_block(); \
-    const int gd = grid.x*grid.y*grid.z; \
-    const int ld = block.x*block.y*block.z; \
-    _Pragma("omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)") \
-    { QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block)
+#define QUDA_OMPTARGET_KERNEL_BEGIN(arg)                                                                               \
+  const dim3 grid = target::omptarget::launch_param_grid();                                                            \
+  const dim3 block = target::omptarget::launch_param_block();                                                          \
+  const int gd = grid.x * grid.y * grid.z;                                                                             \
+  const int ld = block.x * block.y * block.z;                                                                          \
+  _Pragma("omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)")                              \
+  {                                                                                                                    \
+    QUDA_OMPTARGET_PARALLEL_LAUNCH(ld, grid, block)
 
-#define QUDA_OMPTARGET_KERNEL_BEGIN_PTR(argp) \
-    const dim3 grid = target::omptarget::launch_param_grid(); \
-    const dim3 block = target::omptarget::launch_param_block(); \
-    const int gd = grid.x*grid.y*grid.z; \
-    const int ld = block.x*block.y*block.z; \
-    _Pragma("omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)") \
-    { QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block)
+#define QUDA_OMPTARGET_KERNEL_BEGIN_PTR(argp)                                                                          \
+  const dim3 grid = target::omptarget::launch_param_grid();                                                            \
+  const dim3 block = target::omptarget::launch_param_block();                                                          \
+  const int gd = grid.x * grid.y * grid.z;                                                                             \
+  const int ld = block.x * block.y * block.z;                                                                          \
+  _Pragma("omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)")              \
+  {                                                                                                                    \
+    QUDA_OMPTARGET_PARALLEL_LAUNCH(ld, grid, block)
 
-#define QUDA_OMPTARGET_KERNEL_END }} /* closes BEGIN/BEGIN_PTR */
+#define QUDA_OMPTARGET_KERNEL_END                                                                                      \
+  }                                                                                                                    \
+  } /* closes BEGIN/BEGIN_PTR */
 
-namespace quda {
+namespace quda
+{
 
-  namespace target {
+  namespace target
+  {
 
-    namespace omptarget {
-      inline dim3 & launch_param_kernel_block(void)
+    namespace omptarget
+    {
+      inline dim3 &launch_param_kernel_block(void)
       {
 #if 1
         static char block[sizeof(dim3)];
-        #pragma omp groupprivate(block)
-        return *reinterpret_cast<dim3*>(block);
+#pragma omp groupprivate(block)
+        return *reinterpret_cast<dim3 *>(block);
 #else
         /* omp 6 */
         static char block[sizeof(dim3)];
-        #pragma omp threadprivate(block)
-        return *reinterpret_cast<dim3*>(block);
+#pragma omp threadprivate(block)
+        return *reinterpret_cast<dim3 *>(block);
 #endif
       }
-      inline dim3 & launch_param_kernel_grid(void)
+      inline dim3 &launch_param_kernel_grid(void)
       {
 #if 1
         static char grid[sizeof(dim3)];
-        #pragma omp groupprivate(grid)
-        return *reinterpret_cast<dim3*>(grid);
+#pragma omp groupprivate(grid)
+        return *reinterpret_cast<dim3 *>(grid);
 #else
         /* omp 6 */
         static char grid[sizeof(dim3)];
-        #pragma omp threadprivate(grid)
-        return *reinterpret_cast<dim3*>(grid);
+#pragma omp threadprivate(grid)
+        return *reinterpret_cast<dim3 *>(grid);
 #endif
       }
       inline void launch_param_device_set(dim3 grid, dim3 block)
       {
-        dim3 & gref = launch_param_kernel_grid();
-        dim3 & bref = launch_param_kernel_block();
+        dim3 &gref = launch_param_kernel_grid();
+        dim3 &bref = launch_param_kernel_block();
         gref = grid;
         bref = block;
       }
     } // namespace omptarget
 
-#pragma omp begin declare variant match(device={kind(host)})
-    template <template <bool, typename ...> class f, typename ...Args>
-      __host__ __device__ auto dispatch(Args &&... args)
+#pragma omp begin declare variant match(device = {kind(host)})
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
-      return f<false>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<false>()(args...);
+      } else {
+        return f<false>().template operator()<Params...>(args...);
+      }
     }
 #pragma omp end declare variant
-#pragma omp begin declare variant match(device={kind(nohost)})
-    template <template <bool, typename ...> class f, typename ...Args>
-      __host__ __device__ auto dispatch(Args &&... args)
+#pragma omp begin declare variant match(device = {kind(nohost)})
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
-      return f<true>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<true>()(args...);
+      } else {
+        return f<true>().template operator()<Params...>(args...);
+      }
     }
 #pragma omp end declare variant
 
-    template <bool is_device> struct is_device_impl { constexpr bool operator()() { return false; } };
-    template <> struct is_device_impl<true> { constexpr bool operator()() { return true; } };
+    template <bool is_device> struct is_device_impl {
+      constexpr bool operator()() { return false; }
+    };
+    template <> struct is_device_impl<true> {
+      constexpr bool operator()() { return true; }
+    };
 
     /**
        @brief Helper function that returns if the current execution
@@ -137,9 +157,12 @@ namespace quda {
     */
     __device__ __host__ inline bool is_device() { return dispatch<is_device_impl>(); }
 
-
-    template <bool is_device> struct is_host_impl { constexpr bool operator()() { return true; } };
-    template <> struct is_host_impl<true> { constexpr bool operator()() { return false; } };
+    template <bool is_device> struct is_host_impl {
+      constexpr bool operator()() { return true; }
+    };
+    template <> struct is_host_impl<true> {
+      constexpr bool operator()() { return false; }
+    };
 
     /**
        @brief Helper function that returns if the current execution
@@ -179,10 +202,11 @@ namespace quda {
       inline dim3 operator()() { return dim3(0, 0, 0); }
     };
     template <> struct block_idx_impl<true> {
-      __device__ inline dim3 operator()() {
-        const dim3 & gridDim=target::omptarget::launch_param_kernel_grid();
+      __device__ inline dim3 operator()()
+      {
+        const dim3 &gridDim = target::omptarget::launch_param_kernel_grid();
         const auto n = (unsigned int)omp_get_team_num();
-        return dim3(n%gridDim.x, (n/gridDim.x)%gridDim.y, n/(gridDim.x*gridDim.y));
+        return dim3(n % gridDim.x, (n / gridDim.x) % gridDim.y, n / (gridDim.x * gridDim.y));
       }
     };
 
@@ -197,10 +221,11 @@ namespace quda {
       inline dim3 operator()() { return dim3(0, 0, 0); }
     };
     template <> struct thread_idx_impl<true> {
-      __device__ inline dim3 operator()() {
-        const dim3 & blockDim=target::omptarget::launch_param_kernel_block();
+      __device__ inline dim3 operator()()
+      {
+        const dim3 &blockDim = target::omptarget::launch_param_kernel_block();
         const auto n = (unsigned int)omp_get_thread_num();
-        return dim3(n%blockDim.x, (n/blockDim.x)%blockDim.y, n/(blockDim.x*blockDim.y));
+        return dim3(n % blockDim.x, (n / blockDim.x) % blockDim.y, n / (blockDim.x * blockDim.y));
       }
     };
 
@@ -216,33 +241,41 @@ namespace quda {
     */
     template <int dim> __device__ __host__ inline auto thread_idx_linear()
     {
-      const auto n = (unsigned int)omp_get_thread_num();
-      const dim3 & blockDim=target::omptarget::launch_param_kernel_block();
-      switch (dim) {
-      case 1: return n%blockDim.x;
-      case 2: return n%(blockDim.x*blockDim.y);
-      case 3:
-      default: return n;
-      }
+      const auto thread = thread_idx();
+      const auto block = block_dim();
+      if constexpr (dim == 1)
+        return thread.x;
+      else if constexpr (dim == 2)
+        return thread.y * block.x + thread.x;
+      else
+        return (thread.z * block.y + thread.y) * block.x + thread.x;
     }
 
-    /**
-       @brief Helper function that returns the total number thread in a thread block
-    */
+    /** @brief Return the number of threads in the first dim block dimensions. */
     template <int dim> __device__ __host__ inline auto block_size()
     {
-      const dim3 & blockDim=target::omptarget::launch_param_kernel_block();
-      switch (dim) {
-      case 1: return blockDim.x;
-      case 2: return blockDim.y * blockDim.x;
-      case 3:
-      default: return blockDim.z * blockDim.y * blockDim.x;
-      }
+      const auto block = block_dim();
+      if constexpr (dim == 1)
+        return block.x;
+      else if constexpr (dim == 2)
+        return block.y * block.x;
+      else
+        return block.z * block.y * block.x;
     }
+
+    /** @brief Whether this is the first thread in the selected block dimensions. */
+    template <int dim = 3> __device__ __host__ inline bool is_thread_zero() { return thread_idx_linear<dim>() == 0; }
+
+    /** @brief Whether this is the first lane in an OpenMP logical warp. */
+    __device__ __host__ inline bool is_lane_zero() { return thread_idx_linear<3>() % QUDA_WARP_SIZE == 0; }
+
+    /** @brief Preserve a value when no warp uniform instruction is available. */
+    template <typename T> constexpr T uniform(const T &value) { return value; }
 
   } // namespace target
 
-  namespace device {
+  namespace device
+  {
 
     /**
        @brief Helper function that returns the warp-size of the
@@ -259,11 +292,10 @@ namespace quda {
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension.
     */
-    template <int block_size_y = 1, int block_size_z = 1>
-      constexpr unsigned int max_block_size()
-      {
-        return std::max(warp_size(), QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z));
-      }
+    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_block_size()
+    {
+      return std::max(warp_size(), QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z));
+    }
 
     /**
        @brief Helper function that returns the maximum size of a
@@ -277,7 +309,7 @@ namespace quda {
        the kernel arguments passed to a kernel on the target
        architecture.
     */
-    constexpr size_t max_kernel_arg_size() { return 64; }
+    constexpr size_t max_kernel_arg_size() { return MAX_KERNEL_ARG_SIZE; }
 
     /**
        @brief Use a compile time fixed size for the shared local memory,
@@ -293,8 +325,8 @@ namespace quda {
     */
     template <typename Arg> constexpr bool use_kernel_arg()
     {
-      return Arg::always_use_kernel_arg() ||
-        (Arg::default_use_kernel_arg() && sizeof(Arg) <= device::max_kernel_arg_size());
+      return Arg::always_use_kernel_arg()
+        || (Arg::default_use_kernel_arg() && sizeof(Arg) <= device::max_kernel_arg_size());
     }
 
     /**
@@ -303,7 +335,10 @@ namespace quda {
        implementation, and is present only to keep the compiler happy
        in the translation units where constant memory is not used.
      */
-    template <typename Arg> constexpr std::enable_if_t<use_kernel_arg<Arg>(), void *> get_constant_buffer() { return nullptr; }
+    template <typename Arg> constexpr std::enable_if_t<use_kernel_arg<Arg>(), void *> get_constant_buffer()
+    {
+      return nullptr;
+    }
 
     /**
        @brief Return the address of the shared local memory for the current thread group.
@@ -311,7 +346,7 @@ namespace quda {
     inline char *get_shared_cache(void)
     {
       static char s[device::max_shared_memory_size()];
-      #pragma omp groupprivate(s)
+#pragma omp groupprivate(s)
       return s;
     }
   }

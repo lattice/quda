@@ -323,3 +323,11 @@ include/externals/json.hpp is provided under the following license:
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
+
+QUDA uses for the domain decomposition implementation an enum class declared using
+macro in include/declare_enum.h. The "include/declare_enum.h" is provided under the
+following licence:
+
+  Credit: https://stackoverflow.com/a/71375077/12084612
+
+  License: CC BY-SA 4.0

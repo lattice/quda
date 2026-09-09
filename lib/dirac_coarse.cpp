@@ -7,7 +7,7 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup, bool mapped) :
+  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup) :
     Dirac(param),
     mass(param.mass),
     mu(param.mu),
@@ -23,8 +23,7 @@ namespace quda {
     enable_cpu(false),
     gpu_setup(gpu_setup),
     init_gpu(gpu_setup),
-    init_cpu(!gpu_setup),
-    mapped(mapped)
+    init_cpu(!gpu_setup)
   {
     initializeCoarse();
   }
@@ -59,8 +58,7 @@ namespace quda {
     enable_cpu(Y_h ? true : false),
     gpu_setup(true),
     init_gpu(enable_gpu ? false : true),
-    init_cpu(enable_cpu ? false : true),
-    mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
+    init_cpu(enable_cpu ? false : true)
   {
 
     constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
@@ -116,12 +114,11 @@ namespace quda {
     enable_cpu(dirac.enable_cpu),
     gpu_setup(dirac.gpu_setup),
     init_gpu(enable_gpu ? false : true),
-    init_cpu(enable_cpu ? false : true),
-    mapped(dirac.mapped)
+    init_cpu(enable_cpu ? false : true)
   {
   }
 
-  void DiracCoarse::createY(bool gpu, bool mapped) const
+  void DiracCoarse::createY(bool gpu) const
   {
     int ndim = transfer->Vectors().Ndim();
     lat_dim_t x;
@@ -135,18 +132,17 @@ namespace quda {
     gParam.location = gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.order = gpu ? QUDA_NATIVE_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     // use null-space precision for coarse links on gpu
-    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
+    gParam.setPrecision(transfer->NullPrecision());
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 1;
     gParam.geometry = QUDA_COARSE_GEOMETRY;
-    if (mapped) gParam.mem_type = QUDA_MEMORY_MAPPED;
 
     int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
@@ -188,12 +184,12 @@ namespace quda {
     gParam.location = gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.order = gpu ? QUDA_NATIVE_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     // use null-space precision for preconditioned links on gpu
-    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
+    gParam.setPrecision(transfer->NullPrecision());
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -228,7 +224,7 @@ namespace quda {
 
   void DiracCoarse::initializeCoarse()
   {
-    createY(gpu_setup, mapped);
+    createY(gpu_setup);
 
     if (!gpu_setup) {
 
@@ -318,7 +314,7 @@ namespace quda {
     switch(location) {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
-      createY(true, mapped);
+      createY(true);
       createYhat(true);
       Y_d->copy(*Y_h);
       if (need_aos_gauge_copy) { Y_aos_d->copy(*Y_d); }
@@ -405,7 +401,7 @@ namespace quda {
   }
 
   void DiracCoarse::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
 
@@ -462,13 +458,13 @@ namespace quda {
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                   double mu_factor, bool) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t, real_t mu,
+                                   real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    real_t a = 2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
@@ -524,7 +520,7 @@ namespace quda {
   }
 
   void DiracCoarsePC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                 QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                 QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     // FIXME emulated for now
     Dslash(out, in, parity);
@@ -632,13 +628,13 @@ namespace quda {
   //Make the coarse operator one level down.  For the preconditioned
   //operator we are coarsening the Yhat links, not the Y links.  We
   //pass the fine clover fields, though they are actually ignored.
-  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                     double mu_factor, bool) const
+  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t, real_t mu,
+                                     real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    real_t a = -2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, -mu_factor,

@@ -26,10 +26,10 @@ namespace quda {
     Gamma(const Gamma &g) = default;
 
     __device__ __host__ inline int getcol(int row) const {
-      if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	switch(dir) {
-	case 0:
-	case 1:
+      if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS || basis == QUDA_OPENQCD_GAMMA_BASIS) {
+        switch (dir) {
+        case 0:
+        case 1:
 	  switch(row) {
 	  case 0: return 3;
 	  case 1: return 2;
@@ -54,11 +54,11 @@ namespace quda {
 	  case 3: return 3;
 	  }
 	  break;
-	}
+        }
       } else {
-	switch(dir) {
-	case 0:
-	case 1:
+        switch (dir) {
+        case 0:
+        case 1:
 	  switch(row) {
 	  case 0: return 3;
 	  case 1: return 2;
@@ -90,7 +90,7 @@ namespace quda {
 	  case 3: return 1;
 	  }
 	  break;
-	}
+        }
       }
       return 0;
     }
@@ -201,7 +201,51 @@ namespace quda {
 	  }
 	  break;
 	}
+      } else if (basis == QUDA_OPENQCD_GAMMA_BASIS) {
+        switch (dir) {
+        case 0: /* corresponds to gamma1 in OpenQCD convention */
+          switch (row) {
+          case 0:
+          case 1: return -I;
+          case 2:
+          case 3: return I;
+          }
+          break;
+        case 1: /* gamma2 in openQCD */
+          switch (row) {
+          case 0:
+          case 3: return -1;
+          case 1:
+          case 2: return 1;
+          }
+          break;
+        case 2: /* gamma3 in openQCD */
+          switch (row) {
+          case 0:
+          case 3: return -I;
+          case 1:
+          case 2: return I;
+          }
+          break;
+        case 3: /* gamma0 in openQCD */
+          switch (row) {
+          case 0:
+          case 1:
+          case 2:
+          case 3: return -1;
+          }
+          break;
+        case 4: /* gamma5 in openQCD */
+          switch (row) {
+          case 0:
+          case 1: return 1;
+          case 2:
+          case 3: return -1;
+          }
+          break;
+        }
       }
+
       return 0;
     }
 
@@ -283,7 +327,51 @@ namespace quda {
 	  }
 	  break;
 	}
+      } else if (basis == QUDA_OPENQCD_GAMMA_BASIS) {
+        switch (dir) {
+        case 0: /* gamma1 in openQCD convention */
+          switch (row) {
+          case 0:
+          case 1: return complex<ValueType>(a.imag(), -a.real()); //  I
+          case 2:
+          case 3: return complex<ValueType>(-a.imag(), a.real()); // -I
+          }
+          break;
+        case 1: /* gamma2 in openQCD */
+          switch (row) {
+          case 0:
+          case 3: return -a;
+          case 1:
+          case 2: return a;
+          }
+          break;
+        case 2: /* gamma3 in openQCD */
+          switch (row) {
+          case 0:
+          case 3: return complex<ValueType>(a.imag(), -a.real()); //  I
+          case 1:
+          case 2: return complex<ValueType>(-a.imag(), a.real()); // -I
+          }
+          break;
+        case 3: /* gamma0 in openQCD */
+          switch (row) {
+          case 0:
+          case 1:
+          case 2:
+          case 3: return -a;
+          }
+          break;
+        case 4: /* gamma5 in openQCD */
+          switch (row) {
+          case 0:
+          case 1: return a;
+          case 2:
+          case 3: return -a;
+          }
+          break;
+        }
       }
+
       return a;
     }
 
@@ -349,9 +437,31 @@ namespace quda {
              {0, 1, 2, 3}}};
   }
 
+  constexpr array<int, 4> get_dr_gm(int i)
+  {
+    switch (i) {
+    case 0: return get_dr_gm_i()[0];
+    case 1: return get_dr_gm_i()[1];
+    case 2: return get_dr_gm_i()[2];
+    case 3: return get_dr_gm_i()[3];
+    case 4: return get_dr_gm_i()[4];
+    case 5: return get_dr_gm_i()[5];
+    case 6: return get_dr_gm_i()[6];
+    case 7: return get_dr_gm_i()[7];
+    case 8: return get_dr_gm_i()[8];
+    case 9: return get_dr_gm_i()[9];
+    case 10: return get_dr_gm_i()[10];
+    case 11: return get_dr_gm_i()[11];
+    case 12: return get_dr_gm_i()[12];
+    case 13: return get_dr_gm_i()[13];
+    case 14: return get_dr_gm_i()[14];
+    case 15:
+    default: return get_dr_gm_i()[15];
+    }
+  }
+
   template <typename T> constexpr array<array<complex<T>, 4>, 16> get_dr_g5gm_z()
   {
-
     constexpr complex<T> p_i = complex<T>(0., +1.);
     constexpr complex<T> m_i = complex<T>(0., -1.);
     constexpr complex<T> p_1 = complex<T>(+1., 0.);
@@ -410,4 +520,28 @@ namespace quda {
              // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
              {m_1, p_1, m_1, p_1}}};
   }
+
+  template <class T> constexpr array<complex<T>, 4> get_dr_g5gm(int i)
+  {
+    switch (i) {
+    case 0: return get_dr_g5gm_z<T>()[0];
+    case 1: return get_dr_g5gm_z<T>()[1];
+    case 2: return get_dr_g5gm_z<T>()[2];
+    case 3: return get_dr_g5gm_z<T>()[3];
+    case 4: return get_dr_g5gm_z<T>()[4];
+    case 5: return get_dr_g5gm_z<T>()[5];
+    case 6: return get_dr_g5gm_z<T>()[6];
+    case 7: return get_dr_g5gm_z<T>()[7];
+    case 8: return get_dr_g5gm_z<T>()[8];
+    case 9: return get_dr_g5gm_z<T>()[9];
+    case 10: return get_dr_g5gm_z<T>()[10];
+    case 11: return get_dr_g5gm_z<T>()[11];
+    case 12: return get_dr_g5gm_z<T>()[12];
+    case 13: return get_dr_g5gm_z<T>()[13];
+    case 14: return get_dr_g5gm_z<T>()[14];
+    case 15:
+    default: return get_dr_g5gm_z<T>()[15];
+    }
+  }
+
 } // namespace quda

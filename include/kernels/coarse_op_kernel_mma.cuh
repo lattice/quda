@@ -11,6 +11,7 @@
 #include <block_reduce_helper.h>
 #include <kernel.h>
 #include <kernels/coarse_op_kernel.cuh>
+#include <kernel_ops_target.h>
 
 namespace quda
 {
@@ -47,7 +48,7 @@ namespace quda
         Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
        */
       template <typename Wtype, typename Arg>
-      __device__ __host__ inline auto computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb, int m_offset,
+      __device__ __host__ inline auto computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int m_offset,
                                                 int n_offset)
       {
         using real = typename Arg::Float;
@@ -76,7 +77,7 @@ namespace quda
         constexpr int ldb = N;
         constexpr int ldc = N;
 
-        using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
+        using mma_t = typename mma::mg_mma_setup_t<typename Arg::store_t>::type;
         using Config = MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
         if (Arg::dir == QUDA_IN_PLACE) {
@@ -126,8 +127,8 @@ namespace quda
     } // namespace impl
 
     template <typename Arg> struct ComputeUVMMA {
-      Arg &arg;
-      constexpr ComputeUVMMA(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr ComputeUVMMA(const Arg &arg) : arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __forceinline__ void operator()()
@@ -161,7 +162,8 @@ namespace quda
 
         if (Arg::compute_max) {
           constexpr int block_dim = 3;
-          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
+          KernelOps<BlockReduce<unsigned, block_dim>> ops {};
+          unsigned aggregate = BlockReduce<unsigned, block_dim> {ops}.Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }
@@ -170,7 +172,8 @@ namespace quda
     namespace impl
     {
 
-      template <typename Arg> __device__ void computeVUV(Arg &arg, int parity, int x_cb, int m_offset, int n_offset)
+      template <typename Arg>
+      __device__ void computeVUV(const Arg &arg, int parity, int x_cb, int m_offset, int n_offset)
       {
         constexpr int fineSpin = Arg::fineSpin;
         constexpr int coarseSpin = Arg::coarseSpin;
@@ -213,9 +216,10 @@ namespace quda
         constexpr int ldb = N;
         constexpr int ldc = N * coarseSpin;
 
-        using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
+        using mma_t = typename mma::mg_mma_setup_t<typename Arg::store_t>::type;
 
-        extern __shared__ typename mma_t::compute_t smem_ptr[];
+        extern __shared__ int smem[];
+        auto smem_ptr = reinterpret_cast<typename mma_t::compute_t*>(smem);
 
         using Config = MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
@@ -246,7 +250,7 @@ namespace quda
 
           __syncthreads();
           a_loader.template g2r<Config::lda, a_dagger>(a, m_offset, 0);
-          a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+          a_loader.template r2s<decltype(a), a_dagger>(smem_obj_a_real, smem_obj_a_imag);
           __syncthreads();
 
           for (int s_col = 0; s_col < fineSpin; s_col++) { // which chiral block
@@ -255,7 +259,7 @@ namespace quda
 
             __syncthreads();
             b_loader.template g2r<Config::ldb, b_dagger>(b, n_offset, 0);
-            b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+            b_loader.template r2s<decltype(b), b_dagger>(smem_obj_b_real, smem_obj_b_imag);
             __syncthreads();
 
 #pragma unroll 1
@@ -331,8 +335,8 @@ namespace quda
     } // namespace impl
 
     template <typename Arg> struct ComputeVUVMMA {
-      Arg &arg;
-      constexpr ComputeVUVMMA(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr ComputeVUVMMA(const Arg &arg) : arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __forceinline__ void operator()()

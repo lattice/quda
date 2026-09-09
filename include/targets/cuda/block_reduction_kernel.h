@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <constant_kernel_arg.h>
 #include <kernel_helper.h>
 #include <block_reduce_helper.h>
 
@@ -60,9 +61,9 @@ namespace quda
      @tparam block_size x-dimension block-size
      @param[in] arg Kernel argument
    */
-  template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
+  template <unsigned int block_size, typename Arg_> struct BlockKernelArg : Arg_ {
     using Arg = Arg_;
-    static constexpr unsigned int block_size = block_size_;
+    static constexpr unsigned int block_size_cxpr = block_size;
     BlockKernelArg(const Arg &arg) : Arg(arg) { }
   };
 
@@ -81,6 +82,9 @@ namespace quda
   template <template <typename> class Functor, typename Arg>
   __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
+#ifdef QUDA_SHARED_MEMORY_SPILL
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
+#endif
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, blockIdx.z);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
     auto j = blockDim.y * blockIdx.y + threadIdx.y;
@@ -108,7 +112,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __launch_bounds__(Arg::launch_bounds ?
-                      Arg::block_size :
+                      Arg::block_size_cxpr :
                       0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
@@ -131,7 +135,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __launch_bounds__(Arg::launch_bounds ?
-                      Arg::block_size :
+                      Arg::block_size_cxpr :
                       0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");

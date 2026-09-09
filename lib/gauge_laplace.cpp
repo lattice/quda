@@ -29,11 +29,11 @@ namespace quda {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
-    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, dagger, comm_dim, profile);
+    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, comm_dim, profile);
   }
 
   void GaugeLaplace::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkSpinorAlias(in, out);
 
@@ -43,7 +43,7 @@ namespace quda {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
-    ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, dagger, comm_dim, profile);
+    ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, comm_dim, profile);
   }
 
   void GaugeLaplace::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
@@ -79,7 +79,11 @@ namespace quda {
     // do nothing
   }
 
-  GaugeLaplacePC::GaugeLaplacePC(const DiracParam &param) : GaugeLaplace(param) { }
+  GaugeLaplacePC::GaugeLaplacePC(const DiracParam &param) : GaugeLaplace(param)
+  {
+    for (auto i = 0; i < 4; i++)
+      if (laplace3D == i) errorQuda("Cannot use 3-d operator with e/o preconditioning");
+  }
 
   GaugeLaplacePC::GaugeLaplacePC(const GaugeLaplacePC &dirac) : GaugeLaplace(dirac) { }
 
@@ -93,7 +97,7 @@ namespace quda {
 
   void GaugeLaplacePC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    double kappa2 = -kappa*kappa;
+    auto kappa2 = -kappa * kappa;
     auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {

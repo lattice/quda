@@ -12,7 +12,7 @@ namespace quda {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaNoiseType noise = noise_;
-    using Gauge = gauge::FieldOrder<real, nColor, 1, QUDA_FLOAT2_GAUGE_ORDER, true, real>;
+    using Gauge = gauge::FieldOrder<real, nColor, 1, QUDA_NATIVE_GAUGE_ORDER, true, real>;
 
     int geometry;
     int E[4]; // extended grid dimensions

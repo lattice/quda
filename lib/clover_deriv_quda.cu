@@ -11,12 +11,11 @@ namespace quda {
     GaugeField &force;
     const GaugeField &gauge;
     const GaugeField &oprod;
-    double coeff;
+    real_t coeff;
     unsigned int minThreads() const override { return gauge.LocalVolumeCB(); }
-    unsigned int sharedBytesPerThread() const override { return 4 * sizeof(int); } // for thread_array
 
   public:
-    DerivativeClover(const GaugeField &gauge, GaugeField &force, const GaugeField &oprod, double coeff) :
+    DerivativeClover(const GaugeField &gauge, GaugeField &force, const GaugeField &oprod, real_t coeff) :
       TunableKernel3D(gauge, 2, 4), force(force), gauge(gauge), oprod(oprod), coeff(coeff)
     {
       apply(device::get_default_stream());
@@ -44,7 +43,7 @@ namespace quda {
     }
   };
 
-  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff)
+  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, real_t coeff)
   {
     if constexpr (is_enabled_clover()) {
       checkPrecision(force, gauge, oprod);

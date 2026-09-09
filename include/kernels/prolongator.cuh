@@ -25,9 +25,9 @@ namespace quda {
     static constexpr bool to_non_rel = to_non_rel_;
 
     // disable ghost to reduce arg size
-    using F = FieldOrderCB<Float, fineSpin, fineColor, 1, colorspinor::getNative<Float>(fineSpin), Float, Float, true>;
-    using C = FieldOrderCB<Float, coarseSpin, coarseColor, 1, colorspinor::getNative<Float>(coarseSpin), Float, Float, true>;
-    using V = FieldOrderCB<Float, fineSpin, fineColor, coarseColor, colorspinor::getNative<vFloat>(fineSpin), vFloat, vFloat>;
+    using F = FieldOrderCB<Float, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, Float, Float, true>;
+    using C = FieldOrderCB<Float, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, Float, Float, true>;
+    using V = FieldOrderCB<Float, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat>;
 
     const int_fastdiv n_src;
     F out[MAX_MULTI_RHS];
@@ -66,7 +66,7 @@ namespace quda {
   {
     int x = parity * arg.out[src_idx].VolumeCB() + x_cb;
     int x_coarse = arg.geo_map[x];
-    int parity_coarse = (x_coarse >= arg.in[src_idx].VolumeCB()) ? 1 : 0;
+    int parity_coarse = (static_cast<index_t>(x_coarse) >= arg.in[src_idx].VolumeCB()) ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse * arg.in[src_idx].VolumeCB();
 
 #pragma unroll

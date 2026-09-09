@@ -3,13 +3,12 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <constant_kernel_arg.h>
 #include <reduce_helper.h>
 #include <reduction_kernel.h>
 
 namespace quda {
-  
-  using spinor_array = array<double, 8>;
+
+  using spinor_array = array<device_reduce_t, 8>;
 
   constexpr unsigned long max_nx = 4;
   constexpr unsigned long max_ny = 4;
@@ -22,8 +21,8 @@ namespace quda {
     static constexpr int nSpinX = 4;
     static constexpr int nSpinY = 1;
 
-    typedef typename colorspinor_mapper<Float, nSpinX, nColor, false, false, true>::type F4;
-    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, false, true>::type F1;
+    typedef typename colorspinor_mapper<Float, nSpinX, nColor, false, true>::type F4;
+    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, true>::type F1;
     
     static constexpr unsigned int max_n_batch_block = 8;
     int_fastdiv nx;
@@ -47,25 +46,11 @@ namespace quda {
     __device__ __host__ spinor_array init() const { return spinor_array(); }
   };
   
- template <int reduction_dim, class T> __device__ int idx_from_t_xyz(int t, int xyz, T X[4])
-  {
-    int x[4];
-#pragma unroll
-    for (int d = 0; d < 4; d++) {
-      if (d != reduction_dim) {
-	x[d] = xyz % X[d];
-	xyz = xyz / X[d];
-      }
-    }    
-    x[reduction_dim] = t;    
-    return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
-  }
-  
   template <typename Arg> struct EvecProjection : plus<spinor_array> {
     using reduce_t = spinor_array;
-    using plus<reduce_t>::operator();    
-    static constexpr int reduce_block_dim = 1; // only doing a reduct in the x thread dimension
-    
+    using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 1; // only doing a reduce in the x thread dimension
+
     const Arg &arg;
     constexpr EvecProjection(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -99,14 +84,14 @@ namespace quda {
       Vector1 y = arg.y[j](idx_cb, parity);
 
       // Compute the inner product over colour
-      reduce_t result_local;
+      array<real, nSpinX * 2> result_local;
       for (int mu = 0; mu < nSpinX; mu++) {
         complex<real> prod = innerProduct(y, x, 0, mu);
         result_local[2 * mu + 0] = prod.real();
         result_local[2 * mu + 1] = prod.imag();
       }
-      
-      return plus::operator()(result_local, result);
+
+      return operator()(result, result_local);
     }
   };
 }

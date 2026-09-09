@@ -3,6 +3,7 @@
 #include <kernels/color_spinor_pack.cuh>
 #include <instantiate.h>
 #include <multigrid.h>
+#include <int_list.hpp>
 
 /**
    @file color_spinor_pack.cu
@@ -153,8 +154,6 @@ namespace quda {
     long long bytes() const { return work_items * 2 * a.Nspin() * a.Ncolor() * (a.Precision() + a.GhostPrecision()); }
   };
 
-  template <int...> struct IntList { };
-
   template <typename Float, typename ghostFloat, int Ns, bool native, int fineColor, int coarseColor, int...N>
   bool genericPackGhostC(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
                          MemoryLocation *destination, int shmem, cvector_ref<const ColorSpinorField> &v,
@@ -172,7 +171,7 @@ namespace quda {
         (std::is_same_v<Float, float> && std::is_same_v<ghostFloat, int8_t> && Nc != 3 && Ns != 2);
 
       if constexpr (!do_not_compile) {
-        constexpr QudaFieldOrder order = native ? colorspinor::getNative<Float>(Ns) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+        constexpr QudaFieldOrder order = native ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         GhostPack<Float, ghostFloat, order, Ns, Nc>(ghost, a, parity, nFace, dagger, destination, shmem, v);
       } else {
         errorQuda("Not supported (Nc = %d, Ns = %d, Precision = %d, Ghost Precision = %d)",
@@ -213,7 +212,8 @@ namespace quda {
   {
     if (!is_enabled_spin(a.Nspin())) errorQuda("nSpin=%d not enabled for this build", a.Nspin());
 
-    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+    // maybe_unused since no spin is instantiated below if this build has no spin enabled
+    [[maybe_unused]] IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
     if (a.Nspin() == 4) {
       if constexpr (is_enabled_spin(4))
         genericPackGhost<Float, ghostFloat, 4, native>(ghost, a, parity, nFace, dagger, destination, shmem, v, fineColors);

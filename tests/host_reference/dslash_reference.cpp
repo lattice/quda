@@ -43,6 +43,7 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
                                                     QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
                                                     void **gauge, void *, void *, int src_idx)
 {
+  using complex = std::complex<double>;
   if (multishift > 1) errorQuda("Multishift not supported");
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
@@ -51,20 +52,20 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
-        kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-        kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+        kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+        c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
       }
       mdw_mat(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.dagger, inv_param.cpu_prec, gauge_param,
-              inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+              inv_param.mass, b5, c5);
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_mat(spinorCheck, gauge, spinorOut, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass,
-                   inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                   inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                   inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                   std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                   inv_param.eofa_pm, inv_param.eofa_shift);
     } else {
       errorQuda("Unsupported dslash_type=%s", get_dslash_str(dslash_type));
     }
@@ -83,21 +84,21 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
       dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
-        kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-        kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+        kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+        c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
       }
       mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec,
-                gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+                gauge_param, inv_param.mass, b5, c5);
       // DOMAIN_WALL END
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_matpc(spinorCheck, gauge, spinorOut, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
-                     inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
-                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                     inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                     std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                     inv_param.eofa_pm, inv_param.eofa_shift);
     } else {
       errorQuda("Unsupported dslash_type=%s", get_dslash_str(dslash_type));
     }
@@ -123,26 +124,27 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
       dw_4d_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
-        kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-        kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+        kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+        c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
       }
       mdw_matpc(spinorTmp, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
-                inv_param.mass, inv_param.b_5, inv_param.c_5);
+                inv_param.mass, b5, c5);
       mdw_matpc(spinorCheck, gauge, spinorTmp, kappa_b, kappa_c, inv_param.matpc_type, 1, inv_param.cpu_prec,
-                gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+                gauge_param, inv_param.mass, b5, c5);
       // DOMAIN_WALL END
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_matpc(spinorTmp, gauge, spinorOut, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
-                     inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
-                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                     inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                     std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                     inv_param.eofa_pm, inv_param.eofa_shift);
       mdw_eofa_matpc(spinorCheck, gauge, spinorTmp, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param,
-                     inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
-                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                     inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                     std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                     inv_param.eofa_pm, inv_param.eofa_shift);
 
     } else {
       errorQuda("Unsupported dslash_type=%s", get_dslash_str(dslash_type));
@@ -159,9 +161,9 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
 
   int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
   mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-  double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-  double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-  double l2r = sqrt(nrm2 / src2);
+  auto nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  auto src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  auto l2r = sqrt(nrm2 / src2);
 
   printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n",
              inv_param.tol, inv_param.true_res[src_idx], l2r, inv_param.tol_hq, inv_param.true_res_hq[src_idx]);
@@ -232,9 +234,9 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
       axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, vol * spinor_site_size * inv_param.Ls,
            inv_param.cpu_prec);
       mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-      double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-      double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-      double l2r = sqrt(nrm2 / src2);
+      auto nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+      auto src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+      auto l2r = sqrt(nrm2 / src2);
       l2r_max = std::max(l2r, l2r_max);
 
       printfQuda("Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, "
@@ -403,9 +405,9 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
     }
 
     mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-    double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-    double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-    double l2r = sqrt(nrm2 / src2);
+    auto nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+    auto src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+    auto l2r = sqrt(nrm2 / src2);
     l2r_max = l2r;
 
     printfQuda(
@@ -419,6 +421,7 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
 double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, QudaGaugeParam &gauge_param,
                                    QudaEigParam &eig_param, void **gauge, void *clover, void *clover_inv)
 {
+  using complex = std::complex<double>;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
   bool normop = (eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? true : false);
   int vol = (use_pc ? Vh : V);
@@ -470,46 +473,43 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
     break;
   }
   case QUDA_MOBIUS_DWF_DSLASH: {
-    double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-    double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+    std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
     for (int xs = 0; xs < Lsdim; xs++) {
-      kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-      kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+      kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+      kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
+      b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+      c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
     }
     if (use_pc) {
-      mdw_matpc(spinorTmp, gauge, spinor, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass,
-                inv_param.b_5, inv_param.c_5);
+      mdw_matpc(spinorTmp, gauge, spinor, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass, b5, c5);
       if (normop)
         mdw_matpc(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, matpc_type, dagger_opposite, cpu_prec, gauge_param,
-                  mass, inv_param.b_5, inv_param.c_5);
+                  mass, b5, c5);
     } else {
-      mdw_mat(spinorTmp, gauge, spinor, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, inv_param.b_5,
-              inv_param.c_5);
+      mdw_mat(spinorTmp, gauge, spinor, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, b5, c5);
       if (normop)
-        mdw_mat(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, dagger_opposite, cpu_prec, gauge_param, mass,
-                inv_param.b_5, inv_param.c_5);
+        mdw_mat(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, dagger_opposite, cpu_prec, gauge_param, mass, b5, c5);
     }
-    host_free(kappa_b);
-    host_free(kappa_c);
     break;
   }
   case QUDA_MOBIUS_DWF_EOFA_DSLASH: {
     if (use_pc) {
       mdw_eofa_matpc(spinorTmp, gauge, spinor, matpc_type, dagger, cpu_prec, gauge_param, mass, inv_param.m5,
-                     (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                     inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                     std::real(static_cast<complex>(inv_param.b_5[0])), std::real(static_cast<complex>(inv_param.c_5[0])),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
       if (normop)
         mdw_eofa_matpc(spinorTmp2, gauge, spinorTmp, matpc_type, dagger_opposite, cpu_prec, gauge_param, mass,
-                       inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1,
-                       inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                       inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                       std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                       inv_param.eofa_pm, inv_param.eofa_shift);
     } else {
       mdw_eofa_mat(spinorTmp, gauge, spinor, dagger, cpu_prec, gauge_param, mass, inv_param.m5,
-                   (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                   inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                   std::real(static_cast<complex>(inv_param.b_5[0])), std::real(static_cast<complex>(inv_param.c_5[0])),
+                   inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
       if (normop)
         mdw_eofa_mat(spinorTmp2, gauge, spinorTmp, dagger_opposite, cpu_prec, gauge_param, mass, inv_param.m5,
-                     (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                     inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                     std::real(static_cast<complex>(inv_param.b_5[0])), std::real(static_cast<complex>(inv_param.c_5[0])),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
     }
     break;
   }
@@ -616,6 +616,7 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
                                       QudaGaugeParam &gauge_param, QudaEigParam &eig_param, void **gauge, void *clover,
                                       void *clover_inv)
 {
+  using complex = std::complex<double>;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
   int vol = (use_pc ? Vh : V);
 
@@ -656,31 +657,28 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
     break;
   }
   case QUDA_MOBIUS_DWF_DSLASH: {
-    double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-    double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+    std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
     for (int xs = 0; xs < Lsdim; xs++) {
-      kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-      kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+      kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+      kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
+      b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+      c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
     }
     if (use_pc)
-      mdw_matpc(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass,
-                inv_param.b_5, inv_param.c_5);
+      mdw_matpc(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass, b5, c5);
     else
-      mdw_mat(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, inv_param.b_5,
-              inv_param.c_5);
-    host_free(kappa_b);
-    host_free(kappa_c);
+      mdw_mat(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, b5, c5);
     break;
   }
   case QUDA_MOBIUS_DWF_EOFA_DSLASH: {
     if (use_pc)
       mdw_eofa_matpc(spinorTmp, gauge, spinor_left, matpc_type, dagger, cpu_prec, gauge_param, mass, inv_param.m5,
-                     (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                     inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                     std::real(static_cast<complex>(inv_param.b_5[0])), std::real(static_cast<complex>(inv_param.c_5[0])),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
     else
       mdw_eofa_mat(spinorTmp, gauge, spinor_left, dagger, cpu_prec, gauge_param, mass, inv_param.m5,
-                   (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                   inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                   std::real(static_cast<complex>(inv_param.b_5[0])), std::real(static_cast<complex>(inv_param.c_5[0])),
+                   inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
     break;
   }
   case QUDA_TWISTED_MASS_DSLASH: {
@@ -731,12 +729,10 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
   }
 
   // Compute M * x_left - \sigma * x_right
-  double nrm2, src2, l2r;
   caxpy(-sigma, spinor_right, spinorTmp, spinor_length, cpu_prec);
-  nrm2 = norm_2(spinorTmp, spinor_length, cpu_prec);
-
-  src2 = norm_2(spinor_left, spinor_length, cpu_prec);
-  l2r = sqrt(nrm2 / src2);
+  auto nrm2 = norm_2(spinorTmp, spinor_length, cpu_prec);
+  auto src2 = norm_2(spinor_left, spinor_length, cpu_prec);
+  auto l2r = sqrt(nrm2 / src2);
 
   printfQuda("Singular vector pair %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
 
@@ -744,23 +740,23 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
   return l2r;
 }
 
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
+std::array<real_t, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int src_idx)
+                                               QudaInvertParam &inv_param, int laplace3D, int src_idx)
 {
   std::vector<quda::ColorSpinorField> out_vector(1);
   out_vector[0] = out;
-  return verifyStaggeredInversion(in, out_vector, fat_link, long_link, inv_param, src_idx);
+  return verifyStaggeredInversion(in, out_vector, fat_link, long_link, inv_param, laplace3D, src_idx);
 }
 
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
+std::array<real_t, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
                                                std::vector<quda::ColorSpinorField> &out_vector,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int src_idx)
+                                               QudaInvertParam &inv_param, int laplace3D, int src_idx)
 {
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   double l2r_max = 0.0;
-  double hqr_max = 0.0;
+  real_t hqr_max = 0.0;
 
   // Create temporary spinors
   quda::ColorSpinorParam csParam(in);
@@ -783,19 +779,20 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
     for (int i = 0; i < multishift; i++) {
       auto &out = out_vector[i];
       double mass = 0.5 * sqrt(inv_param.offset[i]);
-      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type);
+      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type, laplace3D);
 
       mxpy(in.data(), ref.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-      double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-      double src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-      double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
-      double l2r = sqrt(nrm2 / src2);
+      auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+      auto src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+      auto hq_norm = quda::blas::HeavyQuarkResidualNorm(out, ref);
+      auto hqr = quda::sqrt(hq_norm[2]);
+      auto l2r = sqrt(nrm2 / src2);
 
       printfQuda("%dth solution: mass=%f, ", i, mass);
       printfQuda("Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, "
                  "QUDA = %9.6e, host = %9.6e\n",
-                 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
-                 inv_param.true_res_hq_offset[i], hqr);
+                 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], double(l2r), inv_param.tol_hq_offset[i],
+                 inv_param.true_res_hq_offset[i], double(hqr));
       // Empirical: if the cpu residue is more than 1 order the target accuracy, then it fails to converge
       if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[i]) {
         printfQuda("Shift %2d has empirically failed to converge\n", i);
@@ -809,10 +806,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
     auto &out = out_vector[0];
     double mass = inv_param.mass;
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-      stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
-
-      // correct for the massRescale function inside invertQuda
-      if (is_laplace(dslash_type)) ax(0.5 / kappa, ref.data(), ref.Length(), ref.Precision());
+      stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type, laplace3D);
     } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
       QudaParity parity = QUDA_INVALID_PARITY;
       switch (inv_param.matpc_type) {
@@ -820,22 +814,24 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
       case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
       default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
       }
-      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type);
+      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type, laplace3D);
     } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-      stag_matdag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
+      stag_matdag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type, laplace3D);
     } else {
       errorQuda("Invalid staggered solution type %d", inv_param.solution_type);
     }
 
     mxpy(in.data(), ref.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-    double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
-    double l2r = sqrt(nrm2 / src2);
+    auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto src2 = norm_2(in.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto hq_norm = quda::blas::HeavyQuarkResidualNorm(out, ref);
+    auto hqr = quda::sqrt(hq_norm[2]);
+    auto l2r = sqrt(nrm2 / src2);
 
     printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e, "
                "host = %9.6e\n",
-               inv_param.tol, inv_param.true_res[src_idx], l2r, inv_param.tol_hq, inv_param.true_res_hq[src_idx], hqr);
+               inv_param.tol, inv_param.true_res[src_idx], double(l2r), inv_param.tol_hq,
+               inv_param.true_res_hq[src_idx], double(hqr));
 
     l2r_max = l2r;
     hqr_max = hqr;
@@ -844,8 +840,9 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
   return {l2r_max, hqr_max};
 }
 
-double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Complex lambda, int i,
-                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link)
+double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, const std::vector<double _Complex> &lambda, int i,
+                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                      int laplace3D)
 {
   QudaInvertParam &inv_param = *(eig_param.invert_param);
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
@@ -861,10 +858,7 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Co
     else
       sol_type = QUDA_MATDAG_MAT_SOLUTION;
   } else {
-    if (use_pc)
-      sol_type = QUDA_MATPC_SOLUTION;
-    else
-      sol_type = QUDA_MAT_SOLUTION;
+    sol_type = use_pc ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
   }
 
   // Create temporary spinors
@@ -872,7 +866,7 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Co
   quda::ColorSpinorField ref(csParam);
 
   if (sol_type == QUDA_MAT_SOLUTION) {
-    stag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type);
+    stag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type, laplace3D);
   } else if (sol_type == QUDA_MATPC_SOLUTION) {
     QudaParity parity = QUDA_INVALID_PARITY;
     switch (inv_param.matpc_type) {
@@ -880,26 +874,60 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Co
     case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
     default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
     }
-    stag_matpc(ref, fat_link, long_link, spinor, mass, 0, parity, dslash_type);
+    stag_matpc(ref, fat_link, long_link, spinor, mass, 0, parity, dslash_type, laplace3D);
   } else if (sol_type == QUDA_MATDAG_MAT_SOLUTION) {
-    stag_matdag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type);
+    stag_matdag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type, laplace3D);
   }
 
-  // Compute M * x - \lambda * x
-  caxpy(-lambda, spinor.data(), ref.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(spinor.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double l2r = sqrt(nrm2 / src2);
+  if (laplace3D == 3) {
+    auto batch_size = (spinor.VolumeCB() / spinor.X()[3]) * stag_spinor_site_size;
+    auto t_offset = spinor.X()[3] * comm_coord(3);
+    std::vector<double> nrm2(spinor.X()[3] * comm_dim(3), 0.0);
+    std::vector<double> src2(spinor.X()[3] * comm_dim(3), 0.0);
+    // Compute M * x - \lambda * x on each slice
+    for (auto t = 0; t < spinor.X()[3]; t++) {
+      auto t_global = t_offset + t;
+      auto offset = t * batch_size * inv_param.cpu_prec;
 
-  printfQuda("Eigenvector %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
+      for (int parity = 0; parity < spinor.SiteSubset(); parity++) {
+        caxpy(-lambda[t_global], static_cast<char *>(spinor.data()) + offset, static_cast<char *>(ref.data()) + offset,
+              batch_size, inv_param.cpu_prec);
 
-  return l2r;
+        nrm2[t_global] += norm_2(static_cast<char *>(ref.data()) + offset, batch_size, inv_param.cpu_prec, false);
+        src2[t_global] += norm_2(static_cast<char *>(spinor.data()) + offset, batch_size, inv_param.cpu_prec, false);
+
+        offset += spinor.VolumeCB() * stag_spinor_site_size * inv_param.cpu_prec;
+      }
+    }
+
+    comm_allreduce_sum(nrm2);
+    comm_allreduce_sum(src2);
+
+    for (auto t = 0; t < spinor.X()[3] * comm_dim(3); t++) {
+      auto l = ((double *)&(lambda[t]))[0];
+      printfQuda("Eigenvector %4d, t = %d lambda = %15.14e: tol %.2e, host residual = %.15e\n", i, t, l, eig_param.tol,
+                 sqrt(nrm2[t] / src2[t]));
+    }
+    auto total_nrm2 = std::accumulate(nrm2.begin(), nrm2.end(), 0.0);
+    auto total_src2 = std::accumulate(src2.begin(), src2.end(), 0.0);
+
+    return sqrt(total_nrm2 / total_src2);
+  } else {
+    // Compute M * x - \lambda * x
+    caxpy(-lambda[0], spinor.data(), ref.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto src2 = norm_2(spinor.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    auto l2r = sqrt(nrm2 / src2);
+    printfQuda("Eigenvector %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
+    return l2r;
+  }
 }
 
 double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, quda::ColorSpinorField &spinor_right,
-                                         double _Complex sigma, int i, QudaEigParam &eig_param,
-                                         quda::GaugeField &fat_link, quda::GaugeField &long_link)
+                                         const std::vector<double _Complex> &sigma, int i, QudaEigParam &eig_param,
+                                         quda::GaugeField &fat_link, quda::GaugeField &long_link, int laplace3D)
 {
+  if (laplace3D == 3) errorQuda("3-d Laplace operator not supported");
   QudaInvertParam &inv_param = *(eig_param.invert_param);
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
@@ -912,13 +940,13 @@ double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, qu
   quda::ColorSpinorField ref(csParam);
 
   // Only `mat` is used here
-  stag_mat(ref, fat_link, long_link, spinor_left, mass, dagger, dslash_type);
+  stag_mat(ref, fat_link, long_link, spinor_left, mass, dagger, dslash_type, laplace3D);
 
   // Compute M * x_left - \sigma * x_right
-  caxpy(-sigma, spinor_right.data(), ref.data(), spinor_right.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(spinor_left.data(), spinor_left.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double l2r = sqrt(nrm2 / src2);
+  caxpy(-sigma[0], spinor_right.data(), ref.data(), spinor_right.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  auto nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  auto src2 = norm_2(spinor_left.data(), spinor_left.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  auto l2r = sqrt(nrm2 / src2);
 
   printfQuda("Singular vector pair %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
 
@@ -931,7 +959,7 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
     errorQuda("Spinor distance reweighting should only apply to double precision field");
   }
 
-  alpha0 = abs(alpha0);
+  alpha0 = std::abs(alpha0);
 
   quda::ColorSpinorParam csParam(spinor);
   csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -955,9 +983,9 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
   spinorDistanceReweight(spinorTmp1, -alpha0, t0);
 
   mxpy(spinorTmp1.data(), spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
-  double nrm2 = norm_2(spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
-  double src2 = norm_2(spinorTmp1.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
-  double l2r = sqrt(nrm2 / src2);
+  auto nrm2 = norm_2(spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  auto src2 = norm_2(spinorTmp1.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  auto l2r = sqrt(nrm2 / src2);
   printfQuda("Apply distance reweighting: alpha0 = %.2e, t0 = %d, host residual = %.15e\n", -alpha0, t0, l2r);
 
   spinorDistanceReweight(spinorTmp1, alpha0, t0);

@@ -39,9 +39,8 @@ namespace quda {
   void GaugeCovDev::MdagMCD(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int mu) const
   {
     auto tmp = getFieldTmp(out);
-
     MCD(tmp, in, mu);
-    MCD(out, tmp, (mu+4)%8);
+    MCD(out, tmp, (mu + 4) % 8);
   }
 
   void GaugeCovDev::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -51,7 +50,7 @@ namespace quda {
   }
 
   void GaugeCovDev::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
-                               cvector_ref<const ColorSpinorField> &, double) const
+                               cvector_ref<const ColorSpinorField> &, real_t) const
   {
     //do nothing
   }

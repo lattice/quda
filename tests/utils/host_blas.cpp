@@ -63,20 +63,20 @@ void mxpy(void *x, void *y, int len, QudaPrecision precision)
 }
 
 // returns the square of the L2 norm of the vector
-template <typename real_t> inline double norm2(real_t *v, int len)
+template <typename real_t> inline double norm2(real_t *v, int len, bool global)
 {
   double sum = 0.0;
   for (int i = 0; i < len; i++) sum += v[i] * v[i];
-  quda::comm_allreduce_sum(sum);
+  if (global) quda::comm_allreduce_sum(sum);
   return sum;
 }
 
-double norm_2(void *v, int len, QudaPrecision precision)
+double norm_2(void *v, int len, QudaPrecision precision, bool global)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    return norm2((double *)v, len);
+    return norm2((double *)v, len, global);
   else
-    return norm2((float *)v, len);
+    return norm2((float *)v, len, global);
 }
 
 // performs the operation y[i] = x[i] + a*y[i]
@@ -93,12 +93,13 @@ void xpay(const void *x, double a, void *y, int length, QudaPrecision precision)
     xpay((const float *)x, (float)a, (float *)y, length);
 }
 
-void cxpay(void *x, double _Complex a, void *y, int length, QudaPrecision precision)
+void cxpay(const void *x, std::complex<double> a, void *y, int length, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
-    xpay((double _Complex *)x, (double _Complex)a, (double _Complex *)y, length / 2);
+    xpay(reinterpret_cast<const std::complex<double> *>(x), a, reinterpret_cast<std::complex<double> *>(y), length / 2);
   } else {
-    xpay((float _Complex *)x, (float _Complex)a, (float _Complex *)y, length / 2);
+    xpay(reinterpret_cast<const std::complex<float> *>(x), std::complex<float>(a),
+         reinterpret_cast<std::complex<float> *>(y), length / 2);
   }
 }
 

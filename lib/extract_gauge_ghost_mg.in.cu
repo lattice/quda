@@ -1,5 +1,3 @@
-#define FINE_GRAINED_ACCESS
-
 #include <gauge_field_order.h>
 #include <extract_gauge_ghost_helper.cuh>
 #include <multigrid.h>
@@ -13,15 +11,16 @@ namespace quda {
   void extractGhostMG(const GaugeField &u, storeFloat **Ghost, bool extract, int offset)
   {
     typedef typename mapper<storeFloat>::type Float;
+    constexpr bool fine_grain = true;
 
     if (u.isNative()) {
-      using G = typename gauge::FieldOrder<Float,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,storeFloat>;
-      ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
+      using G = typename gauge::FieldOrder<Float, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, false, storeFloat>;
+      ExtractGhost<storeFloat, Nc, G, fine_grain>(u, Ghost, extract, offset);
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
       if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
         using G = typename gauge::FieldOrder<Float,Nc,1,QUDA_QDP_GAUGE_ORDER,true,storeFloat>;
-        ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
+        ExtractGhost<storeFloat, Nc, G, fine_grain>(u, Ghost, extract, offset);
       } else {
         errorQuda("QDP interface has not been built\n");
       }
@@ -29,7 +28,7 @@ namespace quda {
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
 
       using G = typename gauge::FieldOrder<Float, Nc, 1, QUDA_MILC_GAUGE_ORDER, true, storeFloat>;
-      ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
+      ExtractGhost<storeFloat, Nc, G, fine_grain>(u, Ghost, extract, offset);
 
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());

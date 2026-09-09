@@ -13,56 +13,35 @@ namespace quda
   namespace colorspinor
   {
 
-    template <typename T, int nSpin> constexpr auto getNative() { return QUDA_FLOAT2_FIELD_ORDER; }
-    template <> constexpr auto getNative<float, 4>() { return QUDA_FLOAT4_FIELD_ORDER; }
+    template <typename T> constexpr int get_vector_order();
+    template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+    template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
 
-    // fixed-point Wilson fields
-    template <> constexpr auto getNative<short, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
-    template <> constexpr auto getNative<int8_t, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
-
-    // fp32 multigrid fields
-    template <> constexpr auto getNative<float, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_SP_MG); }
-
-    // fixed-point multigrid fields
-    template <> constexpr auto getNative<short, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
-    template <> constexpr auto getNative<int8_t, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
-
-    template <typename T> constexpr auto getNative(int) { return QUDA_INVALID_FIELD_ORDER; }
-
-    template <> constexpr auto getNative<double>(int nSpin)
+    template <typename T> constexpr int get_vector_order(int length)
     {
-      return nSpin == 1 ? getNative<double, 1>() : nSpin == 2 ? getNative<double, 2>() : getNative<double, 4>();
-    }
-
-    template <> constexpr auto getNative<float>(int nSpin)
-    {
-      return nSpin == 1 ? getNative<float, 1>() : nSpin == 2 ? getNative<float, 2>() : getNative<float, 4>();
-    }
-
-    template <> constexpr auto getNative<short>(int nSpin)
-    {
-      return nSpin == 1 ? getNative<short, 1>() : nSpin == 2 ? getNative<short, 2>() : getNative<short, 4>();
-    }
-
-    template <> constexpr auto getNative<int8_t>(int nSpin)
-    {
-      return nSpin == 1 ? getNative<int8_t, 1>() : nSpin == 2 ? getNative<int8_t, 2>() : getNative<int8_t, 4>();
-    }
-
-    constexpr QudaFieldOrder getNative(QudaPrecision precision, int nSpin)
-    {
-      switch (precision) {
-      case QUDA_DOUBLE_PRECISION: return getNative<double>(nSpin);
-      case QUDA_SINGLE_PRECISION: return getNative<float>(nSpin);
-      case QUDA_HALF_PRECISION: return getNative<short>(nSpin);
-      case QUDA_QUARTER_PRECISION: return getNative<int8_t>(nSpin);
-      default: return QUDA_INVALID_FIELD_ORDER;
+      constexpr int N = get_vector_order<T>();
+      if constexpr (N == 0) {                    // legacy path, greatest vector size that is a divisor of length
+        int Nvec = length & (~(length - 1));     // greatest vector size that is a divisor of length
+        while (Nvec * sizeof(T) > 16) Nvec /= 2; // ensure we don't choose a size greater than 16 bytes
+        return Nvec;
+      } else {
+        int Nvec = N;
+        while (Nvec > length) Nvec /= 2;
+        return Nvec;
       }
     }
 
-    constexpr bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int)
+    constexpr int get_vector_order(size_t word_size, int length)
     {
-      return order == getNative(precision, nSpin);
+      switch (word_size) {
+      case 1: return get_vector_order<int8_t>(length);
+      case 2: return get_vector_order<short>(length);
+      case 4: return get_vector_order<float>(length);
+      case 8: return get_vector_order<double>(length);
+      }
+      return 0;
     }
 
   } // namespace colorspinor
@@ -125,6 +104,7 @@ namespace quda
     int nColor = 0; // Number of colors of the field
     int nSpin = 0;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
     int nVec = 1;   // number of packed vectors (for multigrid transfer operator)
+    int nVec_actual = 1; // The actual number of packed vectors (that are not zero padded)
 
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID; // used by twisted mass
     QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER; // defined for full fields
@@ -149,6 +129,7 @@ namespace quda
     int composite_dim = 0; // e.g., number of eigenvectors in the set
     bool is_component = false;
     int component_id = 0; // eigenvector index
+    DDParam dd {};
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -160,13 +141,9 @@ namespace quda
     void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision = QUDA_INVALID_PRECISION,
                       bool force_native = false)
     {
-      // is the current status in native field order?
-      bool native = force_native ? true : colorspinor::isNative(fieldOrder, this->precision, nSpin, nColor);
       this->precision = precision;
       this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
-
-      // if this is a native field order, let's preserve that status, else keep the same field order
-      if (native) fieldOrder = colorspinor::getNative(precision, nSpin);
+      if (force_native) fieldOrder = QUDA_NATIVE_FIELD_ORDER;
     }
 
     ColorSpinorParam(const ColorSpinorField &a);
@@ -230,6 +207,9 @@ namespace quda
       } else if (inv_param.dirac_order == QUDA_TIFR_PADDED_DIRAC_ORDER) {
         fieldOrder = QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER;
         siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+      } else if (inv_param.dirac_order == QUDA_OPENQCD_DIRAC_ORDER) {
+        fieldOrder = QUDA_OPENQCD_FIELD_ORDER;
+        siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
       } else {
         errorQuda("Dirac order %d not supported", inv_param.dirac_order);
       }
@@ -241,6 +221,7 @@ namespace quda
       nColor(cpuParam.nColor),
       nSpin(cpuParam.nSpin),
       nVec(cpuParam.nVec),
+      nVec_actual(cpuParam.nVec_actual),
       twistFlavor(cpuParam.twistFlavor),
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER),
@@ -280,6 +261,8 @@ namespace quda
       //! for deflation etc.
       if (is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
+
+    void change_dim(int D, int d) { x[D] = d; }
   };
 
   struct DslashConstant;
@@ -310,12 +293,22 @@ namespace quda
     bool reference = false; // whether the field is a reference or not
     bool ghost_only = false; // whether the field is only a ghost wrapper
 
+    /** call-depth of backup and restore methods */
+    mutable int backup_depth = 0;
+
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
     mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
+
+    /** Used to keep local track of nFace in createGhostZone */
+    mutable int nFace_allocated = 0;
+
+    /** Used to keep local track of spin_project in createGhostZone */
+    mutable bool spin_project_allocated = false;
 
     int nColor = 0;
     int nSpin = 0;
     int nVec = 0;
+    mutable int nVec_actual = 0;
 
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID;
 
@@ -355,6 +348,9 @@ namespace quda
     CompositeColorSpinorFieldDescriptor composite_descr; // contains info about the set
     //
     CompositeColorSpinorField components;
+
+    /** Domain decomposition options */
+    DDParam dd {};
 
     /**
        Compute the required extended ghost zone sizes and offsets
@@ -439,6 +435,31 @@ namespace quda
     void copy(const ColorSpinorField &src);
 
     /**
+       @brief Project the field to a domain determined by DDParam
+     */
+    void projectDD();
+
+    /**
+       @brief Returns DDParam (const version)
+     */
+    const DDParam &DD() const { return dd; }
+
+    /**
+       @brief Returns DDParam (non const version)
+     */
+    DDParam &DD() { return dd; }
+
+    /**
+       @brief Sets DDParam from a given DDParam
+     */
+    void DD(const DDParam &in) { dd = in; }
+
+    /**
+       @brief Sets DDParam from a given list of options (DD flags)
+     */
+    template <typename... Args> void DD(const quda::DD &flag, const Args &...args) { dd.set(flag, args...); }
+
+    /**
        @brief Zero all elements of this field
      */
     void zero();
@@ -453,6 +474,8 @@ namespace quda
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
     int Nvec() const { return nVec; }
+    int Nvec_actual() const { return nVec_actual; }
+    void Nvec_actual(int nVec_actual) const { this->nVec_actual = nVec_actual; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int *X() const { return x.data; }
@@ -471,7 +494,7 @@ namespace quda
     template <typename T = void *> auto data() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return reinterpret_cast<T>(v.data());
+      return static_cast<T>(v.data());
     }
 
     /**
@@ -675,7 +698,7 @@ namespace quda
       field order, given the precision and the length of the spin
       dimension.
       */
-    bool isNative() const { return colorspinor::isNative(fieldOrder, precision, nSpin, nColor); }
+    bool isNative() const { return fieldOrder == QUDA_NATIVE_FIELD_ORDER ? true : false; }
 
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }
@@ -769,9 +792,12 @@ namespace quda
     /**
       @brief Create a dummy field used for batched communication
       @param[in] v Vector of fields we which to batch together
+      @param[in] nFace The depth of the face in each dimension and direction
+      @param[in] nFace The depth of the face in each dimension and direction
+      @param[in] spin_project Whether we are spin projecting
       @return Dummy (nDim+1)-dimensional field
      */
-    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v);
+    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v, int nFace = 1, bool spin_project = true);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -852,7 +878,6 @@ namespace quda
 
     /**
      * @brief Print the site vector
-     * @param[in] a The field we are printing from
      * @param[in] parity Parity index
      * @param[in] x_cb Checkerboard space-time index
      * @param[in] rank The rank we are requesting from (default is rank = 0)
@@ -977,6 +1002,8 @@ namespace quda
                               void *Dst = nullptr, const void *Src = nullptr);
 
   void genericSource(ColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
+
+  void genericProjectDD(ColorSpinorField &a);
   int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol);
 
   /**
@@ -1019,6 +1046,8 @@ namespace quda
   */
   class RNG;
 
+  void spinDuplicate(cvector_ref<ColorSpinorField> &v, const ColorSpinorField &src);
+
   /**
      @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.
      @param[out] src The colorspinorfield
@@ -1053,6 +1082,38 @@ namespace quda
      @param[in] t0 The parameter for distance preconditioning
   */
   void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0);
+
+  /**
+     @brief Helper function for determining if the spin of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If spin is unique return the number of spins
+   */
+  inline int Spin_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    int nSpin = 0;
+    if (a.Nspin() == b.Nspin())
+      nSpin = a.Nspin();
+    else
+      errorQuda("Spin %d %d do not match (%s:%d in %s())", a.Nspin(), b.Nspin(), file, line, func);
+    return nSpin;
+  }
+
+  /**
+     @brief Helper function for determining if the spin of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check spin on
+     @return If spins is unique return the number of spins
+   */
+  template <typename... Args>
+  inline int Spin_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b,
+                   const Args &...args)
+  {
+    return Spin_(func, file, line, a, b) & Spin_(func, file, line, a, args...);
+  }
+
+#define checkSpin(...) Spin_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Helper function for determining if the preconditioning

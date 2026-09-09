@@ -40,7 +40,7 @@ namespace quda {
 
   // Modification for the 4D preconditioned domain wall operator
   void DiracDomainWall4D::Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                      const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                      const QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -50,7 +50,7 @@ namespace quda {
   }
 
   void DiracDomainWall4D::Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                      cvector_ref<const ColorSpinorField> &x, double k) const
+                                      cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -61,6 +61,7 @@ namespace quda {
 
   void DiracDomainWall4D::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
 
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
@@ -71,6 +72,7 @@ namespace quda {
 
   void DiracDomainWall4D::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -120,7 +122,7 @@ namespace quda {
   }
 
   void DiracDomainWall4DPC::M5invXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                      cvector_ref<const ColorSpinorField> &x, double b) const
+                                      cvector_ref<const ColorSpinorField> &x, real_t b) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -132,8 +134,9 @@ namespace quda {
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator
   void DiracDomainWall4DPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    double kappa2 = kappa5*kappa5;
+    real_t kappa2 = kappa5 * kappa5;
     auto tmp = getFieldTmp(out);
 
     if (symmetric && !dagger) {
@@ -159,6 +162,7 @@ namespace quda {
 
   void DiracDomainWall4DPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);

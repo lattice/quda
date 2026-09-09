@@ -22,6 +22,7 @@ endif()
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Disable gnu exentions
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -148,13 +149,10 @@ option(QUDA_DIRAC_STAGGERED "build staggered Dirac operators" ${QUDA_DIRAC_DEFAU
 option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
-option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
-option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_LAPLACE "build laplace operator" ${QUDA_DIRAC_DEFAULT})
-
+option(QUDA_DIRAC_COVDEV "build code for covariant derivative" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_DISTANCE_PRECONDITIONING "build code for distance preconditioned Wilson/clover Dirac operators" OFF)
-
-option(QUDA_COVDEV "build code for covariant derivative" OFF)
+set(QUDA_DOMAIN_DECOMPOSITION "0" CACHE STRING "which domain decomposition to instantiate in QUDA (1-bit number - RedBlack)")
 
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
@@ -169,9 +167,12 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not available for NG)" OFF)
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
+option(QUDA_QCD_PLUS_QED "Enable QCD+QED features (builds QUDA_RECONSTRUCT_9/13 instead of 8/12 for Wilson-type operators)" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
+option(QUDA_INTERFACE_OPENQCD "build OpenQCD interface (for QCD+QED support, see QUDA_QCD_PLUS_QED)" OFF)
 option(QUDA_INTERFACE_CPS "build cps interface" OFF)
 option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
 option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)
@@ -195,14 +196,6 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
-set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (recon-8/9) and clover fixed-point fields (4, 8)")
-set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
-set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
-
-set_property(CACHE QUDA_ORDER_FP PROPERTY STRINGS 4 8)
-set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
-set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
-
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
 
@@ -216,12 +209,29 @@ if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
   message(SEND_ERROR "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
 endif()
 
+# For now only we only support register tiles for the staggered dslash operators
+set(QUDA_MAX_MULTI_RHS_TILE "1" CACHE STRING "maximum tile size for MRHS kernels (staggered only)")
+if(QUDA_MAX_MULTI_RHS_TILE GREATER QUDA_MAX_MULTI_RHS)
+  message(SEND_ERROR "QUDA_MAX_MULTI_RHS_TILE is greater than QUDA_MAX_MULTI_RHS")
+endif()
+
+if(QUDA_TARGET_TYPE STREQUAL "OMPTARGET")
+  set(QUDA_MAX_KERNEL_ARG_SIZE "64" CACHE STRING "maximum static size of OpenMP kernel arguments in bytes")
+endif()
+set(QUDA_MAX_KERNEL_ARG_SIZE "4096" CACHE STRING "maximum static size of the kernel arguments in bytes passed to a kernel on the target architecture")
+if(QUDA_MAX_KERNEL_ARG_SIZE GREATER 32764)
+  message(SEND_ERROR "Maximum QUDA_MAX_KERNEL_ARG_SIZE is 32764")
+endif()
+
 set(QUDA_PRECISION
   "14"
   CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
 set(QUDA_RECONSTRUCT
   "7"
   CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+option(QUDA_64BIT_INDEXING "use 64-bit (uint64_t) field indexing in accessors; default is 32-bit (uint32_t)" OFF)
+
+option(QUDA_FLUSH_DENORMALS "Whether to fliush denormals to zero" OFF)
 
 option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
@@ -234,16 +244,26 @@ option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest 
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
-option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
+option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
+if(NOT DEFINED QUDA_BLAS_PREFETCH_TYPE)
+  set(QUDA_BLAS_PREFETCH_TYPE "THREAD" CACHE STRING "BLAS grid-stride prefetch: NONE, THREAD (per-cache-line L2), BULK (CUDA sm_90+; CMake rejects older arches)")
+endif()
+set_property(CACHE QUDA_BLAS_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK)
+mark_as_advanced(QUDA_BLAS_PREFETCH_TYPE)
 
-option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conversion" OFF)
+# Work-item inner-loop unroll: separate knobs for streaming BLAS vs reduction BLAS kernels.
+if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_STREAMING})
+  set(QUDA_BLAS_UNROLL_STREAMING "1" CACHE STRING
+      "Work-item unroll for streaming BLAS (blas_core.cuh, multi_blas_core.cuh). Typical values: 1 or 2.")
+endif()
+if(NOT DEFINED CACHE{QUDA_BLAS_UNROLL_REDUCE})
+  set(QUDA_BLAS_UNROLL_REDUCE "1" CACHE STRING
+      "Work-item unroll for reduction BLAS (reduce_core.cuh, multi_reduce_core.cuh). Typical values: 1 or 2.")
+endif()
+mark_as_advanced(QUDA_BLAS_UNROLL_STREAMING)
+mark_as_advanced(QUDA_BLAS_UNROLL_REDUCE)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
-set(QUDA_CXX_STANDARD
-    20
-    CACHE STRING "set the CXX Standard (14, 17, 20)")
-
-set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17 20)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
@@ -265,17 +285,16 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_ORDER_FP)
-mark_as_advanced(QUDA_ORDER_SP_MG)
-mark_as_advanced(QUDA_ORDER_FP_MG)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 
-mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
-
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_MAX_MULTI_RHS)
+mark_as_advanced(QUDA_MAX_MULTI_RHS_TILE)
+mark_as_advanced(QUDA_MAX_KERNEL_ARG_SIZE)
 mark_as_advanced(QUDA_PRECISION)
+mark_as_advanced(QUDA_64BIT_INDEXING)
+mark_as_advanced(QUDA_FLUSH_DENORMALS)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
@@ -288,7 +307,6 @@ mark_as_advanced(QUDA_INTERFACE_ALL)
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOLVER)
-mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 ####################################################################################
@@ -302,12 +320,30 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 # is to configure the build given the options above
 
 # Some checks for invalid combinations
+set(_valid_blas_pf NONE THREAD BULK)
+if(NOT QUDA_BLAS_PREFETCH_TYPE IN_LIST _valid_blas_pf)
+  message(FATAL_ERROR "Invalid QUDA_BLAS_PREFETCH_TYPE='${QUDA_BLAS_PREFETCH_TYPE}'. Allowed: ${_valid_blas_pf}")
+endif()
+if(NOT QUDA_TARGET_TYPE STREQUAL "CUDA" AND QUDA_BLAS_PREFETCH_TYPE STREQUAL "BULK")
+  message(FATAL_ERROR "QUDA_BLAS_PREFETCH_TYPE=BULK requires QUDA_TARGET_TYPE=CUDA (TMA bulk prefetch is CUDA-only).")
+endif()
+message(STATUS "BLAS prefetch: ${QUDA_BLAS_PREFETCH_TYPE}")
+message(STATUS "BLAS unroll (streaming): ${QUDA_BLAS_UNROLL_STREAMING}")
+message(STATUS "BLAS unroll (reduction): ${QUDA_BLAS_UNROLL_REDUCE}")
+
 if(QUDA_MPI AND QUDA_QMP)
   message(
     SEND_ERROR
     "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
+if(QUDA_INTERFACE_OPENQCD AND QUDA_QMP)
+  message(SEND_ERROR "OpenQCD does not support QMP comms.")
+endif()
+
+if(QUDA_INTERFACE_OPENQCD AND NOT (QUDA_MPI))
+  message(SEND_ERROR "OpenQCD requires QUDA built with MPI comms.")
+endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
@@ -327,8 +363,6 @@ if(${CPU_ARCH} STREQUAL "x86_64")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
-
-set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
 set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3"
@@ -397,6 +431,9 @@ endif()
 
 find_package(Threads REQUIRED)
 if(QUDA_OPENMP)
+  if(${CMAKE_CXX_COMPILER_ID} MATCHES "NVHPC")
+    message(FATAL_ERROR "Host compiler (nvc++) not supported with QUDA_OPENMP=ON")
+  endif()
   find_package(OpenMP REQUIRED)
 endif()
 
@@ -420,20 +457,12 @@ if(QUDA_DOWNLOAD_EIGEN)
   CPMAddPackage(
     NAME Eigen
     VERSION ${QUDA_EIGEN_VERSION}
-    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
+    URL https://gitlab.com/libeigen/eigen/-/archive/e67c494cba7180066e73b9f6234d0b2129f1cdf5.tar.bz2
+    URL_HASH SHA256=98d244932291506b75c4ae7459af29b1112ea3d2f04660686a925d9ef6634583
     DOWNLOAD_ONLY YES
     SYSTEM YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
   install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
-
-  # Eigen 3.4 needs to be patched on Neon with nvc++
-  if (${CMAKE_CXX_COMPILER_ID} MATCHES "NVHPC")
-    set(CMAKE_PATCH_EIGEN OFF CACHE BOOL "Internal use only; do not modify")
-    if (NOT CMAKE_PATCH_EIGEN)
-      execute_process(COMMAND patch -N "${Eigen_SOURCE_DIR}/Eigen/src/Core/arch/NEON/Complex.h" "${CMAKE_SOURCE_DIR}/cmake/eigen34_neon.diff")
-      set(CMAKE_PATCH_EIGEN ON CACHE BOOL "Internal use only; do not modify" FORCE)
-    endif()
-  endif()
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)

@@ -98,7 +98,9 @@ namespace quda
     nColor = param.nColor;
     nSpin = param.nSpin;
     nVec = param.nVec;
+    nVec_actual = param.nVec_actual;
     twistFlavor = param.twistFlavor;
+    dd = param.dd;
 
     if (param.pc_type != QUDA_5D_PC && param.pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", param.pc_type);
     pc_type = param.pc_type;
@@ -227,9 +229,11 @@ namespace quda
     alloc = std::exchange(src.alloc, false);
     reference = std::exchange(src.reference, false);
     ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
+    nFace_allocated = std::exchange(src.nFace_allocated, 0);
     nColor = std::exchange(src.nColor, 0);
     nSpin = std::exchange(src.nSpin, 0);
     nVec = std::exchange(src.nVec, 0);
+    nVec_actual = std::exchange(src.nVec_actual, 0);
     twistFlavor = std::exchange(src.twistFlavor, QUDA_TWIST_INVALID);
     pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
     suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
@@ -240,6 +244,7 @@ namespace quda
     ghostFace = std::exchange(src.ghostFace, {});
     ghostFaceCB = std::exchange(src.ghostFaceCB, {});
     ghost_buf = std::exchange(src.ghost_buf, {});
+    dd = std::exchange(src.dd, {});
     dslash_constant = std::exchange(src.dslash_constant, nullptr);
     bytes = std::exchange(src.bytes, 0);
     bytes_raw = std::exchange(src.bytes_raw, 0);
@@ -291,8 +296,11 @@ namespace quda
     LatticeField::setTuningString();
     if (init) {
       std::stringstream aux_ss;
-      aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",order=" << fieldOrder
-             << ",Ns=" << nSpin << ",Nc=" << nColor;
+      aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",Ns=" << nSpin
+             << ",Nc=" << nColor << ",order=" << fieldOrder;
+      if (isNative()) aux_ss << ",N=" << colorspinor::get_vector_order(precision, 128);
+      if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
+      if (nVec > 1) aux_ss << ",nVec=" << nVec;
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
       if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
@@ -308,7 +316,8 @@ namespace quda
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
     if (ghost_precision == QUDA_INVALID_PRECISION) errorQuda("Invalid requested ghost precision");
-    if (ghost_precision_allocated == ghost_precision) return;
+    if (ghost_precision_allocated == ghost_precision && nFace_allocated == nFace &&
+        spin_project_allocated == spin_project) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
     int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;
@@ -369,39 +378,20 @@ namespace quda
       }
 
       dc.Vh = (X[3] * X[2] * X[1] * X[0]) / 2;
-      dc.ghostFace[0] = X[1] * X[2] * X[3];
-      dc.ghostFace[1] = X[0] * X[2] * X[3];
-      dc.ghostFace[2] = X[0] * X[1] * X[3];
-      dc.ghostFace[3] = X[0] * X[1] * X[2];
-      for (int d = 0; d < 4; d++) dc.ghostFaceCB[d] = dc.ghostFace[d] / 2;
+      dc.ghostFaceCB[0] = X[1] * X[2] * X[3] / 2;
+      dc.ghostFaceCB[1] = X[0] * X[2] * X[3] / 2;
+      dc.ghostFaceCB[2] = X[0] * X[1] * X[3] / 2;
+      dc.ghostFaceCB[3] = X[0] * X[1] * X[2] / 2;
 
       dc.X2X1 = X[1] * X[0];
       dc.X3X2X1 = X[2] * X[1] * X[0];
       dc.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
-      dc.X2X1mX1 = (X[1] - 1) * X[0];
-      dc.X3X2X1mX2X1 = (X[2] - 1) * X[1] * X[0];
-      dc.X4X3X2X1mX3X2X1 = (X[3] - 1) * X[2] * X[1] * X[0];
-      dc.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
-      dc.X4X3X2X1hmX3X2X1h = dc.X4X3X2X1mX3X2X1 / 2;
-
-      // used by indexFromFaceIndexStaggered
-      dc.dims[0][0] = X[1];
-      dc.dims[0][1] = X[2];
-      dc.dims[0][2] = X[3];
-
-      dc.dims[1][0] = X[0];
-      dc.dims[1][1] = X[2];
-      dc.dims[1][2] = X[3];
-
-      dc.dims[2][0] = X[0];
-      dc.dims[2][1] = X[1];
-      dc.dims[2][2] = X[3];
-
-      dc.dims[3][0] = X[0];
-      dc.dims[3][1] = X[1];
-      dc.dims[3][2] = X[2];
+      dc.X5X4X3X2X1 = X[4] * X[3] * X[2] * X[1] * X[0];
     }
+
+    spin_project_allocated = spin_project;
     ghost_precision_allocated = ghost_precision;
+    nFace_allocated = nFace;
   } // createGhostZone
 
   void ColorSpinorField::zero() { qudaMemsetAsync(v, 0, bytes, device::get_default_stream()); }
@@ -429,11 +419,11 @@ namespace quda
     } else if (Location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) { // H2D
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on host
-        void *buffer = pool_pinned_malloc(bytes);
+        void *buffer = pool_host_pinned_malloc(bytes);
         memset(buffer, 0, bytes); // FIXME (temporary?) bug fix for padding
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0);
         qudaMemcpy(v.data(), buffer, bytes, qudaMemcpyDefault);
-        pool_pinned_free(buffer);
+        pool_host_pinned_free(buffer);
       } else { // reorder on device
 
         if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -447,7 +437,7 @@ namespace quda
             Src = buffer;
             qudaMemcpy(Src, src.data(), src.Bytes(), qudaMemcpyDefault);
           } else {
-            buffer = pool_pinned_malloc(src.Bytes());
+            buffer = pool_host_pinned_malloc(src.Bytes());
             memcpy(buffer, src.data(), src.Bytes());
             Src = get_mapped_device_pointer(buffer);
           }
@@ -456,7 +446,7 @@ namespace quda
           copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src);
 
           if (zeroCopy)
-            pool_pinned_free(buffer);
+            pool_host_pinned_free(buffer);
           else
             pool_device_free(buffer);
         }
@@ -465,10 +455,10 @@ namespace quda
     } else if (Location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) { // D2H
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on the host
-        void *buffer = pool_pinned_malloc(src.Bytes());
+        void *buffer = pool_host_pinned_malloc(src.Bytes());
         qudaMemcpy(buffer, src.data(), src.Bytes(), qudaMemcpyDefault);
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 0, buffer);
-        pool_pinned_free(buffer);
+        pool_host_pinned_free(buffer);
       } else { // reorder on the device
 
         if (FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -481,7 +471,7 @@ namespace quda
             buffer = pool_device_malloc(bytes);
             dst = buffer;
           } else {
-            buffer = pool_pinned_malloc(bytes);
+            buffer = pool_host_pinned_malloc(bytes);
             dst = get_mapped_device_pointer(buffer);
           }
 
@@ -495,7 +485,7 @@ namespace quda
           }
 
           if (zeroCopy)
-            pool_pinned_free(buffer);
+            pool_host_pinned_free(buffer);
           else
             pool_device_free(buffer);
         }
@@ -520,6 +510,7 @@ namespace quda
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.nVec = nVec;
+    param.nVec_actual = nVec_actual;
     param.twistFlavor = twistFlavor;
     param.fieldOrder = fieldOrder;
     param.setPrecision(precision, ghost_precision); // intentionally called here and not in LatticeField
@@ -532,6 +523,7 @@ namespace quda
     param.pc_type = pc_type;
     param.suggested_parity = suggested_parity;
     param.create = QUDA_NULL_FIELD_CREATE;
+    param.dd = dd;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const
@@ -580,8 +572,8 @@ namespace quda
       }
     } else { // FIXME add GPU_COMMS support
       if (total_bytes) {
-        total_send = pool_pinned_malloc(total_bytes);
-        total_recv = pool_pinned_malloc(total_bytes);
+        total_send = pool_host_pinned_malloc(total_bytes);
+        total_recv = pool_host_pinned_malloc(total_bytes);
       }
       size_t offset = 0;
       for (int i = 0; i < nDimComms; i++) {
@@ -661,8 +653,8 @@ namespace quda
       }
 
       if (total_bytes) {
-        pool_pinned_free(total_send);
-        pool_pinned_free(total_recv);
+        pool_host_pinned_free(total_send);
+        pool_host_pinned_free(total_recv);
       }
     }
 
@@ -709,6 +701,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    even->dd = dd;
     return *even;
   }
 
@@ -716,6 +709,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    odd->dd = dd;
     return *odd;
   }
 
@@ -723,6 +717,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    even->dd = dd;
     return *even;
   }
 
@@ -730,6 +725,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    odd->dd = dd;
     return *odd;
   }
 
@@ -820,7 +816,8 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
-  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v)
+  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v, int nFace,
+                                                                  bool spin_project)
   {
     // first create a dummy batched field
     ColorSpinorParam param(v[0]);
@@ -838,9 +835,12 @@ namespace quda
     FieldKey<ColorSpinorField> key;
     key.volume = v.VolString();
     key.aux = v.AuxString();
-    char aux[32];
-    strcpy(aux, ",ghost_batch=");
-    u32toa(aux + 13, v.size());
+    char aux[48];
+    strcpy(aux, ",nFace=");
+    u32toa(aux + 7, nFace);
+    strcpy(aux + 8, ",ghost_batch=");
+    u32toa(aux + 21, v.size());
+    if (spin_project && v.Nspin() > 1) strcat(aux, ",spin_project");
     key.aux += aux;
 
     return FieldTmp<ColorSpinorField>(key, param);
@@ -886,9 +886,8 @@ namespace quda
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
-    coarseParam.fieldOrder = (new_location == QUDA_CUDA_FIELD_LOCATION) ?
-      colorspinor::getNative(new_precision, coarseParam.nSpin) :
-      QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    coarseParam.fieldOrder
+      = (new_location == QUDA_CUDA_FIELD_LOCATION) ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     coarseParam.setPrecision(new_precision);
 
@@ -966,10 +965,12 @@ namespace quda
       if (!initGhostFaceBuffer || resize) {
         freeGhostBuffer();
         for (int i = 0; i < nDimComms; i++) {
-          fwdGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          fwdGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+          // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+          // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
+          fwdGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          fwdGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
         }
         initGhostFaceBuffer = 1;
       }
@@ -1484,17 +1485,23 @@ namespace quda
 
   void ColorSpinorField::backup() const
   {
-    if (backup_h.size()) errorQuda("ColorSpinorField already backed up");
-    backup_h.resize(1);
-    backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
-    qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
+    if (backup_depth == 0) {
+      backup_h.resize(1);
+      backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
+      qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
+    }
+    backup_depth++;
   }
 
   void ColorSpinorField::restore() const
   {
-    if (!backup_h.size()) errorQuda("Cannot restore since not backed up");
-    qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
-    backup_h.resize(0);
+    backup_depth--;
+    if (backup_depth < 0) errorQuda("Cannot restore since not backed up");
+
+    if (backup_depth == 0) {
+      qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
+      backup_h.resize(0);
+    }
   }
 
   void ColorSpinorField::copy_to_buffer(void *buffer) const
@@ -1545,6 +1552,8 @@ namespace quda
     genericPrintVector(*this, parity, x_cb, rank);
   }
 
+  void ColorSpinorField::projectDD() { genericProjectDD(*this); }
+
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
   {
     if (checkLocation(a, b) == QUDA_CUDA_FIELD_LOCATION) errorQuda("device field not implemented");
@@ -1554,24 +1563,28 @@ namespace quda
 
   std::ostream &operator<<(std::ostream &out, const ColorSpinorField &a)
   {
-    out << "location = " << a.Location() << std::endl;
-    out << "v = " << a.v.data() << std::endl;
+    out << static_cast<const LatticeField &>(a);
+    out << "init = " << a.init << std::endl;
     out << "alloc = " << a.alloc << std::endl;
     out << "reference = " << a.reference << std::endl;
-    out << "init = " << a.init << std::endl;
+    out << "ghost_only = " << a.ghost_only << std::endl;
+    out << "ghost_precision_allocated = " << a.ghost_precision_allocated << std::endl;
+    out << "nFace_allocated = " << a.nFace_allocated << std::endl;
+    out << "spin_project_allocated = " << a.spin_project_allocated << std::endl;
     out << "nColor = " << a.nColor << std::endl;
     out << "nSpin = " << a.nSpin << std::endl;
+    out << "nVec = " << a.nVec << std::endl;
+    out << "nVec_actual = " << a.nVec_actual << std::endl;
     out << "twistFlavor = " << a.twistFlavor << std::endl;
-    out << "nDim = " << a.nDim << std::endl;
-    for (int d = 0; d < a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
-    out << "volume = " << a.volume << std::endl;
     out << "pc_type = " << a.pc_type << std::endl;
     out << "suggested_parity = " << a.suggested_parity << std::endl;
-    out << "precision = " << a.precision << std::endl;
-    out << "ghost_precision = " << a.ghost_precision << std::endl;
     out << "length = " << a.length << std::endl;
+    out << "v = " << a.v.data() << std::endl;
+    out << "norm_offset = " << a.norm_offset << std::endl;
+    out << "ghostFace = " << a.ghostFace << std::endl;
+    out << "ghostFaceCB = " << a.ghostFaceCB << std::endl;
     out << "bytes = " << a.bytes << std::endl;
-    out << "siteSubset = " << a.siteSubset << std::endl;
+    out << "bytes_raw = " << a.bytes_raw << std::endl;
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
@@ -1583,7 +1596,9 @@ namespace quda
     }
     out << "Is component = " << a.composite_descr.is_component << std::endl;
     if (a.composite_descr.is_composite) out << "Component ID = " << a.composite_descr.id << std::endl;
-    out << "pc_type = " << a.pc_type << std::endl;
+    out << "dd.type = " << a.dd.type << std::endl;
+    out << "dd.flags = " << a.dd.flags << std::endl;
+    out << "dd.block_dim = " << a.dd.block_dim << std::endl;
     return out;
   }
 
