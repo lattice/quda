@@ -6,17 +6,6 @@
 namespace quda
 {
 
-  enum ThreadsSync {
-    ThreadsSyncNo = 0,
-    ThreadsSyncX = 1,
-    ThreadsSyncY = 2,
-    ThreadsSyncXY = 3,
-    ThreadsSyncZ = 4,
-    ThreadsSyncXZ = 5,
-    ThreadsSyncYZ = 6,
-    ThreadsSyncAll = 7
-  };
-
   struct kernel_t {
     const void *func;
     const std::string name;

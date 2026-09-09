@@ -48,7 +48,6 @@ namespace quda
     struct MultiBlasArg : kernel_param<>,
       SpinorXZ<NXZ_, store_t, N, Functor_::use_z>,
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor_>(), store_t, N, y_store_t, Ny, Functor_::use_w> {
-      static constexpr ThreadsSync requires_threads_sync = ThreadsSyncAll;
       using real = real_;
       using Functor = Functor_;
       static constexpr int warp_split = warp_split_;
@@ -125,7 +124,7 @@ namespace quda
           l_idx[j] = lane_id / vector_site_width;
         }
 
-        vec y[n], w[n];
+        vec y[n] {}, w[n] {};
         if (!allthreads || alive) {
 #pragma unroll
           for (int j = 0; j < n; j++) {

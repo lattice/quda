@@ -63,7 +63,6 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
-    static constexpr ThreadsSync requires_threads_sync = ThreadsSyncYZ;
     using Arg = Arg_;
     static constexpr unsigned int block_size_cxpr = block_size_;
     BlockKernelArg(const Arg &arg) : Arg(arg) { }
@@ -89,11 +88,13 @@ namespace quda
     const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
     auto j = blockDim.y * blockIdx.y + threadIdx.y;
     auto k = blockDim.z * blockIdx.z + threadIdx.z;
-    if (j >= arg.threads.y) return;
-    if (k >= arg.threads.z) return;
-
     Functor<Arg> t(arg);
-    t(block_idx, thread_idx);
+    if constexpr (needsFullBlock<Functor<Arg>>) {
+      t.template operator()<true>(block_idx, thread_idx, j < arg.threads.y && k < arg.threads.z);
+    } else {
+      if (j >= arg.threads.y || k >= arg.threads.z) return;
+      t(block_idx, thread_idx);
+    }
   }
 
   /**

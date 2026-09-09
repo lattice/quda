@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel_ops.h>
+#include <kernel_ops_target.h>
 
 #ifdef QUDA_OMPTARGET_THREAD_ARRAY_SIMPLE
 
@@ -28,3 +28,11 @@ namespace quda
 #include "../generic/thread_array.h"
 
 #endif
+
+namespace quda
+{
+  template <typename T, int N, typename O> inline constexpr bool needsFullBlockImpl<thread_array<T, N, O>> = false;
+#ifdef QUDA_OMPTARGET_THREAD_ARRAY_SIMPLE
+  template <typename T, int N, typename O> inline constexpr bool needsSharedMemImpl<thread_array<T, N, O>> = false;
+#endif
+} // namespace quda

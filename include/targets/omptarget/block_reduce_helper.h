@@ -2,7 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
-#include <kernel_ops.h>
+#include <kernel_ops_target.h>
 
 /**
    @file block_reduce_helper.h

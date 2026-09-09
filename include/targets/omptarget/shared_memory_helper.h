@@ -1,7 +1,7 @@
 #pragma once
 
 #include <target_device.h>
-#include <kernel_ops.h>
+#include <kernel_ops_target.h>
 
 /**
    @file shared_memory_helper.h
@@ -94,5 +94,7 @@ namespace quda
      */
     __device__ __host__ T &operator[](int i) const { return data[i]; }
   };
+
+  template <typename T, typename S, typename O> inline constexpr bool needsFullBlockImpl<SharedMemory<T, S, O>> = false;
 
 } // namespace quda

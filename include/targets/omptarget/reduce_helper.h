@@ -30,7 +30,6 @@ namespace quda
    */
   template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE>
   struct ReduceArg : kernel_param<use_kernel_arg> {
-    static constexpr ThreadsSync requires_threads_sync = ThreadsSyncAll;
     using reduce_t = T;
 
     template <typename Reducer, typename Arg, typename I>
@@ -136,25 +135,29 @@ namespace quda
     // printf("team %d thread %d isLastBlockDone %p\n", omp_get_team_num(), omp_get_thread_num(), isLastBlockDone);
 
     KernelOps<BlockReduce> ops {};
+    if constexpr (needsSharedMem<Reducer>) { __syncthreads(); } // release the transformer's scratch
     T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
     // printf("team %d thread %d  r %g  aggregate %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&in), *(double*)(&aggregate));
 
     if (target::thread_idx_linear<2>() == 0) {
-      arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
-      // __threadfence(); // flush result
+      isLastBlockDone[target::thread_idx().z] = false;
+      if (idx < static_cast<int>(arg.threads.z)) {
+        arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
+        // __threadfence(); // flush result
 
-      // increment global block counter
-      // auto value = atomicInc(&arg.count[idx], target::grid_dim().x);
-      unsigned int value = 0u;
-      unsigned int *c = &arg.count[idx];
+        // increment global block counter
+        // auto value = atomicInc(&arg.count[idx], target::grid_dim().x);
+        unsigned int value = 0u;
+        unsigned int *c = &arg.count[idx];
 #pragma omp atomic capture acq_rel
-      {
-        value = *c;
-        *c = *c + 1;
-      }
+        {
+          value = *c;
+          *c = *c + 1;
+        }
 
-      // determine if last block
-      isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
+        // determine if last block
+        isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
+      }
     }
 #pragma omp barrier
 #pragma omp single

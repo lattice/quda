@@ -12,23 +12,6 @@
 namespace quda
 {
 
-  template <typename Arg>
-  concept announce_threads_sync = requires { Arg::requires_threads_sync; };
-
-  template <typename Arg> inline bool acceptThreads(const TuneParam &tp, const Arg &arg)
-  {
-    if (tp.block.x * tp.block.y * tp.block.z > device::max_block_size()) return false;
-
-    // Preserve the synchronization constraints of the OpenMP reduction and block kernels.
-    if constexpr (announce_threads_sync<Arg>) {
-      if (((Arg::requires_threads_sync & ThreadsSyncX) && arg.threads.x % tp.block.x)
-          || ((Arg::requires_threads_sync & ThreadsSyncY) && arg.threads.y % tp.block.y)
-          || ((Arg::requires_threads_sync & ThreadsSyncZ) && arg.threads.z % tp.block.z))
-        return false;
-    }
-    return true;
-  }
-
   class TunableKernel : public Tunable
   {
 
@@ -46,7 +29,8 @@ namespace quda
       const_cast<Arg &>(arg).x_batch_stride = grid_stride ? tp.grid.x * tp.block.x : 0u;
       if constexpr (Arg::is_dslash) const_cast<Arg &>(arg).arg.block_size = arg.block_size;
       launch_error = QUDA_SUCCESS;
-      if (acceptThreads(tp, arg) && 0 == target::omptarget::qudaSetupLaunchParameter(tp)) {
+      if (tp.block.x * tp.block.y * tp.block.z <= device::max_block_size()
+          && 0 == target::omptarget::qudaSetupLaunchParameter(tp)) {
         if constexpr (device::use_kernel_arg<Arg>()) {
           reinterpret_cast<void (*)(Arg)>(const_cast<void *>(kernel.func))(arg);
         } else {

@@ -6,6 +6,7 @@
 
 #include <target_device.h>
 #include <kernel_helper.h>
+#include <kernel_ops_target.h>
 
 #define OMP_KERNEL(kern)                                                                                               \
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>                                 \
@@ -62,20 +63,6 @@ namespace quda
       = requires(Functor<Arg> &f) { f.template operator()<work_item_unroll_t<Arg>>(0, 0, 0, 0); };
   } // namespace kernel_unroll
 
-  namespace kernel_participation
-  {
-    /** @brief Detect the upstream functor interface for inactive threads that must reach team barriers. */
-    template <template <typename> class Functor, typename Arg>
-    inline constexpr bool all_threads_1d = requires(Functor<Arg> &f) { f.template operator()<true>(0, true); };
-
-    template <template <typename> class Functor, typename Arg>
-    inline constexpr bool all_threads_2d = requires(Functor<Arg> &f) { f.template operator()<true>(0, 0, true); };
-
-    template <template <typename> class Functor, typename Arg>
-    inline constexpr bool all_threads_3d = requires(Functor<Arg> &f) { f.template operator()<true>(0, 0, 0, true); };
-
-  } // namespace kernel_participation
-
   /**
      @brief Kernel1D_impl is the implementation of the generic 1-d
      kernel.  Functors that utilize this kernel have a
@@ -96,16 +83,20 @@ namespace quda
 
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if constexpr (Arg::check_bounds && kernel_participation::all_threads_1d<Functor, Arg>) {
+    if constexpr (Arg::check_bounds && needsFullBlock<Functor<Arg>>) {
       // Inactive threads still enter the functor so every team member reaches its barriers.
       if constexpr (grid_stride) {
         const auto stride = gridDim.x * blockDim.x;
-        for (auto base = blockIdx.x * blockDim.x; base < arg.threads.x; base += stride, i += stride)
+        for (auto base = blockIdx.x * blockDim.x; base < arg.threads.x; base += stride, i += stride) {
           f.template operator()<true>(i, i < arg.threads.x);
+          if constexpr (needsSharedMem<Functor<Arg>>) { __syncthreads(); } // finish reading before reuse
+        }
       } else if constexpr (Arg::work_item_unroll > 1u) {
         const bool active_item = i < static_cast<unsigned int>(arg.item_stride);
-        for (unsigned int e = 0; e < Arg::work_item_unroll; e++, i += arg.item_stride)
+        for (unsigned int e = 0; e < Arg::work_item_unroll; e++, i += arg.item_stride) {
           f.template operator()<true>(i, active_item && i < arg.threads.x);
+          if constexpr (needsSharedMem<Functor<Arg>>) { __syncthreads(); }
+        }
       } else {
         f.template operator()<true>(i, i < arg.threads.x);
       }
@@ -195,16 +186,20 @@ namespace quda
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
     auto j = threadIdx.y + blockIdx.y * blockDim.y;
 
-    if constexpr (Arg::check_bounds && kernel_participation::all_threads_2d<Functor, Arg>) {
+    if constexpr (Arg::check_bounds && needsFullBlock<Functor<Arg>>) {
       // Inactive threads still enter the functor so every team member reaches its barriers.
       if constexpr (grid_stride) {
         const auto stride = gridDim.x * blockDim.x;
-        for (auto base = blockIdx.x * blockDim.x; base < arg.threads.x; base += stride, i += stride)
+        for (auto base = blockIdx.x * blockDim.x; base < arg.threads.x; base += stride, i += stride) {
           f.template operator()<true>(i, j, i < arg.threads.x && j < arg.threads.y);
+          if constexpr (needsSharedMem<Functor<Arg>>) { __syncthreads(); } // finish reading before reuse
+        }
       } else if constexpr (Arg::work_item_unroll > 1u) {
         const bool active_item = i < static_cast<unsigned int>(arg.item_stride);
-        for (unsigned int e = 0; e < Arg::work_item_unroll; e++, i += arg.item_stride)
+        for (unsigned int e = 0; e < Arg::work_item_unroll; e++, i += arg.item_stride) {
           f.template operator()<true>(i, j, active_item && i < arg.threads.x && j < arg.threads.y);
+          if constexpr (needsSharedMem<Functor<Arg>>) { __syncthreads(); }
+        }
       } else {
         f.template operator()<true>(i, j, i < arg.threads.x && j < arg.threads.y);
       }
@@ -297,17 +292,21 @@ namespace quda
     auto j = threadIdx.y + blockIdx.y * blockDim.y;
     auto k = threadIdx.z + blockIdx.z * blockDim.z;
 
-    if constexpr (Arg::check_bounds && kernel_participation::all_threads_3d<Functor, Arg>) {
+    if constexpr (Arg::check_bounds && needsFullBlock<Functor<Arg>>) {
       // Inactive threads still enter the functor so every team member reaches its barriers.
       if constexpr (grid_stride) {
         const auto stride = gridDim.x * blockDim.x;
-        for (auto base = blockIdx.x * blockDim.x; base < arg.threads.x; base += stride, i += stride)
+        for (auto base = blockIdx.x * blockDim.x; base < arg.threads.x; base += stride, i += stride) {
           f.template operator()<true>(i, j, k, i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
+          if constexpr (needsSharedMem<Functor<Arg>>) { __syncthreads(); } // finish reading before reuse
+        }
       } else if constexpr (Arg::work_item_unroll > 1u) {
         const bool active_item = i < static_cast<unsigned int>(arg.item_stride);
-        for (unsigned int e = 0; e < Arg::work_item_unroll; e++, i += arg.item_stride)
+        for (unsigned int e = 0; e < Arg::work_item_unroll; e++, i += arg.item_stride) {
           f.template operator()<true>(i, j, k,
                                       active_item && i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
+          if constexpr (needsSharedMem<Functor<Arg>>) { __syncthreads(); }
+        }
       } else {
         f.template operator()<true>(i, j, k, i < arg.threads.x && j < arg.threads.y && k < arg.threads.z);
       }

@@ -74,6 +74,7 @@ namespace quda
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
   {
+    static_assert(!needsFullBlock<Transformer<Arg>>, "Reduction transformers must not use team barriers");
     QUDA_RT_CONSTS;
     using reduce_t = typename Transformer<Arg>::reduce_t;
     using reducer_t = typename Transformer<Arg>::reducer_t;
@@ -157,6 +158,7 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
   {
+    static_assert(!needsFullBlock<Functor<Arg>>, "Reduction transformers must not use team barriers");
     QUDA_RT_CONSTS;
     using reduce_t = typename Functor<Arg>::reduce_t;
     using reducer_t = typename Functor<Arg>::reducer_t;
@@ -166,31 +168,31 @@ namespace quda
     auto k = threadIdx.y;
     auto j = threadIdx.z + blockIdx.z * blockDim.z;
 
-    if (j >= arg.threads.z) return;
-
     reduce_t value = reducer_t::init();
 
-    const auto stride = blockDim.x * gridDim.x;
-    if constexpr (grid_stride) {
-      if constexpr (Arg::work_item_unroll > 1u) {
-        while (idx + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
-          if constexpr (reduction_unroll::reduction_functor_unroll_3d_v<Functor, Arg>) {
-            value = t.template operator()<reduction_unroll::work_item_unroll_t<Arg>>(value, idx, k, j, stride);
-            idx += Arg::work_item_unroll * stride;
-          } else {
+    if (j < arg.threads.z) {
+      const auto stride = blockDim.x * gridDim.x;
+      if constexpr (grid_stride) {
+        if constexpr (Arg::work_item_unroll > 1u) {
+          while (idx + (Arg::work_item_unroll - 1u) * stride < arg.threads.x) {
+            if constexpr (reduction_unroll::reduction_functor_unroll_3d_v<Functor, Arg>) {
+              value = t.template operator()<reduction_unroll::work_item_unroll_t<Arg>>(value, idx, k, j, stride);
+              idx += Arg::work_item_unroll * stride;
+            } else {
 #pragma unroll
-            for (unsigned e = 0; e < Arg::work_item_unroll; e++) { value = t(value, idx + e * stride, k, j); }
-            idx += Arg::work_item_unroll * stride;
+              for (unsigned e = 0; e < Arg::work_item_unroll; e++) { value = t(value, idx + e * stride, k, j); }
+              idx += Arg::work_item_unroll * stride;
+            }
           }
         }
       }
-    }
-    while (idx < arg.threads.x) {
-      value = t(value, idx, k, j);
-      if constexpr (grid_stride) {
-        idx += stride;
-      } else
-        break;
+      while (idx < arg.threads.x) {
+        value = t(value, idx, k, j);
+        if constexpr (grid_stride) {
+          idx += stride;
+        } else
+          break;
+      }
     }
 
     // perform final inter-block reduction and write out result
