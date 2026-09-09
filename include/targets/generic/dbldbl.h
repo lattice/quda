@@ -45,6 +45,8 @@
 
 #pragma once
 
+#include <quda_define.h>
+
 #include <cmath>
 #include <math_helper.h>
 
@@ -376,6 +378,8 @@ struct doubledouble {
 
   constexpr double head() const { return a.y; }
   constexpr double tail() const { return a.x; }
+  constexpr double hi() const { return head(); }
+  constexpr double lo() const { return tail(); }
 
   __device__ __host__ void print() const { printf("scalar: %16.14e + %16.14e\n", head(), tail()); }
 

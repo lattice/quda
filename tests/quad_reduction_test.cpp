@@ -1,5 +1,30 @@
 #include <quda_internal.h>
 #include <gtest/gtest.h>
+#include <type_traits>
+
+#if defined(QUDA_TARGET_CUDA) && defined(QUDA_DOUBLEDOUBLE_USE_CCCL)
+#include <cuda/fpmp>
+#if defined(QUDA_DOUBLEDOUBLE_ACCURACY_LOW)
+static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_low>);
+#elif defined(QUDA_DOUBLEDOUBLE_ACCURACY_MID)
+static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_mid>);
+#elif defined(QUDA_DOUBLEDOUBLE_ACCURACY_HIGH)
+static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_high>);
+#endif
+#endif
+
+namespace quda
+{
+  TEST(QuadReduction, doubledouble_layout_and_components)
+  {
+    static_assert(sizeof(doubledouble) == 2 * sizeof(double));
+    static_assert(std::is_trivially_copyable_v<doubledouble>);
+
+    const doubledouble x(1.0, 1e-20);
+    EXPECT_EQ(x.hi(), 1.0);
+    EXPECT_EQ(x.lo(), 1e-20);
+  }
+} // namespace quda
 
 #ifdef QUDA_USE_QUAD_SCALAR
 
@@ -8,12 +33,11 @@
 
 namespace quda
 {
-
   TEST(QuadReduction, doubledouble_to_real_uses_tail)
   {
     const doubledouble x(1.0, 1e-20);
     const __float128 from_dd = static_cast<__float128>(x);
-    const __float128 from_head = static_cast<__float128>(x.head());
+    const __float128 from_head = static_cast<__float128>(x.hi());
     const __float128 ref = static_cast<__float128>(1.0) + static_cast<__float128>(1e-20);
     const __float128 tol = static_cast<__float128>(1e-30);
 
@@ -28,7 +52,7 @@ namespace quda
     const doubledouble x(static_cast<double>(1e16), static_cast<double>(1.0));
     const __float128 got = static_cast<__float128>(x);
 
-    const double head_only = x.head();
+    const double head_only = x.hi();
     EXPECT_GT(fabsq(got - static_cast<__float128>(head_only)), static_cast<__float128>(1e-6));
     EXPECT_LT(fabsq(got - ref) / ref, static_cast<__float128>(1e-30));
   }

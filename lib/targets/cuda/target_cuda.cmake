@@ -430,8 +430,8 @@ target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS} ${
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-Xfatbin=-compress-all>)
-target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda)
-target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda>
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/targets/cuda>
+                                       $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda>
                                        $<INSTALL_INTERFACE:include/targets/cuda>)
 target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
 target_include_directories(quda_cpp SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
@@ -528,12 +528,14 @@ if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
 
-option(QUDA_DOWNLOAD_CCCL "Download CCCL v3.3.4 via CPM; OFF = use the CUDA toolkit's CCCL" ON)
+option(QUDA_DOWNLOAD_CCCL "Download CCCL via CPM; OFF = use the CUDA toolkit's CCCL" ON)
 if(QUDA_DOWNLOAD_CCCL)
+  # main until CCCL 3.6 is released: the experimental FPMP types used for
+  # QUDA_DOUBLEDOUBLE_USE_CCCL are not in any tagged release yet.
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY nvidia/cccl
-      GIT_TAG v3.3.4 # Fetches this tagged commit
+      GIT_TAG main
   )
 else()
   # Use the CUDA toolkit's CCCL (the same one NVSHMEM 3.x's config find_dependency
@@ -543,6 +545,17 @@ else()
       HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl")
 endif()
 target_link_libraries(quda PRIVATE CCCL::CCCL)
+target_link_libraries(quda_cpp PRIVATE CCCL::CCCL)
+
+# CCCL declares its fp128 conversions __device__ only for sm_100 and newer. A quad scalar
+# is converted to and from doubledouble in device code on every architecture we build for,
+# so opt in to the conversions CCCL documents as available to toolchains that provide them.
+if(QUDA_USE_QUAD_SCALAR AND QUDA_CUDA_BUILD_TYPE STREQUAL "NVCC")
+  target_compile_definitions(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:_CCCL_FPMP_FP128_DEVICE_OPS=1>)
+endif()
+# Internal build-tree consumers include quda_internal.h / dbldbl.h directly.
+# Do not export CCCL as an installed-package dependency.
+target_link_libraries(quda INTERFACE "$<BUILD_INTERFACE:CCCL::CCCL>")
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)

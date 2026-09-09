@@ -146,6 +146,20 @@ if(QUDA_DIRAC_WILSON
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  if(QUDA_SCALAR_TYPE STREQUAL "float128" OR QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
+    add_executable(quad_reduction_test quad_reduction_test.cpp)
+    target_link_libraries(quad_reduction_test ${TEST_LIBS})
+    quda_checkbuildtest(quad_reduction_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS quad_reduction_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+
+  if(QUDA_SCALAR_TYPE STREQUAL "float128")
+    add_executable(eigen_quad_test eigen_quad_test.cpp)
+    target_link_libraries(eigen_quad_test ${TEST_LIBS})
+    quda_checkbuildtest(eigen_quad_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS eigen_quad_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+
   add_executable(dilution_test dilution_test.cpp)
   target_link_libraries(dilution_test ${TEST_LIBS})
   quda_checkbuildtest(dilution_test QUDA_BUILD_ALL_TESTS)

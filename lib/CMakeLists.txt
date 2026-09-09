@@ -440,6 +440,25 @@ set(QUDA_SCALAR_TYPE
 set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble float128)
 set_property(CACHE QUDA_SCALAR_TYPE PROPERTY HELPSTRING "${_quda_scalar_help}")
 
+# Select the double-double implementation and, for CCCL FPMP, its arithmetic accuracy.
+# These cache variables intentionally share a prefix so they appear together in ccmake.
+option(QUDA_DOUBLEDOUBLE_USE_CCCL
+       "use CCCL experimental FPMP for double-double in CUDA builds"
+       ON)
+set(QUDA_DOUBLEDOUBLE_ACCURACY
+    high
+    CACHE STRING "set CCCL double-double arithmetic accuracy (low, mid, high)")
+set_property(CACHE QUDA_DOUBLEDOUBLE_ACCURACY PROPERTY STRINGS low mid high)
+string(TOLOWER "${QUDA_DOUBLEDOUBLE_ACCURACY}" QUDA_DOUBLEDOUBLE_ACCURACY)
+if(NOT QUDA_DOUBLEDOUBLE_ACCURACY MATCHES "^(low|mid|high)$")
+  message(FATAL_ERROR
+          "Invalid QUDA_DOUBLEDOUBLE_ACCURACY='${QUDA_DOUBLEDOUBLE_ACCURACY}'. Allowed: low, mid, high.")
+endif()
+string(TOUPPER "${QUDA_DOUBLEDOUBLE_ACCURACY}" _quda_doubledouble_accuracy_upper)
+set(QUDA_DOUBLEDOUBLE_ACCURACY_${_quda_doubledouble_accuracy_upper} 1)
+message(STATUS "QUDA_DOUBLEDOUBLE_USE_CCCL: ${QUDA_DOUBLEDOUBLE_USE_CCCL}")
+message(STATUS "QUDA_DOUBLEDOUBLE_ACCURACY: ${QUDA_DOUBLEDOUBLE_ACCURACY}")
+
 # Canonical name is float128. Keep accepting the compiler spellings.
 if(QUDA_SCALAR_TYPE STREQUAL "__float128" OR QUDA_SCALAR_TYPE STREQUAL "_Float128")
   set(QUDA_SCALAR_TYPE float128 CACHE STRING "${_quda_scalar_help}" FORCE)

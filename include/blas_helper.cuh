@@ -55,20 +55,20 @@ namespace quda
   }
 
 #ifdef QUAD_SUM
-  __host__ __device__ inline double set(doubledouble &a) { return a.head(); }
-  __host__ __device__ inline double2 set(doubledouble2 &a) { return {a.x.head(), a.y.head()}; }
-  __host__ __device__ inline double3 set(doubledouble3 &a) { return {a.x.head(), a.y.head(), a.z.head()}; }
-  __host__ __device__ inline void sum(double &a, doubledouble &b) { a += b.head(); }
+  __host__ __device__ inline double set(doubledouble &a) { return a.hi(); }
+  __host__ __device__ inline double2 set(doubledouble2 &a) { return {a.x.hi(), a.y.hi()}; }
+  __host__ __device__ inline double3 set(doubledouble3 &a) { return {a.x.hi(), a.y.hi(), a.z.hi()}; }
+  __host__ __device__ inline void sum(double &a, doubledouble &b) { a += b.hi(); }
   __host__ __device__ inline void sum(double2 &a, doubledouble2 &b)
   {
-    a.x += b.x.head();
-    a.y += b.y.head();
+    a.x += b.x.hi();
+    a.y += b.y.hi();
   }
   __host__ __device__ inline void sum(double3 &a, doubledouble3 &b)
   {
-    a.x += b.x.head();
-    a.y += b.y.head();
-    a.z += b.z.head();
+    a.x += b.x.hi();
+    a.y += b.y.hi();
+    a.z += b.z.hi();
   }
 #endif
 
