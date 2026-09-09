@@ -678,7 +678,7 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu)
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_CLOVER, clover, buf)) {
     param.mu = mu;
     
-    if (fabs(mu) > 0.0) {
+    if (std::fabs(mu) > 0.0) {
           param.twist_flavor = QUDA_TWIST_SINGLET;
           param.dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
     }
@@ -1188,7 +1188,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
     additional_prop->qhat = dp.qhat;
     set_su3csw(param, dp.su3csw);
     param->mu = dp.mu;
-    if (fabs(param->mu) > 0.0) {
+    if (std::fabs(param->mu) > 0.0) {
     	param->twist_flavor = QUDA_TWIST_SINGLET;
     	param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
     }
@@ -1198,7 +1198,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
     set_su3csw(mg_inv_param, dp.su3csw);
     mg_inv_param->mu = dp.mu;
     
-    if (fabs(mg_inv_param->mu) > 0.0) {
+    if (std::fabs(mg_inv_param->mu) > 0.0) {
     	mg_inv_param->twist_flavor = QUDA_TWIST_SINGLET;
     	mg_inv_param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
     }
@@ -1346,7 +1346,7 @@ static void *openQCD_qudaSolverReadIn(int id)
   set_su3csw(param, dp.su3csw);
 
   param->mu = dp.mu;
-  if( fabs(param->mu) > 0.0 ) {
+  if(std::fabs(param->mu) > 0.0 ) {
         param->twist_flavor = QUDA_TWIST_SINGLET;
         param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
   }
