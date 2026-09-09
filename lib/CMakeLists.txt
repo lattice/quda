@@ -844,10 +844,15 @@ endif()
 
 set(QUDA_REDUCTION_TYPE
     double
-    CACHE STRING "set the reduction computation type (double, doubledouble)")
-set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble)
+    CACHE STRING "set the reduction computation type (double, doubledouble, floatfloat)")
+set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble floatfloat)
 if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
   set(QUDA_REDUCTION_IS_DOUBLEDOUBLE 1)
+elseif(QUDA_REDUCTION_TYPE STREQUAL "floatfloat")
+  if(NOT QUDA_FPMP_FLOATFLOAT)
+    message(FATAL_ERROR "QUDA_REDUCTION_TYPE=floatfloat requires QUDA_FPMP_FLOATFLOAT=ON")
+  endif()
+  set(QUDA_REDUCTION_IS_FLOATFLOAT 1)
 endif()
 
 set(QUDA_REDUCTION_ALGORITHM

@@ -15,6 +15,19 @@ static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_high>);
 
 namespace quda
 {
+#if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
+  TEST(QuadReduction, floatfloat_reduction_type)
+  {
+    static_assert(std::is_same_v<reduction_t, floatfloat>);
+    static_assert(sizeof(reduction_t) == 2 * sizeof(float));
+    static_assert(std::is_trivially_copyable_v<reduction_t>);
+
+    const reduction_t x(1.0, 1e-8);
+    EXPECT_EQ(x.hi(), 1.0f);
+    EXPECT_EQ(x.lo(), 1e-8f);
+  }
+#endif
+
   TEST(QuadReduction, doubledouble_layout_and_components)
   {
     static_assert(sizeof(doubledouble) == 2 * sizeof(double));

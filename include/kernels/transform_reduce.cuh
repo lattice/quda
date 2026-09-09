@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <algorithm>
+#include <type_traits>
 #include <reduction_kernel.h>
 
 namespace quda {
@@ -47,7 +48,10 @@ namespace quda {
       auto k = arg.m(i);
       auto v = arg.v[j];
       auto t = arg.h(v[k]);
-      return operator()(value, t);
+      if constexpr (std::is_constructible_v<reduce_t, decltype(t)>)
+        return operator()(value, reduce_t(t));
+      else
+        return operator()(value, t);
     }
   };
 

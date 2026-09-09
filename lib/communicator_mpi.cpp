@@ -315,6 +315,22 @@ namespace quda
   }
 #endif
 
+#if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
+  template <> void Communicator::comm_allreduce_sum_array<floatfloat>(floatfloat *data, size_t size)
+  {
+    size_t n = comm_size();
+    std::vector<floatfloat> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_FLOAT_COMPLEX, recv_buf.data(), size, MPI_FLOAT_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<floatfloat> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) { data[i] = deterministic_sum_reduce(recv_trans.data() + i * n, n); }
+  }
+#endif
+
 #if defined(QUDA_USE_QUAD_SCALAR)
   template <> void Communicator::comm_allreduce_sum_array<real_t>(real_t *data, size_t size)
   {
@@ -432,6 +448,44 @@ namespace quda
     for (size_t i = 0; i < size; i++) {
       data[i] = recv_trans[i * n];
       for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+    }
+  }
+#endif
+
+#if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
+  template <>
+  void Communicator::comm_allreduce_max_array<deviation_t<floatfloat>>(deviation_t<floatfloat> *data, size_t size)
+  {
+    size_t n = comm_size();
+    std::vector<deviation_t<floatfloat>> recv_buf(size * n);
+    MPI_CHECK(
+      MPI_Allgather(data, 2 * size, MPI_FLOAT_COMPLEX, recv_buf.data(), 2 * size, MPI_FLOAT_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<deviation_t<floatfloat>> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      data[i] = recv_trans[i * n];
+      for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+    }
+  }
+
+  template <> void Communicator::comm_allreduce_max_array<floatfloat>(floatfloat *data, size_t size)
+  {
+    size_t n = comm_size();
+    std::vector<floatfloat> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_FLOAT_COMPLEX, recv_buf.data(), size, MPI_FLOAT_COMPLEX, MPI_COMM_HANDLE));
+
+    std::vector<floatfloat> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      data[i] = recv_trans[i * n];
+      for (size_t j = 1; j < n; j++) data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j];
     }
   }
 #endif

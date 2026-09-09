@@ -224,8 +224,8 @@ namespace quda
   {
     real_t eps = 0.0;
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION: eps = DBL_EPSILON; break;
-    case QUDA_SINGLE_PRECISION: eps = FLT_EPSILON; break;
+    case QUDA_DOUBLE_PRECISION: eps = compute_epsilon<double>(); break;
+    case QUDA_SINGLE_PRECISION: eps = compute_epsilon<float>(); break;
     case QUDA_HALF_PRECISION: eps = 2e-3; break;
     case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
     default: errorQuda("Invalid precision %d", prec);

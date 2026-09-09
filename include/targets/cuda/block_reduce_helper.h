@@ -49,6 +49,12 @@ namespace quda
     using type = double; // must break up 128-bit types into doubles
   };
 
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct atomic_type<floatfloat> {
+    using type = float; // fp32mp2 is stored as a pair of floats
+  };
+#endif
+
   template <> struct atomic_type<double> {
     using type = double;
   };
