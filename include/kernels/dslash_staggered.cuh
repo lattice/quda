@@ -64,7 +64,7 @@ namespace quda
       > (out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, spin_project, comm_override),
     halo_pack(halo, improved_ ? 3 : 1), halo(halo, improved_ ? 3 : 1), U(U),
     Uback(dslash_double_store() ? U.shift(1) : U), L(L), Lback(dslash_double_store() ? L.shift(3) : L),
-    a(static_cast<real>(a)), tboundary(static_cast<real>(U.TBoundary())),
+    a(static_cast<real>(a)), tboundary(static_cast<real>(static_cast<int>(U.TBoundary()))),
     is_first_time_slice(comm_coord(3) == 0 ? true : false),
     is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
     dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))

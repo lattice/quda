@@ -135,7 +135,7 @@ namespace quda
           HalfVector A_chi[n_flavor];
 #pragma unroll
           for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
-            const complex<real> b(0.0, (chirality ^ flavor_) == 0 ? arg.b : -arg.b);
+            const complex<real> b(real(0), (chirality ^ flavor_) == 0 ? arg.b : -arg.b);
             A_chi[flavor_] = A * out_chi[flavor_];
             A_chi[flavor_] += b * out_chi[flavor_];
             A_chi[flavor_] += arg.c * out_chi[1 - flavor_];

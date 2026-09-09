@@ -25,7 +25,7 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t,recon>::type;
 
     const Gauge u;
 
@@ -69,7 +69,14 @@ namespace quda {
 
       packed_array<int8_t, 4> dx = {};
 
-      auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
+      typename Arg::real path_coeff;
+#ifdef QUDA_FPMP_FLOATFLOAT
+      if constexpr (std::is_same_v<typename Arg::real, floatfloat>)
+        path_coeff = arg.p.path_coeff_floatfloat[path_id];
+      else
+#endif
+        path_coeff = static_cast<typename Arg::real>(arg.p.path_coeff[path_id]);
+      auto coeff_loop = arg.factor * path_coeff;
       if (coeff_loop == 0) return value;
 
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;

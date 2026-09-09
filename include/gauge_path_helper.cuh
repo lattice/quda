@@ -15,6 +15,9 @@ namespace quda {
     int *input_path[dim];
     const int *length;
     const double *path_coeff;
+#ifdef QUDA_FPMP_FLOATFLOAT
+    const floatfloat *path_coeff_floatfloat;
+#endif
     int *buffer;
     int count;
 
@@ -32,7 +35,10 @@ namespace quda {
       // create path struct in a single allocation
       size_t bytes = dim * num_paths * max_length * sizeof(int) + num_paths * sizeof(int);
       int pad = ((sizeof(double) - bytes % sizeof(double)) % sizeof(double))/sizeof(int);
-      bytes += pad*sizeof(int) + num_paths*sizeof(double);
+      bytes += pad * sizeof(int) + num_paths * sizeof(double);
+#ifdef QUDA_FPMP_FLOATFLOAT
+      bytes += num_paths * sizeof(floatfloat);
+#endif
 
       buffer = static_cast<int*>(pool_device_malloc(bytes));
       int *path_h = static_cast<int*>(safe_malloc(bytes));
@@ -54,6 +60,10 @@ namespace quda {
       // path_coeff array (copy and convert if needed)
       double *path_coeff_ = reinterpret_cast<double *>(path_h + dim * num_paths * max_length + num_paths + pad);
       for (auto i = 0; i < num_paths; i++) path_coeff_[i] = double(path_coeff_h[i]);
+#ifdef QUDA_FPMP_FLOATFLOAT
+      floatfloat *path_coeff_floatfloat_ = reinterpret_cast<floatfloat *>(path_coeff_ + num_paths);
+      for (auto i = 0; i < num_paths; i++) path_coeff_floatfloat_[i] = static_cast<floatfloat>(path_coeff_h[i]);
+#endif
 
       qudaMemcpy(buffer, path_h, bytes, qudaMemcpyHostToDevice);
       host_free(path_h);
@@ -62,6 +72,9 @@ namespace quda {
       for (int d=0; d < dim; d++) this->input_path[d] = buffer + d*num_paths*max_length;
       length = buffer + dim*num_paths*max_length;
       path_coeff = reinterpret_cast<double*>(buffer + dim * num_paths * max_length + num_paths + pad);
+#ifdef QUDA_FPMP_FLOATFLOAT
+      path_coeff_floatfloat = reinterpret_cast<floatfloat *>(const_cast<double *>(path_coeff) + num_paths);
+#endif
     }
 
     void free() {

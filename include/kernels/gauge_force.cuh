@@ -16,8 +16,8 @@ namespace quda {
     static constexpr bool compute_force = force_;
     using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    using Gauge = typename gauge_mapper<real,recon_u>::type;
-    using Mom = typename gauge_mapper<real,recon_m>::type;
+    using Gauge = typename gauge_mapper<store_t,recon_u>::type;
+    using Mom = typename gauge_mapper<store_t,recon_m>::type;
 
     Mom mom;
     const Gauge u;
@@ -62,7 +62,13 @@ namespace quda {
       packed_array<int8_t, 4> dx = {};
 
       for (int i=0; i<arg.p.num_paths; i++) {
-        real coeff = arg.p.path_coeff[i];
+        real coeff;
+#ifdef QUDA_FPMP_FLOATFLOAT
+        if constexpr (std::is_same_v<real, floatfloat>)
+          coeff = arg.p.path_coeff_floatfloat[i];
+        else
+#endif
+          coeff = static_cast<real>(arg.p.path_coeff[i]);
         if (coeff == 0) continue;
 
         const int* path = arg.p.input_path[dir] + i*arg.p.max_length;

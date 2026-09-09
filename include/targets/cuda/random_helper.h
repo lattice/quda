@@ -1,6 +1,10 @@
 #pragma once
 
 #include <curand_kernel.h>
+#include <quda_define.h>
+#ifdef QUDA_FPMP_FLOATFLOAT
+#include <floatfloat.h>
+#endif
 
 namespace quda
 {
@@ -71,6 +75,20 @@ namespace quda
     }
   };
 
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct uniform<floatfloat> {
+    __device__ static inline floatfloat rand(RNGState &state)
+    {
+      return floatfloat(curand_uniform(&state.state));
+    }
+
+    __device__ static inline floatfloat rand(RNGState &state, floatfloat a, floatfloat b)
+    {
+      return a + (b - a) * floatfloat(curand_uniform(&state.state));
+    }
+  };
+#endif
+
   template <class Real> struct normal {
   };
 
@@ -89,5 +107,14 @@ namespace quda
      */
     __device__ static inline double rand(RNGState &state) { return curand_normal_double(&state.state); }
   };
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct normal<floatfloat> {
+    __device__ static inline floatfloat rand(RNGState &state)
+    {
+      return floatfloat(curand_normal(&state.state));
+    }
+  };
+#endif
 
 } // namespace quda

@@ -72,8 +72,8 @@ namespace quda {
 #pragma unroll
       for (int i=0; i<6; ++i) F[i] = arg.f(i, x_cb, parity);
 
-      Complex I(0.0,1.0);
-      Complex coeff(0.0, arg.coeff);
+      Complex I(real(0), real(1));
+      Complex coeff(real(0), arg.coeff);
       Link block1[2], block2[2];
       block1[0] = coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops
       block1[1] = coeff*(F[0]+F[5]); // 72 floating-point ops

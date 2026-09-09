@@ -14,7 +14,7 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     static constexpr compute_type type = type_;
     using real = typename mapper<Float>::type;
-    using Gauge = typename gauge_mapper<real, recon>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     int X[4]; // grid dimensions
     int border[4];
     Gauge u;
@@ -53,14 +53,15 @@ namespace quda {
         X[dr] += 2*arg.border[dr];
       }
 
-      complex<double> local = {};
+      complex<typename Arg::real> local = {};
 #pragma unroll
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
         local += Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
       }
 
-      return operator()(value, {local.real(), local.imag()});
+      return operator()(value,
+                        {static_cast<device_reduce_t>(local.real()), static_cast<device_reduce_t>(local.imag())});
     }
   };
 

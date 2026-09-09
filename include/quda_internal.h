@@ -4,6 +4,7 @@
 #include <quda_api.h>
 #include <quda_define.h>
 
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -58,6 +59,9 @@
 #include <array.h>
 #include "timer.h"
 #include "dbldbl.h"
+#ifdef QUDA_FPMP_FLOATFLOAT
+#include "floatfloat.h"
+#endif
 
 namespace quda {
 
@@ -87,6 +91,20 @@ namespace quda {
      Underlying type to use for reductions
   */
   using reduction_t = QUDA_REDUCTION_TYPE;
+
+  /**
+     @brief Machine epsilon of the type that kernels actually compute in
+     for a given storage type.  When a pseudo-double compute type stands in
+     for IEEE double this is coarser than std::numeric_limits<double>.
+  */
+  template <typename T> inline double compute_epsilon() { return std::numeric_limits<T>::epsilon(); }
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> inline double compute_epsilon<double>()
+  {
+    return static_cast<double>(cuda::std::numeric_limits<floatfloat>::epsilon());
+  }
+#endif
 
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 13000
   using double4 = ::double4_32a;

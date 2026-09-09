@@ -2,13 +2,13 @@
 #include <gtest/gtest.h>
 #include <type_traits>
 
-#if defined(QUDA_TARGET_CUDA) && defined(QUDA_DOUBLEDOUBLE_USE_CCCL)
+#if defined(QUDA_TARGET_CUDA) && defined(QUDA_FPMP_DOUBLEDOUBLE)
 #include <cuda/fpmp>
-#if defined(QUDA_DOUBLEDOUBLE_ACCURACY_LOW)
+#if defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW)
 static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_low>);
-#elif defined(QUDA_DOUBLEDOUBLE_ACCURACY_MID)
+#elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID)
 static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_mid>);
-#elif defined(QUDA_DOUBLEDOUBLE_ACCURACY_HIGH)
+#elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_HIGH)
 static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_high>);
 #endif
 #endif

@@ -641,9 +641,11 @@ namespace quda {
      */
     double toleranceSU3() const
     {
+      // ~10x the epsilon of the type the projection is computed in, which is
+      // not the storage type when a pseudo-double compute type is configured
       switch (precision) {
-      case QUDA_DOUBLE_PRECISION: return 2e-15;
-      case QUDA_SINGLE_PRECISION: return 1e-6;
+      case QUDA_DOUBLE_PRECISION: return 10.0 * compute_epsilon<double>();
+      case QUDA_SINGLE_PRECISION: return 10.0 * compute_epsilon<float>();
       default: return 1e-6;
       }
     }

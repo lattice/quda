@@ -47,7 +47,7 @@ namespace quda {
       using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
       using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
       using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
-      using cFine = typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder>;
+      using cFine = typename clover::FieldOrder<typename mapper<Float>::type, fineColor, fineSpin, clOrder, Float>;
 
       const ColorSpinorField &v = T.Vectors();
 
@@ -82,7 +82,7 @@ namespace quda {
       using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
       using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
       using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
-      using cFine = typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder>;
+      using cFine = typename clover::FieldOrder<typename mapper<Float>::type, fineColor, fineSpin, clOrder, Float>;
 
       const ColorSpinorField &v = T.Vectors();
 

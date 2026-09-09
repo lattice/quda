@@ -394,7 +394,7 @@ namespace quda
         }
 
         if constexpr (!(n == 3 && isHalf<store_t>::value)) {
-          real scale_inv = 0.0;
+          real scale_inv {};
           if constexpr (isFixed<store_t>::value)
             scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, data.norm[x + parity * data.cb_norm_offset]);
 

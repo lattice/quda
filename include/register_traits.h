@@ -125,14 +125,24 @@ namespace quda {
   /*
     Here we use traits to define the mapping between storage type and
     register type:
-    double -> double
+    double -> double (or floatfloat when QUDA_FPMP_FLOATFLOAT)
     float -> float
     short -> float
     quarter -> float
     This allows us to wrap the encapsulate the register type into the storage template type
    */
   template<typename> struct mapper { };
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct mapper<double> {
+    using type = floatfloat;
+  };
+  // mapper is also applied to already-mapped register types, so floatfloat maps to itself
+  template <> struct mapper<floatfloat> {
+    using type = floatfloat;
+  };
+#else
   template<> struct mapper<double> { typedef double type; };
+#endif
   template<> struct mapper<float> { typedef float type; };
   template<> struct mapper<short> { typedef float type; };
   template <> struct mapper<int8_t> {
@@ -242,6 +252,14 @@ namespace quda {
   template <> struct get_scalar<doubledouble2> {
     using type = doubledouble;
   };
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct get_scalar<floatfloat> {
+    using type = floatfloat;
+  };
+  template <> struct get_scalar<floatfloat2> {
+    using type = floatfloat;
+  };
+#endif
 #ifdef QUDA_USE_QUAD_SCALAR
   template <> struct get_scalar<float128_t> {
     using type = float128_t;
@@ -253,6 +271,11 @@ namespace quda {
   template <> struct get_scalar<complex<double>> {
     using type = double;
   };
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct get_scalar<complex<floatfloat>> {
+    using type = floatfloat;
+  };
+#endif
   template <> struct get_scalar<complex_t> {
     using type = real_t;
   };

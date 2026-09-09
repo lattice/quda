@@ -329,7 +329,7 @@ namespace quda {
         parity = 1 - parity;
       }
       int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      using complex = complex<typename Arg::store_t>;
+      using complex = complex<typename Arg::real>;
       typename Arg::real tmp[Arg::NElems];
       complex data[9];
       if (Arg::pack) {
@@ -338,8 +338,8 @@ namespace quda {
         for ( int i = 0; i < Arg::NElems / 2; ++i ) arg.array[idx + arg.threads.x * i] = complex(tmp[2*i+0], tmp[2*i+1]);
       } else {
         for ( int i = 0; i < Arg::NElems / 2; ++i ) {
-          tmp[2*i+0] = arg.array[idx + arg.threads.x * i].real();
-          tmp[2*i+1] = arg.array[idx + arg.threads.x * i].imag();
+          tmp[2*i+0] = static_cast<typename Arg::real>(arg.array[idx + arg.threads.x * i].real());
+          tmp[2*i+1] = static_cast<typename Arg::real>(arg.array[idx + arg.threads.x * i].imag());
         }
         arg.u.reconstruct.Unpack(data, tmp, id, arg.dim, 0, arg.u.X, arg.u.R);
         arg.u.save(data, id, arg.dim, parity);

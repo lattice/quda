@@ -182,7 +182,15 @@ namespace quda {
   }
 
   template <typename T> struct low {
-    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }
+    static constexpr T value()
+    {
+#ifdef QUDA_FPMP_FLOATFLOAT
+      if constexpr (std::is_same_v<T, floatfloat>)
+        return cuda::std::numeric_limits<floatfloat>::lowest();
+      else
+#endif
+        return std::numeric_limits<T>::lowest();
+    }
   };
 
   template <typename T, int N> struct low<array<T, N>> {
@@ -207,7 +215,15 @@ namespace quda {
   };
 
   template <typename T> struct high {
-    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::max(); }
+    static constexpr T value()
+    {
+#ifdef QUDA_FPMP_FLOATFLOAT
+      if constexpr (std::is_same_v<T, floatfloat>)
+        return cuda::std::numeric_limits<floatfloat>::max();
+      else
+#endif
+        return std::numeric_limits<T>::max();
+    }
   };
 
   template <> struct high<doubledouble> {
@@ -225,6 +241,17 @@ namespace quda {
   template <> struct RealType<complex<double>> {
     typedef double type;
   };
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct RealType<floatfloat> {
+    typedef floatfloat type;
+  };
+  template <> struct RealType<floatfloat2> {
+    typedef floatfloat type;
+  };
+  template <> struct RealType<complex<floatfloat>> {
+    typedef floatfloat type;
+  };
+#endif
   template <> struct RealType<float> {
     typedef float type;
   };

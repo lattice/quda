@@ -2,7 +2,7 @@
 
 #include <quda_define.h>
 
-#if defined(QUDA_DOUBLEDOUBLE_USE_CCCL)
+#if defined(QUDA_FPMP_DOUBLEDOUBLE)
 
 #include <cuda/fpmp_math>
 #include <math_helper.h>
@@ -10,11 +10,11 @@
 #include <ostream>
 #include <type_traits>
 
-#if defined(QUDA_DOUBLEDOUBLE_ACCURACY_LOW)
+#if defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW)
 using doubledouble = cuda::experimental::fp64mp2_low;
-#elif defined(QUDA_DOUBLEDOUBLE_ACCURACY_MID)
+#elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID)
 using doubledouble = cuda::experimental::fp64mp2_mid;
-#elif defined(QUDA_DOUBLEDOUBLE_ACCURACY_HIGH)
+#elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_HIGH)
 using doubledouble = cuda::experimental::fp64mp2_high;
 #else
 #error "No QUDA double-double accuracy selected"
@@ -79,4 +79,4 @@ namespace quda
 
 #include <targets/generic/dbldbl.h>
 
-#endif // QUDA_DOUBLEDOUBLE_USE_CCCL
+#endif // QUDA_FPMP_DOUBLEDOUBLE

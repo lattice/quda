@@ -13,6 +13,8 @@
 #include <register_traits.h>
 #include <math_helper.h>
 #include <constexpr_for.h>
+#include <complex_quda.h>
+#include <aos.h>
 
 namespace quda
 {
@@ -177,7 +179,7 @@ namespace quda
   template <typename T1, typename T2>
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
-    a = b;
+    a = static_cast<T1>(b);
   }
 
   template <typename T1, typename T2>
@@ -195,7 +197,7 @@ namespace quda
   template <typename T1, typename T2, int n>
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
-    for (int i = 0; i < n; i++) a[i] = b[i];
+    for (int i = 0; i < n; i++) a[i] = static_cast<T1>(b[i]);
   }
 
   template <typename T1, typename T2, int n>
@@ -300,6 +302,43 @@ namespace quda
 #else
     return static_cast<fixed_t>(rint(f));
 #endif
+  }
+
+  /**
+     @brief Load a contiguous site of complex values from a non-native
+     field order, converting from the storage type to the register type.
+     When the types coincide this is a direct vectorized copy.
+  */
+  template <int len, typename real, typename Float>
+  __device__ __host__ inline void load_convert(complex<real> v[len], const Float *in)
+  {
+    if constexpr (std::is_same_v<real, Float>) {
+      block_load<complex<real>, len>(v, reinterpret_cast<const complex<real> *>(in));
+    } else {
+      complex<Float> tmp[len];
+      block_load<complex<Float>, len>(tmp, reinterpret_cast<const complex<Float> *>(in));
+#pragma unroll
+      for (int i = 0; i < len; i++)
+        v[i] = {static_cast<real>(tmp[i].real()), static_cast<real>(tmp[i].imag())};
+    }
+  }
+
+  /**
+     @brief Save a contiguous site of complex values to a non-native
+     field order, converting from the register type to the storage type.
+  */
+  template <int len, typename real, typename Float>
+  __device__ __host__ inline void save_convert(Float *out, const complex<real> v[len])
+  {
+    if constexpr (std::is_same_v<real, Float>) {
+      block_store<complex<real>, len>(reinterpret_cast<complex<real> *>(out), v);
+    } else {
+      complex<Float> tmp[len];
+#pragma unroll
+      for (int i = 0; i < len; i++)
+        tmp[i] = {static_cast<Float>(v[i].real()), static_cast<Float>(v[i].imag())};
+      block_store<complex<Float>, len>(reinterpret_cast<complex<Float> *>(out), tmp);
+    }
   }
 
 #ifdef _NVHPC_CUDA

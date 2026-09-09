@@ -114,12 +114,13 @@ namespace quda
       sink_from_t_xyz<Arg::reduction_dim>(sink, t, xyz, arg.X);
 
       // Calculate exp(-i * [x dot p])
-      real Sum_dXi_dot_Pi = 0.0;
+      real Sum_dXi_dot_Pi = real(0);
       for (int i = 0; i < 4; i++)
-        Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
+        Sum_dXi_dot_Pi
+          += real((arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i]) / real(arg.NxNyNzNt[i]);
 
       complex<real> phase
-        = {static_cast<real>(cospi(Sum_dXi_dot_Pi * 2.)), static_cast<real>(-sinpi(Sum_dXi_dot_Pi * 2.))};
+        = {cospi(Sum_dXi_dot_Pi * real(2)), -sinpi(Sum_dXi_dot_Pi * real(2))};
 
       // Collect vector data
       int parity = 0;

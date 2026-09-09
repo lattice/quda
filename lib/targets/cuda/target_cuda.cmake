@@ -531,7 +531,7 @@ endif()
 option(QUDA_DOWNLOAD_CCCL "Download CCCL via CPM; OFF = use the CUDA toolkit's CCCL" ON)
 if(QUDA_DOWNLOAD_CCCL)
   # main until CCCL 3.6 is released: the experimental FPMP types used for
-  # QUDA_DOUBLEDOUBLE_USE_CCCL are not in any tagged release yet.
+  # QUDA_FPMP_DOUBLEDOUBLE / QUDA_FPMP_FLOATFLOAT are not in any tagged release yet.
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY nvidia/cccl

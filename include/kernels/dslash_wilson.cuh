@@ -135,7 +135,7 @@ namespace quda
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       // Forward gather - compute fwd offset for vector fetch
       if (arg.dd_in.doHopping(coord, d, +1)) {
-        const real fwd_coeff = (d < 3) ? 1.0 : fwd_coeff_3;
+        const real fwd_coeff = (d < 3) ? real(1) : fwd_coeff_3;
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -168,7 +168,7 @@ namespace quda
 
       // Backward gather - compute back offset for spinor and gauge fetch
       if (arg.dd_in.doHopping(coord, d, -1)) {
-        const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
+        const real bwd_coeff = (d < 3) ? real(1) : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         int gauge_idx = dslash_double_store() ? coord.x_cb : back_idx;
         if constexpr (Arg::nDim == 5) gauge_idx = gauge_idx % arg.dc.volume_4d_cb;

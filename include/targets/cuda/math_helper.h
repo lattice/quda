@@ -5,6 +5,10 @@
 #include <cmath>
 #include <type_traits>
 #include <target_device.h>
+#include <quda_define.h>
+#ifdef QUDA_FPMP_FLOATFLOAT
+#include <floatfloat.h>
+#endif
 #ifdef QUDA_USE_QUAD_SCALAR
 #include <float128_math.h>
 #endif
@@ -56,7 +60,8 @@ namespace quda
     }
     template <typename T> __device__ inline std::enable_if_t<!std::is_same_v<T, float>, T> operator()(const T a)
     {
-      return ::sqrt(a);
+      using ::sqrt;
+      return sqrt(a);
     }
   };
 
@@ -72,10 +77,32 @@ namespace quda
   template <typename T> inline __host__ __device__ T acosh(const T a) { return ::acosh(a); }
   template <typename T> inline __host__ __device__ T asinh(const T a) { return ::asinh(a); }
   template <typename T> inline __host__ __device__ T cbrt(const T a) { return ::cbrt(a); }
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> inline __host__ __device__ floatfloat exp(const floatfloat a) { return cuda::experimental::exp(a); }
+  template <> inline __host__ __device__ floatfloat log(const floatfloat a) { return cuda::experimental::log(a); }
+  template <> inline __host__ __device__ floatfloat sin(const floatfloat a) { return cuda::experimental::sin(a); }
+  template <> inline __host__ __device__ floatfloat cos(const floatfloat a) { return cuda::experimental::cos(a); }
+  template <> inline __host__ __device__ floatfloat sinh(const floatfloat a) { return cuda::experimental::sinh(a); }
+  template <> inline __host__ __device__ floatfloat cosh(const floatfloat a) { return cuda::experimental::cosh(a); }
+  template <> inline __host__ __device__ floatfloat acos(const floatfloat a) { return cuda::experimental::acos(a); }
+  template <> inline __host__ __device__ floatfloat acosh(const floatfloat a) { return cuda::experimental::acosh(a); }
+  template <> inline __host__ __device__ floatfloat asinh(const floatfloat a) { return cuda::experimental::asinh(a); }
+  template <> inline __host__ __device__ floatfloat cbrt(const floatfloat a) { return cuda::experimental::cbrt(a); }
+#endif
   inline __host__ __device__ bool isnan(float a) { return std::isnan(a); }
   inline __host__ __device__ bool isnan(double a) { return std::isnan(a); }
   template <typename T> inline __host__ __device__ T pow(const T a, const int b) { return ::pow(a, b); }
   template <typename T> inline __host__ __device__ T pow(const T a, const T b) { return ::pow(a, b); }
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> inline __host__ __device__ floatfloat pow(const floatfloat a, const int b)
+  {
+    return cuda::experimental::pow(a, floatfloat(b));
+  }
+  template <> inline __host__ __device__ floatfloat pow(const floatfloat a, const floatfloat b)
+  {
+    return cuda::experimental::pow(a, b);
+  }
+#endif
   template <typename T> inline __host__ __device__ T fmod(const T a, const T b) { return ::fmod(a, b); }
 
   /**
@@ -214,6 +241,12 @@ namespace quda
    * Specialization to float.  Device function will call CUDA intrinsic.
    */
   template <> inline __host__ __device__ float sinpi(float a) { return target::dispatch<sinpif_impl>(a); }
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> inline __host__ __device__ floatfloat sinpi(floatfloat a)
+  {
+    return cuda::experimental::sin(a * floatfloat(M_PI));
+  }
+#endif
 
   template <bool is_device> struct cospi_impl {
     template <typename T> inline T operator()(T a) { return ::cos(a * static_cast<T>(M_PI)); }
@@ -248,6 +281,12 @@ namespace quda
    * Specialization to float.  Device function will call CUDA intrinsic.
    */
   template <> inline __host__ __device__ float cospi(float a) { return target::dispatch<cospif_impl>(a); }
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> inline __host__ __device__ floatfloat cospi(floatfloat a)
+  {
+    return cuda::experimental::cos(a * floatfloat(M_PI));
+  }
+#endif
 
   template <bool is_device> struct rsqrt_impl {
     template <typename T> inline T operator()(T a) { return static_cast<T>(1.0) / sqrt(a); }
@@ -267,6 +306,9 @@ namespace quda
    * this implementation uses the CUDA builtins
    */
   template <typename T> inline __host__ __device__ T rsqrt(T a) { return target::dispatch<rsqrt_impl>(a); }
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> inline __host__ __device__ floatfloat rsqrt(floatfloat a) { return cuda::experimental::rsqrt(a); }
+#endif
 
   template <bool is_device> struct fpow_impl {
     template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); }
@@ -321,6 +363,12 @@ namespace quda
    */
   __device__ __host__ inline float fdivide(float a, float b) { return target::dispatch<fdivide_impl>(a, b); }
   __device__ __host__ inline double fdivide(double a, double b) { return target::dispatch<fdivide_impl>(a, b); }
+  template <typename T>
+  __device__ __host__ inline std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, T>
+  fdivide(T a, T b)
+  {
+    return a / b;
+  }
 
   template <bool is_device> struct ffma2_impl {
     inline float2 operator()(float2 a, float2 b, float2 c)

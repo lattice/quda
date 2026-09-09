@@ -440,24 +440,43 @@ set(QUDA_SCALAR_TYPE
 set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble float128)
 set_property(CACHE QUDA_SCALAR_TYPE PROPERTY HELPSTRING "${_quda_scalar_help}")
 
-# Select the double-double implementation and, for CCCL FPMP, its arithmetic accuracy.
-# These cache variables intentionally share a prefix so they appear together in ccmake.
-option(QUDA_DOUBLEDOUBLE_USE_CCCL
+# Select CCCL FPMP implementations. These cache variables share the QUDA_FPMP_ prefix
+# so they appear together in ccmake. They are independent: float-float does not require
+# double-double FPMP, and vice versa.
+macro(quda_fpmp_set_accuracy prefix)
+  string(TOLOWER "${${prefix}_ACCURACY}" ${prefix}_ACCURACY)
+  if(NOT ${prefix}_ACCURACY MATCHES "^(low|mid|high)$")
+    message(FATAL_ERROR "Invalid ${prefix}_ACCURACY='${${prefix}_ACCURACY}'. Allowed: low, mid, high.")
+  endif()
+  string(TOUPPER "${${prefix}_ACCURACY}" _quda_fpmp_acc_upper)
+  set(${prefix}_ACCURACY_${_quda_fpmp_acc_upper} 1)
+  unset(_quda_fpmp_acc_upper)
+endmacro()
+
+option(QUDA_FPMP_DOUBLEDOUBLE
        "use CCCL experimental FPMP for double-double in CUDA builds"
        ON)
-set(QUDA_DOUBLEDOUBLE_ACCURACY
+set(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY
     high
     CACHE STRING "set CCCL double-double arithmetic accuracy (low, mid, high)")
-set_property(CACHE QUDA_DOUBLEDOUBLE_ACCURACY PROPERTY STRINGS low mid high)
-string(TOLOWER "${QUDA_DOUBLEDOUBLE_ACCURACY}" QUDA_DOUBLEDOUBLE_ACCURACY)
-if(NOT QUDA_DOUBLEDOUBLE_ACCURACY MATCHES "^(low|mid|high)$")
-  message(FATAL_ERROR
-          "Invalid QUDA_DOUBLEDOUBLE_ACCURACY='${QUDA_DOUBLEDOUBLE_ACCURACY}'. Allowed: low, mid, high.")
+set_property(CACHE QUDA_FPMP_DOUBLEDOUBLE_ACCURACY PROPERTY STRINGS low mid high)
+quda_fpmp_set_accuracy(QUDA_FPMP_DOUBLEDOUBLE)
+
+option(QUDA_FPMP_FLOATFLOAT
+       "use CCCL FPMP float-float for QUDA_DOUBLE_PRECISION register arithmetic"
+       OFF)
+set(QUDA_FPMP_FLOATFLOAT_ACCURACY
+    high
+    CACHE STRING "set CCCL float-float arithmetic accuracy (low, mid, high)")
+set_property(CACHE QUDA_FPMP_FLOATFLOAT_ACCURACY PROPERTY STRINGS low mid high)
+quda_fpmp_set_accuracy(QUDA_FPMP_FLOATFLOAT)
+
+if(QUDA_FPMP_FLOATFLOAT AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
+  message(FATAL_ERROR "QUDA_FPMP_FLOATFLOAT requires QUDA_TARGET_TYPE=CUDA")
 endif()
-string(TOUPPER "${QUDA_DOUBLEDOUBLE_ACCURACY}" _quda_doubledouble_accuracy_upper)
-set(QUDA_DOUBLEDOUBLE_ACCURACY_${_quda_doubledouble_accuracy_upper} 1)
-message(STATUS "QUDA_DOUBLEDOUBLE_USE_CCCL: ${QUDA_DOUBLEDOUBLE_USE_CCCL}")
-message(STATUS "QUDA_DOUBLEDOUBLE_ACCURACY: ${QUDA_DOUBLEDOUBLE_ACCURACY}")
+
+message(STATUS "QUDA_FPMP_DOUBLEDOUBLE: ${QUDA_FPMP_DOUBLEDOUBLE} (${QUDA_FPMP_DOUBLEDOUBLE_ACCURACY})")
+message(STATUS "QUDA_FPMP_FLOATFLOAT: ${QUDA_FPMP_FLOATFLOAT} (${QUDA_FPMP_FLOATFLOAT_ACCURACY})")
 
 # Canonical name is float128. Keep accepting the compiler spellings.
 if(QUDA_SCALAR_TYPE STREQUAL "__float128" OR QUDA_SCALAR_TYPE STREQUAL "_Float128")

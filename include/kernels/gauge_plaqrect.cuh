@@ -13,6 +13,7 @@ namespace quda
   template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct GaugePlaqRectArg : public ReduceArg<array<device_reduce_t, 4>> {
     using Float = Float_;
+    using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
@@ -47,7 +48,7 @@ namespace quda
   template <typename Arg>
   __device__ inline double2 plaquetteRectangle(const Arg &arg, int x[], int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::Float>, 3>;
+    using Link = Matrix<complex<typename Arg::real>, 3>;
     // There are 10 unique links to be fetched, with two of the links
     // being common to all three objects.
     double plaq, rect;
@@ -67,7 +68,7 @@ namespace quda
     Link U3 = conj(static_cast<Link>(arg.U(mu, linkIndexShift(x, dx, arg.E), 1 - parity)));
 
     // Finish plaquette
-    plaq = getTrace(U2 * U3).real();
+    plaq = static_cast<double>(getTrace(U2 * U3).real());
 
     // Finish first rectangle, accumulate into U4
     dx[mu]++; // Now at x+mu+nu
@@ -91,7 +92,7 @@ namespace quda
     U3 = U3 * conj(static_cast<Link>(arg.U(mu, linkIndexShift(x, dx, arg.E), parity)));
 
     // Sum of the two rectangles
-    rect = getTrace(U4 + U3).real();
+    rect = static_cast<double>(getTrace(U4 + U3).real());
 
     return {plaq, rect};
   }

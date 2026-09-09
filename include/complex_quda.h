@@ -27,6 +27,10 @@
 #include <quda_arch.h> // for double2 / float2
 #include <math_helper.h>
 #include "dbldbl.h"
+#include <quda_define.h>
+#ifdef QUDA_FPMP_FLOATFLOAT
+#include "floatfloat.h"
+#endif
 
 namespace quda
 {
@@ -49,6 +53,9 @@ namespace quda
   __host__ __device__ inline float conj(float x) { return x; }
   __host__ __device__ inline double conj(double x) { return x; }
   __host__ __device__ inline doubledouble conj(doubledouble x) { return x; }
+#ifdef QUDA_FPMP_FLOATFLOAT
+  __host__ __device__ inline floatfloat conj(floatfloat x) { return x; }
+#endif
 
   template <typename ValueType> struct complex;
 
@@ -282,8 +289,8 @@ namespace quda
 
     template <typename T> __host__ __device__ inline complex<float> &operator=(const complex<T> &z)
     {
-      real(z.real());
-      imag(z.imag());
+      real(static_cast<float>(z.real()));
+      imag(static_cast<float>(z.imag()));
       return *this;
     }
 
@@ -345,8 +352,8 @@ namespace quda
 
     template <typename T> __host__ __device__ inline complex &operator=(const complex<T> &z)
     {
-      real(z.real());
-      imag(z.imag());
+      real(static_cast<double>(z.real()));
+      imag(static_cast<double>(z.imag()));
       return *this;
     }
 
@@ -610,7 +617,7 @@ namespace quda
   {
     const ValueType cross_norm = lhs * rhs.real();
     const ValueType rhs_norm = norm(rhs);
-    return complex<ValueType>(cross_norm / rhs_norm, (-lhs.real() * rhs.imag()) / rhs_norm);
+    return complex<ValueType>(cross_norm / rhs_norm, (-lhs * rhs.imag()) / rhs_norm);
   }
 
   template <> __host__ __device__ inline complex<float> operator/(const float &lhs, const complex<float> &rhs)
@@ -999,5 +1006,93 @@ namespace quda
       return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
     }
   };
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct complex<floatfloat> : public floatfloat2 {
+  public:
+    typedef floatfloat value_type;
+
+    complex() = default;
+
+    constexpr complex(const floatfloat &re, const floatfloat &im = floatfloat(0)) : floatfloat2 {re, im} { }
+    constexpr complex(const floatfloat2 &z) : floatfloat2(z) { }
+
+    template <typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+    constexpr complex(const T &re) : floatfloat2 {static_cast<floatfloat>(re), floatfloat(0)}
+    {
+    }
+
+    template <typename T, typename U,
+              std::enable_if_t<std::is_arithmetic_v<T> || std::is_arithmetic_v<U>, int> = 0>
+    constexpr complex(const T &re, const U &im) :
+      floatfloat2 {static_cast<floatfloat>(re), static_cast<floatfloat>(im)}
+    {
+    }
+
+    template <typename X>
+    constexpr complex(const std::complex<X> &z) :
+      floatfloat2 {static_cast<floatfloat>(z.real()), static_cast<floatfloat>(z.imag())}
+    {
+    }
+
+    template <typename T> __device__ __host__ inline complex &operator=(const complex<T> &z)
+    {
+      real(static_cast<floatfloat>(z.real()));
+      imag(static_cast<floatfloat>(z.imag()));
+      return *this;
+    }
+
+    template <typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+    __device__ __host__ inline complex &operator=(const T &re)
+    {
+      real(static_cast<floatfloat>(re));
+      imag(floatfloat(0));
+      return *this;
+    }
+
+    __device__ __host__ inline complex &operator+=(const complex<floatfloat> &z)
+    {
+      real(real() + z.real());
+      imag(imag() + z.imag());
+      return *this;
+    }
+
+    __device__ __host__ inline complex &operator-=(const complex<floatfloat> &z)
+    {
+      real(real() - z.real());
+      imag(imag() - z.imag());
+      return *this;
+    }
+
+    __device__ __host__ inline complex &operator*=(const complex<floatfloat> &z)
+    {
+      *this = *this * z;
+      return *this;
+    }
+
+    __device__ __host__ inline complex &operator/=(const complex<floatfloat> &z)
+    {
+      *this = *this / z;
+      return *this;
+    }
+
+    __device__ __host__ inline complex &operator*=(const floatfloat &z)
+    {
+      x *= z;
+      y *= z;
+      return *this;
+    }
+
+    constexpr floatfloat real() const { return x; }
+    constexpr floatfloat imag() const { return y; }
+    __device__ __host__ inline void real(floatfloat re) { x = re; }
+    __device__ __host__ inline void imag(floatfloat im) { y = im; }
+
+    template <typename T> inline __host__ __device__ operator complex<T>() const
+    {
+      return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+    }
+  };
+#endif
 
 } // end namespace quda
