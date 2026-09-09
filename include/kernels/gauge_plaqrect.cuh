@@ -46,12 +46,12 @@ namespace quda
   // x--------x+mu------x+2mu
   //
   template <typename Arg>
-  __device__ inline double2 plaquetteRectangle(const Arg &arg, int x[], int parity, int mu, int nu)
+  __device__ inline array<reduction_t, 2> plaquetteRectangle(const Arg &arg, int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::real>, 3>;
     // There are 10 unique links to be fetched, with two of the links
     // being common to all three objects.
-    double plaq, rect;
+    reduction_t plaq, rect;
     packed_array<int8_t, 4> dx = {};
 
     // Accumulate the two common links U_mu(x) and U_nu(x) in U1
@@ -68,7 +68,7 @@ namespace quda
     Link U3 = conj(static_cast<Link>(arg.U(mu, linkIndexShift(x, dx, arg.E), 1 - parity)));
 
     // Finish plaquette
-    plaq = static_cast<double>(getTrace(U2 * U3).real());
+    plaq = static_cast<reduction_t>(getTrace(U2 * U3).real());
 
     // Finish first rectangle, accumulate into U4
     dx[mu]++; // Now at x+mu+nu
@@ -92,7 +92,7 @@ namespace quda
     U3 = U3 * conj(static_cast<Link>(arg.U(mu, linkIndexShift(x, dx, arg.E), parity)));
 
     // Sum of the two rectangles
-    rect = static_cast<double>(getTrace(U4 + U3).real());
+    rect = static_cast<reduction_t>(getTrace(U4 + U3).real());
 
     return {plaq, rect};
   }
@@ -118,13 +118,13 @@ namespace quda
         for (int nu = 0; nu < 3; nu++) {
           if (nu >= mu + 1) {
             auto tmp = plaquetteRectangle(arg, x, parity, mu, nu);
-            plaqRect[0] += tmp.x; // Spatial plaquette
-            plaqRect[2] += tmp.y; // Spatial rectangle
+            plaqRect[0] += tmp[0]; // Spatial plaquette
+            plaqRect[2] += tmp[1]; // Spatial rectangle
           }
         }
         auto tmp = plaquetteRectangle(arg, x, parity, mu, 3);
-        plaqRect[1] += tmp.x; // Temporal plaquette
-        plaqRect[3] += tmp.y; // Temporal rectangle
+        plaqRect[1] += tmp[0]; // Temporal plaquette
+        plaqRect[3] += tmp[1]; // Temporal rectangle
       }
       return operator()(value, plaqRect);
     }

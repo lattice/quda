@@ -36,16 +36,16 @@ namespace quda {
 	const matrix mom = arg.mom(mu, x_cb, parity);
 
         reduce_t local_sum;
-        local_sum  = 0.5 * mom(0,0).imag() * mom(0,0).imag();
-        local_sum += 0.5 * mom(1,1).imag() * mom(1,1).imag();
-        local_sum += 0.5 * mom(2,2).imag() * mom(2,2).imag();
-        local_sum += mom(0,1).real() * mom(0,1).real();
-        local_sum += mom(0,1).imag() * mom(0,1).imag();
-        local_sum += mom(0,2).real() * mom(0,2).real();
-        local_sum += mom(0,2).imag() * mom(0,2).imag();
-        local_sum += mom(1,2).real() * mom(1,2).real();
-        local_sum += mom(1,2).imag() * mom(1,2).imag();
-	local_sum -= 4.0;
+        local_sum = reduce_t(0.5) * reduce_t(mom(0, 0).imag()) * reduce_t(mom(0, 0).imag());
+        local_sum += reduce_t(0.5) * reduce_t(mom(1, 1).imag()) * reduce_t(mom(1, 1).imag());
+        local_sum += reduce_t(0.5) * reduce_t(mom(2, 2).imag()) * reduce_t(mom(2, 2).imag());
+        local_sum += reduce_t(mom(0, 1).real()) * reduce_t(mom(0, 1).real());
+        local_sum += reduce_t(mom(0, 1).imag()) * reduce_t(mom(0, 1).imag());
+        local_sum += reduce_t(mom(0, 2).real()) * reduce_t(mom(0, 2).real());
+        local_sum += reduce_t(mom(0, 2).imag()) * reduce_t(mom(0, 2).imag());
+        local_sum += reduce_t(mom(1, 2).real()) * reduce_t(mom(1, 2).real());
+        local_sum += reduce_t(mom(1, 2).imag()) * reduce_t(mom(1, 2).imag());
+        local_sum -= reduce_t(4);
 
 	action = operator()(action, local_sum);
       }

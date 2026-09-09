@@ -35,7 +35,7 @@ namespace quda {
   };
 
   template<typename Arg>
-  __device__ inline double plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
+  __device__ inline reduction_t plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::real>,3>;
 
@@ -49,7 +49,7 @@ namespace quda {
     dx[nu]--;
     Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
 
-    return static_cast<double>(getTrace(U1 * U2 * conj(U3) * conj(U4)).real());
+    return static_cast<reduction_t>(getTrace(U1 * U2 * conj(U3) * conj(U4)).real());
   }
 
   template <typename Arg> struct Plaquette : plus<typename Arg::reduce_t> {
