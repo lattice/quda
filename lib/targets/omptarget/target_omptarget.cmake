@@ -26,7 +26,11 @@ if(QUDA_FLUSH_DENORMALS)
 endif()
 
 if(QUDA_REDUCTION_ALGORITHM STREQUAL "REPRODUCIBLE")
-  message(FATAL_ERROR "QUDA_REDUCTION_ALGORITHM=REPRODUCIBLE requires the CUDA accumulator implementation")
+  if(DEFINED QUDA_REDUCTION_TYPE AND NOT QUDA_REDUCTION_TYPE STREQUAL "double")
+    message(FATAL_ERROR "OpenMP reproducible reductions require QUDA_REDUCTION_TYPE=double")
+  endif()
+  # Preserve the imported accumulator's arithmetic and bit access.
+  target_compile_options(quda PUBLIC -fno-fast-math -ffp-contract=off -fno-strict-aliasing)
 endif()
 
 if(QUDA_BUILD_NATIVE_FFT)
@@ -76,6 +80,17 @@ set_property(
            131072)
 target_compile_definitions(quda PUBLIC QUDA_MAX_SHARED_MEMORY_SIZE=${QUDA_MAX_SHARED_MEMORY_SIZE})
 message(STATUS "Using maximum shared memory size: ${QUDA_MAX_SHARED_MEMORY_SIZE}")
+
+if(QUDA_REDUCTION_ALGORITHM STREQUAL "REPRODUCIBLE")
+  # One six-double accumulator per thread, plus the reduction flags.
+  math(EXPR _quda_rfa_shared_bytes "${QUDA_MAX_BLOCK_SIZE} * 6 * 8 + 128")
+  if(QUDA_MAX_SHARED_MEMORY_SIZE LESS _quda_rfa_shared_bytes)
+    message(
+      FATAL_ERROR
+        "OpenMP reproducible reductions need ${_quda_rfa_shared_bytes} shared bytes; lower QUDA_MAX_BLOCK_SIZE or increase QUDA_MAX_SHARED_MEMORY_SIZE"
+    )
+  endif()
+endif()
 
 option(QUDA_OMPTARGET_THREAD_ARRAY_SLM "Build OpenMP target backend with thread_array on SLM" ON)
 mark_as_advanced(QUDA_OMPTARGET_THREAD_ARRAY_SLM)

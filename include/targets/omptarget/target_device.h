@@ -345,7 +345,7 @@ namespace quda
      */
     inline char *get_shared_cache(void)
     {
-      static char s[device::max_shared_memory_size()];
+      alignas(16) static char s[device::max_shared_memory_size()]; // OpenMP: align RFA storage.
 #pragma omp groupprivate(s)
       return s;
     }

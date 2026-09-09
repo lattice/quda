@@ -2,6 +2,10 @@
 
 #include <array.h>
 #include <dbldbl.h>
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+#include <float_vector.h>
+#include <bit>
+#endif
 
 /**
    @file atomic_helper.h
@@ -70,6 +74,18 @@ namespace quda
   }
   /** @brief Read both words of a completed double-double partial reduction. */
   inline doubledouble atomic_read(doubledouble &x) { return doubledouble(atomic_read(x.a.y), atomic_read(x.a.x)); }
+
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+  template <typename T> inline rfa_t<T> atomic_read(rfa_t<T> &x)
+  {
+    // OpenMP atomics read scalar words; retain the complete accumulator state.
+    array<T, 2 * rfa_t<T>::FOLD> words;
+    static_assert(sizeof(words) == sizeof(x));
+    auto *src = reinterpret_cast<T *>(&x);
+    for (int i = 0; i < words.size(); i++) words[i] = atomic_read(src[i]);
+    return std::bit_cast<rfa_t<T>>(words);
+  }
+#endif
 
   template <typename T, int N> inline array<T, N> atomic_read(array<T, N> &x)
   {
