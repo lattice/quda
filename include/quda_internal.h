@@ -80,7 +80,7 @@ namespace quda {
   inline complex_t operator*(double x, const complex_t &z) { return real_t(x) * z; }
   inline complex_t operator*(const complex_t &z, double x) { return z * real_t(x); }
 #else
-  inline double to_double(real_t x) { return x; }
+  inline double to_double(real_t x) { return static_cast<double>(x); }
 #endif
 
   /**

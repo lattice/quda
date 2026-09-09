@@ -42,8 +42,11 @@ namespace quda {
 #endif
   }
 
-  /** Convert a device reduction value to host scalar real_t. */
-  __host__ inline real_t reduction_to_real(const device_reduce_t &x) { return reduction_to_scalar<real_t>(x); }
+  /** Convert a device reduction value to scalar real_t. */
+  __host__ __device__ inline real_t reduction_to_real(const device_reduce_t &x)
+  {
+    return reduction_to_scalar<real_t>(x);
+  }
 
   __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y) { return {x.x + y.x, x.y + y.y}; }
 
