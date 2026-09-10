@@ -11,8 +11,6 @@
    warp- and block-level reductions
  */
 
-using namespace quda;
-
 namespace quda
 {
 
