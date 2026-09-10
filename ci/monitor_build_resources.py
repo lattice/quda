@@ -58,6 +58,7 @@ def snapshot():
     return {
         "time_utc": datetime.now(timezone.utc).isoformat(),
         "monitor_pid": os.getpid(),
+        "parent_pid": os.getppid(),
         "cpu_count": os.cpu_count(),
         "memory_kib": {
             key: memory.get(key)
@@ -79,8 +80,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--parent-pid", type=int)
     args = parser.parse_args()
-    while True:
+    while args.parent_pid is None or os.getppid() == args.parent_pid:
         try:
             data = snapshot()
         except Exception as error:
@@ -94,7 +96,10 @@ def main():
             print("Resource log write failed: " + str(error), file=sys.stderr, flush=True)
         if args.once:
             break
-        time.sleep(15)
+        for _ in range(15):
+            if args.parent_pid is not None and os.getppid() != args.parent_pid:
+                return
+            time.sleep(1)
 
 
 if __name__ == "__main__":

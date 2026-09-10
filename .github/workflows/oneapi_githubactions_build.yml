@@ -18,7 +18,7 @@ jobs:
     - name: Install software
       run: |
         sudo apt update
-        sudo apt install -y gpg-agent wget time
+        sudo apt install -y gpg-agent wget time util-linux procps
         # download the key to system keyring
         wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
         # add signed entry to apt sources and configure the APT client to use Intel repository:
@@ -33,6 +33,7 @@ jobs:
         which icpx
         icpx -v
         cat /proc/cpuinfo
+        mkdir -p "$RUNNER_TEMP/oneapi-build-diagnostics/compiler"
 
     - uses: actions/checkout@v4
 
@@ -53,35 +54,60 @@ jobs:
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         -DQUDA_TARGET_TYPE=OMPTARGET
         -DQUDA_OMPTARGET_JIT=ON
-        -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt"
-        -DQUDA_MULTIGRID=ON
-        -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=ON
-        -DQUDA_INTERFACE_ALL=ON
+        -DQUDA_MAX_BLOCK_SIZE=512
+        -DQUDA_WARP_SIZE=16
+        -DQUDA_MAX_SHARED_MEMORY_SIZE=49152
+        -DQUDA_OMPTARGET_SIMD16=ON
+        -DQUDA_DIRAC_DEFAULT_OFF=ON
+        -DQUDA_DIRAC_STAGGERED=ON
+        -DQUDA_MULTIGRID=OFF
+        -DQUDA_RECONSTRUCT=4
+        -DQUDA_FAST_COMPILE_REDUCE=ON
+        -DQUDA_FAST_COMPILE_DSLASH=ON
+        -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt -fcrash-diagnostics-dir=${{runner.temp}}/oneapi-build-diagnostics/compiler"
         -DQUDA_OPENMP=ON
         -DQUDA_MPI=ON
 
     - name: Build
       run: |
+        set +m
         diagnostics="$RUNNER_TEMP/oneapi-build-diagnostics"
         mkdir -p "$diagnostics"
-        python3 -u ci/monitor_build_resources.py "$diagnostics/resources.jsonl" &
-        monitor_pid=$!
+        monitor_pid=""
+        build_pid=""
         cleanup() {
           build_status=$?
           trap - EXIT
+          trap '' INT TERM
+          echo "Build command exited with status $build_status; stopping build and monitor processes"
           printf '%s\n' "$build_status" > "$diagnostics/exit-status.txt" || true
-          kill "$monitor_pid" 2>/dev/null || true
-          wait "$monitor_pid" 2>/dev/null || true
-          python3 ci/monitor_build_resources.py "$diagnostics/resources.jsonl" --once || true
+          # Ninja jobs can have separate process groups within this session.
+          if [[ -n "$build_pid" ]] && pgrep -s "$build_pid" >/dev/null; then
+            pkill -TERM -s "$build_pid" 2>/dev/null || true
+            sleep 1
+            pkill -KILL -s "$build_pid" 2>/dev/null || true
+          fi
+          if [[ -n "$build_pid" ]]; then wait "$build_pid" 2>/dev/null || true; fi
+          if [[ -n "$monitor_pid" ]]; then
+            kill "$monitor_pid" 2>/dev/null || true
+            wait "$monitor_pid" 2>/dev/null || true
+          fi
           cp "$GITHUB_WORKSPACE/build/CMakeCache.txt" "$diagnostics/" 2>/dev/null || true
           cp "$GITHUB_WORKSPACE/build/.ninja_log" "$diagnostics/ninja.log" 2>/dev/null || true
+          timeout -k 1s 1s python3 ci/monitor_build_resources.py "$diagnostics/resources.jsonl" --once || true
           exit "$build_status"
         }
         trap cleanup EXIT
         trap 'echo "Build shell received SIGTERM"; exit 143' TERM
         trap 'echo "Build shell received SIGINT"; exit 130' INT
-        /usr/bin/time -v -o "$diagnostics/time.txt" \
-          cmake --build "$GITHUB_WORKSPACE/build" --parallel 2 --verbose 2>&1 | tee "$diagnostics/build.log"
+        python3 -u ci/monitor_build_resources.py "$diagnostics/resources.jsonl" --parent-pid "$$" &
+        monitor_pid=$!
+        setsid bash -o pipefail -c '
+          /usr/bin/time -v -o "$1/time.txt" \
+            cmake --build "$2/build" --parallel 2 --verbose 2>&1 | tee "$1/build.log"
+        ' bash "$diagnostics" "$GITHUB_WORKSPACE" &
+        build_pid=$!
+        wait "$build_pid"
 
     - name: Install
       run: cmake --install ${{github.workspace}}/build
