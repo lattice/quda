@@ -76,6 +76,8 @@ typedef struct {
   int qhat;
   double m0, su3csw, u1csw, cF[2], theta[3];
   double mu;     /* mu: twisted mass */
+  int eoflg;     /* openQxD tm_parms().eoflg: if 1, the twisted mass acts on
+                    the even sites only */
 } openQCD_dirac_parms_t;
 
 typedef struct {
