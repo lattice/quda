@@ -1113,6 +1113,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
   bool do_gauge_transfer = (!gauge_field_get_up2date() && !gauge_field_get_unset())
     || additional_prop->qhat != dp.qhat;
   bool do_clover_update = !clover_field_get_up2date() && !gauge_field_get_unset();
+  bool force_reuse = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_REUSE;
   bool force_thin = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_THIN;
   bool force_update = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_UPDATE;
   bool force_refresh = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_REFRESH;
@@ -1259,11 +1260,16 @@ static void openQCD_qudaSolverUpdate(void *param_)
           mg_param->thin_update_only = QUDA_BOOLEAN_TRUE;
         }
 
-        logQuda(QUDA_VERBOSE,
-                force_refresh ? "Refreshing multigrid instance ...\n" : "Updating multigrid instance ...\n");
-        PUSH_RANGE("updateMultigridQuda", 4);
-        updateMultigridQuda(param->preconditioner, mg_param);
-        POP_RANGE;
+        if(!force_reuse) {
+          logQuda(QUDA_VERBOSE,
+                  force_refresh ? "Refreshing multigrid instance ...\n" : "Updating multigrid instance ...\n");
+          PUSH_RANGE("updateMultigridQuda", 4);
+          updateMultigridQuda(param->preconditioner, mg_param);
+          POP_RANGE;
+        }
+        else {
+          logQuda(QUDA_VERBOSE, "Reusing multigrid instance ...\n");
+        }
 
         if (force_refresh) {
           for (int i = 0; i < mg_param->n_level; i++) mg_param->setup_maxiter_refresh[i] = 0;
