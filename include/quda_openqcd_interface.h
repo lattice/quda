@@ -107,6 +107,7 @@ typedef enum OpenQCDFieldType_s {
  */
 typedef enum {
   OPENQCD_MG_UPDATE_AUTO = 0,      // < Skip update if nothing changed, otherwise rebuild the fine Dirac operators and coarse links from the current gauge/clover/kappa/mu
+  OPENQCD_MG_UPDATE_FORCE_THIN,    // < Only update finest links with current gauge/clover/kappa/mu
   OPENQCD_MG_UPDATE_FORCE_UPDATE,  // < Force rebuild of the fine Dirac operators and coarse links from current gauge/clover/kappa/mu
   OPENQCD_MG_UPDATE_FORCE_REFRESH, // < Force rebuild of the fine Dirac operators and coarse links from current gauge/clover/kappa/mu, additionally refine the near-null space with the configured number of extra setup-solver iterations.
   OPENQCD_MG_UPDATE_FORCE_RESET    // < Destroy and rebuild the solver (used to be fat update)

@@ -1113,11 +1113,12 @@ static void openQCD_qudaSolverUpdate(void *param_)
   bool do_gauge_transfer = (!gauge_field_get_up2date() && !gauge_field_get_unset())
     || additional_prop->qhat != dp.qhat;
   bool do_clover_update = !clover_field_get_up2date() && !gauge_field_get_unset();
+  bool force_thin = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_THIN;
   bool force_update = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_UPDATE;
   bool force_refresh = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_REFRESH;
   bool force_reset = additional_prop->pending_mg_tier == OPENQCD_MG_UPDATE_FORCE_RESET;
   bool do_multigrid_update = param_ != qudaState.dirac_handle && param->inv_type_precondition == QUDA_MG_INVERTER
-    && !gauge_field_get_unset() && (!mg_get_up2date(param) || force_update || force_refresh || force_reset);
+    && !gauge_field_get_unset() && (!mg_get_up2date(param) || force_thin || force_update || force_refresh || force_reset);
 
   if (do_gauge_transfer) {
     if (qudaState.layout.h_gauge == nullptr) { WITH_COMM(errorQuda("qudaState.layout.h_gauge is not set.")); }
@@ -1248,15 +1249,14 @@ static void openQCD_qudaSolverUpdate(void *param_)
         PUSH_RANGE("newMultigridQuda", 4);
         param->preconditioner = newMultigridQuda(mg_param);
         POP_RANGE;
-      } else {
-        /* Thin is retired from the automatic path: its mu/kappa/c_sw gap
-         * (see updateMultigridQuda()'s thin_update_only branch in
-         * interface_quda.cpp) makes it unsafe as a silent default. */
-        mg_param->thin_update_only = QUDA_BOOLEAN_FALSE;
-
+      }
+      else {
         if (force_refresh) {
           for (int i = 0; i < mg_param->n_level; i++)
             mg_param->setup_maxiter_refresh[i] = additional_prop->mg_refresh_maxiter[i];
+        }
+        else if (force_thin) {
+          mg_param->thin_update_only = QUDA_BOOLEAN_TRUE;
         }
 
         logQuda(QUDA_VERBOSE,
@@ -1268,6 +1268,10 @@ static void openQCD_qudaSolverUpdate(void *param_)
         if (force_refresh) {
           for (int i = 0; i < mg_param->n_level; i++) mg_param->setup_maxiter_refresh[i] = 0;
         }
+        else if (force_thin) {
+          mg_param->thin_update_only = QUDA_BOOLEAN_FALSE;
+        }
+        
       }
     }
     mg_set_revision(param);
@@ -1633,7 +1637,7 @@ static void *openQCD_qudaSolverReadIn(int id)
   additional_prop->qhat = 0.0;
 
   /* setup_maxiter_refresh is only meant to apply to a single, explicitly
-   * requested Fat-REFRESH update (see openQCD_qudaSetMgUpdateTier() /
+   * requested REFRESH update (see openQCD_qudaSetMgUpdateTier() /
    * OPENQCD_MG_UPDATE_FORCE_REFRESH), not to every updateMultigridQuda()
    * call. Stash the ini-configured per-level budget and reset the live
    * field to 0; openQCD_qudaSolverUpdate() repopulates it only for the one
