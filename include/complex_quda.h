@@ -28,8 +28,6 @@
 #include <math_helper.h>
 #include "dbldbl.h"
 
-#include <quda_api.h>
-
 namespace quda
 {
   namespace gauge
