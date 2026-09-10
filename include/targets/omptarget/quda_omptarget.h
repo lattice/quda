@@ -92,5 +92,3 @@ namespace quda {
     }
   }
 }
-
-#include "../../quda_api.h"

@@ -5,13 +5,6 @@
 #include <enum_quda.h>
 #include <quda_ptr.h>
 
-/* We have to overwrite some cuda-ism here even for public interface,
-   other wise we can't compile tests.
- */
-#ifdef QUDA_TARGET_OMPTARGET
-#include "targets/omptarget/quda_api.h"
-#endif
-
 /**
    @file quda_api.h
 
