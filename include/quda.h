@@ -870,6 +870,17 @@ extern "C" {
                                  with the underlying issue documented https://github.com/lattice/quda/issues/1315 */
   } QudaGaugeObservableParam;
 
+  typedef struct QudaFermMeasurements_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    void **ppb;
+    void *ppb_t;
+    unsigned int meas_int;
+    void *meas_int_vec;
+    void *meas_list;
+    QudaBoolean take_meas;
+    QudaBoolean take_fwd_gflow;
+  } QudaFermMeasurements;
+
   typedef struct QudaGaugeSmearParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     unsigned int n_steps; /**< The total number of smearing steps to perform. */
@@ -1101,6 +1112,14 @@ extern "C" {
    */
   QudaGaugeSmearParam newQudaGaugeSmearParam(void);
 
+  /**
+   * A new QudaFermMeasurements should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
+   */
+  QudaFermMeasurements newQudaFermMeasurements(void);
   /**
    * A new QudaBLASParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
@@ -1388,6 +1407,8 @@ extern "C" {
 
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
+
+  void set_act_path(double *act_path, int i);
                          
   /**
    * Compute two-link field
@@ -1762,13 +1783,11 @@ extern "C" {
    * @param[in] h_in Input fermion field set
    * @param[in] inv_param Dirac/Laplacian and solver meta data
    * @param[in] smear_param Parameter struct that defines the computation parameters
-   * @param[in,out] obs_param Parameter struct that defines which
-   * observables we are making and the resulting observables.
+   * @param[in,out] ferm_meas Parameter struct that conducts measurements of fermionic observables
    * @param[in] nSpinors Number of spinors in the input and output fields
    */
-  void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+  void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
                            size_t nSpinors);
-
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the

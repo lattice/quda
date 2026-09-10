@@ -127,6 +127,7 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
                                 const std::array<int, 4> &source_position, const std::array<int, n_mom * 4> &mom,
                                 const std::array<QudaFFTSymmType, n_mom * 4> &fft_type)
 {
+  printfQuda("part C\n");
   ColorSpinorParam cs_param;
 
   cs_param.nColor = 3;
@@ -193,7 +194,7 @@ int launch_contract_test(const QudaContractType cType, const std::array<int, 4> 
                          const std::array<QudaFFTSymmType, n_mom * 4> &fft_type)
 {
   int faults = 0;
-
+  printfQuda("part B\n");
   if (nspin == 1) {
     faults = launch_contract_test<Float, 1, src_colors, n_mom>(cType, X, red_size, source_position, mom, fft_type);
     //} else  if ( nspin == 4 ){ //TODO : must be enabled when spin=4 case will be re-activated
@@ -210,6 +211,7 @@ int launch_contract_test(const QudaContractType cType, const std::array<int, 4> 
 int contract(test_t param)
 {
   if (xdim % 2) errorQuda("odd local x-dimension is not supported");
+  printfQuda("part A\n");
 
   const std::array<int, 4> X = {xdim, ydim, zdim, tdim};
 
