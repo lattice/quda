@@ -538,6 +538,10 @@ namespace quda
 #endif
     }
 
+    void destroy()
+    {
+    }
+
     void *host_pinned_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
       void *ptr = nullptr;
