@@ -18,7 +18,7 @@ jobs:
     - name: Install software
       run: |
         sudo apt update
-        sudo apt install -y gpg-agent wget
+        sudo apt install -y gpg-agent wget time
         # download the key to system keyring
         wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
         # add signed entry to apt sources and configure the APT client to use Intel repository:
@@ -61,7 +61,35 @@ jobs:
         -DQUDA_MPI=ON
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build
+      run: |
+        diagnostics="$RUNNER_TEMP/oneapi-build-diagnostics"
+        mkdir -p "$diagnostics"
+        python3 -u ci/monitor_build_resources.py "$diagnostics/resources.jsonl" &
+        monitor_pid=$!
+        cleanup() {
+          build_status=$?
+          trap - EXIT
+          printf '%s\n' "$build_status" > "$diagnostics/exit-status.txt" || true
+          kill "$monitor_pid" 2>/dev/null || true
+          wait "$monitor_pid" 2>/dev/null || true
+          python3 ci/monitor_build_resources.py "$diagnostics/resources.jsonl" --once || true
+          cp "$GITHUB_WORKSPACE/build/CMakeCache.txt" "$diagnostics/" 2>/dev/null || true
+          cp "$GITHUB_WORKSPACE/build/.ninja_log" "$diagnostics/ninja.log" 2>/dev/null || true
+          exit "$build_status"
+        }
+        trap cleanup EXIT
+        trap 'echo "Build shell received SIGTERM"; exit 143' TERM
+        trap 'echo "Build shell received SIGINT"; exit 130' INT
+        /usr/bin/time -v -o "$diagnostics/time.txt" \
+          cmake --build "$GITHUB_WORKSPACE/build" --parallel 2 --verbose 2>&1 | tee "$diagnostics/build.log"
 
     - name: Install
       run: cmake --install ${{github.workspace}}/build
+
+    - name: Upload build diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: oneapi-build-diagnostics
+        path: ${{runner.temp}}/oneapi-build-diagnostics
+        if-no-files-found: ignore
