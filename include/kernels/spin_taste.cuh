@@ -12,7 +12,7 @@ namespace quda
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaSpinTasteGamma gamma = gamma_;
-    using F = typename colorspinor_mapper<Float, 1, nColor, false, false>::type;
+    using F = typename colorspinor_mapper<Float, 1, nColor, false>::type;
 
     int X[4];
 

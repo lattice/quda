@@ -29,7 +29,7 @@ namespace quda
       static constexpr bool xpay = xpay_;
       static constexpr Dslash5Type type = type_;
 
-      using F = typename colorspinor_mapper<storage_type, 4, nColor, false, false, true>::type;
+      using F = typename colorspinor_mapper<storage_type, 4, nColor, false, true>::type;
       using real = typename mapper<storage_type>::type;
 
       F out[MAX_MULTI_RHS];   // output vector field

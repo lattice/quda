@@ -135,7 +135,6 @@ set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE HIP)
 target_link_libraries(quda PUBLIC hip::hiprand roc::rocrand hip::hipcub roc::rocprim_hip)
 target_link_libraries(quda PUBLIC roc::hipblas roc::rocblas)
 
-target_include_directories(quda PUBLIC ${ROCM_PATH}/hipfft/include)
 target_link_libraries(quda PUBLIC hip::hipfft)
 
 add_subdirectory(targets/hip)

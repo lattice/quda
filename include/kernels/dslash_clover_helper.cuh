@@ -26,7 +26,7 @@ namespace quda {
     static constexpr bool inverse = inverse_;
     static constexpr bool dynamic_clover = clover::dynamic_inverse();
 
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, false, false, true>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, false, true>::type F;
     typedef typename clover_mapper<Float, length>::type C;
 
     F out[MAX_MULTI_RHS]; // output vector field

@@ -7,6 +7,7 @@
  */
 
 #include <cassert>
+#include <cstdint>
 #include <type_traits>
 #include <limits>
 
@@ -1589,8 +1590,7 @@ namespace quda {
        */
       __host__ __device__ constexpr int Ncolor(int length) { return ct_sqrt(length / 2); }
 
-      // we default to huge allocations for gauge field (for now)
-      constexpr bool default_huge_alloc = true;
+      // Native accessors use the global index_t (32- or 64-bit) selected by QUDA_64BIT_INDEXING.
 
       template <QudaStaggeredPhase phase> constexpr bool static_phase()
       {
@@ -1603,20 +1603,19 @@ namespace quda {
       }
 
       template <typename Float, int length_, QudaReconstructType recon_, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO,
-                bool huge_alloc = default_huge_alloc, QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID,
-                bool use_inphase = false, bool shifted = false, QudaFieldGeometry geometry_ = QUDA_INVALID_GEOMETRY>
+                QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false,
+                bool shifted = false, QudaFieldGeometry geometry_ = QUDA_INVALID_GEOMETRY>
       struct FloatNOrder {
         static constexpr bool is_native = true;
         static constexpr bool static_geometry = (geometry_ != QUDA_INVALID_GEOMETRY);
         using Accessor
-          = FloatNOrder<Float, length_, recon_, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted, geometry_>;
+          = FloatNOrder<Float, length_, recon_, stag_phase, ghostExchange_, use_inphase, shifted, geometry_>;
 
         using store_t = Float;
         static constexpr int length = length_;
         static constexpr QudaReconstructType recon = recon_;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        typedef typename AllocType<huge_alloc>::type AllocInt;
         Reconstruct<length, Float, recon, ghostExchange_, stag_phase, shifted> reconstruct;
         static constexpr int reconLen = recon;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
@@ -1626,7 +1625,7 @@ namespace quda {
         static constexpr int Nrem = reconLen - hasPhase - M * N;
         static_assert(Nrem == 0 || (Nrem > 0 && (Nrem & (Nrem - 1)) == 0), "Nrem must be a power of 2");
         Float *gauge;
-        const AllocInt offset;
+        const index_t offset;
         Float *ghost[4];
         QudaGhostExchange ghostExchange;
         int coords[QUDA_MAX_DIM];
@@ -1634,9 +1633,9 @@ namespace quda {
         int R[QUDA_MAX_DIM];
         const unsigned int volumeCB;
         int faceVolumeCB[4];
-        const int stride;
+        const index_t stride;
         const int geometry;
-        const AllocInt phaseOffset;
+        const index_t phaseOffset;
         size_t bytes;
         gauge::tensor_desc_t tensor_desc;
         const real combined_scale; // Precomputed scale for copy_and_scale: fixedInvMaxValue * reconstruct.scale
@@ -2763,22 +2762,22 @@ namespace quda {
   }
 
   template <typename T, QudaReconstructType recon, int N = 18, QudaStaggeredPhase stag = QUDA_STAGGERED_PHASE_NO,
-            bool huge_alloc = gauge::default_huge_alloc, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID,
-            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER, bool shifted = false,
+            QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false,
+            QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER, bool shifted = false,
             QudaFieldGeometry geometry_ = QUDA_INVALID_GEOMETRY>
   struct gauge_mapper {
-    typedef gauge::FloatNOrder<T, N, recon, stag, huge_alloc, ghostExchange, use_inphase, shifted, geometry_> type;
+    typedef gauge::FloatNOrder<T, N, recon, stag, ghostExchange, use_inphase, shifted, geometry_> type;
   };
 
-  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted, QudaFieldGeometry geometry_>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER, shifted, geometry_> {
+  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, QudaGhostExchange ghostExchange,
+            bool use_inphase, bool shifted, QudaFieldGeometry geometry_>
+  struct gauge_mapper<T, recon, N, stag, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER, shifted, geometry_> {
     typedef gauge::MILCOrder<T, N> type;
   };
 
-  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted, QudaFieldGeometry geometry_>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER, shifted, geometry_> {
+  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, QudaGhostExchange ghostExchange,
+            bool use_inphase, bool shifted, QudaFieldGeometry geometry_>
+  struct gauge_mapper<T, recon, N, stag, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER, shifted, geometry_> {
     typedef gauge::QDPOrder<T, N> type;
   };
 

@@ -35,6 +35,13 @@
 #define MAX_KERNEL_ARG_SIZE @QUDA_MAX_KERNEL_ARG_SIZE@
 
 /**
+ * @def   QUDA_64BIT_INDEXING
+ * @brief When defined, native field accessors use 64-bit (uint64_t)
+ * indices; otherwise they use 32-bit (uint32_t) indices.
+ */
+#cmakedefine QUDA_64BIT_INDEXING
+
+/**
  * @def   MAX_MULTI_BLAS_N
  * @brief This macro sets the register tile size for MRHS kernels
  */

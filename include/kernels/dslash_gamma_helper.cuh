@@ -14,7 +14,7 @@ namespace quda {
   struct GammaArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     constexpr static int nColor = nColor_;
-    using F = typename colorspinor_mapper<Float, 4, nColor, false, false, true>::type;
+    using F = typename colorspinor_mapper<Float, 4, nColor, false, true>::type;
 
     F out[MAX_MULTI_RHS]; // output vector field
     F in[MAX_MULTI_RHS];  // input vector field

@@ -42,9 +42,8 @@ namespace quda
     static constexpr int nSpin = nSpin_;
     static constexpr unsigned int max_n_batch_block = nSpin * nSpin;
     static constexpr bool spin_project = nSpin_ == 1 ? false : true;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
@@ -243,10 +242,9 @@ namespace quda
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr bool spin_project = spin_project_;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorField (F for fermion)
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type;
 
     F x;
     F y;

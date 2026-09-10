@@ -586,6 +586,12 @@ namespace quda {
       void axpyBzpcx(const std::vector<real_t> &a, cvector_ref<ColorSpinorField> &x_, cvector_ref<ColorSpinorField> &y_,
                      const std::vector<real_t> &b, ColorSpinorField &z_, const std::vector<real_t> &c)
       {
+        // besides being a no-op, this keeps a non-recursive path that returns
+        // for builds where the instantiation below is entirely disabled at
+        // compile time, e.g., a build with no nSpin enabled: without it the
+        // compiler flags the splitting below as infinite recursion
+        if (y_.size() == 0) return;
+
         if (y_.size() <= (size_t)max_N_multi_1d()) {
           // swizzle order since we are writing to x_ and y_, but the
           // multi-blas only allow writing to y and w, and moreover the
@@ -614,6 +620,12 @@ namespace quda {
       void caxpyBxpz(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x_, ColorSpinorField &y_,
                      const std::vector<complex_t> &b, ColorSpinorField &z_)
       {
+        // besides being a no-op, this keeps a non-recursive path that returns
+        // for builds where the instantiation below is entirely disabled at
+        // compile time, e.g., a build with no nSpin enabled: without it the
+        // compiler flags the splitting below as infinite recursion
+        if (x_.size() == 0) return;
+
         if (x_.size() <= (size_t)max_N_multi_1d()
             && is_valid_NXZ(x_.size(), false, y_.Precision())) // only split if we have to.
         {

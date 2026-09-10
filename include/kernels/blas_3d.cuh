@@ -30,10 +30,9 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F y;
     F x;
@@ -117,11 +116,10 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
     static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, disable_ghost>::type F;
 
     static constexpr int MAX_ORTHO_DIM = 256;
     real a[MAX_ORTHO_DIM];
@@ -172,11 +170,10 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
     static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, disable_ghost>::type F;
 
     static constexpr int MAX_ORTHO_DIM = 256;
     complex<real> a[MAX_ORTHO_DIM];
@@ -230,10 +227,9 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
@@ -292,10 +288,9 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
