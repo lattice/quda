@@ -369,6 +369,46 @@ double openQCD_qudaInvert(int id, void* source, void* solution, int *status);
 void openQCD_qudaInvertMultiSrc(int id, void** sources, void** solutions, int *status, double *residual);
 
 /**
+ * @brief      Solve (M^dag M + offset[i]) x_i = b for i = 0, ..., noffset-1
+ *             with a single multi-shift CG run, for a Wilson/twisted-mass/
+ *             twisted-clover operator built from solver [id]'s FIXED kappa
+ *             (from openQxD's dirac_parms(), as for openQCD_qudaInvert). All
+ *             fields passed and returned are host (CPU) fields in openQCD
+ *             order. offset[] maps directly to QudaInvertParam::offset[] --
+ *             the solver itself is agnostic to the physical meaning of the
+ *             offsets (e.g. offset[i] = mu[i]^2 for a twisted-mass shift is
+ *             the caller's concern, not this interface's). offset[] MUST be
+ *             supplied in ascending order (this function does not sort it)
+ *             -- errors otherwise, since QUDA requires it.
+ *
+ *             REQUIRES param->mu == 0 for solver [id] (i.e. openQxD's
+ *             current dirac_parms().mu, the solver's own twisted mass):
+ *             M^dag M = D_W^dag D_W + param->mu^2 for any param->mu, so
+ *             offset[i] only shifts the intended D_W^dag D_W when
+ *             param->mu == 0. Errors if param->mu != 0.
+ *
+ *             The "Solver [id]" ini section must ALREADY have inv_type=cg
+ *             and solution_type/solve_type set to the MATPCDAG_MATPC/
+ *             NORMOP_PC pair or the MATDAG_MAT/NORMOP pair -- errors on
+ *             mismatch rather than silently correcting it. [id] should
+ *             therefore be dedicated to multi-shift use, not shared with a
+ *             plain openQCD_qudaInvert call.
+ *
+ * @param[in]  id          The solver identifier ("Solver [id]" ini section).
+ * @param[in]  noffset     Number of offsets, 1..QUDA_MAX_MULTI_SHIFT.
+ * @param[in]  offset      Array of noffset offsets, ascending.
+ * @param[in]  res         Array of noffset desired maximal relative L2
+ *                          residues, one per offset.
+ * @param[in]  source      The single source field
+ * @param[out] solutions   Array of noffset solution fields; solutions[i]
+ *                          solves for offset[i]
+ * @param[out] status      status[i]: iteration count if converged, else -1
+ * @param[out] residual    residual[i]: achieved L2 residual for offset[i]
+ */
+void openQCD_qudaInvertMultiShift(int id, int noffset, double *offset, double *res, void *source, void **solutions,
+                                   int *status, double *residual);
+
+/**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
  *             about the parameters.
  */
