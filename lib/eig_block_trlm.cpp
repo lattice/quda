@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <complex>
 #include <iostream>
 #include <vector>
 #include <algorithm>
