@@ -24,7 +24,9 @@ namespace quda {
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int parity;
+    unsigned int sharedBytes;
 
+#if 0
 #if defined(QUDA_TARGET_SYCL)
     unsigned int sharedBytesPerBlock(const TuneParam &tp) const
     {
@@ -38,6 +40,12 @@ namespace quda {
     }
 #else
     bool tuneSharedBytes() const { return false; }
+#endif
+#else
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    {
+      return sharedBytes;
+    }
 #endif
 
     bool tuneAuxDim() const { return true; }
@@ -68,15 +76,21 @@ namespace quda {
           if (in[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
             Arg<true> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
             arg.swizzle_factor = tp.aux.x;
+	    using Barg = BlockKernelArg<Aggregates::block[0], Arg<true>>;
+	    sharedBytes = sharedMemSize<getKernelOps<Restrictor<Barg>>>(tp.block, Barg(arg));
             launch<Restrictor, Aggregates>(tp, stream, arg);
           } else {
             Arg<false> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
             arg.swizzle_factor = tp.aux.x;
+	    using Barg = BlockKernelArg<Aggregates::block[0], Arg<false>>;
+	    sharedBytes = sharedMemSize<getKernelOps<Restrictor<Barg>>>(tp.block, Barg(arg));
             launch<Restrictor, Aggregates>(tp, stream, arg);
           }
         } else {
           Arg<false> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
           arg.swizzle_factor = tp.aux.x;
+	  using Barg = BlockKernelArg<Aggregates::block[0], Arg<false>>;
+	  sharedBytes = sharedMemSize<getKernelOps<Restrictor<Barg>>>(tp.block, Barg(arg));
           launch<Restrictor, Aggregates>(tp, stream, arg);
         }
       }

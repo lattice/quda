@@ -63,6 +63,7 @@ namespace quda {
     bool two_pass;
     int iter;
     real_t max;
+    unsigned int sharedBytes;
 
   public:
     BlockOrtho(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
@@ -119,7 +120,10 @@ namespace quda {
     template <typename Rotator, typename Vector>
     void launch_host_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<false, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Args = Arg<false, Rotator, Vector>;
+      Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
+      sharedBytes = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
     }
@@ -127,8 +131,11 @@ namespace quda {
     template <typename Rotator, typename Vector>
     void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<true, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Args = Arg<true, Rotator, Vector>;
+      Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
       arg.swizzle_factor = tp.aux.x;
+      using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
+      sharedBytes = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
       launch_device<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
     }
@@ -173,6 +180,7 @@ namespace quda {
 #else
     unsigned int sharedBytesPerBlock(const TuneParam &tp) const
     {
+#if 0
       constexpr bool disable_ghost = true;
       using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
       using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER, bFloat, bFloat, disable_ghost,
@@ -182,6 +190,8 @@ namespace quda {
       using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
       auto sizeOps = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
       return sizeOps;
+#endif
+      return sharedBytes;
     }
 #endif
 
