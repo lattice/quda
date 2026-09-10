@@ -20,7 +20,11 @@ namespace quda {
 #ifndef QUDA_FAST_COMPILE_REDUCE
     using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
+#if defined(QUDA_TARGET_SYCL)
+    using array_type = PowerOfTwoArray<device::max_block_size() / 2, device::max_block_size()>;
+#else
     using array_type = PowerOfTwoArray<device::max_block_size(), device::max_block_size()>;
+#endif
 #endif
     static constexpr array_type block = array_type();
 
@@ -59,6 +63,7 @@ namespace quda {
     bool two_pass;
     int iter;
     real_t max;
+    unsigned int sharedBytes;
 
   public:
     BlockOrtho(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
@@ -115,7 +120,10 @@ namespace quda {
     template <typename Rotator, typename Vector>
     void launch_host_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<false, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Args = Arg<false, Rotator, Vector>;
+      Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
+      sharedBytes = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
     }
@@ -123,8 +131,11 @@ namespace quda {
     template <typename Rotator, typename Vector>
     void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<true, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Args = Arg<true, Rotator, Vector>;
+      Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
       arg.swizzle_factor = tp.aux.x;
+      using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
+      sharedBytes = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
       launch_device<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
     }
@@ -155,6 +166,37 @@ namespace quda {
         }
       }
     }
+
+#if 0
+#if defined(QUDA_TARGET_SYCL)
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    {
+      using sum_t = double;
+      int mVec = quda::tile_size<nColor, nVec>(tp.block.x);
+      int vsize = 2 * sizeof(sum_t) * mVec;
+      return vsize * (tp.block.x * tp.block.y * tp.block.z) / device::warp_size();
+    }
+#endif
+#else
+#if 0
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    {
+      constexpr bool disable_ghost = true;
+      using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
+      using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER, bFloat, bFloat, disable_ghost,
+                                      isFixed<bFloat>::value>;
+      using Args = Arg<true, Rotator, Vector>;
+      Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
+      auto sizeOps = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
+      return sizeOps;
+    }
+#endif
+    unsigned int sharedBytesPerBlock(const TuneParam &) const
+    {
+      return sharedBytes;
+    }
+#endif
 
 #ifdef SWIZZLE
     bool advanceAux(TuneParam &param) const
@@ -188,6 +230,7 @@ namespace quda {
       param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
       param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, 1, chiral_blocks);
       param.aux.x = 1; // swizzle factor
+      setSharedBytes(param);
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
