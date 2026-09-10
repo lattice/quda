@@ -178,9 +178,9 @@ namespace quda {
     }
 #endif
 #else
+#if 0
     unsigned int sharedBytesPerBlock(const TuneParam &tp) const
     {
-#if 0
       constexpr bool disable_ghost = true;
       using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
       using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER, bFloat, bFloat, disable_ghost,
@@ -190,7 +190,10 @@ namespace quda {
       using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
       auto sizeOps = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
       return sizeOps;
+    }
 #endif
+    unsigned int sharedBytesPerBlock(const TuneParam &) const
+    {
       return sharedBytes;
     }
 #endif

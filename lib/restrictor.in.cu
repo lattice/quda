@@ -42,7 +42,7 @@ namespace quda {
     bool tuneSharedBytes() const { return false; }
 #endif
 #else
-    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    unsigned int sharedBytesPerBlock(const TuneParam &) const
     {
       return sharedBytes;
     }
