@@ -1365,7 +1365,7 @@ static void *openQCD_qudaSolverReadIn(int id)
 
     if (param->verbosity >= QUDA_DEBUG_VERBOSE) { kv.dump(); }
 
-    if (kv.get<std::string>(section, "solver") != "QUDA") {
+    if (!kv.get<std::string>(section, "solver").starts_with("QUDA")) {
       WITH_COMM(errorQuda("Solver section \"%s\" in file %s is not a valid quda-solver section (solver = %s).", section.c_str(),
                 qudaState.infile, kv.get<std::string>(section, "solver").c_str()));
     }
@@ -2289,7 +2289,7 @@ void *openQCD_qudaEigensolverReadIn(int id, int solver_id)
 
     if (verbosity >= QUDA_DEBUG_VERBOSE) { kv.dump(); }
 
-    if (kv.get<std::string>(section, "solver") != "QUDA") {
+    if (!kv.get<std::string>(section, "solver").starts_with("QUDA")) {
       WITH_COMM(errorQuda("Eigensolver section \"%s\" in file %s is not a valid quda-eigensolver section (solver = %s)\n",
                 section.c_str(), qudaState.infile, kv.get<std::string>(section, "solver").c_str()));
     }
