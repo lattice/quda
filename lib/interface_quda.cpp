@@ -2980,11 +2980,15 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 
     // FIXME: assumes gauge parameters haven't changed.
     // These routines will set gauge = gaugeFat for DiracImprovedStaggered
+    
     mg->d->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
     mg->d->setMass(param->mass);
+    mg->d->setMu(param->mu);
 
+    
     mg->dSmooth->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
     mg->dSmooth->setMass(param->mass);
+    mg->dSmooth->setMu(param->mu);
 
     if (mg->dSmoothSloppy != mg->dSmooth) {
       if (param->overlap) {
@@ -2994,6 +2998,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
                                         cloverPrecondition);
       }
       mg->dSmoothSloppy->setMass(param->mass);
+      mg->dSmoothSloppy->setMu(param->mu);
     }
     // The above changes are propagated internally by use of references, pointers, etc, so
     // no further updates are needed.

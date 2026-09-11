@@ -391,6 +391,7 @@ namespace quda {
     virtual bool hasSpecialMG() const { return false; }
 
     void setMass(real_t mass) { this->mass = mass; }
+    virtual void setMu(real_t mu){ /* no-op*/ }
 
     // Dirac operator factory
     /**
@@ -1187,6 +1188,7 @@ namespace quda {
     virtual QudaDiracType getDiracType() const override { return QUDA_TWISTED_MASS_DIRAC; }
 
     real_t Mu() const override { return mu; }
+    virtual void setMu(real_t mu) override { this->mu=mu; }
 
     /**
      * @brief Create the coarse twisted-mass operator
