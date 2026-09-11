@@ -126,7 +126,6 @@ TEST_P(GaugeObservableTest, FieldStrengthTensor)
   if (!quda::is_enabled(precision)) GTEST_SKIP();
   if ((QUDA_RECONSTRUCT & getReconstructNibble(reconstruct)) == 0) GTEST_SKIP();
   if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
-  GTEST_SKIP() << "Tensor geometry native-to-QDP CopyGauge currently fails on the GPU";
   EXPECT_LE(field_strength_tensor_test(precision, reconstruct), getTolerance(precision))
     << "Host and QUDA field-strength tensors do not agree";
 }

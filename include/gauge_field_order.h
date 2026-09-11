@@ -2164,12 +2164,12 @@ namespace quda {
       using Accessor = QDPOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      Float *gauge[QUDA_MAX_DIM];
+      Float *gauge[QUDA_MAX_DIM] = {};
       const unsigned int volumeCB;
       QDPOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
-        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+        for (int i = 0; i < u.Geometry(); i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
       }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
@@ -2210,12 +2210,12 @@ namespace quda {
       using Accessor = QDPJITOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      Float *gauge[QUDA_MAX_DIM];
+      Float *gauge[QUDA_MAX_DIM] = {};
       const unsigned int volumeCB;
       QDPJITOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
-        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+        for (int i = 0; i < u.Geometry(); i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
       }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
