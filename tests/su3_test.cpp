@@ -129,7 +129,7 @@ struct FieldStrengthFields {
   }
 };
 
-std::array<double, 3> run_plaquette(Su3Fields &fields, bool verify)
+std::array<double, 3> run_plaquette(const Su3Fields &fields, bool verify)
 {
   long long flops_plaquette = 6ll * 597 * V;
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -162,7 +162,7 @@ std::array<double, 3> run_plaquette(Su3Fields &fields, bool verify)
   return deviation;
 }
 
-std::array<double, 6> run_plaquette_rectangle(Su3Fields &fields, bool verify)
+std::array<double, 6> run_plaquette_rectangle(const Su3Fields &fields, bool verify)
 {
   constexpr long long Nc = 3;
   const long long flops = 6ll * V * (10 * Nc * Nc * (8 * Nc - 2) + 2 * Nc);
@@ -288,7 +288,7 @@ double field_strength_tensor_test(QudaPrecision precision, QudaReconstructType r
   return comparison.max_deviation;
 }
 
-std::array<double, 16> energy_topological_charge_test(QudaPrecision precision, QudaReconstructType reconstruct)
+EnergyTopologicalChargeComparison energy_topological_charge_test(QudaPrecision precision, QudaReconstructType reconstruct)
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   FieldStrengthFields fmunu(fields);
@@ -302,16 +302,18 @@ std::array<double, 16> energy_topological_charge_test(QudaPrecision precision, Q
   observable.compute_qcharge = QUDA_BOOLEAN_TRUE;
   gaugeObservablesQuda(&observable);
 
-  std::array<double, 16> comparison {};
-  int offset = 0;
-  auto add_comparison = [&](double value, double expected, double scale) {
-    comparison[offset++] = std::abs(value - expected);
-    comparison[offset++] = tolerance * scale;
+  EnergyTopologicalChargeComparison comparison {};
+  auto set_comparison = [&](DifferenceTolerance &comparison, double value, double expected, double scale) {
+    comparison.difference = std::abs(value - expected);
+    comparison.tolerance = tolerance * scale;
   };
-  for (int i = 0; i < 3; i++) add_comparison(energy[i], reference.energy[i], std::abs(reference.energy[i]));
-  add_comparison(qcharge, reference.qcharge, reference.qcharge_scale);
-  for (int i = 0; i < 3; i++) add_comparison(observable.energy[i], reference.energy[i], std::abs(reference.energy[i]));
-  add_comparison(observable.qcharge, reference.qcharge, reference.qcharge_scale);
+  for (int i = 0; i < 3; i++) {
+    set_comparison(comparison.direct_energy[i], energy[i], reference.energy[i], std::abs(reference.energy[i]));
+    set_comparison(comparison.observable_energy[i], observable.energy[i], reference.energy[i],
+                   std::abs(reference.energy[i]));
+  }
+  set_comparison(comparison.direct_qcharge, qcharge, reference.qcharge, reference.qcharge_scale);
+  set_comparison(comparison.observable_qcharge, observable.qcharge, reference.qcharge, reference.qcharge_scale);
   return comparison;
 }
 
@@ -335,7 +337,8 @@ std::vector<double> copy_density_to_double(const void *density, size_t length, Q
   return result;
 }
 
-std::array<double, 24> topological_charge_density_test(QudaPrecision precision, QudaReconstructType reconstruct)
+TopologicalChargeDensityComparison topological_charge_density_test(QudaPrecision precision,
+                                                                    QudaReconstructType reconstruct)
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   FieldStrengthFields fmunu(fields);
@@ -371,21 +374,25 @@ std::array<double, 24> topological_charge_density_test(QudaPrecision precision, 
   quda::comm_allreduce_sum(device_density_sum);
   quda::comm_allreduce_sum(public_density_sum);
 
-  std::array<double, 24> comparison {};
-  int offset = 0;
-  auto add_comparison = [&](double difference, double scale) {
-    comparison[offset++] = difference;
-    comparison[offset++] = tolerance * scale;
+  TopologicalChargeDensityComparison comparison {};
+  auto set_comparison = [&](DifferenceTolerance &comparison, double difference, double scale) {
+    comparison.difference = difference;
+    comparison.tolerance = tolerance * scale;
   };
-  add_comparison(direct_field.max_deviation, 1.0);
-  add_comparison(public_field.max_deviation, 1.0);
-  for (int i = 0; i < 3; i++) add_comparison(std::abs(energy[i] - reference.energy[i]), std::abs(reference.energy[i]));
-  for (int i = 0; i < 3; i++)
-    add_comparison(std::abs(observable.energy[i] - reference.energy[i]), std::abs(reference.energy[i]));
-  add_comparison(std::abs(qcharge - reference.qcharge), reference.qcharge_scale);
-  add_comparison(std::abs(observable.qcharge - reference.qcharge), reference.qcharge_scale);
-  add_comparison(std::abs(device_density_sum - qcharge), reference.qcharge_scale);
-  add_comparison(std::abs(public_density_sum - observable.qcharge), reference.qcharge_scale);
+  set_comparison(comparison.direct_field, direct_field.max_deviation, 1.0);
+  set_comparison(comparison.observable_field, public_field.max_deviation, 1.0);
+  for (int i = 0; i < 3; i++) {
+    set_comparison(comparison.direct_energy[i], std::abs(energy[i] - reference.energy[i]),
+                   std::abs(reference.energy[i]));
+    set_comparison(comparison.observable_energy[i], std::abs(observable.energy[i] - reference.energy[i]),
+                   std::abs(reference.energy[i]));
+  }
+  set_comparison(comparison.direct_qcharge, std::abs(qcharge - reference.qcharge), reference.qcharge_scale);
+  set_comparison(comparison.observable_qcharge, std::abs(observable.qcharge - reference.qcharge),
+                 reference.qcharge_scale);
+  set_comparison(comparison.direct_density_sum, std::abs(device_density_sum - qcharge), reference.qcharge_scale);
+  set_comparison(comparison.observable_density_sum, std::abs(public_density_sum - observable.qcharge),
+                 reference.qcharge_scale);
   return comparison;
 }
 

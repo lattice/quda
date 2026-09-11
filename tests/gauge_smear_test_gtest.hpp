@@ -34,15 +34,6 @@ int smear_verify(QudaPrecision precision, QudaReconstructType reconstruct, QudaG
 int flow_verify(QudaPrecision precision, QudaReconstructType reconstruct, QudaGaugeSmearType type, int dir_ignore,
                 unsigned int rk_order, double smear_anisotropy);
 
-inline const char *reconstruct_label(QudaReconstructType reconstruct)
-{
-  switch (reconstruct) {
-  case QUDA_RECONSTRUCT_NO: return "r18";
-  case QUDA_RECONSTRUCT_12: return "r12";
-  default: return "runknown";
-  }
-}
-
 inline std::string test_name(testing::TestParamInfo<smear_test_t> param)
 {
   const auto precision = testing::get<0>(param.param);
@@ -50,7 +41,7 @@ inline std::string test_name(testing::TestParamInfo<smear_test_t> param)
   const auto dir_ignore = testing::get<3>(param.param);
   const auto partition = testing::get<4>(param.param);
   const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_" + direction + "_partition"
+  return std::string(get_prec_str(precision)) + "_r" + get_recon_str(reconstruct) + "_" + direction + "_partition"
     + std::to_string(partition);
 }
 
@@ -62,7 +53,7 @@ inline std::string flow_test_name(testing::TestParamInfo<flow_smear_test_t> para
   const auto dir_ignore = testing::get<3>(param.param);
   const auto partition = testing::get<5>(param.param);
   const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk" + std::to_string(rk_order)
+  return std::string(get_prec_str(precision)) + "_r" + get_recon_str(reconstruct) + "_rk" + std::to_string(rk_order)
     + "_" + direction + "_partition" + std::to_string(partition);
 }
 
@@ -73,8 +64,8 @@ inline std::string anisotropic_test_name(testing::TestParamInfo<anisotropic_smea
   const auto dir_ignore = testing::get<3>(param.param);
   const auto partition = testing::get<5>(param.param);
   const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_aniso_" + direction
-    + "_partition" + std::to_string(partition);
+  return std::string(get_prec_str(precision)) + "_r" + get_recon_str(reconstruct) + "_aniso_" + direction + "_partition"
+    + std::to_string(partition);
 }
 
 inline std::string anisotropic_flow_test_name(testing::TestParamInfo<anisotropic_flow_smear_test_t> param)
@@ -85,7 +76,7 @@ inline std::string anisotropic_flow_test_name(testing::TestParamInfo<anisotropic
   const auto dir_ignore = testing::get<3>(param.param);
   const auto partition = testing::get<6>(param.param);
   const auto direction = dir_ignore < 0 ? "default" : "dir" + std::to_string(dir_ignore);
-  return std::string(get_prec_str(precision)) + "_" + reconstruct_label(reconstruct) + "_rk" + std::to_string(rk_order)
+  return std::string(get_prec_str(precision)) + "_r" + get_recon_str(reconstruct) + "_rk" + std::to_string(rk_order)
     + "_aniso_" + direction + "_partition" + std::to_string(partition);
 }
 
