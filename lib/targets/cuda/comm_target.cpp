@@ -3,9 +3,22 @@
 #include <quda_cuda_api.h>
 #include <algorithm>
 #include <shmem_helper.cuh>
+#include <cstring>
 
 namespace quda
 {
+
+#define CU_CHECK(cmd)                                                          \
+  do {                                                                         \
+    CUresult e = cmd;                                                          \
+    if (e != CUDA_SUCCESS) {                                                   \
+      const char *errstring;                                                   \
+      cuGetErrorName(e, &errstring);                                           \
+      fprintf(stderr, "Failed: Cuda Error %s: %d '%s'\n", __FILE__, __LINE__,  \
+              errstring);                                                      \
+      exit(1);                                                                 \
+    }                                                                          \
+  } while (0)
 
 #define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
@@ -32,6 +45,142 @@ namespace quda
 
     // return the slowest direction of access (lower is faster)
     return std::max(accessRank[0], accessRank[1]);
+  }
+
+  void *map_device_ptr_from_handle(CUmemGenericAllocationHandle handle, size_t bytes, int device) {
+    // reserve / map its allocation (we could also map into one huge range)
+    CUdeviceptr dptr;
+    CU_CHECK(cuMemAddressReserve(&dptr, bytes, 0, 0, 0));
+    CU_CHECK(cuMemMap(dptr, bytes, 0, handle, 0));
+
+    // cuMemMap does not make the address accessible, we need to make it
+    // accessible explicitly
+    CUmemAccessDesc access_desc{};
+    access_desc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    access_desc.location.id = (int)device;
+    access_desc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    CU_CHECK(cuMemSetAccess(dptr, bytes, &access_desc, 1));
+    return (void *)dptr;
+  }
+
+  void *comm_create_local_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, size_t bytes)
+  {
+    // Allocate local memory handle
+    CUdevice device;
+    CU_CHECK(cuCtxGetDevice(&device));
+
+    int devAttr = -1;
+    CU_CHECK(cuDeviceGetAttribute(&devAttr, CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED, device));
+    if (devAttr == 0) {
+        printf("Device %d does not support the CUDA VMM APis, fabric cannot be used", (int)device);
+    }
+    CU_CHECK(cuDeviceGetAttribute(&devAttr, CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED, device));
+    if (devAttr == 0) {
+        printf("Device %d does not support the CUDA fabric handles, fabric cannot be used", (int)device);
+    }
+
+    size_t granularity = 0;
+    CUmemAllocationProp prop;
+    std::memset(&prop, 0, sizeof(CUmemAllocationProp));
+    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
+    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.location.id = (int)device;
+    CU_CHECK(cuMemGetAllocationGranularity(&granularity, &prop,
+                                           CU_MEM_ALLOC_GRANULARITY_MINIMUM));
+    // get the padded size from minimum granularity
+    size_t sz_align = (bytes + granularity - 1) & ~(granularity - 1);
+
+    // each rank creates a handle that is exchanged among all ranks
+    CUmemGenericAllocationHandle this_handle = 0;
+    CU_CHECK(cuMemCreate(&this_handle, sz_align, &prop, 0));
+
+    CUmemFabricHandle shandle;
+    CU_CHECK(cuMemExportToShareableHandle(&shandle, this_handle, CU_MEM_HANDLE_TYPE_FABRIC, 0));
+
+    // handles for obtained ghost pointers
+    CUmemFabricHandle remote_handle[QUDA_MAX_DIM][2];
+
+    for (int dim = 0; dim < 4; ++dim) {
+      if (comm_dim(dim) == 1) continue;
+      for (int dir = 0; dir < 2; ++dir) {
+        MsgHandle *sendHandle = nullptr;
+        MsgHandle *receiveHandle = nullptr;
+        int disp = (dir == 1) ? +1 : -1;
+
+        // first set up receive
+        if (comm_peer2peer_enabled(1 - dir, dim)) {
+          receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp, sizeof(CUmemFabricHandle));
+        }
+        // now send
+        if (comm_peer2peer_enabled(dir, dim)) {
+          sendHandle = comm_declare_send_relative(&shandle, dim, disp, sizeof(CUmemFabricHandle));
+        }
+        if (receiveHandle) comm_start(receiveHandle);
+        if (sendHandle) comm_start(sendHandle);
+
+        if (receiveHandle) comm_wait(receiveHandle);
+        if (sendHandle) comm_wait(sendHandle);
+
+        if (sendHandle) comm_free(sendHandle);
+        if (receiveHandle) comm_free(receiveHandle);
+      }
+    }
+
+    void *local_ptr = map_device_ptr_from_handle(this_handle, sz_align, device);
+
+    // open the remote memory handles and set the send ghost pointers
+    for (int dim = 0; dim < 4; ++dim) {
+      // TODO: We maybe can force loopback comms to use the IB path here
+      if (comm_dim(dim) == 1) continue;
+      // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
+      const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
+      for (int dir = 0; dir < num_dir; dir++) {
+        remote[dim][dir] = nullptr;
+        if (!comm_peer2peer_enabled(dir, dim)) continue;
+        CUmemGenericAllocationHandle handle;
+        // import handle
+        CU_CHECK(cuMemImportFromShareableHandle(&handle, &remote_handle[dim][dir], CU_MEM_HANDLE_TYPE_FABRIC));
+        // map to pointer
+        remote[dim][dir] = map_device_ptr_from_handle(handle, sz_align, device);
+        CU_CHECK(cuMemRelease(handle));
+      }
+      if (num_dir == 1) remote[dim][1] = remote[dim][0];
+    }
+    CU_CHECK(cuMemRelease(this_handle));
+
+    return local_ptr;
+  }
+
+  void free_cu_ptr(void *ptr) {
+    CUdeviceptr alloc_ptr;
+    size_t sz;
+    // get the original allocation from the pointer
+    CU_CHECK(cuMemGetAddressRange(&alloc_ptr, &sz, (CUdeviceptr)ptr));
+    // release the data
+    CU_CHECK(cuMemUnmap(alloc_ptr, sz));
+    CU_CHECK(cuMemAddressFree(alloc_ptr, sz));
+  }
+
+  void comm_destroy_local_neighbor_memory(void *local, array_2d<void *, QUDA_MAX_DIM, 2> &remote)
+  {
+    if (local) {
+      free_cu_ptr(local);
+    }
+    for (int dim = 0; dim < 4; ++dim) {
+
+      if (comm_dim(dim) == 1) continue;
+      const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
+
+      if (comm_peer2peer_enabled(1, dim)) {
+        // only close this handle if it doesn't alias the back ghost
+        if (num_dir == 2 && remote[dim][1]) free_cu_ptr(remote[dim][1]);
+      }
+
+      if (comm_peer2peer_enabled(0, dim)) {
+        if (remote[dim][0]) free_cu_ptr(remote[dim][0]);
+      }
+    } // iterate over dim
   }
 
   void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
@@ -114,6 +263,33 @@ void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
 #else
 void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
 #endif
+
+void comm_create_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+{
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; ++dir) {
+      if (comm_peer2peer_enabled(dir, dim)) {
+        cudaEvent_t event;
+        CHECK_CUDA_ERROR(cudaEventCreate(&event, cudaEventDisableTiming | cudaEventInterprocess));
+        local[dim][dir].event = reinterpret_cast<void *>(event);
+      } else {
+        local[dim][dir].event = nullptr;
+      }
+    }
+  }
+}
+
+void comm_destroy_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+{
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; dir++) {
+      cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(local[dim][dir].event);
+      if (comm_peer2peer_enabled(dir, dim)) CHECK_CUDA_ERROR(cudaEventDestroy(event));
+    }
+  } // iterate over dim
+}
 
 void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                 array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)

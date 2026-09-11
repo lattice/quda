@@ -274,8 +274,10 @@ namespace quda
 
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
       if (comm_peer2peer_enabled(dir2,dim)) {
+#ifndef MNNVL_COMMS
         PROFILE(qudaStreamWaitEvent(device::get_default_stream(), halo.getIPCRemoteCopyEvent(dir2, dim), 0), profile,
                 QUDA_PROFILE_STREAM_WAIT_EVENT);
+#endif
       } else {
 
         if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
@@ -310,8 +312,10 @@ namespace quda
       if (!dslashParam.commDim[dim]) continue;
       for (int dir=0; dir<2; dir++) {
 	if (comm_peer2peer_enabled(dir,dim)) {
+#ifndef MNNVL_COMMS
           PROFILE(qudaStreamWaitEvent(device::get_default_stream(), halo.getIPCCopyEvent(dir, dim), 0), profile,
                   QUDA_PROFILE_STREAM_WAIT_EVENT);
+#endif
         }
       }
     }

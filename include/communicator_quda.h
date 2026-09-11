@@ -285,7 +285,7 @@ namespace quda
           for (int dim = 0; dim < 4; ++dim) {
             int neighbor_rank = comm_neighbor_rank(dir, dim);
             if (neighbor_rank == comm_rank()) continue;
-
+#ifndef MNNVL_COMMS
             // disable peer-to-peer comms in one direction
             if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
                 && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
@@ -318,6 +318,12 @@ namespace quda
               }
 
             } // on the same node
+#else
+            int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+            peer2peer_enabled[dir][dim] = true;
+            printf("MNNVL Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d\n",
+                   comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+#endif
           }   // different dimensions - x, y, z, t
         }     // different directions - forward/backward
 

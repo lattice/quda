@@ -277,6 +277,8 @@ namespace quda
   */
   void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
+  void *comm_create_local_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, size_t bytes);
+
   /**
      @brief Deallocate the remote addresses to logically neighboring
      processes on the on the lattice.
@@ -284,6 +286,8 @@ namespace quda
      pointers
   */
   void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+
+  void comm_destroy_local_neighbor_memory(void *local, array_2d<void *, QUDA_MAX_DIM, 2> &remote);
 
   /**
      @brief Create unique events shared between each logical pair of
@@ -298,6 +302,8 @@ namespace quda
   void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
+  void comm_create_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
+
   /**
      @brief Destroy the coupled events
      @param[out] remote Array of remote events to neighboring processes
@@ -305,6 +311,8 @@ namespace quda
    */
   void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                    array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
+
+  void comm_destroy_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
      @brief Returns true if any peer-to-peer capability is present on
