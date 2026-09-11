@@ -22,6 +22,14 @@ class HostGaugeInput
   quda::GaugeField input;
 
 public:
+  /**
+   * @brief Construct an immutable QDP-ordered host gauge field for test cases.
+   *
+   * @param[in] gauge_param Parameters that define the host field.
+   * @param[in] argc Command-line argument count used to resolve the input mode.
+   * @param[in] argv Command-line arguments used to resolve or load the input field.
+   * @param[in] default_mode Input mode used when no explicit mode is requested.
+   */
   HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv,
                  GaugeInputMode default_mode = GaugeInputMode::HAAR);
 

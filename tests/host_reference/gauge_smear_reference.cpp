@@ -459,6 +459,18 @@ void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam
   for (auto field : level1_ex) delete field;
 }
 
+/**
+ * @brief Compute the Wilson or Symanzik flow action for one link.
+ *
+ * @tparam real_t Floating-point type used for the host gauge field.
+ * @param[in] links Extended input gauge links.
+ * @param[in] i Local link index.
+ * @param[in] dir Link direction.
+ * @param[in] type Wilson or Symanzik flow action.
+ * @param[in] anisotropy Temporal anisotropy.
+ * @param[in] lat Extended lattice metadata.
+ * @return Wilson staple sum or Symanzik-improved staple and rectangle sum.
+ */
 template <typename real_t>
 matrix<real_t> flow_action(const matrix<real_t> *const *links, size_t i, int dir, QudaGaugeSmearType type,
                            double anisotropy, const lattice_t &lat)
@@ -470,6 +482,11 @@ matrix<real_t> flow_action(const matrix<real_t> *const *links, size_t i, int dir
 
 template <typename real_t> using flow_temp = std::vector<std::array<matrix<real_t>, 4>>;
 
+/**
+ * @brief First stage of the third-order Wilson-flow integrator.
+ *
+ * @tparam real_t Floating-point type used for the host gauge field.
+ */
 template <typename real_t> struct WFlowW1 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real_t> &temp, real_t epsilon,
                   real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
@@ -491,6 +508,11 @@ template <typename real_t> struct WFlowW1 {
   }
 };
 
+/**
+ * @brief Second stage of the third-order Wilson-flow integrator.
+ *
+ * @tparam real_t Floating-point type used for the host gauge field.
+ */
 template <typename real_t> struct WFlowW2 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real_t> &temp, real_t epsilon,
                   real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
@@ -513,6 +535,11 @@ template <typename real_t> struct WFlowW2 {
   }
 };
 
+/**
+ * @brief Final stage of the third-order Wilson-flow integrator.
+ *
+ * @tparam real_t Floating-point type used for the host gauge field.
+ */
 template <typename real_t> struct WFlowVt {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, const flow_temp<real_t> &temp, real_t epsilon,
                   real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
@@ -572,6 +599,14 @@ template <typename real_t> struct WFlowRK4Step {
   }
 };
 
+/**
+ * @brief Host implementation of one third-order Wilson-flow integration cycle.
+ *
+ * The operator advances an extended input field through the W1, W2, and Vt stages using temporary
+ * fields constructed from the supplied gauge parameters and border radius.
+ *
+ * @tparam real_t Floating-point type used for the host gauge field.
+ */
 template <typename real_t> struct WFlowRK3 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
                   const quda::lat_dim_t &R, const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
@@ -596,6 +631,14 @@ template <typename real_t> struct WFlowRK3 {
   }
 };
 
+/**
+ * @brief Host implementation of one fourth-order Wilson-flow integration cycle.
+ *
+ * The operator applies the fixed six-stage Runge--Kutta coefficients using temporary fields
+ * constructed from the supplied gauge parameters and border radius.
+ *
+ * @tparam real_t Floating-point type used for the host gauge field.
+ */
 template <typename real_t> struct WFlowRK4 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
                   const quda::lat_dim_t &R, const QudaGaugeSmearParam &smear_param, const lattice_t &lat)

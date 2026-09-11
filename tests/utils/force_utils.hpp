@@ -239,7 +239,23 @@ public:
   Matrix &operator-=(const Matrix<N, T> &mat);
   const T &operator()(int i, int j) const;
   T &operator()(int i, int j);
+
+  /**
+   * @brief Compute the determinant of a 3x3 matrix.
+   *
+   * This operation is implemented only for matrices with N = 3.
+   *
+   * @return Matrix determinant.
+   */
   T determinant() const;
+
+  /**
+   * @brief Compute the inverse of a 3x3 matrix.
+   *
+   * This operation is implemented only for matrices with N = 3 and requires a non-singular matrix.
+   *
+   * @return Inverse matrix.
+   */
   Matrix inverse() const;
 };
 

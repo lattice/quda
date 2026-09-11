@@ -8,6 +8,12 @@
 namespace quda
 {
 
+  /**
+  @brief Kernel arguments for APE gauge smearing.
+
+  X stores the regular output-grid dimensions, while E and border describe the extended
+  input gauge field.  staple_scale is precomputed from alpha and apeDim.
+  */
   template <typename store_t, int nColor_, QudaReconstructType recon_, int apeDim_>
   struct GaugeAPEArg : kernel_param<> {
     using real = typename mapper<store_t>::type;

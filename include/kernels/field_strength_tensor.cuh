@@ -7,6 +7,12 @@
 namespace quda
 {
 
+  /**
+  @brief Kernel arguments for clover field-strength construction.
+
+  X stores the local output-grid dimensions, while E stores the extended input-gauge
+  dimensions.  border translates local output coordinates into the extended input field.
+  */
   template <typename Float_, int nColor_, QudaReconstructType recon_ >
   struct FmunuArg : kernel_param<>
   {
