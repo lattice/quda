@@ -1142,6 +1142,8 @@ static void openQCD_qudaSolverUpdate(void *param_)
   bool do_multigrid_update = param_ != qudaState.dirac_handle && param->inv_type_precondition == QUDA_MG_INVERTER
     && !gauge_field_get_unset() && (!mg_get_up2date(param) || force_thin || force_update || force_refresh || force_reset);
 
+  logQuda(QUDA_VERBOSE, "UPDATE TIER: %d\n", (int) additional_prop->pending_mg_tier);
+
   if (do_gauge_transfer) {
     if (qudaState.layout.h_gauge == nullptr) { WITH_COMM(errorQuda("qudaState.layout.h_gauge is not set.")); }
     WITH_COMM(logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n"));
@@ -1260,7 +1262,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
 
     if (mg_param == nullptr) { WITH_COMM(errorQuda("No multigrid parameter struct set.")); }
 
-    additional_prop->pending_mg_tier = OPENQCD_MG_UPDATE_AUTO; /* consume the request */
+    // additional_prop->pending_mg_tier = OPENQCD_MG_UPDATE_AUTO; /* consume the request */
 
     if (force_reset && param->preconditioner != nullptr) {
       WITH_COMM(logQuda(QUDA_VERBOSE, "Destroying existing multigrid instance ...\n"));
