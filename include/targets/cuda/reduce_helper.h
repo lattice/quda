@@ -173,7 +173,7 @@ namespace quda
       for (int i = 0; i < n_reduce; i++) {
         const auto offset = static_cast<size_t>(i) * n_element / n_reduce;
         // Deserialize flat atomic words (e.g. double components of RFA / doubledouble)
-        std::memcpy(static_cast<void*>(&result[i]), static_cast<const void*>(&scalar_result[offset]), sizeof(T));
+        std::memcpy(static_cast<void *>(&result[i]), static_cast<const void *>(&scalar_result[offset]), sizeof(T));
       }
 
       if (!reset) {

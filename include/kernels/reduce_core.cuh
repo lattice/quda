@@ -150,8 +150,7 @@ namespace quda
       static constexpr bool site_unroll = site_unroll_;
     };
 
-    template <typename, typename real>
-    struct Max : public ReduceFunctor<reduction_t> {
+    template <typename, typename real> struct Max : public ReduceFunctor<reduction_t> {
       using reduce_t = reduction_t;
       using reducer = maximum<reduce_t>;
       static constexpr memory_access<1> read{ };
@@ -168,8 +167,7 @@ namespace quda
       constexpr int flops() const { return 0; }   //! flops per element
     };
 
-    template <typename, typename real>
-    struct MaxDeviation : public ReduceFunctor<deviation_t<reduction_t>> {
+    template <typename, typename real> struct MaxDeviation : public ReduceFunctor<deviation_t<reduction_t>> {
       using reduce_t = deviation_t<reduction_t>;
       using reducer = maximum<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
@@ -179,8 +177,8 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          complex<reduction_t> diff = {reduction_t(abs(x[i].real() - y[i].real())),
-                                       reduction_t(abs(x[i].imag() - y[i].imag()))};
+          complex<reduction_t> diff
+            = {reduction_t(abs(x[i].real() - y[i].real())), reduction_t(abs(x[i].imag() - y[i].imag()))};
           if (diff.real() > max.diff ) {
             max.diff = diff.real();
             max.ref = abs(y[i].real());
@@ -211,7 +209,7 @@ namespace quda
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &, int) const
       {
 #pragma unroll
-        for (int i=0; i < x.size(); i++) sum = reducer::apply(sum, norm1_<compute_t, real>(x[i]));
+        for (int i = 0; i < x.size(); i++) sum = reducer::apply(sum, norm1_<compute_t, real>(x[i]));
       }
       constexpr int flops() const { return 2; }   //! flops per element
     };
@@ -251,8 +249,7 @@ namespace quda
     /**
        Return the real dot product of x and y
     */
-    template <typename reduce_t, typename T>
-    __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
+    template <typename reduce_t, typename T> __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
     {
       auto d = reduce_t(a.real()) * reduce_t(b.real());
       return fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
@@ -337,8 +334,10 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpyNorm2(cvector<complex_t> &a, cvector<complex_t> &b)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &, int j) const
       {
@@ -368,7 +367,8 @@ namespace quda
       cabxpyzaxnorm(cvector<complex_t> &a, cvector<complex_t> &b)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i].real());
-        for (auto i = 0u; i < a.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int j) const
       {
@@ -385,15 +385,14 @@ namespace quda
     /**
        Returns complex-valued dot product of x and y
     */
-    template <typename reduce_t, typename T>
-    __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
+    template <typename reduce_t, typename T> __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
     {
       using scalar_t = typename reduce_t::value_type;
       auto r = scalar_t(a.real()) * scalar_t(b.real());
       r = fma(scalar_t(a.imag()), scalar_t(b.imag()), r);
       auto i = scalar_t(a.real()) * scalar_t(b.imag());
-      i = fma(-scalar_t(a.imag()) , scalar_t(b.real()), i);
-      return reduce_t{r, i};
+      i = fma(-scalar_t(a.imag()), scalar_t(b.real()), i);
+      return reduce_t {r, i};
     }
 
     template <typename real_reduce_t, typename real>
@@ -427,7 +426,8 @@ namespace quda
       complex<real> a[MAX_MULTI_RHS] = {};
       caxpydotzy(cvector<complex_t> &a, cvector<complex_t> &)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int j) const
       {
@@ -463,9 +463,7 @@ namespace quda
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &, int) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          sum = reducer::apply(sum, cdotNormAB_<array<compute_t, 4>>(x[i], y[i]));
-        }
+        for (int i = 0; i < x.size(); i++) { sum = reducer::apply(sum, cdotNormAB_<array<compute_t, 4>>(x[i], y[i])); }
       }
       constexpr int flops() const { return 8; }   //! flops per element
     };
@@ -497,8 +495,10 @@ namespace quda
       complex<real> b[MAX_MULTI_RHS] = {};
       caxpbypzYmbwcDotProductUYNormY_(cvector<complex_t> &a, cvector<complex_t> &b)
       {
-        for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-        for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+        for (auto i = 0u; i < a.size(); i++)
+          this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+        for (auto i = 0u; i < b.size(); i++)
+          this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
       }
       template <typename T>
       __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v, int j) const
@@ -536,7 +536,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           complex<real> y_new = fma2({a[j], a[j]}, x[i], y[i]);
-          sum = reducer::apply(sum, array<compute_t, 2>{norm2_<compute_t>(y_new), dot_<compute_t>(y_new, y_new - y[i])});
+          sum = reducer::apply(sum, array<compute_t, 2> {norm2_<compute_t>(y_new), dot_<compute_t>(y_new, y_new - y[i])});
           y[i] = y_new;
         }
       }
@@ -629,7 +629,8 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          sum = reducer::apply(sum, array<compute_t, 3>{norm2_<compute_t>(x[i]), norm2_<compute_t>(y[i]), dot_<compute_t>(y[i], z[i])});
+          sum = reducer::apply(
+            sum, array<compute_t, 3> {norm2_<compute_t>(x[i]), norm2_<compute_t>(y[i]), dot_<compute_t>(y[i], z[i])});
         }
       }
       constexpr int flops() const { return 6; }   //! flops per element
@@ -653,8 +654,9 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          sum = reducer::apply(sum, array<compute_t, 4>{norm2_<compute_t>(x[i]), norm2_<compute_t>(y[i]),
-                                                        dot_<compute_t>(y[i], z[i]), norm2_<compute_t>(w[i])});
+          sum = reducer::apply(sum,
+                               array<compute_t, 4> {norm2_<compute_t>(x[i]), norm2_<compute_t>(y[i]),
+                                                    dot_<compute_t>(y[i], z[i]), norm2_<compute_t>(w[i])});
         }
       }
       constexpr int flops() const { return 8; }   //! flops per element

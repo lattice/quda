@@ -36,11 +36,8 @@ namespace quda {
     unsigned int minThreads() const { return fineXinv.VolumeCB(); }
 
   public:
-    CalculateStaggeredGeometryReorder(GaugeField& fineXinv, const GaugeField& coarseXinv, const real_t scale) :
-      TunableKernel3D(fineXinv, QUDA_KDINVERSE_GEOMETRY, 2),
-      fineXinv(fineXinv),
-      coarseXinv(coarseXinv),
-      scale(scale)
+    CalculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, const real_t scale) :
+      TunableKernel3D(fineXinv, QUDA_KDINVERSE_GEOMETRY, 2), fineXinv(fineXinv), coarseXinv(coarseXinv), scale(scale)
     {
       checkPrecision(fineXinv, coarseXinv);
       checkLocation(fineXinv, coarseXinv);
@@ -78,7 +75,9 @@ namespace quda {
 
   template<typename Float, int fineColor>
   struct calculateStaggeredGeometryReorder {
-    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const real_t mass) {
+    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv,
+                                      const bool dagger_approximation, const real_t mass)
+    {
       // template on dagger approximation
       if (dagger_approximation)  {
         // Approximate the inverse with the dagger, multiplied by a rescale factor which
@@ -110,12 +109,15 @@ namespace quda {
      @param dagger_approximation[in] Whether or not to apply the dagger approximation
      @param mass[in] Mass of staggered fermion (used for dagger approximation only)
    */
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const real_t mass) {
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &fineXinv, const GaugeField &coarseXinv,
+                                          const bool dagger_approximation, const real_t mass)
+  {
     // Instantiate based on precision, number of colors
     instantiate<calculateStaggeredGeometryReorder>(fineXinv, coarseXinv, dagger_approximation, mass);
   }
 #else
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &, const GaugeField &, const bool, const real_t) {
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &, const GaugeField &, const bool, const real_t)
+  {
     errorQuda("Staggered fermion support has not been built");
   }
 #endif

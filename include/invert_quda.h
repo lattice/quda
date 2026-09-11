@@ -393,7 +393,7 @@ namespace quda {
     bool recompute_evals
       = false; /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField> evecs = {}; /** Holds the eigenvectors. */
-    std::vector<complex_t> evals = {};          /** Holds the eigenvalues. */
+    std::vector<complex_t> evals = {};        /** Holds the eigenvalues. */
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
@@ -1000,8 +1000,10 @@ namespace quda {
 
     // Various coefficients and params needed on each iteration.
     vector<complex_t> rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
-    vector<vector<complex_t>> gamma, gamma_prime, gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
-    vector<vector<complex_t>> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    vector<vector<complex_t>> gamma, gamma_prime,
+      gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    vector<vector<complex_t>>
+      tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
     vector<vector<real_t>>
       sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
 
@@ -1133,8 +1135,8 @@ namespace quda {
     void computeBeta(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int i, int N, int k);
     void updateAp(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int begin, int size, int k);
     void orthoDir(std::vector<complex_t> &beta, cvector_ref<ColorSpinorField> &Ap, int k, int pipeline);
-    void backSubs(const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta, const std::vector<real_t> &gamma,
-                  std::vector<complex_t> &delta, int n);
+    void backSubs(const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
+                  const std::vector<real_t> &gamma, std::vector<complex_t> &delta, int n);
     void updateSolution(ColorSpinorField &x, const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
                         std::vector<real_t> &gamma, int k, cvector_ref<ColorSpinorField> &p);
 
@@ -1634,7 +1636,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in);
     //
     //GMRESDR method
-    void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, const real_t tol_threshold);
+    void RunDeflatedCycles(ColorSpinorField *out, ColorSpinorField *in, const real_t tol_threshold);
     //
     int FlexArnoldiProcedure (const int start_idx, const bool do_givens);
 
@@ -1654,7 +1656,7 @@ public:
  struct deflation_space : public Object {
    bool svd;                            /** Whether this space is for an SVD deflaton */
    std::vector<ColorSpinorField> evecs; /** Container for the eigenvectors */
-   std::vector<complex_t> evals;          /** The eigenvalues */
+   std::vector<complex_t> evals;        /** The eigenvalues */
  };
 
  /**

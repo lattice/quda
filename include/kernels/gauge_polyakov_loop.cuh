@@ -195,7 +195,6 @@ namespace quda {
         X[dir] = U_.X()[dir] - 2 * border[dir];
       }
     }
-
   };
 
   template <typename Arg> struct PolyakovLoopTrace : plus<typename Arg::reduce_t> {

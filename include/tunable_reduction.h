@@ -5,6 +5,7 @@
 #include <register_traits.h>
 #include <reduction_kernel.h>
 #include <reduction_kernel_host.h>
+#include <rfa_traits.h>
 
 namespace quda
 {
@@ -57,8 +58,7 @@ namespace quda
      */
     virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_block_size(); }
 
-    template <typename T, typename U>
-    void copy(T &out, const U &in)
+    template <typename T, typename U> void copy(T &out, const U &in)
     {
       using out_t = typename T::value_type;
       using in_t = typename U::value_type;
@@ -67,9 +67,11 @@ namespace quda
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element_in = in.size() * sizeof(in_t) / sizeof(get_scalar_t<in_t>);
       const int n_element_out = out.size() * sizeof(out_t) / sizeof(get_scalar_t<out_t>);
-      if (n_element_in != n_element_out) errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
-      for (auto i = 0; i < n_element_in; i++) reinterpret_cast<get_scalar_t<out_t>*>(&out[0])[i] =
-                                                static_cast<get_scalar_t<out_t>>(reinterpret_cast<const get_scalar_t<in_t>*>(&in[0])[i]);
+      if (n_element_in != n_element_out)
+        errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
+      for (auto i = 0; i < n_element_in; i++)
+        reinterpret_cast<get_scalar_t<out_t> *>(&out[0])[i]
+          = static_cast<get_scalar_t<out_t>>(reinterpret_cast<const get_scalar_t<in_t> *>(&in[0])[i]);
     }
 
     /**
@@ -91,6 +93,17 @@ namespace quda
                   tp.block.y, device::warp_size());
       if (arg.threads.y != block_size_y)
         errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
+      // Upload this TU's RFA bin table if needed. Unlike a bare ReduceArg<T>
+      // construction (whose ctor is a template shared by every TU that
+      // instantiates the same T, and so is vulnerable to the compiler/linker
+      // folding all those "identical" ctors into a single copy taken from
+      // just one TU -- silently leaving every other TU's private
+      // bin_device_buffer uninitialized), this instantiation of
+      // launch_device is keyed on the call-site-specific Functor/Arg types,
+      // which are unique per translation unit. No other TU ever instantiates
+      // this exact specialization, so it can't be folded away, and this call
+      // reliably reaches this TU's own init_rfa_device_bins_impl().
+      reducer::init_rfa_device_bins<typename Arg::reduce_t>();
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, arg);
 
       if (!commAsyncReduction()) {
@@ -249,6 +262,11 @@ namespace quda
         errorQuda("block.z = %u exceeds n_batch_block_max = %u", tp.block.z, n_batch_block_max);
       if (tp.block.z > Arg::max_n_batch_block)
         errorQuda("block.z = %u exceeds max_n_batch_block = %u", tp.block.z, Arg::max_n_batch_block);
+      // See the comment in TunableReduction2D::launch_device: this
+      // instantiation is keyed on the call-site-specific Arg type, so it is
+      // never folded across TUs and reliably initializes this TU's own RFA
+      // bin table.
+      reducer::init_rfa_device_bins<typename Arg::reduce_t>();
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, arg);
 
       if (!commAsyncReduction()) {

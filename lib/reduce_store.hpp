@@ -35,11 +35,6 @@ namespace quda
     // kernels already built by whichever precision is actually enabled.
     template <typename store_t> constexpr bool multi_reduce_prec_enabled() { return is_enabled(store_prec_v<store_t>); }
 
-    // Call only from an `if constexpr (reduce_prec_enabled<store_t>())` branch.
-    // Do not wrap *_impl in a lambda passed to a helper: decltype(fn())
-    // instantiates the lambda body and emits kernels for disabled precisions.
-    template <typename store_t> void init_reduce_store() { reducer::init_rfa_device_bins<device_reduce_t>(); }
-
     template <typename Fn> auto dispatch_reduce_prec(QudaPrecision prec, Fn &&fn)
     {
       if (!is_enabled(prec) && prec != QUDA_DOUBLE_PRECISION)

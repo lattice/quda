@@ -450,8 +450,7 @@ namespace quda {
     real_t b2 = r2;
     args.c[0] = complex_t(sqrt(r2), 0.0);
 
-    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2,
-               sqrt(normb), param.tol);
+    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
 
     rSloppy = r;
 
@@ -469,8 +468,7 @@ namespace quda {
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
     real_t heavy_quark_res = 0.0;
-    if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
-
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     int restart_idx = 0, j = 0, check_interval = 4;
 

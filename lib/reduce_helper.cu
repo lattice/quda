@@ -32,7 +32,7 @@ namespace quda
     static bool init_rfa = false;
     static reproducible::RFA_bins<reduction_t> bins;
 
-    reproducible::RFA_bins<reduction_t>& get_rfa_bins()
+    reproducible::RFA_bins<reduction_t> &get_rfa_bins()
     {
       if (!init_rfa) {
         bins.initialize_bins();

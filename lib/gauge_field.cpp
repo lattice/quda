@@ -116,7 +116,7 @@ namespace quda {
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     } else if (geometry == QUDA_KDINVERSE_GEOMETRY) {
       real_length = (1 << nDim) * volume * nInternal;
-      length = 2 * (1 << nDim) * nDim * stride * nInternal; // two comes from being full lattice
+      length = 2 * (1 << nDim) * stride * nInternal; // two comes from being full lattice
     }
 
     switch (geometry) {
@@ -933,7 +933,8 @@ namespace quda {
       if (g.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, g.nFace);
       if (g.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, g.fixed);
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
-      if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", double(anisotropy), double(g.anisotropy));
+      if (g.anisotropy != anisotropy)
+        errorQuda("anisotropy does not match %e %e", double(anisotropy), double(g.anisotropy));
       if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", double(tadpole), double(g.tadpole));
     }
     catch(std::bad_cast &e) {

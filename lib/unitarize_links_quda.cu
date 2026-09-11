@@ -156,11 +156,7 @@ namespace quda {
     unsigned int minThreads() const { return u.VolumeCB(); }
 
   public:
-    ProjectSU3(GaugeField &u, real_t tol, int *fails) :
-      TunableKernel3D(u, 2, 4),
-      u(u),
-      tol(tol),
-      fails(fails)
+    ProjectSU3(GaugeField &u, real_t tol, int *fails) : TunableKernel3D(u, 2, 4), u(u), tol(tol), fails(fails)
     {
       apply(device::get_default_stream());
       qudaDeviceSynchronize();

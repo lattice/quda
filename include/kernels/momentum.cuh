@@ -6,16 +6,13 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct MomActionArg : ReduceArg<device_reduce_t> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct MomActionArg : ReduceArg<device_reduce_t> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     const typename gauge_mapper<Float, recon>::type mom;
 
-    MomActionArg(const GaugeField &mom) :
-      ReduceArg<reduce_t>(dim3(mom.VolumeCB(), 2, 1)),
-      mom(mom) { }
+    MomActionArg(const GaugeField &mom) : ReduceArg<reduce_t>(dim3(mom.VolumeCB(), 2, 1)), mom(mom) { }
   };
 
   template <typename Arg> struct MomAction : plus<typename Arg::reduce_t> {
@@ -55,9 +52,8 @@ namespace quda {
     }
   };
 
-  template<typename Float_, int nColor_, QudaReconstructType recon_>
-  struct UpdateMomArg : ReduceArg<array<reduction_t, 2>>
-  {
+  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  struct UpdateMomArg : ReduceArg<array<reduction_t, 2>> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;

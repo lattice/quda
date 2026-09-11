@@ -391,7 +391,7 @@ namespace quda {
     output << "inverse = "   << param.inverse << std::endl;
     output << "clover = "    << param.clover << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;
-    output << "csw = "       << double(param.csw) << std::endl;
+    output << "csw = " << double(param.csw) << std::endl;
     output << "coeff = " << double(param.coeff) << std::endl;
     output << "twist_flavor = " << param.twist_flavor << std::endl;
     output << "mu2 = " << double(param.mu2) << std::endl;

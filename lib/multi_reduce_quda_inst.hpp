@@ -25,7 +25,6 @@ namespace quda
                           cvector_ref<const ColorSpinorField> &y)
       {
         if constexpr (multi_reduce_prec_enabled<store_t>()) {
-          init_reduce_store<store_t>();
           reDotProduct_impl<store_t>(result, x, y);
         } else {
           errorQuda("QUDA_PRECISION=%d does not enable the requested precision", QUDA_PRECISION);
@@ -37,7 +36,6 @@ namespace quda
                          cvector_ref<const ColorSpinorField> &y)
       {
         if constexpr (multi_reduce_prec_enabled<store_t>()) {
-          init_reduce_store<store_t>();
           cDotProduct_impl<store_t>(result, x, y);
         } else {
           errorQuda("QUDA_PRECISION=%d does not enable the requested precision", QUDA_PRECISION);
@@ -49,7 +47,6 @@ namespace quda
                          cvector_ref<const ColorSpinorField> &y)
       {
         if constexpr (multi_reduce_prec_enabled<store_t>()) {
-          init_reduce_store<store_t>();
           hDotProduct_impl<store_t>(result, x, y);
         } else {
           errorQuda("QUDA_PRECISION=%d does not enable the requested precision", QUDA_PRECISION);
@@ -61,7 +58,6 @@ namespace quda
                                cvector_ref<const ColorSpinorField> &y)
       {
         if constexpr (multi_reduce_prec_enabled<store_t>()) {
-          init_reduce_store<store_t>();
           hDotProduct_Anorm_impl<store_t>(result, x, y);
         } else {
           errorQuda("QUDA_PRECISION=%d does not enable the requested precision", QUDA_PRECISION);

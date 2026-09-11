@@ -114,10 +114,7 @@ namespace quda
 } // namespace quda
 
 #if !defined(__CUDACC__)
-inline std::ostream &std::operator<<(std::ostream &os, quda::float128_t x)
-{
-  return os << quda::to_double(x);
-}
+inline std::ostream &std::operator<<(std::ostream &os, quda::float128_t x) { return os << quda::to_double(x); }
 #endif
 
 #endif // QUDA_USE_QUAD_SCALAR

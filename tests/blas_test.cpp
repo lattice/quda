@@ -913,9 +913,7 @@ protected:
       }
 
       error = 0;
-      for (int i = 0; i < Msrc; i++) {
-        error += elt_rel_error(blas::norm2(ymoD[i]), blas::norm2(ymH[i]));
-      }
+      for (int i = 0; i < Msrc; i++) { error += elt_rel_error(blas::norm2(ymoD[i]), blas::norm2(ymH[i])); }
       error /= Msrc;
       break;
 
@@ -928,9 +926,7 @@ protected:
         for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], xmH[i], ymH[j]); }
       }
       error = 0;
-      for (int i = 0; i < Msrc; i++) {
-        error += elt_rel_error(blas::norm2(ymoD[i]), blas::norm2(ymH[i]));
-      }
+      for (int i = 0; i < Msrc; i++) { error += elt_rel_error(blas::norm2(ymoD[i]), blas::norm2(ymH[i])); }
       error /= Msrc;
       break;
 
@@ -944,9 +940,7 @@ protected:
         for (int i = 0; i < Nsrc; i++) { blas::axpy(Ar[Msrc * i + j], xmH[i], wmH[j]); }
       }
       error = 0;
-      for (int i = 0; i < Msrc; i++) {
-        error += elt_rel_error(blas::norm2(wmD[i]), blas::norm2(wmH[i]));
-      }
+      for (int i = 0; i < Msrc; i++) { error += elt_rel_error(blas::norm2(wmD[i]), blas::norm2(wmH[i])); }
       error /= Msrc;
       break;
 
@@ -960,9 +954,7 @@ protected:
         for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], xmH[i], wmH[j]); }
       }
       error = 0;
-      for (int i = 0; i < Msrc; i++) {
-        error += elt_rel_error(blas::norm2(wmD[i]), blas::norm2(wmH[i]));
-      }
+      for (int i = 0; i < Msrc; i++) { error += elt_rel_error(blas::norm2(wmD[i]), blas::norm2(wmH[i])); }
       error /= Msrc;
       break;
 

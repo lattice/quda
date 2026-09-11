@@ -12,7 +12,8 @@ namespace quda
       return dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { return max_t<store_t>(x); });
     }
 
-    cvector<array<real_t, 2>> max_deviation(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y)
+    cvector<array<real_t, 2>> max_deviation(cvector_ref<const ColorSpinorField> &x,
+                                            cvector_ref<const ColorSpinorField> &y)
     {
       return dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { return max_deviation_t<store_t>(x, y); });
     }
@@ -39,7 +40,8 @@ namespace quda
                                   [&]<typename store_t>() { return axpbyzNorm_t<store_t>(a, x, b, y, z); });
     }
 
-    cvector<real_t> axpyReDot(cvector<real_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
+    cvector<real_t> axpyReDot(cvector<real_t> &a, cvector_ref<const ColorSpinorField> &x,
+                              cvector_ref<ColorSpinorField> &y)
     {
       return dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { return axpyReDot_t<store_t>(a, x, y); });
     }
@@ -74,11 +76,10 @@ namespace quda
       return dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { return cDotProductNormAB_t<store_t>(x, y); });
     }
 
-    cvector<array<real_t, 3>> caxpbypzYmbwcDotProductUYNormY(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
-                                                            cvector<complex_t> &b, cvector_ref<ColorSpinorField> &y,
-                                                            cvector_ref<ColorSpinorField> &z,
-                                                            cvector_ref<const ColorSpinorField> &w,
-                                                            cvector_ref<const ColorSpinorField> &v)
+    cvector<array<real_t, 3>>
+    caxpbypzYmbwcDotProductUYNormY(cvector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector<complex_t> &b,
+                                   cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+                                   cvector_ref<const ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v)
     {
       return dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() {
         return caxpbypzYmbwcDotProductUYNormY_t<store_t>(a, x, b, y, z, w, v);
@@ -134,9 +135,8 @@ namespace quda
                                            cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                                            cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v)
     {
-      return dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() {
-        return quadrupleCG3UpdateNorm_t<store_t>(a, b, x, y, z, w, v);
-      });
+      return dispatch_reduce_prec(
+        x.Precision(), [&]<typename store_t>() { return quadrupleCG3UpdateNorm_t<store_t>(a, b, x, y, z, w, v); });
     }
 
   } // namespace blas

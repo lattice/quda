@@ -106,7 +106,7 @@ namespace quda {
       TunableKernel2D(u, 8),
       u(u),
       relax_boost(relax_boost),
-      borderpoints{borderpoints[0], borderpoints[1]},
+      borderpoints {borderpoints[0], borderpoints[1]},
       parity(0),
       halo(halo)
     {
@@ -237,9 +237,8 @@ namespace quda {
   };
 
   template <typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
-                      const real_t relax_boost, const real_t tolerance,
-                      const int reunit_interval, const int stopWtheta)
+  void gaugeFixingOVR(GaugeField &data, const int Nsteps, const int verbose_interval, const real_t relax_boost,
+                      const real_t tolerance, const int reunit_interval, const int stopWtheta)
   {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
@@ -327,7 +326,8 @@ namespace quda {
     flop += (double)GaugeFixQuality.flops();
     byte += (double)GaugeFixQuality.bytes();
     real_t action0 = argQ.getAction();
-    logQuda(QUDA_VERBOSE, "Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, double(argQ.getAction()), double(argQ.getTheta()));
+    logQuda(QUDA_VERBOSE, "Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, double(argQ.getAction()),
+            double(argQ.getTheta()));
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
@@ -427,8 +427,8 @@ namespace quda {
       real_t action = argQ.getAction();
       real_t diff = quda::fabs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1,
-                   double(argQ.getAction()), double(argQ.getTheta()), double(diff));
+        printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, double(argQ.getAction()),
+                   double(argQ.getTheta()), double(diff));
       if (stopWtheta) {
         if (argQ.getTheta() < tolerance) break;
       } else {
@@ -451,8 +451,8 @@ namespace quda {
       byte += (double)GaugeFixQuality.bytes();
       real_t action = argQ.getAction();
       real_t diff = quda::fabs(action0 - action);
-      logQuda(QUDA_VERBOSE, "Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1,
-              double(argQ.getAction()), double(argQ.getTheta()), double(diff));
+      logQuda(QUDA_VERBOSE, "Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, double(argQ.getAction()),
+              double(argQ.getTheta()), double(diff));
     }
 
     for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
@@ -485,8 +485,8 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
-  GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                 const real_t relax_boost, const real_t tolerance, const int reunit_interval, const int stopWtheta)
+    GaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                   const real_t relax_boost, const real_t tolerance, const int reunit_interval, const int stopWtheta)
     {
       if (gauge_dir == 4) {
 	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing...\n");
@@ -511,8 +511,8 @@ namespace quda {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
-  void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const real_t relax_boost,
-                      const real_t tolerance, const int reunit_interval, const int stopWtheta)
+  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const real_t relax_boost, const real_t tolerance, const int reunit_interval, const int stopWtheta)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);

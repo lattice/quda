@@ -20,22 +20,20 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
 
     static constexpr QudaReconstructType reconstruct_u = reconstruct_u_;
     static constexpr QudaReconstructType reconstruct_l = reconstruct_l_;
-    static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     static constexpr bool use_inphase = improved_ ? false : true;
     static constexpr QudaStaggeredPhase phase = phase_;
     template <bool shifted>
-    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase,
+    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, ghost, use_inphase,
                                      QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
     template <bool shifted>
-    using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost,
+    using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, ghost,
                                      use_inphase, QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
 
     F out[MAX_MULTI_RHS];  /** output vector field */
@@ -65,8 +63,9 @@ namespace quda
     nDim, DDArg, improved ? 3 : 1, n_src_tile
       > (out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, spin_project, comm_override),
     halo_pack(halo, improved_ ? 3 : 1), halo(halo, improved_ ? 3 : 1), U(U),
-    Uback(dslash_double_store() ? U.shift(1) : U), L(L), Lback(dslash_double_store() ? L.shift(3) : L), a(static_cast<real>(a)),
-    tboundary(static_cast<real>(U.TBoundary())), is_first_time_slice(comm_coord(3) == 0 ? true : false),
+    Uback(dslash_double_store() ? U.shift(1) : U), L(L), Lback(dslash_double_store() ? L.shift(3) : L),
+    a(static_cast<real>(a)), tboundary(static_cast<real>(U.TBoundary())),
+    is_first_time_slice(comm_coord(3) == 0 ? true : false),
     is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
     dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {

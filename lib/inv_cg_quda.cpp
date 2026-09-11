@@ -286,7 +286,7 @@ namespace quda {
         // here we are deploying the alternative beta computation
         auto cg_norm = blas::axpyCGNorm(-get_alpha(x_update_batch), Ap, r_sloppy);
         for (auto i = 0u; i < b.size(); i++) {
-          r2[i] = cg_norm[i][0];                                  // (r_new, r_new)
+          r2[i] = cg_norm[i][0];                                   // (r_new, r_new)
           sigma[i] = cg_norm[i][1] >= 0.0 ? cg_norm[i][1] : r2[i]; // use r2 if (r_k+1, r_k+1-r_k) breaks
         }
       }
@@ -592,7 +592,7 @@ namespace quda {
       // here we are deploying the alternative beta computation
       auto cg_norm = blas::axpyCGNorm(-alpha, Ap, r_sloppy);
       for (auto i = 0u; i < cg_norm.size(); i++) {
-        r2[i] = cg_norm[i][0];                                  // (r_new, r_new)
+        r2[i] = cg_norm[i][0];                                   // (r_new, r_new)
         sigma[i] = cg_norm[i][1] >= 0.0 ? cg_norm[i][1] : r2[i]; // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
       rNorm = sqrt(r2[0]);
@@ -1561,7 +1561,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         if (&x != &xSloppy) {
           blas::copy(tmp, y);   //  FIXME: check whether copy works here
           for(int i=0; i<param.num_src; i++){
-            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i))[2]);
+            heavy_quark_res[i]
+              = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i))[2]);
           }
         } else {
           blas::copy(r, rSloppy);  //  FIXME: check whether copy works here
@@ -1607,8 +1608,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         if (sqrt(r2(i,i).real()) > r0Norm[i] && updateX) { // reuse r0Norm for this
           resIncrease++;
           resIncreaseTotal++;
-          warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      sqrt(r2(i, i).real()), r0Norm[i], resIncreaseTotal);
+          warningQuda(
+            "CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2(i, i).real()), r0Norm[i], resIncreaseTotal);
           if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;

@@ -16,12 +16,7 @@ namespace quda
 
   public:
     QCharge(const GaugeField &Fmunu, array<real_t, 3> &energy, real_t &qcharge, void *qdensity, bool density) :
-      TunableReduction2D(Fmunu),
-      Fmunu(Fmunu),
-      energy(energy),
-      qcharge(qcharge),
-      qdensity(qdensity),
-      density(density)
+      TunableReduction2D(Fmunu), Fmunu(Fmunu), energy(energy), qcharge(qcharge), qdensity(qdensity), density(density)
     {
       if (!Fmunu.isNative()) errorQuda("Topological charge only supported on native ordered fields");
       apply(device::get_default_stream());

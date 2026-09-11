@@ -47,11 +47,11 @@ namespace quda {
     CloverField *clover;
     GaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
-    real_t mu; // used by twisted mass only
+    real_t mu;        // used by twisted mass only
     real_t mu_factor; // used by multigrid only
-    real_t epsilon; //2nd tm parameter (used by twisted mass only)
-    real_t tm_rho;  // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
-                    // applied like a twisted mass and ignored in the inverse)
+    real_t epsilon;   // 2nd tm parameter (used by twisted mass only)
+    real_t tm_rho;    // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
+                      // applied like a twisted mass and ignored in the inverse)
 
     array<int, QUDA_MAX_DIM> commDim; // whether to do comms or not
 
@@ -390,7 +390,7 @@ namespace quda {
     */
     virtual bool hasSpecialMG() const { return false; }
 
-    void setMass(real_t mass){ this->mass = mass;}
+    void setMass(real_t mass) { this->mass = mass; }
 
     // Dirac operator factory
     /**

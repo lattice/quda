@@ -177,7 +177,7 @@ namespace quda {
     zeta[0] = 1.0;
     for (int j=1; j<nShift; j++) {
       real_t c0 = zeta[j] * zeta_old[j] * alpha_old[j_low];
-      real_t c1 = alpha[j_low] * beta[j_low] * (zeta_old[j]-zeta[j]);
+      real_t c1 = alpha[j_low] * beta[j_low] * (zeta_old[j] - zeta[j]);
       real_t c2 = zeta_old[j] * alpha_old[j_low] * (real_t(1.0) + (offset[j] - offset[0]) * alpha[j_low]);
 
       zeta_old[j] = zeta[j];
@@ -361,8 +361,7 @@ namespace quda {
 	  resIncrease++;
 	  resIncreaseTotal[reliable_shift]++;
           warningQuda("Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)",
-                      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift],
-                      resIncreaseTotal[reliable_shift]);
+                      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
 
           if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) {
             warningQuda("solver exiting due to too many true residual norm increases");

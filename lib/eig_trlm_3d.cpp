@@ -150,8 +150,7 @@ namespace quda
           for (int i = 0; i < (n_kr - num_locked_3D[t]); i++) {
             if (residua_3D[t][i + num_locked_3D[t]] < epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
               logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i,
-                      residua_3D[t][i + num_locked_3D[t]],
-                      epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
+                      residua_3D[t][i + num_locked_3D[t]], epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
               iter_locked_3D[t] = i + 1;
             } else {
               // Unlikely to find new locked pairs
@@ -168,8 +167,7 @@ namespace quda
           for (int i = iter_locked_3D[t]; i < n_kr - num_locked_3D[t]; i++) {
             if (residua_3D[t][i + num_locked_3D[t]] < tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
               logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i,
-                      residua_3D[t][i + num_locked_3D[t]],
-                      tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
+                      residua_3D[t][i + num_locked_3D[t]], tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
               iter_converged_3D[t] = i + 1;
             } else {
               // Unlikely to find new converged pairs

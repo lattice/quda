@@ -798,8 +798,7 @@ namespace quda
         auto l2_deviation = sqrt(deviation[i]) / B_norm[i];
         logQuda(
           QUDA_VERBOSE, "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
-          i, B_norm[i], coarse_norm[i], fine_norm[i], l2_deviation,
-          max_deviation[i][0]);
+          i, B_norm[i], coarse_norm[i], fine_norm[i], l2_deviation, max_deviation[i][0]);
         if (check_deviation(l2_deviation, tol))
           errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, l2_deviation, tol);
         if (check_deviation(max_deviation[i][0], tol))
@@ -824,8 +823,7 @@ namespace quda
           (*param.matResidual)(tmp1, tmp2);
           tmp2 = param.B[i];
           logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, B_norm[i], norm2(tmp1));
-          logQuda(QUDA_SUMMARIZE, "relative residual = %e\n",
-                  sqrt(xmyNorm(tmp2, tmp1) / B_norm[i]));
+          logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / B_norm[i]));
         }
 
         sprintf(prefix, "MG level %d (%s): ", param.level + 1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -875,8 +873,7 @@ namespace quda
       auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
       auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
       logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
-              norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation,
-              max_deviation[0]);
+              norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
       if (check_deviation(l2_deviation, tol))
         errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
       if (check_deviation(max_deviation[0], tol))
@@ -1090,8 +1087,8 @@ namespace quda
           // Prolong r_coarse, place result in tmp2
           transfer->P(tmp2, r_coarse[0]);
 
-          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, B_norm[i],
-                     norm2(r_coarse[0]), norm2(tmp2));
+          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, B_norm[i], norm2(r_coarse[0]),
+                     norm2(tmp2));
 
           // Compare v_k and PP^dag v_k.
           auto max_deviation = blas::max_deviation(tmp2, param.B[i]);
@@ -1113,8 +1110,7 @@ namespace quda
             transfer->P(tmp2, x_coarse[0]);
             (*param.matResidual)(tmp1, tmp2);
 
-            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, B_norm[i],
-                    norm2(tmp1));
+            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, B_norm[i], norm2(tmp1));
             max_deviation = blas::max_deviation(tmp1, param.B[i]);
             logQuda(QUDA_SUMMARIZE, "L2 relative deviation = %e, max deviation = %e\n",
                     sqrt(xmyNorm(param.B[i], tmp1) / B_norm[i]), max_deviation[0]);

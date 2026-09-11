@@ -10,8 +10,7 @@ namespace quda
     prec_precondition(solve_param.precision_precondition)
   {
     logQuda(QUDA_VERBOSE, "Launching MADWF accelerator ... \n");
-    logQuda(QUDA_VERBOSE, "madwf_mu (low modes suppressor)                   = %.4f\n",
-            param.madwf_diagonal_suppressor);
+    logQuda(QUDA_VERBOSE, "madwf_mu (low modes suppressor)                   = %.4f\n", param.madwf_diagonal_suppressor);
     logQuda(QUDA_VERBOSE, "madwf_ls (cheap Ls)                               = %d\n", param.madwf_ls);
     logQuda(QUDA_VERBOSE, "madwf_null_miniter                                = %d\n", param.madwf_null_miniter);
     logQuda(QUDA_VERBOSE, "madwf_null_tol                                    = %4.2e\n", param.madwf_null_tol);

@@ -42,9 +42,8 @@ namespace quda
     static constexpr int nSpin = nSpin_;
     static constexpr unsigned int max_n_batch_block = nSpin * nSpin;
     static constexpr bool spin_project = nSpin_ == 1 ? false : true;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
@@ -119,8 +118,8 @@ namespace quda
       for (int i = 0; i < 4; i++)
         Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
 
-      complex<real> phase = {static_cast<real>(cospi(Sum_dXi_dot_Pi * 2.)),
-                             static_cast<real>(-sinpi(Sum_dXi_dot_Pi * 2.))};
+      complex<real> phase
+        = {static_cast<real>(cospi(Sum_dXi_dot_Pi * 2.)), static_cast<real>(-sinpi(Sum_dXi_dot_Pi * 2.))};
 
       // Collect vector data
       int parity = 0;
@@ -230,7 +229,8 @@ namespace quda
       }
 
       complex<real> phased = phase * complex<real> {prop_prod.real(), prop_prod.imag()};
-      const array<reduction_t, 2> local {static_cast<reduction_t>(phased.real()), static_cast<reduction_t>(phased.imag())};
+      const array<reduction_t, 2> local {static_cast<reduction_t>(phased.real()),
+                                         static_cast<reduction_t>(phased.imag())};
       return operator()(result, local);
     }
   };
@@ -242,10 +242,9 @@ namespace quda
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr bool spin_project = spin_project_;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorField (F for fermion)
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type;
 
     F x;
     F y;

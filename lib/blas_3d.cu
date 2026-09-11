@@ -174,10 +174,7 @@ namespace quda
 
     public:
       reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<real_t> &result) :
-        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]),
-        x(x),
-        y(y),
-        result(result)
+        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result(result)
       {
         apply(device::get_default_stream());
       }
@@ -213,10 +210,7 @@ namespace quda
 
     public:
       cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result) :
-        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]),
-        x(x),
-        y(y),
-        result(result)
+        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result(result)
       {
         apply(device::get_default_stream());
       }

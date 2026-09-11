@@ -18,10 +18,7 @@ namespace quda {
 
   public:
     CalcFunc(const GaugeField &u, complex_t &result, compute_type type) :
-      TunableReduction2D(u),
-      u(u),
-      result(result),
-      type(type)
+      TunableReduction2D(u), u(u), result(result), type(type)
     {
       strcat(aux, type == compute_type::determinant ? ",det" : ",trace");
       apply(device::get_default_stream());
@@ -54,14 +51,14 @@ namespace quda {
 
   complex_t getLinkDeterminant(GaugeField &data)
   {
-    complex_t det{0.0, 0.0};
+    complex_t det {0.0, 0.0};
     instantiate<CalcFunc>(data, det, compute_type::determinant);
     return det;
   }
 
   complex_t getLinkTrace(GaugeField &data)
   {
-    complex_t tr{0.0, 0.0};
+    complex_t tr {0.0, 0.0};
     instantiate<CalcFunc>(data, tr, compute_type::trace);
     return tr;
   }

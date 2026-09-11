@@ -488,8 +488,7 @@ namespace quda
         real_t rtemp = std::max(epsilon23, abs(evals[idx]));
         if (residua[idx] < tol * rtemp) {
           iter_converged++;
-          logQuda(QUDA_DEBUG_VERBOSE, "residuum[%d] = %e, condition = %e\n", i, residua[idx],
-                  tol * abs(evals[idx]));
+          logQuda(QUDA_DEBUG_VERBOSE, "residuum[%d] = %e, condition = %e\n", i, residua[idx], tol * abs(evals[idx]));
         } else {
           // Unlikely to find new converged eigenvalues
           break;

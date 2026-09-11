@@ -276,8 +276,8 @@ namespace quda
     Yhat.exchangeGhost(QUDA_LINK_FORWARDS);
 
     for (int d = 0; d < 8; d++)
-      logQuda(QUDA_VERBOSE, "Yhat[%d] = %e (%e < %e x %e)\n", d, double(Yhat.norm2(d)),
-              double(Yhat.abs_max(d)), double(Y.abs_max(d)), double(Xinv.abs_max(0)));
+      logQuda(QUDA_VERBOSE, "Yhat[%d] = %e (%e < %e x %e)\n", d, double(Yhat.norm2(d)), double(Yhat.abs_max(d)),
+              double(Y.abs_max(d)), double(Xinv.abs_max(0)));
   }
 
   template <typename storeFloat, typename Float, int N>

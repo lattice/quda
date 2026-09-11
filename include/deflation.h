@@ -24,7 +24,7 @@ namespace quda {
     /** Inverse Ritz values*/
     real_t *invRitzVals;
 
-     /** The Dirac operator to use for spinor deflation operation */
+    /** The Dirac operator to use for spinor deflation operation */
     DiracMatrix &matDeflation;
 
     /** Host  projection matrix (e.g. eigCG VH A V) */
@@ -57,7 +57,7 @@ namespace quda {
         ld           = ((tot_dim+15) / 16) * tot_dim;
         //allocate deflation resources:
         matProj = static_cast<complex_t *>(pool_host_pinned_malloc(ld * tot_dim * sizeof(complex_t)));
-        invRitzVals  = new real_t[tot_dim];
+        invRitzVals = new real_t[tot_dim];
 
         //Check that RV is a composite field:
         if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");

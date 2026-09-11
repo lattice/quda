@@ -11,8 +11,9 @@ namespace quda {
     ABS_MIN
   };
 
-  template<typename real, int Nc, QudaCloverFieldOrder order>
-  real_t norm(const CloverField &u, bool inverse, norm_type_ type) {
+  template <typename real, int Nc, QudaCloverFieldOrder order>
+  real_t norm(const CloverField &u, bool inverse, norm_type_ type)
+  {
     constexpr int Ns = 4;
     typedef typename mapper<real>::type reg_type;
     real_t norm_ = 0.0;
@@ -25,8 +26,8 @@ namespace quda {
     return norm_;
   }
 
-  template<typename real, int Nc>
-  real_t norm(const CloverField &u, bool inverse, norm_type_ type) {
+  template <typename real, int Nc> real_t norm(const CloverField &u, bool inverse, norm_type_ type)
+  {
     real_t norm_ = 0.0;
     switch (u.Order()) {
     case QUDA_NATIVE_CLOVER_ORDER: norm_ = norm<real, Nc, QUDA_NATIVE_CLOVER_ORDER>(u, inverse, type); break;
@@ -36,8 +37,8 @@ namespace quda {
     return norm_;
   }
 
-  template<typename real>
-  real_t _norm(const CloverField &u, bool inverse, norm_type_ type) {
+  template <typename real> real_t _norm(const CloverField &u, bool inverse, norm_type_ type)
+  {
     real_t norm_ = 0.0;
     switch(u.Ncolor()) {
     case  3: norm_ = norm<real, 3>(u, inverse, type); break;
@@ -66,20 +67,12 @@ namespace quda {
   }
 #endif
 
-  real_t CloverField::norm1(bool inverse) const {
-    return _norm(*this, inverse, NORM1);
-  }
+  real_t CloverField::norm1(bool inverse) const { return _norm(*this, inverse, NORM1); }
 
-  real_t CloverField::norm2(bool inverse) const {
-    return _norm(*this, inverse, NORM2);
-  }
+  real_t CloverField::norm2(bool inverse) const { return _norm(*this, inverse, NORM2); }
 
-  real_t CloverField::abs_max(bool inverse) const {
-    return _norm(*this, inverse, ABS_MAX);
-  }
+  real_t CloverField::abs_max(bool inverse) const { return _norm(*this, inverse, ABS_MAX); }
 
-  real_t CloverField::abs_min(bool inverse) const {
-    return _norm(*this, inverse, ABS_MIN);
-  }
+  real_t CloverField::abs_min(bool inverse) const { return _norm(*this, inverse, ABS_MIN); }
 
 } // namespace quda

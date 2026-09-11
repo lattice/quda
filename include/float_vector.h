@@ -27,12 +27,13 @@ namespace quda {
 #elif defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
   using device_reduce_t = rfa_t<reduction_t>;
   // nvcc does not match get_scalar through the rfa_t alias template
-  template <> struct get_scalar<device_reduce_t> { using type = device_reduce_t; };
+  template <> struct get_scalar<device_reduce_t> {
+    using type = device_reduce_t;
+  };
 #endif
 
   /** Convert a device reduction value to a scalar (host or device). */
-  template <typename T = real_t>
-  __host__ __device__ inline T reduction_to_scalar(const device_reduce_t &x)
+  template <typename T = real_t> __host__ __device__ inline T reduction_to_scalar(const device_reduce_t &x)
   {
 #if defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
     return static_cast<T>(x.conv());
@@ -76,8 +77,7 @@ namespace quda {
     return c;
   }
 
-  template <typename T, int n>
-  __device__ __host__ inline array<T, n> &operator+=(array<T, n> &a, const array<T, n> &b)
+  template <typename T, int n> __device__ __host__ inline array<T, n> &operator+=(array<T, n> &a, const array<T, n> &b)
   {
 #pragma unroll
     for (int i = 0; i < n; i++) a[i] += b[i];
@@ -166,7 +166,9 @@ namespace quda {
     T ref;
   };
 
-  template <class T> struct get_scalar<deviation_t<T>> { using type = typename get_scalar<T>::type; };
+  template <class T> struct get_scalar<deviation_t<T>> {
+    using type = typename get_scalar<T>::type;
+  };
 
   template <typename T> constexpr specialize<T, deviation_t<double>> zero() { return {0.0, 0.0}; }
   template <typename T> constexpr specialize<T, deviation_t<float>> zero() { return {0.0f, 0.0f}; }
@@ -195,7 +197,10 @@ namespace quda {
   };
 
   template <> struct low<doubledouble> {
-    static inline __host__ __device__ doubledouble value() { return doubledouble(std::numeric_limits<double>::lowest()); }
+    static inline __host__ __device__ doubledouble value()
+    {
+      return doubledouble(std::numeric_limits<double>::lowest());
+    }
   };
 
   template <typename T> struct high {

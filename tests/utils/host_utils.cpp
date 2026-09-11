@@ -63,7 +63,7 @@ QudaPrecision &cuda_prec_eigensolver = prec_eigensolver;
 QudaPrecision &cuda_prec_ritz = prec_ritz;
 
 // Host hypercubic RNG
-std::vector<std::mt19937_64> host_rand;
+std::vector<host_rng_t> host_rand;
 
 size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -444,22 +444,22 @@ void initRand()
   srand(17 * rank + 137);
 
   // initialize the hypercubic RNG
-  std::array<int, 4> X = {xdim, ydim, zdim, tdim};
-  int volume = X[0] * X[1] * X[2] * X[3];
-  int volume_h = volume / 2;
+  std::array<uint64_t, 4> X = {1llu * xdim, 1llu * ydim, 1llu * zdim, 1llu * tdim};
+  uint64_t volume = X[0] * X[1] * X[2] * X[3];
+  uint64_t volume_h = volume / 2;
 
   host_rand.resize(volume);
   std::array<uint64_t, 4> X_global;
   for (int d = 0; d < 4; d++) X_global[d] = static_cast<uint64_t>(X[d] * comm_dim(d));
 
   for (int parity = 0; parity < 2; parity++)
-    for (int i = 0; i < volume_h; i++) {
+    for (uint32_t i = 0; i < volume_h; i++) {
       // get the local coordinate
       std::array<uint64_t, 4> x;
       getCoords(x, i, X, parity);
       for (int d = 0; d < 4; d++) x[d] += X[d] * comm_coord(d);
       uint64_t global_idx = (((x[3] * X_global[2] + x[2]) * X_global[1]) + x[1]) * X_global[0] + x[0];
-      host_rand[parity * volume_h + i] = std::mt19937_64(17ul * global_idx + 137);
+      host_rand[parity * volume_h + i] = host_rng_t(17ul * global_idx + 137);
     }
 }
 

@@ -226,6 +226,7 @@ set(QUDA_PRECISION
 set(QUDA_RECONSTRUCT
   "7"
   CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+option(QUDA_64BIT_INDEXING "use 64-bit (uint64_t) field indexing in accessors; default is 32-bit (uint32_t)" OFF)
 
 option(QUDA_FLUSH_DENORMALS "Whether to fliush denormals to zero" OFF)
 
@@ -289,6 +290,7 @@ mark_as_advanced(QUDA_MAX_MULTI_RHS)
 mark_as_advanced(QUDA_MAX_MULTI_RHS_TILE)
 mark_as_advanced(QUDA_MAX_KERNEL_ARG_SIZE)
 mark_as_advanced(QUDA_PRECISION)
+mark_as_advanced(QUDA_64BIT_INDEXING)
 mark_as_advanced(QUDA_FLUSH_DENORMALS)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)

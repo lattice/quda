@@ -161,8 +161,7 @@ namespace quda
     /**
        Return the real dot product of x and y
     */
-    template <typename reduce_t, typename T>
-    __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
+    template <typename reduce_t, typename T> __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
     {
       auto d = reduce_t(a.real()) * reduce_t(b.real());
       return fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
@@ -179,7 +178,7 @@ namespace quda
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, dot_<compute_t>(x[k], y[k]));
+        for (int k = 0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, dot_<compute_t>(x[k], y[k]));
       }
 
       constexpr int flops() const { return 2; }   //! flops per element
@@ -188,15 +187,14 @@ namespace quda
     /**
        Returns complex-valued dot product of x and y
     */
-    template <typename reduce_t, typename T>
-    __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
+    template <typename reduce_t, typename T> __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
     {
       using scalar_t = typename reduce_t::value_type;
       auto r = scalar_t(a.real()) * scalar_t(b.real());
       r = fma(scalar_t(a.imag()), scalar_t(b.imag()), r);
       auto i = scalar_t(a.real()) * scalar_t(b.imag());
-      i = fma(-scalar_t(a.imag()) , scalar_t(b.real()), i);
-      return reduce_t{r, i};
+      i = fma(-scalar_t(a.imag()), scalar_t(b.real()), i);
+      return reduce_t {r, i};
     }
 
     template <typename real_reduce_t, typename real>
@@ -211,7 +209,7 @@ namespace quda
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, cdot_<array<compute_t, 2>>(x[k], y[k]));
+        for (int k = 0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, cdot_<array<compute_t, 2>>(x[k], y[k]));
       }
 
       constexpr int flops() const { return 4; }   //! flops per element

@@ -391,10 +391,10 @@ namespace quda {
       return result;
     }
 
-  template< template<typename,int> class Mat, class T, int N>
-  __device__ __host__ inline
-  std::enable_if_t<std::is_same_v<Mat<T,N>, Matrix<T, N>> || std::is_same_v<Mat<T,N>, HMatrix<T, N>>, Mat<T, N>>
-  operator+(const Mat<T,N> & a, const Mat<T,N> & b)
+    template <template <typename, int> class Mat, class T, int N>
+    __device__ __host__ inline std::enable_if_t<
+      std::is_same_v<Mat<T, N>, Matrix<T, N>> || std::is_same_v<Mat<T, N>, HMatrix<T, N>>, Mat<T, N>>
+    operator+(const Mat<T, N> &a, const Mat<T, N> &b)
     {
       Mat<T,N> result;
 #pragma unroll
@@ -402,27 +402,27 @@ namespace quda {
       return result;
     }
 
-  template< template<typename,int> class Mat, class T, int N>
-  std::enable_if_t<std::is_same_v<Mat<T,N>, Matrix<T, N>> || std::is_same_v<Mat<T,N>, HMatrix<T, N>>, Mat<T, N>>
-    __device__ __host__ inline operator+=(Mat<T,N> & a, const Mat<T,N> & b)
+    template <template <typename, int> class Mat, class T, int N>
+    std::enable_if_t<std::is_same_v<Mat<T, N>, Matrix<T, N>> || std::is_same_v<Mat<T, N>, HMatrix<T, N>>, Mat<T, N>>
+      __device__ __host__ inline operator+=(Mat<T, N> &a, const Mat<T, N> &b)
     {
 #pragma unroll
       for (int i = 0; i < a.size(); i++) a.data[i] += b.data[i];
       return a;
     }
 
-  template< template<typename,int> class Mat, class T, int N>
-  std::enable_if_t<std::is_same_v<Mat<T,N>, Matrix<T, N>> || std::is_same_v<Mat<T,N>, HMatrix<T, N>>, Mat<T, N>>
-  __device__ __host__ inline operator+=(Mat<T,N> & a, const T & b)
+    template <template <typename, int> class Mat, class T, int N>
+    std::enable_if_t<std::is_same_v<Mat<T, N>, Matrix<T, N>> || std::is_same_v<Mat<T, N>, HMatrix<T, N>>, Mat<T, N>>
+      __device__ __host__ inline operator+=(Mat<T, N> &a, const T &b)
     {
 #pragma unroll
       for (int i = 0; i < a.rows(); i++) a(i, i) += b;
       return a;
     }
 
-  template< template<typename,int> class Mat, class T, int N>
-  std::enable_if_t<std::is_same_v<Mat<T,N>, Matrix<T, N>> || std::is_same_v<Mat<T,N>, HMatrix<T, N>>, Mat<T, N>>
-  __device__ __host__ inline operator-=(Mat<T,N> & a, const Mat<T,N> & b)
+    template <template <typename, int> class Mat, class T, int N>
+    std::enable_if_t<std::is_same_v<Mat<T, N>, Matrix<T, N>> || std::is_same_v<Mat<T, N>, HMatrix<T, N>>, Mat<T, N>>
+      __device__ __host__ inline operator-=(Mat<T, N> &a, const Mat<T, N> &b)
     {
 #pragma unroll
       for (int i = 0; i < a.size(); i++) a.data[i] -= b.data[i];

@@ -15,10 +15,8 @@ namespace quda {
     unsigned int minThreads() const { return arg.threads.x; }
 
   public:
-    ComputeClover(CloverField &clover, const GaugeField& f, real_t coeff) :
-      TunableKernel2D(clover, 2),
-      arg(clover, f, coeff),
-      meta(f)
+    ComputeClover(CloverField &clover, const GaugeField &f, real_t coeff) :
+      TunableKernel2D(clover, 2), arg(clover, f, coeff), meta(f)
     {
       checkNative(clover, f);
       apply(device::get_default_stream());
@@ -34,7 +32,7 @@ namespace quda {
     long long bytes() const { return 2*arg.threads.x*(6*arg.f.Bytes() + arg.clover.Bytes()); }
   };
 
-  void computeClover(CloverField &clover, const GaugeField& f, real_t coeff)
+  void computeClover(CloverField &clover, const GaugeField &f, real_t coeff)
   {
     if constexpr (is_enabled_clover()) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);

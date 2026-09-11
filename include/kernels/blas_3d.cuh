@@ -30,10 +30,9 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F y;
     F x;
@@ -117,11 +116,10 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
     static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, disable_ghost>::type F;
 
     static constexpr int MAX_ORTHO_DIM = 256;
     real a[MAX_ORTHO_DIM];
@@ -172,11 +170,10 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
     static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, disable_ghost>::type F;
 
     static constexpr int MAX_ORTHO_DIM = 256;
     complex<real> a[MAX_ORTHO_DIM];
@@ -189,8 +186,10 @@ namespace quda
       baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), x(x), y(y)
     {
       if (x.X(3) > MAX_ORTHO_DIM) errorQuda("Orthogonal dimension %d exceeds maximum %d", x.X(3), MAX_ORTHO_DIM);
-      for (auto i = 0u; i < a.size(); i++) this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
-      for (auto i = 0u; i < b.size(); i++) this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
+      for (auto i = 0u; i < a.size(); i++)
+        this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+      for (auto i = 0u; i < b.size(); i++)
+        this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
     }
   };
 
@@ -228,10 +227,9 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
@@ -245,7 +243,6 @@ namespace quda
     {
       for (int i = 0; i < 4; i++) Xh[i] = x.SiteSubset() == 2 && i == 0 ? x.X()[i] / 2 : x.X()[i];
     }
-
   };
 
   template <typename Arg> struct reDotProduct3d : plus<typename Arg::reduce_t> {
@@ -260,8 +257,7 @@ namespace quda
     /**
        Compute the real dot product of x and y
     */
-    template <typename T>
-    __device__ __host__ auto dot_(compute_t &sum, const complex<T> &a, const complex<T> &b)
+    template <typename T> __device__ __host__ auto dot_(compute_t &sum, const complex<T> &a, const complex<T> &b)
     {
       sum = fma(compute_t(a.real()), compute_t(b.real()), sum);
       sum = fma(compute_t(a.imag()), compute_t(b.imag()), sum);
@@ -292,10 +288,9 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
@@ -303,8 +298,8 @@ namespace quda
     int_fastdiv Xh[4]; // checkerboard grid dimensions
 
     cDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<array<device_reduce_t, 2>>(dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]),
-                                           x.X()[reduction_dim]),
+      ReduceArg<array<device_reduce_t, 2>>(
+        dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]), x.X()[reduction_dim]),
       x(x),
       y(y)
     {

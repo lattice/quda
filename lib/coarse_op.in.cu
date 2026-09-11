@@ -13,9 +13,9 @@
 namespace quda {
 
   template <typename Float, typename vFloat, int fineColor, int coarseColor>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
-		  const GaugeField &g, const CloverField &c, real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, ColorSpinorField &uv,
+                  ColorSpinorField &av, const Transfer &T, const GaugeField &g, const CloverField &c, real_t kappa,
+                  real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaFieldLocation location = Y.Location();
     constexpr int fineSpin = 4;
@@ -107,9 +107,9 @@ namespace quda {
   }
 
   template <int fineColor, int coarseColor>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g,
-                  const CloverField &c, real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, ColorSpinorField &uv,
+                  ColorSpinorField &av, const Transfer &T, const GaugeField &g, const CloverField &c, real_t kappa,
+                  real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if constexpr (is_enabled_multigrid()) {
       checkPrecision(Xatomic, Yatomic, g);
@@ -146,9 +146,9 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   template <>
-  void CoarseOp<fineColor, coarseColor>(GaugeField &Y, GaugeField &X, const Transfer &T,
-                                        const GaugeField &gauge, const CloverField *clover,
-                                        real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  void CoarseOp<fineColor, coarseColor>(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                                        const CloverField *clover, real_t kappa, real_t mass, real_t mu,
+                                        real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);

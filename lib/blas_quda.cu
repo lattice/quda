@@ -112,8 +112,8 @@ namespace quda {
           // actually build the GPU kernel for that case: error out at compile time
           // instead of redundantly compiling a device kernel already built for
           // whichever precision is actually enabled.
-          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)
-                        && !is_enabled(QUDA_DOUBLE_PRECISION)) {
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)&&!is_enabled(
+                          QUDA_DOUBLE_PRECISION)) {
             errorQuda("QUDA_PRECISION=%d does not enable double precision on the GPU", QUDA_PRECISION);
           } else {
             if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll
@@ -188,6 +188,12 @@ namespace quda {
               typename W, typename V>
     void instantiateBlas(const coeff_t &a, const coeff_t &b, const coeff_t &c, X &x, Y &y, Z &z, W &w, V &v)
     {
+      // besides being a no-op, this keeps a non-recursive path that returns
+      // for builds where the instantiation below is entirely disabled at
+      // compile time, e.g., a build with no nSpin enabled: without it the
+      // compiler flags the splitting below as infinite recursion
+      if (x.size() == 0) return;
+
       if (x.size() > get_max_multi_rhs()) {
         instantiateBlas<Functor, mixed, coeff_t, X, Y, Z, W, V>(
           a, b, c, {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2},
@@ -290,7 +296,12 @@ namespace quda {
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
       if (x.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("This kernel cannot be run on CPU fields");
-      // conv() in caxpyxmazMR_ reads this TU's bin_device_buffer (not via ReduceArg).
+      // Blas (unlike Reduce/MultiReduce) derives from TunableKernel3D_base, not
+      // TunableReduction2D/TunableMultiReduction, so it never goes through
+      // TunableReduction2D::launch_device's automatic per-TU RFA bin init.
+      // caxpyxmazMR_'s conv() reads this TU's bin_device_buffer directly (via
+      // the async-reduction completion path, not ReduceArg::complete()), so
+      // this call must stay here explicitly.
       reducer::init_rfa_device_bins<device_reduce_t>();
       instantiateBlas<caxpyxmazMR_, false>(a, cvector<real_t>(), cvector<real_t>(), x, y, z, y, y);
     }

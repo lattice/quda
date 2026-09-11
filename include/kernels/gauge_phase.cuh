@@ -21,17 +21,14 @@ namespace quda {
     Float tBoundary;
     Float i_mu;
     complex<Float> i_mu_phase;
-    GaugePhaseArg(GaugeField &u) :
-      kernel_param(dim3(u.VolumeCB(), 2, 1)),
-      u(u),
-      i_mu(static_cast<Float>(u.iMu()))
+    GaugePhaseArg(GaugeField &u) : kernel_param(dim3(u.VolumeCB(), 2, 1)), u(u), i_mu(static_cast<Float>(u.iMu()))
     {
       // if staggered phases are applied, then we are removing them
       // else we are applying them
       Float dir = u.StaggeredPhaseApplied() ? -1.0 : 1.0;
 
-      i_mu_phase = complex( cos(M_PI * double(u.iMu()) / (u.X()[3]*comm_dim(3)) ),
-                            dir * sin(M_PI * double(u.iMu()) / (u.X()[3]*comm_dim(3))) );
+      i_mu_phase = complex(cos(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3))),
+                           dir * sin(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3))));
 
       for (int d=0; d<4; d++) X[d] = u.X()[d];
 

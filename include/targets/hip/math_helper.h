@@ -13,14 +13,12 @@ namespace quda
   inline __host__ __device__ float abs(const float a) { return fabs(a); }
   inline __host__ __device__ double abs(const double a) { return fabs(a); }
 
-  template <typename T>
-  __host__ __device__ inline std::enable_if_t<std::is_same_v<T, float>, float> fabs(const T a)
+  template <typename T> __host__ __device__ inline std::enable_if_t<std::is_same_v<T, float>, float> fabs(const T a)
   {
     return fabsf(a);
   }
 
-  template <typename T>
-  __host__ __device__ inline std::enable_if_t<std::is_same_v<T, double>, double> fabs(const T a)
+  template <typename T> __host__ __device__ inline std::enable_if_t<std::is_same_v<T, double>, double> fabs(const T a)
   {
     return ::fabs(a);
   }
@@ -123,7 +121,10 @@ namespace quda
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
    */
-  template <typename T> inline __host__ __device__ void sincospi(const T& a, T *s, T *c) { quda::sincos(a * static_cast<T>(M_PI), s, c); }
+  template <typename T> inline __host__ __device__ void sincospi(const T &a, T *s, T *c)
+  {
+    quda::sincos(a * static_cast<T>(M_PI), s, c);
+  }
 
   /**
    * @brief Sine pi calculation in QUDA NAMESPACE.
@@ -173,7 +174,6 @@ namespace quda
 
   template <> inline __host__ __device__ float rsqrt(const float &a) { return target::dispatch<rsqrtf_impl>(a); }
   template <> inline __host__ __device__ double rsqrt(const double &a) { return target::dispatch<rsqrt_impl>(a); }
-
 
   template <bool is_device> struct fpow_impl {
     template <typename real> inline real operator()(real a, int b) { return ::pow(a, b); }

@@ -112,17 +112,14 @@ namespace quda
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
         logBlockArrowCoeffs("before eigensolveFromBlockArrowMat");
-        logQuda(QUDA_DEBUG_VERBOSE,
-                "BLKTRLM scalar coeffs: restart=%d num_locked=%d num_keep=%d n_kr=%d block_size=%d\n", restart_iter,
-                num_locked, num_keep, n_kr, block_size);
+        logQuda(QUDA_DEBUG_VERBOSE, "BLKTRLM scalar coeffs: restart=%d num_locked=%d num_keep=%d n_kr=%d block_size=%d\n",
+                restart_iter, num_locked, num_keep, n_kr, block_size);
         for (int i = num_locked; i < std::min(n_kr, num_locked + 8); i++) {
-          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, alpha[i], i,
-                  beta[i]);
+          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, alpha[i], i, beta[i]);
           if (block_size == 1) {
             const int ba = (i / block_size) * block_data_length;
             logQuda(QUDA_DEBUG_VERBOSE, "  block_alpha[%d] = (%+.16e,%+.16e) block_beta[%d] = (%+.16e,%+.16e)\n", i,
-                    block_alpha[ba].real(), block_alpha[ba].imag(), i,
-                    block_beta[ba].real(), block_beta[ba].imag());
+                    block_alpha[ba].real(), block_alpha[ba].imag(), i, block_beta[ba].real(), block_beta[ba].imag());
           }
         }
       }
@@ -146,8 +143,8 @@ namespace quda
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i,
-                  residua[i + num_locked], epsilon * check_norm(alpha[i + num_locked]));
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -159,8 +156,8 @@ namespace quda
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i,
-                  residua[i + num_locked], tol * check_norm(alpha[i + num_locked]));
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -195,8 +192,7 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
       logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
       for (int i = 0; i < n_kr; i++) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i,
-                residua[i]);
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
       }
 
       // Check for convergence
@@ -226,8 +222,7 @@ namespace quda
 
       // Dump all Ritz values and residua
       for (int i = 0; i < n_conv; i++) {
-        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0,
-                residua[i]);
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
       }
 
       // Compute eigenvalues
@@ -479,14 +474,10 @@ namespace quda
       }
     }
 
-    // Invert the spectrum due to Chebyshev (except the arrow diagonal)
+    // Invert the spectrum due to Chebyshev
     if (reverse) {
       for (int b = 0; b < dim; b++) {
-        for (int c = 0; c < dim; c++) {
-          T(c, b) *= -1.0;
-          if (restart_iter > 0)
-            if (b == c && b < arrow_pos && c < arrow_pos) T(c, b) *= -1.0;
-        }
+        for (int c = 0; c < dim; c++) { T(c, b) *= -1.0; }
       }
     }
 
@@ -508,6 +499,11 @@ namespace quda
     // Populate the alpha array with eigenvalues
     for (int i = 0; i < dim; i++) alpha[i + num_locked] = eigensolver.eigenvalues()[i];
 
+    // Put spectrum back in order
+    if (reverse) {
+      for (int i = num_locked; i < n_kr; i++) { alpha[i] *= -1.0; }
+    }
+
     // Repopulate ritz matrix: COLUMN major
     for (int i = 0; i < dim; i++)
       for (int j = 0; j < dim; j++) block_ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
@@ -528,10 +524,9 @@ namespace quda
         const int ritz_idx = dim * (i * block_size + b + 1) - 1;
         residua[i * block_size + b + num_locked] = abs(beta_sum * block_ritz_mat[ritz_idx]);
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2 && i < 2 && b < 2) {
-          logQuda(QUDA_DEBUG_VERBOSE,
-                  "  resid estimate i=%d b=%d: beta_sum=%.16e ritz[%d]=(%+.16e,%+.16e) resid=%.16e\n", i, b,
-                  beta_sum, ritz_idx, block_ritz_mat[ritz_idx].real(),
-                  block_ritz_mat[ritz_idx].imag(), residua[i * block_size + b + num_locked]);
+          logQuda(QUDA_DEBUG_VERBOSE, "  resid estimate i=%d b=%d: beta_sum=%.16e ritz[%d]=(%+.16e,%+.16e) resid=%.16e\n",
+                  i, b, beta_sum, ritz_idx, block_ritz_mat[ritz_idx].real(), block_ritz_mat[ritz_idx].imag(),
+                  residua[i * block_size + b + num_locked]);
         }
       }
     }

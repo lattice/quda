@@ -30,11 +30,7 @@ namespace quda {
     const paths<4> p;
 
     GaugeForceArg(GaugeField &mom, const GaugeField &u, real_t epsilon, const paths<4> &p) :
-      kernel_param(dim3(mom.VolumeCB(), 2, 4)),
-      mom(mom),
-      u(u),
-      epsilon(static_cast<real>(epsilon)),
-      p(p)
+      kernel_param(dim3(mom.VolumeCB(), 2, 4)), mom(mom), u(u), epsilon(static_cast<real>(epsilon)), p(p)
     {
       for (int i = 0; i < 4; i++) {
         X[i] = mom.X()[i];

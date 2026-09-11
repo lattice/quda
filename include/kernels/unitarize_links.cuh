@@ -236,10 +236,9 @@ namespace quda {
     real tol;
     int *fails;
     ProjectSU3Arg(GaugeField &u, real_t tol, int *fails) :
-      kernel_param(dim3(u.VolumeCB(), 2, 4)),
-      u(u),
-      tol(static_cast<real>(tol)),
-      fails(fails) { }
+      kernel_param(dim3(u.VolumeCB(), 2, 4)), u(u), tol(static_cast<real>(tol)), fails(fails)
+    {
+    }
   };
 
   template <typename Arg> struct Projector

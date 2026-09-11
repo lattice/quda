@@ -7,7 +7,7 @@
 #include <reduction_kernel.h>
 
 namespace quda {
-  
+
   using spinor_array = array<device_reduce_t, 8>;
 
   constexpr unsigned long max_nx = 4;
@@ -21,8 +21,8 @@ namespace quda {
     static constexpr int nSpinX = 4;
     static constexpr int nSpinY = 1;
 
-    typedef typename colorspinor_mapper<Float, nSpinX, nColor, false, false, true>::type F4;
-    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, false, true>::type F1;
+    typedef typename colorspinor_mapper<Float, nSpinX, nColor, false, true>::type F4;
+    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, true>::type F1;
     
     static constexpr unsigned int max_n_batch_block = 8;
     int_fastdiv nx;
@@ -90,7 +90,7 @@ namespace quda {
         result_local[2 * mu + 0] = prod.real();
         result_local[2 * mu + 1] = prod.imag();
       }
-      
+
       return operator()(result, result_local);
     }
   };

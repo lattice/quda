@@ -36,8 +36,8 @@ namespace quda {
       }
     }
 
-    auto getAction(){ return result[0]; }
-    auto getTheta(){ return result[1]; }
+    auto getAction() { return result[0]; }
+    auto getTheta() { return result[1]; }
   };
 
   template <typename Arg> struct FixQualityOVR : plus<typename Arg::reduce_t> {

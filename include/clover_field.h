@@ -519,7 +519,7 @@ namespace quda {
      @param a The clover field that we want the norm of
      @return The L1 norm of the gauge field
   */
-  real_t norm1(const CloverField &u, bool inverse=false);
+  real_t norm1(const CloverField &u, bool inverse = false);
 
   /**
      This is a debugging function, where we cast a clover field into a
@@ -527,7 +527,7 @@ namespace quda {
      @param a The clover field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  real_t norm2(const CloverField &a, bool inverse=false);
+  real_t norm2(const CloverField &a, bool inverse = false);
 
   /**
      @brief Driver for computing the clover field from the field
