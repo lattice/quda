@@ -1955,6 +1955,130 @@ void openQCD_qudaInvertMultiSrc(int id, void** sources, void** solutions, int *s
   free(h_solutions);
 }
 
+/**
+ * @brief      Check that solver [id]'s QudaInvertParam is valid for a
+ *             multi-shift solve, on top of the generic sync check performed
+ *             by openQCD_qudaInvertParamCheck(). Never mutates
+ *             solution_type/solve_type/dagger/inv_type.
+ *
+ * @param      param  The parameter struct, with offset[]/tol_offset[]/
+ *                    num_offset already populated by the caller.
+ *
+ * @return     Whether the struct is valid for a multi-shift solve
+ */
+static int openQCD_qudaInvertMultiShiftParamCheck(QudaInvertParam *param)
+{
+  if (!openQCD_qudaInvertParamCheck(param)) { return false; }
+
+  if (param->mu != 0) {
+    WITH_COMM(logQuda(QUDA_VERBOSE,
+      "openQCD_qudaInvertMultiShift requires param->mu == 0 (openQxD:dirac_parms().mu = %.6e)\n", param->mu));
+    return false;
+  }
+
+  for (int i = 0; i < param->num_offset - 1; ++i) {
+    if (param->offset[i] > param->offset[i + 1]) {
+      WITH_COMM(logQuda(QUDA_VERBOSE,
+        "openQCD_qudaInvertMultiShift requires offset[] ascending (offset[%d]=%.6e > offset[%d]=%.6e)\n",
+        i, param->offset[i], i + 1, param->offset[i + 1]));
+      return false;
+    }
+  }
+
+  bool pc_solution = param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION;
+  bool pc_solve = param->solve_type == QUDA_NORMOP_PC_SOLVE;
+  bool mat_solution = param->solution_type == QUDA_MATDAG_MAT_SOLUTION;
+  bool mat_solve = param->solve_type == QUDA_NORMOP_SOLVE;
+
+  if (!((pc_solution && pc_solve) || (mat_solution && mat_solve))) {
+    WITH_COMM(logQuda(QUDA_VERBOSE,
+      "openQCD_qudaInvertMultiShift requires (solution_type, solve_type) to be exactly "
+      "(MATPCDAG_MATPC_SOLUTION, NORMOP_PC_SOLVE) or (MATDAG_MAT_SOLUTION, NORMOP_SOLVE) "
+      "(actual: solution_type=%d, solve_type=%d)\n", param->solution_type, param->solve_type));
+    return false;
+  }
+
+  if (param->inv_type != QUDA_CG_INVERTER) {
+    WITH_COMM(logQuda(QUDA_VERBOSE,
+      "openQCD_qudaInvertMultiShift requires inv_type == QUDA_CG_INVERTER (actual: %d)\n", param->inv_type));
+    return false;
+  }
+
+  return true;
+}
+
+void openQCD_qudaInvertMultiShift(int id, int noffset, double *offset, double *res, void *source, void **solutions,
+                                   int *status, double *residual)
+{
+  if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
+
+  if (qudaState.layout.h_sw != nullptr) {
+    qudaState.layout.h_sw();
+  } else {
+    WITH_COMM(errorQuda("qudaState.layout.h_sw is not set."));
+  }
+
+  if (noffset < 1 || noffset > QUDA_MAX_MULTI_SHIFT) {
+    WITH_COMM(errorQuda("openQCD_qudaInvertMultiShift: noffset=%d out of range [1, %d].", noffset, QUDA_MAX_MULTI_SHIFT));
+  }
+
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
+
+  /* offset[] must already be ascending (checked below, not sorted here).
+   * Mutates the shared, cached handle -- offset[]/tol_offset[]/num_offset
+   * are per-call data, not static ini config, and every call overwrites
+   * indices [0, noffset) before use. solution_type/solve_type/dagger/
+   * inv_type are never mutated -- purely ini-configured, validated below. */
+  param->num_offset = noffset;
+  for (int i = 0; i < noffset; ++i) {
+    param->offset[i] = offset[i];
+    param->tol_offset[i] = res[i];
+    param->tol_hq_offset[i] = 0.0; /* not part of openQCD's offset[]/res[] convention */
+  }
+
+  if (!openQCD_qudaInvertMultiShiftParamCheck(param)) {
+    WITH_COMM(errorQuda("Multi-shift solver check failed for id=%d.", id));
+  }
+
+  void *h_source = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, source);
+  qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, source, h_source);
+
+  void **h_solutions = (void **) malloc(noffset * sizeof(void *));
+  for (int i = 0; i < noffset; ++i) {
+    h_solutions[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, 1 + i, solutions[i]);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solutions[i], h_solutions[i]);
+    }
+  }
+
+  WITH_COMM(logQuda(QUDA_VERBOSE, "Calling invertMultiShiftQuda() ...\n"));
+  PUSH_RANGE("invertMultiShiftQuda", 5);
+  WITH_COMM(invertMultiShiftQuda(h_solutions, h_source, param));
+  POP_RANGE;
+
+  for (int i = 0; i < noffset; ++i) {
+    qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, h_solutions[i], solutions[i]);
+    status[i] = param->true_res_offset[i] <= param->tol_offset[i] ? param->iter : -1;
+    residual[i] = param->true_res_offset[i];
+  }
+
+  if (!qudaState.init.two_grids_equal) {
+    MPI_Bcast(status, noffset, MPI_INT, 0, qudaState.layout.world_comm);
+    MPI_Bcast(residual, noffset, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+  }
+
+  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaInvertMultiShift()\n"));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  iter           = %d\n", param->iter));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops         = %.2e\n", param->gflops));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  secs           = %.2e\n", param->secs));
+  for (int i = 0; i < noffset; ++i) {
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_offset[%d] = %.2e\n", i, param->true_res_offset[i]));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]          = %d\n", i, status[i]));
+  }
+
+  free(h_solutions);
+}
+
 static void *openQCD_qudaInvertAsyncWrapper(void*)
 {
   /* enable the thread to use QUDA */
