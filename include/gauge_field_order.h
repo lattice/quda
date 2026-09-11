@@ -1750,7 +1750,7 @@ namespace quda {
 
           if constexpr (loadPhase) prefetch_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
         } else if constexpr (type == PrefetchType::BULK) { // bulk prefetch
-          if (block_size == 0) block_size = blockDim.x;
+          if (block_size == 0) block_size = target::block_dim().x;
           if (target::is_thread_zero()) {
 #pragma unroll
             for (int i = 0; i < M; i++)

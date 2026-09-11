@@ -1,4 +1,5 @@
 #include <typeinfo>
+#include <utility>
 #include <quda_internal.h>
 #include <lattice_field.h>
 #include <color_spinor_field.h>

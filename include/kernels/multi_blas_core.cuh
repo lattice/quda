@@ -124,7 +124,7 @@ namespace quda
           l_idx[j] = lane_id / vector_site_width;
         }
 
-        vec y[n], w[n];
+        vec y[n] {}, w[n] {};
         if (!allthreads || alive) {
 #pragma unroll
           for (int j = 0; j < n; j++) {

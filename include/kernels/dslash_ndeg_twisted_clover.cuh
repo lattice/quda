@@ -92,12 +92,13 @@ namespace quda
       }
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
-        if (arg.dd_x.isZero(coord)) {
-          if (!allthreads || alive) out = arg.a * out;
+        const bool zero_x = arg.dd_x.isZero(coord);
+        if (zero_x && !allthreads) { // keep all threads at the cache barrier
+          out = arg.a * out;
         } else {
           SharedMemoryCache<Vector> cache {*this};
           Vector tmp;
-          if (!allthreads || alive) {
+          if ((!allthreads || alive) && !zero_x) {
             // apply the chiral and flavor twists
             // use consistent load order across s to ensure better cache locality
             Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
@@ -123,7 +124,7 @@ namespace quda
           }
           cache.sync();
           if (!allthreads || alive) {
-            tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
+            if (!zero_x) tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
 
             // add the Wilson part with normalisation
             out = tmp + arg.a * out;
