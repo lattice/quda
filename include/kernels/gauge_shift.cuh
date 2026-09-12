@@ -13,7 +13,7 @@ namespace quda
   struct GaugeShiftArg : kernel_param<> {
     using real = typename mapper<store_t>::type;
     using Link = Matrix<complex<real>, nColor>;
-    using RawLink = array<store_t, recon>;
+    using RawLink = array<native_store_t<store_t>, recon>;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
 
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;

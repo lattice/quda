@@ -13,6 +13,9 @@ namespace quda {
 
     template <typename T> constexpr int get_vector_order();
     template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> constexpr int get_vector_order<floatfloat>() { return QUDA_ORDER_DOUBLE; }
+#endif
     template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
     template <> constexpr int get_vector_order<int>() { return QUDA_ORDER_SINGLE; }
     template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }

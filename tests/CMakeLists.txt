@@ -148,7 +148,7 @@ if(QUDA_DIRAC_WILSON
 
   if(QUDA_SCALAR_TYPE STREQUAL "float128"
      OR QUDA_REDUCTION_TYPE STREQUAL "doubledouble"
-     OR QUDA_REDUCTION_TYPE STREQUAL "floatfloat")
+     OR QUDA_REDUCTION_TYPE MATCHES "^floatfloat")
     add_executable(quad_reduction_test quad_reduction_test.cpp)
     target_link_libraries(quad_reduction_test ${TEST_LIBS})
     quda_checkbuildtest(quad_reduction_test QUDA_BUILD_ALL_TESTS)

@@ -18,7 +18,14 @@ namespace quda
 #if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
   TEST(QuadReduction, floatfloat_reduction_type)
   {
-    static_assert(std::is_same_v<reduction_t, floatfloat>);
+    // The reduction accuracy is selected independently of the bulk accuracy.
+#if defined(QUDA_REDUCTION_FLOATFLOAT_ACCURACY_LOW)
+    static_assert(std::is_same_v<reduction_t, floatfloat_low>);
+#elif defined(QUDA_REDUCTION_FLOATFLOAT_ACCURACY_MID)
+    static_assert(std::is_same_v<reduction_t, floatfloat_mid>);
+#elif defined(QUDA_REDUCTION_FLOATFLOAT_ACCURACY_HIGH)
+    static_assert(std::is_same_v<reduction_t, floatfloat_high>);
+#endif
     static_assert(sizeof(reduction_t) == 2 * sizeof(float));
     static_assert(std::is_trivially_copyable_v<reduction_t>);
 

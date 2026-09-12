@@ -154,8 +154,10 @@ namespace quda
           // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
           // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx
           auto prop_product = get_g5gm(b2) * innerProduct(x, y, b2, s2) * get_g5gm(b1);
-          site_sum[0] += prop_product.real() * phase.real() - prop_product.imag() * phase.imag();
-          site_sum[1] += prop_product.imag() * phase.real() + prop_product.real() * phase.imag();
+          site_sum[0]
+            += static_cast<reduction_t>(prop_product.real() * phase.real() - prop_product.imag() * phase.imag());
+          site_sum[1]
+            += static_cast<reduction_t>(prop_product.imag() * phase.real() + prop_product.real() * phase.imag());
         }
       }
 

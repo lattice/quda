@@ -88,8 +88,9 @@ namespace quda {
       auto trace = getTrace(link_prod);
 
       reduce_t loop_trace {};
-      loop_trace[0] = coeff_loop * trace.real();
-      loop_trace[1] = coeff_loop * trace.imag();
+      using reduce_scalar = typename reduce_t::value_type;
+      loop_trace[0] = static_cast<reduce_scalar>(coeff_loop * trace.real());
+      loop_trace[1] = static_cast<reduce_scalar>(coeff_loop * trace.imag());
       return operator()(value, loop_trace);
     }
   };

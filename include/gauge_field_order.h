@@ -829,7 +829,8 @@ namespace quda {
       /** Convenient types */
       using Float = Float_;
       using storeFloat = storeFloat_;
-      using wrapper = fieldorder_wrapper<Float, storeFloat>;
+      using mem_t = order_store_t<storeFloat_, order == QUDA_NATIVE_GAUGE_ORDER>;
+      using wrapper = fieldorder_wrapper<Float, mem_t>;
 
       /** An internal reference to the actual field we are accessing */
       const unsigned int volumeCB;
@@ -838,10 +839,10 @@ namespace quda {
       const QudaFieldLocation location;
       static constexpr int nColorCoarse = nColor / nSpinCoarse;
 
-      using accessor_type = Accessor<Float, nColor, order, storeFloat>;
+      using accessor_type = Accessor<Float, nColor, order, mem_t>;
       static constexpr bool is_mma_compatible = accessor_type::is_mma_compatible;
       accessor_type accessor;
-      GhostAccessor<Float, nColor, order, native_ghost, storeFloat> ghostAccessor;
+      GhostAccessor<Float, nColor, order, native_ghost, mem_t> ghostAccessor;
 
       /** Does this field type support ghost zones? */
       static constexpr bool supports_ghost_zone = true;
@@ -867,7 +868,7 @@ namespace quda {
 	  ghostAccessor.resetScale(max);
         }
 
-        static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
+        static constexpr bool fixedPoint() { return fixed_point<Float, mem_t>(); }
 
         /**
          * accessor function
@@ -978,7 +979,7 @@ namespace quda {
         {
           commGlobalReductionPush(global);
           auto nrm1 = accessor.template transform_reduce<plus<device_reduce_t>>(
-            location, dim, abs_<double, storeFloat>(accessor.scale_inv));
+            location, dim, abs_<double, mem_t>(accessor.scale_inv));
           commGlobalReductionPop();
           return reduction_to_real(nrm1);
         }
@@ -992,7 +993,7 @@ namespace quda {
         {
           commGlobalReductionPush(global);
           auto nrm2 = accessor.template transform_reduce<plus<device_reduce_t>>(
-            location, dim, square_<double, storeFloat>(accessor.scale_inv));
+            location, dim, square_<double, mem_t>(accessor.scale_inv));
           commGlobalReductionPop();
           return reduction_to_real(nrm2);
         }
@@ -1011,7 +1012,7 @@ namespace quda {
 #endif
           commGlobalReductionPush(global);
           double absmax = accessor.template transform_reduce<maximum<reduce_t>>(
-            location, dim, abs_max_<reduce_t, storeFloat>(static_cast<reduce_t>(accessor.scale_inv)));
+            location, dim, abs_max_<reduce_t, mem_t>(static_cast<reduce_t>(accessor.scale_inv)));
           commGlobalReductionPop();
           return absmax;
         }
@@ -1030,13 +1031,13 @@ namespace quda {
 #endif
           commGlobalReductionPush(global);
           double absmin = accessor.template transform_reduce<minimum<reduce_t>>(
-            location, dim, abs_min_<reduce_t, storeFloat>(static_cast<reduce_t>(accessor.scale_inv)));
+            location, dim, abs_min_<reduce_t, mem_t>(static_cast<reduce_t>(accessor.scale_inv)));
           commGlobalReductionPop();
           return absmin;
         }
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
+        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(mem_t); }
     };
 
       /**
@@ -1623,7 +1624,7 @@ namespace quda {
         using Accessor
           = FloatNOrder<Float, length_, recon_, stag_phase, ghostExchange_, use_inphase, shifted, geometry_>;
 
-        using store_t = Float;
+        using store_t = native_store_t<Float>;
         static constexpr int length = length_;
         static constexpr QudaReconstructType recon = recon_;
         using real = typename mapper<Float>::type;
@@ -1636,9 +1637,9 @@ namespace quda {
         static constexpr int M = (reconLen - hasPhase) / N;
         static constexpr int Nrem = reconLen - hasPhase - M * N;
         static_assert(Nrem == 0 || (Nrem > 0 && (Nrem & (Nrem - 1)) == 0), "Nrem must be a power of 2");
-        Float *gauge;
+        store_t *gauge;
         const index_t offset;
-        Float *ghost[4];
+        store_t *ghost[4];
         QudaGhostExchange ghostExchange;
         int coords[QUDA_MAX_DIM];
         int_fastdiv X[QUDA_MAX_DIM];
@@ -1656,9 +1657,39 @@ namespace quda {
         /** Geometry for indexing: compile-time `geometry_` when set, else runtime field geometry. */
         constexpr int geom() const { return static_geometry ? static_cast<int>(geometry_) : geometry; }
 
-        FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        /** Bit-preserving copy of native storage. Avoid memcpy: floatfloat is a non-trivial class. */
+        template <int n>
+        __device__ __host__ static inline void copy_raw(store_t *dst, const array<store_t, n> &src)
+        {
+#pragma unroll
+          for (int j = 0; j < n; j++) dst[j] = src[j];
+        }
+
+        template <int n>
+        __device__ __host__ static inline void copy_raw(array<store_t, n> &dst, const store_t *src)
+        {
+#pragma unroll
+          for (int j = 0; j < n; j++) dst[j] = src[j];
+        }
+
+        struct storage_pointer_tag {
+        };
+
+        FloatNOrder(const GaugeField &u, Float *gauge_ = nullptr, Float **ghost_ = nullptr) :
+          FloatNOrder(u, reinterpret_cast<store_t *>(gauge_), reinterpret_cast<store_t **>(ghost_),
+                      storage_pointer_tag {})
+        {
+        }
+
+        template <typename T = store_t, std::enable_if_t<!std::is_same_v<T, Float>, int> = 0>
+        FloatNOrder(const GaugeField &u, store_t *gauge_, store_t **ghost_) :
+          FloatNOrder(u, gauge_, ghost_, storage_pointer_tag {})
+        {
+        }
+
+        FloatNOrder(const GaugeField &u, store_t *gauge_, store_t **ghost_, storage_pointer_tag) :
           reconstruct(u),
-          gauge(gauge_ ? gauge_ : u.data<Float *>()),
+          gauge(gauge_ ? gauge_ : u.data<store_t *>()),
           offset(u.Bytes() / (2 * sizeof(Float))),
           ghostExchange(u.GhostExchange()),
           volumeCB(u.VolumeCB()),
@@ -1669,10 +1700,10 @@ namespace quda {
           combined_scale([&]() {
             if constexpr (recon == 18) {
               // QUDA_RECONSTRUCT_NO: combine fixedInvMaxValue with reconstruct.scale
-              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value * reconstruct.scale : 1.0;
+              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value * reconstruct.scale : real(1.0);
             } else {
               // Other reconstruction types: only need fixedInvMaxValue (reconstruct.scale doesn't exist)
-              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value : 1.0;
+              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value : real(1.0);
             }
           }()),
           phase_scale(isFixed<Float>::value ? fixedInvMaxValue<Float>::value * static_cast<real>(2.0) :
@@ -1694,7 +1725,7 @@ namespace quda {
             R[i] = u.R()[i];
             ghost[i] = ghost_ ? ghost_[i] :
               (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && u.Order() == QUDA_NATIVE_GAUGE_ORDER) ?
-                                static_cast<Float *>(const_cast<void *>(u.Ghost()[i].data())) :
+                                static_cast<store_t *>(const_cast<void *>(u.Ghost()[i].data())) :
                                 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
@@ -1708,14 +1739,15 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
+          auto vecTmp = vector_load<store_t, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
+          auto vecTmp
+            = vector_load<store_t, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -1737,17 +1769,16 @@ namespace quda {
         for (int i = 0; i < M; i++) {
           // first load from memory
           auto vecTmp = vector_load<store_t, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
-          memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[i * N], vecTmp);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
-          memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[M * N], vecTmp);
         }
 
-        if constexpr (loadPhase)
-          memcpy(&v[M * N + Nrem], &gauge[parity * offset + phaseOffset + stride * dir + x], sizeof(store_t));
+        if constexpr (loadPhase) v[M * N + Nrem] = gauge[parity * offset + phaseOffset + stride * dir + x];
       }
 
       template <PrefetchType type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
@@ -1834,8 +1865,7 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           array<store_t, N> vecTmp;
-          // first do copy converting into storage type
-          memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[i * N]);
           // second do vectorized copy into memory
           vector_store(gauge, parity * offset + dir * (M * N) * stride, x + i * stride, vecTmp);
         }
@@ -1843,13 +1873,12 @@ namespace quda {
         // now save any remainder
         if constexpr (Nrem > 0) {
           array<store_t, Nrem> vecTmp;
-          memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[M * N]);
           // second do vectorized copy into memory
           vector_store(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x, vecTmp);
         }
 
-        if constexpr (hasPhase)
-          memcpy(&gauge[parity * offset + phaseOffset + dir * stride + x], &v[M * N + Nrem], sizeof(store_t));
+        if constexpr (hasPhase) gauge[parity * offset + phaseOffset + dir * stride + x] = v[M * N + Nrem];
       }
 
       /**
@@ -1861,19 +1890,17 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           auto vecTmp = vector_load<store_t, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx);
-          memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[i * N], vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<store_t, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
                                                    parity * faceVolumeCB[dir] + ghost_idx);
-          memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[M * N], vecTmp);
         }
 
         if constexpr (loadPhase)
-          memcpy(&v[M * N + Nrem],
-                 &ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
-                 sizeof(store_t));
+          v[M * N + Nrem] = ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx];
       }
 
       /**
@@ -1886,19 +1913,18 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           array<store_t, N> vecTmp;
-          memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[i * N]);
           vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx, vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           array<store_t, Nrem> vecTmp;
-          memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[M * N]);
           vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + ghost_idx, vecTmp);
         }
 
         if constexpr (hasPhase)
-          memcpy(&ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
-                 &v[M * N + Nrem], sizeof(store_t));
+          ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx] = v[M * N + Nrem];
       }
 
       /**
@@ -1924,7 +1950,7 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory into registers
-          auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
+          auto vecTmp = vector_load<store_t, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
@@ -1932,7 +1958,8 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
+            = vector_load<store_t, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
+                                         parity * faceVolumeCB[dir] + x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -1955,7 +1982,7 @@ namespace quda {
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          array<Float, N> vecTmp;
+          array<store_t, N> vecTmp;
           // first do copy converting into storage type
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
@@ -1965,7 +1992,7 @@ namespace quda {
 
         // now save any remainder
         if constexpr (Nrem > 0) {
-          array<Float, Nrem> vecTmp;
+          array<store_t, Nrem> vecTmp;
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
@@ -2019,8 +2046,9 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory
-          auto vecTmp = vector_load<Float, N>(ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
-                                              ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
+          auto vecTmp = vector_load<store_t, N>(
+            ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
+            ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
@@ -2029,8 +2057,9 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<Float, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
-                                       (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
+            = vector_load<store_t, Nrem>(
+              ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
+              (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
@@ -2062,7 +2091,7 @@ namespace quda {
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          array<Float, N> vecTmp;
+          array<store_t, N> vecTmp;
           // first do copy converting into storage type
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
@@ -2073,7 +2102,7 @@ namespace quda {
 
         // now save any remainder
         if constexpr (Nrem > 0) {
-          array<Float, Nrem> vecTmp;
+          array<store_t, Nrem> vecTmp;
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory

@@ -1008,91 +1008,98 @@ namespace quda
   };
 
 #ifdef QUDA_FPMP_FLOATFLOAT
-  template <> struct complex<floatfloat> : public floatfloat2 {
-  public:
-    typedef floatfloat value_type;
-
-    complex() = default;
-
-    constexpr complex(const floatfloat &re, const floatfloat &im = floatfloat(0)) : floatfloat2 {re, im} { }
-    constexpr complex(const floatfloat2 &z) : floatfloat2(z) { }
-
-    template <typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-    constexpr complex(const T &re) : floatfloat2 {static_cast<floatfloat>(re), floatfloat(0)}
-    {
-    }
-
-    template <typename T, typename U,
-              std::enable_if_t<std::is_arithmetic_v<T> || std::is_arithmetic_v<U>, int> = 0>
-    constexpr complex(const T &re, const U &im) :
-      floatfloat2 {static_cast<floatfloat>(re), static_cast<floatfloat>(im)}
-    {
-    }
-
-    template <typename X>
-    constexpr complex(const std::complex<X> &z) :
-      floatfloat2 {static_cast<floatfloat>(z.real()), static_cast<floatfloat>(z.imag())}
-    {
-    }
-
-    template <typename T> __device__ __host__ inline complex &operator=(const complex<T> &z)
-    {
-      real(static_cast<floatfloat>(z.real()));
-      imag(static_cast<floatfloat>(z.imag()));
-      return *this;
-    }
-
-    template <typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-    __device__ __host__ inline complex &operator=(const T &re)
-    {
-      real(static_cast<floatfloat>(re));
-      imag(floatfloat(0));
-      return *this;
-    }
-
-    __device__ __host__ inline complex &operator+=(const complex<floatfloat> &z)
-    {
-      real(real() + z.real());
-      imag(imag() + z.imag());
-      return *this;
-    }
-
-    __device__ __host__ inline complex &operator-=(const complex<floatfloat> &z)
-    {
-      real(real() - z.real());
-      imag(imag() - z.imag());
-      return *this;
-    }
-
-    __device__ __host__ inline complex &operator*=(const complex<floatfloat> &z)
-    {
-      *this = *this * z;
-      return *this;
-    }
-
-    __device__ __host__ inline complex &operator/=(const complex<floatfloat> &z)
-    {
-      *this = *this / z;
-      return *this;
-    }
-
-    __device__ __host__ inline complex &operator*=(const floatfloat &z)
-    {
-      x *= z;
-      y *= z;
-      return *this;
-    }
-
-    constexpr floatfloat real() const { return x; }
-    constexpr floatfloat imag() const { return y; }
-    __device__ __host__ inline void real(floatfloat re) { x = re; }
-    __device__ __host__ inline void imag(floatfloat im) { y = im; }
-
-    template <typename T> inline __host__ __device__ operator complex<T>() const
-    {
-      return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
-    }
+  // Declared for each concrete fp32mp2 accuracy rather than only for the bulk
+  // one, so that any accuracy may serve as the reduction type.  `floatfloat` is
+  // an alias for one of these three, so it is covered without a separate case.
+#define QUDA_FPMP_DECLARE_COMPLEX(FF, FF2)                                                                             \
+  template <> struct complex<FF> : public FF2 {                                                                        \
+  public:                                                                                                              \
+    typedef FF value_type;                                                                                             \
+                                                                                                                       \
+    complex() = default;                                                                                               \
+                                                                                                                       \
+    constexpr complex(const FF &re, const FF &im = FF(0)) : FF2 {re, im} { }                                           \
+    constexpr complex(const FF2 &z) : FF2(z) { }                                                                       \
+                                                                                                                       \
+    template <typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                          \
+    constexpr complex(const T &re) : FF2 {static_cast<FF>(re), FF(0)}                                                  \
+    {                                                                                                                  \
+    }                                                                                                                  \
+                                                                                                                       \
+    template <typename T, typename U, std::enable_if_t<std::is_arithmetic_v<T> || std::is_arithmetic_v<U>, int> = 0>   \
+    constexpr complex(const T &re, const U &im) : FF2 {static_cast<FF>(re), static_cast<FF>(im)}                       \
+    {                                                                                                                  \
+    }                                                                                                                  \
+                                                                                                                       \
+    template <typename X>                                                                                              \
+    constexpr complex(const std::complex<X> &z) : FF2 {static_cast<FF>(z.real()), static_cast<FF>(z.imag())}           \
+    {                                                                                                                  \
+    }                                                                                                                  \
+                                                                                                                       \
+    template <typename T> __device__ __host__ inline complex &operator=(const complex<T> &z)                           \
+    {                                                                                                                  \
+      real(static_cast<FF>(z.real()));                                                                                 \
+      imag(static_cast<FF>(z.imag()));                                                                                 \
+      return *this;                                                                                                    \
+    }                                                                                                                  \
+                                                                                                                       \
+    template <typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                          \
+    __device__ __host__ inline complex &operator=(const T &re)                                                         \
+    {                                                                                                                  \
+      real(static_cast<FF>(re));                                                                                       \
+      imag(FF(0));                                                                                                     \
+      return *this;                                                                                                    \
+    }                                                                                                                  \
+                                                                                                                       \
+    __device__ __host__ inline complex &operator+=(const complex<FF> &z)                                               \
+    {                                                                                                                  \
+      real(real() + z.real());                                                                                         \
+      imag(imag() + z.imag());                                                                                         \
+      return *this;                                                                                                    \
+    }                                                                                                                  \
+                                                                                                                       \
+    __device__ __host__ inline complex &operator-=(const complex<FF> &z)                                               \
+    {                                                                                                                  \
+      real(real() - z.real());                                                                                         \
+      imag(imag() - z.imag());                                                                                         \
+      return *this;                                                                                                    \
+    }                                                                                                                  \
+                                                                                                                       \
+    __device__ __host__ inline complex &operator*=(const complex<FF> &z)                                               \
+    {                                                                                                                  \
+      *this = *this * z;                                                                                               \
+      return *this;                                                                                                    \
+    }                                                                                                                  \
+                                                                                                                       \
+    __device__ __host__ inline complex &operator/=(const complex<FF> &z)                                               \
+    {                                                                                                                  \
+      *this = *this / z;                                                                                               \
+      return *this;                                                                                                    \
+    }                                                                                                                  \
+                                                                                                                       \
+    __device__ __host__ inline complex &operator*=(const FF &z)                                                        \
+    {                                                                                                                  \
+      x *= z;                                                                                                          \
+      y *= z;                                                                                                          \
+      return *this;                                                                                                    \
+    }                                                                                                                  \
+                                                                                                                       \
+    constexpr FF real() const { return x; }                                                                            \
+    constexpr FF imag() const { return y; }                                                                            \
+    __device__ __host__ inline void real(FF re) { x = re; }                                                            \
+    __device__ __host__ inline void imag(FF im) { y = im; }                                                            \
+                                                                                                                       \
+    template <typename T> inline __host__ __device__ operator complex<T>() const                                       \
+    {                                                                                                                  \
+      return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));                                               \
+    }                                                                                                                  \
   };
+
+  QUDA_FPMP_DECLARE_COMPLEX(floatfloat_low, floatfloat_low2)
+  QUDA_FPMP_DECLARE_COMPLEX(floatfloat_mid, floatfloat_mid2)
+  QUDA_FPMP_DECLARE_COMPLEX(floatfloat_high, floatfloat_high2)
+
+#undef QUDA_FPMP_DECLARE_COMPLEX
 #endif
 
 } // end namespace quda

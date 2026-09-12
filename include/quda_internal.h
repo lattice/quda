@@ -102,7 +102,7 @@ namespace quda {
 #ifdef QUDA_FPMP_FLOATFLOAT
   template <> inline double compute_epsilon<double>()
   {
-    return static_cast<double>(cuda::std::numeric_limits<floatfloat>::epsilon());
+    return static_cast<double>(cuda::std::numeric_limits<floatfloat_cccl_t<floatfloat>>::epsilon());
   }
 #endif
 

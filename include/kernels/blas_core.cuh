@@ -505,7 +505,7 @@ namespace quda
                                                                      const complex<real> &omega)
     {
       const complex<reduction_t> cdot {to_reduction_scalar(ar4[0]), to_reduction_scalar(ar4[1])};
-      const reduction_t scale = omega.real() / to_reduction_scalar(ar4[2]);
+      const reduction_t scale = static_cast<reduction_t>(omega.real()) / to_reduction_scalar(ar4[2]);
       const complex<reduction_t> alpha_r = {cdot.real() * scale, cdot.imag() * scale};
       return complex<real>(static_cast<real>(alpha_r.real()), static_cast<real>(alpha_r.imag()));
     }

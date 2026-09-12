@@ -121,6 +121,58 @@ namespace quda {
   template <> struct PromoteTypeId<int8_t, short> {
     typedef short type;
   };
+#ifdef QUDA_FPMP_FLOATFLOAT
+  // An fp32mp2 accuracy always wins against a narrower builtin type.  Declared
+  // per concrete accuracy so that a reduction accuracy differing from the bulk
+  // accuracy still promotes correctly.
+#define QUDA_FPMP_DECLARE_PROMOTE(FF)                                                                                  \
+  template <> struct PromoteTypeId<FF, double> {                                                                       \
+    using type = FF;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<double, FF> {                                                                       \
+    using type = FF;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<FF, float> {                                                                        \
+    using type = FF;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<float, FF> {                                                                        \
+    using type = FF;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<FF, short> {                                                                        \
+    using type = FF;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<short, FF> {                                                                        \
+    using type = FF;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<FF, int8_t> {                                                                       \
+    using type = FF;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<int8_t, FF> {                                                                       \
+    using type = FF;                                                                                                   \
+  };
+
+  QUDA_FPMP_DECLARE_PROMOTE(floatfloat_low)
+  QUDA_FPMP_DECLARE_PROMOTE(floatfloat_mid)
+  QUDA_FPMP_DECLARE_PROMOTE(floatfloat_high)
+
+#undef QUDA_FPMP_DECLARE_PROMOTE
+
+  // Between two fp32mp2 accuracies the more accurate one wins, so that mixing a
+  // low-accuracy field value with a higher-accuracy accumulator promotes up.
+#define QUDA_FPMP_DECLARE_PROMOTE_PAIR(LO, HI)                                                                         \
+  template <> struct PromoteTypeId<LO, HI> {                                                                           \
+    using type = HI;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct PromoteTypeId<HI, LO> {                                                                           \
+    using type = HI;                                                                                                   \
+  };
+
+  QUDA_FPMP_DECLARE_PROMOTE_PAIR(floatfloat_low, floatfloat_mid)
+  QUDA_FPMP_DECLARE_PROMOTE_PAIR(floatfloat_low, floatfloat_high)
+  QUDA_FPMP_DECLARE_PROMOTE_PAIR(floatfloat_mid, floatfloat_high)
+
+#undef QUDA_FPMP_DECLARE_PROMOTE_PAIR
+#endif
 
   /*
     Here we use traits to define the mapping between storage type and
@@ -136,9 +188,16 @@ namespace quda {
   template <> struct mapper<double> {
     using type = floatfloat;
   };
-  // mapper is also applied to already-mapped register types, so floatfloat maps to itself
-  template <> struct mapper<floatfloat> {
-    using type = floatfloat;
+  // mapper is also applied to already-mapped register types, so each fp32mp2
+  // accuracy maps to itself
+  template <> struct mapper<floatfloat_low> {
+    using type = floatfloat_low;
+  };
+  template <> struct mapper<floatfloat_mid> {
+    using type = floatfloat_mid;
+  };
+  template <> struct mapper<floatfloat_high> {
+    using type = floatfloat_high;
   };
 #else
   template<> struct mapper<double> { typedef double type; };
@@ -148,6 +207,36 @@ namespace quda {
   template <> struct mapper<int8_t> {
     typedef float type;
   };
+
+  /**
+     Map a precision tag to the scalar representation used by native
+     field-order storage.  Legacy field orders continue to use the
+     precision tag itself as their storage type.
+   */
+  template <typename T> struct native_store {
+    using type = T;
+  };
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct native_store<double> {
+    using type = floatfloat;
+  };
+#endif
+  template <typename T> using native_store_t = typename native_store<T>::type;
+
+  /**
+     Apply native_store only for native field orders.  Legacy orders
+     keep the caller-provided storage type (IEEE double for
+     QUDA_DOUBLE_PRECISION).
+   */
+  template <typename T, bool is_native> struct order_store {
+    using type = T;
+  };
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> struct order_store<double, true> {
+    using type = floatfloat;
+  };
+#endif
+  template <typename T, bool is_native> using order_store_t = typename order_store<T, is_native>::type;
 
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
@@ -178,6 +267,32 @@ namespace quda {
   template <> struct VectorType<double, 8> {
     typedef double8 type;
   };
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+  // floatfloat is an eight-byte pair, so use the same width containers as double.
+#define QUDA_FPMP_DECLARE_VECTOR_TYPE(FF)                                                                              \
+  template <> struct VectorType<FF, 1> {                                                                               \
+    using type = double;                                                                                               \
+  };                                                                                                                   \
+  template <> struct VectorType<FF, 2> {                                                                               \
+    using type = double2;                                                                                              \
+  };                                                                                                                   \
+  template <> struct VectorType<FF, 3> {                                                                               \
+    using type = double3;                                                                                              \
+  };                                                                                                                   \
+  template <> struct VectorType<FF, 4> {                                                                               \
+    using type = double4;                                                                                              \
+  };                                                                                                                   \
+  template <> struct VectorType<FF, 8> {                                                                               \
+    using type = double8;                                                                                              \
+  };
+
+  QUDA_FPMP_DECLARE_VECTOR_TYPE(floatfloat_low)
+  QUDA_FPMP_DECLARE_VECTOR_TYPE(floatfloat_mid)
+  QUDA_FPMP_DECLARE_VECTOR_TYPE(floatfloat_high)
+
+#undef QUDA_FPMP_DECLARE_VECTOR_TYPE
+#endif
 
   // single precision
   template <> struct VectorType<float, 1>{typedef float type; };
@@ -253,11 +368,11 @@ namespace quda {
     using type = doubledouble;
   };
 #ifdef QUDA_FPMP_FLOATFLOAT
-  template <> struct get_scalar<floatfloat> {
-    using type = floatfloat;
+  template <typename T> struct get_scalar<T, std::enable_if_t<is_floatfloat_v<T>>> {
+    using type = T;
   };
-  template <> struct get_scalar<floatfloat2> {
-    using type = floatfloat;
+  template <typename T> struct get_scalar<fpmp2_pair<T>> {
+    using type = T;
   };
 #endif
 #ifdef QUDA_USE_QUAD_SCALAR
@@ -272,8 +387,8 @@ namespace quda {
     using type = double;
   };
 #ifdef QUDA_FPMP_FLOATFLOAT
-  template <> struct get_scalar<complex<floatfloat>> {
-    using type = floatfloat;
+  template <typename T> struct get_scalar<complex<T>, std::enable_if_t<is_floatfloat_v<T>>> {
+    using type = T;
   };
 #endif
   template <> struct get_scalar<complex_t> {

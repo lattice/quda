@@ -842,17 +842,34 @@ if(QUDA_BACKWARDS)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 
+# floatfloat follows whatever QUDA_FPMP_FLOATFLOAT_ACCURACY the bulk uses, while
+# floatfloat_low/mid/high pin the reduction accuracy independently of the bulk.
+# That lets several builds of identical source be compared against each other.
 set(QUDA_REDUCTION_TYPE
     double
-    CACHE STRING "set the reduction computation type (double, doubledouble, floatfloat)")
-set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble floatfloat)
+    CACHE
+      STRING
+      "set the reduction computation type (double, doubledouble, floatfloat, floatfloat_low, floatfloat_mid, floatfloat_high)"
+)
+set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble floatfloat floatfloat_low floatfloat_mid
+                                                floatfloat_high)
 if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
   set(QUDA_REDUCTION_IS_DOUBLEDOUBLE 1)
-elseif(QUDA_REDUCTION_TYPE STREQUAL "floatfloat")
+elseif(QUDA_REDUCTION_TYPE MATCHES "^floatfloat")
   if(NOT QUDA_FPMP_FLOATFLOAT)
-    message(FATAL_ERROR "QUDA_REDUCTION_TYPE=floatfloat requires QUDA_FPMP_FLOATFLOAT=ON")
+    message(FATAL_ERROR "QUDA_REDUCTION_TYPE=${QUDA_REDUCTION_TYPE} requires QUDA_FPMP_FLOATFLOAT=ON")
   endif()
   set(QUDA_REDUCTION_IS_FLOATFLOAT 1)
+
+  # Record the effective reduction accuracy so that host code and tests can key
+  # off it without having to re-derive it from the bulk accuracy.
+  if(QUDA_REDUCTION_TYPE STREQUAL "floatfloat")
+    set(QUDA_REDUCTION_FLOATFLOAT_ACCURACY ${QUDA_FPMP_FLOATFLOAT_ACCURACY})
+  else()
+    string(REPLACE "floatfloat_" "" QUDA_REDUCTION_FLOATFLOAT_ACCURACY ${QUDA_REDUCTION_TYPE})
+  endif()
+  string(TOUPPER ${QUDA_REDUCTION_FLOATFLOAT_ACCURACY} QUDA_REDUCTION_FLOATFLOAT_ACCURACY)
+  set(QUDA_REDUCTION_FLOATFLOAT_ACCURACY_${QUDA_REDUCTION_FLOATFLOAT_ACCURACY} 1)
 endif()
 
 set(QUDA_REDUCTION_ALGORITHM

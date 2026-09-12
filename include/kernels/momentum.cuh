@@ -107,7 +107,8 @@ namespace quda {
         makeAntiHerm(f);
 
         // compute force norms
-        norm = operator()(norm, {f.L1(), f.L2()});
+        const reduce_t force_norm {static_cast<reduction_t>(f.L1()), static_cast<reduction_t>(f.L2())};
+        norm = operator()(norm, force_norm);
 
         m = m + arg.coeff * f;
 

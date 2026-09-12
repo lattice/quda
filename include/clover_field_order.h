@@ -435,11 +435,12 @@ namespace quda {
        deploy for a specifc field ordering, the two operator()
        accessors have to be specialized for that ordering.
      */
-    template <typename Float, int nColor, int nSpin, QudaCloverFieldOrder order, typename storeFloat = Float>
+    template <typename Float, int nColor, int nSpin, QudaCloverFieldOrder order, typename storeFloat_ = Float>
       struct FieldOrder {
 
       /** Does this field type support ghost zones? */
       static constexpr bool supports_ghost_zone = false;
+      using storeFloat = order_store_t<storeFloat_, order == QUDA_NATIVE_CLOVER_ORDER>;
 
     protected:
       /** An internal reference to the actual field we are accessing */
@@ -577,6 +578,7 @@ namespace quda {
       struct FloatNOrder {
         static constexpr bool enable_reconstruct = enable_reconstruct_;
         using Accessor = FloatNOrder<Float, length, add_rho, enable_reconstruct>;
+        using store_t = native_store_t<Float>;
         using real = typename mapper<Float>::type;
         typedef float norm_type;
         static constexpr int Ns = 4;
@@ -590,7 +592,7 @@ namespace quda {
         static constexpr int M = (compressed_block + N - 1) / N; /** number of short vectors per chiral block we need to read */
         static constexpr int M_offset = compressed_block / N;    /** the block offset that contains the second chiral block */
         static constexpr int Nrem = compressed_block % N; /** the remainder of the chiral block not divisible by N */
-        Float *clover;
+        store_t *clover;
         norm_type nrm;
         norm_type nrm_inv;
 
@@ -634,7 +636,8 @@ namespace quda {
             errorQuda("%p max_element(%d) appears unset", &clover, is_inverse);
 #endif
           if (clover.Diagonal() == 0.0 && clover.Reconstruct()) errorQuda("%p diagonal appears unset", &clover);
-          this->clover = clover_ ? clover_ : clover.data<Float *>(is_inverse);
+          this->clover
+            = clover_ ? reinterpret_cast<store_t *>(clover_) : clover.data<store_t *>(is_inverse);
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
@@ -671,7 +674,8 @@ namespace quda {
 #pragma unroll
           for (int i = 0; i < M; i++) {
             // first load from memory
-            auto vecTmp = vector_load<Float, N>(clover, parity * offset + x + volumeCB * (chirality * M_offset + i));
+            auto vecTmp
+              = vector_load<store_t, N>(clover, parity * offset + x + volumeCB * (chirality * M_offset + i));
 
             // second do copy converting into register type
             copy_and_scale(&tmp[i * N], vecTmp, nrm);
@@ -721,17 +725,17 @@ namespace quda {
 
 #pragma unroll
           for (int i = 0; i < M_offset; i++) {
-            array<Float, N> vecTmp;
+            array<store_t, N> vecTmp;
             // first do copy converting into storage type
-            copy_and_scale<Float, real, N>(vecTmp, v + chirality * Nrem + i * N, nrm_inv);
+            copy_and_scale<store_t, real, N>(vecTmp, v + chirality * Nrem + i * N, nrm_inv);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + volumeCB * (chirality * M + i), vecTmp);
           }
 
           if constexpr (Nrem) {
-            array<Float, Nrem> vecTmp;
+            array<store_t, Nrem> vecTmp;
             // first do copy converting into storage type
-            copy_and_scale<Float, real, Nrem>(vecTmp, v + (1 - chirality) * M_offset * N, nrm_inv);
+            copy_and_scale<store_t, real, Nrem>(vecTmp, v + (1 - chirality) * M_offset * N, nrm_inv);
 
             auto *ptr = clover + (parity * offset + x) * N + volumeCB * (M_offset * N) + chirality * Nrem;
             vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory

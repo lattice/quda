@@ -453,6 +453,16 @@ namespace quda
         return colorspinor::get_vector_order<double>(4);
     }
 
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> constexpr int n_vector<floatfloat, true>(int nSpin, int site_unroll)
+    {
+      if (site_unroll)
+        return nSpin == 4 ? colorspinor::get_vector_order<double>(24) : colorspinor::get_vector_order<double>(6);
+      else
+        return colorspinor::get_vector_order<double>(4);
+    }
+#endif
+
     template <> constexpr int n_vector<float, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
@@ -547,10 +557,14 @@ namespace quda
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-        // always instantiate the double-precision template to allow CPU
-        // fields through, and prevent double-precision GPU
-        // instantiation using gpu_mapper
-        instantiate<Functor, Blas, T, x_store_t, double>(a, b, c, x, y, args...);
+        // Native double-precision CUDA fields use floatfloat storage when enabled.
+        // Legacy and CPU field orders retain IEEE-double storage.
+#ifdef QUDA_FPMP_FLOATFLOAT
+        if (y.Location() == QUDA_CUDA_FIELD_LOCATION && y.isNative())
+          instantiate<Functor, Blas, T, x_store_t, floatfloat>(a, b, c, x, y, args...);
+        else
+#endif
+          instantiate<Functor, Blas, T, x_store_t, double>(a, b, c, x, y, args...);
 
       } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
@@ -585,10 +599,14 @@ namespace quda
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-        // always instantiate the double-precision template to allow CPU
-        // fields through, and prevent double-precision GPU
-        // instantiation using double_mapper
-        instantiate<Functor, Blas, mixed, T, double>(a, b, c, x_, args...);
+        // Native double-precision CUDA fields use floatfloat storage when enabled.
+        // Legacy and CPU field orders retain IEEE-double storage.
+#ifdef QUDA_FPMP_FLOATFLOAT
+        if (x.Location() == QUDA_CUDA_FIELD_LOCATION && x.isNative())
+          instantiate<Functor, Blas, mixed, T, floatfloat>(a, b, c, x_, args...);
+        else
+#endif
+          instantiate<Functor, Blas, mixed, T, double>(a, b, c, x_, args...);
       } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
           instantiate<Functor, Blas, mixed, T, float>(a, b, c, x_, args...);
@@ -640,6 +658,11 @@ namespace quda
       instantiated to reduce template bloat.
      */
     template <typename T> struct host_type_mapper { using type = T; };
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> struct host_type_mapper<floatfloat> {
+      using type = double;
+    };
+#endif
     template <> struct host_type_mapper<short> {
 #if QUDA_PRECISION & 4
       using type = float;

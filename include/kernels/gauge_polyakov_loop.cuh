@@ -230,7 +230,9 @@ namespace quda {
 
       // accumulate trace
       auto tr = getTrace( polyloop );
-      return operator()(value, {tr.real(), tr.imag()});
+      using site_scalar = typename Arg::real;
+      const array<site_scalar, 2> trace {tr.real(), tr.imag()};
+      return operator()(value, trace);
     }
 
   };

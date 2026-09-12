@@ -405,7 +405,7 @@ namespace quda
 #endif
 
 #if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
-  template <> void comm_allreduce_max<std::vector<deviation_t<floatfloat>>>(std::vector<deviation_t<floatfloat>> &a)
+  template <> void comm_allreduce_max<std::vector<deviation_t<reduction_t>>>(std::vector<deviation_t<reduction_t>> &a)
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }

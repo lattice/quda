@@ -201,7 +201,8 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
+      using reduce_scalar = typename reduce_t::value_type;
+      data[0] = static_cast<reduce_scalar>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
       //2
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, linkIndexM1(x, arg.X, mu), 1 - parity);
@@ -223,7 +224,7 @@ namespace quda {
       arg.delta[idx + 5 * arg.volume] = delta(2,2);
 
       //12
-      data[1] = getRealTraceUVdagger(delta, delta);
+      data[1] = static_cast<reduce_scalar>(getRealTraceUVdagger(delta, delta));
 
       //35
       //T=36*gauge_dir+65

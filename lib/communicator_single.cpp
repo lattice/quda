@@ -101,12 +101,12 @@ namespace quda
 #endif
 
 #if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
-  template <> void Communicator::comm_allreduce_sum_array<floatfloat>(floatfloat *, size_t) { }
+  template <> void Communicator::comm_allreduce_sum_array<reduction_t>(reduction_t *, size_t) { }
 
-  template <> void Communicator::comm_allreduce_max_array<floatfloat>(floatfloat *, size_t) { }
+  template <> void Communicator::comm_allreduce_max_array<reduction_t>(reduction_t *, size_t) { }
 
   template <>
-  void Communicator::comm_allreduce_max_array<deviation_t<floatfloat>>(deviation_t<floatfloat> *, size_t)
+  void Communicator::comm_allreduce_max_array<deviation_t<reduction_t>>(deviation_t<reduction_t> *, size_t)
   {
   }
 #endif
