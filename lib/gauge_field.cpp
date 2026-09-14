@@ -457,8 +457,12 @@ namespace quda {
 
       qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
 
+#ifndef MNNVL_COMMS
       // record the event
       qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+#else
+      qudaStreamSynchronize(stream);
+#endif
       // send to the neighboring processor
       comm_start(mh_send_p2p[bufferIndex][dim][dir]);
     }
