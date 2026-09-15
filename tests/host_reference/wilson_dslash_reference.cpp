@@ -69,7 +69,7 @@ template <typename real_t> struct DslashReference {
       }
     }
 
-#pragma omp parallel for
+    //#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
 
       for (int dir = 0; dir < 8; dir++) {
