@@ -586,7 +586,7 @@ namespace quda {
   */
   void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
                           const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
-                          const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+                          const std::vector<real_t> &coeff, const std::vector<array<real_t, 2>> &epsilon,
                           double sigma_coeff, bool detratio, bool trlog, bool rhmc, QudaInvertParam &param);
 
   /**
