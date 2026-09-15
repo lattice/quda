@@ -19,17 +19,15 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
-    static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type F;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool distance_pc = distance_pc_;
-    static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     template <bool shifted>
-    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, ghost, false,
                                     QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
 
     typedef typename mapper<Float>::type real;
@@ -48,16 +46,16 @@ namespace quda
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_WILSON;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-              const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
-              const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
+              const GaugeField &U, real_t a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+              const int *comm_override, real_t alpha0 = 0.0, int t0 = -1) :
       DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, spin_project,
                                     comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
       Uback(dslash_double_store() ? U.shift(1) : U),
-      a(a),
-      alpha0(alpha0),
+      a(static_cast<real>(a)),
+      alpha0(static_cast<real>(alpha0)),
       t0(t0)
     {
       for (auto i = 0u; i < out.size(); i++) {

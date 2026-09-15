@@ -14,7 +14,7 @@ namespace quda
     static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
     static constexpr int n_flavor = doublet ? 2 : 1;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, false, false, true>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, false, true>::type;
 
     const unsigned int n_rhs;
 
@@ -25,7 +25,7 @@ namespace quda
     array_2d<real, MAX_MULTI_RHS, 2> coeff;
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
-                        cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff_) :
+                        cvector_ref<const ColorSpinorField> &inB, const std::vector<array<real_t, 2>> &coeff_) :
       kernel_param(dim3(oprod.VolumeCB(), 2, 6)), n_rhs(inA.size()), oprod(oprod), volume_4d_cb(inA.VolumeCB() / 2)
     {
       for (auto i = 0u; i < n_rhs; i++) {

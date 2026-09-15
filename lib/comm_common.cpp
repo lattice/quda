@@ -137,7 +137,7 @@ namespace quda
     return topo;
   }
 
-  void comm_abort(int status)
+  [[noreturn]] void comm_abort(int status)
   {
 #ifdef HOST_DEBUG
   raise(SIGABRT);

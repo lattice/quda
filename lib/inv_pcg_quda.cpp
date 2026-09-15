@@ -99,7 +99,7 @@ namespace quda
   }
 
   void PCG::solve_and_collect(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
-                              cvector_ref<ColorSpinorField> &v_r, int collect_miniter, double collect_tol)
+                              cvector_ref<ColorSpinorField> &v_r, int collect_miniter, real_t collect_tol)
   {
     if (K) K->train_param(*this, b[0]);
 
@@ -134,7 +134,7 @@ namespace quda
       }
     }
 
-    double Anorm = 0.0;
+    real_t Anorm = 0.0;
 
     // for alternative reliable updates
     if (alternative_reliable) {
@@ -144,7 +144,7 @@ namespace quda
     }
 
     // compute initial residual
-    vector<double> r2(b.size(), 0.0);
+    vector<real_t> r2(b.size(), 0.0);
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // Compute r = b - A * x
       mat(r, x);
@@ -192,18 +192,18 @@ namespace quda
     auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     auto stop_hq = std::vector(b.size(), param.tol_hq);
 
-    std::vector<double> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    std::vector<real_t> heavy_quark_res(b.size(), 0.0); // heavy quark residual
     if (use_heavy_quark_res) {
       auto hq = HeavyQuarkResidualNorm(x, r);
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
     }
 
-    std::vector<double> beta(b.size(), 0.0);
-    std::vector<double> pAp(b.size(), 0.0);
-    std::vector<double> rMinvr(b.size(), 0.0);
-    std::vector<double> rMinvr_old(b.size(), 0.0);
-    std::vector<double> r_new_Minvr_old(b.size(), 0.0);
-    std::vector<double> r2_old(b.size(), 0.0);
+    std::vector<real_t> beta(b.size(), 0.0);
+    std::vector<real_t> pAp(b.size(), 0.0);
+    std::vector<real_t> rMinvr(b.size(), 0.0);
+    std::vector<real_t> rMinvr_old(b.size(), 0.0);
+    std::vector<real_t> r_new_Minvr_old(b.size(), 0.0);
+    std::vector<real_t> r2_old(b.size(), 0.0);
 
     if (K) { rMinvr = reDotProduct(r_sloppy, minvr_sloppy); }
 
@@ -241,7 +241,7 @@ namespace quda
     };
 
     auto get_alpha = [](std::vector<XUpdateBatch> &x_update_batch) {
-      vector<double> alpha;
+      vector<real_t> alpha;
       alpha.reserve(x_update_batch.size());
       for (auto &x : x_update_batch) alpha.push_back(x.get_current_alpha());
       return alpha;
@@ -255,8 +255,8 @@ namespace quda
       // alternative reliable updates,
       if (alternative_reliable) {
         auto pAppp = blas::cDotProductNormA(p, Ap);
-        for (auto i = 0u; i < b.size(); i++) pAp[i] = pAppp[i].x;
-        ru.update_ppnorm(pAppp[0].z);
+        for (auto i = 0u; i < b.size(); i++) pAp[i] = pAppp[i][0];
+        ru.update_ppnorm(pAppp[0][2]);
       } else {
         pAp = reDotProduct(p, Ap);
       }
@@ -268,10 +268,10 @@ namespace quda
       // r --> r - alpha*A*p
       r2_old = r2;
 
-      vector<double> sigma(b.size());
+      vector<real_t> sigma(b.size());
       for (auto i = 0u; i < b.size(); i++) {
-        r2[i] = cg_norm[i].x;
-        sigma[i] = cg_norm[i].y >= 0.0 ? cg_norm[i].y : r2[i]; // use r2 if (r_k+1, r_k-1 - r_k) breaks
+        r2[i] = cg_norm[i][0];
+        sigma[i] = cg_norm[i][1] >= 0.0 ? cg_norm[i][1] : r2[i]; // use r2 if (r_k+1, r_k-1 - r_k) breaks
       }
 
       if (K) rMinvr_old = rMinvr;
@@ -347,7 +347,7 @@ namespace quda
         zero(x_sloppy);
 
         bool L2breakdown = false;
-        double L2breakdown_eps = 0;
+        real_t L2breakdown_eps = 0;
         if (ru.reliable_break(r2[0], stop[0], L2breakdown, L2breakdown_eps)) { break; }
 
         ru.update_norm(r2[0], y[0]);

@@ -16,14 +16,15 @@
 
 namespace quda
 {
+
   // Thick Restarted Lanczos Method constructor
   TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : EigenSolver(mat, eig_param)
   {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
-    alpha.resize(n_kr, 0.0);
-    beta.resize(n_kr, 0.0);
+    alpha.resize(n_kr, real_t(0.0));
+    beta.resize(n_kr, real_t(0.0));
 
     // Thick restart specific checks
     if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than or equal to n_ev+6=%d\n", n_kr, n_ev + 6);
@@ -36,7 +37,7 @@ namespace quda
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
+  void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     // Override any user input for block size.
     block_size = 1;
@@ -63,8 +64,8 @@ namespace quda
     checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
-    double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0].Precision());
+    real_t mat_norm = 0.0;
+    real_t epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -86,16 +87,22 @@ namespace quda
 
       // The eigenvalues are returned in the alpha array
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+        logQuda(QUDA_DEBUG_VERBOSE, "TRLM before eigensolveFromArrowMat: restart=%d num_locked=%d num_keep=%d n_kr=%d\n",
+                restart_iter, num_locked, num_keep, n_kr);
+        for (int i = num_locked; i < std::min(n_kr, num_locked + 8); i++)
+          logQuda(QUDA_DEBUG_VERBOSE, "  alpha[%d] = %+.16e beta[%d] = %+.16e\n", i, alpha[i], i, beta[i]);
+      }
       eigensolveFromArrowMat();
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated and used for LR
       for (int i = num_locked; i < n_kr; i++)
-        if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+        if (quda::fabs(alpha[i]) > mat_norm) mat_norm = quda::fabs(alpha[i]);
 
       // Lambda that returns mat_norm for LR and returns the relevant alpha
       // (the corresponding Ritz value) for SR
-      auto check_norm = [&](double sr_norm) -> double {
+      auto check_norm = [&](real_t sr_norm) -> real_t {
         if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
           return mat_norm;
         else
@@ -210,15 +217,20 @@ namespace quda
     int start = (j > num_keep) ? j - 1 : 0;
 
     if (j - start > 0) {
-      std::vector<double> beta_ = {beta.begin() + start, beta.begin() + j};
+      std::vector<real_t> beta_ = {beta.begin() + start, beta.begin() + j};
       for (auto & bi : beta_) bi = -bi;
 
       // r = r - b_{j-1} * v_{j-1}
       blas::block::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
     }
 
-    // Orthogonalise r against the Krylov space
-    for (int k = 0; k < 1; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + 1);
+    // Orthogonalise r against the Krylov space. Two Gram-Schmidt passes
+    // ("twice is enough"): a single pass is only marginally stable and, for
+    // ill-conditioned operators (e.g. twisted-mass norm-op), loses orthogonality
+    // and lets the Chebyshev recurrence blow up. This is precision sensitive and
+    // surfaced in the quad build, where the (more accurate) reductions follow a
+    // trajectory the single-pass scheme could not keep orthogonal.
+    for (int k = 0; k < 2; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + 1);
 
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(r[0]));
@@ -262,8 +274,8 @@ namespace quda
     int arrow_pos = num_keep - num_locked;
 
     // Eigen objects
-    MatrixXd A = MatrixXd::Zero(dim, dim);
-    ritz_mat.resize(dim * dim, 0.0);
+    MatrixX A = MatrixX::Zero(dim, dim);
+    ritz_mat.resize(dim * dim, real_t(0.0));
 
     // Invert the spectrum due to chebyshev
     if (reverse) {
@@ -295,16 +307,31 @@ namespace quda
       A(i + 1, i) = beta[i + num_locked];
     }
 
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+      logQuda(QUDA_DEBUG_VERBOSE, "TRLM arrow matrix: dim=%d arrow_pos=%d num_locked=%d num_keep=%d reverse=%d\n", dim,
+              arrow_pos, num_locked, num_keep, (int)reverse);
+      for (int b = 0; b < std::min(dim, 4); b++) {
+        for (int c = 0; c < std::min(dim, 4); c++) {
+          logQuda(QUDA_DEBUG_VERBOSE, "  A(%d,%d) = %+.16e\n", b, c, A(b, c));
+        }
+      }
+    }
+
     // Eigensolve the arrow matrix
-    SelfAdjointEigenSolver<MatrixXd> eigensolver;
+    SelfAdjointEigenSolver<MatrixX> eigensolver;
     eigensolver.compute(A);
+
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE && restart_iter < 2) {
+      for (int i = 0; i < std::min(dim, 4); i++)
+        logQuda(QUDA_DEBUG_VERBOSE, "  eigenvalue[%d] = %+.16e\n", i, eigensolver.eigenvalues()[i]);
+    }
 
     // repopulate ritz matrix
     for (int i = 0; i < dim; i++)
       for (int j = 0; j < dim; j++) ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
 
     for (int i = 0; i < dim; i++) {
-      residua[i + num_locked] = fabs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
+      residua[i + num_locked] = quda::fabs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
       // Update the alpha array
       alpha[i + num_locked] = eigensolver.eigenvalues()[i];
     }
@@ -323,7 +350,7 @@ namespace quda
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    std::vector<double> ritz_mat_keep(dim * iter_keep);
+    std::vector<real_t> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }

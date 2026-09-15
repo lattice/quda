@@ -17,6 +17,6 @@ namespace quda
     };
   } // namespace gauge
 
-  inline gauge::tensor_desc_t get_tensor_descriptor(const GaugeField &, uint32_t) { return gauge::tensor_desc_t {}; }
+  inline gauge::tensor_desc_t get_tensor_descriptor(const GaugeField &, uint32_t) { return {}; }
 
 } // namespace quda

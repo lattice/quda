@@ -18,7 +18,7 @@ namespace quda
 
   template WilsonCloverPreconditionedApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::WilsonCloverPreconditionedApply(
     cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
-    const GaugeField &U, const CloverField &A, double a, double alpha0, int t0, int parity, bool dagger,
+    const GaugeField &U, const CloverField &A, real_t a, real_t alpha0, int t0, int parity, bool dagger,
     const int *comm_override, DistanceType<false>, TimeProfile &profile);
 
 } // namespace quda

@@ -37,7 +37,7 @@ namespace quda
   }
 
   void DiracStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
-                                    cvector_ref<const ColorSpinorField> &, double) const
+                                    cvector_ref<const ColorSpinorField> &, real_t) const
   {
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
@@ -154,8 +154,8 @@ namespace quda
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
   }
 
-  void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
-                                        double, bool) const
+  void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass, real_t,
+                                        real_t, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");

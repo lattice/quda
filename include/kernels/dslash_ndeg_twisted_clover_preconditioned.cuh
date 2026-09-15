@@ -25,16 +25,16 @@ namespace quda
 
     NdegTwistedCloverPreconditionedArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                        const ColorSpinorField &halo, const GaugeField &U, const CloverField &A,
-                                       double a, double b, double c, bool xpay, cvector_ref<const ColorSpinorField> &x,
+                                       real_t a, real_t b, real_t c, bool xpay, cvector_ref<const ColorSpinorField> &x,
                                        int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
                                                           comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-      a(a),
-      b(dagger ? -0.5 * b : 0.5 * b), // if dagger flip the chiral twist
-      c(0.5 * c),
-      b2_minus_c2(0.25 * (b * b - c * c))
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -0.5 * b : 0.5 * b)), // if dagger flip the chiral twist
+      c(static_cast<real>(0.5 * c)),
+      b2_minus_c2(static_cast<real>(0.25 * (b * b - c * c)))
     {
       checkPrecision(U, A);
       checkLocation(U, A);

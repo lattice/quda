@@ -5,8 +5,6 @@
 namespace quda
 {
 
-  // using namespace quda;
-
   DECLARE_ENUM(DD, // name of the enum class
 
                reset, // No domain decomposition. It sets all flags to zero.

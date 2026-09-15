@@ -4,16 +4,16 @@
 #include <tunable_nd.h>
 #include <kernels/reduce_init.cuh>
 
-// These are used for reduction kernels
-static device_reduce_t *d_reduce = nullptr;
-static device_reduce_t *h_reduce = nullptr;
-static device_reduce_t *hd_reduce = nullptr;
-
-static count_t *reduce_count = nullptr;
-static qudaEvent_t reduceEnd;
-
 namespace quda
 {
+
+  // These are used for reduction kernels
+  static device_reduce_t *d_reduce = nullptr;
+  static device_reduce_t *h_reduce = nullptr;
+  static device_reduce_t *hd_reduce = nullptr;
+
+  static count_t *reduce_count = nullptr;
+  static qudaEvent_t reduceEnd;
 
   namespace reducer
   {
@@ -27,6 +27,20 @@ namespace quda
     static size_t allocated_bytes = 0;
     static int allocated_n_reduce = 0;
     static bool init_event = false;
+
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+    static bool init_rfa = false;
+    static reproducible::RFA_bins<reduction_t> bins;
+
+    reproducible::RFA_bins<reduction_t> &get_rfa_bins()
+    {
+      if (!init_rfa) {
+        bins.initialize_bins();
+        init_rfa = true;
+      }
+      return bins;
+    }
+#endif
 
     template <typename T>
     struct init_reduce : public TunableKernel1D {
@@ -67,7 +81,7 @@ namespace quda
         using system_atomic_t = device_reduce_t;
         size_t n_reduce = bytes / sizeof(system_atomic_t);
         auto *atomic_buf = reinterpret_cast<system_atomic_t *>(h_reduce);
-        for (size_t i = 0; i < n_reduce; i++) new (atomic_buf + i) system_atomic_t {0}; // placement new constructor
+        for (size_t i = 0; i < n_reduce; i++) new (atomic_buf + i) system_atomic_t {}; // placement new constructor
 
         allocated_bytes = bytes;
       }

@@ -9,19 +9,14 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon>
   class QCharge : TunableReduction2D {
     const GaugeField &Fmunu;
-    double *energy;
-    double &qcharge;
+    array<real_t, 3> &energy;
+    real_t &qcharge;
     void *qdensity;
     bool density;
 
   public:
-    QCharge(const GaugeField &Fmunu, double energy[3], double &qcharge, void *qdensity, bool density) :
-      TunableReduction2D(Fmunu),
-      Fmunu(Fmunu),
-      energy(energy),
-      qcharge(qcharge),
-      qdensity(qdensity),
-      density(density)
+    QCharge(const GaugeField &Fmunu, array<real_t, 3> &energy, real_t &qcharge, void *qdensity, bool density) :
+      TunableReduction2D(Fmunu), Fmunu(Fmunu), energy(energy), qcharge(qcharge), qdensity(qdensity), density(density)
     {
       if (!Fmunu.isNative()) errorQuda("Topological charge only supported on native ordered fields");
       apply(device::get_default_stream());
@@ -33,16 +28,17 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      typename Arg<>::reduce_t result{};
+      array<real_t, 3> result {};
       if (!density) {
-        Arg<false> arg(Fmunu, static_cast<Float*>(qdensity));
+        Arg<false> arg(Fmunu, static_cast<Float *>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       } else {
-        Arg<true> arg(Fmunu, static_cast<Float*>(qdensity));
+        Arg<true> arg(Fmunu, static_cast<Float *>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       }
 
-      for (int i=0; i<2; i++) energy[i+1] = result[i] / (Fmunu.Volume() * comm_size());
+      const auto vol = Fmunu.Volume() * comm_size();
+      for (int i = 0; i < 2; i++) energy[i + 1] = result[i] / vol;
       energy[0] = energy[1] + energy[2];
       qcharge = result[2];
     }
@@ -60,18 +56,22 @@ namespace quda
     long long bytes() const { return Fmunu.Bytes() + Fmunu.Volume() * (density * Fmunu.Precision()); }
   }; // QChargeCompute
 
-  void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
+  real_t computeQCharge(array<real_t, 3> &energy, const GaugeField &Fmunu)
   {
+    real_t qcharge;
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    return qcharge;
   }
 
-  void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu)
+  real_t computeQChargeDensity(array<real_t, 3> &energy, void *qdensity, const GaugeField &Fmunu)
   {
+    real_t qcharge;
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    return qcharge;
   }
 
 } // namespace quda

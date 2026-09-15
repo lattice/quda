@@ -64,10 +64,10 @@ namespace quda
     } // init
   }
 
-  void CAGCR::solve(std::vector<Complex> &psi_, cvector_ref<ColorSpinorField> &q, ColorSpinorField &b)
+  void CAGCR::solve(std::vector<complex_t> &psi_, cvector_ref<ColorSpinorField> &q, ColorSpinorField &b)
   {
-    typedef Matrix<Complex, Dynamic, Dynamic> matrix;
-    typedef Matrix<Complex, Dynamic, 1> vector;
+    typedef Matrix<complex_t, Dynamic, Dynamic> matrix;
+    typedef Matrix<complex_t, Dynamic, 1> vector;
 
     const int N = q.size();
     vector phi(N), psi(N);
@@ -78,7 +78,7 @@ namespace quda
     // compute rhs vector phi = Q* b = (q_i, b)
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-    std::vector<Complex> A_(N * (N + 1));
+    std::vector<complex_t> A_(N * (N + 1));
 
     blas::block::cDotProduct(A_, q, {q, b});
     for (int i = 0; i < N; i++) {
@@ -88,12 +88,12 @@ namespace quda
 #else
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
-    std::vector<Complex> phi_(N);
+    std::vector<complex_t> phi_(N);
     blas::block::cDotProduct(phi_, q, b);
     for (int i = 0; i < N; i++) phi(i) = phi_[i];
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-    std::vector<Complex> A_(N * N);
+    std::vector<complex_t> A_(N * N);
     blas::block::hDotProduct(A_, q, q);
     for (int i = 0; i < N; i++)
       for (int j = 0; j < N; j++) A(i, j) = A_[i * N + j];
@@ -146,8 +146,8 @@ namespace quda
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
-    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<double>(b.size(), 1.0);
-    std::vector<double> r2(b.size(), 0.0); // if zero source then we will exit immediately doing no work
+    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<real_t>(b.size(), 1.0);
+    std::vector<real_t> r2(b.size(), 0.0); // if zero source then we will exit immediately doing no work
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
@@ -234,8 +234,8 @@ namespace quda
     }
 
     // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    real_t m_map = 2. / (lambda_max - lambda_min);
+    real_t b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (is_zero_src(x, b, b2)) {
@@ -254,10 +254,10 @@ namespace quda
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    std::vector<double> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    std::vector<real_t> heavy_quark_res(b.size(), 0.0); // heavy quark residual
     if (use_heavy_quark_res) {
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
     }
 
     int resIncrease = 0;
@@ -335,7 +335,7 @@ namespace quda
 
         if (use_heavy_quark_res) {
           auto hq = blas::HeavyQuarkResidualNorm(x, r);
-          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
         }
 
         // break-out check if we have reached the limit of the precision
@@ -382,7 +382,7 @@ namespace quda
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
       for (auto i = 0u; i < b.size(); i++) {
         param.true_res[i] = sqrt(true_r2[i] / b2[i]);
-        param.true_res_hq[i] = sqrt(hq[i].z);
+        param.true_res_hq[i] = sqrt(hq[i][2]);
       }
     }
 

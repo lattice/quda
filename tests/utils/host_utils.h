@@ -8,6 +8,8 @@
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
+#include "host_rng.hpp"
+
 constexpr size_t gauge_site_size = 18;      // real numbers per link
 constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
 constexpr size_t stag_spinor_site_size = 6; // real numbers per staggered 'spinor'
@@ -43,7 +45,7 @@ extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
 // Host hypercubic RNG
-extern std::vector<std::mt19937_64> host_rand;
+extern std::vector<host_rng_t> host_rand;
 
 // Determine if we're running in multi-GPU mode
 constexpr bool is_multi_gpu()

@@ -116,7 +116,7 @@ namespace quda {
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     } else if (geometry == QUDA_KDINVERSE_GEOMETRY) {
       real_length = (1 << nDim) * volume * nInternal;
-      length = 2 * (1 << nDim) * nDim * stride * nInternal; // two comes from being full lattice
+      length = 2 * (1 << nDim) * stride * nInternal; // two comes from being full lattice
     }
 
     switch (geometry) {
@@ -577,8 +577,11 @@ namespace quda {
     } else { // cpu field
       void *send[2 * QUDA_MAX_DIM];
       for (int d = 0; d < nDim; d++) {
-        send[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
-        if (geometry == QUDA_COARSE_GEOMETRY) send[d + 4] = safe_malloc(nFace * surface[d] * nInternal * precision);
+        // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+        // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
+        send[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
+        if (geometry == QUDA_COARSE_GEOMETRY)
+          send[d + 4] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
       }
 
       void *ghost_[2 * QUDA_MAX_DIM];
@@ -696,7 +699,7 @@ namespace quda {
       qudaDeviceSynchronize();
     } else {
       void *recv[QUDA_MAX_DIM];
-      for (int d = 0; d < nDim; d++) recv[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
+      for (int d = 0; d < nDim; d++) recv[d] = host_pinned_malloc(nFace * surface[d] * nInternal * precision);
 
       void *ghost_[] = {ghost[0].data(), ghost[1].data(), ghost[2].data(), ghost[3].data(),
                         ghost[4].data(), ghost[5].data(), ghost[6].data(), ghost[7].data()};
@@ -787,8 +790,8 @@ namespace quda {
       for (int d = 0; d < nDim; d++) {
         if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d]))) continue;
         bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-        send[d] = safe_malloc(2 * bytes[d]);
-        recv[d] = safe_malloc(2 * bytes[d]);
+        send[d] = host_pinned_malloc(2 * bytes[d]);
+        recv[d] = host_pinned_malloc(2 * bytes[d]);
       }
 
       for (int d = 0; d < nDim; d++) {
@@ -930,8 +933,9 @@ namespace quda {
       if (g.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, g.nFace);
       if (g.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, g.fixed);
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
-      if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
-      if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
+      if (g.anisotropy != anisotropy)
+        errorQuda("anisotropy does not match %e %e", double(anisotropy), double(g.anisotropy));
+      if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", double(tadpole), double(g.tadpole));
     }
     catch(std::bad_cast &e) {
       errorQuda("Failed to cast reference to GaugeField");
@@ -1169,9 +1173,9 @@ namespace quda {
     output << "order = " << param.order << std::endl;
     output << "fixed = " << param.fixed << std::endl;
     output << "link_type = " << param.link_type << std::endl;
-    output << "t_boundary = " << param.t_boundary << std::endl;
-    output << "anisotropy = " << param.anisotropy << std::endl;
-    output << "tadpole = " << param.tadpole << std::endl;
+    output << "t_boundary = " << double(param.t_boundary) << std::endl;
+    output << "anisotropy = " << double(param.anisotropy) << std::endl;
+    output << "tadpole = " << double(param.tadpole) << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
@@ -1252,21 +1256,21 @@ namespace quda {
   }
 
   // Return the L2 norm squared of the gauge field
-  double norm2(const GaugeField &a)
+  real_t norm2(const GaugeField &a)
   {
     ColorSpinorField b(colorSpinorParam(a));
     return blas::norm2(b);
   }
 
   // Return the L1 norm of the gauge field
-  double norm1(const GaugeField &a)
+  real_t norm1(const GaugeField &a)
   {
     ColorSpinorField b(colorSpinorParam(a));
     return blas::norm1(b);
   }
 
   // Scale the gauge field by the constant a
-  void ax(const double &a, GaugeField &u)
+  void ax(const real_t &a, GaugeField &u)
   {
     ColorSpinorField b(colorSpinorParam(u));
     blas::ax(a, b);

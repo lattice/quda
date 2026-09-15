@@ -1,6 +1,6 @@
 #pragma once
 #include <color_spinor.h> // vector container
-#include <math_helper.cuh>
+#include <math_helper.h>
 
 /**
    @file linalg.cuh

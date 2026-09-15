@@ -8,7 +8,7 @@ namespace quda
 {
 
   template <typename store_t_, bool twist_, bool compute_tr_log_>
-  struct CloverInvertArg : public ReduceArg<array<double, 2>> {
+  struct CloverInvertArg : public ReduceArg<array<device_reduce_t, 2>> {
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
@@ -52,7 +52,7 @@ namespace quda
       using real = typename Arg::real;
       constexpr int N = Arg::nColor * Arg::nSpin / 2;
       using Mat = HMatrix<real, N>;
-      double trLogA = 0.0;
+      reduction_t trLogA = 0;
 
 #pragma unroll
       for (int ch = 0; ch < 2; ch++) {
@@ -67,8 +67,8 @@ namespace quda
         // compute the Cholesky decomposition
         linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
 
-        // Accumulate trlogA
-        for (int j = 0; j < N; j++) trLogA += 2.0 * log(cholesky.D(j));
+        // Accumulate trlogA in plain precision; RFE only when merged into value
+        for (int j = 0; j < N; j++) trLogA += static_cast<reduction_t>(2.0 * log(cholesky.D(j)));
 
         if (!Arg::compute_tr_log) {
           Mat Ainv = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse
@@ -76,9 +76,9 @@ namespace quda
         }
       }
 
-      reduce_t result{0, 0};
-      parity ? result[1] = trLogA : result[0] = trLogA;
-      return operator()(result, value);
+      array<reduction_t, 2> site {};
+      parity ? site[1] = trLogA : site[0] = trLogA;
+      return operator()(value, site);
     }
 
   };

@@ -15,13 +15,13 @@ namespace quda
     real m_f; /** fermion mass parameter */
 
     DomainWall5DArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo, const GaugeField &U, double a, double m_f, bool xpay,
+                    const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t m_f, bool xpay,
                     cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger,
                                                           comm_override),
       Ls(in.X(4)),
-      a(a),
-      m_f(m_f)
+      a(static_cast<real>(a)),
+      m_f(static_cast<real>(m_f))
     {
       // remove the batch dimension from these constants, since these are used for 5-d checkerboard indexing
       DslashArg<Float, nDim, DDArg>::dc.X[4] = in.X(4);

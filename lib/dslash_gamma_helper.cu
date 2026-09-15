@@ -69,16 +69,16 @@ namespace quda {
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
     int d;
-    double kappa;
-    double mu;
-    double epsilon;
+    real_t kappa;
+    real_t mu;
+    real_t epsilon;
     int dagger;
     QudaTwistGamma5Type type;
     unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in.X(4) : 1); }
 
   public:
-    TwistGammaApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa,
-                    double mu, double epsilon, int dagger, QudaTwistGamma5Type type) :
+    TwistGammaApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, real_t kappa,
+                    real_t mu, real_t epsilon, int dagger, QudaTwistGamma5Type type) :
       TunableKernel3D(in[0], in.size(), in.SiteSubset()),
       out(out),
       in(in),
@@ -107,8 +107,8 @@ namespace quda {
 
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
-  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa,
-                       double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
+  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, real_t kappa,
+                       real_t mu, real_t epsilon, int dagger, QudaTwistGamma5Type type)
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
       instantiate_recurse2<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);

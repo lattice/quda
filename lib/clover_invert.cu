@@ -23,8 +23,9 @@ namespace quda {
                ",twist=false");
       apply(device::get_default_stream());
 
-      if (std::isnan(clover.TrLog()[0]) || std::isnan(clover.TrLog()[1])) {
-        printfQuda("Clover trlog = { %e, %e }\n", clover.TrLog()[0], clover.TrLog()[1]);
+      if (compute_tr_log && (quda::isnan(clover.TrLog()[0]) || quda::isnan(clover.TrLog()[1]))) {
+        printfQuda("Clover trlog = { %e, %e }\n", static_cast<double>(clover.TrLog()[0]),
+                   static_cast<double>(clover.TrLog()[1]));
         errorQuda("Clover trlog has returned nan, clover matrix is likely non HPD (check coefficients)");
       }
     }

@@ -48,7 +48,7 @@ namespace quda
     create(x, b);
 
     const int iter0 = param.iter;
-    vector<double> b2(b.size(), 0.0);
+    vector<real_t> b2(b.size(), 0.0);
     if (param.compute_true_res) {
       b2 = blas::norm2(b);
       bool is_zero = true;
@@ -71,12 +71,12 @@ namespace quda
       blas::xpay(b, -1.0, br); // br now holds the residual
 
       if (param.compute_true_res) {
-        vector<double> r2(b.size());
+        vector<real_t> r2(b.size());
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           auto hq = blas::HeavyQuarkResidualNorm(x, br);
           for (auto i = 0u; i < b.size(); i++) {
-            param.true_res_hq[i] = sqrt(hq[i].z);
-            r2[i] = hq[i].y;
+            param.true_res_hq[i] = sqrt(hq[i][2]);
+            r2[i] = hq[i][1];
           }
         } else {
           r2 = blas::norm2(br);

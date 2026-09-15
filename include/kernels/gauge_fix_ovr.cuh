@@ -14,7 +14,7 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityOVRArg : public ReduceArg<array<double, 2>> {
+  struct GaugeFixQualityOVRArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -23,7 +23,7 @@ namespace quda {
     int X[4]; // grid dimensions
     int border[4];
     Gauge data;
-    reduce_t result;
+    array<real_t, 2> result;
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<reduce_t>(dim3(data.LocalVolumeCB(), 2, 1), 1, true), // reset = true
@@ -36,8 +36,8 @@ namespace quda {
       }
     }
 
-    double getAction(){ return result[0]; }
-    double getTheta(){ return result[1]; }
+    auto getAction() { return result[0]; }
+    auto getTheta() { return result[1]; }
   };
 
   template <typename Arg> struct FixQualityOVR : plus<typename Arg::reduce_t> {
@@ -53,7 +53,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data{0, 0};
+      reduce_t data {};
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];
@@ -92,7 +92,7 @@ namespace quda {
       //35
       //T=36*gauge_dir+65
 
-      return operator()(data, value);
+      return operator()(value, data);
     }
   };
 
@@ -115,7 +115,7 @@ namespace quda {
     int border[4];
     int *borderpoints[2];
 
-    GaugeFixArg(const GaugeField &u, const double relax_boost, int parity, int *borderpoints[2], unsigned threads) :
+    GaugeFixArg(const GaugeField &u, const real_t relax_boost, int parity, int *borderpoints[2], unsigned threads) :
       kernel_param(dim3(threads, (type == 0 || type == 1) ? 8 : 4, 1)),
       u(u),
       relax_boost(static_cast<real>(relax_boost)),

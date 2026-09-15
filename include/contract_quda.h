@@ -20,7 +20,7 @@ namespace quda
    * @param[in] b1              spin component index (0 for staggered)
    */
 
-  void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result,
+  void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result,
                           QudaContractType cType, const int *const source_position, const int *const mom_mode,
                           const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1);
   /**
@@ -40,7 +40,7 @@ namespace quda
      @param[in] x Input fermion field set we are contracting
      @param[in] y Input eigenvector field set we are contracting against
    */
-  void evecProjectLaplace3D(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
+  void evecProjectLaplace3D(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                             cvector_ref<const ColorSpinorField> &y);
 
 } // namespace quda

@@ -26,13 +26,14 @@ namespace quda {
    using namespace blas;
 
    using DynamicStride   = Stride<Dynamic, Dynamic>;
-   using DenseMatrix     = MatrixXcd;
-   using VectorSet       = MatrixXcd;
-   using Vector          = VectorXcd;
-   using RealVector      = VectorXd;
 
-//special types needed for compatibility with QUDA blas:
-   using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
+   using DenseMatrix = MatrixXc;
+   using VectorSet = MatrixXc;
+   using Vector = VectorXc;
+   using RealVector = VectorX;
+
+   // special types needed for compatibility with QUDA blas:
+   using RowMajorDenseMatrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
@@ -56,7 +57,7 @@ namespace quda {
      int id; // cuurent search spase index
 
      int restarts;
-     double global_stop;
+     real_t global_stop;
 
      bool run_residual_correction; // used in mixed precision cycles
 
@@ -84,7 +85,7 @@ namespace quda {
      }
 
      // method for constructing Lanczos matrix :
-     inline void SetLanczos(Complex diag_val, Complex offdiag_val)
+     inline void SetLanczos(complex_t diag_val, complex_t offdiag_val)
      {
        if (run_residual_correction) return;
 
@@ -117,11 +118,11 @@ namespace quda {
        restarts += 1;
      }
 
-     void RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const double inv_sqrt_r2)
+     void RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const real_t inv_sqrt_r2)
      {
        Tm.setZero();
 
-       auto s = std::make_unique<Complex[]>(2 * k);
+       auto s = std::make_unique<complex_t[]>(2 * k);
 
        for (int i = 0; i < 2 * k; i++) Tm(i, i) = Tmvals(i); //??
 
@@ -132,7 +133,7 @@ namespace quda {
 
        blas::legacy::cDotProduct(s.get(), w_, v_);
 
-       Map<VectorXcd, Unaligned> s_(s.get(), 2 * k);
+       Map<Vector, Unaligned> s_(s.get(), 2 * k);
        s_ *= inv_sqrt_r2;
 
        Tm.col(2 * k).segment(0, 2 * k) = s_;
@@ -149,23 +150,24 @@ namespace quda {
      const int m = args.m;
      const int k = args.k;
      //Solve m dim eigenproblem:
-     SelfAdjointEigenSolver<MatrixXcd> es_tm(args.Tm);
+     SelfAdjointEigenSolver<DenseMatrix> es_tm(args.Tm);
      args.ritzVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
      //Solve m-1 dim eigenproblem:
-     SelfAdjointEigenSolver<MatrixXcd> es_tm1(Map<MatrixXcd, Unaligned, DynamicStride >(args.Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
-     Block<MatrixXcd>(args.ritzVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
+     SelfAdjointEigenSolver<DenseMatrix> es_tm1(
+       Map<DenseMatrix, Unaligned, DynamicStride>(args.Tm.data(), (m - 1), (m - 1), DynamicStride(m, 1)));
+     Block<DenseMatrix>(args.ritzVecs.derived(), 0, k, m - 1, k) = es_tm1.eigenvectors().leftCols(k);
      args.ritzVecs.block(m-1, k, 1, k).setZero();
 
-     MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
-     HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(args.ritzVecs.data(), m, 2*k) );
+     DenseMatrix Q2k(DenseMatrix::Identity(m, 2 * k));
+     HouseholderQR<DenseMatrix> ritzVecs2k_qr(Map<DenseMatrix, Unaligned>(args.ritzVecs.data(), m, 2 * k));
      Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ() );
 
      //2. Construct H = QH*Tm*Q :
      args.H2k = Q2k.adjoint()*args.Tm*Q2k;
 
      /* solve the small evecm1 2n_ev x 2n_ev eigenproblem */
-     SelfAdjointEigenSolver<MatrixXcd> es_h2k(args.H2k);
-     Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
+     SelfAdjointEigenSolver<DenseMatrix> es_h2k(args.H2k);
+     Block<DenseMatrix>(args.ritzVecs.derived(), 0, 0, m, 2 * k) = Q2k * es_h2k.eigenvectors();
      args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
 
      return;
@@ -272,7 +274,7 @@ namespace quda {
     }
   }
 
- void IncEigCG::RestartVT(const double beta, const double rho)
+  void IncEigCG::RestartVT(const real_t beta, const real_t rho)
   {
     EigCGArgs &args = *eigcg_args;
 
@@ -289,8 +291,8 @@ namespace quda {
     std::vector<ColorSpinorField*> vm (Vm->Components());
     std::vector<ColorSpinorField*> v2k(args.V2k->Components());
 
-    RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
-    blas::legacy::caxpy(static_cast<Complex *>(Alpha.data()), vm, v2k);
+    RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2 * args.k));
+    blas::legacy::caxpy(Alpha.data(), vm, v2k);
 
     for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), args.V2k->Component(i));
 
@@ -311,7 +313,7 @@ namespace quda {
     return;
   }
 
-  void IncEigCG::UpdateVm(ColorSpinorField &res, double beta, double sqrtr2)
+  void IncEigCG::UpdateVm(ColorSpinorField &res, real_t beta, real_t sqrtr2)
   {
     EigCGArgs &args = *eigcg_args;
 
@@ -343,7 +345,7 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
-    const double b2 = blas::norm2(b);
+    const real_t b2 = blas::norm2(b);
     if (b2 == 0) {
       getProfile().TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
@@ -387,7 +389,7 @@ namespace quda {
       init = true;
     }
 
-    double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
+    real_t local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2 * param.tol * param.tol : b2 * 1e-11;
 
     EigCGArgs &args = *eigcg_args;
 
@@ -414,7 +416,7 @@ namespace quda {
 
     // compute initial residual
     matSloppy(r, x);
-    double r2 = blas::xmyNorm(b, r);
+    real_t r2 = blas::xmyNorm(b, r);
 
     ColorSpinorField *z  = (K != nullptr) ? ColorSpinorField::Create(csParam) : rp;//
 
@@ -440,19 +442,19 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    double heavy_quark_res = 0.0;  // heavy quark res idual
+    real_t heavy_quark_res = 0.0; // heavy quark res idual
 
-    if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
-    double pAp;
-    double alpha=1.0, alpha_inv=1.0, beta=0.0, alpha_old_inv = 1.0;
+    real_t pAp;
+    real_t alpha = 1.0, alpha_inv = 1.0, beta = 0.0, alpha_old_inv = 1.0;
 
-    double lanczos_diag, lanczos_offdiag;
+    real_t lanczos_diag, lanczos_offdiag;
 
     getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    double rMinvr = blas::reDotProduct(r,*z);
+    real_t rMinvr = blas::reDotProduct(r, *z);
     //Begin EigCG iterations:
     args.restarts = 0;
 
@@ -484,7 +486,7 @@ namespace quda {
         blas::copy(*z, pPre);
       }
       //
-      double rMinvr_old   = rMinvr;
+      real_t rMinvr_old = rMinvr;
       rMinvr = K ? blas::reDotProduct(r,*z) : r2;
       beta                = rMinvr / rMinvr_old;
       blas::axpyZpbx(alpha, *p, y, *z, beta);
@@ -515,7 +517,7 @@ namespace quda {
     // compute the true residuals
     matSloppy(r, x);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     PrintSummary("eigCG", k, r2, b2, args.global_stop, param.tol_hq);
 
@@ -533,7 +535,7 @@ namespace quda {
     deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
     Deflation &defl         = *(defl_p->defl);
 
-    const double full_tol    = Kparam.tol;
+    const real_t full_tol = Kparam.tol;
     Kparam.tol         = Kparam.tol_restart;
 
     ColorSpinorParam csParam(x);
@@ -593,7 +595,7 @@ namespace quda {
      if(param.rhs_idx == 0) max_eigcg_cycles = param.eigcg_max_restarts;
 
      const bool mixed_prec = (param.precision != param.precision_sloppy);
-     const double b2       = norm2(in);
+     const real_t b2 = norm2(in);
 
      deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
      Deflation &defl         = *(defl_p->defl);
@@ -621,7 +623,7 @@ namespace quda {
      //deflate initial guess ('out'-field):
      mat(r, out);
      //
-     double r2 = xmyNorm(in, r);
+     real_t r2 = xmyNorm(in, r);
 
      csParam.setPrecision(param.precision_sloppy);
 
@@ -630,7 +632,7 @@ namespace quda {
      ColorSpinorField *rp_sloppy = ( mixed_prec ) ? ColorSpinorField::Create(csParam) : rp;
      ColorSpinorField &rSloppy = *rp_sloppy;
 
-     const double stop = b2*param.tol*param.tol;
+     const real_t stop = b2 * param.tol * param.tol;
      //start iterative refinement cycles (or just one eigcg call for full (solo) precision solver):
      int logical_rhs_id = 0;
      bool dcg_cycle    = false; 
@@ -676,7 +678,7 @@ namespace quda {
        r2 = blas::xmyNorm(in, r);
 
        param.true_res = sqrt(r2 / b2);
-       param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
+       param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out, r)[2]);
        PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
        if( getVerbosity() >= QUDA_VERBOSE ) { 

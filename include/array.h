@@ -31,6 +31,12 @@ namespace quda
     array<T, n> &operator=(const array<T, n> &) = default;
     array<T, n> &operator=(array<T, n> &&) = default;
 
+    template <typename U> constexpr array<T, n> &operator=(const array<U, n> &other)
+    {
+      for (int i = 0; i < n; i++) data[i] = other[i];
+      return *this;
+    }
+
     /** Construction from std::initializer_list. */
     constexpr array(std::initializer_list<T> il) noexcept(true)
     {

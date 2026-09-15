@@ -964,10 +964,12 @@ namespace quda
       if (!initGhostFaceBuffer || resize) {
         freeGhostBuffer();
         for (int i = 0; i < nDimComms; i++) {
-          fwdGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          fwdGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+          // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+          // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
+          fwdGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          fwdGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
         }
         initGhostFaceBuffer = 1;
       }

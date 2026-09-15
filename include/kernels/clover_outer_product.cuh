@@ -17,8 +17,8 @@ namespace quda {
     static constexpr int spin_project = true;
     static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
     static constexpr int n_flavor = doublet ? 2 : 1;
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, false, true>::type;
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false, false>;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, true>::type;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false>;
     using Gauge = typename gauge_mapper<Float, recon, 18>::type;
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
 
@@ -38,7 +38,7 @@ namespace quda {
 
     CloverOprodArg(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &p,
                    const ColorSpinorField &p_halo, cvector_ref<const ColorSpinorField> &x,
-                   const ColorSpinorField &x_halo, const std::vector<double> &coeff) :
+                   const ColorSpinorField &x_halo, const std::vector<real_t> &coeff) :
       kernel_param(dim3(dim == -1 ? static_cast<uint32_t>(x_halo.getDslashConstant().volume_4d_cb) :
                                     x_halo.getDslashConstant().ghostFaceCB[dim],
                         x.SiteSubset(), dim == -1 ? 4 : dim)),
@@ -56,7 +56,7 @@ namespace quda {
       for (auto i = 0u; i < p.size(); i++) {
         this->p[i] = p[i];
         this->x[i] = x[i];
-        this->coeff[i] = coeff[i];
+        this->coeff[i] = static_cast<real>(coeff[i]);
       }
 
       for (int i=0; i<4; ++i) this->X[i] = U.X()[i];

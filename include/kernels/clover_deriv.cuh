@@ -22,8 +22,8 @@ namespace quda
     Gauge gauge;
     Oprod oprod;
 
-    CloverDerivArg(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff) :
-      kernel_param(dim3(force.VolumeCB(), 2, 4)), coeff(coeff), force(force), gauge(gauge), oprod(oprod)
+    CloverDerivArg(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, real_t coeff) :
+      kernel_param(dim3(force.VolumeCB(), 2, 4)), coeff(static_cast<real>(coeff)), force(force), gauge(gauge), oprod(oprod)
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = force.X()[dir];

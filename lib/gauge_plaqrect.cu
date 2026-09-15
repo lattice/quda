@@ -9,10 +9,10 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> class GaugePlaqRect : public TunableReduction2D
   {
     const GaugeField &u;
-    array<double, 4> &plqrct;
+    array<real_t, 4> &plqrct;
 
   public:
-    GaugePlaqRect(const GaugeField &u, array<double, 4> &plqrct) : TunableReduction2D(u), u(u), plqrct(plqrct)
+    GaugePlaqRect(const GaugeField &u, array<real_t, 4> &plqrct) : TunableReduction2D(u), u(u), plqrct(plqrct)
     {
       apply(device::get_default_stream());
     }
@@ -39,14 +39,13 @@ namespace quda
     long long bytes() const { return u.Bytes(); }
   };
 
-  double4 plaquetteRectangle(const GaugeField &U)
+  array<real_t, 4> plaquetteRectangle(const GaugeField &U)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    array<double, 4> plqrct {0.0, 0.0, 0.0, 0.0};
+    array<real_t, 4> plqrct {};
     instantiate<GaugePlaqRect, ReconstructGauge>(U, plqrct);
-    double4 plaqrect = {plqrct[0], plqrct[1], plqrct[2], plqrct[3]};
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-    return plaqrect;
+    return plqrct;
   }
 
 } // namespace quda

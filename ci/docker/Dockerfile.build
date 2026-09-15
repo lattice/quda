@@ -13,32 +13,101 @@ RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
     wget \
     ninja-build \
     git \
-    ca-certificates && \
+    ca-certificates \
+    automake \
+    autoconf \
+    libtool \
+    pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
-ARG MPICH_VERSION=3.3.2
+# CSCS Alps/Daint GH200 nodes expose the Slingshot interconnect to containers
+# via a container-engine "CXI hook" that swaps in the host's libfabric/xpmem
+# stack at *runtime*. That only works if the MPI inside the image was itself
+# built against libfabric+xpmem (ch4:ofi), matching CSCS's documented MPICH
+# recipe (https://docs.cscs.ch/software/communication/mpich/). We deliberately
+# avoid bind-mounting any host Cray Programming Environment paths here, since
+# those are an internal implementation detail that CSCS has changed before
+# (see git history) and will change again.
+
+# xpmem: shared-memory intra-node transport, used by libfabric/MPICH.
+RUN git clone --depth 1 https://github.com/hpc/xpmem && \
+    cd xpmem/lib && \
+    gcc -I../include -shared -o libxpmem.so.1 libxpmem.c && \
+    ln -s libxpmem.so.1 libxpmem.so && \
+    mv libxpmem.so* /usr/lib && \
+    cp ../include/xpmem.h /usr/include/ && \
+    ldconfig && \
+    cd ../.. && rm -rf xpmem
+
+# The image is built without a GPU/driver present, so register the CUDA
+# driver *stub* library that ships with the "devel" base image. This lets
+# libfabric's and MPICH's configure/build-time CUDA checks resolve -lcuda.
+# The real driver is injected by the container engine at run time, so this
+# entry is removed again once the CUDA-aware builds below are done.
+RUN echo '/usr/local/cuda/lib64/stubs' > /etc/ld.so.conf.d/cuda-stubs.conf && ldconfig
+
+# libfabric with CUDA support, needed for GPU-aware (HMEM) transfers over CXI.
+ARG LIBFABRIC_VERSION=1.22.0
+RUN wget -q https://github.com/ofiwg/libfabric/archive/refs/tags/v${LIBFABRIC_VERSION}.tar.gz && \
+    tar xf v${LIBFABRIC_VERSION}.tar.gz && \
+    cd libfabric-${LIBFABRIC_VERSION} && \
+    ./autogen.sh && \
+    ./configure --prefix=/usr --with-cuda=/usr/local/cuda && \
+    make -j${BUILD_JOBS} && \
+    make install && \
+    ldconfig && \
+    cd .. && rm -rf v${LIBFABRIC_VERSION}.tar.gz libfabric-${LIBFABRIC_VERSION}
+
+# MPICH built against the libfabric/xpmem stack above (ch4:ofi), with CUDA
+# support so GPU buffers can be passed directly to MPI calls.
+ARG MPICH_VERSION=4.3.1
 ARG MPICH_PATH=/usr/local/mpich
 RUN wget -q https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPICH_VERSION}.tar.gz && \
     tar -xzf mpich-${MPICH_VERSION}.tar.gz && \
     cd mpich-${MPICH_VERSION} && \
     ./configure \
     --disable-fortran \
+    --with-device=ch4:ofi \
+    --with-libfabric=/usr \
+    --with-xpmem=/usr \
+    --with-cuda=/usr/local/cuda \
     --prefix=$MPICH_PATH && \
     make install -j${BUILD_JOBS} && \
-    rm -rf /root/mpich-${MPICH_VERSION}.tar.gz /root/mpich-${MPICH_VERSION}
+    cd .. && rm -rf mpich-${MPICH_VERSION}.tar.gz mpich-${MPICH_VERSION}
 
 RUN echo "${MPICH_PATH}/lib" >> /etc/ld.so.conf.d/cscs.conf && ldconfig
+
+# NOTE: the CUDA driver stub registered above must stay in place until after
+# QUDA itself is built: QUDA's own binaries link through mpicc/mpicxx, and
+# those wrappers now carry -lcuda (since MPICH was configured --with-cuda),
+# so both CMake's find_package(MPI) compiler probe and the final QUDA link
+# step need -lcuda to resolve. It is removed at the very end of this file,
+# once nothing further needs to link against CUDA.
 
 COPY . /quda/src
 
 ENV QUDA_TEST_GRID_SIZE="1 1 2 2"
 
+# ctest runs ~130 short-lived MPI test binaries back-to-back. Slurm's PMI-2
+# plugin only supports a single MPI_Init/MPI_Finalize cycle per srun step
+# (a second PMI2_Init is treated by slurmstepd as an invalid request and the
+# connection is torn down -- see src/plugins/mpi/pmi2/pmi2.c), so we can't
+# let each test binary rendezvous via the ambient srun/PMI2 environment the
+# way the outer CI job step is launched (that works for exactly one test,
+# then every subsequent one dies with SIGPIPE). Instead, QUDA_CTEST_LAUNCH
+# wraps every test in our own `mpirun` (MPICH's Hydra process manager),
+# forced to use its "fork" launcher and "user" resource-management kernel so
+# it never shells out to Slurm at all: Hydra manages process lifecycle
+# locally and can be invoked as many times in a row as needed. The process
+# count here mirrors QUDA_TEST_GRID_SIZE's product (1*1*2*2 = 4) below; the
+# CI job's driver script (ci/pipeline.yml) only runs ctest on one rank, so
+# there is no outer MPI job for Hydra to conflict with.
 RUN  QUDA_TEST_GRID_SIZE=$QUDA_TEST_GRID_SIZE cmake -S /quda/src \
     -DCMAKE_CUDA_COMPILER=nvcc \
     -DCMAKE_CXX_COMPILER=/usr/local/mpich/bin/mpicxx \
     -DCMAKE_C_COMPILER=/usr/local/mpich/bin/mpicc \
     -DCMAKE_BUILD_TYPE=STRICT \
-    -DQUDA_CTEST_LAUNCH="" \
+    -DQUDA_CTEST_LAUNCH="/usr/local/mpich/bin/mpirun;-launcher;fork;-rmk;user;-np;4" \
     -DQUDA_GPU_ARCH=sm_90 \
     -DQUDA_MULTIGRID=ON \
     -DQUDA_MULTIGRID_NVEC_LIST=6 \
@@ -51,3 +120,8 @@ RUN  QUDA_TEST_GRID_SIZE=$QUDA_TEST_GRID_SIZE cmake -S /quda/src \
 RUN cmake --build /quda/build -j ${BUILD_JOBS}
 
 RUN cmake --install /quda/build
+
+# Drop the build-time CUDA driver stub now that everything that needed to
+# link against CUDA (libfabric, MPICH, QUDA) is built. The real driver is
+# injected by the container engine at run time.
+RUN rm /etc/ld.so.conf.d/cuda-stubs.conf && ldconfig

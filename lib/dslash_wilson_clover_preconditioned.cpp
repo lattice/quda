@@ -12,7 +12,7 @@ namespace quda
     template <bool distance_pc>
     WilsonCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
-                                    double a, double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                                    real_t a, real_t alpha0, int t0, int parity, bool dagger, const int *comm_override,
                                     DistanceType<distance_pc>, TimeProfile &profile);
   };
 
@@ -20,7 +20,7 @@ namespace quda
   // out(x) = M*in = a * A(x)^{-1} (\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
   void ApplyWilsonCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                       const GaugeField &U, const CloverField &A, double a,
+                                       const GaugeField &U, const CloverField &A, real_t a,
                                        cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                        const int *comm_override, TimeProfile &profile)
   {

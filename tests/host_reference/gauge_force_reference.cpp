@@ -318,7 +318,7 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
   delete qdp_ex;
 }
 
-void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces, double factor,
+void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::complex_t> &loop_traces, double factor,
                                 int **input_path, int *length, double *path_coeff, int num_paths)
 {
   // create extended field
@@ -331,7 +331,7 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> 
   auto qdp_ex = quda::createExtendedGauge(u.data_array().data, param, R);
   lattice_t lat(*qdp_ex);
 
-  std::vector<double> loop_tr_dbl(2 * num_paths);
+  std::vector<quda::real_t> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
     auto tr = compute_loop_trace(qdp_ex->data_array<void *>().data, input_path[i], length[i], path_coeff[i], lat,
@@ -342,7 +342,7 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> 
 
   quda::comm_allreduce_sum(loop_tr_dbl);
 
-  for (int i = 0; i < num_paths; i++) loop_traces[i] = quda::Complex(loop_tr_dbl[2 * i], loop_tr_dbl[2 * i + 1]);
+  for (int i = 0; i < num_paths; i++) loop_traces[i] = quda::complex_t(loop_tr_dbl[2 * i], loop_tr_dbl[2 * i + 1]);
 
   delete qdp_ex;
 }

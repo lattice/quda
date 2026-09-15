@@ -12,17 +12,18 @@ namespace quda
     complex<real> a_5[QUDA_MAX_DWF_LS]; /** xpay scale factor for each 4-d subvolume */
 
     DomainWall4DArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo, const GaugeField &U, double a, double m_5, const Complex *b_5,
-                    const Complex *c_5, bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                    const ColorSpinorField &halo, const GaugeField &U, real_t a, real_t m_5, const complex_t *b_5,
+                    const complex_t *c_5, bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                     const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger,
                                                           comm_override),
       Ls(in.X(4))
     {
       if (b_5 == nullptr || c_5 == nullptr)
-        for (int s = 0; s < Ls; s++) a_5[s] = a; // 4-d Shamir
+        for (int s = 0; s < Ls; s++) a_5[s] = real(a); // 4-d Shamir
       else
-        for (int s = 0; s < Ls; s++) a_5[s] = 0.5 * a / (b_5[s] * (m_5 + 4.0) + 1.0); // 4-d Mobius
+        for (int s = 0; s < Ls; s++)
+          a_5[s] = complex<real>(real_t(0.5) * a / (b_5[s] * (m_5 + real_t(4.0)) + real_t(1.0))); // 4-d Mobius
     }
   };
 

@@ -22,16 +22,16 @@ namespace quda
     real b2;
 
     TwistedCloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                     const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a, double b,
+                     const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, real_t a, real_t b,
                      bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                      const int *comm_override) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
                                                           comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-      a(a),
-      b(dagger ? -0.5 * b : 0.5 * b), // factor of 0.5 comes from basis transform
-      b2(0.25 * b * b)
+      a(static_cast<real>(a)),
+      b(static_cast<real>(dagger ? -0.5 * b : 0.5 * b)), // factor of 0.5 comes from basis transform
+      b2(static_cast<real>(0.25 * b * b))
     {
       checkPrecision(U, A);
       checkLocation(U, A);

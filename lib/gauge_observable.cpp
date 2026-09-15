@@ -20,25 +20,29 @@ namespace quda
 
     if (param.compute_rectangle) {
       auto plqrct = plaquetteRectangle(u);
-      param.plaquette[0] = 0.5 * (plqrct.x + plqrct.y);
-      param.plaquette[1] = plqrct.x;
-      param.plaquette[2] = plqrct.y;
-      param.rectangle[0] = 0.5 * (plqrct.z + plqrct.w);
-      param.rectangle[1] = plqrct.z;
-      param.rectangle[2] = plqrct.w;
+      param.plaquette[0] = static_cast<double>(0.5 * (plqrct[0] + plqrct[1]));
+      param.plaquette[1] = static_cast<double>(plqrct[0]);
+      param.plaquette[2] = static_cast<double>(plqrct[1]);
+      param.rectangle[0] = static_cast<double>(0.5 * (plqrct[2] + plqrct[3]));
+      param.rectangle[1] = static_cast<double>(plqrct[2]);
+      param.rectangle[2] = static_cast<double>(plqrct[3]);
     } else if (param.compute_plaquette) {
       auto plaq = plaquette(u);
-      param.plaquette[0] = plaq.x;
-      param.plaquette[1] = plaq.y;
-      param.plaquette[2] = plaq.z;
+      param.plaquette[0] = static_cast<double>(plaq[0]);
+      param.plaquette[1] = static_cast<double>(plaq[1]);
+      param.plaquette[2] = static_cast<double>(plaq[2]);
     }
 
-    if (param.compute_polyakov_loop) { gaugePolyakovLoop(param.ploop, u, 3, profile); }
+    if (param.compute_polyakov_loop) {
+      auto ploop = gaugePolyakovLoop(u, 3, profile);
+      param.ploop[0] = static_cast<double>(ploop[0]);
+      param.ploop[1] = static_cast<double>(ploop[1]);
+    }
 
     if (param.compute_gauge_loop_trace) {
       // wrap 1-d arrays in std::vector
       std::vector<int> path_length_v(param.num_paths);
-      std::vector<double> loop_coeff_v(param.num_paths);
+      std::vector<real_t> loop_coeff_v(param.num_paths);
       for (int i = 0; i < param.num_paths; i++) {
         path_length_v[i] = param.path_length[i];
         loop_coeff_v[i] = param.loop_coeff[i];
@@ -49,13 +53,17 @@ namespace quda
       for (int d = 0; d < 1; d++) { input_path_v[d] = param.input_path_buff; }
 
       // prepare trace storage
-      std::vector<Complex> loop_traces(param.num_paths);
+      std::vector<complex_t> loop_traces(param.num_paths);
 
       // actually do the computation
       gaugeLoopTrace(u, loop_traces, param.factor, input_path_v, path_length_v, loop_coeff_v, param.num_paths,
                      param.max_length);
 
-      for (int i = 0; i < param.num_paths; i++) { memcpy(param.traces + i, &loop_traces[i], sizeof(Complex)); }
+      for (int i = 0; i < param.num_paths; i++) {
+        auto &z = loop_traces[i];
+        __real__(param.traces[i]) = to_double(std::real(z));
+        __imag__(param.traces[i]) = to_double(std::imag(z));
+      }
     }
 
     // no point constructing Fmunu unless we are going to use it
@@ -82,10 +90,14 @@ namespace quda
       void *d_qDensity = param.compute_qcharge_density ? pool_device_malloc(size) : nullptr;
       profile.TPSTOP(QUDA_PROFILE_INIT);
 
+      array<real_t, 3> energy;
+      real_t qcharge;
       if (param.compute_qcharge_density)
-        computeQChargeDensity(param.energy, param.qcharge, d_qDensity, gaugeFmunu);
+        qcharge = computeQChargeDensity(energy, d_qDensity, gaugeFmunu);
       else
-        computeQCharge(param.energy, param.qcharge, gaugeFmunu);
+        qcharge = computeQCharge(energy, gaugeFmunu);
+      for (int i = 0; i < 3; i++) param.energy[i] = static_cast<double>(energy[i]);
+      param.qcharge = static_cast<double>(qcharge);
 
       if (param.compute_qcharge_density) {
         profile.TPSTART(QUDA_PROFILE_D2H);

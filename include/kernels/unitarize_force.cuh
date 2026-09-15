@@ -24,8 +24,8 @@ namespace quda {
       static constexpr int nColor = nColor_;
       static constexpr QudaReconstructType recon = recon_;
       // use long form here to allow specification of order
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type F;
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type G;
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type F;
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type G;
       F force;
       const F force_old;
       const G u;

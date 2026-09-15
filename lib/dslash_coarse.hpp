@@ -22,7 +22,7 @@ namespace quda {
     cvector_ref<const ColorSpinorField> &inB;
     const GaugeField &Y;
     const GaugeField &X;
-    const double kappa;
+    const real_t kappa;
     const int parity;
     const int nParity;
     const ColorSpinorField &halo;
@@ -140,7 +140,7 @@ namespace quda {
 
   public:
     DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                 cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                 cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                  int parity, MemoryLocation *halo_location, const ColorSpinorField &halo) :
       TunableKernel3D(out[0], out.SiteSubset() * out.size(), 1),
       out(out),
@@ -273,7 +273,7 @@ namespace quda {
             typename ghostFloat, bool dagger, int coarseColor, bool use_mma, int nVec>
   inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                           cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                          double kappa, int parity, bool dslash, bool clover, DslashType type,
+                          real_t kappa, int parity, bool dslash, bool clover, DslashType type,
                           MemoryLocation *halo_location, const ColorSpinorField &halo)
   {
     if (Y.FieldOrder() != X.FieldOrder())
@@ -373,7 +373,7 @@ namespace quda {
     const ColorSpinorField &halo;
     const GaugeField &Y;
     const GaugeField &X;
-    double kappa;
+    real_t kappa;
     int parity;
     bool dslash;
     bool clover;
@@ -383,7 +383,7 @@ namespace quda {
 
     DslashCoarseLaunch(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                        cvector_ref<const ColorSpinorField> &inB, const ColorSpinorField &halo, const GaugeField &Y,
-                       const GaugeField &X, double kappa, int parity, bool dslash, bool clover, const int *commDim,
+                       const GaugeField &X, real_t kappa, int parity, bool dslash, bool clover, const int *commDim,
                        QudaPrecision halo_precision) :
       out(out),
       inA(inA),

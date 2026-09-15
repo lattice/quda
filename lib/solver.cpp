@@ -370,19 +370,19 @@ namespace quda {
   {
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
-      param.true_res_offset[i] = static_cast<double>(param.true_res);
-      param.true_res_hq_offset[i] = static_cast<double>(param.true_res_hq);
+      param.true_res_offset[i] = param.true_res[i];
+      param.true_res_hq_offset[i] = param.true_res_hq[i];
     }
   }
 
-  vector<double> Solver::stopping(double tol, cvector<double> &b2, QudaResidualType residual_type)
+  vector<real_t> Solver::stopping(real_t tol, cvector<real_t> &b2, QudaResidualType residual_type)
   {
-    vector<double> stop(b2.size(), 0.0);
+    vector<real_t> stop(b2.size(), 0.0);
     if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
 	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {
       for (auto i = 0u; i < b2.size(); i++) {
         // use the most stringent stopping condition
-        double lowest = (b2[i] < 1.0) ? b2[i] : 1.0;
+        real_t lowest = (b2[i] < 1.0) ? b2[i] : static_cast<real_t>(1.0);
         stop[i] = lowest * tol * tol;
       }
     } else if (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) {
@@ -397,7 +397,7 @@ namespace quda {
     return stop;
   }
 
-  bool Solver::convergence(cvector<double> &r2, cvector<double> &hq2, cvector<double> &r2_tol, cvector<double> &hq_tol)
+  bool Solver::convergence(cvector<real_t> &r2, cvector<real_t> &hq2, cvector<real_t> &r2_tol, cvector<real_t> &hq_tol)
   {
     if (r2.size() != hq2.size() || r2.size() != r2_tol.size() || r2.size() != hq_tol.size())
       errorQuda("Mismatched vector lengths r2 = %lu hq2 = %lu r2_tol = %lu hq_tol = %lu", r2.size(), hq2.size(),
@@ -421,7 +421,7 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceHQ(cvector<double> &hq2, cvector<double> &hq_tol)
+  bool Solver::convergenceHQ(cvector<real_t> &hq2, cvector<real_t> &hq_tol)
   {
     if (hq2.size() != hq_tol.size())
       errorQuda("Mismatched vector lengths hq2 = %lu hq_tol = %lu", hq2.size(), hq_tol.size());
@@ -437,7 +437,7 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceL2(cvector<double> &r2, cvector<double> &r2_tol)
+  bool Solver::convergenceL2(cvector<real_t> &r2, cvector<real_t> &r2_tol)
   {
     if (r2.size() != r2_tol.size())
       errorQuda("Mismatched vector lengths r2 = %lu r2_tol = %lu", r2.size(), r2_tol.size());
@@ -460,9 +460,9 @@ namespace quda {
     return rhs_str;
   }
 
-  void Solver::PrintStats(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &hq2_)
+  void Solver::PrintStats(const char *name, int k, cvector<real_t> &r2, cvector<real_t> &b2, cvector<real_t> &hq2_)
   {
-    auto hq2 = hq2_.size() == 0 ? vector<double>(r2.size(), 0.0) : hq2_;
+    auto hq2 = hq2_.size() == 0 ? vector<real_t>(r2.size(), 0.0) : hq2_;
     if (r2.size() != b2.size() || r2.size() != hq2.size())
       errorQuda("Mismatched vector lengths r2 = %lu b2 = %lu hq2 = %lu", r2.size(), b2.size(), hq2.size());
 
@@ -480,10 +480,10 @@ namespace quda {
     }
   }
 
-  void Solver::PrintSummary(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &r2_tol,
-                            cvector<double> &hq_tol_)
+  void Solver::PrintSummary(const char *name, int k, cvector<real_t> &r2, cvector<real_t> &b2, cvector<real_t> &r2_tol,
+                            cvector<real_t> &hq_tol_)
   {
-    auto hq_tol = hq_tol_.size() == 0 ? vector<double>(r2.size(), 0.0) : hq_tol_;
+    auto hq_tol = hq_tol_.size() == 0 ? vector<real_t>(r2.size(), 0.0) : hq_tol_;
     if (r2.size() != b2.size() || r2.size() != r2_tol.size() || r2.size() != hq_tol.size())
       errorQuda("Mismatched vector lengths r2 = %lu b2 = %lu r2_tol = %lu hq_tol = %lu", r2.size(), b2.size(),
                 r2_tol.size(), hq_tol.size());
@@ -540,7 +540,7 @@ namespace quda {
       errorQuda("Precision mismatch %d %d", checkPrecision(x[0], b), param.precision);
   }
 
-  bool MultiShiftSolver::convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const
+  bool MultiShiftSolver::convergence(const std::vector<real_t> &r2, const std::vector<real_t> &r2_tol, int n) const
   {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
@@ -571,7 +571,7 @@ namespace quda {
   }
 
   // check we're not solving on a zero-valued source
-  bool Solver::is_zero_src(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, cvector<double> &b2)
+  bool Solver::is_zero_src(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, cvector<real_t> &b2)
   {
     // if computing null vectors then zero sources are fine
     if (param.compute_null_vector != QUDA_COMPUTE_NULL_VECTOR_NO) return false;
@@ -592,28 +592,38 @@ namespace quda {
 
   void SolverParam::updateInvertParam(QudaInvertParam &param, int offset)
   {
-    for (auto i = 0u; i < true_res.size(); i++) param.true_res[i] = true_res[i];
-    for (auto i = 0u; i < true_res_hq.size(); i++) param.true_res_hq[i] = true_res_hq[i];
+    for (auto i = 0u; i < true_res.size(); i++)
+      param.true_res[i] = static_cast<std::remove_cvref_t<decltype(param.true_res[i])>>(true_res[i]);
+    for (auto i = 0u; i < true_res_hq.size(); i++)
+      param.true_res_hq[i] = static_cast<std::remove_cvref_t<decltype(param.true_res_hq[i])>>(true_res_hq[i]);
     param.iter += iter;
     if (offset >= 0) {
-      param.true_res_offset[offset] = true_res_offset[offset];
-      param.iter_res_offset[offset] = iter_res_offset[offset];
-      param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
+      param.true_res_offset[offset]
+        = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[0])>>(true_res_offset[offset]);
+      param.iter_res_offset[offset]
+        = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[0])>>(iter_res_offset[offset]);
+      param.true_res_hq_offset[offset]
+        = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[0])>>(true_res_hq_offset[offset]);
     } else {
       for (int i = 0; i < num_offset; i++) {
-        param.true_res_offset[i] = true_res_offset[i];
-        param.iter_res_offset[i] = iter_res_offset[i];
-        param.true_res_hq_offset[i] = true_res_hq_offset[i];
+        param.true_res_offset[i]
+          = static_cast<std::remove_cvref_t<decltype(param.true_res_offset[i])>>(true_res_offset[i]);
+        param.iter_res_offset[i]
+          = static_cast<std::remove_cvref_t<decltype(param.iter_res_offset[i])>>(iter_res_offset[i]);
+        param.true_res_hq_offset[i]
+          = static_cast<std::remove_cvref_t<decltype(param.true_res_hq_offset[i])>>(true_res_hq_offset[i]);
       }
     }
     // for incremental eigCG:
     param.rhs_idx = rhs_idx;
 
-    param.ca_lambda_min = ca_lambda_min;
-    param.ca_lambda_max = ca_lambda_max;
+    param.ca_lambda_min = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_min)>>(ca_lambda_min);
+    param.ca_lambda_max = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_max)>>(ca_lambda_max);
 
-    param.ca_lambda_min_precondition = ca_lambda_min_precondition;
-    param.ca_lambda_max_precondition = ca_lambda_max_precondition;
+    param.ca_lambda_min_precondition
+      = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_min_precondition)>>(ca_lambda_min_precondition);
+    param.ca_lambda_max_precondition
+      = static_cast<std::remove_cvref_t<decltype(param.ca_lambda_max_precondition)>>(ca_lambda_max_precondition);
 
     if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
   }
@@ -631,8 +641,8 @@ namespace quda {
     auto j = sub_partition_coords[3];
     for (auto d = 2; d >= 0; d--) j = j * split_key[d] + sub_partition_coords[d];
 
-    std::vector<double> true_res(in.num_src, 0.0);
-    std::vector<double> true_res_hq(in.num_src, 0.0);
+    std::vector<real_t> true_res(in.num_src, 0.0);
+    std::vector<real_t> true_res_hq(in.num_src, 0.0);
     if (split_rank == 0) { // only rank 0 in each sub partition sets the residuals
       for (auto i = 0; i < in.num_src_per_sub_partition; i++) {
         true_res[i * num_sub_partition + j] = in.true_res[i];

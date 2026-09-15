@@ -70,8 +70,8 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedCloverApply {
     TwistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C, double a,
-                       double b, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C, real_t a,
+                       real_t b, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);

@@ -1,18 +1,50 @@
+#pragma once
+
 #include <blas_quda.h>
+#include <comm_quda.h>
+#include <float_vector.h>
 #include <uint_to_char.h>
 #include <kernels/multi_reduce_core.cuh>
 #include <tunable_reduction.h>
 
-namespace quda {
+namespace quda
+{
 
-  namespace blas {
+  namespace blas
+  {
 
-    template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin,
-              typename T>
+    namespace
+    {
+      /** Hermitian transpose: conjugate for complex_t; real scalars unchanged. */
+      template <typename T> inline T transpose_conj(const T &z)
+      {
+        if constexpr (std::is_same_v<T, complex_t>) {
+          return std::conj(z);
+        } else {
+          return z;
+        }
+      }
+
+      /** Copy a multi-reduce accumulator into the host result vector element. */
+      template <typename T, typename ReduceT> inline void assign_multi_reduce_result(T &dst, const ReduceT &src)
+      {
+        if constexpr (std::is_same_v<ReduceT, device_reduce_t> && std::is_same_v<T, real_t>) {
+          dst = reduction_to_real(src);
+        } else if constexpr (std::is_same_v<ReduceT, array<device_reduce_t, 2>> && std::is_same_v<T, complex_t>) {
+          dst = complex_t(reduction_to_real(src[0]), reduction_to_real(src[1]));
+        } else if constexpr (std::is_same_v<ReduceT, T>) {
+          dst = src;
+        } else {
+          *reinterpret_cast<ReduceT *>(&dst) = src;
+        }
+      }
+    } // namespace
+
+    template <template <typename...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>
     class MultiReduce : public TunableMultiReduction
     {
       using real = typename mapper<y_store_t>::type;
-      using host_reduce_t = typename Reducer<double, real>::reduce_t;
+      using host_reduce_t = typename Reducer<device_reduce_t, real>::reduce_t;
       const int NXZ;
       const int NYW;
       Reducer<device_reduce_t, real> r;
@@ -25,8 +57,8 @@ namespace quda {
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw>
-      MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0,
-                  Vx &x, Vy &y, Vz &z, Vw &w, T &result) :
+      MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0, Vx &x,
+                  Vy &y, Vz &z, Vw &w, T &result) :
         TunableMultiReduction(x[0], 1u, y.size(), max_n_batch_block_multi_reduce()),
         NXZ(x.size()),
         NYW(y.size()),
@@ -35,10 +67,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(reinterpret_cast<cvector_ref<ColorSpinorField>&>(x)),
-        y(reinterpret_cast<cvector_ref<ColorSpinorField>&>(y)),
-        z(reinterpret_cast<cvector_ref<ColorSpinorField>&>(z)),
-        w(reinterpret_cast<cvector_ref<ColorSpinorField>&>(w)),
+        x(reinterpret_cast<cvector_ref<ColorSpinorField> &>(x)),
+        y(reinterpret_cast<cvector_ref<ColorSpinorField> &>(y)),
+        z(reinterpret_cast<cvector_ref<ColorSpinorField> &>(z)),
+        w(reinterpret_cast<cvector_ref<ColorSpinorField> &>(w)),
         result(result),
         location(checkLocation(x[0], y[0], z[0], w[0]))
       {
@@ -108,22 +140,28 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
-          using device_store_t = typename device_type_mapper<store_t>::type;
-          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
-          using device_real_t = typename mapper<device_y_store_t>::type;
-          Reducer<device_reduce_t, device_real_t> r_(NXZ, NYW);
+          // multi-reduce has no CPU fallback (see the errorQuda below), so unlike
+          // Reduce/Blas there is no reason to instantiate anything here at all when
+          // either side is a disabled double precision: just error out at compile time
+          // rather than redundantly compiling a device kernel already built for
+          // whichever precision is actually enabled.
+          if constexpr ((std::is_same_v<store_t, double> || std::is_same_v<y_store_t, double>)&&!is_enabled(
+                          QUDA_DOUBLE_PRECISION)) {
+            errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+          } else {
+            if (site_unroll_check) checkNative(x[0], y[0], z[0], w[0]); // require native order when using site_unroll
+            using device_real_t = typename mapper<y_store_t>::type;
+            Reducer<device_reduce_t, device_real_t> r_(NXZ, NYW);
 
-          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
-          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
-          constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
-          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int length = x0.Length() / M;
+            constexpr int N = n_vector<store_t, true>(nSpin, site_unroll_check);
+            constexpr int Ny = n_vector<y_store_t, true>(nSpin, site_unroll_check);
+            constexpr int M = site_unroll_check ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+            const int length = x0.Length() / M;
 
-          MultiReduceArg<device_real_t, M, NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity);
+            MultiReduceArg<device_real_t, M, NXZ, store_t, N, y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW,
+                                                                                               length, nParity);
 
-          std::vector<host_reduce_t> result_(NXZ * arg.NYW);
+            std::vector<host_reduce_t> result_(NXZ * arg.NYW);
 
 #if 0 // no parameters to set so far
           constexpr bool multi_1d = false;
@@ -131,38 +169,42 @@ namespace quda {
           if (b.size()) { set_param<multi_1d>(arg, 'b', b); }
           if (c.size()) { set_param<multi_1d>(arg, 'c', c); }
 #endif
-          launch<MultiReduce_>(result_, tp, stream, arg);
+            launch<MultiReduce_>(result_, tp, stream, arg);
 
-          // need to transpose for same order with vector thread reduction
-          for (int i = 0; i < NXZ; i++) {
-            for (int j = 0; j < arg.NYW; j++) {
-              reinterpret_cast<host_reduce_t*>(result.data())[i * arg.NYW + j] = result_[j * NXZ + i];
+            // need to transpose for same order with vector thread reduction
+            for (int i = 0; i < NXZ; i++) {
+              for (int j = 0; j < arg.NYW; j++) {
+                assign_multi_reduce_result(result[i * arg.NYW + j], result_[j * NXZ + i]);
+              }
             }
           }
-
         } else {
           errorQuda("Only implemented for GPU fields");
         }
       }
 
-      template <int n> std::enable_if_t<n!=1, void> instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n != 1, void> instantiateLinear(const qudaStream_t &stream)
       {
-        if (NXZ == n) compute<n>(stream);
-        else instantiateLinear<n-1>(stream);
+        if (NXZ == n)
+          compute<n>(stream);
+        else
+          instantiateLinear<n - 1>(stream);
       }
 
-      template <int n> std::enable_if_t<n==1, void> instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n == 1, void> instantiateLinear(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
-      template <int n> std::enable_if_t<n!=1, void> instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n != 1, void> instantiatePow2(const qudaStream_t &stream)
       {
-        if (NXZ == n) compute<n>(stream);
-        else instantiatePow2<n/2>(stream);
+        if (NXZ == n)
+          compute<n>(stream);
+        else
+          instantiatePow2<n / 2>(stream);
       }
 
-      template <int n> std::enable_if_t<n==1, void> instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n == 1, void> instantiatePow2(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
@@ -170,9 +212,12 @@ namespace quda {
       void apply(const qudaStream_t &stream) override
       {
         constexpr int pow2_max = max_NXZ_power2(true);
-        if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
-        else if (NXZ <= MAX_MULTI_BLAS_N) instantiateLinear<MAX_MULTI_BLAS_N>(stream);
-        else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
+        if (NXZ <= pow2_max && is_power2(NXZ))
+          instantiatePow2<pow2_max>(stream);
+        else if (NXZ <= MAX_MULTI_BLAS_N)
+          instantiateLinear<MAX_MULTI_BLAS_N>(stream);
+        else
+          errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
 
       void preTune() override
@@ -195,48 +240,46 @@ namespace quda {
         }
       }
 
-      long long flops() const override
-      {
-        return NYW * NXZ * r.flops() * x[0].Length();
-      }
+      long long flops() const override { return NYW * NXZ * r.flops() * x[0].Length(); }
 
       long long bytes() const override
       {
         // X and Z reads are repeated (and hopefully cached) across NYW
         // each Y and W read/write is done once
-        return NYW * NXZ * (r.read.X + r.write.X) * x[0].Bytes() +
-          NYW * (r.read.Y + r.write.Y) * y[0].Bytes() +
-          NYW * NXZ * (r.read.Z + r.write.Z) * z[0].Bytes() +
-          NYW * (r.read.W + r.write.W) * w[0].Bytes();
+        return NYW * NXZ * (r.read.X + r.write.X) * x[0].Bytes() + NYW * (r.read.Y + r.write.Y) * y[0].Bytes()
+          + NYW * NXZ * (r.read.Z + r.write.Z) * z[0].Bytes() + NYW * (r.read.W + r.write.W) * w[0].Bytes();
       }
     };
 
-    template <template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal,
+    template <typename store_t, template <typename...> class ReducerDiagonal, template <typename...> class ReducerOffDiagonal,
               typename T, typename Vx, typename Vy, typename Vz, typename Vw>
     void multiReduce(std::vector<T> &result, const std::vector<T> &a, const std::vector<T> &b, const std::vector<T> &c,
                      Vx &x, Vy &y, Vz &z, Vw &w, int i, int j)
     {
       if (i == j) { // we are on the diagonal so invoke the diagonal reducer
-        instantiate<ReducerDiagonal, MultiReduce, true>(a, b, c, x[0], y[0], x, y, z, w, result);
+        instantiate<ReducerDiagonal, MultiReduce, true, std::vector<T>, store_t>(a, b, c, x[0], y[0], x, y, z, w, result);
       } else { // we are on the diagonal so invoke the off-diagonal reducer
-        instantiate<ReducerOffDiagonal, MultiReduce, true>(a, b, c, x[0], y[0], x, y, z, w, result);
+        instantiate<ReducerOffDiagonal, MultiReduce, true, std::vector<T>, store_t>(a, b, c, x[0], y[0], x, y, z, w,
+                                                                                    result);
       }
     }
 
     // This function does the outer product of dot products... in column major.
     // There's a function below called 'cDotProduct' that flips it to row major.
-    template <template <typename ...> class reducer_diag,
-              template <typename ...> class reducer_off, typename T, typename Vx, typename Vy, typename Vz, typename Vw>
-    void multiReduce_recurse(std::vector<T> &result, Vx &x, Vy &y, Vz &z, Vw &w, int i_idx, int j_idx,
-                             bool hermitian, uint2 tile_size)
+    template <typename store_t, template <typename...> class reducer_diag, template <typename...> class reducer_off,
+              typename T, typename Vx, typename Vy, typename Vz, typename Vw>
+    void multiReduce_recurse(std::vector<T> &result, Vx &x, Vy &y, Vz &z, Vw &w, int i_idx, int j_idx, bool hermitian,
+                             uint2 tile_size)
     {
       if (y.size() > tile_size.y) { // if greater than max single-kernel size, split and recurse
         // Do the recurse first.
-        auto result_ = std::make_pair( std::vector<T>((y.size() / 2) * x.size()),
-                                       std::vector<T>(result.size() - (y.size() / 2) * x.size()) );
+        auto result_ = std::make_pair(std::vector<T>((y.size() / 2) * x.size()),
+                                      std::vector<T>(result.size() - (y.size() / 2) * x.size()));
         auto y_ = bisect(y);
-        multiReduce_recurse<reducer_diag, reducer_off>(result_.first, x, y_.first, z, w, i_idx, j_idx, hermitian, tile_size);
-        multiReduce_recurse<reducer_diag, reducer_off>(result_.second, x, y_.second, z, w, i_idx, j_idx + y_.first.size(), hermitian, tile_size);
+        multiReduce_recurse<store_t, reducer_diag, reducer_off>(result_.first, x, y_.first, z, w, i_idx, j_idx,
+                                                                hermitian, tile_size);
+        multiReduce_recurse<store_t, reducer_diag, reducer_off>(result_.second, x, y_.second, z, w, i_idx,
+                                                                j_idx + y_.first.size(), hermitian, tile_size);
 
         result = join(result_);
       } else {
@@ -245,10 +288,10 @@ namespace quda {
           // if at bottom of recursion, return if on strict sub-diagonal
           if (hermitian && (j_idx + y.size() < i_idx + x.size())) return;
 
-          std::vector<T> tmp_dot(x.size()*y.size());
+          std::vector<T> tmp_dot(x.size() * y.size());
           std::vector<T> a, b, c;
 
-          multiReduce<reducer_diag, reducer_off>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<store_t, reducer_diag, reducer_off>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
 
           // perform the row-to-column-major transpose here.
           result = transpose(tmp_dot, x.size(), y.size());
@@ -256,23 +299,24 @@ namespace quda {
           // split the problem and recurse. Splitting in x requires
           // memory reshuffling (unless y = 1).
 
-          auto result_ = std::make_pair( std::vector<T>((x.size() / 2) * y.size()),
-                                         std::vector<T>(result.size() - (x.size() / 2) * y.size()) );
+          auto result_ = std::make_pair(std::vector<T>((x.size() / 2) * y.size()),
+                                        std::vector<T>(result.size() - (x.size() / 2) * y.size()));
           auto x_ = bisect(x);
           auto z_ = bisect(z);
           auto w_ = bisect(w);
 
-          multiReduce_recurse<reducer_diag, reducer_off>(result_.first, x_.first, y, z_.first, w_.first, i_idx, j_idx, hermitian, tile_size);
-          multiReduce_recurse<reducer_diag, reducer_off>(result_.second, x_.second, y, z_.second, w_.second, i_idx + x_.first.size(), j_idx, hermitian, tile_size);
+          multiReduce_recurse<store_t, reducer_diag, reducer_off>(result_.first, x_.first, y, z_.first, w_.first, i_idx,
+                                                                  j_idx, hermitian, tile_size);
+          multiReduce_recurse<store_t, reducer_diag, reducer_off>(result_.second, x_.second, y, z_.second, w_.second,
+                                                                  i_idx + x_.first.size(), j_idx, hermitian, tile_size);
 
           result = join_row(result_, x.size() / 2, x.size() - x.size() / 2, y.size());
         }
       }
     }
 
-    template <template <typename ...> class ReducerDiagonal,
-              template <typename ...> class ReducerOffDiagonal, typename T,
-              typename Vx, typename Vy, typename Vz = Vx, typename Vw = Vx>
+    template <typename store_t, template <typename...> class ReducerDiagonal, template <typename...> class ReducerOffDiagonal,
+              typename T, typename Vx, typename Vy, typename Vz = Vx, typename Vw = Vx>
     class TileSizeTune : public Tunable
     {
       std::vector<T> &result;
@@ -289,25 +333,18 @@ namespace quda {
     public:
       TileSizeTune(std::vector<T> &result, Vx &x, Vy &y, Vz &z, Vw &w, bool hermitian, bool Anorm = false,
                    bool nested_policy = false) :
-        result(result),
-        x(x),
-        y(y),
-        z(z),
-        w(w),
-        hermitian(hermitian),
-        Anorm(Anorm)
+        result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
       {
         auto &x0 = x[0];
         auto &y0 = y[0];
 
         NYW_max = std::min(
           (y0.Precision() == QUDA_DOUBLE_PRECISION ?
-           max_YW_size<ReducerDiagonal<device_reduce_t, double>>(x.size(), x0.Precision(), y0.Precision()) :
-           max_YW_size<ReducerDiagonal<device_reduce_t, float>>(x.size(), x0.Precision(), y0.Precision())),
+             max_YW_size<ReducerDiagonal<device_reduce_t, double>>(x.size(), x0.Precision(), y0.Precision()) :
+             max_YW_size<ReducerDiagonal<device_reduce_t, float>>(x.size(), x0.Precision(), y0.Precision())),
           (y0.Precision() == QUDA_DOUBLE_PRECISION ?
-           max_YW_size<ReducerOffDiagonal<device_reduce_t, double>>(x.size(), x0.Precision(), y0.Precision()) :
-           max_YW_size<ReducerOffDiagonal<device_reduce_t, float>>(x.size(), x0.Precision(), y0.Precision()))
-                               );
+             max_YW_size<ReducerOffDiagonal<device_reduce_t, double>>(x.size(), x0.Precision(), y0.Precision()) :
+             max_YW_size<ReducerOffDiagonal<device_reduce_t, float>>(x.size(), x0.Precision(), y0.Precision())));
 
         max_tile_size = make_uint2(1, 1);
 
@@ -317,13 +354,13 @@ namespace quda {
         strcat(aux, y.AuxString().c_str());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
-	strcat(aux,",n=");
-	char size[8];
-	u64toa(size, x.size());
-	strcat(aux,size);
-	strcat(aux,",m=");
-	u64toa(size, y.size());
-	strcat(aux,size);
+        strcat(aux, ",n=");
+        char size[8];
+        u64toa(size, x.size());
+        strcat(aux, size);
+        strcat(aux, ",m=");
+        u64toa(size, y.size());
+        strcat(aux, size);
         u64toa(size, MAX_MULTI_BLAS_N);
         strcat(aux, ",multi-blas-n=");
         strcat(aux, size);
@@ -349,12 +386,14 @@ namespace quda {
           if (x.size() == 1) { // 1-d reduction
 
             max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
-            multiReduce_recurse<ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian, max_tile_size);
+            multiReduce_recurse<store_t, ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian,
+                                                                              max_tile_size);
 
           } else if (y.size() == 1) { // 1-d reduction
 
             max_tile_size = make_uint2(std::min((size_t)max_NXZ_power2(true), x.size()), 1);
-            multiReduce_recurse<ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian, max_tile_size);
+            multiReduce_recurse<store_t, ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian,
+                                                                              max_tile_size);
 
           } else { // 2-d reduction
 
@@ -368,12 +407,14 @@ namespace quda {
             for (unsigned int tile_size = 1;
                  tile_size <= max_tile_size.x && tile_size <= x.size() && (tile_size <= y.size() || y.size() == 1);
                  tile_size *= 2) {
-              multiReduce_recurse<ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian, make_uint2(tile_size, tile_size));
+              multiReduce_recurse<store_t, ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian,
+                                                                                make_uint2(tile_size, tile_size));
             }
 
             // also test case using a single kernel if both dimensions are less than max
             if (is_valid_NXZ(x.size(), true) && y.size() <= (unsigned int)NYW_max) {
-              multiReduce_recurse<ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian, make_uint2(x.size(), y.size()));
+              multiReduce_recurse<store_t, ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian,
+                                                                                make_uint2(x.size(), y.size()));
             }
           }
 
@@ -386,14 +427,16 @@ namespace quda {
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
-      void apply(const qudaStream_t &) override {
+      void apply(const qudaStream_t &) override
+      {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
         // it contains blocksize, grid size, etc. Since we're only tuning
         // a policy, we don't care about those sizes. That's why we only
         // tune "aux.x", which is the tile size.
-        multiReduce_recurse<ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian, make_uint2(tp.aux.x, tp.aux.y));
+        multiReduce_recurse<store_t, ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian,
+                                                                          make_uint2(tp.aux.x, tp.aux.y));
       }
 
       // aux.x is the tile size
@@ -428,7 +471,8 @@ namespace quda {
 
       bool advanceTuneParam(TuneParam &param) const override { return advanceAux(param); }
 
-      void initTuneParam(TuneParam &param) const override {
+      void initTuneParam(TuneParam &param) const override
+      {
         Tunable::initTuneParam(param);
         if (x.size() == 1 || y.size() == 1) {
           param.aux.x = max_tile_size.x;
@@ -441,7 +485,8 @@ namespace quda {
         param.aux.w = 0;
       }
 
-      void defaultTuneParam(TuneParam &param) const override {
+      void defaultTuneParam(TuneParam &param) const override
+      {
         Tunable::defaultTuneParam(param); // default is max tile size
         param.aux.x = max_tile_size.x;
         param.aux.y = max_tile_size.y;
@@ -453,15 +498,15 @@ namespace quda {
 
       long long bytes() const override { return 0; } // FIXME
 
-      void preTune() override { } // FIXME - use write to determine what needs to be saved
+      void preTune() override { }  // FIXME - use write to determine what needs to be saved
       void postTune() override { } // FIXME - use write to determine what needs to be saved
     };
 
-    template <template <typename ...> class ReducerDiagonal,
-              template <typename ...> class ReducerOffDiagonal, typename T, typename Vx, typename Vy>
+    template <typename store_t, template <typename...> class ReducerDiagonal,
+              template <typename...> class ReducerOffDiagonal, typename T, typename Vx, typename Vy>
     class TransposeTune : public Tunable
     {
-      using TileTuner = TileSizeTune<ReducerDiagonal, ReducerOffDiagonal, T, Vx, Vy, Vx, Vx>;
+      using TileTuner = TileSizeTune<store_t, ReducerDiagonal, ReducerOffDiagonal, T, Vx, Vy, Vx, Vx>;
       std::vector<T> &result;
       Vx &x;
       Vy &y;
@@ -470,11 +515,7 @@ namespace quda {
 
     public:
       TransposeTune(std::vector<T> &result, Vx &x, Vy &y, bool hermitian, bool Anorm = false) :
-        result(result),
-        x(x),
-        y(y),
-        hermitian(hermitian),
-        Anorm(Anorm)
+        result(result), x(x), y(y), hermitian(hermitian), Anorm(Anorm)
       {
         strcpy(aux, "policy,");
         strcat(aux, x.AuxString().c_str());
@@ -550,7 +591,7 @@ namespace quda {
           const auto xlen = x.size();
           const auto ylen = y.size();
           for (unsigned int j = 0; j < xlen; j++)
-            for (unsigned int i = 0; i < ylen; i++) result[i * xlen + j] = conj(result_trans[j * ylen + i]);
+            for (unsigned int i = 0; i < ylen; i++) result[i * xlen + j] = transpose_conj(result_trans[j * ylen + i]);
         } else {
           errorQuda("Unexpected transpose parameter %d", static_cast<int>(tp.aux.x));
         }
@@ -590,21 +631,22 @@ namespace quda {
 
       long long bytes() const override { return 0; } // FIXME
 
-      void preTune() override {}  // FIXME - use write to determine what needs to be saved
-      void postTune() override {} // FIXME - use write to determine what needs to be saved
+      void preTune() override { }  // FIXME - use write to determine what needs to be saved
+      void postTune() override { } // FIXME - use write to determine what needs to be saved
     };
 
     namespace block
     {
 
-      void reDotProduct(std::vector<double> &result, cvector_ref<const ColorSpinorField> &x,
-                        cvector_ref<const ColorSpinorField> &y)
+      template <typename store_t>
+      void reDotProduct_impl(std::vector<real_t> &result, cvector_ref<const ColorSpinorField> &x,
+                             cvector_ref<const ColorSpinorField> &y)
       {
         auto &x0 = x[0];
         auto &y0 = y[0];
 
         if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-        std::vector<double> result_tmp(x.size() * y.size(), 0.0);
+        std::vector<real_t> result_tmp(x.size() * y.size(), 0.0);
 
         if (x.size() == 1) {
           auto NYW_max = y0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -613,10 +655,10 @@ namespace quda {
 
           // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
           uint2 max_tile_size = make_uint2(1, std::min({NYW_max, (int)y.size(), x0.Ncolor() == 3 ? 32 : NYW_max}));
-          multiReduce_recurse<multiDot, multiDot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
+          multiReduce_recurse<store_t, multiDot, multiDot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
         } else if (y.size() == 1 && x0.Precision() == y0.Precision()) {
 
-          std::vector<double> result_trans(x.size() * y.size());
+          std::vector<real_t> result_trans(x.size() * y.size());
 
           // swap (x<->y and w<-z> when doing transpose calculation)
           auto NXZ_max = x0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -625,7 +667,7 @@ namespace quda {
 
           // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
           uint2 max_tile_size = make_uint2(1, std::min({NXZ_max, (int)x.size(), x0.Ncolor() == 3 ? 32 : NXZ_max}));
-          multiReduce_recurse<multiDot, multiDot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
+          multiReduce_recurse<store_t, multiDot, multiDot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
 
           // transpose the result if we are doing the transpose calculation
           const auto xlen = x.size();
@@ -634,9 +676,9 @@ namespace quda {
             for (unsigned int i = 0; i < ylen; i++) result_tmp[i * xlen + j] = result_trans[j * ylen + i];
 
         } else if (x0.Precision() == y0.Precision()) {
-          TransposeTune<multiDot, multiDot, double, decltype(x), decltype(y)>(result_tmp, x, y, false);
+          TransposeTune<store_t, multiDot, multiDot, real_t, decltype(x), decltype(y)>(result_tmp, x, y, false);
         } else {
-          TileSizeTune<multiDot, multiDot, double, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
+          TileSizeTune<store_t, multiDot, multiDot, real_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
         }
 
         // do a single multi-node reduction only once we have computed all local dot products
@@ -648,14 +690,15 @@ namespace quda {
         result = transpose(result_tmp, y.size(), x.size());
       }
 
-      void cDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
-                       cvector_ref<const ColorSpinorField> &y)
+      template <typename store_t>
+      void cDotProduct_impl(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
+                            cvector_ref<const ColorSpinorField> &y)
       {
         auto &x0 = x[0];
         auto &y0 = y[0];
 
         if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-        std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
+        std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
 
         if (x.size() == 1) {
           auto NYW_max = y0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -664,10 +707,10 @@ namespace quda {
 
           // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
           uint2 max_tile_size = make_uint2(1, std::min({NYW_max, (int)y.size(), x0.Ncolor() == 3 ? 32 : NYW_max}));
-          multiReduce_recurse<multiCdot, multiCdot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
+          multiReduce_recurse<store_t, multiCdot, multiCdot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
         } else if (y.size() == 1 && x0.Precision() == y0.Precision()) {
 
-          std::vector<Complex> result_trans(x.size() * y.size());
+          std::vector<complex_t> result_trans(x.size() * y.size());
 
           // swap (x<->y and w<-z> when doing transpose calculation)
           auto NXZ_max = x0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -676,18 +719,19 @@ namespace quda {
 
           // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
           uint2 max_tile_size = make_uint2(1, std::min({NXZ_max, (int)x.size(), x0.Ncolor() == 3 ? 32 : NXZ_max}));
-          multiReduce_recurse<multiCdot, multiCdot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
+          multiReduce_recurse<store_t, multiCdot, multiCdot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
 
           // transpose the result if we are doing the transpose calculation
           const auto xlen = x.size();
           const auto ylen = y.size();
           for (unsigned int j = 0; j < xlen; j++) {
-            for (unsigned int i = 0; i < ylen; i++) result_tmp[i * xlen + j] = conj(result_trans[j * ylen + i]);
+            for (unsigned int i = 0; i < ylen; i++)
+              result_tmp[i * xlen + j] = transpose_conj(result_trans[j * ylen + i]);
           }
         } else if (x0.Precision() == y0.Precision()) {
-          TransposeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, false);
+          TransposeTune<store_t, multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, false);
         } else {
-          TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
+          TileSizeTune<store_t, multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
         }
 
         // do a single multi-node reduction only once we have computed all local dot products
@@ -699,15 +743,17 @@ namespace quda {
         result = transpose(result_tmp, y.size(), x.size());
       }
 
-      void hDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
-                       cvector_ref<const ColorSpinorField> &y)
+      template <typename store_t>
+      void hDotProduct_impl(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
+                            cvector_ref<const ColorSpinorField> &y)
       {
         if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
         if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
-        std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
-        TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true,
-                                                                              false); // last false is b/c L2 norm
+        std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
+        TileSizeTune<store_t, multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(
+          result_tmp, x, y, x, x, true,
+          false); // last false is b/c L2 norm
 
         // do a single multi-node reduction only once we have computed all local dot products
         comm_allreduce_sum(result_tmp); // FIXME - could optimize this for Hermiticity as well
@@ -720,19 +766,20 @@ namespace quda {
         // we have only computed result on upper block trinagular part
         // so copy over to lower block tringaular
         for (auto i = 0u; i < x.size(); i++)
-          for (auto j = 0u; j < i; j++) result[i * y.size() + j] = conj(result[j * x.size() + i]);
+          for (auto j = 0u; j < i; j++) result[i * y.size() + j] = transpose_conj(result[j * x.size() + i]);
       }
 
       // for (p, Ap) norms in CG which are Hermitian.
-      void hDotProduct_Anorm(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
-                             cvector_ref<const ColorSpinorField> &y)
+      template <typename store_t>
+      void hDotProduct_Anorm_impl(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
+                                  cvector_ref<const ColorSpinorField> &y)
       {
         if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
         if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
-        std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
-        TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true,
-                                                                              true); // last true is b/c A norm
+        std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
+        TileSizeTune<store_t, multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true,
+                                                                                         true); // last true is b/c A norm
 
         // do a single multi-node reduction only once we have computed all local dot products
         comm_allreduce_sum(result_tmp);
@@ -745,48 +792,10 @@ namespace quda {
         // we have only computed result on upper block trinagular part
         // so copy over to lower block tringaular
         for (auto i = 0u; i < x.size(); i++)
-          for (auto j = 0u; j < i; j++) result[i * y.size() + j] = conj(result[j * x.size() + i]);
+          for (auto j = 0u; j < i; j++) result[i * y.size() + j] = transpose_conj(result[j * x.size() + i]);
       }
 
     } // namespace block
-
-    namespace legacy
-    {
-
-      void reDotProduct(double *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
-      {
-        std::vector<double> result_(x.size() * y.size());
-        vector_ref<const ColorSpinorField> x_;
-        for (auto &xi : x) x_.push_back(*xi);
-        vector_ref<const ColorSpinorField> y_;
-        for (auto &yi : y) y_.push_back(*yi);
-        blas::block::reDotProduct(result_, std::move(x_), std::move(y_));
-        memcpy(result, result_.data(), x.size() * y.size() * sizeof(double));
-      }
-
-      void cDotProduct(Complex *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
-      {
-        std::vector<Complex> result_(x.size() * y.size());
-        vector_ref<const ColorSpinorField> x_;
-        for (auto &xi : x) x_.push_back(*xi);
-        vector_ref<const ColorSpinorField> y_;
-        for (auto &yi : y) y_.push_back(*yi);
-        blas::block::cDotProduct(result_, std::move(x_), std::move(y_));
-        memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
-      }
-
-      void hDotProduct(Complex *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
-      {
-        std::vector<Complex> result_(x.size() * y.size());
-        vector_ref<const ColorSpinorField> x_;
-        for (auto &xi : x) x_.push_back(*xi);
-        vector_ref<const ColorSpinorField> y_;
-        for (auto &yi : y) y_.push_back(*yi);
-        blas::block::hDotProduct(result_, std::move(x_), std::move(y_));
-        memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
-      }
-
-    } // namespace legacy
 
   } // namespace blas
 

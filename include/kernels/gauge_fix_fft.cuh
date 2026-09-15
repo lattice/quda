@@ -83,11 +83,8 @@ namespace quda {
     Float alpha;
     int volume;
 
-    GaugeFixArg(GaugeField &data, double alpha) :
-      kernel_param(dim3(data.VolumeCB(), 2, 1)),
-      data(data),
-      alpha(static_cast<Float>(alpha)),
-      volume(data.Volume())
+    GaugeFixArg(GaugeField &data, real_t alpha) :
+      kernel_param(dim3(data.VolumeCB(), 2, 1)), data(data), alpha(static_cast<Float>(alpha)), volume(data.Volume())
     {
       for (int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       invpsq = (Float*)device_malloc(sizeof(Float) * volume);
@@ -150,7 +147,7 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityFFTArg : public ReduceArg<array<double, 2>> {
+  struct GaugeFixQualityFFTArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -159,7 +156,7 @@ namespace quda {
     int_fastdiv X[4];     // grid dimensions
     Gauge data;
     complex<real> *delta;
-    reduce_t result;
+    array<real_t, 2> result;
     int volume;
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
@@ -172,8 +169,8 @@ namespace quda {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    double getAction() { return result[0]; }
-    double getTheta() { return result[1]; }
+    real_t getAction() { return result[0]; }
+    real_t getTheta() { return result[1]; }
   };
 
   template <typename Arg> struct FixQualityFFT : plus<typename Arg::reduce_t> {
@@ -189,7 +186,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data{0, 0};
+      reduce_t data {};
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -226,7 +223,7 @@ namespace quda {
 
       //35
       //T=36*gauge_dir+65
-      return operator()(data, value);
+      return operator()(value, data);
     }
   };
 
