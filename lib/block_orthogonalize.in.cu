@@ -118,24 +118,30 @@ namespace quda {
     }
 
     template <typename Rotator, typename Vector>
-    void launch_host_(const TuneParam &tp, const qudaStream_t &stream)
+    void launch_host_(const qudaStream_t &stream)
     {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       using Args = Arg<false, Rotator, Vector>;
       Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
       using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
       sharedBytes = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
+      //printfQuda("blockOrtho setSharedBytes: %i\n", sharedBytes);
+      setSharedBytes(tp);
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
     }
 
     template <typename Rotator, typename Vector>
-    void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
+    void launch_device_(const qudaStream_t &stream)
     {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       using Args = Arg<true, Rotator, Vector>;
       Args arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
       arg.swizzle_factor = tp.aux.x;
       using Barg = BlockKernelArg<OrthoAggregates::block[0], Args>;
       sharedBytes = sharedMemSize<getKernelOps<BlockOrtho_<Barg>>>(tp.block, Barg(arg));
+      //printfQuda("blockOrtho setSharedBytes: %i\n", sharedBytes);
+      setSharedBytes(tp);
       launch_device<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
     }
@@ -143,7 +149,6 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       constexpr bool disable_ghost = true;
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER
             && B[0].FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -151,7 +156,7 @@ namespace quda {
             = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
           using Vector
             = FieldOrderCB<real, nSpin, nColor, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, bFloat, bFloat, disable_ghost>;
-          launch_host_<Rotator, Vector>(tp, stream);
+          launch_host_<Rotator, Vector>(stream);
         } else {
           errorQuda("Unsupported field order %d", V.FieldOrder());
         }
@@ -160,7 +165,7 @@ namespace quda {
           using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
           using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER, bFloat, bFloat, disable_ghost,
                                       isFixed<bFloat>::value>;
-          launch_device_<Rotator, Vector>(tp, stream);
+          launch_device_<Rotator, Vector>(stream);
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0].FieldOrder());
         }
@@ -194,6 +199,7 @@ namespace quda {
 #endif
     unsigned int sharedBytesPerBlock(const TuneParam &) const
     {
+      //printfQuda("blockOrtho getSharedBytes: %i\n", sharedBytes);
       return sharedBytes;
     }
 #endif
@@ -230,7 +236,8 @@ namespace quda {
       param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
       param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, 1, chiral_blocks);
       param.aux.x = 1; // swizzle factor
-      setSharedBytes(param);
+      //printfQuda("blockOrtho setSharedBytes: %i\n", sharedBytes);
+      //setSharedBytes(param);
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
