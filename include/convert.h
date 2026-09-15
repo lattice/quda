@@ -225,6 +225,28 @@ namespace quda
   }
 
   /**
+     @brief Convert a register value for field storage.
+     If the source is fp32mp2_low, renormalize the pair first so
+     memory holds a normalized (hi, lo).  MID/HIGH sources are already
+     renormalized by arithmetic, so they are converted only.
+     @tparam Dst Destination/storage scalar type
+     @tparam Src Source/register scalar type
+     @param[in] s Register value
+     @return Value converted for storage
+   */
+  template <typename Dst, typename Src> __host__ __device__ inline Dst store_cast(const Src &s)
+  {
+#if defined(QUDA_FPMP_FLOATFLOAT)
+    if constexpr (std::is_same_v<Src, floatfloat_low>) {
+      return static_cast<Dst>(cuda::experimental::renormalize(s));
+    } else
+#endif
+    {
+      return static_cast<Dst>(s);
+    }
+  }
+
+  /**
      @brief Specialized variants of the copy function that include an
      additional scale factor.  Note the scale factor is ignored unless
      the input type (b) is either a short or char vector.
@@ -327,16 +349,21 @@ namespace quda
      @brief Save a contiguous site of complex values to a non-native
      field order, converting from the register type to the storage type.
   */
-  template <int len, typename real, typename Float>
-  __device__ __host__ inline void save_convert(Float *out, const complex<real> v[len])
+  template <int len, typename In, typename Float>
+  __device__ __host__ inline void save_convert(Float *out, const quda::complex<In> v[len])
   {
-    if constexpr (std::is_same_v<real, Float>) {
-      block_store<complex<real>, len>(reinterpret_cast<complex<real> *>(out), v);
+#if defined(QUDA_FPMP_FLOATFLOAT)
+    constexpr bool low_src = std::is_same_v<In, floatfloat_low>;
+#else
+    constexpr bool low_src = false;
+#endif
+    if constexpr (std::is_same_v<In, Float> && !low_src) {
+      block_store<quda::complex<In>, len>(reinterpret_cast<quda::complex<In> *>(out), v);
     } else {
       complex<Float> tmp[len];
 #pragma unroll
       for (int i = 0; i < len; i++)
-        tmp[i] = {static_cast<Float>(v[i].real()), static_cast<Float>(v[i].imag())};
+        tmp[i] = {store_cast<Float>(v[i].real()), store_cast<Float>(v[i].imag())};
       block_store<complex<Float>, len>(reinterpret_cast<complex<Float> *>(out), tmp);
     }
   }

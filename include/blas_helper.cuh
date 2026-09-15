@@ -389,8 +389,8 @@ namespace quda
         array<real, len> v_;
 #pragma unroll
         for (int i = 0; i < n; i++) {
-          v_[2 * i + 0] = v[i].real();
-          v_[2 * i + 1] = v[i].imag();
+          v_[2 * i + 0] = store_cast<real>(v[i].real());
+          v_[2 * i + 1] = store_cast<real>(v[i].imag());
         }
 
         if constexpr (!(n == 3 && isHalf<store_t>::value)) {

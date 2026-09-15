@@ -750,15 +750,20 @@ namespace quda {
 
         /**
            @brief Store accessor for a single chiral block
+           @tparam In Register scalar type of the incoming block
            @param[out] v Vector of elements to be stored
            @param[in] x Checkerboarded site index
            @param[in] parity Field parity
            @param[in] chirality Chiral block index
          */
-        __device__ __host__ inline void save(const real v[block], int x, int parity, int chirality) const
+        template <typename In>
+        __device__ __host__ inline void save(const In v[block], int x, int parity, int chirality) const
         {
+          array<real, block> in_r;
+#pragma unroll
+          for (int i = 0; i < block; i++) in_r[i] = store_cast<real>(v[i]);
           array<real, compressed_block> tmp;
-          recon.pack(tmp, v);
+          recon.pack(tmp, in_r);
           raw_save(tmp.data, x, parity, chirality);
         }
 
@@ -777,12 +782,13 @@ namespace quda {
 
         /**
            @brief Store accessor for the clover matrix
+           @tparam In Register scalar type of the incoming matrix
            @param[out] v Vector of elements to be stored
            @param[in] x Checkerboarded site index
            @param[in] parity Field parity
-           @param[in] chirality Chiral block index
          */
-        __device__ __host__ inline void save(const real v[], int x, int parity) const
+        template <typename In>
+        __device__ __host__ inline void save(const In v[], int x, int parity) const
         {
 #pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) save(&v[chirality * block], x, parity, chirality);
@@ -850,12 +856,13 @@ namespace quda {
           for (int i = 0; i < length; i++) v[i] = half * static_cast<RegType>(v_[i]);
         }
 
-        __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
+        template <typename In>
+        __device__ __host__ inline void save(const In v[length], int x, int parity) const
         {
           Float v_[length];
-          const auto two = static_cast<RegType>(2.0);
+          const auto two = static_cast<In>(2.0);
 #pragma unroll
-          for (int i = 0; i < length; i++) v_[i] = static_cast<Float>(two * v[i]);
+          for (int i = 0; i < length; i++) v_[i] = store_cast<Float>(two * v[i]);
           block_store<Float, length>(&clover[parity * offset + x * length], v_);
         }
 
@@ -914,15 +921,17 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
+        template <typename In>
+        __device__ __host__ inline void save(const In v[length], int x, int parity) const
         {
           // the factor of 2.0 comes from undoing the basis change
+          const auto two = static_cast<In>(2.0);
 #pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) {
             // set diagonal elements
 #pragma unroll
             for (int i = 0; i < 6; i++) {
-              diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = static_cast<Float>(static_cast<RegType>(2.0)*v[chirality*36 + i]);
+              diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = store_cast<Float>(two * v[chirality*36 + i]);
             }
 
             // the off diagonal elements
@@ -932,7 +941,7 @@ namespace quda {
 	      int off = i/2;
 	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
 	      offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x]
-                = static_cast<Float>(static_cast<RegType>(2.0)*v[chirality*36 + 6 + i]);
+                = store_cast<Float>(two * v[chirality*36 + 6 + i]);
             }
           }
         }
