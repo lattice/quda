@@ -578,7 +578,7 @@ namespace quda
 
   template <typename Float_, int nColor_, QudaReconstructType recon, bool heatbath_> struct MonteArg : kernel_param<> {
     using Float = Float_;
-    using real = typename mapper<Float>::type;
+    using real = typename promote_mapper<Float>::type;
     static constexpr int nColor = nColor_;
     using Gauge = typename gauge_mapper<Float, recon>::type;
     static constexpr bool heatbath = heatbath_;

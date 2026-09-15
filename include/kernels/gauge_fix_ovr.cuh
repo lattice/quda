@@ -75,7 +75,8 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
+      using reduce_scalar = typename reduce_t::value_type;
+      data[0] = static_cast<reduce_scalar>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
       //2
       //load downward links
 #pragma unroll
@@ -88,7 +89,7 @@ namespace quda {
       //18
       SubTraceUnit(delta);
       //12
-      data[1] = getRealTraceUVdagger(delta, delta);
+      data[1] = static_cast<reduce_scalar>(getRealTraceUVdagger(delta, delta));
       //35
       //T=36*gauge_dir+65
 
@@ -101,7 +102,7 @@ namespace quda {
    */
   template <typename store_t, QudaReconstructType recon, int gauge_dir_, bool halo_, int type_>
   struct GaugeFixArg : kernel_param<> {
-    using real = typename mapper<store_t>::type;
+    using real = typename promote_mapper<store_t>::type;
     static constexpr int gauge_dir = gauge_dir_;
     static constexpr bool halo = halo_;
     static constexpr int type = type_;

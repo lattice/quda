@@ -209,6 +209,26 @@ namespace quda {
   };
 
   /**
+     @brief Map a storage or precision type to the register type used
+     by kernels that must compute above native storage precision.
+     On LOW-accuracy fp32mp2 builds, native double fields store
+     fp32mp2_low but use renormalized fp32mp2_mid in registers so
+     iterated SU(N) updates stay in the group.  Otherwise this is
+     identical to mapper.
+     @tparam T Storage or precision type
+   */
+  template <typename T> struct promote_mapper : mapper<T> {
+  };
+#if defined(QUDA_FPMP_FLOATFLOAT) && defined(QUDA_FPMP_FLOATFLOAT_ACCURACY_LOW)
+  template <> struct promote_mapper<double> {
+    using type = floatfloat_mid;
+  };
+  template <> struct promote_mapper<floatfloat_low> {
+    using type = floatfloat_mid;
+  };
+#endif
+
+  /**
      Map a precision tag to the scalar representation used by native
      field-order storage.  Legacy field orders continue to use the
      precision tag itself as their storage type.

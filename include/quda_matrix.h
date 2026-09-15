@@ -88,11 +88,21 @@ namespace quda {
             data[i] = T(static_cast<real>(b.data[i].real()), static_cast<real>(b.data[i].imag()));
 	}
 
-	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_wrapper<real, S> &s);
+        /**
+           @brief Construct a Matrix from a wrapped gauge-field location.
+           If the wrapper scalar type differs from the matrix register type, convert after loading.
+           @param[in] s Wrapped gauge accessor at a field location
+         */
+	template<typename Float, typename S>
+	  __device__ __host__ inline Matrix(const gauge_wrapper<Float, S> &s);
 
-	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_wrapper<real, S> &s);
+        /**
+           @brief Assign from a wrapped gauge-field location.
+           If the wrapper scalar type differs from the matrix register type, convert after loading.
+           @param[in] s Wrapped gauge accessor at a field location
+         */
+	template<typename Float, typename S>
+	  __device__ __host__ inline void operator=(const gauge_wrapper<Float, S> &s);
 
 	template<typename S>
 	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<real, S> &s);

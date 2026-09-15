@@ -68,26 +68,56 @@ namespace quda {
       {
         gauge.save(a.data, x_cb, dim, parity);
       }
+
+      /**
+         @brief Store a Matrix into this wrapped field location.
+         If the matrix scalar type differs from the accessor type, convert first.
+         @tparam U Matrix scalar type
+         @tparam N Matrix rank
+         @param[in] a Matrix we want to store in this accessor
+       */
+      template <typename U, int N>
+      __device__ __host__ inline void operator=(const Matrix<complex<U>, N> &a) const
+      {
+        if constexpr (std::is_same_v<Float, U>) {
+          gauge.save(a.data, x_cb, dim, parity);
+        } else {
+          Matrix<complex<Float>, N> tmp(a);
+          gauge.save(tmp.data, x_cb, dim, parity);
+        }
+      }
     };
 
   /**
-     @brief Copy constructor for the Matrix class with a gauge_wrapper input.
+     @brief Assignment operator for the Matrix class with a gauge_wrapper input.
+     If the wrapper scalar type differs from the matrix register type, convert after loading.
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    template <typename Float, typename S>
+    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<Float,S> &a) {
+    if constexpr (std::is_same_v<real, Float>) {
+      a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    } else {
+      Matrix<complex<Float>, N> tmp(a);
+      *this = tmp;
+    }
   }
 
   /**
-     @brief Assignment operator for the Matrix class with a gauge_wrapper input.
+     @brief Constructor for the Matrix class with a gauge_wrapper input.
+     If the wrapper scalar type differs from the matrix register type, convert after loading.
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    template <typename Float, typename S>
+    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<Float,S> &a) {
+    if constexpr (std::is_same_v<real, Float>) {
+      a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    } else {
+      Matrix<complex<Float>, N> tmp(a);
+      *this = tmp;
+    }
   }
 
   /**
