@@ -168,6 +168,8 @@ namespace quda
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
+    reportMatNorm(mat_norm);
+
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {

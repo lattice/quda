@@ -192,6 +192,13 @@ namespace quda
     }
   }
 
+  void EigenSolver::reportMatNorm(real_t krylov_norm)
+  {
+    real_t norm = eig_param->use_poly_acc ? static_cast<real_t>(eig_param->a_max) : krylov_norm;
+    eig_param->mat_norm = static_cast<std::remove_cvref_t<decltype(eig_param->mat_norm)>>(norm);
+    logQuda(QUDA_VERBOSE, "Operator norm estimate: %e\n", eig_param->mat_norm);
+  }
+
   void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     resize(kSpace, n_kr + block_size, QUDA_ZERO_FIELD_CREATE); // increase Krylov space to n_kr + block_size

@@ -118,6 +118,16 @@ namespace quda
     real_t setEpsilon(const QudaPrecision prec);
 
     /**
+       @brief Record an estimate of the operator norm in eig_param->mat_norm.
+       The Krylov space samples the whole spectrum, so the largest magnitude
+       Ritz value of the projected matrix estimates ||A|| even for an SR solve;
+       this is ARPACK's anorm.  Under polynomial acceleration the projected
+       matrix belongs to the accelerated operator, so a_max is reported instead.
+       @param[in] krylov_norm Largest magnitude Ritz value of the projected matrix
+    */
+    void reportMatNorm(real_t krylov_norm);
+
+    /**
        @brief Query the eigensolver precision to stdout
        @param[in] prec Precision of the solver instance
     */
