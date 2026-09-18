@@ -289,7 +289,10 @@ namespace quda {
   };
 
 #ifdef QUDA_FPMP_FLOATFLOAT
-  // floatfloat is an eight-byte pair, so use the same width containers as double.
+  // floatfloat is an eight-byte pair.  Width-1/2/3/8 containers match double.
+  // Width 4 must be float8, not double4: the limbs live in 32-bit registers, so
+  // the "d" constraints on ld/st.global.v4.f64 make nvcc stage the vector in
+  // local memory.  float8 uses v8.f32, which is the register class already in use.
 #define QUDA_FPMP_DECLARE_VECTOR_TYPE(FF)                                                                              \
   template <> struct VectorType<FF, 1> {                                                                               \
     using type = double;                                                                                               \
@@ -301,7 +304,7 @@ namespace quda {
     using type = double3;                                                                                              \
   };                                                                                                                   \
   template <> struct VectorType<FF, 4> {                                                                               \
-    using type = double4;                                                                                              \
+    using type = float8;                                                                                               \
   };                                                                                                                   \
   template <> struct VectorType<FF, 8> {                                                                               \
     using type = double8;                                                                                              \
