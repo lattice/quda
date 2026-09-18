@@ -326,6 +326,14 @@ namespace quda
     return true;
   }
 
+  /**
+     Unroll factor for the 4-d hop loop in Wilson-like dslash.
+     fp32mp2 kernels are I-cache limited if this loop is fully unrolled;
+     IEEE types keep full unroll.  Staggered hops stay fully unrolled
+     regardless of precision.
+  */
+  template <typename real> constexpr int wilson_dslash_hop_unroll = is_floatfloat_v<real> ? 1 : 4;
+
   template <typename Float_, int nDim_, typename DDArg, int nFace_ = 1, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;

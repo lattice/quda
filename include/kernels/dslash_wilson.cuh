@@ -31,6 +31,7 @@ namespace quda
                                     QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
 
     typedef typename mapper<Float>::type real;
+    static constexpr int hop_unroll = wilson_dslash_hop_unroll<real>;
 
     F out[MAX_MULTI_RHS]; /** output vector field set */
     F in[MAX_MULTI_RHS];  /** input vector field set */
@@ -131,7 +132,7 @@ namespace quda
     real bwd_coeff_3
       = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
 
-#pragma unroll
+#pragma unroll Arg::hop_unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       // Forward gather - compute fwd offset for vector fetch
       if (arg.dd_in.doHopping(coord, d, +1)) {
