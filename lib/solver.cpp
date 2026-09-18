@@ -521,17 +521,9 @@ namespace quda {
 
   double Solver::precisionEpsilon(QudaPrecision prec) const
   {
-    double eps = 0.;
     if (prec == QUDA_INVALID_PRECISION) { prec = param.precision; }
 
-    switch (prec) {
-    case QUDA_DOUBLE_PRECISION: eps = compute_epsilon<double>() / 2.; break;
-    case QUDA_SINGLE_PRECISION: eps = compute_epsilon<float>() / 2.; break;
-    case QUDA_HALF_PRECISION: eps = std::pow(2., -13); break;
-    case QUDA_QUARTER_PRECISION: eps = std::pow(2., -6); break;
-    default: errorQuda("Invalid precision %d", param.precision); break;
-    }
-    return eps;
+    return 0.5 * compute_epsilon(prec);
   }
 
   void MultiShiftSolver::create(const std::vector<ColorSpinorField> &x, const ColorSpinorField &b)

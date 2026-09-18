@@ -642,16 +642,7 @@ namespace quda {
      * @brief Helper function that returns the default tolerance used by SU(3) projection
      * @return The default tolerance, which is ~10x epsilon
      */
-    double toleranceSU3() const
-    {
-      // ~10x the epsilon of the type the projection is computed in, which is
-      // not the storage type when a pseudo-double compute type is configured
-      switch (precision) {
-      case QUDA_DOUBLE_PRECISION: return 10.0 * compute_epsilon<double>();
-      case QUDA_SINGLE_PRECISION: return 10.0 * compute_epsilon<float>();
-      default: return 1e-6;
-      }
-    }
+    double toleranceSU3() const { return 10.0 * compute_epsilon(precision); }
 
     /**
        @brief Return the shifted gauge field by shift in each

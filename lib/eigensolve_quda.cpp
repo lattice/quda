@@ -229,15 +229,11 @@ namespace quda
 
   real_t EigenSolver::setEpsilon(const QudaPrecision prec)
   {
-    real_t eps = 0.0;
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION: eps = compute_epsilon<double>(); break;
-    case QUDA_SINGLE_PRECISION: eps = compute_epsilon<float>(); break;
-    case QUDA_HALF_PRECISION: eps = 2e-3; break;
-    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
-    default: errorQuda("Invalid precision %d", prec);
+    case QUDA_HALF_PRECISION: return 2e-3;
+    case QUDA_QUARTER_PRECISION: return 5e-2;
+    default: return compute_epsilon(prec);
     }
-    return eps;
   }
 
   void EigenSolver::queryPrec(const QudaPrecision prec)
