@@ -220,8 +220,8 @@ namespace quda
     };
 
     template <typename real_reduce_t, typename real>
-    struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
-      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+    struct multiCdotCopy : public MultiReduceFunctor<array<real_reduce_t, 2>, complex<real>> {
+      using reduce_t = array<real_reduce_t, 2>;
       static constexpr memory_access<1, 1> read { };
       static constexpr memory_access<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;

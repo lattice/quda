@@ -214,22 +214,6 @@ namespace quda
     /**
        Functor to perform the operation y = a*x + b*y  (complex-valued)
     */
-    template <typename T>
-    __device__ __host__ void _caxpby(const complex<T> &a, const typename VectorType<T, 2>::type &x,
-                                     const complex<T> &b, typename VectorType<T, 2>::type &y)
-    {
-      typename VectorType<T, 2>::type yy;
-      yy.x = a.x * x.x;
-      yy.x -= a.y * x.y;
-      yy.x += b.x * y.x;
-      yy.x -= b.y * y.y;
-      yy.y = a.y * x.x;
-      yy.y += a.x * x.y;
-      yy.y += b.y * y.x;
-      yy.y += b.x * y.y;
-      y = yy;
-    }
-
     template <typename real> struct caxpby_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
