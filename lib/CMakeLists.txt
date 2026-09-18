@@ -874,7 +874,7 @@ endif()
 
 set(QUDA_REDUCTION_ALGORITHM
     NAIVE
-    CACHE STRING "set the reduction algorithm (NAIVE, KAHAN, REPRODUCIBLE)")
+    CACHE STRING "set the reduction algorithm (NAIVE, KAHAN, REPRODUCIBLE). REPRODUCIBLE requires QUDA_REDUCTION_TYPE=double")
 set_property(CACHE QUDA_REDUCTION_ALGORITHM PROPERTY STRINGS NAIVE KAHAN REPRODUCIBLE)
 if(${QUDA_REDUCTION_ALGORITHM} STREQUAL "NAIVE")
   set(QUDA_REDUCTION_ALGORITHM_NAIVE 1)
@@ -883,6 +883,12 @@ elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "KAHAN")
   message(FATAL_ERROR "QUDA_REDUCTION_ALGORITHM=KAHAN is not implemented yet "
                       "(no kahan_t definition). Use NAIVE or REPRODUCIBLE.")
 elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "REPRODUCIBLE")
+  # RFA / reproducible reductions are IEEE-double only.  They do not
+  # currently work with doubledouble or float-float accumulators.
+  if(NOT QUDA_REDUCTION_TYPE STREQUAL "double")
+    message(FATAL_ERROR "QUDA_REDUCTION_ALGORITHM=REPRODUCIBLE requires QUDA_REDUCTION_TYPE=double "
+                        "(IEEE double). It is not supported with '${QUDA_REDUCTION_TYPE}'.")
+  endif()
   set(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE 1)
 else()
   message(FATAL_ERROR "Invalid value for QUDA_REDUCTION_ALGORITHM: '${QUDA_REDUCTION_ALGORITHM}'. "
