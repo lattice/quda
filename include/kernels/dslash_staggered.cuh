@@ -175,7 +175,7 @@ namespace quda
 
       // standard - forward direction
       if (arg.dd_in.doHopping(coord, d, +1)) {
-        const bool ghost = coord1.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord1.in_boundary_at(1, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
@@ -206,7 +206,7 @@ namespace quda
 
       // improved - forward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, +3)) {
-        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary_at(1, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
           const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback.Ghost(d, ghost_idx, 1 - parity)) :
@@ -235,7 +235,7 @@ namespace quda
 
       if (arg.dd_in.doHopping(coord, d, -1)) {
         // Backward gather - compute back offset for spinor and gauge fetch
-        const bool ghost = coord1.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord1.in_boundary_at(0, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
@@ -269,7 +269,7 @@ namespace quda
 
       // improved - backward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, -3)) {
-        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary_at(0, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const Link L = static_cast<const Link>(arg.L.Ghost(d, ghost_idx, 1 - parity));
