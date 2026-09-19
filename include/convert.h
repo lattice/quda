@@ -305,7 +305,7 @@ namespace quda
   {
     static_assert(n % 2 == 0);
     constexpr_for<0, n, 2>([&](auto i) {
-      auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, c);
+      auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, static_cast<float>(c));
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
     });
