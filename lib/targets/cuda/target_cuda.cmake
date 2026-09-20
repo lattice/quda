@@ -131,6 +131,29 @@ set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTU
 
 message(STATUS "QUDA_GPU_ARCH: ${QUDA_GPU_ARCH}")
 
+# Low FP64:FP32 parts (32:1 or 64:1). First-configure defaults: bulk float-float
+# low, reductions mid. High-FP64 parts (70/80/90/100/107) stay IEEE double.
+set(_quda_low_fp64_caps 72 75 86 87 89 103 110 120 121)
+string(REGEX MATCH "^[0-9]+" _quda_fp64_cap "${QUDA_COMPUTE_CAPABILITY}")
+if(_quda_fp64_cap IN_LIST _quda_low_fp64_caps)
+  set(QUDA_FPMP_FLOATFLOAT_DEFAULT ON)
+  set(QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT low)
+  # An explicit QUDA_FPMP_FLOATFLOAT=OFF has to leave the reductions on IEEE double
+  if(DEFINED QUDA_FPMP_FLOATFLOAT AND NOT QUDA_FPMP_FLOATFLOAT)
+    set(QUDA_REDUCTION_TYPE_DEFAULT double)
+  else()
+    set(QUDA_REDUCTION_TYPE_DEFAULT floatfloat_mid)
+  endif()
+  message(STATUS "Low-FP64 arch ${QUDA_GPU_ARCH}: default float-float bulk=low, "
+                 "reductions=${QUDA_REDUCTION_TYPE_DEFAULT}")
+else()
+  set(QUDA_FPMP_FLOATFLOAT_DEFAULT OFF)
+  set(QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT high)
+  set(QUDA_REDUCTION_TYPE_DEFAULT double)
+endif()
+unset(_quda_low_fp64_caps)
+unset(_quda_fp64_cap)
+
 # ######################################################################################################################
 # data order variables
 cmake_dependent_option(LDG256 "are 256-bit load instructions supported" ON
@@ -541,9 +564,59 @@ else()
   # Use the CUDA toolkit's CCCL (the same one NVSHMEM 3.x's config find_dependency
   # resolves to) so QUDA and NVSHMEM share ONE CCCL -> no libcudacxx/cub clash.
   # QUDA requires CUDAToolkit, so CUDAToolkit_LIBRARY_ROOT points at the toolkit.
-  find_package(CCCL REQUIRED CONFIG
-      HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl")
+  find_package(CCCL CONFIG
+      HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl"
+            "${CUDAToolkit_LIBRARY_ROOT}/lib64/cmake/cccl")
+  if(NOT TARGET CCCL::CCCL)
+    message(FATAL_ERROR
+            "QUDA_DOWNLOAD_CCCL=OFF but CCCL was not found in the CUDA toolkit "
+            "(looked under ${CUDAToolkit_LIBRARY_ROOT}). "
+            "Update the toolkit CCCL, set QUDA_DOWNLOAD_CCCL=ON, or install CCCL so CMake can find it.")
+  endif()
 endif()
+
+# FPMP options are declared after this file returns. Use cache values when the
+# user already passed -D, otherwise the same defaults option() will apply.
+set(_quda_need_fpmp FALSE)
+if(NOT DEFINED QUDA_FPMP_DOUBLEDOUBLE OR QUDA_FPMP_DOUBLEDOUBLE)
+  set(_quda_need_fpmp TRUE)
+endif()
+if(DEFINED QUDA_FPMP_FLOATFLOAT)
+  if(QUDA_FPMP_FLOATFLOAT)
+    set(_quda_need_fpmp TRUE)
+  endif()
+elseif(QUDA_FPMP_FLOATFLOAT_DEFAULT)
+  set(_quda_need_fpmp TRUE)
+endif()
+
+set(_quda_fpmp_hints)
+if(DEFINED cccl_SOURCE_DIR)
+  list(APPEND _quda_fpmp_hints "${cccl_SOURCE_DIR}/libcudacxx/include" "${cccl_SOURCE_DIR}/include")
+endif()
+if(CUDAToolkit_INCLUDE_DIRS)
+  list(APPEND _quda_fpmp_hints ${CUDAToolkit_INCLUDE_DIRS})
+endif()
+if(CUDAToolkit_LIBRARY_ROOT)
+  list(APPEND _quda_fpmp_hints "${CUDAToolkit_LIBRARY_ROOT}/include")
+endif()
+find_path(QUDA_CCCL_FPMP_INCLUDE
+          NAMES cuda/fpmp
+          HINTS ${_quda_fpmp_hints}
+          DOC "Directory containing CCCL <cuda/fpmp>")
+mark_as_advanced(QUDA_CCCL_FPMP_INCLUDE)
+if(QUDA_CCCL_FPMP_INCLUDE)
+  message(STATUS "CCCL FPMP headers: ${QUDA_CCCL_FPMP_INCLUDE}")
+elseif(_quda_need_fpmp)
+  message(FATAL_ERROR
+          "The selected CCCL does not provide FPMP (<cuda/fpmp>), which this build needs "
+          "(QUDA_FPMP_DOUBLEDOUBLE and/or QUDA_FPMP_FLOATFLOAT is on; low-FP64 arches default float-float on). "
+          "Update CCCL to 3.6+ / a toolkit that ships FPMP, set QUDA_DOWNLOAD_CCCL=ON, "
+          "or disable FPMP with -DQUDA_FPMP_FLOATFLOAT=OFF -DQUDA_FPMP_DOUBLEDOUBLE=OFF.")
+else()
+  message(STATUS "CCCL has no FPMP headers; OK because QUDA_FPMP_DOUBLEDOUBLE and QUDA_FPMP_FLOATFLOAT are OFF")
+endif()
+unset(_quda_fpmp_hints)
+unset(_quda_need_fpmp)
 target_link_libraries(quda PRIVATE CCCL::CCCL)
 target_link_libraries(quda_cpp PRIVATE CCCL::CCCL)
 
