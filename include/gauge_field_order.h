@@ -273,7 +273,7 @@ namespace quda {
       {
         complex<storeFloat> tmp = v[idx];
         if constexpr (fixed) return scale_inv * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        return complex<Float>(tmp.x, tmp.y);
+        return complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
       }
 
       /**

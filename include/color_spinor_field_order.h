@@ -488,7 +488,7 @@ namespace quda
       {
         if (!fixed) {
           complex<storeFloat> tmp = v[idx];
-          return complex<Float>(tmp.real(), tmp.imag());
+          return complex<Float>(static_cast<Float>(tmp.real()), static_cast<Float>(tmp.imag()));
         } else {
           complex<storeFloat> tmp = v[idx];
           Float norm_ = block_float ? norm[norm_idx] : scale_inv;
@@ -502,7 +502,7 @@ namespace quda
       template <typename theirFloat> __device__ __host__ inline operator complex<theirFloat>() const
       {
         auto out = static_cast<complex<Float>>(*this);
-        return complex<theirFloat>(out.real(), out.imag());
+        return complex<theirFloat>(static_cast<theirFloat>(out.real()), static_cast<theirFloat>(out.imag()));
       }
 
       /**
