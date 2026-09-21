@@ -5,11 +5,11 @@
 #if defined(QUDA_TARGET_CUDA) && defined(QUDA_FPMP_DOUBLEDOUBLE)
 #include <cuda/fpmp>
 #if defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW)
-static_assert(std::is_base_of_v<cuda::experimental::fp64mp2_low, doubledouble>);
+static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_low>);
 #elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID)
-static_assert(std::is_base_of_v<cuda::experimental::fp64mp2_mid, doubledouble>);
+static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_mid>);
 #elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_HIGH)
-static_assert(std::is_base_of_v<cuda::experimental::fp64mp2_high, doubledouble>);
+static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_high>);
 #endif
 #endif
 
