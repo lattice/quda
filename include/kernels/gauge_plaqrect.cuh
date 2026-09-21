@@ -108,7 +108,7 @@ namespace quda
     // return the rectangle and plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t plaqRect {};
+      array<reduction_t, 4> plaqRect {};
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
