@@ -67,7 +67,6 @@ namespace quda
 
 #ifdef QUDA_USE_QUAD_SCALAR
 
-#include <quadmath.h>
 #include <quad_scalar_test_utils.h>
 
 namespace quda
@@ -80,8 +79,8 @@ namespace quda
     const float128_t ref = static_cast<float128_t>(1.0) + static_cast<float128_t>(1e-20);
     const float128_t tol = static_cast<float128_t>(1e-30);
 
-    EXPECT_LT(fabsq(from_dd - ref), tol);
-    EXPECT_GT(fabsq(from_dd - from_head), static_cast<float128_t>(1e-25));
+    EXPECT_LT(fp128::fabs(from_dd - ref), tol);
+    EXPECT_GT(fp128::fabs(from_dd - from_head), static_cast<float128_t>(1e-25));
     EXPECT_EQ(from_dd, static_cast<float128_t>(x));
   }
 
@@ -92,20 +91,20 @@ namespace quda
     const float128_t got = static_cast<float128_t>(x);
 
     const double head_only = x.hi();
-    EXPECT_GT(fabsq(got - static_cast<float128_t>(head_only)), static_cast<float128_t>(1e-6));
-    EXPECT_LT(fabsq(got - ref) / ref, static_cast<float128_t>(1e-30));
+    EXPECT_GT(fp128::fabs(got - static_cast<float128_t>(head_only)), static_cast<float128_t>(1e-6));
+    EXPECT_LT(fp128::fabs(got - ref) / ref, static_cast<float128_t>(1e-30));
   }
 
   TEST(QuadReduction, rel_error_in_quad_precision)
   {
-    const __float128 a = static_cast<__float128>(1.0) + static_cast<__float128>(1e-20);
-    const __float128 b = static_cast<__float128>(1.0);
-    const __float128 err = rel_error(a, b);
+    const float128_t a = static_cast<float128_t>(1.0) + static_cast<float128_t>(1e-20);
+    const float128_t b = static_cast<float128_t>(1.0);
+    const float128_t err = rel_error(a, b);
     const double err_d = to_double(err);
 
-    const __float128 target = static_cast<__float128>(1e-20);
-    EXPECT_LT(fabsq(err - target) / target, static_cast<__float128>(1e-10));
-    // rel_error keeps ~1e-20 in __float128; folding through double would crush this to 0
+    const float128_t target = static_cast<float128_t>(1e-20);
+    EXPECT_LT(fp128::fabs(err - target) / target, static_cast<float128_t>(1e-10));
+    // rel_error keeps ~1e-20 in float128_t; folding through double would crush this to 0
     EXPECT_GT(err_d, 1e-21);
     EXPECT_LT(err_d, 1e-15);
   }
