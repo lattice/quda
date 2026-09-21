@@ -60,8 +60,8 @@ namespace quda {
         local += Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
       }
 
-      return operator()(value,
-                        {static_cast<device_reduce_t>(local.real()), static_cast<device_reduce_t>(local.imag())});
+      const array<reduction_t, 2> site {static_cast<reduction_t>(local.real()), static_cast<reduction_t>(local.imag())};
+      return operator()(value, site);
     }
   };
 

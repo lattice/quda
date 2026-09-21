@@ -42,7 +42,7 @@ namespace quda
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
-      reduce_t E_local {};
+      array<reduction_t, 3> E_local {};
       auto &Q = E_local[2];
       real E_compute[2] = {real(0), real(0)};
 
@@ -66,8 +66,8 @@ namespace quda
         else
           E_compute[1] -= getTrace(tmp * tmp).real(); // temporal
       }
-      E_local[0] = static_cast<device_reduce_t>(E_compute[0]);
-      E_local[1] = static_cast<device_reduce_t>(E_compute[1]);
+      E_local[0] = static_cast<reduction_t>(E_compute[0]);
+      E_local[1] = static_cast<reduction_t>(E_compute[1]);
 
       // now compute topological charge
       real Q_idx = real(0);
@@ -84,7 +84,7 @@ namespace quda
       for (int i=0; i<3; i++) i % 2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
       const real q_site = static_cast<real>(Q_idx) * q_norm;
       if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = static_cast<typename Arg::Float>(q_site);
-      Q = static_cast<device_reduce_t>(q_site);
+      Q = static_cast<reduction_t>(q_site);
 
       return operator()(E, E_local);
     }
