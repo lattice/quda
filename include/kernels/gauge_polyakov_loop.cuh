@@ -230,8 +230,7 @@ namespace quda {
 
       // accumulate trace
       auto tr = getTrace(polyloop);
-      using acc_t = typename reduce_t::value_type;
-      const reduce_t trace {static_cast<acc_t>(tr.real()), static_cast<acc_t>(tr.imag())};
+      const array<reduction_t, 2> trace {static_cast<reduction_t>(tr.real()), static_cast<reduction_t>(tr.imag())};
       return operator()(value, trace);
     }
 

@@ -190,7 +190,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data {};
+      array<reduction_t, 2> data {};
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -201,8 +201,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      using reduce_scalar = typename reduce_t::value_type;
-      data[0] = static_cast<reduce_scalar>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
+      data[0] = static_cast<reduction_t>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
       //2
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, linkIndexM1(x, arg.X, mu), 1 - parity);
@@ -224,7 +223,7 @@ namespace quda {
       arg.delta[idx + 5 * arg.volume] = delta(2,2);
 
       //12
-      data[1] = static_cast<reduce_scalar>(getRealTraceUVdagger(delta, delta));
+      data[1] = static_cast<reduction_t>(getRealTraceUVdagger(delta, delta));
 
       //35
       //T=36*gauge_dir+65

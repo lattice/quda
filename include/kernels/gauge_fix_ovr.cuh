@@ -53,7 +53,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data {};
+      array<reduction_t, 2> data {};
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];
@@ -75,8 +75,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      using reduce_scalar = typename reduce_t::value_type;
-      data[0] = static_cast<reduce_scalar>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
+      data[0] = static_cast<reduction_t>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
       //2
       //load downward links
 #pragma unroll
@@ -89,7 +88,7 @@ namespace quda {
       //18
       SubTraceUnit(delta);
       //12
-      data[1] = static_cast<reduce_scalar>(getRealTraceUVdagger(delta, delta));
+      data[1] = static_cast<reduction_t>(getRealTraceUVdagger(delta, delta));
       //35
       //T=36*gauge_dir+65
 
