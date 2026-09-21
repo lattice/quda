@@ -147,7 +147,7 @@ if(QUDA_DIRAC_WILSON
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(QUDA_SCALAR_TYPE STREQUAL "float128"
-     OR QUDA_REDUCTION_TYPE STREQUAL "doubledouble"
+     OR QUDA_REDUCTION_TYPE MATCHES "^doubledouble"
      OR QUDA_REDUCTION_TYPE MATCHES "^floatfloat")
     add_executable(quad_reduction_test quad_reduction_test.cpp)
     target_link_libraries(quad_reduction_test ${TEST_LIBS})

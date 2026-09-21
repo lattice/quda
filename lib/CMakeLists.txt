@@ -518,6 +518,10 @@ endmacro()
 if(NOT DEFINED QUDA_FPMP_DOUBLEDOUBLE_DEFAULT)
   set(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT OFF)
 endif()
+if(NOT DEFINED QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_DEFAULT)
+  # Double-double is a reduction type today, so default to the renormalized pair.
+  set(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_DEFAULT mid)
+endif()
 if(NOT DEFINED QUDA_FPMP_FLOATFLOAT_DEFAULT)
   set(QUDA_FPMP_FLOATFLOAT_DEFAULT OFF)
 endif()
@@ -532,7 +536,7 @@ option(QUDA_FPMP_DOUBLEDOUBLE
        "use CCCL experimental FPMP for double-double in CUDA builds"
        ${QUDA_FPMP_DOUBLEDOUBLE_DEFAULT})
 set(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY
-    high
+    ${QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_DEFAULT}
     CACHE STRING "set CCCL double-double arithmetic accuracy (low, mid, high)")
 set_property(CACHE QUDA_FPMP_DOUBLEDOUBLE_ACCURACY PROPERTY STRINGS low mid high)
 quda_fpmp_set_accuracy(QUDA_FPMP_DOUBLEDOUBLE)
@@ -861,31 +865,48 @@ if(QUDA_BACKWARDS)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 
-# floatfloat follows whatever QUDA_FPMP_FLOATFLOAT_ACCURACY the bulk uses, while
-# floatfloat_low/mid/high pin the reduction accuracy independently of the bulk.
-# That lets several builds of identical source be compared against each other.
+# Bare floatfloat / doubledouble follow the bulk FPMP accuracy. The _low/_mid/_high
+# spellings pin the reduction independently so several builds of identical source
+# can be compared against each other.
 set(QUDA_REDUCTION_TYPE
     ${QUDA_REDUCTION_TYPE_DEFAULT}
     CACHE
       STRING
-      "set the reduction computation type (double, doubledouble, floatfloat, floatfloat_low, floatfloat_mid, floatfloat_high)"
+      "set the reduction computation type (double, doubledouble, doubledouble_low, doubledouble_mid, doubledouble_high, floatfloat, floatfloat_low, floatfloat_mid, floatfloat_high)"
 )
-set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble floatfloat floatfloat_low floatfloat_mid
+set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble doubledouble_low doubledouble_mid
+                                                doubledouble_high floatfloat floatfloat_low floatfloat_mid
                                                 floatfloat_high)
-if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
+if(QUDA_REDUCTION_TYPE MATCHES "^doubledouble")
+  if(QUDA_REDUCTION_TYPE MATCHES "^doubledouble_" AND NOT QUDA_FPMP_DOUBLEDOUBLE)
+    message(FATAL_ERROR "QUDA_REDUCTION_TYPE=${QUDA_REDUCTION_TYPE} requires QUDA_FPMP_DOUBLEDOUBLE=ON")
+  endif()
   set(QUDA_REDUCTION_IS_DOUBLEDOUBLE 1)
+  if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
+    set(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY ${QUDA_FPMP_DOUBLEDOUBLE_ACCURACY})
+  else()
+    string(REPLACE "doubledouble_" "" QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY ${QUDA_REDUCTION_TYPE})
+  endif()
+  if(NOT QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY MATCHES "^(low|mid|high)$")
+    message(FATAL_ERROR "Invalid QUDA_REDUCTION_TYPE='${QUDA_REDUCTION_TYPE}'. "
+                        "Allowed doubledouble values: doubledouble, doubledouble_low, doubledouble_mid, doubledouble_high.")
+  endif()
+  string(TOUPPER ${QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY} QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY)
+  set(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_${QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY} 1)
 elseif(QUDA_REDUCTION_TYPE MATCHES "^floatfloat")
   if(NOT QUDA_FPMP_FLOATFLOAT)
     message(FATAL_ERROR "QUDA_REDUCTION_TYPE=${QUDA_REDUCTION_TYPE} requires QUDA_FPMP_FLOATFLOAT=ON")
   endif()
   set(QUDA_REDUCTION_IS_FLOATFLOAT 1)
 
-  # Record the effective reduction accuracy so that host code and tests can key
-  # off it without having to re-derive it from the bulk accuracy.
   if(QUDA_REDUCTION_TYPE STREQUAL "floatfloat")
     set(QUDA_REDUCTION_FLOATFLOAT_ACCURACY ${QUDA_FPMP_FLOATFLOAT_ACCURACY})
   else()
     string(REPLACE "floatfloat_" "" QUDA_REDUCTION_FLOATFLOAT_ACCURACY ${QUDA_REDUCTION_TYPE})
+  endif()
+  if(NOT QUDA_REDUCTION_FLOATFLOAT_ACCURACY MATCHES "^(low|mid|high)$")
+    message(FATAL_ERROR "Invalid QUDA_REDUCTION_TYPE='${QUDA_REDUCTION_TYPE}'. "
+                        "Allowed floatfloat values: floatfloat, floatfloat_low, floatfloat_mid, floatfloat_high.")
   endif()
   string(TOUPPER ${QUDA_REDUCTION_FLOATFLOAT_ACCURACY} QUDA_REDUCTION_FLOATFLOAT_ACCURACY)
   set(QUDA_REDUCTION_FLOATFLOAT_ACCURACY_${QUDA_REDUCTION_FLOATFLOAT_ACCURACY} 1)

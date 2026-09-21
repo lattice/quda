@@ -397,14 +397,14 @@ namespace quda
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }
 
-#if defined(QUDA_ENABLE_DOUBLEDOUBLE)
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE) && !defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
   template <> void comm_allreduce_max<std::vector<deviation_t<doubledouble>>>(std::vector<deviation_t<doubledouble>> &a)
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }
 #endif
 
-#if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
+#if defined(QUDA_REDUCTION_IS_FLOATFLOAT) || defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
   template <> void comm_allreduce_max<std::vector<deviation_t<reduction_t>>>(std::vector<deviation_t<reduction_t>> &a)
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());

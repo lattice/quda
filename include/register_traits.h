@@ -382,9 +382,18 @@ namespace quda {
   template <> struct get_scalar<double2> {
     using type = double;
   };
+#ifdef QUDA_FPMP_DOUBLEDOUBLE
+  template <typename T> struct get_scalar<T, std::enable_if_t<is_doubledouble_v<T>>> {
+    using type = T;
+  };
+  template <typename T> struct get_scalar<doubledouble_pair<T>> {
+    using type = T;
+  };
+#else
   template <> struct get_scalar<doubledouble> {
     using type = doubledouble;
   };
+#endif
   template <> struct get_scalar<doubledouble2> {
     using type = doubledouble;
   };
@@ -409,6 +418,11 @@ namespace quda {
   };
 #ifdef QUDA_FPMP_FLOATFLOAT
   template <typename T> struct get_scalar<complex<T>, std::enable_if_t<is_floatfloat_v<T>>> {
+    using type = T;
+  };
+#endif
+#ifdef QUDA_FPMP_DOUBLEDOUBLE
+  template <typename T> struct get_scalar<complex<T>, std::enable_if_t<is_doubledouble_v<T>>> {
     using type = T;
   };
 #endif

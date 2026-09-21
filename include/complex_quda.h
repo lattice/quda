@@ -974,6 +974,7 @@ namespace quda
 #endif
   }
 
+#ifndef QUDA_FPMP_DOUBLEDOUBLE
   template <> struct complex<doubledouble> : public doubledouble2 {
   public:
     typedef doubledouble value_type;
@@ -1006,11 +1007,11 @@ namespace quda
       return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
     }
   };
+#endif
 
-#ifdef QUDA_FPMP_FLOATFLOAT
-  // Declared for each concrete fp32mp2 accuracy rather than only for the bulk
-  // one, so that any accuracy may serve as the reduction type.  `floatfloat` is
-  // an alias for one of these three, so it is covered without a separate case.
+#if defined(QUDA_FPMP_FLOATFLOAT) || defined(QUDA_FPMP_DOUBLEDOUBLE)
+  // Declared for each concrete FPMP accuracy rather than only for the bulk
+  // alias, so that any accuracy may serve as the reduction type.
 #define QUDA_FPMP_DECLARE_COMPLEX(FF, FF2)                                                                             \
   template <> struct complex<FF> : public FF2 {                                                                        \
   public:                                                                                                              \
@@ -1095,9 +1096,16 @@ namespace quda
     }                                                                                                                  \
   };
 
+#ifdef QUDA_FPMP_FLOATFLOAT
   QUDA_FPMP_DECLARE_COMPLEX(floatfloat_low, floatfloat_low2)
   QUDA_FPMP_DECLARE_COMPLEX(floatfloat_mid, floatfloat_mid2)
   QUDA_FPMP_DECLARE_COMPLEX(floatfloat_high, floatfloat_high2)
+#endif
+#ifdef QUDA_FPMP_DOUBLEDOUBLE
+  QUDA_FPMP_DECLARE_COMPLEX(doubledouble_low, doubledouble_low2)
+  QUDA_FPMP_DECLARE_COMPLEX(doubledouble_mid, doubledouble_mid2)
+  QUDA_FPMP_DECLARE_COMPLEX(doubledouble_high, doubledouble_high2)
+#endif
 
 #undef QUDA_FPMP_DECLARE_COMPLEX
 #endif

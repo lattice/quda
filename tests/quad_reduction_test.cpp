@@ -35,6 +35,25 @@ namespace quda
   }
 #endif
 
+#if defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) && defined(QUDA_FPMP_DOUBLEDOUBLE)
+  TEST(QuadReduction, doubledouble_reduction_type)
+  {
+#if defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_LOW)
+    static_assert(std::is_same_v<reduction_t, doubledouble_low>);
+#elif defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_MID)
+    static_assert(std::is_same_v<reduction_t, doubledouble_mid>);
+#elif defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_HIGH)
+    static_assert(std::is_same_v<reduction_t, doubledouble_high>);
+#endif
+    static_assert(sizeof(reduction_t) == 2 * sizeof(double));
+    static_assert(std::is_trivially_copyable_v<reduction_t>);
+
+    const reduction_t x(1.0, 1e-20);
+    EXPECT_EQ(x.hi(), 1.0);
+    EXPECT_EQ(x.lo(), 1e-20);
+  }
+#endif
+
   TEST(QuadReduction, doubledouble_layout_and_components)
   {
     static_assert(sizeof(doubledouble) == 2 * sizeof(double));

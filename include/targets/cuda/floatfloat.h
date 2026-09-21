@@ -216,8 +216,8 @@ namespace quda
   /** True for any fp32mp2 accuracy, not just the one aliased by floatfloat. */
   template <typename T> struct is_floatfloat : std::false_type {
   };
-  template <typename FpType, cuda::experimental::fpmp2_accuracy Acc>
-  struct is_floatfloat<cuda::experimental::fpmp2<FpType, Acc>> : std::true_type {
+  template <cuda::experimental::fpmp2_accuracy Acc>
+  struct is_floatfloat<cuda::experimental::fpmp2<float, Acc>> : std::true_type {
   };
   template <typename CccT> struct is_floatfloat<fp32mp2_normalized<CccT>> : is_floatfloat<CccT> {
   };

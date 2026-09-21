@@ -10,12 +10,19 @@
 #include <ostream>
 #include <type_traits>
 
+// The three fp64mp2 accuracies are distinct C++ types, so reductions
+// (QUDA_REDUCTION_TYPE) can pin low/mid/high independently of the
+// `doubledouble` alias (QUDA_FPMP_DOUBLEDOUBLE_ACCURACY).
+using doubledouble_low = cuda::experimental::fp64mp2_low;
+using doubledouble_mid = cuda::experimental::fp64mp2_mid;
+using doubledouble_high = cuda::experimental::fp64mp2_high;
+
 #if defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW)
-using doubledouble = cuda::experimental::fp64mp2_low;
+using doubledouble = doubledouble_low;
 #elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID)
-using doubledouble = cuda::experimental::fp64mp2_mid;
+using doubledouble = doubledouble_mid;
 #elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_HIGH)
-using doubledouble = cuda::experimental::fp64mp2_high;
+using doubledouble = doubledouble_high;
 #else
 #error "No QUDA double-double accuracy selected"
 #endif
@@ -23,26 +30,46 @@ using doubledouble = cuda::experimental::fp64mp2_high;
 static_assert(sizeof(doubledouble) == 2 * sizeof(double));
 static_assert(alignof(doubledouble) == 2 * alignof(double));
 static_assert(std::is_trivially_copyable_v<doubledouble>);
+static_assert(std::is_trivially_copyable_v<doubledouble_low>);
+static_assert(std::is_trivially_copyable_v<doubledouble_mid>);
+static_assert(std::is_trivially_copyable_v<doubledouble_high>);
+
+namespace quda
+{
+  template <typename T> struct is_doubledouble : std::false_type {
+  };
+  template <cuda::experimental::fpmp2_accuracy Acc>
+  struct is_doubledouble<cuda::experimental::fpmp2<double, Acc>> : std::true_type {
+  };
+  template <typename T> constexpr bool is_doubledouble_v = is_doubledouble<T>::value;
+  template <typename T> using enable_if_doubledouble = std::enable_if_t<is_doubledouble_v<T>, int>;
+} // namespace quda
 
 // CCCL spells this operation fabs; keep QUDA's existing unqualified abs interface.
-__device__ __host__ inline doubledouble abs(const doubledouble &a) { return cuda::experimental::fabs(a); }
+template <typename T, quda::enable_if_doubledouble<T> = 0> __device__ __host__ inline T abs(const T &a)
+{
+  return cuda::experimental::fabs(a);
+}
 namespace cuda::experimental
 {
-  // Supply the standard spelling in the associated namespace so generic code can find it through ADL.
-  __device__ __host__ inline ::doubledouble abs(const ::doubledouble &a) { return fabs(a); }
+  template <typename T, quda::enable_if_doubledouble<T> = 0>
+  __device__ __host__ inline T abs(const T &a)
+  {
+    return fabs(a);
+  }
 } // namespace cuda::experimental
 
-struct doubledouble2 {
-  doubledouble x;
-  doubledouble y;
+template <typename T> struct doubledouble_pair {
+  T x;
+  T y;
 
-  doubledouble2() = default;
-  constexpr doubledouble2(const doubledouble2 &) = default;
-  constexpr doubledouble2 &operator=(const doubledouble2 &) = default;
-  constexpr doubledouble2(const double2 &a) : x(a.x), y(a.y) { }
-  constexpr doubledouble2(const doubledouble &x, const doubledouble &y) : x(x), y(y) { }
+  doubledouble_pair() = default;
+  constexpr doubledouble_pair(const doubledouble_pair &) = default;
+  constexpr doubledouble_pair &operator=(const doubledouble_pair &) = default;
+  constexpr doubledouble_pair(const double2 &a) : x(a.x), y(a.y) { }
+  constexpr doubledouble_pair(const T &x, const T &y) : x(x), y(y) { }
 
-  __device__ __host__ doubledouble2 &operator+=(const doubledouble2 &a)
+  __device__ __host__ doubledouble_pair &operator+=(const doubledouble_pair &a)
   {
     x += a.x;
     y += a.y;
@@ -55,9 +82,20 @@ struct doubledouble2 {
   }
 };
 
-__device__ __host__ inline doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &b)
+using doubledouble_low2 = doubledouble_pair<doubledouble_low>;
+using doubledouble_mid2 = doubledouble_pair<doubledouble_mid>;
+using doubledouble_high2 = doubledouble_pair<doubledouble_high>;
+using doubledouble2 = doubledouble_pair<doubledouble>;
+
+template <typename T>
+__device__ __host__ inline doubledouble_pair<T> operator+(const doubledouble_pair<T> &a, const doubledouble_pair<T> &b)
 {
-  return doubledouble2(a.x + b.x, a.y + b.y);
+  return {a.x + b.x, a.y + b.y};
+}
+
+template <typename T> __device__ __host__ inline doubledouble_pair<T> operator-(const doubledouble_pair<T> &a)
+{
+  return {-a.x, -a.y};
 }
 
 inline std::ostream &operator<<(std::ostream &output, const doubledouble &a)
@@ -72,6 +110,22 @@ namespace quda
   {
     output << "{" << a.hi() << ", " << a.lo() << "}";
     return output;
+  }
+
+  template <typename T> __device__ __host__ inline doubledouble_pair<T> add2(doubledouble_pair<T> a, doubledouble_pair<T> b)
+  {
+    return {a.x + b.x, a.y + b.y};
+  }
+
+  template <typename T> __device__ __host__ inline doubledouble_pair<T> mul2(doubledouble_pair<T> a, doubledouble_pair<T> b)
+  {
+    return {a.x * b.x, a.y * b.y};
+  }
+
+  template <typename T>
+  __device__ __host__ inline doubledouble_pair<T> fma2(doubledouble_pair<T> a, doubledouble_pair<T> b, doubledouble_pair<T> c)
+  {
+    return {a.x * b.x + c.x, a.y * b.y + c.y};
   }
 } // namespace quda
 

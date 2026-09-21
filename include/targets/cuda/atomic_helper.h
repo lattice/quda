@@ -5,6 +5,9 @@
 #ifdef QUDA_FPMP_FLOATFLOAT
 #include <floatfloat.h>
 #endif
+#ifdef QUDA_FPMP_DOUBLEDOUBLE
+#include <dbldbl.h>
+#endif
 
 /**
    @file atomic_helper.h
@@ -50,6 +53,12 @@ namespace quda
         *addr = *addr + val;
       } else
 #endif
+#ifdef QUDA_FPMP_DOUBLEDOUBLE
+      if constexpr (is_doubledouble_v<T>) {
+#pragma omp critical
+        *addr = *addr + val;
+      } else
+#endif
       {
 #pragma omp atomic update
         *addr += val;
@@ -70,6 +79,11 @@ namespace quda
         // wrappers.
         using ccc_t = floatfloat_cccl_t<T>;
         atomicAdd(static_cast<ccc_t *>(addr), static_cast<const ccc_t &>(val));
+      } else
+#endif
+#ifdef QUDA_FPMP_DOUBLEDOUBLE
+      if constexpr (is_doubledouble_v<T>) {
+        atomicAdd(addr, val);
       } else
 #endif
       {
