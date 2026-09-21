@@ -7,7 +7,8 @@
 #include <kernel.h>
 #include <gauge_path_helper.cuh>
 
-namespace quda {
+namespace quda
+{
 
   template <typename store_t, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m, bool force_>
   struct GaugeForceArg : kernel_param<> {
@@ -16,14 +17,14 @@ namespace quda {
     static constexpr bool compute_force = force_;
     using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    using Gauge = typename gauge_mapper<store_t,recon_u>::type;
-    using Mom = typename gauge_mapper<store_t,recon_m>::type;
+    using Gauge = typename gauge_mapper<store_t, recon_u>::type;
+    using Mom = typename gauge_mapper<store_t, recon_m>::type;
 
     Mom mom;
     const Gauge u;
 
-    int X[4]; // the regular volume parameters
-    int E[4]; // the extended volume parameters
+    int X[4];      // the regular volume parameters
+    int E[4];      // the extended volume parameters
     int border[4]; // radius of border
 
     real epsilon; // stepsize and any other overall scaling factor
@@ -35,16 +36,14 @@ namespace quda {
       for (int i = 0; i < 4; i++) {
         X[i] = mom.X()[i];
         E[i] = u.X()[i];
-        border[i] = (E[i] - X[i])/2;
+        border[i] = (E[i] - X[i]) / 2;
       }
     }
   };
 
   template <typename Arg> struct GaugeForce {
     const Arg &arg;
-    constexpr GaugeForce(const Arg &arg) : arg(arg)
-    {
-    }
+    constexpr GaugeForce(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
@@ -54,24 +53,18 @@ namespace quda {
 
       int x[4] = {0, 0, 0, 0};
       getCoords(x, x_cb, arg.X, parity);
-      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
       // prod: current matrix product
       // accum: accumulator matrix
       Link link_prod, accum;
       packed_array<int8_t, 4> dx = {};
 
-      for (int i=0; i<arg.p.num_paths; i++) {
-        real coeff;
-#ifdef QUDA_FPMP_FLOATFLOAT
-        if constexpr (std::is_same_v<real, floatfloat>)
-          coeff = arg.p.path_coeff_floatfloat[i];
-        else
-#endif
-          coeff = static_cast<real>(arg.p.path_coeff[i]);
+      for (int i = 0; i < arg.p.num_paths; i++) {
+        real coeff = static_cast<real>(arg.p.path_coeff[i]);
         if (coeff == 0) continue;
 
-        const int* path = arg.p.input_path[dir] + i*arg.p.max_length;
+        const int *path = arg.p.input_path[dir] + i * arg.p.max_length;
 
         // the gauge path starts pre-shifted, so we need to do the shift + update the parity
         dx[dir]++;
@@ -81,10 +74,10 @@ namespace quda {
         link_prod = computeGaugePath(arg, x, nbr_oddbit, path, arg.p.length[i], dx);
 
         accum = accum + coeff * link_prod;
-      } //i
+      } // i
 
       // multiply by U(x)
-      link_prod = arg.u(dir, linkIndex(x,arg.E), parity);
+      link_prod = arg.u(dir, linkIndex(x, arg.E), parity);
       link_prod = link_prod * accum;
 
       // update mom(x)
@@ -98,4 +91,4 @@ namespace quda {
       arg.mom(dir, x_cb, parity) = mom;
     }
   };
-}
+} // namespace quda
