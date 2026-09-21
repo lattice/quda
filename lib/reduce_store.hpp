@@ -39,7 +39,7 @@ namespace quda
     // kernels already built by whichever precision is actually enabled.
     template <typename store_t> constexpr bool multi_reduce_prec_enabled() { return is_enabled(store_prec_v<store_t>); }
 
-    template <typename Fn> auto dispatch_reduce_prec(QudaPrecision prec, bool native, Fn &&fn)
+    template <typename Fn> auto dispatch_reduce_prec(QudaPrecision prec, [[maybe_unused]] bool native, Fn &&fn)
     {
       if (!is_enabled(prec) && prec != QUDA_DOUBLE_PRECISION)
         errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, prec);

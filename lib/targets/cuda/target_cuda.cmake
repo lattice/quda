@@ -575,23 +575,56 @@ else()
   endif()
 endif()
 
+# Double-double is only worth pulling FPMP in for when double-double is actually
+# a compute type: the reduction accumulator or the host scalar.  Everything else
+# is served by the legacy dbldbl fallback, which is also all a non-CUDA target
+# can use.
+if(DEFINED QUDA_REDUCTION_TYPE)
+  set(_quda_dd_reduction "${QUDA_REDUCTION_TYPE}")
+else()
+  set(_quda_dd_reduction "${QUDA_REDUCTION_TYPE_DEFAULT}")
+endif()
+if(_quda_dd_reduction STREQUAL "doubledouble" OR QUDA_SCALAR_IS_DOUBLEDOUBLE)
+  set(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT ON)
+else()
+  set(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT OFF)
+endif()
+unset(_quda_dd_reduction)
+
 # FPMP options are declared after this file returns. Use cache values when the
 # user already passed -D, otherwise the same defaults option() will apply.
-set(_quda_need_fpmp FALSE)
-if(NOT DEFINED QUDA_FPMP_DOUBLEDOUBLE OR QUDA_FPMP_DOUBLEDOUBLE)
-  set(_quda_need_fpmp TRUE)
+set(_quda_need_fpmp)
+if(DEFINED QUDA_FPMP_DOUBLEDOUBLE)
+  if(QUDA_FPMP_DOUBLEDOUBLE)
+    list(APPEND _quda_need_fpmp QUDA_FPMP_DOUBLEDOUBLE)
+  endif()
+elseif(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT)
+  list(APPEND _quda_need_fpmp QUDA_FPMP_DOUBLEDOUBLE)
 endif()
 if(DEFINED QUDA_FPMP_FLOATFLOAT)
   if(QUDA_FPMP_FLOATFLOAT)
-    set(_quda_need_fpmp TRUE)
+    list(APPEND _quda_need_fpmp QUDA_FPMP_FLOATFLOAT)
   endif()
 elseif(QUDA_FPMP_FLOATFLOAT_DEFAULT)
-  set(_quda_need_fpmp TRUE)
+  list(APPEND _quda_need_fpmp QUDA_FPMP_FLOATFLOAT)
 endif()
 
 set(_quda_fpmp_hints)
-if(DEFINED cccl_SOURCE_DIR)
-  list(APPEND _quda_fpmp_hints "${cccl_SOURCE_DIR}/libcudacxx/include" "${cccl_SOURCE_DIR}/include")
+# The libcudacxx target is where <cuda/fpmp> lives, for both the downloaded and
+# the toolkit CCCL.  CPM exports CCCL_SOURCE_DIR (the name passed to it), so keep
+# that as a fallback rather than FetchContent's lower-case spelling.
+foreach(_quda_cccl_target CCCL::libcudacxx libcudacxx::libcudacxx)
+  if(TARGET ${_quda_cccl_target})
+    get_target_property(_quda_cccl_inc ${_quda_cccl_target} INTERFACE_INCLUDE_DIRECTORIES)
+    if(_quda_cccl_inc)
+      list(APPEND _quda_fpmp_hints ${_quda_cccl_inc})
+    endif()
+  endif()
+endforeach()
+unset(_quda_cccl_target)
+unset(_quda_cccl_inc)
+if(CCCL_SOURCE_DIR)
+  list(APPEND _quda_fpmp_hints "${CCCL_SOURCE_DIR}/libcudacxx/include" "${CCCL_SOURCE_DIR}/include")
 endif()
 if(CUDAToolkit_INCLUDE_DIRS)
   list(APPEND _quda_fpmp_hints ${CUDAToolkit_INCLUDE_DIRS})
@@ -607,9 +640,10 @@ mark_as_advanced(QUDA_CCCL_FPMP_INCLUDE)
 if(QUDA_CCCL_FPMP_INCLUDE)
   message(STATUS "CCCL FPMP headers: ${QUDA_CCCL_FPMP_INCLUDE}")
 elseif(_quda_need_fpmp)
+  string(REPLACE ";" ", " _quda_need_fpmp_str "${_quda_need_fpmp}")
   message(FATAL_ERROR
           "The selected CCCL does not provide FPMP (<cuda/fpmp>), which this build needs "
-          "(QUDA_FPMP_DOUBLEDOUBLE and/or QUDA_FPMP_FLOATFLOAT is on; low-FP64 arches default float-float on). "
+          "for ${_quda_need_fpmp_str}. Searched ${_quda_fpmp_hints}. "
           "Update CCCL to 3.6+ / a toolkit that ships FPMP, set QUDA_DOWNLOAD_CCCL=ON, "
           "or disable FPMP with -DQUDA_FPMP_FLOATFLOAT=OFF -DQUDA_FPMP_DOUBLEDOUBLE=OFF.")
 else()
@@ -617,6 +651,7 @@ else()
 endif()
 unset(_quda_fpmp_hints)
 unset(_quda_need_fpmp)
+unset(_quda_need_fpmp_str)
 target_link_libraries(quda PRIVATE CCCL::CCCL)
 target_link_libraries(quda_cpp PRIVATE CCCL::CCCL)
 

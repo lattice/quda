@@ -503,7 +503,8 @@ endif()
 # Select CCCL FPMP implementations. These cache variables share the QUDA_FPMP_ prefix
 # so they appear together in ccmake. They are independent: float-float does not require
 # double-double FPMP, and vice versa. This comes after the target file so the
-# float-float defaults can follow the GPU architecture's FP64 rate.
+# float-float defaults can follow the GPU architecture's FP64 rate, and the
+# double-double default can follow whether double-double is a compute type.
 macro(quda_fpmp_set_accuracy prefix)
   string(TOLOWER "${${prefix}_ACCURACY}" ${prefix}_ACCURACY)
   if(NOT ${prefix}_ACCURACY MATCHES "^(low|mid|high)$")
@@ -514,6 +515,9 @@ macro(quda_fpmp_set_accuracy prefix)
   unset(_quda_fpmp_acc_upper)
 endmacro()
 
+if(NOT DEFINED QUDA_FPMP_DOUBLEDOUBLE_DEFAULT)
+  set(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT OFF)
+endif()
 if(NOT DEFINED QUDA_FPMP_FLOATFLOAT_DEFAULT)
   set(QUDA_FPMP_FLOATFLOAT_DEFAULT OFF)
 endif()
@@ -526,7 +530,7 @@ endif()
 
 option(QUDA_FPMP_DOUBLEDOUBLE
        "use CCCL experimental FPMP for double-double in CUDA builds"
-       ON)
+       ${QUDA_FPMP_DOUBLEDOUBLE_DEFAULT})
 set(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY
     high
     CACHE STRING "set CCCL double-double arithmetic accuracy (low, mid, high)")
@@ -541,6 +545,10 @@ set(QUDA_FPMP_FLOATFLOAT_ACCURACY
     CACHE STRING "set CCCL float-float arithmetic accuracy (low, mid, high)")
 set_property(CACHE QUDA_FPMP_FLOATFLOAT_ACCURACY PROPERTY STRINGS low mid high)
 quda_fpmp_set_accuracy(QUDA_FPMP_FLOATFLOAT)
+
+if(QUDA_FPMP_DOUBLEDOUBLE AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
+  message(FATAL_ERROR "QUDA_FPMP_DOUBLEDOUBLE requires QUDA_TARGET_TYPE=CUDA")
+endif()
 
 if(QUDA_FPMP_FLOATFLOAT AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
   message(FATAL_ERROR "QUDA_FPMP_FLOATFLOAT requires QUDA_TARGET_TYPE=CUDA")
