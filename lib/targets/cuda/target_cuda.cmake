@@ -553,12 +553,13 @@ endif()
 
 option(QUDA_DOWNLOAD_CCCL "Download CCCL via CPM; OFF = use the CUDA toolkit's CCCL" ON)
 if(QUDA_DOWNLOAD_CCCL)
-  # main until CCCL 3.6 is released: the experimental FPMP types used for
-  # QUDA_FPMP_DOUBLEDOUBLE / QUDA_FPMP_FLOATFLOAT are not in any tagged release yet.
+  # Temporary: lattice/cccl fpmp-iec-float128-conv adds fp64mp2 <-> GCC _Float128
+  # interchange (needed for aarch64 quad). Revert to nvidia/cccl main once that
+  # lands upstream. FPMP types are still not in a tagged CCCL release.
   CPMAddPackage(
       NAME CCCL
-      GITHUB_REPOSITORY nvidia/cccl
-      GIT_TAG main
+      GITHUB_REPOSITORY lattice/cccl
+      GIT_TAG fpmp-iec-float128-conv
   )
 else()
   # Use the CUDA toolkit's CCCL (the same one NVSHMEM 3.x's config find_dependency
