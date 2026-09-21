@@ -5,11 +5,11 @@
 #if defined(QUDA_TARGET_CUDA) && defined(QUDA_FPMP_DOUBLEDOUBLE)
 #include <cuda/fpmp>
 #if defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW)
-static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_low>);
+static_assert(std::is_base_of_v<cuda::experimental::fp64mp2_low, doubledouble>);
 #elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID)
-static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_mid>);
+static_assert(std::is_base_of_v<cuda::experimental::fp64mp2_mid, doubledouble>);
 #elif defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_HIGH)
-static_assert(std::is_same_v<doubledouble, cuda::experimental::fp64mp2_high>);
+static_assert(std::is_base_of_v<cuda::experimental::fp64mp2_high, doubledouble>);
 #endif
 #endif
 
@@ -75,25 +75,25 @@ namespace quda
   TEST(QuadReduction, doubledouble_to_real_uses_tail)
   {
     const doubledouble x(1.0, 1e-20);
-    const __float128 from_dd = static_cast<__float128>(x);
-    const __float128 from_head = static_cast<__float128>(x.hi());
-    const __float128 ref = static_cast<__float128>(1.0) + static_cast<__float128>(1e-20);
-    const __float128 tol = static_cast<__float128>(1e-30);
+    const float128_t from_dd = static_cast<float128_t>(x);
+    const float128_t from_head = static_cast<float128_t>(x.hi());
+    const float128_t ref = static_cast<float128_t>(1.0) + static_cast<float128_t>(1e-20);
+    const float128_t tol = static_cast<float128_t>(1e-30);
 
     EXPECT_LT(fabsq(from_dd - ref), tol);
-    EXPECT_GT(fabsq(from_dd - from_head), static_cast<__float128>(1e-25));
-    EXPECT_EQ(from_dd, static_cast<__float128>(x));
+    EXPECT_GT(fabsq(from_dd - from_head), static_cast<float128_t>(1e-25));
+    EXPECT_EQ(from_dd, static_cast<float128_t>(x));
   }
 
   TEST(QuadReduction, doubledouble_to_real_large_cancellation_sum)
   {
-    const __float128 ref = static_cast<__float128>(1e16) + static_cast<__float128>(1.0);
+    const float128_t ref = static_cast<float128_t>(1e16) + static_cast<float128_t>(1.0);
     const doubledouble x(static_cast<double>(1e16), static_cast<double>(1.0));
-    const __float128 got = static_cast<__float128>(x);
+    const float128_t got = static_cast<float128_t>(x);
 
     const double head_only = x.hi();
-    EXPECT_GT(fabsq(got - static_cast<__float128>(head_only)), static_cast<__float128>(1e-6));
-    EXPECT_LT(fabsq(got - ref) / ref, static_cast<__float128>(1e-30));
+    EXPECT_GT(fabsq(got - static_cast<float128_t>(head_only)), static_cast<float128_t>(1e-6));
+    EXPECT_LT(fabsq(got - ref) / ref, static_cast<float128_t>(1e-30));
   }
 
   TEST(QuadReduction, rel_error_in_quad_precision)

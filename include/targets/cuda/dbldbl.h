@@ -4,18 +4,44 @@
 
 #if defined(QUDA_FPMP_DOUBLEDOUBLE)
 
+#ifdef QUDA_USE_QUAD_SCALAR
+#include "float128_t.h"
+#endif
+
 #include <cuda/fpmp_math>
 #include <math_helper.h>
 
 #include <ostream>
 #include <type_traits>
 
+// Inherit CCCL's fp64mp2 so we can add the binary128 conversion that
+// generic dbldbl already had.  Arithmetic still returns the CCCL type;
+// the converting constructor below folds it back into this wrapper.
+template <typename CccT> struct doubledouble_fpmp : CccT {
+  using CccT::CccT;
+  using CccT::operator=;
+
+  doubledouble_fpmp() = default;
+  doubledouble_fpmp(const doubledouble_fpmp &) = default;
+  doubledouble_fpmp(doubledouble_fpmp &&) = default;
+  doubledouble_fpmp &operator=(const doubledouble_fpmp &) = default;
+  doubledouble_fpmp &operator=(doubledouble_fpmp &&) = default;
+  __host__ __device__ constexpr doubledouble_fpmp(const CccT &x) : CccT(x) { }
+
+#ifdef QUDA_USE_QUAD_SCALAR
+  explicit constexpr operator quda::float128_t() const
+  {
+    return quda::float128_t(this->hi()) + quda::float128_t(this->lo());
+  }
+#endif
+};
+
 // The three fp64mp2 accuracies are distinct C++ types, so reductions
 // (QUDA_REDUCTION_TYPE) can pin low/mid/high independently of the
 // `doubledouble` alias (QUDA_FPMP_DOUBLEDOUBLE_ACCURACY).
-using doubledouble_low = cuda::experimental::fp64mp2_low;
-using doubledouble_mid = cuda::experimental::fp64mp2_mid;
-using doubledouble_high = cuda::experimental::fp64mp2_high;
+using doubledouble_low = doubledouble_fpmp<cuda::experimental::fp64mp2_low>;
+using doubledouble_mid = doubledouble_fpmp<cuda::experimental::fp64mp2_mid>;
+using doubledouble_high = doubledouble_fpmp<cuda::experimental::fp64mp2_high>;
 
 #if defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW)
 using doubledouble = doubledouble_low;
@@ -40,6 +66,8 @@ namespace quda
   };
   template <cuda::experimental::fpmp2_accuracy Acc>
   struct is_doubledouble<cuda::experimental::fpmp2<double, Acc>> : std::true_type {
+  };
+  template <typename CccT> struct is_doubledouble<doubledouble_fpmp<CccT>> : is_doubledouble<CccT> {
   };
   template <typename T> constexpr bool is_doubledouble_v = is_doubledouble<T>::value;
   template <typename T> using enable_if_doubledouble = std::enable_if_t<is_doubledouble_v<T>, int>;
