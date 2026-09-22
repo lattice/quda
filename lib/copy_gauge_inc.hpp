@@ -504,11 +504,4 @@ namespace quda {
     }
   };
 
-  template <typename FloatIn>
-  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale, void *Out,
-                        void *In, void **ghostOut, void **ghostIn, int type)
-  {
-    instantiatePrecision2<GaugeCopy, FloatIn>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-  }
-
 } // namespace quda

@@ -2,19 +2,43 @@
 #include <multigrid.h>
 #include <int_list.hpp>
 
-namespace quda {
+namespace quda
+{
 
-  void copyGenericGaugeDoubleIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale,
-                                void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+#define COPY_GAUGE_DECL(IN, OUT)                                                                                       \
+  void copyGenericGauge_##IN##_##OUT(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale,  \
+                                     void *Out, void *In, void **ghostOut, void **ghostIn, int type)
 
-  void copyGenericGaugeSingleIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale,
-                                void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+  COPY_GAUGE_DECL(double, double);
+#if QUDA_PRECISION & 4
+  COPY_GAUGE_DECL(double, single);
+  COPY_GAUGE_DECL(single, double);
+  COPY_GAUGE_DECL(single, single);
+#endif
+#if QUDA_PRECISION & 2
+  COPY_GAUGE_DECL(double, half);
+  COPY_GAUGE_DECL(half, double);
+  COPY_GAUGE_DECL(half, half);
+#endif
+#if QUDA_PRECISION & 1
+  COPY_GAUGE_DECL(double, quarter);
+  COPY_GAUGE_DECL(quarter, double);
+  COPY_GAUGE_DECL(quarter, quarter);
+#endif
+#if (QUDA_PRECISION & 4) && (QUDA_PRECISION & 2)
+  COPY_GAUGE_DECL(single, half);
+  COPY_GAUGE_DECL(half, single);
+#endif
+#if (QUDA_PRECISION & 4) && (QUDA_PRECISION & 1)
+  COPY_GAUGE_DECL(single, quarter);
+  COPY_GAUGE_DECL(quarter, single);
+#endif
+#if (QUDA_PRECISION & 2) && (QUDA_PRECISION & 1)
+  COPY_GAUGE_DECL(half, quarter);
+  COPY_GAUGE_DECL(quarter, half);
+#endif
 
-  void copyGenericGaugeHalfIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale,
-                              void *Out, void *In, void **ghostOut, void **ghostIn, int type);
-
-  void copyGenericGaugeQuarterIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale,
-                                 void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+#undef COPY_GAUGE_DECL
 
   template <int nColor>
   void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale, void *Out,
@@ -35,25 +59,26 @@ namespace quda {
     }
   }
 
-  void checkMomOrder(const GaugeField &u) {
+  void checkMomOrder(const GaugeField &u)
+  {
     if (u.Order() == QUDA_TIFR_GAUGE_ORDER || u.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_NO)
-	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+        errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
-	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+        errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
         errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else if (u.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
-	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+        errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else if (u.Order() != QUDA_NATIVE_GAUGE_ORDER) {
       errorQuda("Unsupported gauge field order %d", u.Order());
     }
   }
 
-    // this is the function that is actually called, from here on down we instantiate all required templates
+  // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale, void *Out,
                         void *In, void **ghostOut, void **ghostIn, int type)
   {
@@ -61,8 +86,7 @@ namespace quda {
     if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD || out.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD))
       type = 2;
 
-    if (in.Ncolor() != out.Ncolor())
-      errorQuda("Colors (%d,%d) do not match", out.Ncolor(), in.Ncolor());
+    if (in.Ncolor() != out.Ncolor()) errorQuda("Colors (%d,%d) do not match", out.Ncolor(), in.Ncolor());
 
     if (out.Geometry() != in.Geometry())
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
@@ -76,15 +100,79 @@ namespace quda {
         errorQuda("Multigrid has not been built");
       }
     } else if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-      copyGenericGaugeDoubleIn(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+        copyGenericGauge_double_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#if QUDA_PRECISION & 4
+      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+        copyGenericGauge_double_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+#if QUDA_PRECISION & 2
+      } else if (out.Precision() == QUDA_HALF_PRECISION) {
+        copyGenericGauge_double_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+#if QUDA_PRECISION & 1
+      } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+        copyGenericGauge_double_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+      } else {
+        errorQuda("Unsupported output precision %d", out.Precision());
+      }
+#if QUDA_PRECISION & 4
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-      copyGenericGaugeSingleIn(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+        copyGenericGauge_single_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+        copyGenericGauge_single_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#if QUDA_PRECISION & 2
+      } else if (out.Precision() == QUDA_HALF_PRECISION) {
+        copyGenericGauge_single_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+#if QUDA_PRECISION & 1
+      } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+        copyGenericGauge_single_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+      } else {
+        errorQuda("Unsupported output precision %d", out.Precision());
+      }
+#endif
+#if QUDA_PRECISION & 2
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
-      copyGenericGaugeHalfIn(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+        copyGenericGauge_half_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#if QUDA_PRECISION & 4
+      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+        copyGenericGauge_half_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+      } else if (out.Precision() == QUDA_HALF_PRECISION) {
+        copyGenericGauge_half_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#if QUDA_PRECISION & 1
+      } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+        copyGenericGauge_half_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+      } else {
+        errorQuda("Unsupported output precision %d", out.Precision());
+      }
+#endif
+#if QUDA_PRECISION & 1
     } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-      copyGenericGaugeQuarterIn(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+        copyGenericGauge_quarter_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#if QUDA_PRECISION & 4
+      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+        copyGenericGauge_quarter_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+#if QUDA_PRECISION & 2
+      } else if (out.Precision() == QUDA_HALF_PRECISION) {
+        copyGenericGauge_quarter_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+#endif
+      } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+        copyGenericGauge_quarter_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      } else {
+        errorQuda("Unsupported output precision %d", out.Precision());
+      }
+#endif
     } else {
-      errorQuda("Unknown precision %d", out.Precision());
+      errorQuda("Unsupported input precision %d", in.Precision());
     }
   }
 

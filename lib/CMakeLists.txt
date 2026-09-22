@@ -99,8 +99,6 @@ set (QUDA_OBJS
   copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
   copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
-  copy_gauge_double.cu copy_gauge_single.cu
-  copy_gauge_half.cu copy_gauge_quarter.cu
   copy_gauge.cpp copy_clover.cu
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
@@ -320,6 +318,32 @@ if(QUDA_DIRAC_STAGGERED)
   endforeach()
   list(APPEND QUDA_OBJS ${QUDA_HISQ_PATH_FORCE_OBJS})
 endif()
+
+set(QUDA_COPY_GAUGE_PREC_LIST "DOUBLE")
+check_bit(${QUDA_PRECISION} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_COPY_GAUGE_PREC_LIST "SINGLE")
+endif()
+check_bit(${QUDA_PRECISION} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_COPY_GAUGE_PREC_LIST "HALF")
+endif()
+check_bit(${QUDA_PRECISION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_COPY_GAUGE_PREC_LIST "QUARTER")
+endif()
+
+set(QUDA_COPY_GAUGE_OBJS "")
+foreach(QUDA_COPY_GAUGE_PREC_IN ${QUDA_COPY_GAUGE_PREC_LIST})
+  string(TOLOWER "${QUDA_COPY_GAUGE_PREC_IN}" QUDA_COPY_GAUGE_PREC_IN_LOWER)
+  foreach(QUDA_COPY_GAUGE_PREC_OUT ${QUDA_COPY_GAUGE_PREC_LIST})
+    string(TOLOWER "${QUDA_COPY_GAUGE_PREC_OUT}" QUDA_COPY_GAUGE_PREC_OUT_LOWER)
+    set(TMP_FILENAME "copy_gauge_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+    configure_file(copy_gauge.in.cu ${TMP_FILENAME} @ONLY)
+    list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+  endforeach()
+endforeach()
+list(APPEND QUDA_OBJS ${QUDA_COPY_GAUGE_OBJS})
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
