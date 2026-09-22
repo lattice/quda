@@ -39,6 +39,14 @@ namespace quda
     // kernels already built by whichever precision is actually enabled.
     template <typename store_t> constexpr bool multi_reduce_prec_enabled() { return is_enabled(store_prec_v<store_t>); }
 
+    // Multi-BLAS is GPU-only as well (same "Only implemented for GPU fields"
+    // error in MultiBlas::compute), so reuse the multi-reduce gate.
+    template <typename store_t> constexpr bool multi_blas_prec_enabled() { return multi_reduce_prec_enabled<store_t>(); }
+
+    // Single-vector BLAS has a CPU-field path (see Blas::apply), so keep
+    // double instantiable even when GPU double is disabled.
+    template <typename store_t> constexpr bool blas_prec_enabled() { return reduce_prec_enabled<store_t>(); }
+
     template <typename Fn> auto dispatch_reduce_prec(QudaPrecision prec, [[maybe_unused]] bool native, Fn &&fn)
     {
       if (!is_enabled(prec) && prec != QUDA_DOUBLE_PRECISION)
