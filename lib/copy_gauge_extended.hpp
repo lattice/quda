@@ -1,4 +1,5 @@
 #include <tunable_nd.h>
+#include <instantiate.h>
 #include <kernels/copy_gauge_extended.cuh>
 
 namespace quda {
@@ -50,73 +51,71 @@ namespace quda {
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO>::type G;
         CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
-        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
-#endif
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_12>::type G;
+          CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
+        }
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
-#if QUDA_RECONSTRUCT & 1
-        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
-        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
-#endif
-#if defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_8>()) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_8>::type G;
+          CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
+        }
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
-        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
-#endif
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_13>::type G;
+          CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
+        }
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
-#if QUDA_RECONSTRUCT & 1
-        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_9>::type G;
-        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
-#endif
-#endif // defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_9>()) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
+          CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+        }
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-      using G = QDPOrder<FloatOut,length>;
-      CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-      errorQuda("QDP interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+        using G = QDPOrder<FloatOut, length>;
+        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("QDP interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-      using G = MILCOrder<FloatOut, length>;
-      CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-      errorQuda("MILC interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+        using G = MILCOrder<FloatOut, length>;
+        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("MILC interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-      using G = TIFROrder<FloatOut,length>;
-      CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+        using G = TIFROrder<FloatOut, length>;
+        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("TIFR interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
 
-#ifdef BUILD_OPENQCD_INTERFACE
-      using G = OpenQCDOrder<FloatOut, length>;
-      CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
-#else
-      errorQuda("OPENQCD interface has not been built");
-#endif
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) {
+        using G = OpenQCDOrder<FloatOut, length>;
+        CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("OPENQCD interface has not been built");
+      }
 
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
@@ -132,72 +131,70 @@ namespace quda {
         typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO>::type G;
         copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
-        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
-#endif
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_12>::type G;
+          copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
+        }
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-#if QUDA_RECONSTRUCT & 1
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
-        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
-#endif
-#if defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_8>()) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_8>::type G;
+          copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
+        }
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
-        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
-#endif
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_13>::type G;
+          copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
+        }
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
-#if QUDA_RECONSTRUCT & 1
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_9>::type G;
-        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
-#endif
-#endif // defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_9>()) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9>::type G;
+          copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+        }
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-      using G = QDPOrder<FloatIn, length>;
-      copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-      errorQuda("QDP interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+        using G = QDPOrder<FloatIn, length>;
+        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("QDP interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-      using G = MILCOrder<FloatIn, length>;
-      copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-      errorQuda("MILC interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+        using G = MILCOrder<FloatIn, length>;
+        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("MILC interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-      using G = TIFROrder<FloatIn,length>;
-      copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+        using G = TIFROrder<FloatIn, length>;
+        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("TIFR interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
-#ifdef BUILD_OPENQCD_INTERFACE
-      using G = OpenQCDOrder<FloatIn, length>;
-      copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
-#else
-      errorQuda("OpenQCD interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) {
+        using G = OpenQCDOrder<FloatIn, length>;
+        copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, scale, Out, In);
+      } else {
+        errorQuda("OpenQCD interface has not been built\n");
+      }
 
     } else {
       errorQuda("Gauge field %d order not supported", in.Order());

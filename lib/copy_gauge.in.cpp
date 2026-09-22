@@ -1,4 +1,5 @@
 #include <gauge_field.h>
+#include <instantiate.h>
 #include <multigrid.h>
 #include <int_list.hpp>
 
@@ -10,33 +11,21 @@ namespace quda
                                      void *Out, void *In, void **ghostOut, void **ghostIn, int type)
 
   COPY_GAUGE_DECL(double, double);
-#if QUDA_PRECISION & 4
   COPY_GAUGE_DECL(double, single);
+  COPY_GAUGE_DECL(double, half);
+  COPY_GAUGE_DECL(double, quarter);
   COPY_GAUGE_DECL(single, double);
   COPY_GAUGE_DECL(single, single);
-#endif
-#if QUDA_PRECISION & 2
-  COPY_GAUGE_DECL(double, half);
-  COPY_GAUGE_DECL(half, double);
-  COPY_GAUGE_DECL(half, half);
-#endif
-#if QUDA_PRECISION & 1
-  COPY_GAUGE_DECL(double, quarter);
-  COPY_GAUGE_DECL(quarter, double);
-  COPY_GAUGE_DECL(quarter, quarter);
-#endif
-#if (QUDA_PRECISION & 4) && (QUDA_PRECISION & 2)
   COPY_GAUGE_DECL(single, half);
-  COPY_GAUGE_DECL(half, single);
-#endif
-#if (QUDA_PRECISION & 4) && (QUDA_PRECISION & 1)
   COPY_GAUGE_DECL(single, quarter);
-  COPY_GAUGE_DECL(quarter, single);
-#endif
-#if (QUDA_PRECISION & 2) && (QUDA_PRECISION & 1)
+  COPY_GAUGE_DECL(half, double);
+  COPY_GAUGE_DECL(half, single);
+  COPY_GAUGE_DECL(half, half);
   COPY_GAUGE_DECL(half, quarter);
+  COPY_GAUGE_DECL(quarter, double);
+  COPY_GAUGE_DECL(quarter, single);
   COPY_GAUGE_DECL(quarter, half);
-#endif
+  COPY_GAUGE_DECL(quarter, quarter);
 
 #undef COPY_GAUGE_DECL
 
@@ -46,20 +35,14 @@ namespace quda
                                        double scale, void *Out, void *In, void **ghostOut, void **ghostIn, int type)
 
   COPY_GAUGE_MG_DECL(double, double);
-#if QUDA_PRECISION & 4
   COPY_GAUGE_MG_DECL(double, single);
+  COPY_GAUGE_MG_DECL(double, half);
   COPY_GAUGE_MG_DECL(single, double);
   COPY_GAUGE_MG_DECL(single, single);
-#endif
-#if QUDA_PRECISION & 2
-  COPY_GAUGE_MG_DECL(double, half);
-  COPY_GAUGE_MG_DECL(half, double);
-  COPY_GAUGE_MG_DECL(half, half);
-#endif
-#if (QUDA_PRECISION & 4) && (QUDA_PRECISION & 2)
   COPY_GAUGE_MG_DECL(single, half);
+  COPY_GAUGE_MG_DECL(half, double);
   COPY_GAUGE_MG_DECL(half, single);
-#endif
+  COPY_GAUGE_MG_DECL(half, half);
 
 #undef COPY_GAUGE_MG_DECL
 
@@ -70,45 +53,53 @@ namespace quda
     if (in.Precision() == QUDA_DOUBLE_PRECISION) {
       if (out.Precision() == QUDA_DOUBLE_PRECISION) {
         copyGenericGaugeMG_double_double<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 4
       } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGenericGaugeMG_double_single<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-#if QUDA_PRECISION & 2
+        if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+          copyGenericGaugeMG_double_single<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        else
+          errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
       } else if (out.Precision() == QUDA_HALF_PRECISION) {
-        copyGenericGaugeMG_double_half<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
+        if constexpr (is_enabled(QUDA_HALF_PRECISION))
+          copyGenericGaugeMG_double_half<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        else
+          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       } else {
         errorQuda("Unsupported output precision %d", out.Precision());
       }
-#if QUDA_PRECISION & 4
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-        copyGenericGaugeMG_single_double<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGenericGaugeMG_single_single<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 2
-      } else if (out.Precision() == QUDA_HALF_PRECISION) {
-        copyGenericGaugeMG_single_half<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) {
+        if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyGenericGaugeMG_single_double<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+          copyGenericGaugeMG_single_single<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_HALF_PRECISION) {
+          if constexpr (is_enabled(QUDA_HALF_PRECISION))
+            copyGenericGaugeMG_single_half<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+        } else {
+          errorQuda("Unsupported output precision %d", out.Precision());
+        }
       } else {
-        errorQuda("Unsupported output precision %d", out.Precision());
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
       }
-#endif
-#if QUDA_PRECISION & 2
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
-      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-        copyGenericGaugeMG_half_double<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 4
-      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGenericGaugeMG_half_single<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-      } else if (out.Precision() == QUDA_HALF_PRECISION) {
-        copyGenericGaugeMG_half_half<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+        if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyGenericGaugeMG_half_double<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+          if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+            copyGenericGaugeMG_half_single<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+        } else if (out.Precision() == QUDA_HALF_PRECISION) {
+          copyGenericGaugeMG_half_half<nColor>(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else {
+          errorQuda("Unsupported output precision %d", out.Precision());
+        }
       } else {
-        errorQuda("Unsupported output precision %d", out.Precision());
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       }
-#endif
     } else {
       errorQuda("Unsupported input precision %d", in.Precision());
     }
@@ -172,75 +163,90 @@ namespace quda
     } else if (in.Precision() == QUDA_DOUBLE_PRECISION) {
       if (out.Precision() == QUDA_DOUBLE_PRECISION) {
         copyGenericGauge_double_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 4
       } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGenericGauge_double_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-#if QUDA_PRECISION & 2
+        if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+          copyGenericGauge_double_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        else
+          errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
       } else if (out.Precision() == QUDA_HALF_PRECISION) {
-        copyGenericGauge_double_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-#if QUDA_PRECISION & 1
+        if constexpr (is_enabled(QUDA_HALF_PRECISION))
+          copyGenericGauge_double_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        else
+          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
-        copyGenericGauge_double_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
+        if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+          copyGenericGauge_double_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        else
+          errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
       } else {
         errorQuda("Unsupported output precision %d", out.Precision());
       }
-#if QUDA_PRECISION & 4
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-        copyGenericGauge_single_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGenericGauge_single_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 2
-      } else if (out.Precision() == QUDA_HALF_PRECISION) {
-        copyGenericGauge_single_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-#if QUDA_PRECISION & 1
-      } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
-        copyGenericGauge_single_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) {
+        if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyGenericGauge_single_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+          copyGenericGauge_single_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_HALF_PRECISION) {
+          if constexpr (is_enabled(QUDA_HALF_PRECISION))
+            copyGenericGauge_single_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+        } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+          if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+            copyGenericGauge_single_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+        } else {
+          errorQuda("Unsupported output precision %d", out.Precision());
+        }
       } else {
-        errorQuda("Unsupported output precision %d", out.Precision());
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
       }
-#endif
-#if QUDA_PRECISION & 2
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
-      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-        copyGenericGauge_half_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 4
-      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGenericGauge_half_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-      } else if (out.Precision() == QUDA_HALF_PRECISION) {
-        copyGenericGauge_half_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 1
-      } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
-        copyGenericGauge_half_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+        if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyGenericGauge_half_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+          if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+            copyGenericGauge_half_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+        } else if (out.Precision() == QUDA_HALF_PRECISION) {
+          copyGenericGauge_half_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+          if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+            copyGenericGauge_half_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+        } else {
+          errorQuda("Unsupported output precision %d", out.Precision());
+        }
       } else {
-        errorQuda("Unsupported output precision %d", out.Precision());
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       }
-#endif
-#if QUDA_PRECISION & 1
     } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-        copyGenericGauge_quarter_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#if QUDA_PRECISION & 4
-      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGenericGauge_quarter_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-#if QUDA_PRECISION & 2
-      } else if (out.Precision() == QUDA_HALF_PRECISION) {
-        copyGenericGauge_quarter_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
-#endif
-      } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
-        copyGenericGauge_quarter_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) {
+        if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyGenericGauge_quarter_double(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+          if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+            copyGenericGauge_quarter_single(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+        } else if (out.Precision() == QUDA_HALF_PRECISION) {
+          if constexpr (is_enabled(QUDA_HALF_PRECISION))
+            copyGenericGauge_quarter_half(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+        } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+          copyGenericGauge_quarter_quarter(out, in, location, scale, Out, In, ghostOut, ghostIn, type);
+        } else {
+          errorQuda("Unsupported output precision %d", out.Precision());
+        }
       } else {
-        errorQuda("Unsupported output precision %d", out.Precision());
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
       }
-#endif
     } else {
       errorQuda("Unsupported input precision %d", in.Precision());
     }

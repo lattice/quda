@@ -1,18 +1,13 @@
 #include <gauge_field.h>
+#include <instantiate.h>
 
 namespace quda
 {
 
   void copyGaugeOffset_double(GaugeField &out, const GaugeField &in, CommKey offset);
-#if QUDA_PRECISION & 4
   void copyGaugeOffset_single(GaugeField &out, const GaugeField &in, CommKey offset);
-#endif
-#if QUDA_PRECISION & 2
   void copyGaugeOffset_half(GaugeField &out, const GaugeField &in, CommKey offset);
-#endif
-#if QUDA_PRECISION & 1
   void copyGaugeOffset_quarter(GaugeField &out, const GaugeField &in, CommKey offset);
-#endif
 
   void copyFieldOffset(GaugeField &out, const GaugeField &in, CommKey offset, QudaPCType pc_type)
   {
@@ -28,18 +23,21 @@ namespace quda
 
     if (in.Precision() == QUDA_DOUBLE_PRECISION) {
       copyGaugeOffset_double(out, in, offset);
-#if QUDA_PRECISION & 4
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-      copyGaugeOffset_single(out, in, offset);
-#endif
-#if QUDA_PRECISION & 2
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+        copyGaugeOffset_single(out, in, offset);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
-      copyGaugeOffset_half(out, in, offset);
-#endif
-#if QUDA_PRECISION & 1
+      if constexpr (is_enabled(QUDA_HALF_PRECISION))
+        copyGaugeOffset_half(out, in, offset);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
     } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-      copyGaugeOffset_quarter(out, in, offset);
-#endif
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+        copyGaugeOffset_quarter(out, in, offset);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
     } else {
       errorQuda("Unsupported precision %d", in.Precision());
     }

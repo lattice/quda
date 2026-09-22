@@ -16,138 +16,136 @@ namespace quda {
         copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
                                                            type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_12>::type G;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
-#endif
-      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
-#if QUDA_RECONSTRUCT & 1
-        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_8>::type G;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
-#endif
-#if defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
-      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_13>::type G;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
-#endif
-      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
-#if QUDA_RECONSTRUCT & 1
-        if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
-          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                             type);
-        } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
-#ifdef BUILD_TIFR_INTERFACE
-          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_TIFR>::type G;
-          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                             type);
-#else
-          errorQuda("TIFR interface has not been built so TIFR phase type not enabled\n");
-#endif
-        } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
-          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_12>::type G;
           copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
                                                              type);
         } else {
-          errorQuda("Staggered phase type %d not supported", out.StaggeredPhase());
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
         }
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
-#endif
-#endif // defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_8>()) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_8>::type G;
+          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
+                                                             type);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
+        }
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_13>::type G;
+          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
+                                                             type);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
+        }
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_9>()) {
+          if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+            typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+            copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
+                                                               type);
+          } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+            if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+              typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_TIFR>::type G;
+              copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
+                                                                 type);
+            } else {
+              errorQuda("TIFR interface has not been built so TIFR phase type not enabled\n");
+            }
+          } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
+            typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
+            copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
+                                                               type);
+          } else {
+            errorQuda("Staggered phase type %d not supported", out.StaggeredPhase());
+          }
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+        }
       } else {
         errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(QDPOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
-                                                         in, location, scale, type);
-#else
-      errorQuda("QDP interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(QDPOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
+                                                           in, location, scale, type);
+      } else {
+        errorQuda("QDP interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
-#ifdef BUILD_QDPJIT_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(QDPJITOrder<FloatOut, length>(out, Out, outGhost), inOrder,
-                                                         out, in, location, scale, type);
-#else
-      errorQuda("QDPJIT interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(QDPJITOrder<FloatOut, length>(out, Out, outGhost), inOrder,
+                                                           out, in, location, scale, type);
+      } else {
+        errorQuda("QDPJIT interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 
-#ifdef BUILD_CPS_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(CPSOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
-                                                         in, location, scale, type);
-#else
-      errorQuda("CPS interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(CPSOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
+                                                           in, location, scale, type);
+      } else {
+        errorQuda("CPS interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(MILCOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
-                                                         in, location, scale, type);
-#else
-      errorQuda("MILC interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(MILCOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
+                                                           in, location, scale, type);
+      } else {
+        errorQuda("MILC interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(MILCSiteOrder<FloatOut, length>(out, Out, outGhost), inOrder,
-                                                         out, in, location, scale, type);
-#else
-      errorQuda("MILC interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(MILCSiteOrder<FloatOut, length>(out, Out, outGhost), inOrder,
+                                                           out, in, location, scale, type);
+      } else {
+        errorQuda("MILC interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_BQCD_GAUGE_ORDER) {
 
-#ifdef BUILD_BQCD_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(BQCDOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
-                                                         in, location, scale, type);
-#else
-      errorQuda("BQCD interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_BQCD_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(BQCDOrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
+                                                           in, location, scale, type);
+      } else {
+        errorQuda("BQCD interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(TIFROrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
-                                                         in, location, scale, type);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(TIFROrder<FloatOut, length>(out, Out, outGhost), inOrder, out,
+                                                           in, location, scale, type);
+      } else {
+        errorQuda("TIFR interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(TIFRPaddedOrder<FloatOut, length>(out, Out, outGhost), inOrder,
-                                                         out, in, location, scale, type);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(TIFRPaddedOrder<FloatOut, length>(out, Out, outGhost), inOrder,
+                                                           out, in, location, scale, type);
+      } else {
+        errorQuda("TIFR interface has not been built\n");
+      }
 
     } else if (out.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
 
-#ifdef BUILD_OPENQCD_INTERFACE
-      copyGauge<FloatOut, FloatIn, length, fine_grain()>(OpenQCDOrder<FloatOut, length>(out, Out, outGhost), inOrder,
-                                                         out, in, location, scale, type);
-#else
-      errorQuda("OPENQCD interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(OpenQCDOrder<FloatOut, length>(out, Out, outGhost), inOrder,
+                                                           out, in, location, scale, type);
+      } else {
+        errorQuda("OPENQCD interface has not been built\n");
+      }
 
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
@@ -165,125 +163,123 @@ namespace quda {
         typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO>::type G;
         copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
-#endif
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-#if QUDA_RECONSTRUCT & 1
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
-#endif
-#if defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
-#if QUDA_RECONSTRUCT & 2
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
-#endif
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
-#if QUDA_RECONSTRUCT & 1
-        if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
-        } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
-          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9>::type G;
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_12>::type G;
           copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
         } else {
-          errorQuda("Staggered phase type %d not supported", in.StaggeredPhase());
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
         }
-#else
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
-#endif
-#endif // defined(GPU_STAGGERED_DIRAC) || defined(BUILD_QCD_PLUS_QED)
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_8>()) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_8>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
+        }
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_13>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
+        }
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
+        if constexpr (is_enabled<QUDA_RECONSTRUCT_9>()) {
+          if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+            typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+            copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
+          } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
+            typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9>::type G;
+            copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
+          } else {
+            errorQuda("Staggered phase type %d not supported", in.StaggeredPhase());
+          }
+        } else {
+          errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+        }
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(QDPOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
-                                           outGhost, type);
-#else
-      errorQuda("QDP interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(QDPOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
+                                             outGhost, type);
+      } else {
+        errorQuda("QDP interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
-#ifdef BUILD_QDPJIT_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(QDPJITOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
-                                           outGhost, type);
-#else
-      errorQuda("QDPJIT interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(QDPJITOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
+                                             outGhost, type);
+      } else {
+        errorQuda("QDPJIT interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 
-#ifdef BUILD_CPS_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(CPSOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
-                                           outGhost, type);
-#else
-      errorQuda("CPS interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(CPSOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
+                                             outGhost, type);
+      } else {
+        errorQuda("CPS interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(MILCOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
-                                           outGhost, type);
-#else
-      errorQuda("MILC interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(MILCOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
+                                             outGhost, type);
+      } else {
+        errorQuda("MILC interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(MILCSiteOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale,
-                                           Out, outGhost, type);
-#else
-      errorQuda("MILC interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(MILCSiteOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale,
+                                             Out, outGhost, type);
+      } else {
+        errorQuda("MILC interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_BQCD_GAUGE_ORDER) {
 
-#ifdef BUILD_BQCD_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(BQCDOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
-                                           outGhost, type);
-#else
-      errorQuda("BQCD interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_BQCD_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(BQCDOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
+                                             outGhost, type);
+      } else {
+        errorQuda("BQCD interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(TIFROrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
-                                           outGhost, type);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(TIFROrder<FloatIn, length>(in, In, inGhost), out, in, location, scale, Out,
+                                             outGhost, type);
+      } else {
+        errorQuda("TIFR interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(TIFRPaddedOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale,
-                                           Out, outGhost, type);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(TIFRPaddedOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale,
+                                             Out, outGhost, type);
+      } else {
+        errorQuda("TIFR interface has not been built\n");
+      }
 
     } else if (in.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
 
-#ifdef BUILD_OPENQCD_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>(OpenQCDOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale,
-                                           Out, outGhost, type);
-#else
-      errorQuda("OPENQCD interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) {
+        copyGauge<FloatOut, FloatIn, length>(OpenQCDOrder<FloatIn, length>(in, In, inGhost), out, in, location, scale,
+                                             Out, outGhost, type);
+      } else {
+        errorQuda("OPENQCD interface has not been built\n");
+      }
 
     } else {
       errorQuda("Gauge field order %d not supported", in.Order());
@@ -345,158 +341,166 @@ namespace quda {
               copyMom<decltype(arg)>(arg,out,in,location);
             }
           } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
-#ifdef BUILD_QDP_INTERFACE
-            using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
-            typedef QDPOrder<FloatIn,10> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-#else
-	    errorQuda("QDP interface has not been built\n");
-#endif
+            if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+              using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
+              typedef QDPOrder<FloatIn, 10> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("QDP interface has not been built\n");
+            }
           } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-#ifdef BUILD_MILC_INTERFACE
-            using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
-            typedef MILCOrder<FloatIn,10> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-#else
-	    errorQuda("MILC interface has not been built\n");
-#endif
+            if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+              using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
+              typedef MILCOrder<FloatIn, 10> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("MILC interface has not been built\n");
+            }
           } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
-#ifdef BUILD_MILC_INTERFACE
-            using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
-            typedef MILCSiteOrder<FloatIn,10> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-#else
-	    errorQuda("MILC interface has not been built\n");
-#endif
+            if constexpr (is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>()) {
+              using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
+              typedef MILCSiteOrder<FloatIn, 10> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("MILC interface has not been built\n");
+            }
           } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
-#ifdef BUILD_TIFR_INTERFACE
-            using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
-            typedef TIFROrder<FloatIn,18> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-#else
-	    errorQuda("TIFR interface has not been built\n");
-#endif
+            if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+              using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
+              typedef TIFROrder<FloatIn, 18> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("TIFR interface has not been built\n");
+            }
           } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
-#ifdef BUILD_TIFR_INTERFACE
-            using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
-            typedef TIFRPaddedOrder<FloatIn,18> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-#else
-	    errorQuda("TIFR interface has not been built\n");
-#endif
+            if constexpr (is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>()) {
+              using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
+              typedef TIFRPaddedOrder<FloatIn, 18> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("TIFR interface has not been built\n");
+            }
           } else {
             errorQuda("Gauge field orders %d not supported", in.Order());
           }
         } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
-#ifdef BUILD_QDP_INTERFACE
-	  typedef QDPOrder<FloatOut,10> momOut;
-          if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
-            using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-          } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-            typedef MILCOrder<FloatIn, 10> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
+          if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+            typedef QDPOrder<FloatOut, 10> momOut;
+            if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
+              using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+              if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+                typedef MILCOrder<FloatIn, 10> momIn;
+                CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
+                                                                                     scale);
+                copyMom<decltype(arg)>(arg, out, in, location);
+              } else {
+                errorQuda("MILC interface has not been built\n");
+              }
+            } else {
+              errorQuda("Gauge field orders %d not supported", in.Order());
+            }
           } else {
-            errorQuda("Gauge field orders %d not supported", in.Order());
+            errorQuda("QDP interface has not been built\n");
           }
-#else
-	  errorQuda("QDP interface has not been built\n");
-#endif
         } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
-#ifdef BUILD_MILC_INTERFACE
-	  typedef MILCOrder<FloatOut,10> momOut;
-          if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
-            using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-          } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-            typedef MILCOrder<FloatIn, 10> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-          } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
-            typedef QDPOrder<FloatIn, 10> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
+          if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+            typedef MILCOrder<FloatOut, 10> momOut;
+            if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
+              using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+              typedef MILCOrder<FloatIn, 10> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+              if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+                typedef QDPOrder<FloatIn, 10> momIn;
+                CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
+                                                                                     scale);
+                copyMom<decltype(arg)>(arg, out, in, location);
+              } else {
+                errorQuda("QDP interface has not been built\n");
+              }
+            } else {
+              errorQuda("Gauge field orders %d not supported", in.Order());
+            }
           } else {
-            errorQuda("Gauge field orders %d not supported", in.Order());
+            errorQuda("MILC interface has not been built\n");
           }
-#else
-	  errorQuda("MILC interface has not been built\n");
-#endif
         } else if (out.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
-#ifdef BUILD_MILC_INTERFACE
-	  typedef MILCSiteOrder<FloatOut,10> momOut;
-          if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
-            using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-          } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
-            typedef MILCSiteOrder<FloatIn, 10> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
+          if constexpr (is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>()) {
+            typedef MILCSiteOrder<FloatOut, 10> momOut;
+            if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
+              using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+              typedef MILCSiteOrder<FloatIn, 10> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("Gauge field orders %d not supported", in.Order());
+            }
           } else {
-            errorQuda("Gauge field orders %d not supported", in.Order());
+            errorQuda("MILC interface has not been built\n");
           }
-#else
-	  errorQuda("MILC interface has not been built\n");
-#endif
         } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
-#ifdef BUILD_TIFR_INTERFACE
-	  typedef TIFROrder<FloatOut,18> momOut;
-          if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
-            using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10>::type;
-            CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-          } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
-            typedef TIFROrder<FloatIn, 18> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
+          if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+            typedef TIFROrder<FloatOut, 18> momOut;
+            if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
+              using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10>::type;
+              CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
+              typedef TIFROrder<FloatIn, 18> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("Gauge field orders %d not supported", in.Order());
+            }
           } else {
-            errorQuda("Gauge field orders %d not supported", in.Order());
+            errorQuda("TIFR interface has not been built\n");
           }
-#else
-	  errorQuda("TIFR interface has not been built\n");
-#endif
         } else if (out.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
-#ifdef BUILD_TIFR_INTERFACE
-	  typedef TIFRPaddedOrder<FloatOut,18> momOut;
-          if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
-            using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10>::type;
-            CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
-          } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
-            typedef TIFRPaddedOrder<FloatIn, 18> momIn;
-            CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
-                                                                                 scale);
-            copyMom<decltype(arg)>(arg,out,in,location);
+          if constexpr (is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>()) {
+            typedef TIFRPaddedOrder<FloatOut, 18> momOut;
+            if (in.Order() == QUDA_NATIVE_GAUGE_ORDER) {
+              using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10>::type;
+              CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+              typedef TIFRPaddedOrder<FloatIn, 18> momIn;
+              CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In), in,
+                                                                                   scale);
+              copyMom<decltype(arg)>(arg, out, in, location);
+            } else {
+              errorQuda("Gauge field orders %d not supported", in.Order());
+            }
           } else {
-            errorQuda("Gauge field orders %d not supported", in.Order());
+            errorQuda("TIFR interface has not been built\n");
           }
-#else
-	  errorQuda("TIFR interface has not been built\n");
-#endif
         } else {
           errorQuda("Gauge field orders %d not supported", out.Order());
         }
