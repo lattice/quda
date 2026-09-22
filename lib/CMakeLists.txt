@@ -27,9 +27,9 @@ set (QUDA_OBJS
   prolongator.cpp restrictor.cpp staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
-  inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
+  inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cpp
   gauge_shift.cu
-  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu gauge_plaqrect.cu
+  gauge_stout.cpp gauge_hyp.cpp gauge_wilson_flow.cpp gauge_plaq.cu gauge_plaqrect.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cgnr.cpp inv_cgne.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
@@ -47,7 +47,7 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
-  llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
+  llfat.cpp staggered_two_link.cpp gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
@@ -304,6 +304,54 @@ if(QUDA_DIRAC_STAGGERED)
   endforeach()
   list(APPEND QUDA_OBJS ${QUDA_HISQ_PATH_FORCE_OBJS})
 endif()
+
+# Generate double/single × reconstruct 12/18 TUs from ${stem}.in.cu
+# Templates substitute @QUDA_GAUGE_PREC@ and @QUDA_GAUGE_RECON@.
+# Optional extra argument NONE skips reconstruct-12 (ReconstructNone kernels).
+function(quda_generate_recon_no12_tuts stem)
+  set(recon_none OFF)
+  if(ARGC GREATER 1 AND "${ARGV1}" STREQUAL "NONE")
+    set(recon_none ON)
+  endif()
+
+  set(prec_list "")
+  check_bit(${QUDA_PRECISION} 2)
+  if(BIT_CHECK)
+    list(APPEND prec_list "SINGLE")
+  endif()
+  check_bit(${QUDA_PRECISION} 3)
+  if(BIT_CHECK)
+    list(APPEND prec_list "DOUBLE")
+  endif()
+
+  foreach(QUDA_GAUGE_PREC ${prec_list})
+    string(TOLOWER "${QUDA_GAUGE_PREC}" prec_lower)
+    if(NOT recon_none)
+      check_bit(${QUDA_RECONSTRUCT} 1)
+      if(BIT_CHECK)
+        set(QUDA_GAUGE_RECON "12")
+        set(TMP_FILENAME "${stem}_${prec_lower}_reconstruct12.cu")
+        configure_file(${stem}.in.cu ${TMP_FILENAME} @ONLY)
+        list(APPEND QUDA_OBJS ${TMP_FILENAME})
+      endif()
+    endif()
+    check_bit(${QUDA_RECONSTRUCT} 2)
+    if(BIT_CHECK)
+      set(QUDA_GAUGE_RECON "NO")
+      set(TMP_FILENAME "${stem}_${prec_lower}_reconstruct18.cu")
+      configure_file(${stem}.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_OBJS ${TMP_FILENAME})
+    endif()
+  endforeach()
+  set(QUDA_OBJS ${QUDA_OBJS} PARENT_SCOPE)
+endfunction()
+
+quda_generate_recon_no12_tuts(gauge_wilson_flow)
+quda_generate_recon_no12_tuts(gauge_ape)
+quda_generate_recon_no12_tuts(gauge_stout)
+quda_generate_recon_no12_tuts(gauge_hyp)
+quda_generate_recon_no12_tuts(llfat)
+quda_generate_recon_no12_tuts(staggered_two_link NONE)
 
 set(QUDA_COPY_GAUGE_PREC_LIST "DOUBLE")
 check_bit(${QUDA_PRECISION} 2)

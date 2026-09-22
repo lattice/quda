@@ -1,3 +1,5 @@
+#pragma once
+
 #include <utility>
 #include <quda_internal.h>
 #include <gauge_field.h>
@@ -36,19 +38,10 @@ namespace quda
     long long bytes() const { return 2 * link.Bytes() + twoLink.Bytes(); }
   };
 
-  void computeTwoLink(GaugeField &twoLink, const GaugeField &link)
+  template <typename Float, QudaReconstructType recon>
+  void applyComputeTwoLink(GaugeField &twoLink, const GaugeField &link)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
-      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-      checkNative(twoLink, link);
-      checkLocation(twoLink, link);
-      checkPrecision(twoLink, link);
-      // FIXME: enable link-12/8 reconstruction
-      instantiate<ComputeTwoLink, ReconstructNone>(twoLink, link);
-      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-    } else {
-      errorQuda("Two-link computation requires staggered operator to be enabled");
-    }
+    ComputeTwoLink<Float, 3, recon>(twoLink, link);
   }
 
 } // namespace quda

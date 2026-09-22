@@ -1,10 +1,13 @@
+#pragma once
+
 #include <quda_internal.h>
 #include <gauge_field.h>
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <kernels/gauge_ape.cuh>
 
-namespace quda {
+namespace quda
+{
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeAPE : TunableKernel3D
   {
@@ -63,20 +66,10 @@ namespace quda {
 
   }; // GaugeAPE
 
-  void APEStep(GaugeField &out, GaugeField &in, real_t alpha, int dir_ignore, real_t smear_anisotropy)
+  template <typename Float, QudaReconstructType recon>
+  void applyGaugeAPE(GaugeField &out, const GaugeField &in, real_t alpha, int dir_ignore, real_t anisotropy)
   {
-    checkPrecision(out, in);
-    checkReconstruct(out, in);
-    checkNative(out, in);
-
-    if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
-
-    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
-    in.exchangeExtendedGhost(in.R(), false);
-    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugeAPE>(out, in, alpha, dir_ignore, smear_anisotropy);
-    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-    out.exchangeExtendedGhost(out.R(), false);
+    GaugeAPE<Float, 3, recon>(out, in, alpha, dir_ignore, anisotropy);
   }
 
-}
+} // namespace quda
