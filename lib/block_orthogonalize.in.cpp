@@ -1,5 +1,6 @@
 #include "multigrid.h"
 #include <int_list.hpp>
+#include "block_orthogonalize_launch.hpp"
 
 namespace quda
 {

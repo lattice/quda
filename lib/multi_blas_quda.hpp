@@ -112,9 +112,6 @@ namespace quda {
         strcat(aux, ",Nyw=");
         strcat(aux, NYW_str);
 
-#ifdef QUDA_FAST_COMPILE_REDUCE
-        strcat(aux, ",fast_compile");
-#endif
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           blas_tune_aux_prefetch(aux);
           blas_tune_aux_work_item_unroll(aux, multi_blas_unroll(NXZ));
