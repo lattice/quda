@@ -81,7 +81,7 @@ set (QUDA_OBJS
   reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
-  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
+  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cpp
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
   spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
@@ -99,8 +99,8 @@ set (QUDA_OBJS
   copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
   copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
-  copy_gauge.cpp copy_clover.cu
-  copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
+  copy_gauge.cpp copy_gauge_offset.cpp copy_clover.cu
+  copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force.cpp
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
@@ -341,9 +341,21 @@ foreach(QUDA_COPY_GAUGE_PREC_IN ${QUDA_COPY_GAUGE_PREC_LIST})
     set(TMP_FILENAME "copy_gauge_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
     configure_file(copy_gauge.in.cu ${TMP_FILENAME} @ONLY)
     list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+    set(TMP_FILENAME "copy_gauge_extended_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+    configure_file(copy_gauge_extended.in.cu ${TMP_FILENAME} @ONLY)
+    list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
   endforeach()
 endforeach()
+foreach(QUDA_COPY_GAUGE_PREC ${QUDA_COPY_GAUGE_PREC_LIST})
+  string(TOLOWER "${QUDA_COPY_GAUGE_PREC}" QUDA_COPY_GAUGE_PREC_LOWER)
+  set(TMP_FILENAME "copy_gauge_offset_${QUDA_COPY_GAUGE_PREC_LOWER}.cu")
+  configure_file(copy_gauge_offset.in.cu ${TMP_FILENAME} @ONLY)
+  list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+endforeach()
 list(APPEND QUDA_OBJS ${QUDA_COPY_GAUGE_OBJS})
+
+set(QUDA_COPY_GAUGE_MG_PREC_LIST ${QUDA_COPY_GAUGE_PREC_LIST})
+list(REMOVE_ITEM QUDA_COPY_GAUGE_MG_PREC_LIST "QUARTER")
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
@@ -419,9 +431,16 @@ if(QUDA_MULTIGRID)
     endif()
   endforeach()
   foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
-    configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    foreach(QUDA_COPY_GAUGE_PREC_IN ${QUDA_COPY_GAUGE_MG_PREC_LIST})
+      string(TOLOWER "${QUDA_COPY_GAUGE_PREC_IN}" QUDA_COPY_GAUGE_PREC_IN_LOWER)
+      foreach(QUDA_COPY_GAUGE_PREC_OUT ${QUDA_COPY_GAUGE_MG_PREC_LIST})
+        string(TOLOWER "${QUDA_COPY_GAUGE_PREC_OUT}" QUDA_COPY_GAUGE_PREC_OUT_LOWER)
+        set(TMP_FILENAME "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+        configure_file(copy_gauge_mg.in.cu ${TMP_FILENAME} @ONLY)
+        list(PREPEND QUDA_CU_OBJS ${TMP_FILENAME})
+      endforeach()
+    endforeach()
     configure_file(extract_gauge_ghost_mg.in.cu "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
-    list(PREPEND QUDA_CU_OBJS "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu")
     list(PREPEND QUDA_CU_OBJS "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(coarse_op.in.cu "coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)

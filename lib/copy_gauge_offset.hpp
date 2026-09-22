@@ -1,6 +1,5 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <instantiate.h>
 #include "copy_field_offset.hpp"
 
 namespace quda
@@ -113,20 +112,5 @@ namespace quda
       }
     }
   };
-
-  void copyFieldOffset(GaugeField &out, const GaugeField &in, CommKey offset, QudaPCType pc_type)
-  {
-    checkPrecision(out, in);
-    checkLocation(out, in); // check all locations match
-    checkReconstruct(out, in);
-
-    if (pc_type != QUDA_4D_PC) { errorQuda("Gauge field copy must use 4d even-odd preconditioning."); }
-
-    if (out.Geometry() != in.Geometry()) {
-      errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
-    }
-
-    instantiate<CopyGaugeOffset>(out, in, offset);
-  }
 
 } // namespace quda
