@@ -104,7 +104,7 @@ set (QUDA_OBJS
   copy_gauge.cpp copy_clover.cu
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
-  hisq_paths_force_quda.cu
+  hisq_paths_force.cpp
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
   tune.cpp
   device_vector.cu
@@ -279,6 +279,46 @@ endif()
 
 if(NOT QUDA_NVSHMEM)
   list(APPEND QUDA_OBJS ${QUDA_DSLASH_OBJS})
+endif()
+
+set(QUDA_HISQ_PATH_FORCE_OBJS "")
+if(QUDA_DIRAC_STAGGERED)
+  set(QUDA_HISQ_PATH_FORCE_PREC_LIST "")
+  check_bit(${QUDA_PRECISION} 2)
+  if(BIT_CHECK)
+    list(APPEND QUDA_HISQ_PATH_FORCE_PREC_LIST "SINGLE")
+  endif()
+  check_bit(${QUDA_PRECISION} 3)
+  if(BIT_CHECK)
+    list(APPEND QUDA_HISQ_PATH_FORCE_PREC_LIST "DOUBLE")
+  endif()
+
+  foreach(QUDA_HISQ_PATH_FORCE_PREC ${QUDA_HISQ_PATH_FORCE_PREC_LIST})
+    string(TOLOWER "${QUDA_HISQ_PATH_FORCE_PREC}" QUDA_HISQ_PATH_FORCE_PREC_LOWER)
+    # Filename uses packed layout: 18 (full), 13 (12 reals + stored phase),
+    # 12 (recon 13 + on-the-fly MILC phases). Field Reconstruct() is still 18 or 13.
+    check_bit(${QUDA_RECONSTRUCT} 1)
+    if(BIT_CHECK)
+      set(QUDA_HISQ_PATH_FORCE_RECON "13")
+      set(QUDA_HISQ_PATH_FORCE_PHASE "NO")
+      set(TMP_FILENAME "hisq_path_force_${QUDA_HISQ_PATH_FORCE_PREC_LOWER}_reconstruct13.cu")
+      configure_file(hisq_path_force.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_HISQ_PATH_FORCE_OBJS ${TMP_FILENAME})
+      set(QUDA_HISQ_PATH_FORCE_PHASE "MILC")
+      set(TMP_FILENAME "hisq_path_force_${QUDA_HISQ_PATH_FORCE_PREC_LOWER}_reconstruct12.cu")
+      configure_file(hisq_path_force.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_HISQ_PATH_FORCE_OBJS ${TMP_FILENAME})
+    endif()
+    check_bit(${QUDA_RECONSTRUCT} 2)
+    if(BIT_CHECK)
+      set(QUDA_HISQ_PATH_FORCE_RECON "NO")
+      set(QUDA_HISQ_PATH_FORCE_PHASE "NO")
+      set(TMP_FILENAME "hisq_path_force_${QUDA_HISQ_PATH_FORCE_PREC_LOWER}_reconstruct18.cu")
+      configure_file(hisq_path_force.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_HISQ_PATH_FORCE_OBJS ${TMP_FILENAME})
+    endif()
+  endforeach()
+  list(APPEND QUDA_OBJS ${QUDA_HISQ_PATH_FORCE_OBJS})
 endif()
 
 # split source into cu and cpp files
