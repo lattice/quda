@@ -12,6 +12,7 @@
 #include <color_spinor_field.h>
 #include <tunable_nd.h>
 #include <kernels/copy_color_spinor_mg.cuh>
+#include <instantiate.h>
 #include <multigrid.h>
 #include <int_list.hpp>
 
@@ -141,24 +142,14 @@ namespace quda {
     auto &src = std::get<1>(pack);
     if (dst.Nspin() != src.Nspin()) errorQuda("source and destination spins must match");
 
+    if (!is_enabled_spin(dst.Nspin())) errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
+
     if (dst.Nspin() == 4) {
-#if defined(NSPIN4)
-      copyGenericColorSpinor<4, Nc, dst_t, src_t>(dst, src, pack);
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
+      if constexpr (is_enabled_spin(4)) copyGenericColorSpinor<4, Nc, dst_t, src_t>(dst, src, pack);
     } else if (dst.Nspin() == 2) {
-#if defined(NSPIN2)
-      copyGenericColorSpinor<2, Nc, dst_t, src_t>(dst, src, pack);
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
+      if constexpr (is_enabled_spin(2)) copyGenericColorSpinor<2, Nc, dst_t, src_t>(dst, src, pack);
     } else if (dst.Nspin() == 1) {
-#if defined(NSPIN1)
-      copyGenericColorSpinor<1, Nc, dst_t, src_t>(dst, src, pack);
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
+      if constexpr (is_enabled_spin(1)) copyGenericColorSpinor<1, Nc, dst_t, src_t>(dst, src, pack);
     } else {
       errorQuda("Nspin=%d unsupported", dst.Nspin());
     }

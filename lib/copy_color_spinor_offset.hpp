@@ -51,20 +51,13 @@ namespace quda
     CopyColorSpinorOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type)
     {
       if (in.Nspin() == 4) {
-        copy_color_spinor_offset<Float, nColor, 4>(out, in, offset, pc_type);
+        if constexpr (is_enabled_spin(4)) copy_color_spinor_offset<Float, nColor, 4>(out, in, offset, pc_type);
       } else if (in.Nspin() == 1) {
-        copy_color_spinor_offset<Float, nColor, 1>(out, in, offset, pc_type);
+        if constexpr (is_enabled_spin(1)) copy_color_spinor_offset<Float, nColor, 1>(out, in, offset, pc_type);
       } else {
         errorQuda("Unsupported spin = %d.\n", in.Nspin());
       }
     }
   };
-
-  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type)
-  {
-    checkPrecision(out, in);
-    checkLocation(out, in); // check all locations match
-    instantiate<CopyColorSpinorOffset>(out, in, offset, pc_type);
-  }
 
 } // namespace quda

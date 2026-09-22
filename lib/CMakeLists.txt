@@ -85,22 +85,8 @@ set (QUDA_OBJS
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
   spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
-  copy_color_spinor_dd.cu copy_color_spinor_ds.cu
-  copy_color_spinor_dh.cu copy_color_spinor_dq.cu
-  copy_color_spinor_ss.cu copy_color_spinor_sd.cu
-  copy_color_spinor_sh.cu copy_color_spinor_sq.cu
-  copy_color_spinor_hd.cu copy_color_spinor_hs.cu
-  copy_color_spinor_hh.cu copy_color_spinor_hq.cu
-  copy_color_spinor_qd.cu copy_color_spinor_qs.cu
-  copy_color_spinor_qh.cu copy_color_spinor_qq.cu
-  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
-  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
-  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
-  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
-  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
-  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge.cpp copy_gauge_offset.cpp copy_clover.cu
-  copy_color_spinor_offset.cu copy_clover_offset.cu
+  copy_color_spinor_offset.cpp copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force.cpp
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
@@ -344,12 +330,18 @@ foreach(QUDA_COPY_GAUGE_PREC_IN ${QUDA_COPY_GAUGE_PREC_LIST})
     set(TMP_FILENAME "copy_gauge_extended_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
     configure_file(copy_gauge_extended.in.cu ${TMP_FILENAME} @ONLY)
     list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+    set(TMP_FILENAME "copy_color_spinor_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+    configure_file(copy_color_spinor.in.cu ${TMP_FILENAME} @ONLY)
+    list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
   endforeach()
 endforeach()
 foreach(QUDA_COPY_GAUGE_PREC ${QUDA_COPY_GAUGE_PREC_LIST})
   string(TOLOWER "${QUDA_COPY_GAUGE_PREC}" QUDA_COPY_GAUGE_PREC_LOWER)
   set(TMP_FILENAME "copy_gauge_offset_${QUDA_COPY_GAUGE_PREC_LOWER}.cu")
   configure_file(copy_gauge_offset.in.cu ${TMP_FILENAME} @ONLY)
+  list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+  set(TMP_FILENAME "copy_color_spinor_offset_${QUDA_COPY_GAUGE_PREC_LOWER}.cu")
+  configure_file(copy_color_spinor_offset.in.cu ${TMP_FILENAME} @ONLY)
   list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
 endforeach()
 list(APPEND QUDA_OBJS ${QUDA_COPY_GAUGE_OBJS})
@@ -424,6 +416,33 @@ configure_file(multigrid.in.hpp multigrid.hpp @ONLY)
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
   string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
+  # Keep the historical MG color-spinor pair set: double only mixes with
+  # double/single; half/quarter mix with single/half/quarter.
+  set(QUDA_COPY_COLOR_SPINOR_MG_PAIRS
+    DOUBLE_DOUBLE
+    SINGLE_DOUBLE
+    DOUBLE_SINGLE
+    SINGLE_SINGLE
+    HALF_SINGLE
+    QUARTER_SINGLE
+    SINGLE_HALF
+    HALF_HALF
+    QUARTER_HALF
+    SINGLE_QUARTER
+    HALF_QUARTER
+    QUARTER_QUARTER)
+  foreach(QUDA_COPY_COLOR_SPINOR_MG_PAIR ${QUDA_COPY_COLOR_SPINOR_MG_PAIRS})
+    string(REPLACE "_" ";" QUDA_COPY_COLOR_SPINOR_MG_PAIR_LIST ${QUDA_COPY_COLOR_SPINOR_MG_PAIR})
+    list(GET QUDA_COPY_COLOR_SPINOR_MG_PAIR_LIST 0 QUDA_COPY_GAUGE_PREC_IN)
+    list(GET QUDA_COPY_COLOR_SPINOR_MG_PAIR_LIST 1 QUDA_COPY_GAUGE_PREC_OUT)
+    if(QUDA_COPY_GAUGE_PREC_IN IN_LIST QUDA_COPY_GAUGE_PREC_LIST AND QUDA_COPY_GAUGE_PREC_OUT IN_LIST QUDA_COPY_GAUGE_PREC_LIST)
+      string(TOLOWER "${QUDA_COPY_GAUGE_PREC_IN}" QUDA_COPY_GAUGE_PREC_IN_LOWER)
+      string(TOLOWER "${QUDA_COPY_GAUGE_PREC_OUT}" QUDA_COPY_GAUGE_PREC_OUT_LOWER)
+      set(TMP_FILENAME "copy_color_spinor_mg_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+      configure_file(copy_color_spinor_mg.in.cu ${TMP_FILENAME} @ONLY)
+      list(PREPEND QUDA_CU_OBJS ${TMP_FILENAME})
+    endif()
+  endforeach()
   foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
     math(EXPR MOD "${QUDA_MULTIGRID_MRHS} % 8")
     if(NOT (${QUDA_MULTIGRID_MRHS} GREATER_EQUAL "8" AND ${QUDA_MULTIGRID_MRHS} LESS_EQUAL "64" AND ${MOD} EQUAL "0"))
