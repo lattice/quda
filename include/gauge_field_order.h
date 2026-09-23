@@ -54,7 +54,8 @@ namespace quda {
 	 @param[in] x_cb Checkerboarded space-time index we are accessing
 	 @param[in] parity Parity we are accessing
        */
-      __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity, Float phase = 1.0) :
+      __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity,
+                                                          Float phase = Float(1)) :
         dim(dim), x_cb(x_cb), parity(parity), phase(phase), gauge(gauge)
       {
       }
@@ -67,26 +68,52 @@ namespace quda {
       {
         gauge.save(a.data, x_cb, dim, parity);
       }
+
+      /**
+         @brief Store a Matrix into this wrapped field location.  The
+         matrix scalar type is passed through to save, which keys its
+         storage conversion off the incoming register type.
+         @tparam U Matrix scalar type
+         @tparam N Matrix rank
+         @param[in] a Matrix we want to store in this accessor
+       */
+      template <typename U, int N>
+      __device__ __host__ inline void operator=(const Matrix<complex<U>, N> &a) const
+      {
+        gauge.save(a.data, x_cb, dim, parity);
+      }
     };
 
   /**
-     @brief Copy constructor for the Matrix class with a gauge_wrapper input.
+     @brief Assignment operator for the Matrix class with a gauge_wrapper input.
+     If the wrapper scalar type differs from the matrix register type, convert after loading.
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    template <typename Float, typename S>
+    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<Float,S> &a) {
+    if constexpr (std::is_same_v<real, Float>) {
+      a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    } else {
+      Matrix<complex<Float>, N> tmp(a);
+      *this = tmp;
+    }
   }
 
   /**
-     @brief Assignment operator for the Matrix class with a gauge_wrapper input.
+     @brief Constructor for the Matrix class with a gauge_wrapper input.
+     If the wrapper scalar type differs from the matrix register type, convert after loading.
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    template <typename Float, typename S>
+    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<Float,S> &a) {
+    if constexpr (std::is_same_v<real, Float>) {
+      a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+    } else {
+      Matrix<complex<Float>, N> tmp(a);
+      *this = tmp;
+    }
   }
 
   /**
@@ -116,7 +143,7 @@ namespace quda {
 	 @param[in] parity Parity we are accessing
        */
       __device__ __host__ inline gauge_ghost_wrapper<Float, T>(T &gauge, int dim, int ghost_idx, int parity,
-                                                               Float phase = 1.0) :
+                                                               Float phase = Float(1)) :
         dim(dim), ghost_idx(ghost_idx), parity(parity), phase(phase), gauge(gauge)
       {
       }
@@ -222,7 +249,7 @@ namespace quda {
         complex<theirFloat> in = a;
         v[idx] = fixed ?
           complex<storeFloat>(f2i_round<storeFloat>(scale * in.real()), f2i_round<storeFloat>(scale * in.imag())) :
-          complex<storeFloat>(in.real(), in.imag());
+          complex<storeFloat>(store_cast<storeFloat>(in.real()), store_cast<storeFloat>(in.imag()));
       }
 
       /**
@@ -235,7 +262,7 @@ namespace quda {
           v[idx] = complex<storeFloat>(a.x, a.y);
         } else {
           v[idx] = fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x), f2i_round<storeFloat>(scale * a.y)) :
-                           complex<storeFloat>(a.x, a.y);
+                           complex<storeFloat>(store_cast<storeFloat>(a.x), store_cast<storeFloat>(a.y));
         }
       }
 
@@ -246,7 +273,7 @@ namespace quda {
       {
         complex<storeFloat> tmp = v[idx];
         if constexpr (fixed) return scale_inv * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        return complex<Float>(tmp.x, tmp.y);
+        return complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
       }
 
       /**
@@ -283,7 +310,7 @@ namespace quda {
           v[idx] += complex<storeFloat>(a.x, a.y);
         } else {
           v[idx] += fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x), f2i_round<storeFloat>(scale * a.y)) :
-                            complex<storeFloat>(a.x, a.y);
+                            complex<storeFloat>(store_cast<storeFloat>(a.x), store_cast<storeFloat>(a.y));
         }
       }
 
@@ -297,7 +324,7 @@ namespace quda {
           v[idx] -= complex<storeFloat>(a.x, a.y);
         } else {
           v[idx] -= fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x), f2i_round<storeFloat>(scale * a.y)) :
-                            complex<storeFloat>(a.x, a.y);
+                            complex<storeFloat>(store_cast<storeFloat>(a.x), store_cast<storeFloat>(a.y));
         }
       }
       };
@@ -406,7 +433,7 @@ namespace quda {
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
           vec2 {f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
-          vec2 {static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
+          vec2 {store_cast<storeFloat>(val.real()), store_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
@@ -527,7 +554,7 @@ namespace quda {
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
           vec2 {f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
-          vec2 {static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
+          vec2 {store_cast<storeFloat>(val.real()), store_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
@@ -710,7 +737,7 @@ namespace quda {
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
           vec2 {f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
-          vec2 {static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
+          vec2 {store_cast<storeFloat>(val.real()), store_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
@@ -828,7 +855,8 @@ namespace quda {
       /** Convenient types */
       using Float = Float_;
       using storeFloat = storeFloat_;
-      using wrapper = fieldorder_wrapper<Float, storeFloat>;
+      using mem_t = order_store_t<storeFloat_, order == QUDA_NATIVE_GAUGE_ORDER>;
+      using wrapper = fieldorder_wrapper<Float, mem_t>;
 
       /** An internal reference to the actual field we are accessing */
       const unsigned int volumeCB;
@@ -837,10 +865,10 @@ namespace quda {
       const QudaFieldLocation location;
       static constexpr int nColorCoarse = nColor / nSpinCoarse;
 
-      using accessor_type = Accessor<Float, nColor, order, storeFloat>;
+      using accessor_type = Accessor<Float, nColor, order, mem_t>;
       static constexpr bool is_mma_compatible = accessor_type::is_mma_compatible;
       accessor_type accessor;
-      GhostAccessor<Float, nColor, order, native_ghost, storeFloat> ghostAccessor;
+      GhostAccessor<Float, nColor, order, native_ghost, mem_t> ghostAccessor;
 
       /** Does this field type support ghost zones? */
       static constexpr bool supports_ghost_zone = true;
@@ -866,7 +894,7 @@ namespace quda {
 	  ghostAccessor.resetScale(max);
         }
 
-        static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
+        static constexpr bool fixedPoint() { return fixed_point<Float, mem_t>(); }
 
         /**
          * accessor function
@@ -977,7 +1005,7 @@ namespace quda {
         {
           commGlobalReductionPush(global);
           auto nrm1 = accessor.template transform_reduce<plus<device_reduce_t>>(
-            location, dim, abs_<double, storeFloat>(accessor.scale_inv));
+            location, dim, abs_<double, mem_t>(accessor.scale_inv));
           commGlobalReductionPop();
           return reduction_to_real(nrm1);
         }
@@ -991,7 +1019,7 @@ namespace quda {
         {
           commGlobalReductionPush(global);
           auto nrm2 = accessor.template transform_reduce<plus<device_reduce_t>>(
-            location, dim, square_<double, storeFloat>(accessor.scale_inv));
+            location, dim, square_<double, mem_t>(accessor.scale_inv));
           commGlobalReductionPop();
           return reduction_to_real(nrm2);
         }
@@ -1003,9 +1031,14 @@ namespace quda {
          */
         __host__ double abs_max(int dim = -1, bool global = true) const
         {
+#ifdef QUDA_FPMP_FLOATFLOAT
+          using reduce_t = std::conditional_t<std::is_same_v<Float, floatfloat>, double, Float>;
+#else
+          using reduce_t = Float;
+#endif
           commGlobalReductionPush(global);
-          double absmax = accessor.template transform_reduce<maximum<Float>>(
-            location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv));
+          double absmax = accessor.template transform_reduce<maximum<reduce_t>>(
+            location, dim, abs_max_<reduce_t, mem_t>(static_cast<reduce_t>(accessor.scale_inv)));
           commGlobalReductionPop();
           return absmax;
         }
@@ -1017,15 +1050,20 @@ namespace quda {
          */
         __host__ double abs_min(int dim = -1, bool global = true) const
         {
+#ifdef QUDA_FPMP_FLOATFLOAT
+          using reduce_t = std::conditional_t<std::is_same_v<Float, floatfloat>, double, Float>;
+#else
+          using reduce_t = Float;
+#endif
           commGlobalReductionPush(global);
-          double absmin = accessor.template transform_reduce<minimum<Float>>(
-            location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv));
+          double absmin = accessor.template transform_reduce<minimum<reduce_t>>(
+            location, dim, abs_min_<reduce_t, mem_t>(static_cast<reduce_t>(accessor.scale_inv)));
           commGlobalReductionPop();
           return absmin;
         }
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
+        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(mem_t); }
     };
 
       /**
@@ -1164,7 +1202,7 @@ namespace quda {
 
         Reconstruct(const GaugeField &u) :
           anisotropy(static_cast<real>(u.Anisotropy())),
-          tBoundary(static_cast<real>(u.TBoundary())),
+          tBoundary(static_cast<real>(static_cast<int>(u.TBoundary()))),
           firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
@@ -1366,9 +1404,10 @@ namespace quda {
         QudaGhostExchange ghostExchange;
 
         // scale factor is set when using recon-9
-        Reconstruct(const GaugeField &u, real scale = 1.0) :
+        Reconstruct(const GaugeField &u, real scale = real(1)) :
           anisotropy(static_cast<real>(u.Anisotropy() * scale), static_cast<real>(1.0 / (u.Anisotropy() * scale))),
-          tBoundary(static_cast<real>(u.TBoundary()) * scale, 1.0 / (static_cast<real>(u.TBoundary()) * scale)),
+          tBoundary(static_cast<real>(static_cast<int>(u.TBoundary())) * scale,
+                    real(1) / (static_cast<real>(static_cast<int>(u.TBoundary())) * scale)),
           firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
@@ -1420,21 +1459,18 @@ namespace quda {
           row_sum += out[2].imag() * out[2].imag();
           real row_sum_inv = quda::fdivide(static_cast<real>(1.0), row_sum);
 
-          real diff = u0_inv * u0_inv - row_sum;
-          real U00_mag = quda::sqrt(quda::max(diff, static_cast<real>(0.0)));
-
-          out[0] *= U00_mag;
+          // sqrt(s^2-n) cancels in fp32mp2_low; promote_mapper is mid for that
+          // bulk and identity otherwise (IEEE / mid / high).
+          using mag_t = typename promote_mapper<real>::type;
+          mag_t s2 = mag_t(u0_inv) * mag_t(u0_inv);
+          out[0] *= sqrt(max(real(s2 - mag_t(row_sum)), real(0)));
 
           // Second, reconstruct first column
           real column_sum = out[0].real() * out[0].real();
           column_sum += out[0].imag() * out[0].imag();
           column_sum += out[3].real() * out[3].real();
           column_sum += out[3].imag() * out[3].imag();
-
-          diff = u0_inv * u0_inv - column_sum;
-          real U20_mag = quda::sqrt(quda::max(diff, static_cast<real>(0.0)));
-
-          out[6] *= U20_mag;
+          out[6] *= sqrt(max(real(s2 - mag_t(column_sum)), real(0)));
 
           // Finally, reconstruct last elements from SU(2) rotation
           real r_inv2 = u0_inv * row_sum_inv;
@@ -1611,7 +1647,7 @@ namespace quda {
         using Accessor
           = FloatNOrder<Float, length_, recon_, stag_phase, ghostExchange_, use_inphase, shifted, geometry_>;
 
-        using store_t = Float;
+        using store_t = native_store_t<Float>;
         static constexpr int length = length_;
         static constexpr QudaReconstructType recon = recon_;
         using real = typename mapper<Float>::type;
@@ -1624,9 +1660,9 @@ namespace quda {
         static constexpr int M = (reconLen - hasPhase) / N;
         static constexpr int Nrem = reconLen - hasPhase - M * N;
         static_assert(Nrem == 0 || (Nrem > 0 && (Nrem & (Nrem - 1)) == 0), "Nrem must be a power of 2");
-        Float *gauge;
+        store_t *gauge;
         const index_t offset;
-        Float *ghost[4];
+        store_t *ghost[4];
         QudaGhostExchange ghostExchange;
         int coords[QUDA_MAX_DIM];
         int_fastdiv X[QUDA_MAX_DIM];
@@ -1644,9 +1680,39 @@ namespace quda {
         /** Geometry for indexing: compile-time `geometry_` when set, else runtime field geometry. */
         constexpr int geom() const { return static_geometry ? static_cast<int>(geometry_) : geometry; }
 
-        FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        /** Bit-preserving copy of native storage. Avoid memcpy: floatfloat is a non-trivial class. */
+        template <int n>
+        __device__ __host__ static inline void copy_raw(store_t *dst, const array<store_t, n> &src)
+        {
+#pragma unroll
+          for (int j = 0; j < n; j++) dst[j] = src[j];
+        }
+
+        template <int n>
+        __device__ __host__ static inline void copy_raw(array<store_t, n> &dst, const store_t *src)
+        {
+#pragma unroll
+          for (int j = 0; j < n; j++) dst[j] = src[j];
+        }
+
+        struct storage_pointer_tag {
+        };
+
+        FloatNOrder(const GaugeField &u, Float *gauge_ = nullptr, Float **ghost_ = nullptr) :
+          FloatNOrder(u, reinterpret_cast<store_t *>(gauge_), reinterpret_cast<store_t **>(ghost_),
+                      storage_pointer_tag {})
+        {
+        }
+
+        template <typename T = store_t, std::enable_if_t<!std::is_same_v<T, Float>, int> = 0>
+        FloatNOrder(const GaugeField &u, store_t *gauge_, store_t **ghost_) :
+          FloatNOrder(u, gauge_, ghost_, storage_pointer_tag {})
+        {
+        }
+
+        FloatNOrder(const GaugeField &u, store_t *gauge_, store_t **ghost_, storage_pointer_tag) :
           reconstruct(u),
-          gauge(gauge_ ? gauge_ : u.data<Float *>()),
+          gauge(gauge_ ? gauge_ : u.data<store_t *>()),
           offset(u.Bytes() / (2 * sizeof(Float))),
           ghostExchange(u.GhostExchange()),
           volumeCB(u.VolumeCB()),
@@ -1657,10 +1723,10 @@ namespace quda {
           combined_scale([&]() {
             if constexpr (recon == 18) {
               // QUDA_RECONSTRUCT_NO: combine fixedInvMaxValue with reconstruct.scale
-              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value * reconstruct.scale : 1.0;
+              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value * reconstruct.scale : real(1.0);
             } else {
               // Other reconstruction types: only need fixedInvMaxValue (reconstruct.scale doesn't exist)
-              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value : 1.0;
+              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value : real(1.0);
             }
           }()),
           phase_scale(isFixed<Float>::value ? fixedInvMaxValue<Float>::value * static_cast<real>(2.0) :
@@ -1682,27 +1748,29 @@ namespace quda {
             R[i] = u.R()[i];
             ghost[i] = ghost_ ? ghost_[i] :
               (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && u.Order() == QUDA_NATIVE_GAUGE_ORDER) ?
-                                static_cast<Float *>(const_cast<void *>(u.Ghost()[i].data())) :
+                                static_cast<store_t *>(const_cast<void *>(u.Ghost()[i].data())) :
                                 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
         }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity,
+                                           real phase = real(1)) const
       {
         real tmp[reconLen];
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
+          auto vecTmp = vector_load<store_t, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
+          auto vecTmp
+            = vector_load<store_t, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -1724,17 +1792,16 @@ namespace quda {
         for (int i = 0; i < M; i++) {
           // first load from memory
           auto vecTmp = vector_load<store_t, N>(gauge, parity * offset + dir * (M * N) * stride, i * stride + x);
-          memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[i * N], vecTmp);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
-          memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[M * N], vecTmp);
         }
 
-        if constexpr (loadPhase)
-          memcpy(&v[M * N + Nrem], &gauge[parity * offset + phaseOffset + stride * dir + x], sizeof(store_t));
+        if constexpr (loadPhase) v[M * N + Nrem] = gauge[parity * offset + phaseOffset + stride * dir + x];
       }
 
       template <PrefetchType type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
@@ -1786,8 +1853,26 @@ namespace quda {
         }
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      /**
+         @brief Convert incoming registers for reconstruct Pack
+       */
+      template <typename In>
+      __device__ __host__ inline void cast_in(complex out[length / 2], const quda::complex<In> in[length / 2]) const
       {
+#pragma unroll
+        for (int i = 0; i < length / 2; i++) {
+          out[i] = {store_cast<real>(in[i].real()), store_cast<real>(in[i].imag())};
+        }
+      }
+
+      /**
+         @brief Store a gauge link
+       */
+      template <typename In>
+      __device__ __host__ inline void save(const quda::complex<In> in[length / 2], int x, int dir, int parity) const
+      {
+        complex v[length / 2];
+        cast_in(v, in);
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
 
@@ -1821,8 +1906,7 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           array<store_t, N> vecTmp;
-          // first do copy converting into storage type
-          memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[i * N]);
           // second do vectorized copy into memory
           vector_store(gauge, parity * offset + dir * (M * N) * stride, x + i * stride, vecTmp);
         }
@@ -1830,13 +1914,12 @@ namespace quda {
         // now save any remainder
         if constexpr (Nrem > 0) {
           array<store_t, Nrem> vecTmp;
-          memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[M * N]);
           // second do vectorized copy into memory
           vector_store(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x, vecTmp);
         }
 
-        if constexpr (hasPhase)
-          memcpy(&gauge[parity * offset + phaseOffset + dir * stride + x], &v[M * N + Nrem], sizeof(store_t));
+        if constexpr (hasPhase) gauge[parity * offset + phaseOffset + dir * stride + x] = v[M * N + Nrem];
       }
 
       /**
@@ -1848,19 +1931,17 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           auto vecTmp = vector_load<store_t, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx);
-          memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[i * N], vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<store_t, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
                                                    parity * faceVolumeCB[dir] + ghost_idx);
-          memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
+          copy_raw(&v[M * N], vecTmp);
         }
 
         if constexpr (loadPhase)
-          memcpy(&v[M * N + Nrem],
-                 &ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
-                 sizeof(store_t));
+          v[M * N + Nrem] = ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx];
       }
 
       /**
@@ -1873,19 +1954,18 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           array<store_t, N> vecTmp;
-          memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[i * N]);
           vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + ghost_idx, vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           array<store_t, Nrem> vecTmp;
-          memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
+          copy_raw(vecTmp, &v[M * N]);
           vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + ghost_idx, vecTmp);
         }
 
         if constexpr (hasPhase)
-          memcpy(&ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx],
-                 &v[M * N + Nrem], sizeof(store_t));
+          ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + ghost_idx] = v[M * N + Nrem];
       }
 
       /**
@@ -1898,19 +1978,20 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = 1.0) const
+      __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = real(1)) const
       {
         return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
       }
 
-      __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
+      __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity,
+                                                real phase = real(1)) const
       {
         real tmp[reconLen];
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory into registers
-          auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
+          auto vecTmp = vector_load<store_t, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
@@ -1918,7 +1999,8 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
+            = vector_load<store_t, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
+                                         parity * faceVolumeCB[dir] + x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -1934,14 +2016,17 @@ namespace quda {
         reconstruct.template Unpack<true>(v, tmp, x, dir, phase, X, R);
       }
 
-      __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity) const
+      template <typename In>
+      __device__ __host__ inline void saveGhost(const quda::complex<In> in[length / 2], int x, int dir, int parity) const
       {
+        complex v[length / 2];
+        cast_in(v, in);
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          array<Float, N> vecTmp;
+          array<store_t, N> vecTmp;
           // first do copy converting into storage type
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
@@ -1951,7 +2036,7 @@ namespace quda {
 
         // now save any remainder
         if constexpr (Nrem > 0) {
-          array<Float, Nrem> vecTmp;
+          array<store_t, Nrem> vecTmp;
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
@@ -1976,7 +2061,7 @@ namespace quda {
          this field at the above coordinates.
        */
       __device__ __host__ inline gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                           real phase = 1.0)
+                                                                           real phase = real(1))
       {
         return gauge_ghost_wrapper<real, Accessor>(*this, dim, ghost_idx, parity, phase);
       }
@@ -1992,7 +2077,7 @@ namespace quda {
          this field at the above coordinates.
        */
       __device__ __host__ inline const gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                                 real phase = 1.0) const
+                                                                                 real phase = real(1)) const
       {
         return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
       }
@@ -2005,8 +2090,9 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory
-          auto vecTmp = vector_load<Float, N>(ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
-                                              ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
+          auto vecTmp = vector_load<store_t, N>(
+            ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
+            ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
@@ -2015,13 +2101,14 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<Float, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
-                                       (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
+            = vector_load<store_t, Nrem>(
+              ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
+              (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
-        real phase = 0.;
+        real phase = real(0);
         if constexpr (hasPhase) {
           if constexpr (isFixed<Float>::value) {
             copy_and_scale(phase,
@@ -2040,15 +2127,18 @@ namespace quda {
         reconstruct.Unpack(v, tmp, extended_idx, g, phase, X, R);
       }
 
-      __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int x, int, int dir, int dim, int g,
+      template <typename In>
+      __device__ __host__ inline void saveGhostEx(const quda::complex<In> in[length / 2], int x, int, int dir, int dim, int g,
                                                   int parity, const int R[]) const
       {
+        complex v[length / 2];
+        cast_in(v, in);
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          array<Float, N> vecTmp;
+          array<store_t, N> vecTmp;
           // first do copy converting into storage type
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
@@ -2059,7 +2149,7 @@ namespace quda {
 
         // now save any remainder
         if constexpr (Nrem > 0) {
-          array<Float, Nrem> vecTmp;
+          array<store_t, Nrem> vecTmp;
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
@@ -2116,13 +2206,14 @@ namespace quda {
         __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
           auto in = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
-          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+          load_convert<length / 2>(v, in);
         }
 
-        __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
+        template <typename In>
+        __device__ __host__ inline void saveGhost(const quda::complex<In> v[length / 2], int x, int dir, int parity)
         {
           auto out = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
-          block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+          save_convert<length / 2>(out, v);
         }
 
         /**
@@ -2136,7 +2227,7 @@ namespace quda {
            this field at the above coordinates.
          */
         __device__ __host__ inline const gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                                   real phase = 1.0) const
+                                                                                   real phase = real(1)) const
         {
           return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
         }
@@ -2145,14 +2236,15 @@ namespace quda {
                                                     int parity, const int R[]) const
         {
           auto in = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
-          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+          load_convert<length / 2>(v, in);
         }
 
-        __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int x, int, int dir, int dim, int g,
-                                                    int parity, const int R[]) const
+        template <typename In>
+        __device__ __host__ inline void saveGhostEx(const quda::complex<In> v[length / 2], int x, int, int dir, int dim,
+                                                    int g, int parity, const int R[]) const
         {
           auto out = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
-          block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+          save_convert<length / 2>(out, v);
         }
       };
 
@@ -2175,13 +2267,14 @@ namespace quda {
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
           auto in = &gauge[dir][(parity * volumeCB + x) * length];
-          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+          load_convert<length / 2>(v, in);
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      template <typename In>
+      __device__ __host__ inline void save(const quda::complex<In> v[length / 2], int x, int dir, int parity) const
       {
         auto out = &gauge[dir][(parity * volumeCB + x) * length];
-        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+        save_convert<length / 2>(out, v);
       }
 
       /**
@@ -2226,11 +2319,12 @@ namespace quda {
           }
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      template <typename In>
+      __device__ __host__ inline void save(const quda::complex<In> v[length / 2], int x, int dir, int parity) const
       {
         for (int i = 0; i < length / 2; i++) {
-          gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].real();
-          gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].imag();
+          gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x] = store_cast<Float>(v[i].real());
+          gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x] = store_cast<Float>(v[i].imag());
         }
       }
 
@@ -2275,13 +2369,14 @@ namespace quda {
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
       auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+      load_convert<length / 2>(v, in);
     }
 
-    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+    template <typename In>
+    __device__ __host__ inline void save(const quda::complex<In> v[length / 2], int x, int dir, int parity) const
     {
       auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      save_convert<length / 2>(out, v);
     }
 
     /**
@@ -2342,15 +2437,16 @@ namespace quda {
       // get base pointer
       auto in = reinterpret_cast<const Float *>(reinterpret_cast<const char *>(gauge) + (parity * volumeCB + x) * size
                                                 + offset + dir * length * sizeof(Float));
-      block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
+      load_convert<length / 2>(v, in);
     }
 
-    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+    template <typename In>
+    __device__ __host__ inline void save(const quda::complex<In> v[length / 2], int x, int dir, int parity) const
     {
       // get base pointer
       auto out = reinterpret_cast<Float *>(reinterpret_cast<char *>(gauge) + (parity * volumeCB + x) * size + offset
                                            + dir * length * sizeof(Float));
-      block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      save_convert<length / 2>(out, v);
     }
 
     /**
@@ -2402,22 +2498,23 @@ namespace quda {
     {
       auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
       complex v_[9];
-      block_load<complex, length / 2>(v_, reinterpret_cast<complex *>(in));
+      load_convert<length / 2>(v_, in);
 
       for (int i=0; i<Nc; i++) {
         for (int j = 0; j < Nc; j++) { v[i * Nc + j] = v_[j * Nc + i] * anisotropy_inv; }
       }
     }
 
-    __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const
+    template <typename In>
+    __device__ __host__ inline void save(const quda::complex<In> v[9], int x, int dir, int parity) const
     {
       auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      complex v_[9];
+      quda::complex<In> v_[9];
       for (int i=0; i<Nc; i++) {
-        for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * anisotropy; }
+        for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * static_cast<In>(anisotropy); }
       }
 
-      block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v_);
+      save_convert<length / 2>(out, v_);
     }
 
     /**
@@ -2467,22 +2564,23 @@ namespace quda {
       {
         auto in = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
         complex v_[9];
-        block_load<complex, 9>(v_, reinterpret_cast<complex *>(in));
+        load_convert<9>(v_, in);
 
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) { v[i * Nc + j] = v_[j * Nc + i]; }
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const
+      template <typename In>
+      __device__ __host__ inline void save(const quda::complex<In> v[9], int x, int dir, int parity) const
       {
         auto out = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
-        complex v_[9];
+        quda::complex<In> v_[9];
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i]; }
         }
 
-        block_store<complex, 9>(reinterpret_cast<complex *>(out), v_);
+        save_convert<9>(out, v_);
       }
 
       /**
@@ -2531,22 +2629,23 @@ namespace quda {
       {
         auto in = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
         complex v_[9];
-        block_load<complex, 9>(v_, reinterpret_cast<complex *>(in));
+        load_convert<9>(v_, in);
 
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) { v[i * Nc + j] = v_[j * Nc + i] * scale_inv; }
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const
+      template <typename In>
+      __device__ __host__ inline void save(const quda::complex<In> v[9], int x, int dir, int parity) const
       {
         auto out = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
-        complex v_[9];
+        quda::complex<In> v_[9];
         for (int i = 0; i < Nc; i++) {
-          for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * scale; }
+          for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * static_cast<In>(scale); }
         }
 
-        block_store<complex, 9>(reinterpret_cast<complex *>(out), v_);
+        save_convert<9>(out, v_);
       }
 
       /**
@@ -2620,24 +2719,25 @@ namespace quda {
         int y = getPaddedIndex(x, parity);
         auto in = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
         complex v_[9];
-        block_load<complex, 9>(v_, reinterpret_cast<complex *>(in));
+        load_convert<9>(v_, in);
 
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) { v[i * Nc + j] = v_[j * Nc + i] * scale_inv; }
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const
+      template <typename In>
+      __device__ __host__ inline void save(const quda::complex<In> v[9], int x, int dir, int parity) const
       {
         int y = getPaddedIndex(x, parity);
         auto out = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
 
-        complex v_[9];
+        quda::complex<In> v_[9];
         for (int i = 0; i < Nc; i++) {
-          for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * scale; }
+          for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * static_cast<In>(scale); }
         }
 
-        block_store<complex, 9>(reinterpret_cast<complex *>(out), v_);
+        save_convert<9>(out, v_);
       }
 
       /**
@@ -2724,13 +2824,14 @@ namespace quda {
       __device__ __host__ inline void load(complex v[length / 2], int x_cb, int dir, int parity, Float = 1.0) const
       {
         auto in = &gauge[getGaugeOffset(x_cb, dir, parity)];
-        block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+        load_convert<length / 2>(v, in);
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int dir, int parity) const
+      template <typename In>
+      __device__ __host__ inline void save(const quda::complex<In> v[length / 2], int x_cb, int dir, int parity) const
       {
         auto out = &gauge[getGaugeOffset(x_cb, dir, parity)];
-        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+        save_convert<length / 2>(out, v);
       }
 
       /**

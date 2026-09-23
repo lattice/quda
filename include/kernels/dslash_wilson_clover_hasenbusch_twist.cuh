@@ -84,7 +84,7 @@ namespace quda
           HalfVector Ax_chi = A * x_chi; // A x_chi
 
           HalfVector A2x_chi = A * Ax_chi; // A2x_chi
-          const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+          const complex<real> b(real(0), chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
           Ax_chi += b * A2x_chi;
 
           tmp += Ax_chi.chiral_reconstruct(chirality);

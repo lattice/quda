@@ -10,6 +10,28 @@ namespace quda
 {
 
   /**
+     Hop unroll for staggered / asqtad.  Default is full unroll (4).
+     For floatfloat, asqtad long-link recon 13/9 and naive staggered
+     recon 9 stay at 1; asqtad-18 and naive 18/13 use 4.
+   */
+  template <typename real, QudaReconstructType recon, bool improved>
+  constexpr int staggered_dslash_hop_unroll()
+  {
+#ifdef QUDA_FPMP_FLOATFLOAT
+    if constexpr (is_floatfloat_v<real>) {
+      if constexpr (improved) {
+        if constexpr (recon == QUDA_RECONSTRUCT_13 || recon == QUDA_RECONSTRUCT_12 || recon == QUDA_RECONSTRUCT_9
+                      || recon == QUDA_RECONSTRUCT_8)
+          return 1;
+      } else {
+        if constexpr (recon == QUDA_RECONSTRUCT_9 || recon == QUDA_RECONSTRUCT_8) return 1;
+      }
+    }
+#endif
+    return 4;
+  }
+
+  /**
      @brief Parameter structure for driving the Staggered Dslash operator
   */
   template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_u_,
@@ -51,6 +73,8 @@ namespace quda
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
+    static constexpr int hop_unroll
+      = staggered_dslash_hop_unroll<real, improved_ ? reconstruct_l_ : reconstruct_u_, improved_>();
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED;
     static constexpr int prefetch_distance_l1 = 0;
 
@@ -64,7 +88,7 @@ namespace quda
       > (out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, spin_project, comm_override),
     halo_pack(halo, improved_ ? 3 : 1), halo(halo, improved_ ? 3 : 1), U(U),
     Uback(dslash_double_store() ? U.shift(1) : U), L(L), Lback(dslash_double_store() ? L.shift(3) : L),
-    a(static_cast<real>(a)), tboundary(static_cast<real>(U.TBoundary())),
+    a(static_cast<real>(a)), tboundary(static_cast<real>(static_cast<int>(U.TBoundary()))),
     is_first_time_slice(comm_coord(3) == 0 ? true : false),
     is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
     dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
@@ -170,12 +194,12 @@ namespace quda
       }
     }
 
-#pragma unroll
+#pragma unroll Arg::hop_unroll
     for (int d = 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction
       if (arg.dd_in.doHopping(coord, d, +1)) {
-        const bool ghost = coord1.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord1.in_boundary_at(1, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
@@ -206,7 +230,7 @@ namespace quda
 
       // improved - forward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, +3)) {
-        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary_at(1, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
           const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback.Ghost(d, ghost_idx, 1 - parity)) :
@@ -235,7 +259,7 @@ namespace quda
 
       if (arg.dd_in.doHopping(coord, d, -1)) {
         // Backward gather - compute back offset for spinor and gauge fetch
-        const bool ghost = coord1.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord1.in_boundary_at(0, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
@@ -269,7 +293,7 @@ namespace quda
 
       // improved - backward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, -3)) {
-        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary_at(0, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const Link L = static_cast<const Link>(arg.L.Ghost(d, ghost_idx, 1 - parity));

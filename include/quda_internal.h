@@ -4,6 +4,8 @@
 #include <quda_api.h>
 #include <quda_define.h>
 
+#include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -58,6 +60,9 @@
 #include <array.h>
 #include "timer.h"
 #include "dbldbl.h"
+#ifdef QUDA_FPMP_FLOATFLOAT
+#include "floatfloat.h"
+#endif
 
 namespace quda {
 
@@ -80,13 +85,43 @@ namespace quda {
   inline complex_t operator*(double x, const complex_t &z) { return real_t(x) * z; }
   inline complex_t operator*(const complex_t &z, double x) { return z * real_t(x); }
 #else
-  inline double to_double(real_t x) { return x; }
+  inline double to_double(real_t x) { return static_cast<double>(x); }
 #endif
 
   /**
      Underlying type to use for reductions
   */
   using reduction_t = QUDA_REDUCTION_TYPE;
+
+  /**
+     @brief Machine epsilon of the type that kernels actually compute in
+     for a given storage type.  When a pseudo-double compute type stands in
+     for IEEE double this is coarser than std::numeric_limits<double>.
+  */
+  template <typename T> inline double compute_epsilon() { return std::numeric_limits<T>::epsilon(); }
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <> inline double compute_epsilon<double>()
+  {
+    return static_cast<double>(cuda::std::numeric_limits<floatfloat_cccl_t<floatfloat>>::epsilon());
+  }
+#endif
+
+  /**
+     @brief Runtime overload of compute_epsilon keyed on a QUDA precision
+     tag.  DOUBLE uses compute_epsilon<double>() (fp32mp2 when that is
+     the native double compute type).  SINGLE uses IEEE float.
+  */
+  inline double compute_epsilon(QudaPrecision prec)
+  {
+    switch (prec) {
+    case QUDA_DOUBLE_PRECISION: return compute_epsilon<double>();
+    case QUDA_SINGLE_PRECISION: return compute_epsilon<float>();
+    case QUDA_HALF_PRECISION: return std::pow(2., -12);
+    case QUDA_QUARTER_PRECISION: return std::pow(2., -5);
+    default: errorQuda("Invalid precision %d", prec);
+    }
+  }
 
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 13000
   using double4 = ::double4_32a;

@@ -1,6 +1,10 @@
 #pragma once
 
 #include <curand_kernel.h>
+#include <quda_define.h>
+#ifdef QUDA_FPMP_FLOATFLOAT
+#include <floatfloat.h>
+#endif
 
 namespace quda
 {
@@ -30,7 +34,7 @@ namespace quda
     curand_init(seed, sequence, offset, &state.state);
   }
 
-  template <class Real> struct uniform {
+  template <class Real, typename Enable = void> struct uniform {
   };
   template <> struct uniform<float> {
 
@@ -71,7 +75,35 @@ namespace quda
     }
   };
 
-  template <class Real> struct normal {
+#ifdef QUDA_FPMP_FLOATFLOAT
+  /**
+     @brief Uniform generator for any fp32mp2 accuracy, including a
+     promoted register type that is not the bulk alias.  Constructs
+     Real from a single-precision cuRAND draw.
+   */
+  template <class Real> struct uniform<Real, std::enable_if_t<is_floatfloat_v<Real>>> {
+    /**
+       @brief Return a uniform deviate in (0, 1].
+       @param[in,out] state RNG state
+       @return Uniform sample of type Real
+     */
+    __device__ static inline Real rand(RNGState &state) { return Real(curand_uniform(&state.state)); }
+
+    /**
+       @brief Return a uniform deviate in [a, b].
+       @param[in,out] state RNG state
+       @param[in] a Lower end of the range
+       @param[in] b Upper end of the range
+       @return Uniform sample of type Real in [a, b]
+     */
+    __device__ static inline Real rand(RNGState &state, Real a, Real b)
+    {
+      return a + (b - a) * Real(curand_uniform(&state.state));
+    }
+  };
+#endif
+
+  template <class Real, typename Enable = void> struct normal {
   };
 
   template <> struct normal<float> {
@@ -89,5 +121,21 @@ namespace quda
      */
     __device__ static inline double rand(RNGState &state) { return curand_normal_double(&state.state); }
   };
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+  /**
+     @brief Normal generator for any fp32mp2 accuracy, including a
+     promoted register type that is not the bulk alias.  Constructs
+     Real from a single-precision cuRAND draw.
+   */
+  template <class Real> struct normal<Real, std::enable_if_t<is_floatfloat_v<Real>>> {
+    /**
+       @brief Return a Gaussian deviate with mean 0 and variance 1.
+       @param[in,out] state RNG state
+       @return Normal sample of type Real
+     */
+    __device__ static inline Real rand(RNGState &state) { return Real(curand_normal(&state.state)); }
+  };
+#endif
 
 } // namespace quda

@@ -589,6 +589,16 @@ extern "C" {
     /** The size of the orthogonal direction in the 3D eigensolver, local **/
     int ortho_dim_size_local;
 
+    /** Output: an estimate of the operator norm, taken as the largest
+        magnitude Ritz value of the projected tridiagonal/Hessenberg matrix.
+        This is the analogue of ARPACK's anorm: because the Krylov space
+        samples the whole spectrum, it is a good estimate of ||A|| even when
+        only the smallest eigenvalues are requested.  When polynomial
+        acceleration is used the projected matrix belongs to the accelerated
+        operator, so a_max is reported instead.  Set on return from
+        eigensolveQuda; zero if the solver did not provide an estimate. **/
+    double mat_norm;
+
     //-------------------------------------------------
 
     // EIG-CG PARAMS

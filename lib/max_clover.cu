@@ -18,10 +18,10 @@ namespace quda {
     typedef typename mapper<real>::type reg_type;
     real_t norm_ = 0.0;
     switch(type) {
-    case   NORM1: norm_ = FieldOrder<reg_type,Nc,Ns,order>(const_cast<CloverField &>(u), inverse).norm1();   break;
-    case   NORM2: norm_ = FieldOrder<reg_type,Nc,Ns,order>(const_cast<CloverField &>(u), inverse).norm2();   break;
-    case ABS_MAX: norm_ = FieldOrder<reg_type,Nc,Ns,order>(const_cast<CloverField &>(u), inverse).abs_max(); break;
-    case ABS_MIN: norm_ = FieldOrder<reg_type,Nc,Ns,order>(const_cast<CloverField &>(u), inverse).abs_min(); break;
+    case   NORM1: norm_ =     FieldOrder<reg_type,Nc,Ns,order,real>(const_cast<CloverField &>(u), inverse).norm1();   break;
+    case   NORM2: norm_ = FieldOrder<reg_type,Nc,Ns,order,real>(const_cast<CloverField &>(u), inverse).norm2();   break;
+    case ABS_MAX: norm_ = FieldOrder<reg_type,Nc,Ns,order,real>(const_cast<CloverField &>(u), inverse).abs_max(); break;
+    case ABS_MIN: norm_ = FieldOrder<reg_type,Nc,Ns,order,real>(const_cast<CloverField &>(u), inverse).abs_min(); break;
     }
     return norm_;
   }

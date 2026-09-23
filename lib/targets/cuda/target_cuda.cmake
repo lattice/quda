@@ -131,6 +131,29 @@ set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTU
 
 message(STATUS "QUDA_GPU_ARCH: ${QUDA_GPU_ARCH}")
 
+# Low FP64:FP32 parts (32:1 or 64:1). First-configure defaults: bulk float-float
+# low, reductions mid. High-FP64 parts (70/80/90/100/107) stay IEEE double.
+set(_quda_low_fp64_caps 72 75 86 87 89 103 110 120 121)
+string(REGEX MATCH "^[0-9]+" _quda_fp64_cap "${QUDA_COMPUTE_CAPABILITY}")
+if(_quda_fp64_cap IN_LIST _quda_low_fp64_caps)
+  set(QUDA_FPMP_FLOATFLOAT_DEFAULT ON)
+  set(QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT low)
+  # An explicit QUDA_FPMP_FLOATFLOAT=OFF has to leave the reductions on IEEE double
+  if(DEFINED QUDA_FPMP_FLOATFLOAT AND NOT QUDA_FPMP_FLOATFLOAT)
+    set(QUDA_REDUCTION_TYPE_DEFAULT double)
+  else()
+    set(QUDA_REDUCTION_TYPE_DEFAULT floatfloat_mid)
+  endif()
+  message(STATUS "Low-FP64 arch ${QUDA_GPU_ARCH}: default float-float bulk=low, "
+                 "reductions=${QUDA_REDUCTION_TYPE_DEFAULT}")
+else()
+  set(QUDA_FPMP_FLOATFLOAT_DEFAULT OFF)
+  set(QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT high)
+  set(QUDA_REDUCTION_TYPE_DEFAULT double)
+endif()
+unset(_quda_low_fp64_caps)
+unset(_quda_fp64_cap)
+
 # ######################################################################################################################
 # data order variables
 cmake_dependent_option(LDG256 "are 256-bit load instructions supported" ON
@@ -399,12 +422,15 @@ if(QUDA_MULTIGRID)
         math(EXPR MRHS_MODULO "${QUDA_MULTIGRID_MRHS} % ${MRHS_ATOM}")
 
         if((${QUDA_MULTIGRID_MRHS} GREATER 0) AND (${QUDA_MULTIGRID_MRHS} LESS_EQUAL 64) AND (${MRHS_MODULO} EQUAL 0))
-          set(QUDA_MULTIGRID_DAGGER "false")
-          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
-          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
-          set(QUDA_MULTIGRID_DAGGER "true")
-          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
-          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
+          foreach(QUDA_DSLASH_COARSE_TRIPLE ${QUDA_DSLASH_COARSE_TRIPLES})
+            quda_parse_dslash_coarse_triple(${QUDA_DSLASH_COARSE_TRIPLE})
+            set(QUDA_MULTIGRID_DAGGER "false")
+            configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}_${QUDA_COARSE_TRIPLE_TAG}.cu" @ONLY)
+            list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}_${QUDA_COARSE_TRIPLE_TAG}.cu")
+            set(QUDA_MULTIGRID_DAGGER "true")
+            configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}_${QUDA_COARSE_TRIPLE_TAG}.cu" @ONLY)
+            list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}_${QUDA_COARSE_TRIPLE_TAG}.cu")
+          endforeach()
         else()
           message(SEND_ERROR "MRHS not supported:" "${QUDA_MULTIGRID_MRHS}")
         endif()
@@ -430,8 +456,8 @@ target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS} ${
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-Xfatbin=-compress-all>)
-target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda)
-target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda>
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/targets/cuda>
+                                       $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda>
                                        $<INSTALL_INTERFACE:include/targets/cuda>)
 target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
 target_include_directories(quda_cpp SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
@@ -528,21 +554,120 @@ if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
 
-option(QUDA_DOWNLOAD_CCCL "Download CCCL v3.3.4 via CPM; OFF = use the CUDA toolkit's CCCL" ON)
+option(QUDA_DOWNLOAD_CCCL "Download CCCL via CPM; OFF = use the CUDA toolkit's CCCL" ON)
 if(QUDA_DOWNLOAD_CCCL)
+  # Temporary: lattice/cccl fpmp-iec-float128-conv adds fp64mp2 <-> GCC _Float128
+  # interchange (needed for aarch64 quad). Revert to nvidia/cccl main once that
+  # lands upstream. FPMP types are still not in a tagged CCCL release.
   CPMAddPackage(
       NAME CCCL
-      GITHUB_REPOSITORY nvidia/cccl
-      GIT_TAG v3.3.4 # Fetches this tagged commit
+      GITHUB_REPOSITORY lattice/cccl
+      GIT_TAG fpmp-iec-float128-conv
   )
 else()
   # Use the CUDA toolkit's CCCL (the same one NVSHMEM 3.x's config find_dependency
   # resolves to) so QUDA and NVSHMEM share ONE CCCL -> no libcudacxx/cub clash.
   # QUDA requires CUDAToolkit, so CUDAToolkit_LIBRARY_ROOT points at the toolkit.
-  find_package(CCCL REQUIRED CONFIG
-      HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl")
+  find_package(CCCL CONFIG
+      HINTS "${CUDAToolkit_LIBRARY_ROOT}/lib/cmake/cccl"
+            "${CUDAToolkit_LIBRARY_ROOT}/lib64/cmake/cccl")
+  if(NOT TARGET CCCL::CCCL)
+    message(FATAL_ERROR
+            "QUDA_DOWNLOAD_CCCL=OFF but CCCL was not found in the CUDA toolkit "
+            "(looked under ${CUDAToolkit_LIBRARY_ROOT}). "
+            "Update the toolkit CCCL, set QUDA_DOWNLOAD_CCCL=ON, or install CCCL so CMake can find it.")
+  endif()
 endif()
+
+# Double-double is only worth pulling FPMP in for when double-double is actually
+# a compute type: the reduction accumulator or the host scalar.  Everything else
+# is served by the legacy dbldbl fallback, which is also all a non-CUDA target
+# can use.
+if(DEFINED QUDA_REDUCTION_TYPE)
+  set(_quda_dd_reduction "${QUDA_REDUCTION_TYPE}")
+else()
+  set(_quda_dd_reduction "${QUDA_REDUCTION_TYPE_DEFAULT}")
+endif()
+if(_quda_dd_reduction MATCHES "^doubledouble" OR QUDA_SCALAR_IS_DOUBLEDOUBLE)
+  set(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT ON)
+else()
+  set(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT OFF)
+endif()
+unset(_quda_dd_reduction)
+
+# FPMP options are declared after this file returns. Use cache values when the
+# user already passed -D, otherwise the same defaults option() will apply.
+set(_quda_need_fpmp)
+if(DEFINED QUDA_FPMP_DOUBLEDOUBLE)
+  if(QUDA_FPMP_DOUBLEDOUBLE)
+    list(APPEND _quda_need_fpmp QUDA_FPMP_DOUBLEDOUBLE)
+  endif()
+elseif(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT)
+  list(APPEND _quda_need_fpmp QUDA_FPMP_DOUBLEDOUBLE)
+endif()
+if(DEFINED QUDA_FPMP_FLOATFLOAT)
+  if(QUDA_FPMP_FLOATFLOAT)
+    list(APPEND _quda_need_fpmp QUDA_FPMP_FLOATFLOAT)
+  endif()
+elseif(QUDA_FPMP_FLOATFLOAT_DEFAULT)
+  list(APPEND _quda_need_fpmp QUDA_FPMP_FLOATFLOAT)
+endif()
+
+set(_quda_fpmp_hints)
+# The libcudacxx target is where <cuda/fpmp> lives, for both the downloaded and
+# the toolkit CCCL.  CPM exports CCCL_SOURCE_DIR (the name passed to it), so keep
+# that as a fallback rather than FetchContent's lower-case spelling.
+foreach(_quda_cccl_target CCCL::libcudacxx libcudacxx::libcudacxx)
+  if(TARGET ${_quda_cccl_target})
+    get_target_property(_quda_cccl_inc ${_quda_cccl_target} INTERFACE_INCLUDE_DIRECTORIES)
+    if(_quda_cccl_inc)
+      list(APPEND _quda_fpmp_hints ${_quda_cccl_inc})
+    endif()
+  endif()
+endforeach()
+unset(_quda_cccl_target)
+unset(_quda_cccl_inc)
+if(CCCL_SOURCE_DIR)
+  list(APPEND _quda_fpmp_hints "${CCCL_SOURCE_DIR}/libcudacxx/include" "${CCCL_SOURCE_DIR}/include")
+endif()
+if(CUDAToolkit_INCLUDE_DIRS)
+  list(APPEND _quda_fpmp_hints ${CUDAToolkit_INCLUDE_DIRS})
+endif()
+if(CUDAToolkit_LIBRARY_ROOT)
+  list(APPEND _quda_fpmp_hints "${CUDAToolkit_LIBRARY_ROOT}/include")
+endif()
+find_path(QUDA_CCCL_FPMP_INCLUDE
+          NAMES cuda/fpmp
+          HINTS ${_quda_fpmp_hints}
+          DOC "Directory containing CCCL <cuda/fpmp>")
+mark_as_advanced(QUDA_CCCL_FPMP_INCLUDE)
+if(QUDA_CCCL_FPMP_INCLUDE)
+  message(STATUS "CCCL FPMP headers: ${QUDA_CCCL_FPMP_INCLUDE}")
+elseif(_quda_need_fpmp)
+  string(REPLACE ";" ", " _quda_need_fpmp_str "${_quda_need_fpmp}")
+  message(FATAL_ERROR
+          "The selected CCCL does not provide FPMP (<cuda/fpmp>), which this build needs "
+          "for ${_quda_need_fpmp_str}. Searched ${_quda_fpmp_hints}. "
+          "Update CCCL to 3.6+ / a toolkit that ships FPMP, set QUDA_DOWNLOAD_CCCL=ON, "
+          "or disable FPMP with -DQUDA_FPMP_FLOATFLOAT=OFF -DQUDA_FPMP_DOUBLEDOUBLE=OFF.")
+else()
+  message(STATUS "CCCL has no FPMP headers; OK because QUDA_FPMP_DOUBLEDOUBLE and QUDA_FPMP_FLOATFLOAT are OFF")
+endif()
+unset(_quda_fpmp_hints)
+unset(_quda_need_fpmp)
+unset(_quda_need_fpmp_str)
 target_link_libraries(quda PRIVATE CCCL::CCCL)
+target_link_libraries(quda_cpp PRIVATE CCCL::CCCL)
+
+# CCCL declares its fp128 conversions __device__ only for sm_100 and newer. A quad scalar
+# is converted to and from doubledouble in device code on every architecture we build for,
+# so opt in to the conversions CCCL documents as available to toolchains that provide them.
+if(QUDA_USE_QUAD_SCALAR AND QUDA_CUDA_BUILD_TYPE STREQUAL "NVCC")
+  target_compile_definitions(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:_CCCL_FPMP_FP128_DEVICE_OPS=1>)
+endif()
+# Internal build-tree consumers include quda_internal.h / dbldbl.h directly.
+# Do not export CCCL as an installed-package dependency.
+target_link_libraries(quda INTERFACE "$<BUILD_INTERFACE:CCCL::CCCL>")
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)

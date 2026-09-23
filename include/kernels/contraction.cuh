@@ -114,12 +114,13 @@ namespace quda
       sink_from_t_xyz<Arg::reduction_dim>(sink, t, xyz, arg.X);
 
       // Calculate exp(-i * [x dot p])
-      real Sum_dXi_dot_Pi = 0.0;
+      real Sum_dXi_dot_Pi = real(0);
       for (int i = 0; i < 4; i++)
-        Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
+        Sum_dXi_dot_Pi
+          += real((arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i]) / real(arg.NxNyNzNt[i]);
 
       complex<real> phase
-        = {static_cast<real>(cospi(Sum_dXi_dot_Pi * 2.)), static_cast<real>(-sinpi(Sum_dXi_dot_Pi * 2.))};
+        = {cospi(Sum_dXi_dot_Pi * real(2)), -sinpi(Sum_dXi_dot_Pi * real(2))};
 
       // Collect vector data
       int parity = 0;
@@ -153,8 +154,10 @@ namespace quda
           // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
           // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx
           auto prop_product = get_g5gm(b2) * innerProduct(x, y, b2, s2) * get_g5gm(b1);
-          site_sum[0] += prop_product.real() * phase.real() - prop_product.imag() * phase.imag();
-          site_sum[1] += prop_product.imag() * phase.real() + prop_product.real() * phase.imag();
+          site_sum[0]
+            += static_cast<reduction_t>(prop_product.real() * phase.real() - prop_product.imag() * phase.imag());
+          site_sum[1]
+            += static_cast<reduction_t>(prop_product.imag() * phase.real() + prop_product.real() * phase.imag());
         }
       }
 

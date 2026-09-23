@@ -42,8 +42,11 @@ namespace quda {
 #endif
   }
 
-  /** Convert a device reduction value to host scalar real_t. */
-  __host__ inline real_t reduction_to_real(const device_reduce_t &x) { return reduction_to_scalar<real_t>(x); }
+  /** Convert a device reduction value to scalar real_t. */
+  __host__ __device__ inline real_t reduction_to_real(const device_reduce_t &x)
+  {
+    return reduction_to_scalar<real_t>(x);
+  }
 
   __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y) { return {x.x + y.x, x.y + y.y}; }
 
@@ -179,7 +182,15 @@ namespace quda {
   }
 
   template <typename T> struct low {
-    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }
+    static constexpr T value()
+    {
+#ifdef QUDA_FPMP_FLOATFLOAT
+      if constexpr (is_floatfloat_v<T>)
+        return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::lowest());
+      else
+#endif
+        return std::numeric_limits<T>::lowest();
+    }
   };
 
   template <typename T, int N> struct low<array<T, N>> {
@@ -204,7 +215,15 @@ namespace quda {
   };
 
   template <typename T> struct high {
-    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::max(); }
+    static constexpr T value()
+    {
+#ifdef QUDA_FPMP_FLOATFLOAT
+      if constexpr (is_floatfloat_v<T>)
+        return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::max());
+      else
+#endif
+        return std::numeric_limits<T>::max();
+    }
   };
 
   template <> struct high<doubledouble> {
@@ -222,6 +241,24 @@ namespace quda {
   template <> struct RealType<complex<double>> {
     typedef double type;
   };
+#ifdef QUDA_FPMP_FLOATFLOAT
+#define QUDA_FPMP_DECLARE_REAL_TYPE(FF)                                                                                \
+  template <> struct RealType<FF> {                                                                                    \
+    typedef FF type;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct RealType<fpmp2_pair<FF>> {                                                                        \
+    typedef FF type;                                                                                                   \
+  };                                                                                                                   \
+  template <> struct RealType<complex<FF>> {                                                                           \
+    typedef FF type;                                                                                                   \
+  };
+
+  QUDA_FPMP_DECLARE_REAL_TYPE(floatfloat_low)
+  QUDA_FPMP_DECLARE_REAL_TYPE(floatfloat_mid)
+  QUDA_FPMP_DECLARE_REAL_TYPE(floatfloat_high)
+
+#undef QUDA_FPMP_DECLARE_REAL_TYPE
+#endif
   template <> struct RealType<float> {
     typedef float type;
   };

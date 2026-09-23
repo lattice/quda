@@ -31,6 +31,7 @@ namespace quda
                                     QUDA_NATIVE_GAUGE_ORDER, shifted, QUDA_VECTOR_GEOMETRY>::type;
 
     typedef typename mapper<Float>::type real;
+    static constexpr int hop_unroll = wilson_dslash_hop_unroll<real>;
 
     F out[MAX_MULTI_RHS]; /** output vector field set */
     F in[MAX_MULTI_RHS];  /** input vector field set */
@@ -131,16 +132,16 @@ namespace quda
     real bwd_coeff_3
       = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
 
-#pragma unroll
+#pragma unroll Arg::hop_unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       // Forward gather - compute fwd offset for vector fetch
       if (arg.dd_in.doHopping(coord, d, +1)) {
-        const real fwd_coeff = (d < 3) ? 1.0 : fwd_coeff_3;
+        const real fwd_coeff = (d < 3) ? real(1) : fwd_coeff_3;
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
 
-        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary_at(1, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
@@ -168,13 +169,13 @@ namespace quda
 
       // Backward gather - compute back offset for spinor and gauge fetch
       if (arg.dd_in.doHopping(coord, d, -1)) {
-        const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
+        const real bwd_coeff = (d < 3) ? real(1) : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         int gauge_idx = dslash_double_store() ? coord.x_cb : back_idx;
         if constexpr (Arg::nDim == 5) gauge_idx = gauge_idx % arg.dc.volume_4d_cb;
         constexpr int proj_dir = dagger ? -1 : +1;
 
-        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary_at(0, d) & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours

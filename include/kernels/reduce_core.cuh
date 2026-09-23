@@ -160,8 +160,10 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          max = max > abs(x[i].real()) ? max : abs(x[i].real());
-          max = max > abs(x[i].imag()) ? max : abs(x[i].imag());
+          const reduction_t abs_real = static_cast<reduction_t>(abs(x[i].real()));
+          const reduction_t abs_imag = static_cast<reduction_t>(abs(x[i].imag()));
+          max = max > abs_real ? max : abs_real;
+          max = max > abs_imag ? max : abs_imag;
         }
       }
       constexpr int flops() const { return 0; }   //! flops per element
@@ -181,11 +183,11 @@ namespace quda
             = {reduction_t(abs(x[i].real() - y[i].real())), reduction_t(abs(x[i].imag() - y[i].imag()))};
           if (diff.real() > max.diff ) {
             max.diff = diff.real();
-            max.ref = abs(y[i].real());
+            max.ref = static_cast<reduction_t>(abs(y[i].real()));
           }
           if (diff.imag() > max.diff) {
             max.diff = diff.imag();
-            max.ref = abs(y[i].imag());
+            max.ref = static_cast<reduction_t>(abs(y[i].imag()));
           }
         }
       }
@@ -219,8 +221,10 @@ namespace quda
     */
     template <typename reduce_t, typename T> __device__ __host__ auto norm2_(const complex<T> &a)
     {
-      auto n = reduce_t(a.real()) * reduce_t(a.real());
-      return fma(reduce_t(a.imag()), reduce_t(a.imag()), n);
+      const auto re = reduce_t(a.real());
+      const auto im = reduce_t(a.imag());
+      auto n = re * re;
+      return fma(im, im, n);
     }
 
     /**
@@ -228,8 +232,10 @@ namespace quda
     */
     template <typename reduce_t, typename T> __device__ __host__ void norm2_(reduce_t &sum, const complex<T> &a)
     {
-      sum += static_cast<reduce_t>(a.real()) * static_cast<reduce_t>(a.real());
-      sum += static_cast<reduce_t>(a.imag()) * static_cast<reduce_t>(a.imag());
+      const auto re = reduce_t(a.real());
+      const auto im = reduce_t(a.imag());
+      sum += re * re;
+      sum += im * im;
     }
 
     template <typename reduce_t, typename real>
@@ -251,8 +257,12 @@ namespace quda
     */
     template <typename reduce_t, typename T> __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
     {
-      auto d = reduce_t(a.real()) * reduce_t(b.real());
-      return fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
+      const auto ar = reduce_t(a.real());
+      const auto ai = reduce_t(a.imag());
+      const auto br = reduce_t(b.real());
+      const auto bi = reduce_t(b.imag());
+      auto d = ar * br;
+      return fma(ai, bi, d);
     }
 
     template <typename reduce_t, typename real>
@@ -388,10 +398,14 @@ namespace quda
     template <typename reduce_t, typename T> __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
     {
       using scalar_t = typename reduce_t::value_type;
-      auto r = scalar_t(a.real()) * scalar_t(b.real());
-      r = fma(scalar_t(a.imag()), scalar_t(b.imag()), r);
-      auto i = scalar_t(a.real()) * scalar_t(b.imag());
-      i = fma(-scalar_t(a.imag()), scalar_t(b.real()), i);
+      const auto ar = scalar_t(a.real());
+      const auto ai = scalar_t(a.imag());
+      const auto br = scalar_t(b.real());
+      const auto bi = scalar_t(b.imag());
+      auto r = ar * br;
+      r = fma(ai, bi, r);
+      auto i = ar * bi;
+      i = fma(-ai, br, i);
       return reduce_t {r, i};
     }
 
@@ -567,11 +581,15 @@ namespace quda
 
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          norm2_<reduction_t, real>(aux[0], x[i]);
-          norm2_<reduction_t, real>(aux[1], y[i]);
+          const complex<reduction_t> x_mid {reduction_t(x[i].real()), reduction_t(x[i].imag())};
+          const complex<reduction_t> r_mid {reduction_t(y[i].real()), reduction_t(y[i].imag())};
+          norm2_<reduction_t>(aux[0], x_mid);
+          norm2_<reduction_t>(aux[1], r_mid);
         }
 
-        sum = reducer::apply(sum, {aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0)});
+        const array<reduction_t, 3> site {
+          aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<reduction_t>(1.0)};
+        sum = reducer::apply(sum, site);
       }
 
       constexpr int flops() const { return 4; }   //! undercounts since it excludes the per-site division
@@ -602,11 +620,16 @@ namespace quda
 
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          norm2_<reduction_t, real>(aux[0], x[i] + y[i]);
-          norm2_<reduction_t, real>(aux[1], z[i]);
+          const complex<reduction_t> x_mid {reduction_t(x[i].real()), reduction_t(x[i].imag())};
+          const complex<reduction_t> y_mid {reduction_t(y[i].real()), reduction_t(y[i].imag())};
+          const complex<reduction_t> r_mid {reduction_t(z[i].real()), reduction_t(z[i].imag())};
+          norm2_<reduction_t>(aux[0], x_mid + y_mid);
+          norm2_<reduction_t>(aux[1], r_mid);
         }
 
-        sum = reducer::apply(sum, {aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0)});
+        const array<reduction_t, 3> site {
+          aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<reduction_t>(1.0)};
+        sum = reducer::apply(sum, site);
       }
 
       constexpr int flops() const { return 5; }

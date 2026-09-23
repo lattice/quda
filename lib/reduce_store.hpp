@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <utility>
 #include <instantiate.h>
 #include <float_vector.h>
 
@@ -15,6 +16,9 @@ namespace quda
     // symbol per TU (gcc merges them). Both reduce_quda.cpp and
     // multi_reduce_quda.cpp include this header.
     template <> inline constexpr QudaPrecision store_prec_v<double> = QUDA_DOUBLE_PRECISION;
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> inline constexpr QudaPrecision store_prec_v<floatfloat> = QUDA_DOUBLE_PRECISION;
+#endif
     template <> inline constexpr QudaPrecision store_prec_v<float> = QUDA_SINGLE_PRECISION;
     template <> inline constexpr QudaPrecision store_prec_v<short> = QUDA_HALF_PRECISION;
     template <> inline constexpr QudaPrecision store_prec_v<int8_t> = QUDA_QUARTER_PRECISION;
@@ -35,13 +39,25 @@ namespace quda
     // kernels already built by whichever precision is actually enabled.
     template <typename store_t> constexpr bool multi_reduce_prec_enabled() { return is_enabled(store_prec_v<store_t>); }
 
-    template <typename Fn> auto dispatch_reduce_prec(QudaPrecision prec, Fn &&fn)
+    // Multi-BLAS is GPU-only as well (same "Only implemented for GPU fields"
+    // error in MultiBlas::compute), so reuse the multi-reduce gate.
+    template <typename store_t> constexpr bool multi_blas_prec_enabled() { return multi_reduce_prec_enabled<store_t>(); }
+
+    // Single-vector BLAS has a CPU-field path (see Blas::apply), so keep
+    // double instantiable even when GPU double is disabled.
+    template <typename store_t> constexpr bool blas_prec_enabled() { return reduce_prec_enabled<store_t>(); }
+
+    template <typename Fn> auto dispatch_reduce_prec(QudaPrecision prec, [[maybe_unused]] bool native, Fn &&fn)
     {
       if (!is_enabled(prec) && prec != QUDA_DOUBLE_PRECISION)
         errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, prec);
 
       switch (prec) {
-      case QUDA_DOUBLE_PRECISION: return fn.template operator()<double>();
+      case QUDA_DOUBLE_PRECISION:
+#ifdef QUDA_FPMP_FLOATFLOAT
+        if (native) return fn.template operator()<floatfloat>();
+#endif
+        return fn.template operator()<double>();
       case QUDA_SINGLE_PRECISION:
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) return fn.template operator()<float>();
         break;
@@ -56,6 +72,12 @@ namespace quda
       errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, prec);
       using Ret = decltype(fn.template operator()<double>());
       if constexpr (!std::is_void_v<Ret>) return Ret {};
+    }
+
+    template <typename Field, typename Fn> auto dispatch_reduce_store(const Field &field, Fn &&fn)
+    {
+      const bool native = field.Location() == QUDA_CUDA_FIELD_LOCATION && field.isNative();
+      return dispatch_reduce_prec(field.Precision(), native, std::forward<Fn>(fn));
     }
 
   } // namespace blas

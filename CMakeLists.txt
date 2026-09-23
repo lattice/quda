@@ -240,7 +240,6 @@ option(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST "Whether to run eigensolver cte
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
-option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
 if(NOT DEFINED QUDA_BLAS_PREFETCH_TYPE)
   set(QUDA_BLAS_PREFETCH_TYPE "THREAD" CACHE STRING "BLAS grid-stride prefetch: NONE, THREAD (per-cache-line L2), BULK (CUDA sm_90+; CMake rejects older arches)")
@@ -282,7 +281,6 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)

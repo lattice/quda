@@ -28,7 +28,10 @@ namespace quda {
     int faceVolumeCB[nDim];
     const int offset;
     ExtractGhostArg(const GaugeField &u, store_t **Ghost, int offset, uint64_t size) :
-      kernel_param(dim3(size, fine_grain ? nColor : 1, 2 * nDim)), u(u, 0, Ghost), nFace(u.Nface()), offset(offset)
+      kernel_param(dim3(size, fine_grain ? nColor : 1, 2 * nDim)),
+      u(u, static_cast<store_t *>(nullptr), Ghost),
+      nFace(u.Nface()),
+      offset(offset)
     {
       for (int d=0; d<nDim; d++) {
 	X[d] = u.X()[d];
@@ -96,7 +99,7 @@ namespace quda {
       int oddness = (a+b+c+d)&1;
       if (oddness == parity) {
         if constexpr (Arg::Gauge::is_native) { // native format so use raw bit stream
-          using RawLink = array<typename Arg::store_t, Arg::Gauge::recon>;
+          using RawLink = array<typename Arg::Gauge::store_t, Arg::Gauge::recon>;
           RawLink link;
           if (Arg::extract) { // load the ghost element from the bulk
             arg.u.raw_load(link, x_cb, dim + arg.offset, parity);

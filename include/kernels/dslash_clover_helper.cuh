@@ -55,8 +55,8 @@ namespace quda {
       parity(parity),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB()),
-      a(0.0),
-      b(0.0),
+      a {},
+      b {},
       twist(twist)
     {
       for (auto i = 0u; i < out.size(); i++) {
@@ -67,26 +67,26 @@ namespace quda {
       checkLocation(out, in, clover);
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          a = real(2.0 * kappa * mu);
-          b = 1.0;
+          a = static_cast<real>(2.0 * kappa * mu);
+          b = real(1);
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          a = -real(2.0 * kappa * mu);
-          b = 1.0 / (1.0 + a*a);
+          a = static_cast<real>(-2.0 * kappa * mu);
+          b = real(1) / (real(1) + a * a);
         }
-        if (dagger) a *= -1.0;
+        if (dagger) a *= real(-1);
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT){
-          a = real(2.0 * kappa * mu);
-          b = -real(2.0 * kappa * epsilon);
+          a = static_cast<real>(2.0 * kappa * mu);
+          b = static_cast<real>(-2.0 * kappa * epsilon);
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          a = -real(2.0 * kappa * mu);
-          b = real(2.0 * kappa * epsilon);
+          a = static_cast<real>(-2.0 * kappa * mu);
+          b = static_cast<real>(2.0 * kappa * epsilon);
         }
-        if (dagger) a *= -1.0;
+        if (dagger) a *= real(-1);
       }
       // factor of 2 comes from clover normalization we need to correct for
-      a *= 0.5;
-      b *= 0.5;
+      a *= real(0.5);
+      b *= real(0.5);
       a2_minus_b2 = a * a - b * b;
     }
   };
@@ -156,7 +156,7 @@ namespace quda {
 
 #pragma unroll
       for (int chirality=0; chirality<2; chirality++) {
-        const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
+        const complex<real> a(real(0), chirality == 0 ? arg.a : -arg.a);
         Mat A = arg.clover(x_cb, clover_parity, chirality);
 
         half_fermion in_chi = in.chiral_project(chirality);
@@ -228,7 +228,7 @@ namespace quda {
       }
 
       // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
-      const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
+      const complex<real> a(real(0), chirality == 0 ? arg.a : -arg.a);
 
       SharedMemoryCache<half_fermion> cache {*this};
 

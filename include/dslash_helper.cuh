@@ -326,6 +326,17 @@ namespace quda
     return true;
   }
 
+  /**
+     Unroll factor for the 4-d hop loop in Wilson-like dslash.
+     fp32mp2 (floatfloat) kernels are I-cache limited if this loop is
+     fully unrolled, for every reconstruct.  IEEE types keep full unroll.
+   */
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <typename real> constexpr int wilson_dslash_hop_unroll = is_floatfloat_v<real> ? 1 : 4;
+#else
+  template <typename real> constexpr int wilson_dslash_hop_unroll = 4;
+#endif
+
   template <typename Float_, int nDim_, typename DDArg, int nFace_ = 1, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
@@ -366,9 +377,9 @@ namespace quda
 
     // these are set with symmetric preconditioned twisted-mass dagger
     // operator for the packing (which needs to a do a twist)
-    real twist_a = 0.0; // scale factor
-    real twist_b = 0.0; // chiral twist
-    real twist_c = 0.0; // flavor twist
+    real twist_a {}; // scale factor
+    real twist_b {}; // chiral twist
+    real twist_c {}; // flavor twist
 
     int pack_threads = 0; // really number of face sites we have to pack
     int_fastdiv blocks_per_dir = 1;

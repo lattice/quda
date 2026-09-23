@@ -72,14 +72,15 @@ namespace quda {
 
   template <typename store_t, QudaReconstructType recon>
   struct GaugeFixArg : kernel_param<> {
+    using Store = store_t;
     using Float = typename mapper<store_t>::type;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int elems = recon / 2;
     Gauge data;
     int_fastdiv X[4];     // grid dimensions
     Float *invpsq;
-    complex<Float> *delta;
-    complex<Float> *gx;
+    complex<Store> *delta;
+    complex<Store> *gx;
     Float alpha;
     int volume;
 
@@ -88,11 +89,11 @@ namespace quda {
     {
       for (int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       invpsq = (Float*)device_malloc(sizeof(Float) * volume);
-      delta = (complex<Float>*)device_malloc(sizeof(complex<Float>) * volume * 6);
+      delta = (complex<Store>*)device_malloc(sizeof(complex<Store>) * volume * 6);
 #ifdef GAUGEFIXING_DONT_USE_GX
-      gx = (complex<Float>*)device_malloc(sizeof(complex<Float>) * volume);
+      gx = (complex<Store>*)device_malloc(sizeof(complex<Store>) * volume);
 #else
-      gx = (complex<Float>*)device_malloc(sizeof(complex<Float>) * volume * elems);
+      gx = (complex<Store>*)device_malloc(sizeof(complex<Store>) * volume * elems);
 #endif
     }
 
@@ -119,14 +120,14 @@ namespace quda {
       int x3 = (id / arg.X[2]) % arg.X[3];
       int x2 = id % arg.X[2];
       //id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-      Float sx = quda::sinpi( (Float)x0 / (Float)arg.X[0]);
-      Float sy = quda::sinpi( (Float)x1 / (Float)arg.X[1]);
-      Float sz = quda::sinpi( (Float)x2 / (Float)arg.X[2]);
-      Float st = quda::sinpi( (Float)x3 / (Float)arg.X[3]);
+      Float sx = quda::sinpi(Float(x0) / Float(static_cast<int>(arg.X[0])));
+      Float sy = quda::sinpi(Float(x1) / Float(static_cast<int>(arg.X[1])));
+      Float sz = quda::sinpi(Float(x2) / Float(static_cast<int>(arg.X[2])));
+      Float st = quda::sinpi(Float(x3) / Float(static_cast<int>(arg.X[3])));
       Float sinsq = sx * sx + sy * sy + sz * sz + st * st;
-      Float prcfact = 0.0;
+      Float prcfact = Float(0);
       //The FFT normalization is done here
-      if (sinsq > 0.00001) prcfact = 4.0 / (sinsq * (Float)(arg.volume));
+      if (sinsq > Float(0.00001)) prcfact = Float(4) / (sinsq * Float(arg.volume));
       arg.invpsq[id] = prcfact;
     }
   };
@@ -139,7 +140,9 @@ namespace quda {
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       int id = parity * arg.threads.x + x_cb;
-      arg.gx[id] = arg.gx[id] * arg.invpsq[id];
+      complex<typename Arg::Float> value = arg.gx[id];
+      value *= arg.invpsq[id];
+      arg.gx[id] = value;
     }
   };
 
@@ -148,6 +151,7 @@ namespace quda {
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
   struct GaugeFixQualityFFTArg : public ReduceArg<array<device_reduce_t, 2>> {
+    using Store = store_t;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -155,11 +159,11 @@ namespace quda {
 
     int_fastdiv X[4];     // grid dimensions
     Gauge data;
-    complex<real> *delta;
+    complex<Store> *delta;
     array<real_t, 2> result;
     int volume;
 
-    GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
+    GaugeFixQualityFFTArg(const GaugeField &data, complex<Store> *delta) :
       ReduceArg<reduce_t>(dim3(data.VolumeCB(), 2, 1), 1, true), // reset = true
       data(data),
       delta(delta),
@@ -186,7 +190,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data {};
+      array<reduction_t, 2> data {};
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -197,7 +201,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
+      data[0] = static_cast<reduction_t>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
       //2
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, linkIndexM1(x, arg.X, mu), 1 - parity);
@@ -219,7 +223,7 @@ namespace quda {
       arg.delta[idx + 5 * arg.volume] = delta(2,2);
 
       //12
-      data[1] = getRealTraceUVdagger(delta, delta);
+      data[1] = static_cast<reduction_t>(getRealTraceUVdagger(delta, delta));
 
       //35
       //T=36*gauge_dir+65
@@ -230,8 +234,8 @@ namespace quda {
   template <typename Float>
   __host__ __device__ inline void reunit_link(Matrix<complex<Float>,3> &U)
   {
-    complex<Float> t2((Float)0.0, (Float)0.0);
-    Float t1 = 0.0;
+    complex<Float> t2(Float(0), Float(0));
+    Float t1 = Float(0);
     //first normalize first row
     //sum of squares of row
 #pragma unroll

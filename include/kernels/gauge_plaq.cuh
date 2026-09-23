@@ -11,6 +11,7 @@ namespace quda {
   template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct GaugePlaqArg : public ReduceArg<array<device_reduce_t, 2>> {
     using Float = Float_;
+    using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
@@ -34,9 +35,9 @@ namespace quda {
   };
 
   template<typename Arg>
-  __device__ inline double plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
+  __device__ inline reduction_t plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::Float>,3>;
+    using Link = Matrix<complex<typename Arg::real>,3>;
 
     int dx[4] = {0, 0, 0, 0};
     Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);
@@ -48,7 +49,7 @@ namespace quda {
     dx[nu]--;
     Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
 
-    return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
+    return static_cast<reduction_t>(getTrace(U1 * U2 * conj(U3) * conj(U4)).real());
   }
 
   template <typename Arg> struct Plaquette : plus<typename Arg::reduce_t> {
@@ -62,7 +63,7 @@ namespace quda {
     // return the plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t plaq {};
+      array<reduction_t, 2> plaq {};
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

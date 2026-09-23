@@ -41,7 +41,6 @@ jobs:
             -DCMAKE_PREFIX_PATH=/opt/rocm \
             -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=ON \
             -DQUDA_CLOVER_DYNAMIC=ON \
-            -DQUDA_FAST_COMPILE_REDUCE=ON \
             -DQUDA_FAST_COMPILE_DSLASH=ON \
             -DQUDA_QDPJIT=OFF \
             -DQUDA_INTERFACE_QDPJIT=OFF \

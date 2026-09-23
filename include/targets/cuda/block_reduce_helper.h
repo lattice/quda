@@ -45,9 +45,21 @@ namespace quda
    */
   template <typename T, typename Enable = void> struct atomic_type;
 
+#ifdef QUDA_FPMP_DOUBLEDOUBLE
+  template <typename T> struct atomic_type<T, std::enable_if_t<is_doubledouble_v<T>>> {
+    using type = double; // must break up 128-bit types into doubles
+  };
+#else
   template <> struct atomic_type<doubledouble> {
     using type = double; // must break up 128-bit types into doubles
   };
+#endif
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+  template <typename T> struct atomic_type<T, std::enable_if_t<is_floatfloat_v<T>>> {
+    using type = float; // fp32mp2 is stored as a pair of floats
+  };
+#endif
 
   template <> struct atomic_type<double> {
     using type = double;

@@ -27,9 +27,9 @@ set (QUDA_OBJS
   prolongator.cpp restrictor.cpp staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
-  inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
+  inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cpp
   gauge_shift.cu
-  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu gauge_plaqrect.cu
+  gauge_stout.cpp gauge_hyp.cpp gauge_wilson_flow.cpp gauge_plaq.cu gauge_plaqrect.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cgnr.cpp inv_cgne.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
@@ -47,7 +47,7 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
-  llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
+  llfat.cpp staggered_two_link.cpp gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
@@ -74,37 +74,25 @@ set (QUDA_OBJS
   laplace.cpp
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
-  blas_quda.cu multi_blas_quda.cu reduce_quda.cpp
+  blas_quda.cpp
+  blas_quda_double.cu blas_quda_single.cu blas_quda_half.cu blas_quda_quarter.cu
+  multi_blas_quda.cpp
+  multi_blas_quda_double.cu multi_blas_quda_single.cu multi_blas_quda_half.cu multi_blas_quda_quarter.cu
+  reduce_quda.cpp
   reduce_quda_double.cu reduce_quda_single.cu reduce_quda_half.cu reduce_quda_quarter.cu
   multi_reduce_quda.cpp
   multi_reduce_quda_double.cu multi_reduce_quda_single.cu multi_reduce_quda_half.cu multi_reduce_quda_quarter.cu
   reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
-  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
+  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cpp
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
   spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
-  copy_color_spinor_dd.cu copy_color_spinor_ds.cu
-  copy_color_spinor_dh.cu copy_color_spinor_dq.cu
-  copy_color_spinor_ss.cu copy_color_spinor_sd.cu
-  copy_color_spinor_sh.cu copy_color_spinor_sq.cu
-  copy_color_spinor_hd.cu copy_color_spinor_hs.cu
-  copy_color_spinor_hh.cu copy_color_spinor_hq.cu
-  copy_color_spinor_qd.cu copy_color_spinor_qs.cu
-  copy_color_spinor_qh.cu copy_color_spinor_qq.cu
-  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
-  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
-  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
-  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
-  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
-  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
-  copy_gauge_double.cu copy_gauge_single.cu
-  copy_gauge_half.cu copy_gauge_quarter.cu
-  copy_gauge.cpp copy_clover.cu
-  copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
+  copy_gauge.cpp copy_gauge_offset.cpp copy_clover.cu
+  copy_color_spinor_offset.cpp copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
-  hisq_paths_force_quda.cu
+  hisq_paths_force.cpp
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
   tune.cpp
   device_vector.cu
@@ -135,6 +123,44 @@ function(check_bit number bit)
   # Perform bitwise AND with (1 << bit) to check if the bit is set
   math(EXPR result "${number} & (1 << ${bit})")
   set(BIT_CHECK "${result}" PARENT_SCOPE)
+endfunction()
+
+function(quda_parse_block_ortho_pair pair)
+  string(REPLACE ":" ";" parts "${pair}")
+  list(GET parts 0 QUDA_BLOCK_ORTHO_VFLOAT)
+  list(GET parts 1 QUDA_BLOCK_ORTHO_BFLOAT)
+  list(GET parts 2 QUDA_BLOCK_ORTHO_TAG)
+  list(GET parts 3 QUDA_BLOCK_ORTHO_GUARD)
+  if(QUDA_BLOCK_ORTHO_GUARD STREQUAL "GPU_MULTIGRID_DOUBLE")
+    set(QUDA_BLOCK_ORTHO_FILE_BEGIN "#ifdef GPU_MULTIGRID_DOUBLE" PARENT_SCOPE)
+    set(QUDA_BLOCK_ORTHO_FILE_END "#endif" PARENT_SCOPE)
+  else()
+    set(QUDA_BLOCK_ORTHO_FILE_BEGIN "" PARENT_SCOPE)
+    set(QUDA_BLOCK_ORTHO_FILE_END "" PARENT_SCOPE)
+  endif()
+  set(QUDA_BLOCK_ORTHO_VFLOAT "${QUDA_BLOCK_ORTHO_VFLOAT}" PARENT_SCOPE)
+  set(QUDA_BLOCK_ORTHO_BFLOAT "${QUDA_BLOCK_ORTHO_BFLOAT}" PARENT_SCOPE)
+  set(QUDA_BLOCK_ORTHO_TAG "${QUDA_BLOCK_ORTHO_TAG}" PARENT_SCOPE)
+endfunction()
+
+function(quda_parse_dslash_coarse_triple triple)
+  string(REPLACE ":" ";" parts "${triple}")
+  list(GET parts 0 QUDA_COARSE_FLOAT)
+  list(GET parts 1 QUDA_COARSE_YFLOAT)
+  list(GET parts 2 QUDA_COARSE_GHOSTFLOAT)
+  list(GET parts 3 QUDA_COARSE_TRIPLE_TAG)
+  list(GET parts 4 QUDA_COARSE_TRIPLE_GUARD)
+  if(QUDA_COARSE_TRIPLE_GUARD STREQUAL "GPU_MULTIGRID_DOUBLE")
+    set(QUDA_COARSE_FILE_BEGIN "#ifdef GPU_MULTIGRID_DOUBLE" PARENT_SCOPE)
+    set(QUDA_COARSE_FILE_END "#endif" PARENT_SCOPE)
+  else()
+    set(QUDA_COARSE_FILE_BEGIN "" PARENT_SCOPE)
+    set(QUDA_COARSE_FILE_END "" PARENT_SCOPE)
+  endif()
+  set(QUDA_COARSE_FLOAT "${QUDA_COARSE_FLOAT}" PARENT_SCOPE)
+  set(QUDA_COARSE_YFLOAT "${QUDA_COARSE_YFLOAT}" PARENT_SCOPE)
+  set(QUDA_COARSE_GHOSTFLOAT "${QUDA_COARSE_GHOSTFLOAT}" PARENT_SCOPE)
+  set(QUDA_COARSE_TRIPLE_TAG "${QUDA_COARSE_TRIPLE_TAG}" PARENT_SCOPE)
 endfunction()
 
 set(QUDA_DSLASH_FILENAME_LIST "") 
@@ -281,6 +307,138 @@ if(NOT QUDA_NVSHMEM)
   list(APPEND QUDA_OBJS ${QUDA_DSLASH_OBJS})
 endif()
 
+set(QUDA_HISQ_PATH_FORCE_OBJS "")
+if(QUDA_DIRAC_STAGGERED)
+  set(QUDA_HISQ_PATH_FORCE_PREC_LIST "")
+  check_bit(${QUDA_PRECISION} 2)
+  if(BIT_CHECK)
+    list(APPEND QUDA_HISQ_PATH_FORCE_PREC_LIST "SINGLE")
+  endif()
+  check_bit(${QUDA_PRECISION} 3)
+  if(BIT_CHECK)
+    list(APPEND QUDA_HISQ_PATH_FORCE_PREC_LIST "DOUBLE")
+  endif()
+
+  foreach(QUDA_HISQ_PATH_FORCE_PREC ${QUDA_HISQ_PATH_FORCE_PREC_LIST})
+    string(TOLOWER "${QUDA_HISQ_PATH_FORCE_PREC}" QUDA_HISQ_PATH_FORCE_PREC_LOWER)
+    # Filename uses packed layout: 18 (full), 13 (12 reals + stored phase),
+    # 12 (recon 13 + on-the-fly MILC phases). Field Reconstruct() is still 18 or 13.
+    check_bit(${QUDA_RECONSTRUCT} 1)
+    if(BIT_CHECK)
+      set(QUDA_HISQ_PATH_FORCE_RECON "13")
+      set(QUDA_HISQ_PATH_FORCE_PHASE "NO")
+      set(TMP_FILENAME "hisq_path_force_${QUDA_HISQ_PATH_FORCE_PREC_LOWER}_reconstruct13.cu")
+      configure_file(hisq_path_force.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_HISQ_PATH_FORCE_OBJS ${TMP_FILENAME})
+      set(QUDA_HISQ_PATH_FORCE_PHASE "MILC")
+      set(TMP_FILENAME "hisq_path_force_${QUDA_HISQ_PATH_FORCE_PREC_LOWER}_reconstruct12.cu")
+      configure_file(hisq_path_force.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_HISQ_PATH_FORCE_OBJS ${TMP_FILENAME})
+    endif()
+    check_bit(${QUDA_RECONSTRUCT} 2)
+    if(BIT_CHECK)
+      set(QUDA_HISQ_PATH_FORCE_RECON "NO")
+      set(QUDA_HISQ_PATH_FORCE_PHASE "NO")
+      set(TMP_FILENAME "hisq_path_force_${QUDA_HISQ_PATH_FORCE_PREC_LOWER}_reconstruct18.cu")
+      configure_file(hisq_path_force.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_HISQ_PATH_FORCE_OBJS ${TMP_FILENAME})
+    endif()
+  endforeach()
+  list(APPEND QUDA_OBJS ${QUDA_HISQ_PATH_FORCE_OBJS})
+endif()
+
+# Generate double/single × reconstruct 12/18 TUs from ${stem}.in.cu
+# Templates substitute @QUDA_GAUGE_PREC@ and @QUDA_GAUGE_RECON@.
+# Optional extra argument NONE skips reconstruct-12 (ReconstructNone kernels).
+function(quda_generate_recon_no12_tuts stem)
+  set(recon_none OFF)
+  if(ARGC GREATER 1 AND "${ARGV1}" STREQUAL "NONE")
+    set(recon_none ON)
+  endif()
+
+  set(prec_list "")
+  check_bit(${QUDA_PRECISION} 2)
+  if(BIT_CHECK)
+    list(APPEND prec_list "SINGLE")
+  endif()
+  check_bit(${QUDA_PRECISION} 3)
+  if(BIT_CHECK)
+    list(APPEND prec_list "DOUBLE")
+  endif()
+
+  foreach(QUDA_GAUGE_PREC ${prec_list})
+    string(TOLOWER "${QUDA_GAUGE_PREC}" prec_lower)
+    if(NOT recon_none)
+      check_bit(${QUDA_RECONSTRUCT} 1)
+      if(BIT_CHECK)
+        set(QUDA_GAUGE_RECON "12")
+        set(TMP_FILENAME "${stem}_${prec_lower}_reconstruct12.cu")
+        configure_file(${stem}.in.cu ${TMP_FILENAME} @ONLY)
+        list(APPEND QUDA_OBJS ${TMP_FILENAME})
+      endif()
+    endif()
+    check_bit(${QUDA_RECONSTRUCT} 2)
+    if(BIT_CHECK)
+      set(QUDA_GAUGE_RECON "NO")
+      set(TMP_FILENAME "${stem}_${prec_lower}_reconstruct18.cu")
+      configure_file(${stem}.in.cu ${TMP_FILENAME} @ONLY)
+      list(APPEND QUDA_OBJS ${TMP_FILENAME})
+    endif()
+  endforeach()
+  set(QUDA_OBJS ${QUDA_OBJS} PARENT_SCOPE)
+endfunction()
+
+quda_generate_recon_no12_tuts(gauge_wilson_flow)
+quda_generate_recon_no12_tuts(gauge_ape)
+quda_generate_recon_no12_tuts(gauge_stout)
+quda_generate_recon_no12_tuts(gauge_hyp)
+quda_generate_recon_no12_tuts(llfat)
+quda_generate_recon_no12_tuts(staggered_two_link NONE)
+
+set(QUDA_COPY_GAUGE_PREC_LIST "DOUBLE")
+check_bit(${QUDA_PRECISION} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_COPY_GAUGE_PREC_LIST "SINGLE")
+endif()
+check_bit(${QUDA_PRECISION} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_COPY_GAUGE_PREC_LIST "HALF")
+endif()
+check_bit(${QUDA_PRECISION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_COPY_GAUGE_PREC_LIST "QUARTER")
+endif()
+
+set(QUDA_COPY_GAUGE_OBJS "")
+foreach(QUDA_COPY_GAUGE_PREC_IN ${QUDA_COPY_GAUGE_PREC_LIST})
+  string(TOLOWER "${QUDA_COPY_GAUGE_PREC_IN}" QUDA_COPY_GAUGE_PREC_IN_LOWER)
+  foreach(QUDA_COPY_GAUGE_PREC_OUT ${QUDA_COPY_GAUGE_PREC_LIST})
+    string(TOLOWER "${QUDA_COPY_GAUGE_PREC_OUT}" QUDA_COPY_GAUGE_PREC_OUT_LOWER)
+    set(TMP_FILENAME "copy_gauge_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+    configure_file(copy_gauge.in.cu ${TMP_FILENAME} @ONLY)
+    list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+    set(TMP_FILENAME "copy_gauge_extended_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+    configure_file(copy_gauge_extended.in.cu ${TMP_FILENAME} @ONLY)
+    list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+    set(TMP_FILENAME "copy_color_spinor_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+    configure_file(copy_color_spinor.in.cu ${TMP_FILENAME} @ONLY)
+    list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+  endforeach()
+endforeach()
+foreach(QUDA_COPY_GAUGE_PREC ${QUDA_COPY_GAUGE_PREC_LIST})
+  string(TOLOWER "${QUDA_COPY_GAUGE_PREC}" QUDA_COPY_GAUGE_PREC_LOWER)
+  set(TMP_FILENAME "copy_gauge_offset_${QUDA_COPY_GAUGE_PREC_LOWER}.cu")
+  configure_file(copy_gauge_offset.in.cu ${TMP_FILENAME} @ONLY)
+  list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+  set(TMP_FILENAME "copy_color_spinor_offset_${QUDA_COPY_GAUGE_PREC_LOWER}.cu")
+  configure_file(copy_color_spinor_offset.in.cu ${TMP_FILENAME} @ONLY)
+  list(APPEND QUDA_COPY_GAUGE_OBJS ${TMP_FILENAME})
+endforeach()
+list(APPEND QUDA_OBJS ${QUDA_COPY_GAUGE_OBJS})
+
+set(QUDA_COPY_GAUGE_MG_PREC_LIST ${QUDA_COPY_GAUGE_PREC_LIST})
+list(REMOVE_ITEM QUDA_COPY_GAUGE_MG_PREC_LIST "QUARTER")
+
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
   string(REGEX MATCH ".+\\.cu$" item_match ${item})
@@ -348,6 +506,33 @@ configure_file(multigrid.in.hpp multigrid.hpp @ONLY)
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
   string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
+  # Keep the historical MG color-spinor pair set: double only mixes with
+  # double/single; half/quarter mix with single/half/quarter.
+  set(QUDA_COPY_COLOR_SPINOR_MG_PAIRS
+    DOUBLE_DOUBLE
+    SINGLE_DOUBLE
+    DOUBLE_SINGLE
+    SINGLE_SINGLE
+    HALF_SINGLE
+    QUARTER_SINGLE
+    SINGLE_HALF
+    HALF_HALF
+    QUARTER_HALF
+    SINGLE_QUARTER
+    HALF_QUARTER
+    QUARTER_QUARTER)
+  foreach(QUDA_COPY_COLOR_SPINOR_MG_PAIR ${QUDA_COPY_COLOR_SPINOR_MG_PAIRS})
+    string(REPLACE "_" ";" QUDA_COPY_COLOR_SPINOR_MG_PAIR_LIST ${QUDA_COPY_COLOR_SPINOR_MG_PAIR})
+    list(GET QUDA_COPY_COLOR_SPINOR_MG_PAIR_LIST 0 QUDA_COPY_GAUGE_PREC_IN)
+    list(GET QUDA_COPY_COLOR_SPINOR_MG_PAIR_LIST 1 QUDA_COPY_GAUGE_PREC_OUT)
+    if(QUDA_COPY_GAUGE_PREC_IN IN_LIST QUDA_COPY_GAUGE_PREC_LIST AND QUDA_COPY_GAUGE_PREC_OUT IN_LIST QUDA_COPY_GAUGE_PREC_LIST)
+      string(TOLOWER "${QUDA_COPY_GAUGE_PREC_IN}" QUDA_COPY_GAUGE_PREC_IN_LOWER)
+      string(TOLOWER "${QUDA_COPY_GAUGE_PREC_OUT}" QUDA_COPY_GAUGE_PREC_OUT_LOWER)
+      set(TMP_FILENAME "copy_color_spinor_mg_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+      configure_file(copy_color_spinor_mg.in.cu ${TMP_FILENAME} @ONLY)
+      list(PREPEND QUDA_CU_OBJS ${TMP_FILENAME})
+    endif()
+  endforeach()
   foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
     math(EXPR MOD "${QUDA_MULTIGRID_MRHS} % 8")
     if(NOT (${QUDA_MULTIGRID_MRHS} GREATER_EQUAL "8" AND ${QUDA_MULTIGRID_MRHS} LESS_EQUAL "64" AND ${MOD} EQUAL "0"))
@@ -355,9 +540,16 @@ if(QUDA_MULTIGRID)
     endif()
   endforeach()
   foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
-    configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    foreach(QUDA_COPY_GAUGE_PREC_IN ${QUDA_COPY_GAUGE_MG_PREC_LIST})
+      string(TOLOWER "${QUDA_COPY_GAUGE_PREC_IN}" QUDA_COPY_GAUGE_PREC_IN_LOWER)
+      foreach(QUDA_COPY_GAUGE_PREC_OUT ${QUDA_COPY_GAUGE_MG_PREC_LIST})
+        string(TOLOWER "${QUDA_COPY_GAUGE_PREC_OUT}" QUDA_COPY_GAUGE_PREC_OUT_LOWER)
+        set(TMP_FILENAME "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}_${QUDA_COPY_GAUGE_PREC_IN_LOWER}_${QUDA_COPY_GAUGE_PREC_OUT_LOWER}.cu")
+        configure_file(copy_gauge_mg.in.cu ${TMP_FILENAME} @ONLY)
+        list(PREPEND QUDA_CU_OBJS ${TMP_FILENAME})
+      endforeach()
+    endforeach()
     configure_file(extract_gauge_ghost_mg.in.cu "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
-    list(PREPEND QUDA_CU_OBJS "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu")
     list(PREPEND QUDA_CU_OBJS "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(coarse_op.in.cu "coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
@@ -379,16 +571,31 @@ if(QUDA_MULTIGRID)
 
   endforeach()
 
+  set(QUDA_BLOCK_ORTHO_PAIRS "double:double:double_double:GPU_MULTIGRID_DOUBLE" "float:float:single_single:1")
+  check_bit(${QUDA_PRECISION} 1)
+  if(BIT_CHECK)
+    list(APPEND QUDA_BLOCK_ORTHO_PAIRS "short:short:half_half:1")
+    check_bit(${QUDA_PRECISION} 2)
+    if(BIT_CHECK)
+      list(APPEND QUDA_BLOCK_ORTHO_PAIRS "short:float:half_single:1")
+    endif()
+  endif()
+
   string(REPLACE "," ";" QUDA_MULTIGRID_NC_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NC_NVEC_LIST}")
   foreach(QUDA_MULTIGRID_NC_NVEC ${QUDA_MULTIGRID_NC_NVEC_LIST_SEMICOLON})
     foreach(QUDA_MULTIGRID_NVEC2 ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
       if(${QUDA_MULTIGRID_NVEC2} GREATER_EQUAL ${QUDA_MULTIGRID_NC_NVEC})
          configure_file(prolongator.in.cu "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
          configure_file(restrictor.in.cu "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
-         configure_file(block_orthogonalize.in.cu "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
          list(PREPEND QUDA_CU_OBJS "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
          list(PREPEND QUDA_CU_OBJS "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
-         list(PREPEND QUDA_CU_OBJS "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         foreach(QUDA_BLOCK_ORTHO_PAIR ${QUDA_BLOCK_ORTHO_PAIRS})
+           quda_parse_block_ortho_pair(${QUDA_BLOCK_ORTHO_PAIR})
+           configure_file(block_orthogonalize.in.cu
+                          "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_${QUDA_BLOCK_ORTHO_TAG}.cu" @ONLY)
+           list(PREPEND QUDA_CU_OBJS
+                "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_${QUDA_BLOCK_ORTHO_TAG}.cu")
+         endforeach()
          foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
            list(PREPEND QUDA_CU_OBJS "prolongator_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu")
            configure_file(prolongator_mma.in.cu "prolongator_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
@@ -400,13 +607,27 @@ if(QUDA_MULTIGRID)
   endforeach()
 
   # add dslash_coarse last to the list so it is compiled first
+  set(QUDA_DSLASH_COARSE_TRIPLES
+      "double:double:double:double_double_double:GPU_MULTIGRID_DOUBLE"
+      "float:float:float:single_single_single:1")
+  check_bit(${QUDA_PRECISION} 1)
+  if(BIT_CHECK)
+    list(APPEND QUDA_DSLASH_COARSE_TRIPLES "float:short:short:single_half_half:1")
+    check_bit(${QUDA_PRECISION} 0)
+    if(BIT_CHECK)
+      list(APPEND QUDA_DSLASH_COARSE_TRIPLES "float:short:int8_t:single_half_quarter:1")
+    endif()
+  endif()
   foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
-    set(QUDA_MULTIGRID_DAGGER "false")
-    configure_file(dslash_coarse.in.cu "dslash_coarse_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
-    set(QUDA_MULTIGRID_DAGGER "true")
-    configure_file(dslash_coarse.in.cu "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
-    list(PREPEND QUDA_CU_OBJS "dslash_coarse_${QUDA_MULTIGRID_NVEC}.cu")
-    list(PREPEND QUDA_CU_OBJS "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu")
+    foreach(QUDA_DSLASH_COARSE_TRIPLE ${QUDA_DSLASH_COARSE_TRIPLES})
+      quda_parse_dslash_coarse_triple(${QUDA_DSLASH_COARSE_TRIPLE})
+      set(QUDA_MULTIGRID_DAGGER "false")
+      configure_file(dslash_coarse.in.cu "dslash_coarse_${QUDA_MULTIGRID_NVEC}_${QUDA_COARSE_TRIPLE_TAG}.cu" @ONLY)
+      set(QUDA_MULTIGRID_DAGGER "true")
+      configure_file(dslash_coarse.in.cu "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_COARSE_TRIPLE_TAG}.cu" @ONLY)
+      list(PREPEND QUDA_CU_OBJS "dslash_coarse_${QUDA_MULTIGRID_NVEC}_${QUDA_COARSE_TRIPLE_TAG}.cu")
+      list(PREPEND QUDA_CU_OBJS "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_COARSE_TRIPLE_TAG}.cu")
+    endforeach()
   endforeach()
 
 endif()
@@ -499,6 +720,67 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
+
+# Select CCCL FPMP implementations. These cache variables share the QUDA_FPMP_ prefix
+# so they appear together in ccmake. They are independent: float-float does not require
+# double-double FPMP, and vice versa. This comes after the target file so the
+# float-float defaults can follow the GPU architecture's FP64 rate, and the
+# double-double default can follow whether double-double is a compute type.
+macro(quda_fpmp_set_accuracy prefix)
+  string(TOLOWER "${${prefix}_ACCURACY}" ${prefix}_ACCURACY)
+  if(NOT ${prefix}_ACCURACY MATCHES "^(low|mid|high)$")
+    message(FATAL_ERROR "Invalid ${prefix}_ACCURACY='${${prefix}_ACCURACY}'. Allowed: low, mid, high.")
+  endif()
+  string(TOUPPER "${${prefix}_ACCURACY}" _quda_fpmp_acc_upper)
+  set(${prefix}_ACCURACY_${_quda_fpmp_acc_upper} 1)
+  unset(_quda_fpmp_acc_upper)
+endmacro()
+
+if(NOT DEFINED QUDA_FPMP_DOUBLEDOUBLE_DEFAULT)
+  set(QUDA_FPMP_DOUBLEDOUBLE_DEFAULT OFF)
+endif()
+if(NOT DEFINED QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_DEFAULT)
+  # Double-double is a reduction type today, so default to the renormalized pair.
+  set(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_DEFAULT mid)
+endif()
+if(NOT DEFINED QUDA_FPMP_FLOATFLOAT_DEFAULT)
+  set(QUDA_FPMP_FLOATFLOAT_DEFAULT OFF)
+endif()
+if(NOT DEFINED QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT)
+  set(QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT high)
+endif()
+if(NOT DEFINED QUDA_REDUCTION_TYPE_DEFAULT)
+  set(QUDA_REDUCTION_TYPE_DEFAULT double)
+endif()
+
+option(QUDA_FPMP_DOUBLEDOUBLE
+       "use CCCL experimental FPMP for double-double in CUDA builds"
+       ${QUDA_FPMP_DOUBLEDOUBLE_DEFAULT})
+set(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY
+    ${QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_DEFAULT}
+    CACHE STRING "set CCCL double-double arithmetic accuracy (low, mid, high)")
+set_property(CACHE QUDA_FPMP_DOUBLEDOUBLE_ACCURACY PROPERTY STRINGS low mid high)
+quda_fpmp_set_accuracy(QUDA_FPMP_DOUBLEDOUBLE)
+
+option(QUDA_FPMP_FLOATFLOAT
+       "use CCCL FPMP float-float for QUDA_DOUBLE_PRECISION register arithmetic"
+       ${QUDA_FPMP_FLOATFLOAT_DEFAULT})
+set(QUDA_FPMP_FLOATFLOAT_ACCURACY
+    ${QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT}
+    CACHE STRING "set CCCL float-float arithmetic accuracy (low, mid, high)")
+set_property(CACHE QUDA_FPMP_FLOATFLOAT_ACCURACY PROPERTY STRINGS low mid high)
+quda_fpmp_set_accuracy(QUDA_FPMP_FLOATFLOAT)
+
+if(QUDA_FPMP_DOUBLEDOUBLE AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
+  message(FATAL_ERROR "QUDA_FPMP_DOUBLEDOUBLE requires QUDA_TARGET_TYPE=CUDA")
+endif()
+
+if(QUDA_FPMP_FLOATFLOAT AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
+  message(FATAL_ERROR "QUDA_FPMP_FLOATFLOAT requires QUDA_TARGET_TYPE=CUDA")
+endif()
+
+message(STATUS "QUDA_FPMP_DOUBLEDOUBLE: ${QUDA_FPMP_DOUBLEDOUBLE} (${QUDA_FPMP_DOUBLEDOUBLE_ACCURACY})")
+message(STATUS "QUDA_FPMP_FLOATFLOAT: ${QUDA_FPMP_FLOATFLOAT} (${QUDA_FPMP_FLOATFLOAT_ACCURACY})")
 
 # order variables will be set in the target file
 set(VALID_ORDER_DOUBLE_VALUES "0" "2" "4")
@@ -782,10 +1064,6 @@ target_compile_definitions(
   PRIVATE "QUDA_BLAS_UNROLL_STREAMING=${QUDA_BLAS_UNROLL_STREAMING}"
           "QUDA_BLAS_UNROLL_REDUCE=${QUDA_BLAS_UNROLL_REDUCE}")
 
-if(QUDA_FAST_COMPILE_REDUCE)
-  target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)
-endif()
-
 if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
 endif()
@@ -804,17 +1082,57 @@ if(QUDA_BACKWARDS)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 
+# Bare floatfloat / doubledouble follow the bulk FPMP accuracy. The _low/_mid/_high
+# spellings pin the reduction independently so several builds of identical source
+# can be compared against each other.
 set(QUDA_REDUCTION_TYPE
-    double
-    CACHE STRING "set the reduction computation type (double, doubledouble)")
-set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble)
-if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
+    ${QUDA_REDUCTION_TYPE_DEFAULT}
+    CACHE
+      STRING
+      "set the reduction computation type (double, doubledouble, doubledouble_low, doubledouble_mid, doubledouble_high, floatfloat, floatfloat_low, floatfloat_mid, floatfloat_high)"
+)
+set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble doubledouble_low doubledouble_mid
+                                                doubledouble_high floatfloat floatfloat_low floatfloat_mid
+                                                floatfloat_high)
+if(QUDA_REDUCTION_TYPE MATCHES "^doubledouble")
+  if(QUDA_REDUCTION_TYPE MATCHES "^doubledouble_" AND NOT QUDA_FPMP_DOUBLEDOUBLE)
+    message(FATAL_ERROR "QUDA_REDUCTION_TYPE=${QUDA_REDUCTION_TYPE} requires QUDA_FPMP_DOUBLEDOUBLE=ON")
+  endif()
   set(QUDA_REDUCTION_IS_DOUBLEDOUBLE 1)
+  if(QUDA_REDUCTION_TYPE STREQUAL "doubledouble")
+    set(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY ${QUDA_FPMP_DOUBLEDOUBLE_ACCURACY})
+  else()
+    string(REPLACE "doubledouble_" "" QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY ${QUDA_REDUCTION_TYPE})
+  endif()
+  if(NOT QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY MATCHES "^(low|mid|high)$")
+    message(FATAL_ERROR "Invalid QUDA_REDUCTION_TYPE='${QUDA_REDUCTION_TYPE}'. "
+                        "Allowed doubledouble values: doubledouble, doubledouble_low, doubledouble_mid, doubledouble_high.")
+  endif()
+  string(TOUPPER ${QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY} QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY)
+  set(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_${QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY} 1)
+elseif(QUDA_REDUCTION_TYPE MATCHES "^floatfloat")
+  if(NOT QUDA_FPMP_FLOATFLOAT)
+    message(FATAL_ERROR "QUDA_REDUCTION_TYPE=${QUDA_REDUCTION_TYPE} requires QUDA_FPMP_FLOATFLOAT=ON")
+  endif()
+  set(QUDA_REDUCTION_IS_FLOATFLOAT 1)
+
+  if(QUDA_REDUCTION_TYPE STREQUAL "floatfloat")
+    set(QUDA_REDUCTION_FLOATFLOAT_ACCURACY ${QUDA_FPMP_FLOATFLOAT_ACCURACY})
+  else()
+    string(REPLACE "floatfloat_" "" QUDA_REDUCTION_FLOATFLOAT_ACCURACY ${QUDA_REDUCTION_TYPE})
+  endif()
+  if(NOT QUDA_REDUCTION_FLOATFLOAT_ACCURACY MATCHES "^(low|mid|high)$")
+    message(FATAL_ERROR "Invalid QUDA_REDUCTION_TYPE='${QUDA_REDUCTION_TYPE}'. "
+                        "Allowed floatfloat values: floatfloat, floatfloat_low, floatfloat_mid, floatfloat_high.")
+  endif()
+  string(TOUPPER ${QUDA_REDUCTION_FLOATFLOAT_ACCURACY} QUDA_REDUCTION_FLOATFLOAT_ACCURACY)
+  set(QUDA_REDUCTION_FLOATFLOAT_ACCURACY_${QUDA_REDUCTION_FLOATFLOAT_ACCURACY} 1)
 endif()
+message(STATUS "QUDA_REDUCTION_TYPE: ${QUDA_REDUCTION_TYPE}")
 
 set(QUDA_REDUCTION_ALGORITHM
     NAIVE
-    CACHE STRING "set the reduction algorithm (NAIVE, KAHAN, REPRODUCIBLE)")
+    CACHE STRING "set the reduction algorithm (NAIVE, KAHAN, REPRODUCIBLE). REPRODUCIBLE requires QUDA_REDUCTION_TYPE=double")
 set_property(CACHE QUDA_REDUCTION_ALGORITHM PROPERTY STRINGS NAIVE KAHAN REPRODUCIBLE)
 if(${QUDA_REDUCTION_ALGORITHM} STREQUAL "NAIVE")
   set(QUDA_REDUCTION_ALGORITHM_NAIVE 1)
@@ -823,6 +1141,12 @@ elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "KAHAN")
   message(FATAL_ERROR "QUDA_REDUCTION_ALGORITHM=KAHAN is not implemented yet "
                       "(no kahan_t definition). Use NAIVE or REPRODUCIBLE.")
 elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "REPRODUCIBLE")
+  # RFA / reproducible reductions are IEEE-double only.  They do not
+  # currently work with doubledouble or float-float accumulators.
+  if(NOT QUDA_REDUCTION_TYPE STREQUAL "double")
+    message(FATAL_ERROR "QUDA_REDUCTION_ALGORITHM=REPRODUCIBLE requires QUDA_REDUCTION_TYPE=double "
+                        "(IEEE double). It is not supported with '${QUDA_REDUCTION_TYPE}'.")
+  endif()
   set(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE 1)
 else()
   message(FATAL_ERROR "Invalid value for QUDA_REDUCTION_ALGORITHM: '${QUDA_REDUCTION_ALGORITHM}'. "
