@@ -328,10 +328,9 @@ namespace quda
 
   /**
      Unroll factor for the 4-d hop loop in Wilson-like dslash.
-     fp32mp2 kernels are I-cache limited if this loop is fully unrolled;
-     IEEE types keep full unroll.  Staggered hops stay fully unrolled
-     regardless of precision.
-  */
+     fp32mp2 (floatfloat) kernels are I-cache limited if this loop is
+     fully unrolled, for every reconstruct.  IEEE types keep full unroll.
+   */
 #ifdef QUDA_FPMP_FLOATFLOAT
   template <typename real> constexpr int wilson_dslash_hop_unroll = is_floatfloat_v<real> ? 1 : 4;
 #else

@@ -10,6 +10,28 @@ namespace quda
 {
 
   /**
+     Hop unroll for staggered / asqtad.  Default is full unroll (4).
+     For floatfloat, asqtad long-link recon 13/9 and naive staggered
+     recon 9 stay at 1; asqtad-18 and naive 18/13 use 4.
+   */
+  template <typename real, QudaReconstructType recon, bool improved>
+  constexpr int staggered_dslash_hop_unroll()
+  {
+#ifdef QUDA_FPMP_FLOATFLOAT
+    if constexpr (is_floatfloat_v<real>) {
+      if constexpr (improved) {
+        if constexpr (recon == QUDA_RECONSTRUCT_13 || recon == QUDA_RECONSTRUCT_12 || recon == QUDA_RECONSTRUCT_9
+                      || recon == QUDA_RECONSTRUCT_8)
+          return 1;
+      } else {
+        if constexpr (recon == QUDA_RECONSTRUCT_9 || recon == QUDA_RECONSTRUCT_8) return 1;
+      }
+    }
+#endif
+    return 4;
+  }
+
+  /**
      @brief Parameter structure for driving the Staggered Dslash operator
   */
   template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_u_,
@@ -51,6 +73,8 @@ namespace quda
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
+    static constexpr int hop_unroll
+      = staggered_dslash_hop_unroll<real, improved_ ? reconstruct_l_ : reconstruct_u_, improved_>();
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED;
     static constexpr int prefetch_distance_l1 = 0;
 
@@ -170,7 +194,7 @@ namespace quda
       }
     }
 
-#pragma unroll
+#pragma unroll Arg::hop_unroll
     for (int d = 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction
