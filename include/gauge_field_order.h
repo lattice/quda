@@ -1459,21 +1459,18 @@ namespace quda {
           row_sum += out[2].imag() * out[2].imag();
           real row_sum_inv = quda::fdivide(static_cast<real>(1.0), row_sum);
 
-          real diff = u0_inv * u0_inv - row_sum;
-          real U00_mag = quda::sqrt(quda::max(diff, static_cast<real>(0.0)));
-
-          out[0] *= U00_mag;
+          // sqrt(s^2-n) cancels in fp32mp2_low; promote_mapper is mid for that
+          // bulk and identity otherwise (IEEE / mid / high).
+          using mag_t = typename promote_mapper<real>::type;
+          mag_t s2 = mag_t(u0_inv) * mag_t(u0_inv);
+          out[0] *= sqrt(max(real(s2 - mag_t(row_sum)), real(0)));
 
           // Second, reconstruct first column
           real column_sum = out[0].real() * out[0].real();
           column_sum += out[0].imag() * out[0].imag();
           column_sum += out[3].real() * out[3].real();
           column_sum += out[3].imag() * out[3].imag();
-
-          diff = u0_inv * u0_inv - column_sum;
-          real U20_mag = quda::sqrt(quda::max(diff, static_cast<real>(0.0)));
-
-          out[6] *= U20_mag;
+          out[6] *= sqrt(max(real(s2 - mag_t(column_sum)), real(0)));
 
           // Finally, reconstruct last elements from SU(2) rotation
           real r_inv2 = u0_inv * row_sum_inv;
