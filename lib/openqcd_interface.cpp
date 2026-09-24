@@ -1088,6 +1088,16 @@ static int openQCD_qudaInvertParamCheck(void *param_)
     ret = false;
   }
 
+  /* eoflg=1 is only reproduced by the PC operator, so the solve has to be PC */
+  if (dp.eoflg == 1 && param_ != qudaState.dirac_handle) {
+    bool pc_solve = param->solve_type == QUDA_DIRECT_PC_SOLVE || param->solve_type == QUDA_NORMOP_PC_SOLVE
+      || param->solve_type == QUDA_NORMERR_PC_SOLVE;
+    if (!pc_solve) {
+      WITH_COMM(errorQuda("openQxD runs with eoflg=1, which requires a PC solve"
+                          "(actual: solve_type=%d, solution_type=%d)", param->solve_type));
+    }
+  }
+
   if (additional_prop->u1csw != dp.u1csw) {
     WITH_COMM(logQuda(
       QUDA_VERBOSE,
