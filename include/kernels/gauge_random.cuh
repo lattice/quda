@@ -39,6 +39,7 @@ namespace quda {
     Link ret;
     real rand1[4], rand2[4], phi[4], radius[4], temp1[4], temp2[4];
 
+#pragma unroll
     for (int i = 0; i < 4; ++i) {
       rand1[i] = uniform<real>::rand(localState);
       rand2[i] = uniform<real>::rand(localState);

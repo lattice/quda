@@ -196,6 +196,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       matrix delta = {};
 
+#pragma unroll
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, x_cb, parity);
         delta -= U;
@@ -203,6 +204,7 @@ namespace quda {
       //18*gauge_dir
       data[0] = static_cast<reduction_t>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
       //2
+#pragma unroll
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, linkIndexM1(x, arg.X, mu), 1 - parity);
         delta += U;
