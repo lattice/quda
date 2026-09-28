@@ -710,7 +710,9 @@ namespace quda
 
   template <> __host__ __device__ inline complex<float> polar(const float &magnitude, const float &angle)
   {
-    return complex<float>(magnitude * cos(angle), magnitude * sin(angle));
+    float s, c;
+    quda::sincos(angle, &s, &c);
+    return complex<float>(magnitude * c, magnitude * s);
   }
 
   template <> __host__ __device__ inline complex<double> polar(const double &magnitude, const double &angle)
