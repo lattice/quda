@@ -27,7 +27,11 @@ namespace quda
   inline bool isnan(double a) { return std::isnan(a); }
   template <typename T> inline T max(const T a, const T b) { return a > b ? a : b; }
   template <typename T> inline T min(const T a, const T b) { return a < b ? a : b; }
+  inline void sincos(const float a, float *s, float *c) { ::sincosf(a, s, c); }
+  inline void sincos(const double a, double *s, double *c) { ::sincos(a, s, c); }
   template <typename T> inline void sincos(const T a, T *s, T *c) { ::sincos(a, s, c); }
+  inline void sincospi(const float a, float *s, float *c) { ::sincosf(a * static_cast<float>(M_PI), s, c); }
+  inline void sincospi(const double a, double *s, double *c) { ::sincos(a * static_cast<double>(M_PI), s, c); }
   template <typename T> inline void sincospi(const T a, T *s, T *c) { ::sincos(a * static_cast<T>(M_PI), s, c); }
   template <typename T> inline T sinpi(const T a) { return ::sin(a * static_cast<float>(M_PI)); }
   template <typename T> inline T cospi(const T a) { return ::cos(a * static_cast<float>(M_PI)); }
