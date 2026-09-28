@@ -313,19 +313,18 @@ namespace quda
 
       // Color contract: <\phi(x)_{\mu} | \phi(y)_{\nu}>
       // The Bra is conjugated
+#pragma unroll
       for (int mu = 0; mu < nSpin; mu++) {
+#pragma unroll
         for (int nu = 0; nu < nSpin; nu++) { spin_elem[mu][nu] = innerProduct(x, y, mu, nu); }
       }
 
       Matrix<complex<real>, nSpin> A_;
-      auto A = A_.data;
 
       // Spin contract: <\phi(x)_{\mu} \Gamma_{mu,nu}^{rho,tau} \phi(y)_{\nu}>
       // The rho index runs slowest.
       // Layout is defined in enum_quda.h: G_idx = 4*rho + tau
       // DMH: Hardcoded to Degrand-Rossi. Need a template on Gamma basis.
-
-      int G_idx = 0;
 
       // SCALAR
       // G_idx = 0: I
@@ -334,7 +333,7 @@ namespace quda
       result_local += spin_elem[1][1];
       result_local += spin_elem[2][2];
       result_local += spin_elem[3][3];
-      A[G_idx++] = result_local;
+      A_(0, 0) = result_local;
 
       // VECTORS
       // G_idx = 1: \gamma_1
@@ -343,42 +342,32 @@ namespace quda
       result_local += I * spin_elem[1][2];
       result_local -= I * spin_elem[2][1];
       result_local -= I * spin_elem[3][0];
-      A[G_idx++] = result_local;
-
-      // G_idx = 2: \gamma_2
+      A_(0, 1) = result_local;
       result_local = 0.0;
       result_local -= spin_elem[0][3];
       result_local += spin_elem[1][2];
       result_local += spin_elem[2][1];
       result_local -= spin_elem[3][0];
-      A[G_idx++] = result_local;
-
-      // G_idx = 3: \gamma_3
+      A_(0, 2) = result_local;
       result_local = 0.0;
       result_local += I * spin_elem[0][2];
       result_local -= I * spin_elem[1][3];
       result_local -= I * spin_elem[2][0];
       result_local += I * spin_elem[3][1];
-      A[G_idx++] = result_local;
-
-      // G_idx = 4: \gamma_4
+      A_(0, 3) = result_local;
       result_local = 0.0;
       result_local += spin_elem[0][2];
       result_local += spin_elem[1][3];
       result_local += spin_elem[2][0];
       result_local += spin_elem[3][1];
-      A[G_idx++] = result_local;
-
-      // PSEUDO-SCALAR
+      A_(1, 0) = result_local;
       // G_idx = 5: \gamma_5
       result_local = 0.0;
       result_local += spin_elem[0][0];
       result_local += spin_elem[1][1];
       result_local -= spin_elem[2][2];
       result_local -= spin_elem[3][3];
-      A[G_idx++] = result_local;
-
-      // PSEUDO-VECTORS
+      A_(1, 1) = result_local;
       // DMH: Careful here... we may wish to use  \gamma_1,2,3,4\gamma_5 for pseudovectors
       // G_idx = 6: \gamma_5\gamma_1
       result_local = 0.0;
@@ -386,40 +375,32 @@ namespace quda
       result_local += I * spin_elem[1][2];
       result_local += I * spin_elem[2][1];
       result_local += I * spin_elem[3][0];
-      A[G_idx++] = result_local;
-
-      // G_idx = 7: \gamma_5\gamma_2
+      A_(1, 2) = result_local;
       result_local = 0.0;
       result_local -= spin_elem[0][3];
       result_local += spin_elem[1][2];
       result_local -= spin_elem[2][1];
       result_local += spin_elem[3][0];
-      A[G_idx++] = result_local;
-
-      // G_idx = 8: \gamma_5\gamma_3
+      A_(1, 3) = result_local;
       result_local = 0.0;
       result_local += I * spin_elem[0][2];
       result_local -= I * spin_elem[1][3];
       result_local += I * spin_elem[2][0];
       result_local -= I * spin_elem[3][1];
-      A[G_idx++] = result_local;
-
-      // G_idx = 9: \gamma_5\gamma_4
+      A_(2, 0) = result_local;
       result_local = 0.0;
       result_local += spin_elem[0][2];
       result_local += spin_elem[1][3];
       result_local -= spin_elem[2][0];
       result_local -= spin_elem[3][1];
-      A[G_idx++] = result_local;
-
-      // TENSORS
+      A_(2, 1) = result_local;
       // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
       result_local = 0.0;
       result_local += spin_elem[0][0];
       result_local -= spin_elem[1][1];
       result_local += spin_elem[2][2];
       result_local -= spin_elem[3][3];
-      A[G_idx++] = result_local;
+      A_(2, 2) = result_local;
 
       // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]
       result_local = 0.0;
@@ -427,7 +408,7 @@ namespace quda
       result_local -= I * spin_elem[1][3];
       result_local += I * spin_elem[2][0];
       result_local += I * spin_elem[3][1];
-      A[G_idx++] = result_local;
+      A_(2, 3) = result_local;
 
       // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
       result_local = 0.0;
@@ -435,7 +416,7 @@ namespace quda
       result_local -= spin_elem[1][0];
       result_local += spin_elem[2][3];
       result_local += spin_elem[3][2];
-      A[G_idx++] = result_local;
+      A_(3, 0) = result_local;
 
       // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
       result_local = 0.0;
@@ -443,7 +424,7 @@ namespace quda
       result_local += spin_elem[1][0];
       result_local += spin_elem[2][3];
       result_local += spin_elem[3][2];
-      A[G_idx++] = result_local;
+      A_(3, 1) = result_local;
 
       // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
       result_local = 0.0;
@@ -451,7 +432,7 @@ namespace quda
       result_local += I * spin_elem[1][0];
       result_local += I * spin_elem[2][3];
       result_local -= I * spin_elem[3][2];
-      A[G_idx++] = result_local;
+      A_(3, 2) = result_local;
 
       // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]
       result_local = 0.0;
@@ -459,7 +440,7 @@ namespace quda
       result_local -= spin_elem[1][1];
       result_local += spin_elem[2][2];
       result_local += spin_elem[3][3];
-      A[G_idx++] = result_local;
+      A_(3, 3) = result_local;
 
       arg.s.save(A_, x_cb, parity);
     }
