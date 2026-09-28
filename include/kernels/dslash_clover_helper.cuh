@@ -266,7 +266,7 @@ namespace quda {
             Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A2);
 #pragma unroll
             for (int flavor = 0; flavor < n_flavor; flavor++)
-              out_chi[flavor] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(out_chi[flavor]));
+              out_chi[flavor] = static_cast<real>(0.25) * cholesky.solve(out_chi[flavor]);
           } else {
             Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
 #pragma unroll

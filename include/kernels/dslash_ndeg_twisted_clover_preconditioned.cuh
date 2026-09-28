@@ -148,7 +148,7 @@ namespace quda
 
 #pragma unroll
             for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
-              out_chi[flavor_] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(A_chi[flavor_]));
+              out_chi[flavor_] = static_cast<real>(0.25) * cholesky.solve(A_chi[flavor_]);
             }
           } else {
             HMat A2inv = arg.A2inv(coord.x_cb, parity, chirality);
