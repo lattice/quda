@@ -559,10 +559,16 @@ if(QUDA_DOWNLOAD_CCCL)
   # Temporary: lattice/cccl fpmp-iec-float128-conv adds fp64mp2 <-> GCC _Float128
   # interchange (needed for aarch64 quad). Revert to nvidia/cccl main once that
   # lands upstream. FPMP types are still not in a tagged CCCL release.
+  # The installed QUDA headers include <cuda/fpmp>, so the downloaded CCCL has to be
+  # installed alongside them; CCCL disables its install rules when it is a subproject.
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY lattice/cccl
       GIT_TAG fpmp-iec-float128-conv
+      OPTIONS "CCCL_ENABLE_INSTALL_RULES ON"
+              "libcudacxx_ENABLE_INSTALL_RULES ON"
+              "CUB_ENABLE_INSTALL_RULES ON"
+              "Thrust_ENABLE_INSTALL_RULES ON"
   )
 else()
   # Use the CUDA toolkit's CCCL (the same one NVSHMEM 3.x's config find_dependency
