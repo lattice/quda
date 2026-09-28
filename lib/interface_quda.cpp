@@ -4434,7 +4434,8 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
 
     if (inv_param->use_resident_solution)
       x.Even() = solutionResident[i];
-    else errorQuda("%s requires resident solution", __func__);
+    else
+      errorQuda("Resident solution required");
 
     // set the odd solution component
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);

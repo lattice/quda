@@ -214,7 +214,7 @@ namespace quda
                                 static_cast<dst_t *>(std::get<3>(pack)), static_cast<const src_t *>(std::get<4>(pack)));
 
     if (dst.Nspin() != src.Nspin()) errorQuda("source and destination spins must match");
-    if (!is_enabled_spin(dst.Nspin())) errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
+    if (!is_enabled_spin(dst.Nspin())) errorQuda("Nspin=%d support has not been built", src.Nspin());
 
     switch (dst.Nspin()) {
     case 1:

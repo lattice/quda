@@ -142,7 +142,7 @@ namespace quda {
     auto &src = std::get<1>(pack);
     if (dst.Nspin() != src.Nspin()) errorQuda("source and destination spins must match");
 
-    if (!is_enabled_spin(dst.Nspin())) errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
+    if (!is_enabled_spin(dst.Nspin())) errorQuda("Nspin=%d support has not been built", src.Nspin());
 
     if (dst.Nspin() == 4) {
       if constexpr (is_enabled_spin(4)) copyGenericColorSpinor<4, Nc, dst_t, src_t>(dst, src, pack);

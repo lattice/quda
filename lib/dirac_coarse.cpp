@@ -403,7 +403,7 @@ namespace quda {
   void DiracCoarse::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
-    if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
+    if (k != 1.0) errorQuda("k!=1.0 not supported");
 
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);

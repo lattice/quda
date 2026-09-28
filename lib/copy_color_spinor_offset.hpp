@@ -50,6 +50,8 @@ namespace quda
   template <class Float, int nColor> struct CopyColorSpinorOffset {
     CopyColorSpinorOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type)
     {
+      if (!is_enabled_spin(in.Nspin())) errorQuda("Nspin=%d support has not been built", in.Nspin());
+
       if (in.Nspin() == 4) {
         if constexpr (is_enabled_spin(4)) copy_color_spinor_offset<Float, nColor, 4>(out, in, offset, pc_type);
       } else if (in.Nspin() == 1) {
