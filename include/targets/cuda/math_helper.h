@@ -273,7 +273,11 @@ namespace quda
 #define QUDA_FPMP_DECLARE_SINCOSPI(FF)                                                                                 \
   template <> inline __host__ __device__ void sincospi(const FF &a, FF *s, FF *c)                                      \
   {                                                                                                                    \
-    quda::sincos(a * FF(M_PI), s, c);                                                                                  \
+    using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
+    ccc_t s_tmp, c_tmp;                                                                                                \
+    cuda::experimental::sincospi(static_cast<const ccc_t &>(a), &s_tmp, &c_tmp);                                       \
+    *s = FF(s_tmp);                                                                                                    \
+    *c = FF(c_tmp);                                                                                                    \
   }
 
   QUDA_FPMP_DECLARE_SINCOSPI(floatfloat_low)

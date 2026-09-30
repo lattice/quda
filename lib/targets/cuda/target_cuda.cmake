@@ -556,15 +556,15 @@ endif()
 
 option(QUDA_DOWNLOAD_CCCL "Download CCCL via CPM; OFF = use the CUDA toolkit's CCCL" ON)
 if(QUDA_DOWNLOAD_CCCL)
-  # lattice/cccl fpmp-sincos-register-index is main plus a Payne-Hanek index
-  # change that keeps the fp32mp2 sincos window in registers. FPMP types are still
-  # not in a tagged CCCL release. The installed QUDA headers include <cuda/fpmp>,
-  # so the downloaded CCCL has to be installed alongside them; CCCL disables its
-  # install rules when it is a subproject.
+  # lattice/cccl fpmp-native-sincospi is main plus a native fp32mp2
+  # sinpi/cospi/sincospi. FPMP types are still not in a tagged CCCL release.
+  # The installed QUDA headers include <cuda/fpmp>, so the downloaded CCCL has
+  # to be installed alongside them; CCCL disables its install rules when it is
+  # a subproject.
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY lattice/cccl
-      GIT_TAG 61bbc2e75f8bfecd2481759bac6d6584ba6165ba
+      GIT_TAG 850ac8970a084a421c7a6376d6f1665d2f2247c4
       OPTIONS "CCCL_ENABLE_INSTALL_RULES ON"
               "libcudacxx_ENABLE_INSTALL_RULES ON"
               "CUB_ENABLE_INSTALL_RULES ON"
