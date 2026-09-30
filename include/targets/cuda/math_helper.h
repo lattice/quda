@@ -324,7 +324,7 @@ namespace quda
   template <> inline __host__ __device__ FF sinpi(FF a)                                                                \
   {                                                                                                                    \
     using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
-    return FF(cuda::experimental::sin(static_cast<const ccc_t &>(a * FF(M_PI))));                                      \
+    return FF(cuda::experimental::sinpi(static_cast<const ccc_t &>(a)));                                               \
   }
 
   QUDA_FPMP_DECLARE_SINPI(floatfloat_low)
@@ -370,7 +370,8 @@ namespace quda
 #define QUDA_FPMP_DECLARE_COSPI(FF)                                                                                    \
   template <> inline __host__ __device__ FF cospi(FF a)                                                                \
   {                                                                                                                    \
-    return cuda::experimental::cos(a * FF(M_PI));                                                                      \
+    using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
+    return FF(cuda::experimental::cospi(static_cast<const ccc_t &>(a)));                                               \
   }
 
   QUDA_FPMP_DECLARE_COSPI(floatfloat_low)
