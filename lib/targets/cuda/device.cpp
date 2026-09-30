@@ -69,7 +69,7 @@ namespace quda
         constexpr int length = 80;
         char graphics_version[length];
         NVML_CHECK(nvmlSystemGetDriverVersion(graphics_version, length));
-        printfQuda("NVML-Reported driver version = %s\n", graphics_version);
+        logQuda(QUDA_DEBUG_VERBOSE, "NVML-Reported driver version = %s\n", graphics_version);
         return static_cast<int>(strtol(graphics_version, nullptr, 10));
       }();
       return nvml_driver_major_version;
@@ -133,22 +133,22 @@ namespace quda
       auto get_temperature_v()
       {
         if (get_nvml_driver_version() < 580) {
-          static bool print_helper = []() {
+          static bool legacy_path_printed = false;
+          if (!legacy_path_printed) {
             logQuda(QUDA_DEBUG_VERBOSE,
                     "Since the NVML driver version < 580, we are taking the nvmlDeviceGetTemperature path\n");
-            return true;
-          }();
-          (void)print_helper;
+            legacy_path_printed = true;
+          }
           return get_temperature_orig();
         }
 
-        static bool print_helper = []() {
+        static bool versioned_path_printed = false;
+        if (!versioned_path_printed) {
           logQuda(
             QUDA_DEBUG_VERBOSE,
             "Since the NVML driver version >= 580, we are attempting to take the nvmlDeviceGetTemperatureV path\n");
-          return true;
-        }();
-        (void)print_helper;
+          versioned_path_printed = true;
+        }
 
 #if defined(nvmlTemperature_v1)
         static auto func_temperature_v = [&]() -> nvmlDeviceGetTemperatureV_t {
@@ -178,14 +178,14 @@ namespace quda
         if (nvml_handle != nullptr) NVML_CHECK(func_temperature_v(monitor_device_id, &temperature));
         return static_cast<unsigned int>(temperature.temperature);
 #else
-        static bool no_v_api_print_helper = []() {
+        static bool fallback_printed = false;
+        if (!fallback_printed) {
           logQuda(QUDA_DEBUG_VERBOSE,
                   "'nvmlTemperature_v1' was not defined at compile time so we cannot use the "
                   "nvmlDeviceGetTemperatureV path.\n");
           logQuda(QUDA_DEBUG_VERBOSE, "We are now falling back to the nvmlDeviceGetTemperature path.\n");
-          return true;
-        }();
-        (void)no_v_api_print_helper;
+          fallback_printed = true;
+        }
         return get_temperature_orig();
 #endif
       }
@@ -304,19 +304,19 @@ namespace quda
     auto get_temperature()
     {
 #if defined(_WIN32)
-      static bool print_helper = []() {
+      static bool unsupported_windows_printed = false;
+      if (!unsupported_windows_printed) {
         warningQuda("We cannot query the temperature on Windows with the current implementation, returning 0.\n");
-        return true;
-      }();
-      (void)print_helper;
+        unsupported_windows_printed = true;
+      }
       return 0u;
 #else
       if (nvml_handle == nullptr) {
-        static bool print_helper = []() {
+        static bool missing_nvml_printed = false;
+        if (!missing_nvml_printed) {
           warningQuda("We could not dynamically load NVML, so we cannot query the temperature, returning 0.\n");
-          return true;
-        }();
-        (void)print_helper;
+          missing_nvml_printed = true;
+        }
         return 0u;
       } else {
         return impl::get_temperature_v();
