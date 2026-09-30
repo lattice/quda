@@ -275,7 +275,8 @@ namespace quda
       char name[NVML_DEVICE_NAME_BUFFER_SIZE];
       NVML_CHECK(nvmlDeviceGetName(monitor_device_id, name, NVML_DEVICE_NAME_BUFFER_SIZE));
 
-      printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
+      if (monitor::is_enabled())
+        printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
       monitor::init();
     }
 
