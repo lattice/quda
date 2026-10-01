@@ -327,7 +327,7 @@ namespace quda
   {
     size_t n = comm_size();
     std::vector<reduction_t> recv_buf(size * n);
-    MPI_CHECK(MPI_Allgather(data, size, MPI_FLOAT_COMPLEX, recv_buf.data(), size, MPI_FLOAT_COMPLEX, MPI_COMM_HANDLE));
+    MPI_CHECK(MPI_Allgather(data, size, MPI_C_FLOAT_COMPLEX, recv_buf.data(), size, MPI_C_FLOAT_COMPLEX, MPI_COMM_HANDLE));
 
     std::vector<reduction_t> recv_trans(size * n);
     for (size_t i = 0; i < n; i++) {
@@ -467,7 +467,7 @@ namespace quda
     size_t n = comm_size();
     std::vector<deviation_t<reduction_t>> recv_buf(size * n);
     MPI_CHECK(
-      MPI_Allgather(data, 2 * size, MPI_FLOAT_COMPLEX, recv_buf.data(), 2 * size, MPI_FLOAT_COMPLEX, MPI_COMM_HANDLE));
+      MPI_Allgather(data, 2 * size, MPI_C_FLOAT_COMPLEX, recv_buf.data(), 2 * size, MPI_C_FLOAT_COMPLEX, MPI_COMM_HANDLE));
 
     std::vector<deviation_t<reduction_t>> recv_trans(size * n);
     for (size_t i = 0; i < n; i++) {
@@ -484,7 +484,7 @@ namespace quda
   {
     size_t n = comm_size();
     std::vector<reduction_t> recv_buf(size * n);
-    MPI_CHECK(MPI_Allgather(data, size, MPI_FLOAT_COMPLEX, recv_buf.data(), size, MPI_FLOAT_COMPLEX, MPI_COMM_HANDLE));
+    MPI_CHECK(MPI_Allgather(data, size, MPI_C_FLOAT_COMPLEX, recv_buf.data(), size, MPI_C_FLOAT_COMPLEX, MPI_COMM_HANDLE));
 
     std::vector<reduction_t> recv_trans(size * n);
     for (size_t i = 0; i < n; i++) {
