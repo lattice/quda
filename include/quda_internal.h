@@ -66,6 +66,11 @@
 
 namespace quda {
 
+#ifndef QUDA_FPMP_FLOATFLOAT
+  /** False for every type when this build has float-float arithmetic disabled. */
+  template <typename T> constexpr bool is_floatfloat_v = false;
+#endif
+
   /**
      Scalar real variable type on the host
   */

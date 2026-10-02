@@ -17,7 +17,6 @@ namespace quda
   template <typename real, QudaReconstructType recon, bool improved>
   constexpr int staggered_dslash_hop_unroll()
   {
-#ifdef QUDA_FPMP_FLOATFLOAT
     if constexpr (is_floatfloat_v<real>) {
       if constexpr (improved) {
         if constexpr (recon == QUDA_RECONSTRUCT_13 || recon == QUDA_RECONSTRUCT_12 || recon == QUDA_RECONSTRUCT_9
@@ -27,7 +26,6 @@ namespace quda
         if constexpr (recon == QUDA_RECONSTRUCT_9 || recon == QUDA_RECONSTRUCT_8) return 1;
       }
     }
-#endif
     return 4;
   }
 

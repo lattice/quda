@@ -233,6 +233,23 @@ namespace quda
   template <typename T> using floatfloat_cccl_t = typename floatfloat_cccl<T>::type;
 
   template <typename T> using enable_if_floatfloat = std::enable_if_t<is_floatfloat_v<T>, int>;
+
+  template <typename T, enable_if_floatfloat<T> = 0> __device__ __host__ constexpr T floatfloat_numeric_lowest(const T &)
+  {
+    return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::lowest());
+  }
+
+  template <typename T, enable_if_floatfloat<T> = 0> __device__ __host__ constexpr T floatfloat_numeric_max(const T &)
+  {
+    return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::max());
+  }
+
+  /** CCCL atomic add on the pair. Limb-wise atomicAdd would tear hi and lo. */
+  template <typename T, enable_if_floatfloat<T> = 0> __device__ inline void floatfloat_atomic_add(T *addr, const T &val)
+  {
+    using ccc_t = floatfloat_cccl_t<T>;
+    atomicAdd(static_cast<ccc_t *>(addr), static_cast<const ccc_t &>(val));
+  }
 } // namespace quda
 
 template <typename T, quda::enable_if_floatfloat<T> = 0> __device__ __host__ inline T abs(const T &a)

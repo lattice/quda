@@ -184,11 +184,9 @@ namespace quda {
   template <typename T> struct low {
     static constexpr T value()
     {
-#ifdef QUDA_FPMP_FLOATFLOAT
       if constexpr (is_floatfloat_v<T>)
-        return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::lowest());
+        return floatfloat_numeric_lowest(T {});
       else
-#endif
         return std::numeric_limits<T>::lowest();
     }
   };
@@ -217,11 +215,9 @@ namespace quda {
   template <typename T> struct high {
     static constexpr T value()
     {
-#ifdef QUDA_FPMP_FLOATFLOAT
       if constexpr (is_floatfloat_v<T>)
-        return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::max());
+        return floatfloat_numeric_max(T {});
       else
-#endif
         return std::numeric_limits<T>::max();
     }
   };

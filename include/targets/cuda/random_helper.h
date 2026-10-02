@@ -2,9 +2,7 @@
 
 #include <curand_kernel.h>
 #include <quda_define.h>
-#ifdef QUDA_FPMP_FLOATFLOAT
-#include <floatfloat.h>
-#endif
+#include <quda_internal.h>
 
 namespace quda
 {
@@ -75,7 +73,6 @@ namespace quda
     }
   };
 
-#ifdef QUDA_FPMP_FLOATFLOAT
   /**
      @brief Uniform generator for any fp32mp2 accuracy, including a
      promoted register type that is not the bulk alias.  Constructs
@@ -101,7 +98,6 @@ namespace quda
       return a + (b - a) * Real(curand_uniform(&state.state));
     }
   };
-#endif
 
   template <class Real, typename Enable = void> struct normal {
   };
@@ -122,7 +118,6 @@ namespace quda
     __device__ static inline double rand(RNGState &state) { return curand_normal_double(&state.state); }
   };
 
-#ifdef QUDA_FPMP_FLOATFLOAT
   /**
      @brief Normal generator for any fp32mp2 accuracy, including a
      promoted register type that is not the bulk alias.  Constructs
@@ -136,6 +131,5 @@ namespace quda
      */
     __device__ static inline Real rand(RNGState &state) { return Real(curand_normal(&state.state)); }
   };
-#endif
 
 } // namespace quda

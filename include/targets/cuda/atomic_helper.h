@@ -2,12 +2,7 @@
 
 #include <quda_define.h>
 #include <array.h>
-#ifdef QUDA_FPMP_FLOATFLOAT
-#include <floatfloat.h>
-#endif
-#ifdef QUDA_FPMP_DOUBLEDOUBLE
-#include <dbldbl.h>
-#endif
+#include <quda_internal.h>
 
 /**
    @file atomic_helper.h
@@ -46,13 +41,11 @@ namespace quda
   template <bool is_device> struct atomic_fetch_add_impl {
     template <typename T> inline void operator()(T *addr, T val)
     {
-#ifdef QUDA_FPMP_FLOATFLOAT
       if constexpr (is_floatfloat_v<T>) {
         // Not a scalar, so it cannot be the subject of an omp atomic update
 #pragma omp critical
         *addr = *addr + val;
       } else
-#endif
 #ifdef QUDA_FPMP_DOUBLEDOUBLE
       if constexpr (is_doubledouble_v<T>) {
 #pragma omp critical
@@ -69,18 +62,12 @@ namespace quda
   template <> struct atomic_fetch_add_impl<true> {
     template <typename T> __device__ inline void operator()(T *addr, T val)
     {
-#ifdef QUDA_FPMP_FLOATFLOAT
       if constexpr (is_floatfloat_v<T>) {
         // The hi and lo limbs of an fp32mp2 are coupled, so the sum cannot be
         // applied to each limb with its own atomic.  CCCL exchanges the pair
-        // with a single compare-and-swap, adding with high accuracy, so the
-        // addend must arrive renormalized (see store_cast).  The cast to the
-        // CCCL type is what lets ADL find that overload for the MID/HIGH
-        // wrappers.
-        using ccc_t = floatfloat_cccl_t<T>;
-        atomicAdd(static_cast<ccc_t *>(addr), static_cast<const ccc_t &>(val));
+        // with a single compare-and-swap.
+        floatfloat_atomic_add(addr, val);
       } else
-#endif
 #ifdef QUDA_FPMP_DOUBLEDOUBLE
       if constexpr (is_doubledouble_v<T>) {
         atomicAdd(addr, val);

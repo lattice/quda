@@ -331,11 +331,7 @@ namespace quda
      fp32mp2 (floatfloat) kernels are I-cache limited if this loop is
      fully unrolled, for every reconstruct.  IEEE types keep full unroll.
    */
-#ifdef QUDA_FPMP_FLOATFLOAT
   template <typename real> constexpr int wilson_dslash_hop_unroll = is_floatfloat_v<real> ? 1 : 4;
-#else
-  template <typename real> constexpr int wilson_dslash_hop_unroll = 4;
-#endif
 
   template <typename Float_, int nDim_, typename DDArg, int nFace_ = 1, int n_src_tile_ = 1> struct DslashArg {
 

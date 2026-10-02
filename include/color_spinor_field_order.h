@@ -757,11 +757,7 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
-#ifdef QUDA_FPMP_FLOATFLOAT
-        using reduce_t = std::conditional_t<std::is_same_v<Float, floatfloat>, double, Float>;
-#else
-        using reduce_t = Float;
-#endif
+        using reduce_t = std::conditional_t<is_floatfloat_v<Float>, double, Float>;
         real_t absmax = real_t(transform_reduce<maximum<reduce_t>>(field.Location(), field.SiteSubset(),
                                                                 abs_max_<reduce_t, ghost_store_t>(static_cast<reduce_t>(scale_inv))));
         commGlobalReductionPop();
@@ -1010,11 +1006,7 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
-#ifdef QUDA_FPMP_FLOATFLOAT
-        using reduce_t = std::conditional_t<std::is_same_v<Float, floatfloat>, double, Float>;
-#else
-        using reduce_t = Float;
-#endif
+        using reduce_t = std::conditional_t<is_floatfloat_v<Float>, double, Float>;
         auto absmax = real_t(transform_reduce<maximum<reduce_t>>(field.Location(), field.SiteSubset(),
                                                               abs_max_<reduce_t, store_t>(static_cast<reduce_t>(scale_inv))));
         commGlobalReductionPop();

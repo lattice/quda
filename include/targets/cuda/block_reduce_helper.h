@@ -55,11 +55,9 @@ namespace quda
   };
 #endif
 
-#ifdef QUDA_FPMP_FLOATFLOAT
   template <typename T> struct atomic_type<T, std::enable_if_t<is_floatfloat_v<T>>> {
     using type = float; // fp32mp2 is stored as a pair of floats
   };
-#endif
 
   template <> struct atomic_type<double> {
     using type = double;

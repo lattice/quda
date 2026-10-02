@@ -1031,11 +1031,7 @@ namespace quda {
          */
         __host__ double abs_max(int dim = -1, bool global = true) const
         {
-#ifdef QUDA_FPMP_FLOATFLOAT
-          using reduce_t = std::conditional_t<std::is_same_v<Float, floatfloat>, double, Float>;
-#else
-          using reduce_t = Float;
-#endif
+          using reduce_t = std::conditional_t<is_floatfloat_v<Float>, double, Float>;
           commGlobalReductionPush(global);
           double absmax = accessor.template transform_reduce<maximum<reduce_t>>(
             location, dim, abs_max_<reduce_t, mem_t>(static_cast<reduce_t>(accessor.scale_inv)));
@@ -1050,11 +1046,7 @@ namespace quda {
          */
         __host__ double abs_min(int dim = -1, bool global = true) const
         {
-#ifdef QUDA_FPMP_FLOATFLOAT
-          using reduce_t = std::conditional_t<std::is_same_v<Float, floatfloat>, double, Float>;
-#else
-          using reduce_t = Float;
-#endif
+          using reduce_t = std::conditional_t<is_floatfloat_v<Float>, double, Float>;
           commGlobalReductionPush(global);
           double absmin = accessor.template transform_reduce<minimum<reduce_t>>(
             location, dim, abs_min_<reduce_t, mem_t>(static_cast<reduce_t>(accessor.scale_inv)));
