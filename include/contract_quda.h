@@ -29,7 +29,19 @@ namespace quda
    * @param[in] cType   contraction type
    */
 
+  /**
+     @param[out] result Per-site contraction in native field storage at the
+                        precision of x and y. One nSpin*nSpin complex per site,
+                        even parity then odd. Not an IEEE host buffer.
+   */
   void contractField(const ColorSpinorField &x, const ColorSpinorField &y, void *result, QudaContractType cType);
+
+  /**
+     @brief Copy n complexes from native field storage to an IEEE host buffer.
+     Single precision is a device-to-host copy. Double precision converts
+     fp32mp2 to IEEE complex<double> when QUDA_FPMP_FLOATFLOAT is enabled.
+   */
+  void copyInternalComplexToHost(QudaPrecision precision, void *dst, const void *src, size_t n_complex);
 
   /**
      @brief Contract the quark field x against the 3-d Laplace eigenvector

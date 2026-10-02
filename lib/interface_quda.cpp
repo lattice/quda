@@ -237,6 +237,9 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
+//!< Profiler for the exact staggered current
+static TimeProfile profileExactCurrent("exactCurrentQuda");
+
 //!< Profiler for FT contractions
 static TimeProfile profileContractFT("contractFTQuda");
 
@@ -6317,16 +6320,180 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   size_t data_bytes = x[0].Volume() * x[0].Nspin() * x[0].Nspin() * 2 * x[0].Precision();
   void *d_result = pool_device_malloc(data_bytes);
 
+  // Host spinors are IEEE. The copy into the native device fields is the
+  // conversion into internal precision.
   x[0] = h_x;
   y[0] = h_y;
 
   contractField(x[0], y[0], d_result, cType);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
+  copyInternalComplexToHost(x[0].Precision(), h_result, d_result, x[0].Volume() * x[0].Nspin() * x[0].Nspin());
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   pool_device_free(d_result);
+}
+
+void exactCurrentQuda(void **evec_even, void **evec_odd, const double *evals, int n_ev, const double *masses,
+                      int nmasses, QudaInvertParam *param, const int *X, void *jlow, void *jlow2)
+{
+  auto profile = pushProfile(profileExactCurrent);
+
+  if (!param || !X || !evec_even || !evec_odd || !evals || !masses) errorQuda("exactCurrentQuda called with a null argument");
+  if (n_ev < 1) errorQuda("exactCurrentQuda requires at least one eigenvector");
+  if (nmasses != 1 && nmasses != 2 && nmasses != 3) errorQuda("Wrong number of masses %d!", nmasses);
+
+  // Masses and eigenvalues cross the interface as IEEE doubles. Convert once.
+  std::vector<real_t> mass(nmasses);
+  for (int i = 0; i < nmasses; i++) mass[i] = static_cast<real_t>(masses[i]);
+  std::vector<real_t> eval(n_ev);
+  for (int i = 0; i < n_ev; i++) eval[i] = static_cast<real_t>(evals[i]);
+
+  // Copy so the caller's dslash type is left as the staggered operator.
+  QudaInvertParam invertParam = *param;
+  lat_dim_t X_ = {X[0], X[1], X[2], X[3]};
+
+  // Device eigenvectors are native-order fields at cuda_prec. The invert-param
+  // constructor would otherwise describe a host-order field at cpu_prec.
+  ColorSpinorParam csParam(evec_even[0], invertParam, X_, true, QUDA_CUDA_FIELD_LOCATION);
+  csParam.setPrecision(invertParam.cuda_prec, invertParam.cuda_prec, true);
+
+  std::vector<ColorSpinorField> src_even, src_odd;
+  src_even.reserve(n_ev);
+  src_odd.reserve(n_ev);
+  for (int i = 0; i < n_ev; i++) {
+    csParam.v = evec_even[i];
+    src_even.emplace_back(csParam);
+    csParam.v = evec_odd[i];
+    src_odd.emplace_back(csParam);
+  }
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, &invertParam, true);
+  Dirac *dirac = Dirac::create(diracParam);
+
+  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
+  DiracParam cDParam;
+  setDiracParam(cDParam, &invertParam, false);
+  GaugeCovDev myCovDev(cDParam);
+
+  ColorSpinorParam gpuParam(src_even[0]);
+  gpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  gpuParam.x[0] *= 2;
+  gpuParam.create = QUDA_ZERO_FIELD_CREATE;
+  ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam), evec(gpuParam);
+
+  // One complex per full-volume site. Even sites occupy [0, V/2), odd sites [V/2, V).
+  size_t data_bytes = 2 * gr0.Volume() * gr0.Precision();
+  void *d_result = pool_device_malloc(data_bytes);
+
+  ColorSpinorParam resParam(src_even[0]);
+  resParam.nColor = 1;
+  resParam.nSpin = 1;
+  resParam.pad = 0;
+  resParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  resParam.v = d_result;
+  ColorSpinorField res_even(resParam);
+  resParam.v = static_cast<char *>(d_result) + data_bytes / 2;
+  ColorSpinorField res_odd(resParam);
+
+  ColorSpinorParam accParam(src_even[0]);
+  accParam.nColor = 1;
+  accParam.nSpin = 1;
+  accParam.pad = 0;
+  accParam.create = QUDA_ZERO_FIELD_CREATE;
+  std::vector<ColorSpinorField> acc_even, acc_odd, acc2_even, acc2_odd;
+  resize(acc_even, 4, accParam);
+  resize(acc_odd, 4, accParam);
+  if (nmasses == 3) {
+    resize(acc2_even, 4, accParam);
+    resize(acc2_odd, 4, accParam);
+  }
+
+  profileExactCurrent.TPSTART(QUDA_PROFILE_COMPUTE);
+  for (int i = 0; i < n_ev; i++) {
+    dirac->Dslash(gr0.Odd(), src_even[i], QUDA_ODD_PARITY);
+
+    blas::copy(evec.Even(), src_even[i]);
+    blas::copy(evec.Odd(), src_odd[i]);
+
+    real_t zscale = 0.0, zscale2 = 0.0;
+    switch (nmasses) {
+    case 1: zscale = 1.0 / (eval[i] + 4.0 * mass[0] * mass[0]); break;
+    case 2: {
+      const real_t dl = eval[i] + 4.0 * mass[0] * mass[0];
+      const real_t ds = eval[i] + 4.0 * mass[1] * mass[1];
+      zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (dl * ds);
+      break;
+    }
+    case 3: {
+      const real_t du = eval[i] + 4.0 * mass[0] * mass[0];
+      const real_t dd = eval[i] + 4.0 * mass[1] * mass[1];
+      const real_t ds = eval[i] + 4.0 * mass[2] * mass[2];
+      zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (du * dd);
+      zscale2 = 4.0 * (mass[2] * mass[2] - mass[0] * mass[0]) / (du * ds);
+      break;
+    }
+    default: break;
+    }
+
+    for (int mu = 0; mu < 4; mu++) {
+      myCovDev.MCD(gr_mu, gr0, mu);
+      blas::axy(-1.0, gr0.Odd(), gr_mu.Odd());
+
+      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
+      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
+
+      contractField(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      blas::axpy(-zscale, res_even, acc_even[mu]);
+      if (nmasses == 3) blas::axpy(-zscale2, res_even, acc2_even[mu]);
+
+      myCovDev.MCD(gr_mu, evec, mu);
+      blas::ax(-1.0, gr_mu.Odd());
+
+      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
+      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
+
+      contractField(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      blas::axpy(+zscale, res_odd, acc_odd[mu]);
+      if (nmasses == 3) blas::axpy(+zscale2, res_odd, acc2_odd[mu]);
+    }
+  }
+  profileExactCurrent.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  // Accumulators are native storage. Convert each one to IEEE here, then
+  // scatter the imaginary part. Even-parity block -> [0, 2V), odd -> [2V, 4V).
+  const bool host_single = (param->cpu_prec == QUDA_SINGLE_PRECISION);
+  const bool device_single = (gr0.Precision() == QUDA_SINGLE_PRECISION);
+  const size_t vol_cb = gr0.Volume() / 2;
+  void *h_result = malloc(data_bytes / 2);
+  auto store_imag = [&](void *arr, const ColorSpinorField &acc, int mu, size_t base) {
+    if (!arr) return;
+    copyInternalComplexToHost(gr0.Precision(), h_result, acc.data(), vol_cb);
+    for (size_t x = 0; x < vol_cb; x++) {
+      double im = device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag()) :
+                                  reinterpret_cast<const std::complex<double> *>(h_result)[x].imag();
+      if (host_single)
+        reinterpret_cast<float *>(arr)[base + 4 * x + mu] += static_cast<float>(im);
+      else
+        reinterpret_cast<double *>(arr)[base + 4 * x + mu] += im;
+    }
+  };
+
+  profileExactCurrent.TPSTART(QUDA_PROFILE_D2H);
+  for (int mu = 0; mu < 4; mu++) {
+    store_imag(jlow, acc_even[mu], mu, 0);
+    store_imag(jlow, acc_odd[mu], mu, 2 * gr0.Volume());
+    if (nmasses == 3) {
+      store_imag(jlow2, acc2_even[mu], mu, 0);
+      store_imag(jlow2, acc2_odd[mu], mu, 2 * gr0.Volume());
+    }
+  }
+  profileExactCurrent.TPSTOP(QUDA_PROFILE_D2H);
+
+  free(h_result);
+  pool_device_free(d_result);
+  delete dirac;
 }
 
 void gaugeObservablesQuda(QudaGaugeObservableParam *param)

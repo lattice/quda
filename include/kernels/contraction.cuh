@@ -251,9 +251,11 @@ namespace quda
 
     F x;
     F y;
-    matrix_field<complex<Float>, nSpin> s;
+    // Native field storage: fp32mp2 for double when QUDA_FPMP_FLOATFLOAT, otherwise the precision tag.
+    using store_complex = complex<native_store_t<Float>>;
+    matrix_field<store_complex, nSpin> s;
 
-    ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *s) :
+    ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, store_complex *s) :
       kernel_param(dim3(x.VolumeCB(), 2, 1)),
       x(x),
       y(y),

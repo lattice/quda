@@ -1606,157 +1606,26 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   if (preserved_evals_mass[0] != 0.0 || preserved_evals_mass[1] != 0.0)
     errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
   int n_evecs = eigargs.n_ev;
+  if (n_evecs < 1) errorQuda("Requested number of eigenvectors %d must be positive", n_evecs);
+  if (space_even->evecs.size() < static_cast<size_t>(n_evecs) || space_odd->evecs.size() < static_cast<size_t>(n_evecs)
+      || space_even->evals.size() < static_cast<size_t>(n_evecs))
+    errorQuda("Requested %d eigenvectors but deflation spaces hold even=%zu (evals=%zu), odd=%zu", n_evecs,
+              space_even->evecs.size(), space_even->evals.size(), space_odd->evecs.size());
 
-  // Create Dslash operator
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 1.0, 0.0, inv_args.max_iter, 1e-1,
                   QUDA_ODD_PARITY, verbosity, QUDA_CG_INVERTER, &invertParam);
-  DiracParam diracParam;
-  setDiracParam(diracParam, &invertParam, true);
-  Dirac *dirac = Dirac::create(diracParam);
 
-  // Create Gauge Covariant Derivative Operator
-  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
-  DiracParam cDParam;
-  setDiracParam(cDParam, &invertParam, false);
-  GaugeCovDev myCovDev(cDParam);
-
-  // Full parity vectors on GPU
-  ColorSpinorParam gpuParam(space_even->evecs[0]);
-  gpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gpuParam.x[0] *= 2;
-  ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam), evec(gpuParam);
-
-  // Device buffer for contractField output: one complex per full-volume site at the device (field)
-  // precision. Even-parity sites occupy the first half [0, V/2), odd-parity the second half [V/2, V).
-  size_t data_bytes = 2 * gr0.Volume() * gr0.Precision();
-  void *d_result = pool_device_malloc(data_bytes);
-
-  // Wrap the two halves of d_result as single-parity (nColor=1, nSpin=1) fields so each scaled complex
-  // contraction can be summed on the device with blas::axpy
-  ColorSpinorParam resParam(space_even->evecs[0]);
-  resParam.nColor = 1;
-  resParam.nSpin = 1;
-  resParam.pad = 0;
-  resParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  resParam.v = d_result;
-  ColorSpinorField res_even(resParam); // even-parity contraction output (first half of d_result)
-  resParam.v = static_cast<char *>(d_result) + data_bytes / 2;
-  ColorSpinorField res_odd(resParam); // odd-parity contraction output (second half of d_result)
-
-  // Per-direction, per-parity device accumulators with precision inherited from the eigenvectors
-  ColorSpinorParam accParam(space_even->evecs[0]);
-  accParam.nColor = 1;
-  accParam.nSpin = 1;
-  accParam.pad = 0;
-  accParam.create = QUDA_ZERO_FIELD_CREATE;
-  std::vector<ColorSpinorField> acc_even, acc_odd, acc2_even, acc2_odd;
-  resize(acc_even, 4, accParam);
-  resize(acc_odd, 4, accParam);
-  if (nmasses == 3) {
-    resize(acc2_even, 4, accParam);
-    resize(acc2_odd, 4, accParam);
-  }
-
-  real_t m_l, m_s, m_u, m_d, dl, ds, du, dd;
-  real_t zscale = 0.0, zscale2 = 0.0;
-
-  // Loop over eigenvectors
+  std::vector<void *> evec_even(n_evecs), evec_odd(n_evecs);
+  std::vector<double> evals(n_evecs);
   for (int i = 0; i < n_evecs; i++) {
-
-    // Compute Dslash of eigenvector
-    dirac->Dslash(gr0.Odd(), space_even->evecs[i], QUDA_ODD_PARITY);
-
-    // Construct full parity eigenvector
-    blas::copy(evec.Even(), space_even->evecs[i]);
-    blas::copy(evec.Odd(), space_odd->evecs[i]);
-
-    // Scaled eigenvalue
-    switch (nmasses) {
-    case (1): zscale = 1.0 / (space_even->evals[i].real() + 4.0 * mass[0] * mass[0]); break;
-    case (2):
-      m_l = mass[0];
-      m_s = mass[1];
-      dl = space_even->evals[i].real() + 4.0 * m_l * m_l;
-      ds = space_even->evals[i].real() + 4.0 * m_s * m_s;
-      zscale = 4.0 * (m_s * m_s - m_l * m_l) / (dl * ds);
-      break;
-    case (3):
-      m_u = mass[0];
-      m_d = mass[1];
-      m_s = mass[2];
-      du = space_even->evals[i].real() + 4.0 * m_u * m_u;
-      dd = space_even->evals[i].real() + 4.0 * m_d * m_d;
-      ds = space_even->evals[i].real() + 4.0 * m_s * m_s;
-      zscale = 4.0 * (m_d * m_d - m_u * m_u) / (du * dd);
-      zscale2 = 4.0 * (m_s * m_s - m_u * m_u) / (du * ds);
-      break;
-    default: errorQuda("Wrong number of masses %d!", nmasses);
-    }
-
-    for (int mu = 0; mu < 4; mu++) {
-
-      // Do gauge covariant shift and flip sign on ODD sites
-      myCovDev.MCD(gr_mu, gr0, mu);
-      blas::axy(-1.0, gr0.Odd(), gr_mu.Odd());
-
-      // Do spin-taste operation
-      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
-      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
-
-      // Save current for EVEN sites (first half of d_result) and accumulate on device
-      contractField(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
-      blas::axpy(-zscale, res_even, acc_even[mu]);
-      if (nmasses == 3) blas::axpy(-zscale2, res_even, acc2_even[mu]);
-
-      // Do gauge covariant shift and flip sign on ODD sites
-      myCovDev.MCD(gr_mu, evec, mu);
-      blas::ax(-1.0, gr_mu.Odd());
-
-      // Do spin-taste operation
-      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
-      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
-
-      // Save current for ODD sites (second half of d_result) and accumulate on device
-      contractField(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
-      blas::axpy(+zscale, res_odd, acc_odd[mu]);
-      if (nmasses == 3) blas::axpy(+zscale2, res_odd, acc2_odd[mu]);
-    }
+    evec_even[i] = space_even->evecs[i].data();
+    evec_odd[i] = space_odd->evecs[i].data();
+    evals[i] = quda::to_double(space_even->evals[i].real());
   }
 
-  // Copy each device accumulator (FLOAT2, one contiguous complex per site, at device precision) to a small
-  // host staging buffer and write its imaginary part into MILC's interleaved jlow array. Note: nColor=1
-  // fields are not supported by copyGenericColorSpinor, so read the raw buffer directly rather than assigning
-  // to a host field. Even-parity block -> [0, 2V), odd-parity block -> [2V, 4V).
-  const bool device_single = (gr0.Precision() == QUDA_SINGLE_PRECISION);
-  const size_t vol_cb = gr0.Volume() / 2;
-  void *h_result = malloc(data_bytes / 2);
-  auto store_imag = [&](void *arr, const ColorSpinorField &acc, int mu, size_t base) {
-    if (!arr) return;
-    qudaMemcpy(h_result, acc.data(), data_bytes / 2, qudaMemcpyDeviceToHost);
-    for (size_t x = 0; x < vol_cb; x++) {
-      double im = device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag()) :
-                                  reinterpret_cast<const std::complex<double> *>(h_result)[x].imag();
-      if (host_single)
-        reinterpret_cast<float *>(arr)[base + 4 * x + mu] += static_cast<float>(im);
-      else
-        reinterpret_cast<double *>(arr)[base + 4 * x + mu] += im;
-    }
-  };
-
-  for (int mu = 0; mu < 4; mu++) {
-    store_imag(jlow_mu, acc_even[mu], mu, 0);
-    store_imag(jlow_mu, acc_odd[mu], mu, 2 * gr0.Volume());
-    if (nmasses == 3) {
-      store_imag(jlow_mu2, acc2_even[mu], mu, 0);
-      store_imag(jlow_mu2, acc2_odd[mu], mu, 2 * gr0.Volume());
-    }
-  }
-
-  // Cleanup
-  free(h_result);
-  pool_device_free(d_result);
-  delete dirac;
+  exactCurrentQuda(evec_even.data(), evec_odd.data(), evals.data(), n_evecs, mass.data(), nmasses, &invertParam,
+                   localDim, jlow_mu, jlow_mu2);
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaExactCurrent

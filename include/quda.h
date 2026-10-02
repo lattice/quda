@@ -1790,16 +1790,47 @@ extern "C" {
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
-   * Public function to perform color contractions of the host spinors x and y.
+   * @brief Perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data
    * @param[in] y pointer to host data
-   * @param[out] result pointer to the 16 spin projections per lattice site
+   * @param[out] result pointer to the spin projections per lattice site. Spin-4
+   * contractions store 16 complexes per site; the staggered contraction stores one.
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
    * @param[in] X spacetime data for construction of ColorSpinorFields.
+   * @return This function does not return a value. The contraction is written to result.
    */
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
+
+  /**
+   * @brief Exact staggered vector current from a pair of deflation spaces.
+   *
+   * Eigenvectors are device-resident, parity-subset, native-order staggered
+   * fields (nSpin = 1, nColor = 3) at param->cuda_prec. The resident fat, long,
+   * and shift gauges must already be loaded. Masses and eigenvalues enter as
+   * IEEE doubles and are converted to QUDA's host real type on entry. The
+   * current is accumulated in native field precision.
+   *
+   * For each direction mu and checkerboard site x the imaginary part is
+   * accumulated at base + 4*x + mu. The even-parity block starts at base 0
+   * and the odd-parity block at base 2*Volume.
+   * @param[in] evec_even Even-parity eigenvector device pointers, length n_ev.
+   * @param[in] evec_odd Odd-parity eigenvector device pointers, length n_ev.
+   * @param[in] evals Real parts of the even-parity eigenvalues of the massless
+   * operator, as IEEE doubles, length n_ev.
+   * @param[in] n_ev Number of eigenvectors.
+   * @param[in] masses Staggered masses, as IEEE doubles, length nmasses.
+   * @param[in] nmasses Number of masses: 1, 2, or 3.
+   * @param[in] param Invert-param metadata. cuda_prec is the eigenvector
+   * precision and cpu_prec is the precision of jlow and jlow2.
+   * @param[in] X Full local lattice dimensions.
+   * @param[in,out] jlow Host current at param->cpu_prec. Imaginary parts are accumulated into this array.
+   * @param[in,out] jlow2 Second host current at param->cpu_prec, accumulated only when nmasses == 3. May be null otherwise.
+   * @return This function does not return a value. The current is accumulated into jlow and, when nmasses == 3, jlow2.
+   */
+  void exactCurrentQuda(void **evec_even, void **evec_odd, const double *evals, int n_ev, const double *masses,
+                        int nmasses, QudaInvertParam *param, const int *X, void *jlow, void *jlow2);
 
   /**
    * @param[in] x pointer to host data array

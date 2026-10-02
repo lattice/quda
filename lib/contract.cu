@@ -129,7 +129,8 @@ namespace quda {
 
   template <typename Float, int nColor> class Contraction : TunableKernel2D
   {
-    complex<Float> *result;
+    using store_complex = complex<native_store_t<Float>>;
+    store_complex *result;
     const ColorSpinorField &x;
     const ColorSpinorField &y;
     const QudaContractType cType;
@@ -138,7 +139,7 @@ namespace quda {
 public:
     Contraction(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType) :
       TunableKernel2D(x, 2),
-      result(static_cast<complex<Float>*>(result)),
+      result(static_cast<store_complex *>(result)),
       x(x),
       y(y),
       cType(cType)
@@ -191,9 +192,27 @@ public:
 
     long long bytes() const
     {
-      return x.Bytes() + y.Bytes() + x.Nspin() * x.Nspin() * x.Volume() * sizeof(complex<Float>);
+      return x.Bytes() + y.Bytes() + x.Nspin() * x.Nspin() * x.Volume() * sizeof(store_complex);
     }
   };
+
+  void copyInternalComplexToHost(QudaPrecision precision, void *dst, const void *src, size_t n_complex)
+  {
+    if (!dst || !src) errorQuda("copyInternalComplexToHost called with a null pointer");
+    const size_t bytes = n_complex * 2 * static_cast<size_t>(precision);
+
+#if defined(QUDA_FPMP_FLOATFLOAT)
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      std::vector<floatfloat2> tmp(n_complex);
+      qudaMemcpy(tmp.data(), src, bytes, qudaMemcpyDeviceToHost);
+      auto *out = static_cast<complex<double> *>(dst);
+      for (size_t i = 0; i < n_complex; i++)
+        out[i] = complex<double>(static_cast<double>(tmp[i].x), static_cast<double>(tmp[i].y));
+      return;
+    }
+#endif
+    qudaMemcpy(dst, src, bytes, qudaMemcpyDeviceToHost);
+  }
 
   void contractField(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
