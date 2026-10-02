@@ -230,6 +230,13 @@ if(QUDA_DIRAC_COVDEV)
   install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+if(QUDA_DIRAC_STAGGERED AND QUDA_DIRAC_COVDEV)
+  add_executable(exact_current_test exact_current_test.cpp)
+  target_link_libraries(exact_current_test ${TEST_LIBS})
+  quda_checkbuildtest(exact_current_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS exact_current_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 if(QUDA_DIRAC_STAGGERED)
   add_executable(llfat_test llfat_test.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
@@ -1139,6 +1146,13 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
 endforeach(pol)
+
+if(QUDA_DIRAC_STAGGERED AND QUDA_DIRAC_COVDEV)
+  add_test(NAME exact_current
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:exact_current_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 6 8 10 12 --enable-testing true
+                   --gtest_output=xml:exact_current_test.xml)
+endif()
 
 # enable the precisions that are compiled
 math(EXPR double_prec  "${QUDA_PRECISION} & 8")
