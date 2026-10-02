@@ -325,10 +325,14 @@ namespace quda
     template <typename T>
     __device__ __host__ auto cdot_(complex<compute_t> &sum, const complex<T> &a, const complex<T> &b)
     {
-      sum.real(fma(compute_t(a.real()), compute_t(b.real()), sum.real()));
-      sum.real(fma(compute_t(a.imag()), compute_t(b.imag()), sum.real()));
-      sum.imag(fma(compute_t(a.real()), compute_t(b.imag()), sum.imag()));
-      sum.imag(fma(-compute_t(a.imag()), compute_t(b.real()), sum.imag()));
+      const auto ar = compute_t(a.real());
+      const auto ai = compute_t(a.imag());
+      const auto br = compute_t(b.real());
+      const auto bi = compute_t(b.imag());
+      sum.real(fma(ar, br, sum.real()));
+      sum.real(fma(ai, bi, sum.real()));
+      sum.imag(fma(ar, bi, sum.imag()));
+      sum.imag(fma(-ai, br, sum.imag()));
     }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)

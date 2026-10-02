@@ -107,8 +107,8 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH_TAG}")
 # ######################################################################################################################
 # HIP specific compile options
 
-target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/hip)
-target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/hip>
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/targets/hip>
+                                       $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/hip>
                                        $<INSTALL_INTERFACE:include/targets/hip>)
 
 

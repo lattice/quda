@@ -95,6 +95,13 @@ namespace quda
     __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
 
     template <class U>
+    __device__ __host__ static inline std::enable_if_t<!std::is_same_v<T, U> && !plus_array_site_compatible<T, U>::value, T>
+    apply(T a, const U &b)
+    {
+      return a + static_cast<T>(b);
+    }
+
+    template <class U>
     __device__ __host__ static inline std::enable_if_t<plus_array_site_compatible<T, U>::value, T> apply(T a, const U &b)
     {
 #pragma unroll

@@ -5,8 +5,7 @@
 namespace quda
 {
   /**
-   * Interface function that launch contraction compute kernels,
-   * used in interface_quda.cpp
+   * Summed contraction of two color-spinor fields. Called from contractFTQuda.
    * @param[in] x               input source field
    * @param[in] y               input source field
    * @param[out] result         container of complex contraction results for
@@ -20,7 +19,7 @@ namespace quda
    * @param[in] b1              spin component index (0 for staggered)
    */
 
-  void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result,
+  void contractSummed(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result,
                           QudaContractType cType, const int *const source_position, const int *const mom_mode,
                           const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1);
   /**
@@ -30,7 +29,19 @@ namespace quda
    * @param[in] cType   contraction type
    */
 
-  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, QudaContractType cType);
+  /**
+     @param[out] result Per-site contraction in native field storage at the
+                        precision of x and y. One nSpin*nSpin complex per site,
+                        even parity then odd. Not an IEEE host buffer.
+   */
+  void contractField(const ColorSpinorField &x, const ColorSpinorField &y, void *result, QudaContractType cType);
+
+  /**
+     @brief Copy n complexes from native field storage to an IEEE host buffer.
+     Single precision is a device-to-host copy. Double precision converts
+     fp32mp2 to IEEE complex<double> when QUDA_FPMP_FLOATFLOAT is enabled.
+   */
+  void copyInternalComplexToHost(QudaPrecision precision, void *dst, const void *src, size_t n_complex);
 
   /**
      @brief Contract the quark field x against the 3-d Laplace eigenvector

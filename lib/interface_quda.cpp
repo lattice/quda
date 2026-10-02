@@ -1,4 +1,5 @@
 #include <cmath>
+#include <complex>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -20,7 +21,7 @@
 #include <eigensolve_quda.h>
 #include <color_spinor_field.h>
 #include <clover_field.h>
-#include <llfat_quda.h>
+#include <llfat.h>
 #include <unitarization_links.h>
 #include <algorithm>
 #include <staggered_oprod.h>
@@ -64,6 +65,7 @@ void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
 
 #include <gauge_tools.h>
 #include <contract_quda.h>
+#include <exact_current.h>
 #include <momentum.h>
 
 using namespace quda;
@@ -236,6 +238,9 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
+
+//!< Profiler for the exact staggered current
+static TimeProfile profileExactCurrent("exactCurrentQuda");
 
 //!< Profiler for FT contractions
 static TimeProfile profileContractFT("contractFTQuda");
@@ -4434,7 +4439,8 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
 
     if (inv_param->use_resident_solution)
       x.Even() = solutionResident[i];
-    else errorQuda("%s requires resident solution", __func__);
+    else
+      errorQuda("Resident solution required");
 
     // set the odd solution component
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
@@ -6268,7 +6274,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
         for (size_t c1 = 0; c1 < src_nColor; c1++) {
 
           std::fill(result_global.begin(), result_global.end(), 0.0);
-          contractSummedQuda(d_prop1[s1 * src_nColor + c1], d_prop2[b1 * src_nColor + c1], result_global, cType,
+          contractSummed(d_prop1[s1 * src_nColor + c1], d_prop2[b1 * src_nColor + c1], result_global, cType,
                              source_position, &mom_modes[4 * mom_idx], &fft_type[4 * mom_idx], s1, b1);
 
           comm_allreduce_sum(result_global);
@@ -6316,16 +6322,88 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   size_t data_bytes = x[0].Volume() * x[0].Nspin() * x[0].Nspin() * 2 * x[0].Precision();
   void *d_result = pool_device_malloc(data_bytes);
 
+  // Host spinors are IEEE. The copy into the native device fields is the
+  // conversion into internal precision.
   x[0] = h_x;
   y[0] = h_y;
 
-  contractQuda(x[0], y[0], d_result, cType);
+  contractField(x[0], y[0], d_result, cType);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
+  copyInternalComplexToHost(x[0].Precision(), h_result, d_result, x[0].Volume() * x[0].Nspin() * x[0].Nspin());
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   pool_device_free(d_result);
+}
+
+void exactCurrentQuda(void **evec_even, void **evec_odd, const double *evals, int n_ev, const double *masses,
+                      int nmasses, QudaInvertParam *param, const int *X, void *jlow, void *jlow2)
+{
+  auto profile = pushProfile(profileExactCurrent);
+
+  if (!param || !X || !evec_even || !evec_odd || !evals || !masses) errorQuda("exactCurrentQuda called with a null argument");
+  if (n_ev < 1) errorQuda("exactCurrentQuda requires at least one eigenvector");
+  if (nmasses != 1 && nmasses != 2 && nmasses != 3) errorQuda("Wrong number of masses %d!", nmasses);
+
+  // Masses and eigenvalues cross the interface as IEEE doubles. Convert once.
+  std::vector<real_t> mass(nmasses);
+  for (int i = 0; i < nmasses; i++) mass[i] = static_cast<real_t>(masses[i]);
+  std::vector<real_t> eval(n_ev);
+  for (int i = 0; i < n_ev; i++) eval[i] = static_cast<real_t>(evals[i]);
+
+  // Copy so the caller's dslash type is left as the staggered operator.
+  QudaInvertParam invertParam = *param;
+  lat_dim_t X_ = {X[0], X[1], X[2], X[3]};
+
+  // Device eigenvectors are native-order fields at cuda_prec. The invert-param
+  // constructor would otherwise describe a host-order field at cpu_prec.
+  ColorSpinorParam csParam(evec_even[0], invertParam, X_, true, QUDA_CUDA_FIELD_LOCATION);
+  csParam.setPrecision(invertParam.cuda_prec, invertParam.cuda_prec, true);
+
+  std::vector<ColorSpinorField> src_even, src_odd;
+  src_even.reserve(n_ev);
+  src_odd.reserve(n_ev);
+  for (int i = 0; i < n_ev; i++) {
+    csParam.v = evec_even[i];
+    src_even.emplace_back(csParam);
+    csParam.v = evec_odd[i];
+    src_odd.emplace_back(csParam);
+  }
+
+  std::vector<ColorSpinorField> acc_even, acc_odd, acc2_even, acc2_odd;
+  exactCurrent(src_even, src_odd, eval, mass, invertParam, acc_even, acc_odd, acc2_even, acc2_odd);
+
+  // Accumulators are native storage. Convert each one to IEEE here, then
+  // scatter the imaginary part. Even-parity block -> [0, 2V), odd -> [2V, 4V).
+  const bool host_single = (param->cpu_prec == QUDA_SINGLE_PRECISION);
+  const bool device_single = (acc_even[0].Precision() == QUDA_SINGLE_PRECISION);
+  const size_t vol_cb = acc_even[0].Volume();
+  void *h_result = malloc(vol_cb * 2 * acc_even[0].Precision());
+  auto store_imag = [&](void *arr, const ColorSpinorField &acc, int mu, size_t base) {
+    if (!arr) return;
+    copyInternalComplexToHost(acc.Precision(), h_result, acc.data(), vol_cb);
+    for (size_t x = 0; x < vol_cb; x++) {
+      double im = device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag()) :
+                                  reinterpret_cast<const std::complex<double> *>(h_result)[x].imag();
+      if (host_single)
+        reinterpret_cast<float *>(arr)[base + 4 * x + mu] += static_cast<float>(im);
+      else
+        reinterpret_cast<double *>(arr)[base + 4 * x + mu] += im;
+    }
+  };
+
+  profileExactCurrent.TPSTART(QUDA_PROFILE_D2H);
+  for (int mu = 0; mu < 4; mu++) {
+    store_imag(jlow, acc_even[mu], mu, 0);
+    store_imag(jlow, acc_odd[mu], mu, 4 * vol_cb);
+    if (nmasses == 3) {
+      store_imag(jlow2, acc2_even[mu], mu, 0);
+      store_imag(jlow2, acc2_odd[mu], mu, 4 * vol_cb);
+    }
+  }
+  profileExactCurrent.TPSTOP(QUDA_PROFILE_D2H);
+
+  free(h_result);
 }
 
 void gaugeObservablesQuda(QudaGaugeObservableParam *param)

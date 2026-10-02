@@ -53,7 +53,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data {};
+      array<reduction_t, 2> data {};
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];
@@ -75,7 +75,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
+      data[0] = static_cast<reduction_t>(-delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real());
       //2
       //load downward links
 #pragma unroll
@@ -88,7 +88,7 @@ namespace quda {
       //18
       SubTraceUnit(delta);
       //12
-      data[1] = getRealTraceUVdagger(delta, delta);
+      data[1] = static_cast<reduction_t>(getRealTraceUVdagger(delta, delta));
       //35
       //T=36*gauge_dir+65
 
@@ -101,7 +101,7 @@ namespace quda {
    */
   template <typename store_t, QudaReconstructType recon, int gauge_dir_, bool halo_, int type_>
   struct GaugeFixArg : kernel_param<> {
-    using real = typename mapper<store_t>::type;
+    using real = typename promote_mapper<store_t>::type;
     static constexpr int gauge_dir = gauge_dir_;
     static constexpr bool halo = halo_;
     static constexpr int type = type_;
@@ -329,7 +329,7 @@ namespace quda {
         parity = 1 - parity;
       }
       int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      using complex = complex<typename Arg::store_t>;
+      using complex = complex<typename Arg::real>;
       typename Arg::real tmp[Arg::NElems];
       complex data[9];
       if (Arg::pack) {
@@ -338,8 +338,8 @@ namespace quda {
         for ( int i = 0; i < Arg::NElems / 2; ++i ) arg.array[idx + arg.threads.x * i] = complex(tmp[2*i+0], tmp[2*i+1]);
       } else {
         for ( int i = 0; i < Arg::NElems / 2; ++i ) {
-          tmp[2*i+0] = arg.array[idx + arg.threads.x * i].real();
-          tmp[2*i+1] = arg.array[idx + arg.threads.x * i].imag();
+          tmp[2*i+0] = static_cast<typename Arg::real>(arg.array[idx + arg.threads.x * i].real());
+          tmp[2*i+1] = static_cast<typename Arg::real>(arg.array[idx + arg.threads.x * i].imag());
         }
         arg.u.reconstruct.Unpack(data, tmp, id, arg.dim, 0, arg.u.X, arg.u.R);
         arg.u.save(data, id, arg.dim, parity);

@@ -1,43 +1,50 @@
 #include <tuple>
 #include <color_spinor_field.h>
+#include <instantiate.h>
+#include <multigrid.h>
 
 namespace quda
 {
 
   using copy_pack = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, const void *>;
-  void copyGenericColorSpinorDD(const copy_pack &pack);
-  void copyGenericColorSpinorDS(const copy_pack &pack);
-  void copyGenericColorSpinorDH(const copy_pack &pack);
-  void copyGenericColorSpinorDQ(const copy_pack &pack);
 
-  void copyGenericColorSpinorSD(const copy_pack &pack);
-  void copyGenericColorSpinorSS(const copy_pack &pack);
-  void copyGenericColorSpinorSH(const copy_pack &pack);
-  void copyGenericColorSpinorSQ(const copy_pack &pack);
+#define COPY_COLOR_SPINOR_DECL(IN, OUT) void copyGenericColorSpinor_##IN##_##OUT(const copy_pack &pack)
 
-  void copyGenericColorSpinorHD(const copy_pack &pack);
-  void copyGenericColorSpinorHS(const copy_pack &pack);
-  void copyGenericColorSpinorHH(const copy_pack &pack);
-  void copyGenericColorSpinorHQ(const copy_pack &pack);
+  COPY_COLOR_SPINOR_DECL(double, double);
+  COPY_COLOR_SPINOR_DECL(double, single);
+  COPY_COLOR_SPINOR_DECL(double, half);
+  COPY_COLOR_SPINOR_DECL(double, quarter);
+  COPY_COLOR_SPINOR_DECL(single, double);
+  COPY_COLOR_SPINOR_DECL(single, single);
+  COPY_COLOR_SPINOR_DECL(single, half);
+  COPY_COLOR_SPINOR_DECL(single, quarter);
+  COPY_COLOR_SPINOR_DECL(half, double);
+  COPY_COLOR_SPINOR_DECL(half, single);
+  COPY_COLOR_SPINOR_DECL(half, half);
+  COPY_COLOR_SPINOR_DECL(half, quarter);
+  COPY_COLOR_SPINOR_DECL(quarter, double);
+  COPY_COLOR_SPINOR_DECL(quarter, single);
+  COPY_COLOR_SPINOR_DECL(quarter, half);
+  COPY_COLOR_SPINOR_DECL(quarter, quarter);
 
-  void copyGenericColorSpinorQD(const copy_pack &pack);
-  void copyGenericColorSpinorQS(const copy_pack &pack);
-  void copyGenericColorSpinorQH(const copy_pack &pack);
-  void copyGenericColorSpinorQQ(const copy_pack &pack);
+#undef COPY_COLOR_SPINOR_DECL
 
-  // multigrid copying routines
-  void copyGenericColorSpinorMGDD(const copy_pack &pack);
-  void copyGenericColorSpinorMGDS(const copy_pack &pack);
-  void copyGenericColorSpinorMGSD(const copy_pack &pack);
-  void copyGenericColorSpinorMGSS(const copy_pack &pack);
-  void copyGenericColorSpinorMGSH(const copy_pack &pack);
-  void copyGenericColorSpinorMGSQ(const copy_pack &pack);
-  void copyGenericColorSpinorMGHS(const copy_pack &pack);
-  void copyGenericColorSpinorMGHH(const copy_pack &pack);
-  void copyGenericColorSpinorMGHQ(const copy_pack &pack);
-  void copyGenericColorSpinorMGQS(const copy_pack &pack);
-  void copyGenericColorSpinorMGQH(const copy_pack &pack);
-  void copyGenericColorSpinorMGQQ(const copy_pack &pack);
+#define COPY_COLOR_SPINOR_MG_DECL(IN, OUT) void copyGenericColorSpinorMG_##IN##_##OUT(const copy_pack &pack)
+
+  COPY_COLOR_SPINOR_MG_DECL(double, double);
+  COPY_COLOR_SPINOR_MG_DECL(single, double);
+  COPY_COLOR_SPINOR_MG_DECL(double, single);
+  COPY_COLOR_SPINOR_MG_DECL(single, single);
+  COPY_COLOR_SPINOR_MG_DECL(half, single);
+  COPY_COLOR_SPINOR_MG_DECL(quarter, single);
+  COPY_COLOR_SPINOR_MG_DECL(single, half);
+  COPY_COLOR_SPINOR_MG_DECL(half, half);
+  COPY_COLOR_SPINOR_MG_DECL(quarter, half);
+  COPY_COLOR_SPINOR_MG_DECL(single, quarter);
+  COPY_COLOR_SPINOR_MG_DECL(half, quarter);
+  COPY_COLOR_SPINOR_MG_DECL(quarter, quarter);
+
+#undef COPY_COLOR_SPINOR_MG_DECL
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location, void *Dst,
                               const void *Src)
@@ -50,100 +57,179 @@ namespace quda
 
     copy_pack pack(dst, src, location, Dst, Src);
     if (dst.Ncolor() == 3) {
-      if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
-        if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorDD(pack);
-        } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorDS(pack);
-        } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorDH(pack);
-        } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorDQ(pack);
+      if (src.Precision() == QUDA_DOUBLE_PRECISION) {
+        if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyGenericColorSpinor_double_double(pack);
+        } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+          if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+            copyGenericColorSpinor_double_single(pack);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+        } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+          if constexpr (is_enabled(QUDA_HALF_PRECISION))
+            copyGenericColorSpinor_double_half(pack);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+        } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+          if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+            copyGenericColorSpinor_double_quarter(pack);
+          else
+            errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
-      } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
-        if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorSD(pack);
-        } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorSS(pack);
-        } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorSH(pack);
-        } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorSQ(pack);
+      } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
+        if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) {
+          if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
+            copyGenericColorSpinor_single_double(pack);
+          } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+            copyGenericColorSpinor_single_single(pack);
+          } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+            if constexpr (is_enabled(QUDA_HALF_PRECISION))
+              copyGenericColorSpinor_single_half(pack);
+            else
+              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+          } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+            if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+              copyGenericColorSpinor_single_quarter(pack);
+            else
+              errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+          } else {
+            errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          }
         } else {
-          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
         }
-      } else if (dst.Precision() == QUDA_HALF_PRECISION) {
-        if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorHD(pack);
-        } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorHS(pack);
-        } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorHH(pack);
-        } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorHQ(pack);
+      } else if (src.Precision() == QUDA_HALF_PRECISION) {
+        if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+          if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
+            copyGenericColorSpinor_half_double(pack);
+          } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+            if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+              copyGenericColorSpinor_half_single(pack);
+            else
+              errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+          } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+            copyGenericColorSpinor_half_half(pack);
+          } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+            if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+              copyGenericColorSpinor_half_quarter(pack);
+            else
+              errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+          } else {
+            errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          }
         } else {
-          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
         }
-      } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
-        if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorQD(pack);
-        } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorQS(pack);
-        } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorQH(pack);
-        } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorQQ(pack);
+      } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
+        if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) {
+          if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
+            copyGenericColorSpinor_quarter_double(pack);
+          } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+            if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+              copyGenericColorSpinor_quarter_single(pack);
+            else
+              errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+          } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+            if constexpr (is_enabled(QUDA_HALF_PRECISION))
+              copyGenericColorSpinor_quarter_half(pack);
+            else
+              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+          } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+            copyGenericColorSpinor_quarter_quarter(pack);
+          } else {
+            errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          }
         } else {
-          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
         }
       } else {
-        errorQuda("Unsupported Destination Precision %d", dst.Precision());
+        errorQuda("Unsupported Source Precision %d", src.Precision());
       }
     } else {
-      if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled_multigrid()) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorMGDD(pack);
+          if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
+            copyGenericColorSpinorMG_double_double(pack);
+          } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+            if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+              copyGenericColorSpinorMG_double_single(pack);
+            else
+              errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+          } else {
+            errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          }
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGDS(pack);
-        } else {
-          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
-        }
-      } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
-        if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorMGSD(pack);
-        } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGSS(pack);
+          if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) {
+            if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
+              copyGenericColorSpinorMG_single_double(pack);
+            } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+              copyGenericColorSpinorMG_single_single(pack);
+            } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+              if constexpr (is_enabled(QUDA_HALF_PRECISION))
+                copyGenericColorSpinorMG_single_half(pack);
+              else
+                errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+            } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+              if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+                copyGenericColorSpinorMG_single_quarter(pack);
+              else
+                errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+            } else {
+              errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(),
+                        src.Precision());
+            }
+          } else {
+            errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+          }
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorMGSH(pack);
+          if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+            if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+              if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+                copyGenericColorSpinorMG_half_single(pack);
+              else
+                errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+            } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+              copyGenericColorSpinorMG_half_half(pack);
+            } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+              if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
+                copyGenericColorSpinorMG_half_quarter(pack);
+              else
+                errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+            } else {
+              errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(),
+                        src.Precision());
+            }
+          } else {
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+          }
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGSQ(pack);
+          if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) {
+            if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+              if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+                copyGenericColorSpinorMG_quarter_single(pack);
+              else
+                errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+            } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+              if constexpr (is_enabled(QUDA_HALF_PRECISION))
+                copyGenericColorSpinorMG_quarter_half(pack);
+              else
+                errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+            } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
+              copyGenericColorSpinorMG_quarter_quarter(pack);
+            } else {
+              errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(),
+                        src.Precision());
+            }
+          } else {
+            errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+          }
         } else {
-          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
-        }
-      } else if (dst.Precision() == QUDA_HALF_PRECISION) {
-        if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGHS(pack);
-        } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorMGHH(pack);
-        } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGHQ(pack);
-        } else {
-          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
-        }
-      } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
-        if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGQS(pack);
-        } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorMGQH(pack);
-        } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGQQ(pack);
-        } else {
-          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
+          errorQuda("Unsupported Source Precision %d", src.Precision());
         }
       } else {
-        errorQuda("Unsupported Destination Precision %d", dst.Precision());
+        errorQuda("Multigrid has not been built");
       }
     }
   }

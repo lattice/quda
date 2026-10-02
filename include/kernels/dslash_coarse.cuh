@@ -11,12 +11,6 @@
 
 namespace quda {
 
-  enum DslashType {
-    DSLASH_INTERIOR,
-    DSLASH_EXTERIOR,
-    DSLASH_FULL
-  };
-
 #ifdef MULTIGRID_DSLASH_PROMOTE
   template <typename store_t> using compute_prec = real_t;
 #else

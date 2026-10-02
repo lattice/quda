@@ -79,12 +79,13 @@ namespace quda
      @tparam precision The precision requested
      @return True if enabled, false if not
   */
-  constexpr bool is_enabled(QudaPrecision precision) {
+  constexpr bool is_enabled(QudaPrecision precision)
+  {
     switch (precision) {
     case QUDA_DOUBLE_PRECISION: return (QUDA_PRECISION & 8) ? true : false;
     case QUDA_SINGLE_PRECISION: return (QUDA_PRECISION & 4) ? true : false;
-    case QUDA_HALF_PRECISION:   return (QUDA_PRECISION & 2) ? true : false;
-    case QUDA_QUARTER_PRECISION:  return (QUDA_PRECISION & 1) ? true : false;
+    case QUDA_HALF_PRECISION: return (QUDA_PRECISION & 2) ? true : false;
+    case QUDA_QUARTER_PRECISION: return (QUDA_PRECISION & 1) ? true : false;
     default: return false;
     }
   }
@@ -136,7 +137,8 @@ namespace quda
 
   struct ReconstructFull {
     static constexpr std::array<QudaReconstructType, 6> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_10};
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12,
+         QUDA_RECONSTRUCT_9,  QUDA_RECONSTRUCT_8,  QUDA_RECONSTRUCT_10};
   };
 
   struct ReconstructGauge {
@@ -202,7 +204,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename G,
             typename... Args>
-  constexpr void instantiate(G &U, Args &&... args)
+  constexpr void instantiate(G &U, Args &&...args)
   {
     if (U.Ncolor() == 3) {
       constexpr int i = Recon::recon.size() - 1;
@@ -237,6 +239,82 @@ namespace quda
   }
 
   /**
+     @brief Host-side nColor=3 and double/single dispatch. Does not instantiate GPU kernels.
+  */
+  template <typename G, typename Fn> void instantiatePrecisionDS(G &U, Fn &&fn)
+  {
+    if (U.Ncolor() != 3) errorQuda("Unsupported number of colors %d", U.Ncolor());
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
+        fn.template operator()<double>();
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+        fn.template operator()<float>();
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d", U.Precision());
+    }
+  }
+
+  /**
+     @brief Host-side reconstruct NO/12 dispatch. Does not instantiate GPU kernels.
+  */
+  template <typename G, typename Fn> void instantiateReconstructNo12(G &U, Fn &&fn)
+  {
+    if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
+        fn.template operator()<QUDA_RECONSTRUCT_NO>();
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_NO);
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_12>())
+        fn.template operator()<QUDA_RECONSTRUCT_12>();
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_12);
+    } else {
+      errorQuda("Unsupported reconstruct type %d", U.Reconstruct());
+    }
+  }
+
+  /**
+     @brief Host-side reconstruct NO dispatch. Does not instantiate GPU kernels.
+  */
+  template <typename G, typename Fn> void instantiateReconstructNone(G &U, Fn &&fn)
+  {
+    if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
+        fn.template operator()<QUDA_RECONSTRUCT_NO>();
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_NO);
+    } else {
+      errorQuda("Unsupported reconstruct type %d", U.Reconstruct());
+    }
+  }
+
+  /**
+     @brief Host-side double/single × reconstruct NO/12 dispatch for generated TUs.
+  */
+  template <typename G, typename Fn> void instantiatePrecReconNo12(G &U, Fn &&fn)
+  {
+    instantiatePrecisionDS(U, [&]<typename Float>() {
+      instantiateReconstructNo12(U, [&]<QudaReconstructType recon>() { fn.template operator()<Float, recon>(); });
+    });
+  }
+
+  /**
+     @brief Host-side double/single × reconstruct NO dispatch for generated TUs.
+  */
+  template <typename G, typename Fn> void instantiatePrecReconNone(G &U, Fn &&fn)
+  {
+    instantiatePrecisionDS(U, [&]<typename Float>() {
+      instantiateReconstructNone(U, [&]<QudaReconstructType recon>() { fn.template operator()<Float, recon>(); });
+    });
+  }
+
+  /**
      @brief This instantiate2 function is used to instantiate the
      precisions, with double precision always enabled.  This is a
      temporary addition until we fuse this with the original function
@@ -266,7 +344,7 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename> class Apply, typename C, typename... Args>
-  constexpr void instantiate(C &c, Args &&... args)
+  constexpr void instantiate(C &c, Args &&...args)
   {
     if (c.Precision() == QUDA_DOUBLE_PRECISION) {
       Apply<double>(c, args...);
@@ -302,7 +380,7 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename, int> class Apply, typename F, typename... Args>
-  constexpr void instantiate(F &field, Args &&... args)
+  constexpr void instantiate(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
@@ -449,7 +527,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecision(F &field, Args &&... args)
+  constexpr void instantiatePrecision(F &field, Args &&...args)
   {
     if (!is_enabled(field.Precision()) && field.Precision() != QUDA_DOUBLE_PRECISION)
       errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, field.Precision());
@@ -484,7 +562,7 @@ namespace quda
      computation at hand
   */
   template <template <typename, typename> class Apply, typename T, typename F, typename... Args>
-  constexpr void instantiatePrecision2(F &field, Args &&... args)
+  constexpr void instantiatePrecision2(F &field, Args &&...args)
   {
     if (!is_enabled(field.Precision()) && field.Precision() != QUDA_DOUBLE_PRECISION)
       errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, field.Precision());

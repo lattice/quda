@@ -128,7 +128,7 @@ namespace quda
             HMatrix<real, Arg::nColor *Arg::nSpin / 2> A = arg.A(coord.x_cb, parity, chirality);
             HalfVector x_chi = x.chiral_project(chirality);
             HalfVector Ax_chi = A * x_chi;
-            const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+            const complex<real> b(real(0), chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
             x_chi = b * Ax_chi;
             tmp += x_chi.chiral_reconstruct(chirality);
           }
