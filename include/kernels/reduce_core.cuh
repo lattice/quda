@@ -558,6 +558,21 @@ namespace quda
     };
 
     /**
+       Site ratio (r, r)_i / (x, x)_i.  CCCL fp32mp2 mid/low division
+       returns NaN for a divisor below ~2^-128, because the reciprocal
+       of the hi limb overflows.  The high-accuracy division scales
+       that range before the reciprocal.
+    */
+    template <typename T> __device__ __host__ inline T heavyQuarkSiteRatio(const T &num, const T &den)
+    {
+      if constexpr (is_floatfloat_v<T>) {
+        return floatfloat_div_high(num, den);
+      } else {
+        return num / den;
+      }
+    }
+
+    /**
        This kernel returns (x, x) and (r,r) and also returns the
        so-called heavy quark norm as used by MILC: 1 / N * \sum_i (r,
        r)_i / (x, x)_i, where i is site index and N is the number of
@@ -588,7 +603,7 @@ namespace quda
         }
 
         const array<reduction_t, 3> site {
-          aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<reduction_t>(1.0)};
+          aux[0], aux[1], (aux[0] > 0.0) ? heavyQuarkSiteRatio(aux[1], aux[0]) : static_cast<reduction_t>(1.0)};
         sum = reducer::apply(sum, site);
       }
 
@@ -628,7 +643,7 @@ namespace quda
         }
 
         const array<reduction_t, 3> site {
-          aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<reduction_t>(1.0)};
+          aux[0], aux[1], (aux[0] > 0.0) ? heavyQuarkSiteRatio(aux[1], aux[0]) : static_cast<reduction_t>(1.0)};
         sum = reducer::apply(sum, site);
       }
 

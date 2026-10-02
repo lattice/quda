@@ -234,6 +234,15 @@ namespace quda
 
   template <typename T> using enable_if_floatfloat = std::enable_if_t<is_floatfloat_v<T>, int>;
 
+  /** High-accuracy quotient. Mid/low division returns NaN for a divisor below ~2^-128. */
+  template <typename T, enable_if_floatfloat<T> = 0>
+  __device__ __host__ inline T floatfloat_div_high(const T &num, const T &den)
+  {
+    using ccc_t = floatfloat_cccl_t<T>;
+    return T(cuda::experimental::div<cuda::experimental::fpmp2_accuracy::high>(static_cast<const ccc_t &>(num),
+                                                                               static_cast<const ccc_t &>(den)));
+  }
+
   template <typename T, enable_if_floatfloat<T> = 0> __device__ __host__ constexpr T floatfloat_numeric_lowest(const T &)
   {
     return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::lowest());
