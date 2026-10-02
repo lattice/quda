@@ -1627,7 +1627,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   gpuParam.x[0] *= 2;
   ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam), evec(gpuParam);
 
-  // Device buffer for contractQuda output: one complex per full-volume site at the device (field)
+  // Device buffer for contractField output: one complex per full-volume site at the device (field)
   // precision. Even-parity sites occupy the first half [0, V/2), odd-parity the second half [V/2, V).
   size_t data_bytes = 2 * gr0.Volume() * gr0.Precision();
   void *d_result = pool_device_malloc(data_bytes);
@@ -1705,7 +1705,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
 
       // Save current for EVEN sites (first half of d_result) and accumulate on device
-      contractQuda(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      contractField(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
       blas::axpy(-zscale, res_even, acc_even[mu]);
       if (nmasses == 3) blas::axpy(-zscale2, res_even, acc2_even[mu]);
 
@@ -1718,7 +1718,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
 
       // Save current for ODD sites (second half of d_result) and accumulate on device
-      contractQuda(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      contractField(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
       blas::axpy(+zscale, res_odd, acc_odd[mu]);
       if (nmasses == 3) blas::axpy(+zscale2, res_odd, acc2_odd[mu]);
     }

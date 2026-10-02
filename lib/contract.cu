@@ -104,7 +104,7 @@ namespace quda {
     }
   };
 
-  void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result_global,
+  void contractSummed(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result_global,
                           const QudaContractType cType, const int *const source_position, const int *const mom_mode,
                           const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1)
   {
@@ -195,7 +195,7 @@ public:
     }
   };
 
-  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
+  void contractField(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(x, y);

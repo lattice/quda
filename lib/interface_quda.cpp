@@ -6269,7 +6269,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
         for (size_t c1 = 0; c1 < src_nColor; c1++) {
 
           std::fill(result_global.begin(), result_global.end(), 0.0);
-          contractSummedQuda(d_prop1[s1 * src_nColor + c1], d_prop2[b1 * src_nColor + c1], result_global, cType,
+          contractSummed(d_prop1[s1 * src_nColor + c1], d_prop2[b1 * src_nColor + c1], result_global, cType,
                              source_position, &mom_modes[4 * mom_idx], &fft_type[4 * mom_idx], s1, b1);
 
           comm_allreduce_sum(result_global);
@@ -6320,7 +6320,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   x[0] = h_x;
   y[0] = h_y;
 
-  contractQuda(x[0], y[0], d_result, cType);
+  contractField(x[0], y[0], d_result, cType);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
