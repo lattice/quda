@@ -1,4 +1,5 @@
 #include <cmath>
+#include <complex>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -64,6 +65,7 @@ void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
 
 #include <gauge_tools.h>
 #include <contract_quda.h>
+#include <exact_current.h>
 #include <momentum.h>
 
 using namespace quda;
@@ -6368,108 +6370,18 @@ void exactCurrentQuda(void **evec_even, void **evec_odd, const double *evals, in
     src_odd.emplace_back(csParam);
   }
 
-  DiracParam diracParam;
-  setDiracParam(diracParam, &invertParam, true);
-  Dirac *dirac = Dirac::create(diracParam);
-
-  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
-  DiracParam cDParam;
-  setDiracParam(cDParam, &invertParam, false);
-  GaugeCovDev myCovDev(cDParam);
-
-  ColorSpinorParam gpuParam(src_even[0]);
-  gpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gpuParam.x[0] *= 2;
-  gpuParam.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam), evec(gpuParam);
-
-  // One complex per full-volume site. Even sites occupy [0, V/2), odd sites [V/2, V).
-  size_t data_bytes = 2 * gr0.Volume() * gr0.Precision();
-  void *d_result = pool_device_malloc(data_bytes);
-
-  ColorSpinorParam resParam(src_even[0]);
-  resParam.nColor = 1;
-  resParam.nSpin = 1;
-  resParam.pad = 0;
-  resParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  resParam.v = d_result;
-  ColorSpinorField res_even(resParam);
-  resParam.v = static_cast<char *>(d_result) + data_bytes / 2;
-  ColorSpinorField res_odd(resParam);
-
-  ColorSpinorParam accParam(src_even[0]);
-  accParam.nColor = 1;
-  accParam.nSpin = 1;
-  accParam.pad = 0;
-  accParam.create = QUDA_ZERO_FIELD_CREATE;
   std::vector<ColorSpinorField> acc_even, acc_odd, acc2_even, acc2_odd;
-  resize(acc_even, 4, accParam);
-  resize(acc_odd, 4, accParam);
-  if (nmasses == 3) {
-    resize(acc2_even, 4, accParam);
-    resize(acc2_odd, 4, accParam);
-  }
-
-  profileExactCurrent.TPSTART(QUDA_PROFILE_COMPUTE);
-  for (int i = 0; i < n_ev; i++) {
-    dirac->Dslash(gr0.Odd(), src_even[i], QUDA_ODD_PARITY);
-
-    blas::copy(evec.Even(), src_even[i]);
-    blas::copy(evec.Odd(), src_odd[i]);
-
-    real_t zscale = 0.0, zscale2 = 0.0;
-    switch (nmasses) {
-    case 1: zscale = 1.0 / (eval[i] + 4.0 * mass[0] * mass[0]); break;
-    case 2: {
-      const real_t dl = eval[i] + 4.0 * mass[0] * mass[0];
-      const real_t ds = eval[i] + 4.0 * mass[1] * mass[1];
-      zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (dl * ds);
-      break;
-    }
-    case 3: {
-      const real_t du = eval[i] + 4.0 * mass[0] * mass[0];
-      const real_t dd = eval[i] + 4.0 * mass[1] * mass[1];
-      const real_t ds = eval[i] + 4.0 * mass[2] * mass[2];
-      zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (du * dd);
-      zscale2 = 4.0 * (mass[2] * mass[2] - mass[0] * mass[0]) / (du * ds);
-      break;
-    }
-    default: break;
-    }
-
-    for (int mu = 0; mu < 4; mu++) {
-      myCovDev.MCD(gr_mu, gr0, mu);
-      blas::axy(-1.0, gr0.Odd(), gr_mu.Odd());
-
-      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
-      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
-
-      contractField(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
-      blas::axpy(-zscale, res_even, acc_even[mu]);
-      if (nmasses == 3) blas::axpy(-zscale2, res_even, acc2_even[mu]);
-
-      myCovDev.MCD(gr_mu, evec, mu);
-      blas::ax(-1.0, gr_mu.Odd());
-
-      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
-      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
-
-      contractField(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
-      blas::axpy(+zscale, res_odd, acc_odd[mu]);
-      if (nmasses == 3) blas::axpy(+zscale2, res_odd, acc2_odd[mu]);
-    }
-  }
-  profileExactCurrent.TPSTOP(QUDA_PROFILE_COMPUTE);
+  exactCurrent(src_even, src_odd, eval, mass, invertParam, acc_even, acc_odd, acc2_even, acc2_odd);
 
   // Accumulators are native storage. Convert each one to IEEE here, then
   // scatter the imaginary part. Even-parity block -> [0, 2V), odd -> [2V, 4V).
   const bool host_single = (param->cpu_prec == QUDA_SINGLE_PRECISION);
-  const bool device_single = (gr0.Precision() == QUDA_SINGLE_PRECISION);
-  const size_t vol_cb = gr0.Volume() / 2;
-  void *h_result = malloc(data_bytes / 2);
+  const bool device_single = (acc_even[0].Precision() == QUDA_SINGLE_PRECISION);
+  const size_t vol_cb = acc_even[0].Volume();
+  void *h_result = malloc(vol_cb * 2 * acc_even[0].Precision());
   auto store_imag = [&](void *arr, const ColorSpinorField &acc, int mu, size_t base) {
     if (!arr) return;
-    copyInternalComplexToHost(gr0.Precision(), h_result, acc.data(), vol_cb);
+    copyInternalComplexToHost(acc.Precision(), h_result, acc.data(), vol_cb);
     for (size_t x = 0; x < vol_cb; x++) {
       double im = device_single ? static_cast<double>(reinterpret_cast<const std::complex<float> *>(h_result)[x].imag()) :
                                   reinterpret_cast<const std::complex<double> *>(h_result)[x].imag();
@@ -6483,17 +6395,15 @@ void exactCurrentQuda(void **evec_even, void **evec_odd, const double *evals, in
   profileExactCurrent.TPSTART(QUDA_PROFILE_D2H);
   for (int mu = 0; mu < 4; mu++) {
     store_imag(jlow, acc_even[mu], mu, 0);
-    store_imag(jlow, acc_odd[mu], mu, 2 * gr0.Volume());
+    store_imag(jlow, acc_odd[mu], mu, 4 * vol_cb);
     if (nmasses == 3) {
       store_imag(jlow2, acc2_even[mu], mu, 0);
-      store_imag(jlow2, acc2_odd[mu], mu, 2 * gr0.Volume());
+      store_imag(jlow2, acc2_odd[mu], mu, 4 * vol_cb);
     }
   }
   profileExactCurrent.TPSTOP(QUDA_PROFILE_D2H);
 
   free(h_result);
-  pool_device_free(d_result);
-  delete dirac;
 }
 
 void gaugeObservablesQuda(QudaGaugeObservableParam *param)

@@ -83,7 +83,7 @@ set (QUDA_OBJS
   multi_reduce_quda.cpp
   multi_reduce_quda_double.cu multi_reduce_quda_single.cu multi_reduce_quda_half.cu multi_reduce_quda_quarter.cu
   reduce_helper.cu
-  contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
+  contract.cu exact_current.cpp spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cpp
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
