@@ -629,6 +629,78 @@ double openQCD_qudaPlaquette(void)
   return 3.0 * plaq[0];
 }
 
+void openQCD_qudaGaugeForce(double dt, double c0, double c1, double eps)
+{
+  /* Set up staples of the openQCD gauge action: 6 plaquettes (weight c0).
+  *  If c1 != 0, 18 1x2 rectangles (weight c1) per direction (forces/force1)
+  *  From tests/gauge_path_test, MILC/QDP CPU vs GPU check */
+  constexpr int n_plaq = 6;
+  constexpr int n_rect = 18;
+  const int num_paths = (c0 != 1.0) ? n_plaq + n_rect : n_plaq;
+  const int max_length = (c0 != 1.0) ? 5 : 3;
+
+  static const int path_dir[4][n_plaq + n_rect][5] = {
+    /* path_dir_x */
+    {{1, 7, 6}, {6, 7, 1}, {2, 7, 5}, {5, 7, 2}, {3, 7, 4}, {4, 7, 3},
+     {0, 1, 7, 7, 6}, {1, 7, 7, 6, 0}, {6, 7, 7, 1, 0}, {0, 6, 7, 7, 1}, {0, 2, 7, 7, 5}, {2, 7, 7, 5, 0},
+     {5, 7, 7, 2, 0}, {0, 5, 7, 7, 2}, {0, 3, 7, 7, 4}, {3, 7, 7, 4, 0}, {4, 7, 7, 3, 0}, {0, 4, 7, 7, 3},
+     {6, 6, 7, 1, 1}, {1, 1, 7, 6, 6}, {5, 5, 7, 2, 2}, {2, 2, 7, 5, 5}, {4, 4, 7, 3, 3}, {3, 3, 7, 4, 4}},
+    /* path_dir_y */
+    {{2, 6, 5}, {5, 6, 2}, {3, 6, 4}, {4, 6, 3}, {0, 6, 7}, {7, 6, 0},
+     {1, 2, 6, 6, 5}, {2, 6, 6, 5, 1}, {5, 6, 6, 2, 1}, {1, 5, 6, 6, 2}, {1, 3, 6, 6, 4}, {3, 6, 6, 4, 1},
+     {4, 6, 6, 3, 1}, {1, 4, 6, 6, 3}, {1, 0, 6, 6, 7}, {0, 6, 6, 7, 1}, {7, 6, 6, 0, 1}, {1, 7, 6, 6, 0},
+     {5, 5, 6, 2, 2}, {2, 2, 6, 5, 5}, {4, 4, 6, 3, 3}, {3, 3, 6, 4, 4}, {7, 7, 6, 0, 0}, {0, 0, 6, 7, 7}},
+    /* path_dir_z */
+    {{3, 5, 4}, {4, 5, 3}, {0, 5, 7}, {7, 5, 0}, {1, 5, 6}, {6, 5, 1},
+     {2, 3, 5, 5, 4}, {3, 5, 5, 4, 2}, {4, 5, 5, 3, 2}, {2, 4, 5, 5, 3}, {2, 0, 5, 5, 7}, {0, 5, 5, 7, 2},
+     {7, 5, 5, 0, 2}, {2, 7, 5, 5, 0}, {2, 1, 5, 5, 6}, {1, 5, 5, 6, 2}, {6, 5, 5, 1, 2}, {2, 6, 5, 5, 1},
+     {4, 4, 5, 3, 3}, {3, 3, 5, 4, 4}, {7, 7, 5, 0, 0}, {0, 0, 5, 7, 7}, {6, 6, 5, 1, 1}, {1, 1, 5, 6, 6}},
+    /* path_dir_t */
+    {{0, 4, 7}, {7, 4, 0}, {1, 4, 6}, {6, 4, 1}, {2, 4, 5}, {5, 4, 2},
+     {3, 0, 4, 4, 7}, {0, 4, 4, 7, 3}, {7, 4, 4, 0, 3}, {3, 7, 4, 4, 0}, {3, 1, 4, 4, 6}, {1, 4, 4, 6, 3},
+     {6, 4, 4, 1, 3}, {3, 6, 4, 4, 1}, {3, 2, 4, 4, 5}, {2, 4, 4, 5, 3}, {5, 4, 4, 2, 3}, {3, 5, 4, 4, 2},
+     {7, 7, 4, 0, 0}, {0, 0, 4, 7, 7}, {6, 6, 4, 1, 1}, {1, 1, 4, 6, 6}, {5, 5, 4, 2, 2}, {2, 2, 4, 5, 5}}};
+
+  int length[n_plaq + n_rect];
+  double loop_coeff[n_plaq + n_rect];
+  for (int i = 0; i < num_paths; i++) {
+    length[i] = (i < n_plaq) ? 3 : 5;
+    loop_coeff[i] = (i < n_plaq) ? c0 : c1;
+  }
+
+  int **input_path_buf[4];
+  for (int dir = 0; dir < 4; dir++) {
+    input_path_buf[dir] = (int **)safe_malloc(num_paths * sizeof(int *));
+    for (int i = 0; i < num_paths; i++) {
+      input_path_buf[dir][i] = (int *)safe_malloc(length[i] * sizeof(int));
+      memcpy(input_path_buf[dir][i], path_dir[dir][i], length[i] * sizeof(int));
+    }
+  }
+  /* End of setup of coefficients and paths */
+
+  QudaGaugeParam gauge_param = newOpenQCDGaugeParam(QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_PERIODIC_T);
+  gauge_param.make_resident_gauge = true;
+  gauge_param.use_resident_gauge = true;
+  gauge_param.return_result_gauge = false; /* gauge stays on gpu */
+  gauge_param.use_resident_mom = true;
+  gauge_param.make_resident_mom = true;
+  gauge_param.return_result_mom = false;
+  gauge_param.overwrite_mom = false; /* accumulate to mom */
+
+  /* nullptrs since we use resident fields */
+  void *mom = nullptr;
+  void *gauge = nullptr;
+  WITH_COMM(computeGaugeForceQuda(mom, gauge, input_path_buf, length, loop_coeff, num_paths, max_length, dt,
+                                  &gauge_param));
+  WITH_COMM(updateGaugeFieldQuda(gauge, mom, eps, 0, 0, &gauge_param));
+
+  for (int dir = 0; dir < 4; dir++) {
+    for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
+    host_free(input_path_buf[dir]);
+  }
+
+}
+
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
   void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, gauge);
@@ -646,6 +718,25 @@ void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType 
     saveGaugeQuda(buf, &param);
   }
   qudaState.layout.quda2openqcd(OPENQCD_FIELD_GAUGE, buf, gauge);
+}
+
+void openQCD_qudaMomCreate(QudaPrecision prec, QudaTboundary t_boundary)
+{
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec, QUDA_RECONSTRUCT_10, t_boundary);
+  param.make_resident_mom = true;
+  param.return_result_mom = false;
+
+  /* Use MILC order on all zeros since OpenQCD order does not suppot mom order */
+  param.gauge_order = QUDA_MILC_GAUGE_ORDER;
+
+  size_t V = static_cast<size_t>(param.X[0]) * param.X[1] * param.X[2] * param.X[3];
+  size_t bytes = 4ul * V * 10 * (prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
+  void *mom = safe_malloc(bytes);
+  memset(mom, 0, bytes);
+  
+  /* Make resident mom field*/
+  momResidentQuda(mom, &param);
+  host_free(mom);
 }
 
 void openQCD_qudaGaugeFree(void)

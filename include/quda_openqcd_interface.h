@@ -511,6 +511,20 @@ bool openQCD_qudaQCDPlusQEDEnabled(void);
 double openQCD_qudaPlaquette(void);
 
 /**
+ * @brief      Compute the gauge force of the openQCD gauge action on the
+ *             resident gauge field. Update momentum and gauge field.
+ *             QUDA equivalent of force0(c) + update_mom() + update_ud(eps).
+ *
+ * @param[in]  dt           Integration step size, c*beta/6 in openQCD
+ *                          convention
+ * @param[in]  c0           Plaquette coefficient of the gauge action
+ * @param[in]  c1           Rectangle coefficient of the gauge action
+ *                          (skipped if c0 != 1.0)
+ * @param[in]  eps          Step size of the gauge field update, exp{eps*mom}*ud
+ */
+void openQCD_qudaGaugeForce(double dt, double c0, double c1, double eps);
+
+/**
  * @brief      Load the gauge fields from host to quda. Notice that the boundary
  *             fields have to be up2date; i.e. call copy_bnd_hd(), copy_bnd_ud()
  *             before pass fields into this function.
@@ -521,6 +535,16 @@ double openQCD_qudaPlaquette(void);
  * @param[in]  t_boundary  Time boundary condition
  */
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary);
+
+
+/**
+ * @brief      Create new resident momentum field. Initialize to zero.
+ * 
+ * @param[in]  prec        Precision of the incoming gauge field
+ * @param[in]  t_boundary  Time boundary condition
+ */
+void openQCD_qudaMomCreate(QudaPrecision prec, QudaTboundary t_boundary);
+
 
 /**
  * @brief      Save the gauge fields from quda to host.
