@@ -319,6 +319,8 @@ double gauge_smear_alpha = 0.6;
 double gauge_smear_alpha1 = 0.75;
 double gauge_smear_alpha2 = 0.6;
 double gauge_smear_alpha3 = 0.3;
+double gauge_smear_anisotropy = 1.0;
+unsigned int gauge_smear_rk_order = 3;
 int gauge_smear_steps = 5;
 int gauge_n_save = 3;
 int hier_threshold = 6;
@@ -1181,6 +1183,13 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-smear-alpha1", gauge_smear_alpha1, "alpha1 coefficient for HYP smearing (default 0.75)");
   opgroup->add_option("--su3-smear-alpha2", gauge_smear_alpha2, "alpha2 coefficient for HYP smearing (default 0.6)");
   opgroup->add_option("--su3-smear-alpha3", gauge_smear_alpha3, "alpha3 coefficient for HYP smearing (default 0.3)");
+
+  opgroup->add_option("--su3-smear-anisotropy", gauge_smear_anisotropy, "Smearing anisotropy factor (default 1.0)")
+    ->check(CLI::PositiveNumber);
+
+  opgroup
+    ->add_option("--su3-smear-rk-order", gauge_smear_rk_order, "Runge-Kutta order for gauge flow (3 or 4, default 3)")
+    ->check(CLI::Range(3u, 4u));
 
   opgroup->add_option(
     "--su3-smear-dir-ignore", gauge_smear_dir_ignore,

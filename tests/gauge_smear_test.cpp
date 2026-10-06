@@ -283,13 +283,14 @@ int main(int argc, char **argv)
   } else {
     if (niter < 1) errorQuda("--niter must be positive");
 
-    const auto verify_param = make_smear_param(gauge_smear_type, gauge_smear_dir_ignore, true);
+    const auto verify_param
+      = make_smear_param(gauge_smear_type, gauge_smear_dir_ignore, true, gauge_smear_rk_order, gauge_smear_anisotropy);
     if (verify_results && !verify_one_step(prec, verify_param)) {
       freeGaugeQuda();
       result = 1;
     } else {
-      const auto benchmark_param
-        = make_smear_param(gauge_smear_type, gauge_smear_dir_ignore, true, 3, 1.0, static_cast<unsigned int>(niter));
+      const auto benchmark_param = make_smear_param(gauge_smear_type, gauge_smear_dir_ignore, true, gauge_smear_rk_order,
+                                                    gauge_smear_anisotropy, static_cast<unsigned int>(niter));
       const auto metrics = benchmark(prec, benchmark_param);
       report_benchmark(gauge_smear_type, niter, metrics);
       freeGaugeQuda();
