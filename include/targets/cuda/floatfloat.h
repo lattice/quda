@@ -4,8 +4,7 @@
 
 #if defined(QUDA_FPMP_FLOATFLOAT)
 
-#include <cuda/fpmp>       // cuda::std::numeric_limits specialization
-#include <cuda/fpmp_math>
+#include <cuda/fpmp> // types, arithmetic, and math
 
 #include <ostream>
 #include <type_traits>

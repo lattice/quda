@@ -1415,8 +1415,10 @@ namespace quda {
 
         __device__ __host__ inline void Pack(real out[8], const complex in[9]) const
         {
-          out[0] = atan2(in[3].imag(), in[3].real()) / static_cast<real>(M_PI);   // a1 -> b1
-          out[1] = atan2(-in[6].imag(), -in[6].real()) / static_cast<real>(M_PI); // c1 -> -c1
+          // atan2 returns the raw fp32mp2. Cast before dividing so this is the
+          // wrapper operator/, not an overload ambiguous with CCCL's.
+          out[0] = static_cast<real>(atan2(in[3].imag(), in[3].real())) / static_cast<real>(M_PI);   // a1 -> b1
+          out[1] = static_cast<real>(atan2(-in[6].imag(), -in[6].real())) / static_cast<real>(M_PI); // c1 -> -c1
 
           out[2] = in[4].real();
           out[3] = in[4].imag(); // a2 -> b2

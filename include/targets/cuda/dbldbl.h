@@ -4,7 +4,7 @@
 
 #if defined(QUDA_FPMP_DOUBLEDOUBLE)
 
-#include <cuda/fpmp_math>
+#include <cuda/fpmp>
 #include <math_helper.h>
 
 #include <ostream>

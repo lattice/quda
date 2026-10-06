@@ -556,15 +556,15 @@ endif()
 
 option(QUDA_DOWNLOAD_CCCL "Download CCCL via CPM; OFF = use the CUDA toolkit's CCCL" ON)
 if(QUDA_DOWNLOAD_CCCL)
-  # lattice/cccl fpmp-native-sincospi is main plus a native fp32mp2
-  # sinpi/cospi/sincospi. FPMP types are still not in a tagged CCCL release.
+  # NVIDIA/cccl main. FPMP, including native fp32mp2 sinpi/cospi/sincospi,
+  # is not in a tagged CCCL release yet.
   # The installed QUDA headers include <cuda/fpmp>, so the downloaded CCCL has
   # to be installed alongside them; CCCL disables its install rules when it is
   # a subproject.
   CPMAddPackage(
       NAME CCCL
-      GITHUB_REPOSITORY lattice/cccl
-      GIT_TAG 850ac8970a084a421c7a6376d6f1665d2f2247c4
+      GITHUB_REPOSITORY NVIDIA/cccl
+      GIT_TAG main
       OPTIONS "CCCL_ENABLE_INSTALL_RULES ON"
               "libcudacxx_ENABLE_INSTALL_RULES ON"
               "CUB_ENABLE_INSTALL_RULES ON"
