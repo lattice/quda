@@ -199,7 +199,9 @@ SmearMetrics benchmark(QudaPrecision precision, QudaGaugeSmearParam smear_param,
 
   const auto lo = measure_smear(smear_param, 1);
   const auto hi = measure_smear(smear_param, steps + 1);
-  return {hi.seconds - lo.seconds, hi.flops - lo.flops, hi.bytes - lo.bytes};
+  SmearMetrics metrics {hi.seconds - lo.seconds, hi.flops - lo.flops, hi.bytes - lo.bytes};
+  if (metrics.seconds < 0.0) warningQuda("Gauge-smear benchmark produced a negative elapsed-time difference\n");
+  return metrics;
 }
 
 void report_benchmark(QudaGaugeSmearType type, int n_steps, const SmearMetrics &metrics)

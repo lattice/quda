@@ -60,8 +60,8 @@ inline void set_test_partition(int partition)
 
 inline void expect_finite(const DifferenceTolerance &comparison, const std::string &description)
 {
-  EXPECT_FALSE(std::isnan(comparison.difference)) << description << " difference is NaN";
-  EXPECT_FALSE(std::isnan(comparison.tolerance)) << description << " tolerance is NaN";
+  EXPECT_TRUE(std::isfinite(comparison.difference)) << description << " difference is not finite";
+  EXPECT_TRUE(std::isfinite(comparison.tolerance)) << description << " tolerance is not finite";
 }
 
 std::array<double, 3> plaquette_test(QudaPrecision precision, QudaReconstructType reconstruct);

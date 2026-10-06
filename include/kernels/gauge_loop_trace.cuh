@@ -45,8 +45,8 @@ namespace quda {
     {
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = u.R()[dir];
-      	E[dir] = u.X()[dir];
-      	X[dir] = E[dir] - border[dir]*2;
+        E[dir] = u.X()[dir];
+        X[dir] = E[dir] - border[dir]*2;
       }
     }
   };

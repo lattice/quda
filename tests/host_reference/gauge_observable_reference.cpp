@@ -119,7 +119,7 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
     const auto ptrs = u.data_array<void *>();
     const auto links = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
 
-    std::vector<matrix<real_t>> local_product(spatial_volume);
+    std::vector<matrix<double>> local_product(spatial_volume);
 #pragma omp parallel for
     for (size_t spatial_index = 0; spatial_index < spatial_volume; spatial_index++) {
       size_t index = spatial_index;
@@ -130,7 +130,7 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
       const int parity = (x + y + z) & 1;
       const size_t half_index = ((z * x1 + y) * (x0 / 2)) + x / 2;
 
-      auto product = Identity<3, std::complex<real_t>>()();
+      auto product = Identity<3, std::complex<double>>()();
       for (int t = 0; t < x3; t++) {
         const size_t temporal_half_index = half_index + static_cast<size_t>(t) * x0 * x1 * x2 / 2;
         const int temporal_parity = parity ^ (t & 1);
@@ -142,14 +142,14 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
 
     const int temporal_ranks = quda::comm_dim(3);
     const int temporal_coordinate = quda::comm_coord(3);
-    std::vector<std::vector<matrix<real_t>>> rank_product(temporal_ranks, std::vector<matrix<real_t>>(spatial_volume));
+    std::vector<std::vector<matrix<double>>> rank_product(temporal_ranks, std::vector<matrix<double>>(spatial_volume));
     rank_product[temporal_coordinate] = local_product;
 
     if (temporal_ranks > 1) {
-      std::array<std::vector<matrix<real_t>>, 2> buffer {std::vector<matrix<real_t>>(spatial_volume),
-                                                         std::vector<matrix<real_t>>(spatial_volume)};
+      std::array<std::vector<matrix<double>>, 2> buffer {std::vector<matrix<double>>(spatial_volume),
+                                                        std::vector<matrix<double>>(spatial_volume)};
       buffer[0] = local_product;
-      const size_t bytes = spatial_volume * sizeof(matrix<real_t>);
+      const size_t bytes = spatial_volume * sizeof(matrix<double>);
       std::array<quda::MsgHandle *, 2> receive;
       std::array<quda::MsgHandle *, 2> send;
       for (int i = 0; i < 2; i++) {
@@ -177,7 +177,7 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
     double imaginary = 0.0;
 #pragma omp parallel for reduction(+ : real, imaginary)
     for (size_t spatial_index = 0; spatial_index < spatial_volume; spatial_index++) {
-      auto product = Identity<3, std::complex<real_t>>()();
+      auto product = Identity<3, std::complex<double>>()();
       for (int t = 0; t < temporal_ranks; t++) product = product * rank_product[t][spatial_index];
       const auto value = trace(product);
       real += value.real();
