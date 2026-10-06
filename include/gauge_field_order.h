@@ -2169,6 +2169,7 @@ namespace quda {
       QDPOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
+        if (u.Geometry() > QUDA_MAX_DIM) errorQuda("Unsupported gauge geometry %d for QDP order", u.Geometry());
         for (int i = 0; i < u.Geometry(); i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
       }
 
@@ -2215,6 +2216,7 @@ namespace quda {
       QDPJITOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
+        if (u.Geometry() > QUDA_MAX_DIM) errorQuda("Unsupported gauge geometry %d for QDPJIT order", u.Geometry());
         for (int i = 0; i < u.Geometry(); i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
       }
 
