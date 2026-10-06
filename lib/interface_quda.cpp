@@ -6332,7 +6332,7 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
       }
       
       if (Nsrc > 1){
-          printfQuda("doing multisrc\n");
+          printfQuda("doing multisrc inversion\n");
           f_temp3[0].PrintVector(0,0,0);
           std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
           
@@ -6346,7 +6346,7 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
       }
       }
       else{
-          printfQuda("doing single source\n");
+          printfQuda("inverting a single source single source\n");
           invertQuda(f_temp4[0].data(),f_temp3[0].data(),inv_param);
       }
       f_temp4[0].PrintVector(0,0,0);
@@ -6357,14 +6357,13 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
       }
       
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
-      printfQuda("here?\n");
       std::array<int, 4> mom_modes = {0,0,0,0};
       std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
       std::array<int, 4> source_position = {0,0,0,0};
       QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
         
       for (const auto& m : ferm_m->meas_diff_vec){
-          printfQuda("flow a distance of %i\n",m);
+          logQuda(QUDA_VERBOSE,"now flowing a distance of %i\n",m);
           if (m != 0){
             gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, &flow_op, profileFlowedPionCorrelator, ferm_m);
           }
@@ -6384,7 +6383,6 @@ void perform_flow_pion_corr(std::vector<ColorSpinorField>&f_temp4, std::vector<C
             }
           comm_allreduce_sum(result_global);
           pion_corr_t_el.push_back(result_global);
-          printfQuda("size of pion cvorr %i\n",pion_corr_t_el.size());
           ferm_m->pion_corr.push_back(pion_corr_t_el);
           
           
@@ -6427,7 +6425,6 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
 
       
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
-      printfQuda("here?\n");
       std::array<int, 4> mom_modes = {0,0,0,0};
       std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
       std::array<int, 4> source_position = {0,0,0,0};
@@ -6435,8 +6432,27 @@ void perform_flow_forward_ppb(std::vector<ColorSpinorField>&f_temp4, std::vector
       std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
         
       for (const auto& m : ferm_m->meas_diff_vec){
-          printfQuda("flow a distance of %i\n",m);
+          logQuda(QUDA_VERBOSE,"now flowing a distance of %i\n",m);
           if (m != 0){
+            // //Experimental, but may be the more efficient way to go in the future
+            // //using move semantics, we concatenate f_temp3 + f_temp4
+            // f_temp3.insert(
+            //   f_temp3.end(),
+            //   std::make_move_iterator(f_temp4.begin()),
+            //   std::make_move_iterator(f_temp4.end())
+            // );
+            // //excecute gFlow
+            // gfEvolve(f_temp3,t_gf_list, smear_param, inv_param, m, &flow_op, profileFlowedForwardPpb, ferm_m);
+            // //"un"concatenate
+            // f_temp4.insert(
+            //   f_temp4.end(),
+            //   std::make_move_iterator(f_temp3.begin() + Nsrc),
+            //   std::make_move_iterator(f_temp3.end())
+            // );
+            // //erase unnatural
+            // f_temp3.erase(f_temp3.begin() + Nsrc, f_temp3.end());
+            
+            
             gfEvolve(f_temp3,t_gf_list, smear_param, inv_param, m, &flow_op, profileFlowedForwardPpb, ferm_m);
             t_gf_list[0] = initial_gauge_copy;
             gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, m, &flow_op, profileFlowedForwardPpb, ferm_m);
