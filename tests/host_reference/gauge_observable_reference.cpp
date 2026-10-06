@@ -135,7 +135,10 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
         const size_t temporal_half_index = half_index + static_cast<size_t>(t) * x0 * x1 * x2 / 2;
         const int temporal_parity = parity ^ (t & 1);
         const size_t temporal_index = temporal_half_index + temporal_parity * volume / 2;
-        product = product * links[3][temporal_index];
+        matrix<double> link;
+        for (int row = 0; row < 3; row++)
+          for (int col = 0; col < 3; col++) link(row, col) = links[3][temporal_index](row, col);
+        product = product * link;
       }
       local_product[spatial_index] = product;
     }
