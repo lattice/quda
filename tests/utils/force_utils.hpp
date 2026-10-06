@@ -400,16 +400,17 @@ template <typename real_t> Matrix<3, std::complex<real_t>> exponentiate_iQ(const
   const real_t exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
   const real_t exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
   const real_t cos_w = std::cos(w * inv_pi * static_cast<real_t>(M_PI));
-  const real_t sinc_w = std::abs(w) < static_cast<real_t>(0.05) ?
-    static_cast<real_t>(1.0) - w_sq / 6 * (static_cast<real_t>(1.0) - w_sq * static_cast<real_t>(0.05)
-                                             * (static_cast<real_t>(1.0) - w_sq / 42
-                                                * (static_cast<real_t>(1.0) - w_sq / 72))) :
-    std::sin(w * inv_pi * static_cast<real_t>(M_PI)) / w;
+  const real_t sinc_w = std::abs(w) < static_cast<real_t>(0.05) ? static_cast<real_t>(1.0)
+      - w_sq / 6
+        * (static_cast<real_t>(1.0)
+           - w_sq * static_cast<real_t>(0.05)
+             * (static_cast<real_t>(1.0) - w_sq / 42 * (static_cast<real_t>(1.0) - w_sq / 72))) :
+                                                                  std::sin(w * inv_pi * static_cast<real_t>(M_PI)) / w;
 
-  real_t h_re = (u_sq - w_sq) * exp_2iu_re + 8 * u_sq * cos_w * exp_iu_re
-    + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_im;
-  real_t h_im = (u_sq - w_sq) * exp_2iu_im - 8 * u_sq * cos_w * exp_iu_im
-    + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_re;
+  real_t h_re
+    = (u_sq - w_sq) * exp_2iu_re + 8 * u_sq * cos_w * exp_iu_re + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_im;
+  real_t h_im
+    = (u_sq - w_sq) * exp_2iu_im - 8 * u_sq * cos_w * exp_iu_im + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_re;
   complex f0(h_re * denom_inv, h_im * denom_inv);
 
   h_re = 2 * u * exp_2iu_re - 2 * u * cos_w * exp_iu_re + (3 * u_sq - w_sq) * sinc_w * exp_iu_im;
@@ -477,8 +478,7 @@ bool is_unitary(const Matrix<3, std::complex<real_t>> &inv, const Matrix<3, std:
   const auto identity = conj(u) * u;
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
-      if (std::abs(u(i, j).real() - inv(j, i).real()) > tol
-          || std::abs(u(i, j).imag() + inv(j, i).imag()) > tol)
+      if (std::abs(u(i, j).real() - inv(j, i).real()) > tol || std::abs(u(i, j).imag() + inv(j, i).imag()) > tol)
         return false;
     }
     if (std::abs(identity(i, i).real() - static_cast<real_t>(1.0)) > tol || std::abs(identity(i, i).imag()) > tol)

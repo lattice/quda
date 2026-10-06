@@ -443,8 +443,8 @@ template <typename real_t> struct ConstructGaussianSU3GaugeField {
           Matrix<3, complex> matrix;
           for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
-              matrix(row, col)
-                = complex(random_gaussian_host<real_t>(i, parity, 0, width), random_gaussian_host<real_t>(i, parity, 0, width));
+              matrix(row, col) = complex(random_gaussian_host<real_t>(i, parity, 0, width),
+                                         random_gaussian_host<real_t>(i, parity, 0, width));
             }
           }
           make_herm(matrix);

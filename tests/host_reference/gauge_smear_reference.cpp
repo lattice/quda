@@ -24,8 +24,9 @@ template <typename real_t> using matrix = Matrix<3, std::complex<real_t>>;
  * @param[in] lat Extended lattice metadata.
  * @return APE staple.
  */
-template <typename real_t> matrix<real_t> staple(const matrix<real_t> *const *links, size_t i, int nu, int dir_ignore,
-                                                 double anisotropy, const lattice_t &lat)
+template <typename real_t>
+matrix<real_t> staple(const matrix<real_t> *const *links, size_t i, int nu, int dir_ignore, double anisotropy,
+                      const lattice_t &lat)
 {
   matrix<real_t> out;
   for (int mu = 0; mu < 4; mu++) {
@@ -81,8 +82,8 @@ const matrix<real_t> &centered_link(const matrix<real_t> *const *links, size_t i
  * @param[in] lat Extended lattice metadata.
  */
 template <typename real_t> struct APESmear {
-  void operator()(quda::GaugeField &out, const quda::GaugeField &in, double alpha, int dir_ignore,
-                  double anisotropy, const lattice_t &lat)
+  void operator()(quda::GaugeField &out, const quda::GaugeField &in, double alpha, int dir_ignore, double anisotropy,
+                  const lattice_t &lat)
   {
     using link = matrix<real_t>;
     const auto input_ptrs = in.data_array<void *>();
@@ -314,8 +315,8 @@ template <typename real_t> struct HYPLevel1 {
  * @param[in] lat Extended lattice metadata.
  */
 template <typename real_t> struct HYPLevel2 {
-  void operator()(quda::GaugeField *const *out, quda::GaugeField *const *in, const quda::GaugeField &thin,
-                  double alpha, const lattice_t &lat)
+  void operator()(quda::GaugeField *const *out, quda::GaugeField *const *in, const quda::GaugeField &thin, double alpha,
+                  const lattice_t &lat)
   {
     using link = matrix<real_t>;
     std::array<std::array<const link *, 4>, 4> input;
@@ -349,8 +350,8 @@ template <typename real_t> struct HYPLevel2 {
             while (sigma == mu || sigma == nu || sigma == rho) sigma++;
             staple_sum += mixed_staple(input[sigma].data(), input[sigma].data(), i, mu, rho, lat);
           }
-          auto test_u = (static_cast<real_t>(1.0) - alpha_) * identity
-            + static_cast<real_t>(alpha_ / 4) * staple_sum * conj(u);
+          auto test_u
+            = (static_cast<real_t>(1.0) - alpha_) * identity + static_cast<real_t>(alpha_ / 4) * staple_sum * conj(u);
           polar_su3(test_u, tolerance);
           output[nu][mu][i] = test_u * u;
         }
@@ -424,8 +425,8 @@ template <typename real_t> struct HYPFinal {
  * @param[in] smear_param HYP parameters.
  * @param[in] lat Extended lattice metadata.
  */
-void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
-               const quda::lat_dim_t &R, const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
+void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param, const quda::lat_dim_t &R,
+               const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
 {
   quda::GaugeFieldParam field_param(out);
   field_param.location = QUDA_CPU_FIELD_LOCATION;
@@ -451,10 +452,12 @@ void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam
     std::array<quda::GaugeField *, 4> level2_ex {};
     for (int slot = 0; slot < 4; slot++)
       level2_ex[slot] = quda::createExtendedGauge(level2[slot]->data_array().data, gauge_param, R);
-    instantiate_host<HYPFinal>(in.Precision(), out, level2_ex.data(), in, smear_param.alpha1, smear_param.dir_ignore, lat);
+    instantiate_host<HYPFinal>(in.Precision(), out, level2_ex.data(), in, smear_param.alpha1, smear_param.dir_ignore,
+                               lat);
     for (auto field : level2_ex) delete field;
   } else {
-    instantiate_host<HYPFinal>(in.Precision(), out, level1_ex.data(), in, smear_param.alpha2, smear_param.dir_ignore, lat);
+    instantiate_host<HYPFinal>(in.Precision(), out, level1_ex.data(), in, smear_param.alpha2, smear_param.dir_ignore,
+                               lat);
   }
   for (auto field : level1_ex) delete field;
 }
@@ -621,12 +624,12 @@ template <typename real_t> struct WFlowRK3 {
     field_param.create = QUDA_NULL_FIELD_CREATE;
     quda::GaugeField stage_two(field_param);
 
-    WFlowW1<real_t>{}(out, in, temp, epsilon, anisotropy, type, lat);
+    WFlowW1<real_t> {}(out, in, temp, epsilon, anisotropy, type, lat);
     auto stage_one_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowW2<real_t>{}(stage_two, *stage_one_ex, temp, epsilon, anisotropy, type, lat);
+    WFlowW2<real_t> {}(stage_two, *stage_one_ex, temp, epsilon, anisotropy, type, lat);
     delete stage_one_ex;
     auto stage_two_ex = quda::createExtendedGauge(stage_two.data_array().data, gauge_param, R);
-    WFlowVt<real_t>{}(out, *stage_two_ex, temp, epsilon, anisotropy, type, lat);
+    WFlowVt<real_t> {}(out, *stage_two_ex, temp, epsilon, anisotropy, type, lat);
     delete stage_two_ex;
   }
 };
@@ -668,26 +671,26 @@ template <typename real_t> struct WFlowRK4 {
     field_param.create = QUDA_NULL_FIELD_CREATE;
     quda::GaugeField stage(field_param);
 
-    WFlowRK4Step<real_t>{}(out, in, temp, epsilon, anisotropy, type, lat, stages[0].coeff_a, stages[0].coeff_b,
+    WFlowRK4Step<real_t> {}(out, in, temp, epsilon, anisotropy, type, lat, stages[0].coeff_a, stages[0].coeff_b,
                             stages[0].get_stored, stages[0].do_store);
     auto out_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t>{}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[1].coeff_a, stages[1].coeff_b,
+    WFlowRK4Step<real_t> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[1].coeff_a, stages[1].coeff_b,
                             stages[1].get_stored, stages[1].do_store);
     delete out_ex;
     auto stage_ex = quda::createExtendedGauge(stage.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t>{}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[2].coeff_a, stages[2].coeff_b,
+    WFlowRK4Step<real_t> {}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[2].coeff_a, stages[2].coeff_b,
                             stages[2].get_stored, stages[2].do_store);
     delete stage_ex;
     out_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t>{}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[3].coeff_a, stages[3].coeff_b,
+    WFlowRK4Step<real_t> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[3].coeff_a, stages[3].coeff_b,
                             stages[3].get_stored, stages[3].do_store);
     delete out_ex;
     stage_ex = quda::createExtendedGauge(stage.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t>{}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[4].coeff_a, stages[4].coeff_b,
+    WFlowRK4Step<real_t> {}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[4].coeff_a, stages[4].coeff_b,
                             stages[4].get_stored, stages[4].do_store);
     delete stage_ex;
     out_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t>{}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[5].coeff_a, stages[5].coeff_b,
+    WFlowRK4Step<real_t> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[5].coeff_a, stages[5].coeff_b,
                             stages[5].get_stored, stages[5].do_store);
     delete out_ex;
     out.copy(stage);
@@ -728,9 +731,9 @@ void wflow_smear_rk4(quda::GaugeField &out, const quda::GaugeField &in, QudaGaug
 
 void gauge_smear_reference(quda::GaugeField &out, const quda::GaugeField &in, const QudaGaugeSmearParam &smear_param)
 {
-  if (smear_param.n_steps != 1) errorQuda("Host gauge-smear reference supports one step, received %u", smear_param.n_steps);
-  if ((smear_param.smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW
-       || smear_param.smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW)
+  if (smear_param.n_steps != 1)
+    errorQuda("Host gauge-smear reference supports one step, received %u", smear_param.n_steps);
+  if ((smear_param.smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_param.smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW)
       && smear_param.rk_order != 3 && smear_param.rk_order != 4)
     errorQuda("Host flow reference supports third- and fourth-order RK, received order %d", smear_param.rk_order);
 
@@ -757,19 +760,17 @@ void gauge_smear_reference(quda::GaugeField &out, const quda::GaugeField &in, co
   switch (reference_param.smear_type) {
   case QUDA_GAUGE_SMEAR_APE:
     instantiate_host<APESmear>(in.Precision(), out, *input_ex, reference_param.alpha, reference_param.dir_ignore,
-                                reference_param.smear_anisotropy, lat);
+                               reference_param.smear_anisotropy, lat);
     break;
   case QUDA_GAUGE_SMEAR_STOUT:
     instantiate_host<StoutSmear>(in.Precision(), out, *input_ex, reference_param.rho, reference_param.epsilon,
-                                  reference_param.dir_ignore, reference_param.smear_anisotropy, false, lat);
+                                 reference_param.dir_ignore, reference_param.smear_anisotropy, false, lat);
     break;
   case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
     instantiate_host<StoutSmear>(in.Precision(), out, *input_ex, reference_param.rho, reference_param.epsilon,
-                                  reference_param.dir_ignore, reference_param.smear_anisotropy, true, lat);
+                                 reference_param.dir_ignore, reference_param.smear_anisotropy, true, lat);
     break;
-  case QUDA_GAUGE_SMEAR_HYP:
-    hyp_smear(out, *input_ex, gauge_param, R, reference_param, lat);
-    break;
+  case QUDA_GAUGE_SMEAR_HYP: hyp_smear(out, *input_ex, gauge_param, R, reference_param, lat); break;
   case QUDA_GAUGE_SMEAR_WILSON_FLOW:
   case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
     if (reference_param.rk_order == 4)

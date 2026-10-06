@@ -309,8 +309,7 @@ namespace quda {
   {
     QudaPrecision precision = checkPrecision(T.Vectors(), X, Y);
     QudaFieldLocation location = checkLocation(Y, X);
-    if (location == QUDA_CPU_FIELD_LOCATION
-        && (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
+    if (location == QUDA_CPU_FIELD_LOCATION && (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
       errorQuda("CPU KD coarsening is not supported");
 
     // sanity check long link coarsening

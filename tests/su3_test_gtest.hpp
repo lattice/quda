@@ -72,7 +72,7 @@ double field_strength_tensor_test(QudaPrecision precision, QudaReconstructType r
 EnergyTopologicalChargeComparison energy_topological_charge_test(QudaPrecision precision,
                                                                  QudaReconstructType reconstruct);
 TopologicalChargeDensityComparison topological_charge_density_test(QudaPrecision precision,
-                                                                    QudaReconstructType reconstruct);
+                                                                   QudaReconstructType reconstruct);
 GaugeSmearObservableComparison run_gauge_smear_observable_test(QudaPrecision precision, QudaReconstructType reconstruct,
                                                                QudaGaugeSmearType type, bool su_project);
 
@@ -169,8 +169,7 @@ TEST_P(GaugeObservableTest, FieldStrengthTensor)
   if (!verify_results) GTEST_SKIP() << "CPU reference verification disabled";
   const auto deviation = field_strength_tensor_test(precision, reconstruct);
   EXPECT_FALSE(std::isnan(deviation)) << "Host and QUDA field-strength tensor deviation is NaN";
-  EXPECT_LE(deviation, getTolerance(precision))
-    << "Host and QUDA field-strength tensors do not agree";
+  EXPECT_LE(deviation, getTolerance(precision)) << "Host and QUDA field-strength tensors do not agree";
 }
 
 TEST_P(GaugeObservableTest, EnergyAndTopologicalCharge)
@@ -275,8 +274,10 @@ TEST_P(GaugeSmearObservableTest, FiveStep)
     EXPECT_LE(comparison.energy_difference[i], comparison.energy_tolerance[i])
       << "Host and QUDA five-step field-energy component " << i << " do not agree";
   }
-  EXPECT_FALSE(std::isnan(comparison.qcharge_difference)) << "Host and QUDA five-step topological charge difference is NaN";
-  EXPECT_FALSE(std::isnan(comparison.qcharge_tolerance)) << "Host and QUDA five-step topological charge tolerance is NaN";
+  EXPECT_FALSE(std::isnan(comparison.qcharge_difference))
+    << "Host and QUDA five-step topological charge difference is NaN";
+  EXPECT_FALSE(std::isnan(comparison.qcharge_tolerance))
+    << "Host and QUDA five-step topological charge tolerance is NaN";
   EXPECT_LE(comparison.qcharge_difference, comparison.qcharge_tolerance)
     << "Host and QUDA five-step topological charge do not agree";
 }

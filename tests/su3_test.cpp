@@ -338,7 +338,7 @@ std::vector<double> copy_density_to_double(const void *density, size_t length, Q
 }
 
 TopologicalChargeDensityComparison topological_charge_density_test(QudaPrecision precision,
-                                                                    QudaReconstructType reconstruct)
+                                                                   QudaReconstructType reconstruct)
 {
   Su3Fields fields(shared_test_input(), precision, reconstruct);
   FieldStrengthFields fmunu(fields);
@@ -382,8 +382,7 @@ TopologicalChargeDensityComparison topological_charge_density_test(QudaPrecision
   set_comparison(comparison.direct_field, direct_field.max_deviation, 1.0);
   set_comparison(comparison.observable_field, public_field.max_deviation, 1.0);
   for (int i = 0; i < 3; i++) {
-    set_comparison(comparison.direct_energy[i], std::abs(energy[i] - reference.energy[i]),
-                   std::abs(reference.energy[i]));
+    set_comparison(comparison.direct_energy[i], std::abs(energy[i] - reference.energy[i]), std::abs(reference.energy[i]));
     set_comparison(comparison.observable_energy[i], std::abs(observable.energy[i] - reference.energy[i]),
                    std::abs(reference.energy[i]));
   }

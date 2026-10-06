@@ -147,7 +147,7 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
 
     if (temporal_ranks > 1) {
       std::array<std::vector<matrix<double>>, 2> buffer {std::vector<matrix<double>>(spatial_volume),
-                                                        std::vector<matrix<double>>(spatial_volume)};
+                                                         std::vector<matrix<double>>(spatial_volume)};
       buffer[0] = local_product;
       const size_t bytes = spatial_volume * sizeof(matrix<double>);
       std::array<quda::MsgHandle *, 2> receive;

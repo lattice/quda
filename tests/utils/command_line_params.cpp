@@ -569,8 +569,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
   quda_app
     ->add_option(
-      "--gauge-input", gauge_input,
-      "Gauge field input mode: haar, unit, gaussian-su3, or load (default: legacy --unit-gauge / --load-gauge selection)")
+      "--gauge-input",
+      gauge_input, "Gauge field input mode: haar, unit, gaussian-su3, or load (default: legacy --unit-gauge / --load-gauge selection)")
     ->check(CLI::IsMember({"haar", "unit", "gaussian-su3", "load"}));
   quda_app
     ->add_option(

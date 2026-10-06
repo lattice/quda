@@ -48,8 +48,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
 
 #pragma unroll
-      for (int dr = 0; dr < 4; ++dr)
-        x[dr] += arg.border[dr];
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
 
       complex<double> local = {};
 #pragma unroll

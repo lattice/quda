@@ -616,8 +616,7 @@ namespace quda
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
-      for (int dr = 0; dr < 4; ++dr)
-        x[dr] += arg.border[dr];
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
       int e_cb = linkIndex(x, arg.E);
 
       Link staple = {};
