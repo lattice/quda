@@ -1625,6 +1625,27 @@ namespace quda {
     }
   }
 
+  // Copy n complexes from native device storage into an IEEE host buffer.
+  // Single precision is a plain device-to-host copy. Double precision converts
+  // fp32mp2 to IEEE complex<double> when float-float is enabled.
+  static void copyInternalComplexToHost(QudaPrecision precision, void *dst, const void *src, size_t n_complex)
+  {
+    if (!dst || !src) errorQuda("copyInternalComplexToHost called with a null pointer");
+    const size_t bytes = n_complex * 2 * static_cast<size_t>(precision);
+
+#if defined(QUDA_FPMP_FLOATFLOAT)
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      std::vector<floatfloat2> tmp(n_complex);
+      qudaMemcpy(tmp.data(), src, bytes, qudaMemcpyDeviceToHost);
+      auto *out = static_cast<complex<double> *>(dst);
+      for (size_t i = 0; i < n_complex; i++)
+        out[i] = complex<double>(static_cast<double>(tmp[i].x), static_cast<double>(tmp[i].y));
+      return;
+    }
+#endif
+    qudaMemcpy(dst, src, bytes, qudaMemcpyDeviceToHost);
+  }
+
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
     real_t kappa = inv_param->kappa;

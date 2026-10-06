@@ -37,13 +37,6 @@ namespace quda
   void contractField(const ColorSpinorField &x, const ColorSpinorField &y, void *result, QudaContractType cType);
 
   /**
-     @brief Copy n complexes from native field storage to an IEEE host buffer.
-     Single precision is a device-to-host copy. Double precision converts
-     fp32mp2 to IEEE complex<double> when QUDA_FPMP_FLOATFLOAT is enabled.
-   */
-  void copyInternalComplexToHost(QudaPrecision precision, void *dst, const void *src, size_t n_complex);
-
-  /**
      @brief Contract the quark field x against the 3-d Laplace eigenvector
      set y.  At present, this expects a spin-4 fermion field, and the
      Laplace eigenvector is a spin-1 field.
