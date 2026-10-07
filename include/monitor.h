@@ -7,6 +7,14 @@ namespace quda
   {
 
     /**
+       @brief Return if monitoring is enabled.  Default is disabled,
+       and can be enabled setting the environment variable
+       QUDA_ENABLE_MONITOR=1.
+       @return True if monitoring is enabled, false otherwise.
+    */
+    bool is_enabled();
+
+    /**
        @brief Initialize device monitoring if supported.  On CUDA this
        uses NVML-based monitoring.
     */

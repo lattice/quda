@@ -5,6 +5,9 @@
 #include <quda_cuda_api.h>
 #include <nvml.h>
 #include <algorithm>
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
 #include "monitor.h"
 
 static cudaDeviceProp deviceProp;
@@ -36,6 +39,16 @@ namespace quda
 
     static nvmlDevice_t monitor_device_id;
 
+    static bool nvml_initialized = false;
+
+#if !defined(_WIN32)
+    static void *nvml_handle = nullptr;
+    using nvmlDeviceGetTemperature_t = nvmlReturn_t (*)(nvmlDevice_t, nvmlTemperatureSensors_t, unsigned int *);
+#if defined(nvmlTemperature_v1)
+    using nvmlDeviceGetTemperatureV_t = nvmlReturn_t (*)(nvmlDevice_t, nvmlTemperature_t *);
+#endif
+#endif
+
     int get_driver_version()
     {
       int driver_version;
@@ -50,6 +63,136 @@ namespace quda
       return runtime_version;
     }
 
+    int get_nvml_driver_version()
+    {
+      static int nvml_driver_major_version = []() {
+        constexpr int length = 80;
+        char graphics_version[length];
+        NVML_CHECK(nvmlSystemGetDriverVersion(graphics_version, length));
+        logQuda(QUDA_DEBUG_VERBOSE, "NVML-Reported driver version = %s\n", graphics_version);
+        return static_cast<int>(strtol(graphics_version, nullptr, 10));
+      }();
+      return nvml_driver_major_version;
+    }
+
+    void init_nvml_library()
+    {
+#if !defined(_WIN32)
+      nvml_handle = dlopen("libnvidia-ml.so", RTLD_NOW);
+      if (nvml_handle != nullptr) {
+        logQuda(QUDA_DEBUG_VERBOSE, "Successfully opened libnvidia-ml.so\n");
+      } else {
+        (void)dlerror();
+        nvml_handle = dlopen("libnvidia-ml.so.1", RTLD_NOW);
+        if (nvml_handle != nullptr) {
+          logQuda(QUDA_DEBUG_VERBOSE, "Successfully opened libnvidia-ml.so.1\n");
+        } else {
+          warningQuda("Failed to open libnvidia-ml.so or libnvidia-ml.so.1: %s", dlerror());
+        }
+      }
+      (void)dlerror();
+#endif
+    }
+
+    void destroy_nvml_library()
+    {
+#if !defined(_WIN32)
+      if (nvml_handle != nullptr) {
+        dlclose(nvml_handle);
+        nvml_handle = nullptr;
+        (void)dlerror();
+      }
+#endif
+    }
+
+#if !defined(_WIN32)
+    namespace impl
+    {
+
+      auto get_temperature_orig()
+      {
+        unsigned int temp = 0;
+        if (nvml_handle != nullptr) {
+          static auto func_temperature = [&]() -> nvmlDeviceGetTemperature_t {
+            logQuda(QUDA_DEBUG_VERBOSE, "We are trying to load symbol 'nvmlDeviceGetTemperature'\n");
+            nvmlDeviceGetTemperature_t func_temperature = nullptr;
+            *(void **)(&func_temperature) = dlsym(nvml_handle, "nvmlDeviceGetTemperature");
+            if (func_temperature == nullptr)
+              warningQuda("Could not load symbol 'nvmlDeviceGetTemperature': %s; temperature reporting will return 0",
+                          dlerror());
+            else
+              logQuda(QUDA_DEBUG_VERBOSE, "Successfully loaded symbol 'nvmlDeviceGetTemperature'\n");
+            return func_temperature;
+          }();
+
+          if (func_temperature != nullptr) NVML_CHECK(func_temperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
+        }
+        return temp;
+      }
+
+      auto get_temperature_v()
+      {
+        if (get_nvml_driver_version() < 580) {
+          static bool legacy_path_printed = false;
+          if (!legacy_path_printed) {
+            logQuda(QUDA_DEBUG_VERBOSE,
+                    "Since the NVML driver version < 580, we are taking the nvmlDeviceGetTemperature path\n");
+            legacy_path_printed = true;
+          }
+          return get_temperature_orig();
+        }
+
+        static bool versioned_path_printed = false;
+        if (!versioned_path_printed) {
+          logQuda(
+            QUDA_DEBUG_VERBOSE,
+            "Since the NVML driver version >= 580, we are attempting to take the nvmlDeviceGetTemperatureV path\n");
+          versioned_path_printed = true;
+        }
+
+#if defined(nvmlTemperature_v1)
+        static auto func_temperature_v = [&]() -> nvmlDeviceGetTemperatureV_t {
+          logQuda(QUDA_DEBUG_VERBOSE,
+                  "'nvmlTemperature_v1' was defined at compile time, so we are attempting to load the symbol "
+                  "'nvmlDeviceGetTemperatureV'\n");
+          nvmlDeviceGetTemperatureV_t func_temperature_v = nullptr;
+          *(void **)(&func_temperature_v) = dlsym(nvml_handle, "nvmlDeviceGetTemperatureV");
+          if (func_temperature_v == nullptr) {
+            logQuda(QUDA_DEBUG_VERBOSE,
+                    "We cannot load the symbol 'nvmlDeviceGetTemperatureV' from the driver library with error '%s'\n",
+                    dlerror());
+            logQuda(QUDA_DEBUG_VERBOSE, "We are now falling back to the nvmlDeviceGetTemperature path.\n");
+          } else {
+            logQuda(QUDA_DEBUG_VERBOSE,
+                    "We successfully loaded the symbol 'nvmlDeviceGetTemperatureV' from the driver library.\n");
+            (void)dlerror();
+          }
+          return func_temperature_v;
+        }();
+
+        if (func_temperature_v == nullptr) return get_temperature_orig();
+
+        nvmlTemperature_t temperature;
+        temperature.version = nvmlTemperature_v1;
+        temperature.sensorType = NVML_TEMPERATURE_GPU;
+        if (nvml_handle != nullptr) NVML_CHECK(func_temperature_v(monitor_device_id, &temperature));
+        return static_cast<unsigned int>(temperature.temperature);
+#else
+        static bool fallback_printed = false;
+        if (!fallback_printed) {
+          logQuda(QUDA_DEBUG_VERBOSE,
+                  "'nvmlTemperature_v1' was not defined at compile time so we cannot use the "
+                  "nvmlDeviceGetTemperatureV path.\n");
+          logQuda(QUDA_DEBUG_VERBOSE, "We are now falling back to the nvmlDeviceGetTemperature path.\n");
+          fallback_printed = true;
+        }
+        return get_temperature_orig();
+#endif
+      }
+
+    } // namespace impl
+#endif
+
     void init(int dev)
     {
       if (initialized) return;
@@ -63,10 +206,9 @@ namespace quda
 #endif
 
       NVML_CHECK(nvmlInit());
-      const int length = 80;
-      char graphics_version[length];
-      NVML_CHECK(nvmlSystemGetDriverVersion(graphics_version, length));
-      printfQuda("Graphic driver version = %s\n", graphics_version);
+      nvml_initialized = true;
+      printfQuda("NVML-Reported driver major version = %d\n", get_nvml_driver_version());
+      init_nvml_library();
 
       for (int i = 0; i < get_device_count(); i++) {
         CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
@@ -133,7 +275,8 @@ namespace quda
       char name[NVML_DEVICE_NAME_BUFFER_SIZE];
       NVML_CHECK(nvmlDeviceGetName(monitor_device_id, name, NVML_DEVICE_NAME_BUFFER_SIZE));
 
-      printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
+      if (monitor::is_enabled())
+        printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
       monitor::init();
     }
 
@@ -160,17 +303,25 @@ namespace quda
 
     auto get_temperature()
     {
-      unsigned int temp = 0;
-#if defined(nvmlTemperature_v1)
-      nvmlTemperature_t temperature;
-      temperature.version = nvmlTemperature_v1;
-      temperature.sensorType = NVML_TEMPERATURE_GPU;
-      NVML_CHECK(nvmlDeviceGetTemperatureV(monitor_device_id, &temperature));
-      temp = static_cast<unsigned int>(temperature.temperature);
+#if defined(_WIN32)
+      static bool unsupported_windows_printed = false;
+      if (!unsupported_windows_printed) {
+        warningQuda("We cannot query the temperature on Windows with the current implementation, returning 0.\n");
+        unsupported_windows_printed = true;
+      }
+      return 0u;
 #else
-      NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
+      if (nvml_handle == nullptr) {
+        static bool missing_nvml_printed = false;
+        if (!missing_nvml_printed) {
+          warningQuda("We could not dynamically load NVML, so we cannot query the temperature, returning 0.\n");
+          missing_nvml_printed = true;
+        }
+        return 0u;
+      } else {
+        return impl::get_temperature_v();
+      }
 #endif
-      return temp;
     }
 
     state_t get_state()
@@ -300,7 +451,11 @@ namespace quda
 
       monitor::destroy();
 
-      NVML_CHECK(nvmlShutdown());
+      destroy_nvml_library();
+      if (nvml_initialized) {
+        NVML_CHECK(nvmlShutdown());
+        nvml_initialized = false;
+      }
 
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
       if (device_reset_env && strcmp(device_reset_env, "1") == 0) {
