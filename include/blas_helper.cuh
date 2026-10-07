@@ -343,7 +343,7 @@ namespace quda
           }
         } else if constexpr (blas_prefetch_type() == PrefetchType::BULK) {
           if (!target::is_thread_zero()) return;
-          const unsigned bx = blockDim.x;
+          const unsigned bx = target::block_dim().x;
 
           if constexpr (!(n == 3 && isHalf<store_t>::value)) {
             if constexpr (isFixed<store_t>::value)

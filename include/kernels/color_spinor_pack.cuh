@@ -319,6 +319,7 @@ namespace quda {
       const int spin_block = (spin_color_block / (Arg::nColor / Mc)) * Ms;
       const int color_block = (spin_color_block % (Arg::nColor / Mc)) * Mc;
 
+      if (allthreads && !alive) tid = 0; // use a valid face for inactive threads
       int ghost_idx;
       const int dim = dimFromFaceIndex<Arg>(ghost_idx, tid, arg);
       const int dir = dirFromFaceIndex(dim, ghost_idx, arg);

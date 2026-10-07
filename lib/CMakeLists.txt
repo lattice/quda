@@ -499,6 +499,9 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "OMPTARGET")
+	include(targets/omptarget/target_omptarget.cmake)
+endif()
 
 # order variables will be set in the target file
 set(VALID_ORDER_DOUBLE_VALUES "0" "2" "4")

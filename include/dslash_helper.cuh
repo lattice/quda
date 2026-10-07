@@ -15,7 +15,12 @@
 #include <kernel_ops.h>
 #include <tma_helper.hpp>
 
+#ifdef QUDA_TARGET_OMPTARGET
+#include <constant_kernel_arg.h>
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::FALSE;
+#else
 constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
+#endif
 
 #include <kernel.h>
 

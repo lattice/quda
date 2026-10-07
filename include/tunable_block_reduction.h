@@ -154,9 +154,9 @@ namespace quda
     {
       dim3 block = param.block;
       dim3 grid = param.grid;
-      bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
       param.block.z = block.z;
       param.grid.z = grid.z;
+      bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
 
       if (ret) {
         return true;
