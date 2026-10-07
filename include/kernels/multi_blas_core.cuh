@@ -26,11 +26,7 @@ namespace quda
      */
     constexpr unsigned int multi_blas_unroll(int NXZ) { return NXZ > 1 ? 1 : QUDA_BLAS_UNROLL_STREAMING; }
 
-#ifndef QUDA_FAST_COMPILE_REDUCE
-    constexpr bool enable_warp_split() { return false; }
-#else
     constexpr bool enable_warp_split() { return true; }
-#endif
 
     /**
        @brief Parameter struct for generic multi-blas kernel.

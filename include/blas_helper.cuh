@@ -55,20 +55,20 @@ namespace quda
   }
 
 #ifdef QUAD_SUM
-  __host__ __device__ inline double set(doubledouble &a) { return a.head(); }
-  __host__ __device__ inline double2 set(doubledouble2 &a) { return {a.x.head(), a.y.head()}; }
-  __host__ __device__ inline double3 set(doubledouble3 &a) { return {a.x.head(), a.y.head(), a.z.head()}; }
-  __host__ __device__ inline void sum(double &a, doubledouble &b) { a += b.head(); }
+  __host__ __device__ inline double set(doubledouble &a) { return a.hi(); }
+  __host__ __device__ inline double2 set(doubledouble2 &a) { return {a.x.hi(), a.y.hi()}; }
+  __host__ __device__ inline double3 set(doubledouble3 &a) { return {a.x.hi(), a.y.hi(), a.z.hi()}; }
+  __host__ __device__ inline void sum(double &a, doubledouble &b) { a += b.hi(); }
   __host__ __device__ inline void sum(double2 &a, doubledouble2 &b)
   {
-    a.x += b.x.head();
-    a.y += b.y.head();
+    a.x += b.x.hi();
+    a.y += b.y.hi();
   }
   __host__ __device__ inline void sum(double3 &a, doubledouble3 &b)
   {
-    a.x += b.x.head();
-    a.y += b.y.head();
-    a.z += b.z.head();
+    a.x += b.x.hi();
+    a.y += b.y.hi();
+    a.z += b.z.hi();
   }
 #endif
 
@@ -389,12 +389,12 @@ namespace quda
         array<real, len> v_;
 #pragma unroll
         for (int i = 0; i < n; i++) {
-          v_[2 * i + 0] = v[i].real();
-          v_[2 * i + 1] = v[i].imag();
+          v_[2 * i + 0] = store_cast<real>(v[i].real());
+          v_[2 * i + 1] = store_cast<real>(v[i].imag());
         }
 
         if constexpr (!(n == 3 && isHalf<store_t>::value)) {
-          real scale_inv = 0.0;
+          real scale_inv {};
           if constexpr (isFixed<store_t>::value)
             scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, data.norm[x + parity * data.cb_norm_offset]);
 
@@ -452,6 +452,16 @@ namespace quda
       else
         return colorspinor::get_vector_order<double>(4);
     }
+
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> constexpr int n_vector<floatfloat, true>(int nSpin, int site_unroll)
+    {
+      if (site_unroll)
+        return nSpin == 4 ? colorspinor::get_vector_order<double>(24) : colorspinor::get_vector_order<double>(6);
+      else
+        return colorspinor::get_vector_order<double>(4);
+    }
+#endif
 
     template <> constexpr int n_vector<float, true>(int nSpin, int site_unroll)
     {
@@ -547,10 +557,14 @@ namespace quda
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-        // always instantiate the double-precision template to allow CPU
-        // fields through, and prevent double-precision GPU
-        // instantiation using gpu_mapper
-        instantiate<Functor, Blas, T, x_store_t, double>(a, b, c, x, y, args...);
+        // Native double-precision CUDA fields use floatfloat storage when enabled.
+        // Legacy and CPU field orders retain IEEE-double storage.
+#ifdef QUDA_FPMP_FLOATFLOAT
+        if (y.Location() == QUDA_CUDA_FIELD_LOCATION && y.isNative())
+          instantiate<Functor, Blas, T, x_store_t, floatfloat>(a, b, c, x, y, args...);
+        else
+#endif
+          instantiate<Functor, Blas, T, x_store_t, double>(a, b, c, x, y, args...);
 
       } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
@@ -585,10 +599,14 @@ namespace quda
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-        // always instantiate the double-precision template to allow CPU
-        // fields through, and prevent double-precision GPU
-        // instantiation using double_mapper
-        instantiate<Functor, Blas, mixed, T, double>(a, b, c, x_, args...);
+        // Native double-precision CUDA fields use floatfloat storage when enabled.
+        // Legacy and CPU field orders retain IEEE-double storage.
+#ifdef QUDA_FPMP_FLOATFLOAT
+        if (x.Location() == QUDA_CUDA_FIELD_LOCATION && x.isNative())
+          instantiate<Functor, Blas, mixed, T, floatfloat>(a, b, c, x_, args...);
+        else
+#endif
+          instantiate<Functor, Blas, mixed, T, double>(a, b, c, x_, args...);
       } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
           instantiate<Functor, Blas, mixed, T, float>(a, b, c, x_, args...);
@@ -640,6 +658,11 @@ namespace quda
       instantiated to reduce template bloat.
      */
     template <typename T> struct host_type_mapper { using type = T; };
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> struct host_type_mapper<floatfloat> {
+      using type = double;
+    };
+#endif
     template <> struct host_type_mapper<short> {
 #if QUDA_PRECISION & 4
       using type = float;

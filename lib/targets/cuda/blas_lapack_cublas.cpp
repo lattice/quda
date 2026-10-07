@@ -103,7 +103,7 @@ namespace quda
                                                       static_cast<std::complex<double> *>(A_d));
           if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
         } else {
-          errorQuda("%s not implemented for precision=%d", __func__, prec);
+          errorQuda("Not implemented for precision=%d", prec);
         }
 #endif
 
@@ -227,7 +227,7 @@ namespace quda
           pool_host_pinned_free(A_h);
 #endif
         } else {
-          errorQuda("%s not implemented for precision=%d", __func__, prec);
+          errorQuda("Not implemented for precision=%d", prec);
         }
 
         if (location == QUDA_CPU_FIELD_LOCATION) {

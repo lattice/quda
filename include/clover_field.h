@@ -4,6 +4,7 @@
 #include <lattice_field.h>
 #include <comm_key.h>
 #include <array.h>
+#include <register_traits.h>
 
 namespace quda {
 
@@ -52,17 +53,21 @@ namespace quda {
     /**
        @brief Precision mapper that is used for the Cholesky
        factorization when inverting the clover matrices.  If
-       CLOVER_PROMOTE_CHOLESKY is set, then we always use double
-       precision, else we use the same precision as the type.  For
-       fixed-point types we always use single precision regardless.
+       CLOVER_PROMOTE_CHOLESKY is set, double and float both use
+       promote_mapper<double>: IEEE double when fp32mp2 is off, and
+       the build's floatfloat (at least floatfloat_mid) when it is
+       on.  Otherwise each type uses promote_mapper<T>, so float stays
+       float and double is IEEE double with fp32mp2 off, or floatfloat
+       with a floor of floatfloat_mid with it on.  Fixed-point types
+       always use single precision.
     */
 #ifdef CLOVER_PROMOTE_CHOLESKY
     template <typename T> struct cholesky_mapper {
-      using type = double;
+      using type = typename promote_mapper<double>::type;
     };
 #else
     template <typename T> struct cholesky_mapper {
-      using type = T;
+      using type = typename promote_mapper<T>::type;
     };
 #endif
     template <> struct cholesky_mapper<short> {
@@ -89,6 +94,9 @@ namespace quda {
 
     template <typename T> constexpr int get_vector_order();
     template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> constexpr int get_vector_order<floatfloat>() { return QUDA_ORDER_DOUBLE; }
+#endif
     template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
     template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF <= 8 ? QUDA_ORDER_HALF : 8; }
     template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER <= 8 ? QUDA_ORDER_QUARTER : 8; }

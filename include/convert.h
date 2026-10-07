@@ -13,6 +13,8 @@
 #include <register_traits.h>
 #include <math_helper.h>
 #include <constexpr_for.h>
+#include <complex_quda.h>
+#include <aos.h>
 
 namespace quda
 {
@@ -177,7 +179,7 @@ namespace quda
   template <typename T1, typename T2>
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
-    a = b;
+    a = static_cast<T1>(b);
   }
 
   template <typename T1, typename T2>
@@ -195,7 +197,7 @@ namespace quda
   template <typename T1, typename T2, int n>
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
-    for (int i = 0; i < n; i++) a[i] = b[i];
+    for (int i = 0; i < n; i++) a[i] = static_cast<T1>(b[i]);
   }
 
   template <typename T1, typename T2, int n>
@@ -220,6 +222,28 @@ namespace quda
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
     });
+  }
+
+  /**
+     @brief Convert a register value for field storage.
+     If the source is fp32mp2_low, renormalize the pair first so
+     memory holds a normalized (hi, lo).  MID/HIGH sources are already
+     renormalized by arithmetic, so they are converted only.
+     @tparam Dst Destination/storage scalar type
+     @tparam Src Source/register scalar type
+     @param[in] s Register value
+     @return Value converted for storage
+   */
+  template <typename Dst, typename Src> __host__ __device__ inline Dst store_cast(const Src &s)
+  {
+#if defined(QUDA_FPMP_FLOATFLOAT)
+    if constexpr (std::is_same_v<Src, floatfloat_low>) {
+      return static_cast<Dst>(cuda::experimental::renormalize(s));
+    } else
+#endif
+    {
+      return static_cast<Dst>(s);
+    }
   }
 
   /**
@@ -281,7 +305,7 @@ namespace quda
   {
     static_assert(n % 2 == 0);
     constexpr_for<0, n, 2>([&](auto i) {
-      auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, c);
+      auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, static_cast<float>(c));
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
     });
@@ -300,6 +324,48 @@ namespace quda
 #else
     return static_cast<fixed_t>(rint(f));
 #endif
+  }
+
+  /**
+     @brief Load a contiguous site of complex values from a non-native
+     field order, converting from the storage type to the register type.
+     When the types coincide this is a direct vectorized copy.
+  */
+  template <int len, typename real, typename Float>
+  __device__ __host__ inline void load_convert(complex<real> v[len], const Float *in)
+  {
+    if constexpr (std::is_same_v<real, Float>) {
+      block_load<complex<real>, len>(v, reinterpret_cast<const complex<real> *>(in));
+    } else {
+      complex<Float> tmp[len];
+      block_load<complex<Float>, len>(tmp, reinterpret_cast<const complex<Float> *>(in));
+#pragma unroll
+      for (int i = 0; i < len; i++)
+        v[i] = {static_cast<real>(tmp[i].real()), static_cast<real>(tmp[i].imag())};
+    }
+  }
+
+  /**
+     @brief Save a contiguous site of complex values to a non-native
+     field order, converting from the register type to the storage type.
+  */
+  template <int len, typename In, typename Float>
+  __device__ __host__ inline void save_convert(Float *out, const quda::complex<In> v[len])
+  {
+#if defined(QUDA_FPMP_FLOATFLOAT)
+    constexpr bool low_src = std::is_same_v<In, floatfloat_low>;
+#else
+    constexpr bool low_src = false;
+#endif
+    if constexpr (std::is_same_v<In, Float> && !low_src) {
+      block_store<quda::complex<In>, len>(reinterpret_cast<quda::complex<In> *>(out), v);
+    } else {
+      complex<Float> tmp[len];
+#pragma unroll
+      for (int i = 0; i < len; i++)
+        tmp[i] = {store_cast<Float>(v[i].real()), store_cast<Float>(v[i].imag())};
+      block_store<complex<Float>, len>(reinterpret_cast<complex<Float> *>(out), tmp);
+    }
   }
 
 #ifdef _NVHPC_CUDA

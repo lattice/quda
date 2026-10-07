@@ -219,4 +219,19 @@ namespace quda
     }
   };
 
+  template <bool dagger, int coarseColor, int nVec> struct CoarseDslashMmaD {
+    template <typename Float, typename yFloat, typename ghostFloat, int Ns, bool dslash, bool clover, DslashType type>
+    using D = DslashCoarseMma<Float, yFloat, ghostFloat, Ns, coarseColor, dslash, clover, dagger, type, nVec>;
+  };
+
+  template <bool dagger, int coarseColor, int nVec, typename Float, typename yFloat, typename ghostFloat>
+  void ApplyCoarseMma_t(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                        cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
+                        int parity, bool dslash, bool clover, DslashType type, MemoryLocation *halo_location,
+                        const ColorSpinorField &halo)
+  {
+    ApplyCoarse<CoarseDslashMmaD<dagger, coarseColor, nVec>::template D, Float, yFloat, ghostFloat, dagger, coarseColor,
+                true, nVec>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, halo);
+  }
+
 } // namespace quda

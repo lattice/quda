@@ -10,7 +10,8 @@
 #include <reduction_kernel.h>
 #include <gauge_path_helper.cuh>
 
-namespace quda {
+namespace quda
+{
 
   /**
     @brief Return the batch block size used for multi reductions.
@@ -25,15 +26,15 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
 
     const Gauge u;
 
     const real factor;                // overall scaling factor for all loops
     static constexpr int nParity = 2; // always true for gauge fields
-    int X[4]; // the regular volume parameters
-    int E[4]; // the extended volume parameters
-    int border[4]; // radius of border
+    int X[4];                         // the regular volume parameters
+    int E[4];                         // the extended volume parameters
+    int border[4];                    // radius of border
 
     const paths<1> p;
 
@@ -45,8 +46,8 @@ namespace quda {
     {
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = u.R()[dir];
-      	E[dir] = u.X()[dir];
-      	X[dir] = u.X()[dir] - border[dir]*2;
+        E[dir] = u.X()[dir];
+        X[dir] = u.X()[dir] - border[dir] * 2;
       }
     }
   };
@@ -65,14 +66,14 @@ namespace quda {
 
       int x[4] = {0, 0, 0, 0};
       getCoords(x, x_cb, arg.X, parity);
-      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
       packed_array<int8_t, 4> dx = {};
 
-      auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
+      auto coeff_loop = arg.factor * static_cast<typename Arg::real>(arg.p.path_coeff[path_id]);
       if (coeff_loop == 0) return value;
 
-      const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;
+      const int *path = arg.p.input_path[0] + path_id * arg.p.max_length;
 
       // compute the path
       Link link_prod = computeGaugePath(arg, x, parity, path, arg.p.length[path_id], dx);
@@ -80,10 +81,10 @@ namespace quda {
       // compute trace
       auto trace = getTrace(link_prod);
 
-      reduce_t loop_trace {};
-      loop_trace[0] = coeff_loop * trace.real();
-      loop_trace[1] = coeff_loop * trace.imag();
+      array<reduction_t, 2> loop_trace {};
+      loop_trace[0] = static_cast<reduction_t>(coeff_loop * trace.real());
+      loop_trace[1] = static_cast<reduction_t>(coeff_loop * trace.imag());
       return operator()(value, loop_trace);
     }
   };
-}
+} // namespace quda

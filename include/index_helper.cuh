@@ -241,6 +241,41 @@ namespace quda {
     constexpr int& operator[](int i) { return x[i]; }
     array_2d<int, 2, nDim> in_boundary = {};
     constexpr int size() const { return nDim; }
+
+    /**
+       @brief Return in_boundary[dir][d].
+       A switch so a compile-time d folds away, and a runtime d is a
+       register select rather than an indexed load that parks Coord in
+       local memory.
+       @param[in] dir Hop direction (0 = backward, 1 = forward)
+       @param[in] d Lattice dimension
+       @return Non-zero if this site is on the boundary in that direction
+    */
+    __host__ __device__ constexpr int in_boundary_at(int dir, int d) const
+    {
+      if (dir == 1) {
+        switch (d) {
+        case 0: return in_boundary[1][0];
+        case 1: return in_boundary[1][1];
+        case 2: return in_boundary[1][2];
+        case 3: return in_boundary[1][3];
+        case 4:
+          if constexpr (nDim > 4) return in_boundary[1][4];
+          break;
+        }
+      } else {
+        switch (d) {
+        case 0: return in_boundary[0][0];
+        case 1: return in_boundary[0][1];
+        case 2: return in_boundary[0][2];
+        case 3: return in_boundary[0][3];
+        case 4:
+          if constexpr (nDim > 4) return in_boundary[0][4];
+          break;
+        }
+      }
+      return 0;
+    }
   };
 
   /**

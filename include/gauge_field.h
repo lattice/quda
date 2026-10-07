@@ -13,6 +13,9 @@ namespace quda {
 
     template <typename T> constexpr int get_vector_order();
     template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+#ifdef QUDA_FPMP_FLOATFLOAT
+    template <> constexpr int get_vector_order<floatfloat>() { return QUDA_ORDER_DOUBLE; }
+#endif
     template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
     template <> constexpr int get_vector_order<int>() { return QUDA_ORDER_SINGLE; }
     template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
@@ -639,14 +642,7 @@ namespace quda {
      * @brief Helper function that returns the default tolerance used by SU(3) projection
      * @return The default tolerance, which is ~10x epsilon
      */
-    double toleranceSU3() const
-    {
-      switch (precision) {
-      case QUDA_DOUBLE_PRECISION: return 2e-15;
-      case QUDA_SINGLE_PRECISION: return 1e-6;
-      default: return 1e-6;
-      }
-    }
+    double toleranceSU3() const { return 10.0 * compute_epsilon(precision); }
 
     /**
        @brief Return the shifted gauge field by shift in each

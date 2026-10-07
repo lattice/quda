@@ -18,8 +18,11 @@ namespace quda
     V v;
     real alpha0;
     int t0;
-    SpinorDistanceReweightArg(ColorSpinorField &v, real alpha0, int t0) :
-      kernel_param(dim3(v.VolumeCB(), v.SiteSubset(), 1)), v(v), alpha0(alpha0), t0(t0)
+    SpinorDistanceReweightArg(ColorSpinorField &v, real_t alpha0, int t0) :
+      kernel_param(dim3(v.VolumeCB(), v.SiteSubset(), 1)),
+      v(v),
+      alpha0(static_cast<real>(alpha0)),
+      t0(t0)
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = v.X()[dir];
       X[0] *= (v.SiteSubset() == 1) ? 2 : 1; // need full lattice dims

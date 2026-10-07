@@ -54,7 +54,7 @@ jobs:
           -DQUDA_MULTIGRID_NVEC_LIST=24
           -DQUDA_MDW_FUSED_LS_LIST=4
           -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON 
-          -DQUDA_PRECISION=14 -DQUDA_FAST_COMPILE_REDUCE=ON
+          -DQUDA_PRECISION=14
           -GNinja
           -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 

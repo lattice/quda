@@ -12,8 +12,14 @@ namespace quda
 {
 
   /**
+     @brief Interior / exterior / fused halo region for coarse dslash.
+     Shared by the host launch policy and the coarse kernels.
+   */
+  enum DslashType { DSLASH_INTERIOR, DSLASH_EXTERIOR, DSLASH_FULL };
+
+  /**
      @brief Constants used by dslash and packing kernels
-  */
+   */
   struct DslashConstant {
     int Vh;
     int_fastdiv X[QUDA_MAX_DIM];

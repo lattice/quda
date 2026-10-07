@@ -10,6 +10,7 @@ namespace quda {
   template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_>
   struct GaugePhaseArg : kernel_param<> {
     using Float = Float_;
+    using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
@@ -18,60 +19,61 @@ namespace quda {
 
     Gauge u;
     int X[4];
-    Float tBoundary;
-    Float i_mu;
-    complex<Float> i_mu_phase;
-    GaugePhaseArg(GaugeField &u) : kernel_param(dim3(u.VolumeCB(), 2, 1)), u(u), i_mu(static_cast<Float>(u.iMu()))
+    real tBoundary;
+    real i_mu;
+    complex<real> i_mu_phase;
+    GaugePhaseArg(GaugeField &u) : kernel_param(dim3(u.VolumeCB(), 2, 1)), u(u), i_mu(static_cast<real>(u.iMu()))
     {
       // if staggered phases are applied, then we are removing them
       // else we are applying them
-      Float dir = u.StaggeredPhaseApplied() ? -1.0 : 1.0;
+      real dir = u.StaggeredPhaseApplied() ? real(-1) : real(1);
 
-      i_mu_phase = complex(cos(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3))),
-                           dir * sin(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3))));
+      i_mu_phase = complex<real>(
+        static_cast<real>(cos(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))),
+        dir * static_cast<real>(sin(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))));
 
       for (int d=0; d<4; d++) X[d] = u.X()[d];
 
       // only set the boundary condition on the last time slice of nodes
       bool last_node_in_t = (commCoords(3) == commDim(3)-1);
-      tBoundary = (Float)(last_node_in_t ? u.TBoundary() : QUDA_PERIODIC_T);
+      tBoundary = static_cast<real>(static_cast<int>(last_node_in_t ? u.TBoundary() : QUDA_PERIODIC_T));
     }
   };
 
   // FIXME need to check this with odd local volumes
   template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, const Arg &arg) {
-    typename Arg::Float phase = 1.0;
+    typename Arg::real phase = typename Arg::real(1);
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
       if (dim==0) {
-	phase = (1.0 - 2.0 * (t % 2) );
+	phase = (1 - 2 * (t % 2) );
       } else if (dim == 1) {
-	phase = (1.0 - 2.0 * ((t + x) % 2) );
+	phase = (1 - 2 * ((t + x) % 2) );
       } else if (dim == 2) {
-	phase = (1.0 - 2.0 * ((t + x + y) % 2) );
+	phase = (1 - 2 * ((t + x + y) % 2) );
       } else if (dim == 3) { // also apply boundary condition
-	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
+	phase = (t == arg.X[3]-1) ? arg.tBoundary : typename Arg::real(1);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim==0) {
-	phase = (1.0 - 2.0 * ((3 + t + z + y) % 2) );
+	phase = (1 - 2 * ((3 + t + z + y) % 2) );
       } else if (dim == 1) {
-	phase = (1.0 - 2.0 * ((2 + t + z) % 2) );
+	phase = (1 - 2 * ((2 + t + z) % 2) );
       } else if (dim == 2) {
-	phase = (1.0 - 2.0 * ((1 + t) % 2) );
+	phase = (1 - 2 * ((1 + t) % 2) );
       } else if (dim == 3) { // also apply boundary condition
-	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
+	phase = (t == arg.X[3]-1) ? arg.tBoundary : typename Arg::real(1);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {
       // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
       if (dim==0) {
 	phase = -1.0;
       } else if (dim == 1) {
-	phase = (1.0 - 2.0 * ((1 + x) % 2) );
+	phase = (1 - 2 * ((1 + x) % 2) );
       } else if (dim == 2) {
-	phase = (1.0 - 2.0 * ((1 + x + y) % 2) );
+	phase = (1 - 2 * ((1 + x + y) % 2) );
       } else if (dim == 3) { // also apply boundary condition
-	phase = ((t == arg.X[3]-1) ? arg.tBoundary : 1.0) *
-	  (1.0 - 2 * ((1 + x + y + z) % 2) );
+	phase = ((t == arg.X[3]-1) ? arg.tBoundary : typename Arg::real(1)) *
+	  (1 - 2 * ((1 + x + y + z) % 2) );
       }
     }
     return phase;
@@ -79,7 +81,7 @@ namespace quda {
 
   template <int dim, typename Arg>
   __device__ __host__ void gaugePhase(int indexCB, int parity, const Arg &arg) {
-    typedef typename mapper<typename Arg::Float>::type real;
+    using real = typename Arg::real;
 
     int x[4];
     getCoords(x, indexCB, arg.X, parity);
@@ -89,7 +91,7 @@ namespace quda {
     u *= phase;
 
     // apply imaginary chemical potential if needed
-    if (dim==3 && arg.i_mu != 0.0) u *= arg.i_mu_phase;
+    if (dim==3 && arg.i_mu != real(0)) u *= arg.i_mu_phase;
 
     arg.u(dim, indexCB, parity) = u;
   }
