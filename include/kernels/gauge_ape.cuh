@@ -8,6 +8,12 @@
 namespace quda
 {
 
+  /**
+  @brief Kernel arguments for APE gauge smearing.
+
+  X stores the regular output-grid dimensions, while E and border describe the extended
+  input gauge field.  staple_scale is precomputed from alpha and apeDim.
+  */
   template <typename store_t, int nColor_, QudaReconstructType recon_, int apeDim_>
   struct GaugeAPEArg : kernel_param<> {
     using real = typename mapper<store_t>::type;
@@ -20,25 +26,29 @@ namespace quda
     Gauge out;
     const Gauge in;
 
-    int X[4]; // grid dimensions
+    int_fastdiv X[4]; // regular grid dims
+    int_fastdiv E[4]; // extended grid dims
     int border[4];
     const real alpha;
+    const real staple_scale;
     const int dir_ignore;
     const real anisotropy;
     const real tolerance;
 
-    GaugeAPEArg(GaugeField &out, const GaugeField &in, real_t alpha, int dir_ignore, real_t anisotropy) :
+    GaugeAPEArg(GaugeField &out, const GaugeField &in, real_t alpha_, int dir_ignore, real_t anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),
-      alpha(static_cast<real>(alpha)),
+      alpha(static_cast<real>(alpha_)),
+      staple_scale(static_cast<real>(alpha_ / (static_cast<real>(2 * (apeDim - 1))))),
       dir_ignore(dir_ignore),
       anisotropy(static_cast<real>(anisotropy)),
       tolerance(in.toleranceSU3())
     {
       for (int dir = 0; dir < 4; ++dir) {
+        E[dir] = in.X()[dir];
         border[dir] = in.R()[dir];
-        X[dir] = in.X()[dir] - border[dir] * 2;
+        X[dir] = E[dir] - 2 * border[dir];
       }
     }
   };
@@ -54,32 +64,29 @@ namespace quda
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
       int x[4];
-      getCoords(x, x_cb, X, parity);
-      for (int dr = 0; dr < 4; ++dr) {
-        x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
-      }
+      getCoords(x, x_cb, arg.X, parity);
+
+#pragma unroll
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
+
       dir = dir + (dir >= arg.dir_ignore);
 
-      int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
+      computeStaple(arg, x, arg.E, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
-      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+      U = arg.in(dir, linkIndex(x, arg.E), parity);
 
-      Stap = Stap * (arg.alpha / ((real)(2 * (Arg::apeDim - 1))));
+      Stap = Stap * arg.staple_scale;
       setIdentity(&I);
 
       TestU = I * (static_cast<real>(1.0) - arg.alpha) + Stap * conj(U);
       polarSu3<real>(TestU, arg.tolerance);
       U = TestU * U;
 
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
+      arg.out(dir, linkIndex(x, arg.E), parity) = U;
     }
   };
 } // namespace quda
