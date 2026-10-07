@@ -34,22 +34,28 @@
  * (in the case of dslash_type being QUDA_LAPLACE_DSLASH)
  */
 template <typename real_t> struct StaggeredDslashReference {
-  void operator()(void *res_, const void *const *fatlink_, const void *const *longlink_,
-                  const void *const *ghostFatlink_, const void *const *ghostLonglink_, const void *spinorField_,
-                  const void *const *fwd_nbr_spinor_, const void *const *back_nbr_spinor_, int oddBit, int daggerBit,
+  void operator()(ColorSpinorField &res_, const GaugeField &fatlink_, const GaugeField &longlink_,
+                  const ColorSpinorField &spinorField_,
+                  int oddBit, int daggerBit,
                   QudaDslashType dslash_type, int laplace3D)
   {
     if (laplace3D < 4 && dslash_type != QUDA_LAPLACE_DSLASH)
       errorQuda("laplace3D = %d only supported for Laplace dslash (%d requested)", laplace3D, dslash_type);
 
-    auto res = reinterpret_cast<real_t *>(res_);
-    auto fatlink = reinterpret_cast<const real_t *const *>(fatlink_);
-    auto longlink = reinterpret_cast<const real_t *const *>(longlink_);
-    auto ghostFatlink = reinterpret_cast<const real_t *const *>(ghostFatlink_);
-    auto ghostLonglink = reinterpret_cast<const real_t *const *>(ghostLonglink_);
-    auto spinorField = reinterpret_cast<const real_t *>(spinorField_);
-    auto fwd_nbr_spinor = reinterpret_cast<const real_t *const *>(fwd_nbr_spinor_);
-    auto back_nbr_spinor = reinterpret_cast<const real_t *const *>(back_nbr_spinor_);
+#define E(x,i,y) static_cast<const real_t *>(x[i]y)
+#define INIT(x,y) {E(x,0,y), E(x,1,y), E(x,2,y), E(x,3,y)}
+    const auto res = res_.data<real_t *>();
+    const auto fatlinkArray = fatlink_.data_array<const real_t *>();
+    const auto fatlink = fatlinkArray.data;
+    const auto longlinkArray = longlink_.data_array<const real_t *>();
+    const auto longlink = longlinkArray.data;
+    const real_t *const ghostFatlink[] = INIT(fatlink_.Ghost(), .data());
+    const real_t *const ghostLonglink[] = INIT(longlink_.Ghost(), .data());
+    const auto spinorField = spinorField_.data<const real_t *>();
+    const real_t *const fwd_nbr_spinor[] = INIT(spinorField_.fwdGhostFaceBuffer, );
+    const real_t *const back_nbr_spinor[] = INIT(spinorField_.backGhostFaceBuffer, );
+#undef INIT
+#undef E
 
 #pragma omp parallel for
     for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
@@ -71,9 +77,8 @@ template <typename real_t> struct StaggeredDslashReference {
       if (is_multi_gpu()) {
         ghostFatlinkEven[dir] = ghostFatlink[dir];
         ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-        ghostLonglinkEven[dir] = ghostLonglink ? ghostLonglink[dir] : nullptr;
-        ghostLonglinkOdd[dir]
-          = ghostLonglink ? ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
+        ghostLonglinkEven[dir] = ghostLonglink[dir];
+        ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size;
       }
     }
 
@@ -149,14 +154,9 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
-  const void *const ghost_fatlink[]
-    = {fat_link.Ghost()[0].data(), fat_link.Ghost()[1].data(), fat_link.Ghost()[2].data(), fat_link.Ghost()[3].data()};
-  const void *const ghost_longlink[] = {long_link.Ghost()[0].data(), long_link.Ghost()[1].data(),
-                                        long_link.Ghost()[2].data(), long_link.Ghost()[3].data()};
-
-  instantiate_host<StaggeredDslashReference>(in.Precision(), out.data<void *>(), fat_link.data_array<const void *>().data,
-                                             long_link.data_array<const void *>().data, ghost_fatlink, ghost_longlink,
-                                             in.data<void *>(), in.fwdGhostFaceBuffer, in.backGhostFaceBuffer, oddBit,
+  instantiate_host<StaggeredDslashReference>(in.Precision(), out, fat_link,
+                                             long_link,
+                                             in, oddBit,
                                              daggerBit, dslash_type, laplace3D);
 }
 
