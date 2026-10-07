@@ -511,18 +511,44 @@ bool openQCD_qudaQCDPlusQEDEnabled(void);
 double openQCD_qudaPlaquette(void);
 
 /**
- * @brief      Compute the gauge force of the openQCD gauge action on the
- *             resident gauge field. Update momentum and gauge field.
- *             QUDA equivalent of force0(c) + update_mom() + update_ud(eps).
+ * @brief      Compute force derived from the gauge action on the resident
+ *             gauge field, updating directly into the resident momentum field.
+ *             QUDA equivalent of force0(c) + update_mom().
  *
- * @param[in]  dt           Integration step size, c*beta/6 in openQCD
- *                          convention
- * @param[in]  c0           Plaquette coefficient of the gauge action
- * @param[in]  c1           Rectangle coefficient of the gauge action
- *                          (skipped if c0 != 1.0)
- * @param[in]  eps          Step size of the gauge field update, exp{eps*mom}*ud
+ * @param[in]  c                   Prefactor, following openqcd terminology
+ * @param[in]  beta                beta parameter
+ * @param[in]  c0                  Plaquette coefficient of the gauge action
+ * @param[in]  c1                  Rectangle coefficient of the gauge action
+ *                                 (skipps computation if c0 == 1.0)
+ * @param[in]  compute_mom_action  If nonzero, return the momentum action
+ *
+ * @return     Momentum action in openQCD convention, i.e. momentum_action(1),
+ *             if compute_mom_action, else 0
  */
-void openQCD_qudaGaugeForce(double dt, double c0, double c1, double eps);
+double openQCD_qudaGaugeForce(double c, double beta, double c0, double c1, int compute_mom_action);
+
+/**
+ * @brief      Compute the gauge action of the resident gauge field. QUDA
+ *             equivalent of action0(1), assumes periodic boundary conditions.
+ *
+ * @param[in]  beta                beta parameter
+ * @param[in]  c0                  Plaquette coefficient of the gauge action
+ * @param[in]  c1                  Rectangle coefficient of the gauge action
+ *                                 (skipped if c0 == 1.0)
+ *
+ * @return     Gauge action summed over all ranks in openQCD convention
+ */
+double openQCD_qudaGaugeAction(double beta, double c0, double c1);
+
+/**
+ * @brief     Update the resident gauge field with the resident momentum field.
+ *            Momentum field must be initialized first with
+ *            openQCD_qudaMomCreate, and will updated accordingly with force calls
+ *            such as openQCD_qudaGaugeForce.
+ * 
+ * @param[in]  eps          Step size of the gauge field update, exp{eps*mom}*ud
+ */ 
+void openQCD_qudaGaugeUpdate(double eps);
 
 /**
  * @brief      Load the gauge fields from host to quda. Notice that the boundary
@@ -538,7 +564,8 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType 
 
 
 /**
- * @brief      Create new resident momentum field. Initialize to zero.
+ * @brief     Create new resident momentum field. Initialize to zero. TODO: add
+ *            support to initialize to random, or from the CPU?
  * 
  * @param[in]  prec        Precision of the incoming gauge field
  * @param[in]  t_boundary  Time boundary condition

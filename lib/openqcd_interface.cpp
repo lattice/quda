@@ -581,6 +581,31 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructTy
   return param;
 }
 
+/**
+ * @brief      Initialize quda gauge param struct for the molecular dynamics
+ *             integration, so that subsequent operations use the resident 
+ *             fields and don't interact with the CPU. Assumes both gauge and
+ *             momentum field exist.
+ *
+ * @param[in]  prec        Precision
+ * @param[in]  rec         QUDA internal gauge field format
+ * @param[in]  t_boundary  Time boundary condition
+ *
+ * @return     The quda gauge parameter struct.
+ */
+static QudaGaugeParam newOpenQCDHMCParam(QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
+{
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
+  param.use_resident_gauge = true;    /* use current resident gauge field */
+  param.make_resident_gauge = true;   /* make the resulting field the resident gauge field */
+  param.return_result_gauge = false;  /* don't return, gauge field stays on gpu */
+  param.use_resident_mom = true;      /* similar as above for the momentum field */
+  param.make_resident_mom = true;
+  param.return_result_mom = false;
+  param.overwrite_mom = false;        /* accumulate to mom, don't overwrite */
+  return param;
+}
+
 void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, char *infile)
 {
   if (qudaState.initialized) return;
@@ -629,15 +654,26 @@ double openQCD_qudaPlaquette(void)
   return 3.0 * plaq[0];
 }
 
-void openQCD_qudaGaugeForce(double dt, double c0, double c1, double eps)
+double openQCD_qudaGaugeForce(double c, double beta, double c0, double c1, int compute_mom_action)
 {
+  double mom_action = 0.0;
+  double dt=c*beta/6.0; /* openQCD convetion */
+
   /* Set up staples of the openQCD gauge action: 6 plaquettes (weight c0).
   *  If c1 != 0, 18 1x2 rectangles (weight c1) per direction (forces/force1)
-  *  From tests/gauge_path_test, MILC/QDP CPU vs GPU check */
+  *  Setup taken from tests/gauge_path_test, MILC/QDP CPU vs GPU check */
   constexpr int n_plaq = 6;
   constexpr int n_rect = 18;
-  const int num_paths = (c0 != 1.0) ? n_plaq + n_rect : n_plaq;
-  const int max_length = (c0 != 1.0) ? 5 : 3;
+  const int rect = (c0 != 1.0);
+
+  QudaGaugeParam gauge_param = newOpenQCDHMCParam(QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_PERIODIC_T);
+
+  /* nullptrs since we use resident fields */
+  void *mom = nullptr;
+  void *gauge = nullptr;
+
+  const int num_paths = rect ? n_plaq + n_rect : n_plaq;
+  const int max_length = rect ? 5 : 3;
 
   static const int path_dir[4][n_plaq + n_rect][5] = {
     /* path_dir_x */
@@ -678,27 +714,52 @@ void openQCD_qudaGaugeForce(double dt, double c0, double c1, double eps)
   }
   /* End of setup of coefficients and paths */
 
-  QudaGaugeParam gauge_param = newOpenQCDGaugeParam(QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_PERIODIC_T);
-  gauge_param.make_resident_gauge = true;
-  gauge_param.use_resident_gauge = true;
-  gauge_param.return_result_gauge = false; /* gauge stays on gpu */
-  gauge_param.use_resident_mom = true;
-  gauge_param.make_resident_mom = true;
-  gauge_param.return_result_mom = false;
-  gauge_param.overwrite_mom = false; /* accumulate to mom */
-
-  /* nullptrs since we use resident fields */
-  void *mom = nullptr;
-  void *gauge = nullptr;
   WITH_COMM(computeGaugeForceQuda(mom, gauge, input_path_buf, length, loop_coeff, num_paths, max_length, dt,
                                   &gauge_param));
-  WITH_COMM(updateGaugeFieldQuda(gauge, mom, eps, 0, 0, &gauge_param));
+  if (compute_mom_action) {
+    WITH_COMM(mom_action = momActionQuda(mom, &gauge_param));
+    /* Revert MILC convention (see MomAction) of subtracting 4 per link, factor
+     * 2 to match norm_square_alg, in openQCD::momentum_action(1)*/
+    const auto &N = qudaState.layout.N;
+    const double vol = static_cast<double>(N[0]) * N[1] * N[2] * N[3];
+    mom_action = 2.0 * (mom_action + 4.0 * 4.0 * vol);
+  }
 
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
     host_free(input_path_buf[dir]);
   }
 
+  if (!qudaState.init.two_grids_equal) MPI_Bcast(&mom_action, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+
+  return mom_action;
+}
+
+double openQCD_qudaGaugeAction(double beta, double c0, double c1)
+{
+  double result = 0.0;
+  QudaGaugeObservableParam obs = newQudaGaugeObservableParam();
+  if (c0 != 1.0) { obs.compute_rectangle = QUDA_BOOLEAN_TRUE;
+  } else { obs.compute_plaquette = QUDA_BOOLEAN_TRUE;}
+  WITH_COMM(gaugeObservablesQuda(&obs));
+
+  const auto &N = qudaState.layout.N;
+  const double vol = static_cast<double>(N[0]) * N[1] * N[2] * N[3];
+  /* Revert QUDA normalization of plaquette/rectangle (averages of Re tr/3), 6
+   * plaquettes and 12 rectangles per site, as in openQCD::action0(1)*/
+  result = 6.0 * c0 * (1.0 - obs.plaquette[0]);
+  if (c0 != 1.0) result += 12.0 * c1 * (1.0 - obs.rectangle[0]);
+  result *= beta * vol;
+
+  if (!qudaState.init.two_grids_equal) MPI_Bcast(&result, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+
+  return result;
+}
+
+void openQCD_qudaGaugeUpdate(double eps)
+{
+  QudaGaugeParam gauge_param = newOpenQCDHMCParam(QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_PERIODIC_T);
+  WITH_COMM(updateGaugeFieldQuda(nullptr, nullptr, eps, 0, 1, &gauge_param));
 }
 
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
@@ -734,8 +795,10 @@ void openQCD_qudaMomCreate(QudaPrecision prec, QudaTboundary t_boundary)
   void *mom = safe_malloc(bytes);
   memset(mom, 0, bytes);
   
-  /* Make resident mom field*/
-  momResidentQuda(mom, &param);
+  /* Make resident momentum field*/
+  WITH_COMM(momResidentQuda(mom, &param));
+  /* to make a random momentum field
+  * void gaussMomQuda(unsigned long long seed, double sigma) */
   host_free(mom);
 }
 
