@@ -881,6 +881,16 @@ namespace quda {
       real sqrt_c1_inv3 = sqrt(c1 * inv3);
       real c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
 
+      // Q = 0, or Q so small that c0_max underflows, would make c0 / c0_max below 0/0.
+      // There exp(iQ) = I + iQ - Q^2/2 to working precision; temp1 holds Q^2.
+      if (c0_max == static_cast<real>(0.0)) {
+        Matrix<T, 3> exp_iQ;
+        setIdentity(&exp_iQ);
+        exp_iQ += T {0, 1} * Q;
+        exp_iQ += T {-0.5, 0} * temp1;
+        return exp_iQ;
+      }
+
       //[34] Test for c0 < 0.
       int parity = 0;
       if(c0 < 0) {
