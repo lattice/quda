@@ -102,7 +102,7 @@ namespace quda
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+          logQuda(QUDA_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
                   epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
@@ -115,7 +115,7 @@ namespace quda
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+          logQuda(QUDA_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
                   tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
@@ -136,14 +136,16 @@ namespace quda
 
       logQuda(QUDA_VERBOSE, "%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
 
-      logQuda(QUDA_DEBUG_VERBOSE, "iter Conv = %d\n", iter_converged);
-      logQuda(QUDA_DEBUG_VERBOSE, "iter Keep = %d\n", iter_keep);
-      logQuda(QUDA_DEBUG_VERBOSE, "iter Lock = %d\n", iter_locked);
-      logQuda(QUDA_DEBUG_VERBOSE, "num_converged = %d\n", num_converged);
-      logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
-      logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
+      logQuda(QUDA_VERBOSE, "iter Conv = %d\n", iter_converged);
+      logQuda(QUDA_VERBOSE, "iter Keep = %d\n", iter_keep);
+      logQuda(QUDA_VERBOSE, "iter Lock = %d\n", iter_locked);
+      logQuda(QUDA_VERBOSE, "num_converged = %d\n", num_converged);
+      logQuda(QUDA_VERBOSE, "num_keep = %d\n", num_keep);
+      logQuda(QUDA_VERBOSE, "num_locked = %d\n", num_locked);
       for (int i = 0; i < n_kr; i++) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+        logQuda(QUDA_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e (conv if < %.6e -> %s)\n",
+          i, alpha[i], i, residua[i], tol * check_norm(alpha[i]),
+          (residua[i] < tol * check_norm(alpha[i])) ? "true" : "false");
       }
 
       // Check for convergence
