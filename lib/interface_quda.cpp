@@ -5389,6 +5389,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   auto profile = pushProfile(profileWFlow);
   pushOutputPrefix("performWFlowQuda: ");
   checkGaugeSmearParam(smear_param);
+  if (smear_param->n_steps == 0) errorQuda("n_steps = 0: a flow needs at least one step");
 
   if (smear_param->restart) {
     if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared must be loaded");
@@ -5491,6 +5492,7 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
   auto profile = pushProfile(profileGFlow);
   pushOutputPrefix("performGFlowQuda: ");
   checkGaugeSmearParam(smear_param);
+  if (smear_param->n_steps == 0) errorQuda("n_steps = 0: a flow needs at least one step");
 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -5651,6 +5653,7 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   auto profile = pushProfile(profileAdjGFlowSafe);
   pushOutputPrefix("performAdjGFlowQudaSafe: ");
   checkGaugeSmearParam(smear_param);
+  if (smear_param->n_steps == 0) errorQuda("n_steps = 0: a flow needs at least one step");
 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -5905,12 +5908,13 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   auto profile = pushProfile(profileAdjGFlowHier);
   pushOutputPrefix("performAdjGFlowQudaHier: ");
   checkGaugeSmearParam(smear_param);
+  if (smear_param->n_steps == 0) errorQuda("n_steps = 0: a flow needs at least one step");
 
   if (smear_param->n_steps <= smear_param->adj_n_save) {
 
     errorQuda("Not good practice to have adj_n_save (%d) >= n_steps (%d); adj_n_save should be manually altered to "
               "min(nsteps, %d): \n",
-              smear_param->n_steps, smear_param->adj_n_save, smear_param->n_steps - 1);
+              smear_param->adj_n_save, smear_param->n_steps, smear_param->n_steps - 1);
   }
 
   pushVerbosity(inv_param->verbosity);
