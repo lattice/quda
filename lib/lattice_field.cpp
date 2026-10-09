@@ -7,6 +7,19 @@
 
 namespace quda {
 
+  static bool use_mnnvl_vmm_comms()
+  {
+#ifdef MNNVL_COMMS
+#ifdef NVSHMEM_COMMS
+    return !comm_nvshmem_enabled();
+#else
+    return true;
+#endif
+#else
+    return false;
+#endif
+  }
+
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field) :
     location(field.Location()),
     precision(field.Precision()),
@@ -269,9 +282,7 @@ namespace quda {
           // hipErrorInvalidValue.
           destroyIPCComms();
           for (int b=0; b<2; b++) {
-#ifndef MNNVL_COMMS
-            device_comms_pinned_free(ghost_recv_buffer_d[b]);
-#endif
+            if (!use_mnnvl_vmm_comms()) device_comms_pinned_free(ghost_recv_buffer_d[b]);
             device_comms_pinned_free(ghost_send_buffer_d[b]);
             host_free(ghost_pinned_send_buffer_h[b]);
             host_free(ghost_pinned_recv_buffer_h[b]);
@@ -281,12 +292,12 @@ namespace quda {
 
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
-#ifndef MNNVL_COMMS
-          // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
-          // silence any false cuda-memcheck initcheck errors
-          qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
-#endif
+          if (!use_mnnvl_vmm_comms()) {
+            // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+            ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+            // silence any false cuda-memcheck initcheck errors
+            qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
+          }
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
           ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
@@ -322,11 +333,11 @@ namespace quda {
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
-#ifndef MNNVL_COMMS
-      // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
-      ghost_recv_buffer_d[b] = nullptr;
-#endif
+      if (!use_mnnvl_vmm_comms()) {
+        // free receive buffer
+        if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
+        ghost_recv_buffer_d[b] = nullptr;
+      }
 
       // free send buffer
       if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
@@ -481,11 +492,18 @@ namespace quda {
       comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
     }
 #else
-    for (int b = 0; b < 2; b++) {
-      // set remote send buffer to ghost receive buffers on neighboring processes
-      ghost_recv_buffer_d[b] = comm_create_local_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_bytes);
-      comm_create_local_event(ipcCopyEvent[b]);
-      from_face_d[b] = ghost_recv_buffer_d[b];
+    if (comm_nvshmem_enabled()) {
+      for (int b = 0; b < 2; b++) {
+        comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
+        comm_create_local_event(ipcCopyEvent[b]);
+      }
+    } else {
+      for (int b = 0; b < 2; b++) {
+        // set remote send buffer to ghost receive buffers on neighboring processes
+        ghost_recv_buffer_d[b] = comm_create_local_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_bytes);
+        comm_create_local_event(ipcCopyEvent[b]);
+        from_face_d[b] = ghost_recv_buffer_d[b];
+      }
     }
 
     // Update the receive buffers
@@ -540,8 +558,13 @@ namespace quda {
       comm_destroy_neighbor_memory(ghost_remote_send_buffer_d[b]);
       comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
 #else
-      comm_destroy_local_neighbor_memory(ghost_recv_buffer_d[b], ghost_remote_send_buffer_d[b]);
-      comm_destroy_local_event(ipcCopyEvent[b]);
+      if (comm_nvshmem_enabled()) {
+        comm_destroy_neighbor_memory(ghost_remote_send_buffer_d[b]);
+        comm_destroy_local_event(ipcCopyEvent[b]);
+      } else {
+        comm_destroy_local_neighbor_memory(ghost_recv_buffer_d[b], ghost_remote_send_buffer_d[b]);
+        comm_destroy_local_event(ipcCopyEvent[b]);
+      }
 #endif
     }
 

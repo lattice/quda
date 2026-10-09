@@ -36,7 +36,7 @@ namespace quda
                name ? name : "unknown", str ? str : "unknown");
   }
 
-  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, N_ALLOC_TYPE };
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, VMM, N_ALLOC_TYPE };
 
   class MemAlloc
   {
@@ -110,7 +110,7 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host", "Host Pinned", "Managed", "Shmem"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host", "Host Pinned", "Managed", "Shmem", "VMM"};
 
     for (auto entry : alloc[type]) {
       void *ptr = entry.first;
@@ -130,7 +130,7 @@ namespace quda
   {
     total_bytes[type] += a.base_size;
     if (total_bytes[type] > max_total_bytes[type]) { max_total_bytes[type] = total_bytes[type]; }
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) {
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != VMM) {
       total_host_bytes += a.base_size;
       if (total_host_bytes > max_total_host_bytes) { max_total_host_bytes = total_host_bytes; }
     }
@@ -145,7 +145,7 @@ namespace quda
   {
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) { total_host_bytes -= size; }
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != VMM) { total_host_bytes -= size; }
     if (type == HOST_PINNED) { total_pinned_bytes -= size; }
     alloc[type].erase(ptr);
   }
@@ -289,6 +289,78 @@ namespace quda
     return ptr;
   }
 
+#ifdef MNNVL_COMMS
+  /** Allocate VMM memory for MNNVL communication buffers. */
+  void *device_vmm_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+    CUdevice device;
+    CUresult err = cuCtxGetDevice(&device);
+    if (err != CUDA_SUCCESS) {
+      report_cu_error("cuCtxGetDevice", err);
+      errorQuda("Failed to query the CUDA device (%s:%d in %s())", file, line, func);
+    }
+
+    int vmm_supported = 0;
+    err = cuDeviceGetAttribute(&vmm_supported, CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED, device);
+    if (err != CUDA_SUCCESS || !vmm_supported) {
+      if (err != CUDA_SUCCESS) report_cu_error("cuDeviceGetAttribute(VMM)", err);
+      errorQuda("MNNVL communication buffers require CUDA VMM support");
+    }
+    int gdr_vmm_supported = 0;
+    err = cuDeviceGetAttribute(&gdr_vmm_supported, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, device);
+    if (err != CUDA_SUCCESS || !gdr_vmm_supported) {
+      if (err != CUDA_SUCCESS) report_cu_error("cuDeviceGetAttribute(GDR VMM)", err);
+      errorQuda("MNNVL communication buffers require GPUDirect RDMA support for CUDA VMM allocations");
+    }
+
+    CUmemAllocationProp prop {};
+    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
+    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.location.id = device;
+    prop.allocFlags.gpuDirectRDMACapable = 1;
+
+    size_t granularity = 0;
+    err = cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM);
+    if (err != CUDA_SUCCESS) {
+      report_cu_error("cuMemGetAllocationGranularity", err);
+      errorQuda("Failed to query VMM allocation granularity (%s:%d in %s())", file, line, func);
+    }
+    a.size = size;
+    a.base_size = ((size + granularity - 1) / granularity) * granularity;
+
+    CUmemGenericAllocationHandle handle = 0;
+    err = cuMemCreate(&handle, a.base_size, &prop, 0);
+    if (err != CUDA_SUCCESS) {
+      report_cu_error("cuMemCreate", err);
+      errorQuda("Failed to allocate VMM device memory of size %zu (%s:%d in %s())", size, file, line, func);
+    }
+    CUdeviceptr ptr = 0;
+    err = cuMemAddressReserve(&ptr, a.base_size, 0, 0, 0);
+    if (err == CUDA_SUCCESS) err = cuMemMap(ptr, a.base_size, 0, handle, 0);
+    if (err == CUDA_SUCCESS) {
+      CUmemAccessDesc access {};
+      access.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+      access.location.id = device;
+      access.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+      err = cuMemSetAccess(ptr, a.base_size, &access, 1);
+    }
+    if (err != CUDA_SUCCESS) {
+      report_cu_error("CUDA VMM map", err);
+      errorQuda("Failed to map VMM device memory of size %zu (%s:%d in %s())", size, file, line, func);
+    }
+    err = cuMemRelease(handle);
+    if (err != CUDA_SUCCESS) {
+      report_cu_error("cuMemRelease", err);
+      errorQuda("Failed to release VMM allocation handle (%s:%d in %s())", file, line, func);
+    }
+    void *mapped_ptr = reinterpret_cast<void *>(ptr);
+    track_malloc(VMM, a, mapped_ptr);
+    return mapped_ptr;
+  }
+#endif
+
   /**
    * Perform a standard malloc() with error-checking.  This function
    * should only be called via the safe_malloc() macro, defined in
@@ -388,7 +460,10 @@ namespace quda
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
 #ifdef NVSHMEM_COMMS
-    return shmem_malloc_(func, file, line, size);
+    if (comm_nvshmem_enabled()) return shmem_malloc_(func, file, line, size);
+#endif
+#ifdef MNNVL_COMMS
+    return device_vmm_malloc_(func, file, line, size);
 #else
     return device_pinned_malloc_(func, file, line, size);
 #endif
@@ -448,6 +523,24 @@ namespace quda
     }
     track_free(DEVICE_PINNED, ptr);
   }
+
+#ifdef MNNVL_COMMS
+  void device_vmm_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) { errorQuda("Attempt to free NULL VMM pointer (%s:%d in %s())", file, line, func); }
+    if (!alloc[VMM].count(ptr)) { errorQuda("Attempt to free invalid VMM pointer (%s:%d in %s())", file, line, func); }
+    CUdeviceptr base = 0;
+    size_t size = 0;
+    CUresult err = cuMemGetAddressRange(&base, &size, reinterpret_cast<CUdeviceptr>(ptr));
+    if (err == CUDA_SUCCESS) err = cuMemUnmap(base, size);
+    if (err == CUDA_SUCCESS) err = cuMemAddressFree(base, size);
+    if (err != CUDA_SUCCESS) {
+      report_cu_error("CUDA VMM free", err);
+      errorQuda("Failed to free VMM device memory (%s:%d in %s())", file, line, func);
+    }
+    track_free(VMM, ptr);
+  }
+#endif
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -519,10 +612,15 @@ namespace quda
   void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
 #ifdef NVSHMEM_COMMS
-    shmem_free_(func, file, line, ptr);
-#else
-    device_pinned_free_(func, file, line, ptr);
+    if (alloc[SHMEM].count(ptr)) {
+      shmem_free_(func, file, line, ptr);
+      return;
+    }
 #endif
+#ifdef MNNVL_COMMS
+    if (alloc[VMM].count(ptr)) return device_vmm_free_(func, file, line, ptr);
+#endif
+    device_pinned_free_(func, file, line, ptr);
   }
 
   void printPeakMemUsage()

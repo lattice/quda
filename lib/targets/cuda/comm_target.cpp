@@ -86,6 +86,12 @@ namespace quda
     prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
     prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
     prop.location.id = (int)device;
+    CU_CHECK(cuDeviceGetAttribute(&devAttr, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, device));
+    if (devAttr == 0) {
+      fprintf(stderr, "Device %d does not support GPUDirect RDMA for CUDA VMM allocations\n", (int)device);
+      exit(1);
+    }
+    prop.allocFlags.gpuDirectRDMACapable = 1;
     CU_CHECK(cuMemGetAllocationGranularity(&granularity, &prop,
                                            CU_MEM_ALLOC_GRANULARITY_MINIMUM));
     // get the padded size from minimum granularity
@@ -185,45 +191,41 @@ namespace quda
 
   void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
   {
-#ifndef NVSHMEM_COMMS
+    const bool use_nvshmem = comm_nvshmem_enabled();
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
 
-  for (int dim = 0; dim < 4; ++dim) {
-    if (comm_dim(dim) == 1) continue;
-    for (int dir = 0; dir < 2; ++dir) {
-      MsgHandle *sendHandle = nullptr;
-      MsgHandle *receiveHandle = nullptr;
-      int disp = (dir == 1) ? +1 : -1;
+    if (!use_nvshmem) {
+      for (int dim = 0; dim < 4; ++dim) {
+        if (comm_dim(dim) == 1) continue;
+        for (int dir = 0; dir < 2; ++dir) {
+          MsgHandle *sendHandle = nullptr;
+          MsgHandle *receiveHandle = nullptr;
+          int disp = (dir == 1) ? +1 : -1;
 
-      // first set up receive
-      if (comm_peer2peer_enabled(1 - dir, dim)) {
-        receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp, sizeof(remote_handle));
+          if (comm_peer2peer_enabled(1 - dir, dim)) {
+            receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp,
+                                                          sizeof(remote_handle[dim][1 - dir]));
+          }
+          cudaIpcMemHandle_t local_handle;
+          if (comm_peer2peer_enabled(dir, dim)) {
+            CHECK_CUDA_ERROR(cudaIpcGetMemHandle(&local_handle, local));
+            sendHandle = comm_declare_send_relative(&local_handle, dim, disp, sizeof(local_handle));
+          }
+          if (receiveHandle) comm_start(receiveHandle);
+          if (sendHandle) comm_start(sendHandle);
+
+          if (receiveHandle) comm_wait(receiveHandle);
+          if (sendHandle) comm_wait(sendHandle);
+          if (sendHandle) comm_free(sendHandle);
+          if (receiveHandle) comm_free(receiveHandle);
+        }
       }
-      // now send
-      cudaIpcMemHandle_t local_handle;
-      if (comm_peer2peer_enabled(dir, dim)) {
-        CHECK_CUDA_ERROR(cudaIpcGetMemHandle(&local_handle, local));
-        sendHandle = comm_declare_send_relative(&local_handle, dim, disp, sizeof(local_handle));
-      }
-      if (receiveHandle) comm_start(receiveHandle);
-      if (sendHandle) comm_start(sendHandle);
-
-      if (receiveHandle) comm_wait(receiveHandle);
-      if (sendHandle) comm_wait(sendHandle);
-
-      if (sendHandle) comm_free(sendHandle);
-      if (receiveHandle) comm_free(receiveHandle);
     }
-  }
-#endif
 
-  // open the remote memory handles and set the send ghost pointers
-  for (int dim = 0; dim < 4; ++dim) {
-#ifndef NVSHMEM_COMMS
-    // TODO: We maybe can force loopback comms to use the IB path here
-    if (comm_dim(dim) == 1) continue;
-#endif
+    // Open the remote IPC handles or obtain NVSHMEM remote aliases.
+    for (int dim = 0; dim < 4; ++dim) {
+      if (!use_nvshmem && comm_dim(dim) == 1) continue;
     // even if comm_dim(dim) == 2, we might not have p2p enabled in both directions, so check this
     const int num_dir
       = (!comm_dim_cstar(dim) && comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ?
@@ -231,20 +233,26 @@ namespace quda
       2;
     for (int dir = 0; dir < num_dir; dir++) {
       remote[dim][dir] = nullptr;
-#ifndef NVSHMEM_COMMS
-      if (!comm_peer2peer_enabled(dir, dim)) continue;
-      CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dim][dir], cudaIpcMemLazyEnablePeerAccess));
+      if (use_nvshmem) {
+#ifdef NVSHMEM_COMMS
+        remote[dim][dir] = nvshmem_ptr(static_cast<char *>(local), comm_neighbor_rank(dir, dim));
 #else
-      remote[dim][dir] = nvshmem_ptr(static_cast<char *>(local), comm_neighbor_rank(dir, dim));
+        fprintf(stderr, "NVSHMEM peer mapping requested in a build without NVSHMEM support\n");
+        exit(1);
 #endif
+      } else if (comm_peer2peer_enabled(dir, dim)) {
+        CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dim][dir], cudaIpcMemLazyEnablePeerAccess));
+      }
     }
     if (num_dir == 1) remote[dim][1] = remote[dim][0];
   }
 }
 
-#ifndef NVSHMEM_COMMS
 void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
 {
+#ifdef NVSHMEM_COMMS
+  if (comm_nvshmem_enabled()) return;
+#endif
   for (int dim = 0; dim < 4; ++dim) {
 
     if (comm_dim(dim) == 1) continue;
@@ -260,9 +268,6 @@ void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
     }
   } // iterate over dim
 }
-#else
-void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
-#endif
 
 void comm_create_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
 {
