@@ -198,6 +198,13 @@ namespace quda
 
     getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
 
+    // Bracket the body (Solver::create, chronoExtrapolate, Mdag setup, the
+    // solver call itself, etc.) under COMPUTE. Inner CG/GCR also TPSTART
+    // COMPUTE on the same profile; sub-phase TPSTART/TPSTOP are reference-
+    // counted in TimeProfile (see include/timer.h::Timer::start), so the
+    // nested wraps compose correctly.
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+
     if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
       auto tmp = getFieldTmp(cvector_ref<ColorSpinorField>(in));
       blas::copy(tmp, in);
@@ -266,6 +273,7 @@ namespace quda
       auto x_norm = blas::norm2(out);
       for (auto i = 0u; i < x.size(); i++) printfQuda("Solution = %g\n", x_norm[i]);
     }
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
     if (param.chrono_make_resident) {
@@ -317,8 +325,7 @@ namespace quda
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param, bool pc_solve,
-                          bool use_smeared_gauge);
+  // createDiracWithEig(7-arg) is declared in dirac_quda.h and defined in interface_quda.cpp.
 
   extern std::vector<ColorSpinorField> solutionResident;
 
@@ -326,6 +333,12 @@ namespace quda
              const GaugeField &u)
   {
     pushVerbosity(param.verbosity);
+
+    // INIT: param checks, Dirac construction, host CPU-pointer wrapping,
+    // device field allocation, source download to GPU, initial-guess setup.
+    // Inner solve() does its own PREAMBLE/COMPUTE/EPILOGUE; we wrap the
+    // outer host-side staging that previously fell outside any sub-phase.
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     if (hp_b.size() != hp_x.size())
       errorQuda("Number of solutions %lu != number of solves %lu", hp_x.size(), hp_b.size());
@@ -367,14 +380,21 @@ namespace quda
       h_x[i] = ColorSpinorField(cpuParam);
     }
 
-    // download source
     ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
     std::vector<ColorSpinorField> b;
     resize(b, n_src, cudaParam);
-    blas::copy(b, h_b);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
 
-    // now check if we need to invalidate the solutionResident vectors
+    // DOWNLOAD: host→device source copy (separate sub-phase since this is
+    // the standard QUDA category for h2d data movement).
+    getProfile().TPSTART(QUDA_PROFILE_H2D);
+    blas::copy(b, h_b);
+    getProfile().TPSTOP(QUDA_PROFILE_H2D);
+
+    // INIT continued: solution-vector allocation and resident-solution
+    // bookkeeping (host-side allocation, no kernel work).
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
     std::vector<ColorSpinorField> x;
     resize(x, n_src, cudaParam);
     if (param.use_resident_solution == 1) {
@@ -406,15 +426,21 @@ namespace quda
     } else {              // zero initial guess
       blas::zero(x);
     }
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
 
+    // The actual solve. Inner solve(x,b,...) brackets PREAMBLE/COMPUTE/
+    // EPILOGUE on the same profile; nothing to wrap here.
     solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, param);
 
+    // EPILOGUE: device→host result copy and Dirac cleanup.
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
     if (!param.make_resident_solution) blas::copy(h_x, x);
 
     delete dirac;
     delete diracSloppy;
     delete diracPre;
     delete diracEig;
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     popVerbosity();
   }

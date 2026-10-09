@@ -842,6 +842,143 @@ extern "C" {
     QudaBoolean thin_update_only;
   } QudaMultigridParam;
 
+  typedef struct QudaHMCParam_s {
+    size_t struct_size; /**< Size of this struct in bytes. Used to ensure that the host application and QUDA see the same struct */
+
+    /** Trajectory control */
+    double tau;                    /**< Trajectory length */
+    int n_steps;                   /**< Outer integration steps (n_outer for nested) */
+    QudaIntegratorType integrator; /**< Which integrator to use */
+    double beta;                   /**< Gauge coupling constant */
+
+    /** Momentum generation */
+    int generate_momentum;            /**< If 1, generate Gaussian momentum internally; if 0, use caller-supplied */
+    unsigned long long momentum_seed; /**< RNG seed for momentum generation (ignored if generate_momentum=0) */
+    int reuse_pseudofermion; /**< If 1, reuse pseudofermion from previous trajectory (for reversibility tests) */
+
+    /** Omelyan parameter */
+    double omelyan_lambda; /**< Omelyan-Mryglod-Folk lambda (default 0.1932) */
+
+    /** Force-gradient parameters (FGI and nested FGI) */
+    double fgi_lambda; /**< PQPQP lambda (default 1/6) */
+    double fgi_xi;     /**< PQPQP xi (default 1/72) */
+
+    /** Inner integrator (nested FGI only) */
+    int n_inner_steps;                   /**< Sub-steps per inner half-step */
+    QudaIntegratorType inner_integrator; /**< Inner sub-integrator type (leapfrog or Omelyan) */
+    double inner_omelyan_lambda;         /**< Omelyan lambda for inner integrator (default 0.1932) */
+
+    /** Coarse deflation (nested FGI only) */
+    int n_defl;                /**< Number of coarse-grid deflation eigenvectors */
+    double eig_tol;            /**< TRLM convergence tolerance */
+    int eig_n_kr;              /**< Krylov space size (default 3*n_defl) */
+    int eig_max_restarts;      /**< TRLM max restarts (default 100) */
+    int defl_refresh_interval; /**< Inner steps between eigenspace refresh (0=frozen) */
+    int coarse_level;          /**< Which MG level provides coarse grid (default 1) */
+
+    /** MR smoothing (nested FGI only) */
+    int n_mr_smooth; /**< MR smoothing iterations (0=off) */
+    double mr_omega; /**< MR relaxation parameter */
+
+    /** Multi-trajectory control (used by hmcRunQuda) */
+    int n_trajectories;    /**< Total number of MD trajectories to run */
+    int n_thermalization;  /**< Number of thermalisation trajectories (no measurements) */
+    int mg_setup_interval; /**< Full MG re-setup every N trajectories (0=thin update only) */
+    /** Adaptive MG re-setup trigger: refresh when current per-trajectory
+     *  iters-per-solve exceeds this ratio times the baseline iters-per-solve.
+     *  0.0 disables the adaptive trigger. Recommended 2.0 for double-precision
+     *  outer solver. ORs with the fixed-interval trigger above. */
+    double mg_setup_iter_ratio;
+    /** Number of accepted trajectories used to establish the baseline
+     *  iters-per-solve for the adaptive trigger. The baseline is the mean
+     *  iters-per-solve over those trajectories. Default 5. */
+    int mg_setup_iter_baseline_traj;
+
+    /** Checkpointing */
+    int checkpoint_interval;     /**< Save gauge every N accepted trajectories (0=disabled) */
+    char checkpoint_prefix[256]; /**< Filename prefix for checkpoints (e.g. "ckpt_") */
+
+    /** Gauge I/O */
+    char gauge_infile[256];  /**< Load initial gauge from file (empty = use host pointer) */
+    char gauge_outfile[256]; /**< Save final gauge to file (empty = no save) */
+
+    /** Field management flags (standard QUDA pattern) */
+    int use_resident_gauge;  /**< Use existing resident gauge as input */
+    int make_resident_gauge; /**< Store result gauge as resident */
+    int return_result_gauge; /**< Copy result gauge back to host */
+    int use_resident_mom;    /**< Use existing resident momentum */
+    int make_resident_mom;   /**< Store result momentum as resident */
+    int return_result_mom;   /**< Copy result momentum back to host */
+
+    /** Eigenspace tracking during HMC */
+    int eigentracking_enabled;             /**< 1=enable eigentracking, 0=disabled (default 0) */
+    int eigentracking_n_ev;                /**< Number of tracked eigenpairs (default 8) */
+    int eigentracking_pool_capacity;       /**< Maximum pool size (default 32) */
+    int eigentracking_n_ritz;              /**< Ritz pairs to extract per CG solve (default 4) */
+    int eigentracking_forecast_order;      /**< Generator forecast order: 0/1/2 (default 1) */
+    int eigentracking_fresh_trlm_interval; /**< Trajectories between fresh TRLM (0=disabled, default 10) */
+    int eigentracking_solution_history;    /**< Chronological solution history depth (default 3) */
+    /** Whether to absorb CG-extracted Ritz vectors into the tracker pool.
+     *  When true (default), the pool drifts toward exact D†D eigenvectors,
+     *  which is good for deflation but degrades MG-null-vector quality at
+     *  light mass. Set to 0 to keep the pool as RR-evolved MG null vectors
+     *  only (Schwinger-style: smoother-aware structure preserved). */
+    int eigentracking_absorb_ritz; /**< 1=absorb Ritz vectors into pool, 0=skip (default 1) */
+    /** Pool-driven MG null-vector refresh ("Fix 2: hybrid pool + CG").
+     *
+     * On accepted-trajectory MG re-setup, copy the eigentracker pool into the
+     * MG null-space slots (`mg_solver->B`) instead of regenerating with CG
+     * from random vectors, then run N CG inverse-iter steps per vector to
+     * polish them against the current gauge. The pool is already a good
+     * approximation of the slow subspace, so a small N suffices.
+     *
+     *   -1 (default) — disabled; use the standard CG-based MG re-setup.
+     *    0           — pure pool replacement (no CG polish). Cheapest, but
+     *                  drifts when the gauge moves between refreshes; only
+     *                  reliable when `absorb_ritz=0` keeps the pool
+     *                  smoother-aware (Schwinger-style).
+     *    N > 0       — hybrid: pool warm-start + N CG iters of polish.
+     *                  Recovers smoother-aware structure even with
+     *                  Ritz-contaminated pools. Empirically ~5 iters
+     *                  closes the gap to standard re-setup at L=16^4
+     *                  Wilson, mass=-1.5. */
+    int eigentracking_mg_refresh_iters;
+    /** Per-solve cap on extra ET-pool candidates contributed by each
+     *  fermion solve (single knob covering both the CG and GCR install
+     *  paths; see cg_tracker.h, gcr_tracker.h):
+     *    - GCR (MG-preconditioned outer solve): cap on normalised
+     *      intermediate residuals stashed in a FIFO during the solve
+     *      (gcr_tracker.h).
+     *    - CG (non-preconditioned fallback): cap on Ritz pairs extracted
+     *      from the implicit Lanczos tridiagonal (cg_ritz_extractor.cpp).
+     *  Cost is linear in this knob; for either solver, value N pushes up
+     *  to N normalised ColorSpinorFields into stashRitzVectors per solve.
+     *
+     *  Default 0 (off): on Wilson and Wilson-clover at masses well
+     *  inside the safe regime, the converged-solution stash already
+     *  saturates the useful low-mode content of the pool and adding
+     *  intermediate Krylov vectors does not move the iter count.
+     *  Recommended to turn on (typical value 4) for light-mass /
+     *  large-volume regimes where the preconditioner degrades fast
+     *  enough that each solve has many "stuck" low modes the converged
+     *  solution alone misses. The HMC call sites read this through
+     *  EigenTrackingParam::residualCap. */
+    int eigentracking_residual_cap;
+    /** Initial TRLM convergence knobs (also applied to fresh-TRLM refreshes) */
+    double eigentracking_trlm_tol;         /**< TRLM convergence tolerance (default 1e-6) */
+    int eigentracking_trlm_max_restarts;   /**< TRLM maximum restarts (default 100) */
+    int eigentracking_trlm_check_interval; /**< TRLM iterations between convergence checks (default 10) */
+    /** Eigensolver to use for the initial / fresh-TRLM solves
+     *  (TRLM, BLKTRLM, IRAM, BLKIRAM, ...). Default QUDA_EIG_TR_LANCZOS. */
+    QudaEigType eigentracking_eig_type;
+    int eigentracking_blk_size; /**< Block size for block solvers; n_ev rounded up (default 4) */
+    /** Chebyshev acceleration for the initial TRLM (ill-conditioned M^dag M) */
+    int eigentracking_use_poly_acc; /**< 1=Chebyshev poly acceleration on, 0=off (default 0) */
+    int eigentracking_poly_deg;     /**< Chebyshev polynomial degree (default 50) */
+    double eigentracking_a_min;     /**< Suppression lower bound ~10x smallest target eigenvalue */
+    double eigentracking_a_max;     /**< Upper bound; 0 => QUDA power-iteration auto-estimate */
+  } QudaHMCParam;
+
   typedef struct QudaGaugeObservableParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
@@ -1147,6 +1284,12 @@ extern "C" {
   void printQudaBLASParam(QudaBLASParam *param);
 
   /**
+   * Print the members of QudaHMCParam.
+   * @param param The QudaHMCParam whose elements we are to print.
+   */
+  void printQudaHMCParam(QudaHMCParam *param);
+
+  /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
    * @param param   Contains all metadata regarding host and device storage
@@ -1294,6 +1437,59 @@ extern "C" {
    * sets the output filename prefix).
    */
   void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
+
+  /**
+   * @brief Initialize a QudaHMCParam with sensible defaults
+   * @return Default-initialized QudaHMCParam
+   */
+  QudaHMCParam newQudaHMCParam(void);
+
+  /**
+   * @brief Run one HMC molecular dynamics trajectory.
+   *
+   * Performs the MD evolution only (no accept/reject step -- the caller
+   * handles the Metropolis test using the returned dH).
+   *
+   * Host/device field management follows the standard QUDA resident-field
+   * pattern controlled by the use_resident, make_resident, and return_result
+   * flags in hmc_param.
+   *
+   * @param[in,out] gauge       Host gauge field pointer (or nullptr if use_resident_gauge)
+   * @param[in,out] momentum    Host momentum pointer (or nullptr if use_resident_mom)
+   * @param[in]     hmc_param   HMC/integrator parameters
+   * @param[in]     gauge_param Gauge field metadata
+   * @param[in]     inv_param   Inverter parameters (for fermion force solves)
+   * @param[in]     mg_instance MG preconditioner (from newMultigridQuda, or nullptr)
+   * @return dH = H_final - H_initial for the Metropolis accept/reject test
+   */
+  double hmcTrajectoryQuda(void *gauge, void *momentum, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param,
+                           QudaInvertParam *inv_param, void *mg_instance);
+
+  /**
+   * @brief Run a complete HMC simulation with Metropolis accept/reject.
+   *
+   * Runs n_trajectories MD trajectories with accept/reject, thermalisation,
+   * plaquette logging, and periodic gauge checkpointing to disk.
+   * The gauge field is loaded from gauge_infile (if set) or from the host
+   * pointer, and saved to gauge_outfile (if set) at the end.
+   *
+   * @param[in,out] gauge       Host gauge field pointer (or nullptr if loading from file)
+   * @param[in]     hmc_param   HMC parameters including trajectory count and checkpointing
+   * @param[in]     gauge_param Gauge field metadata
+   * @param[in]     inv_param   Inverter parameters
+   * @param[in]     mg_instance MG preconditioner (from newMultigridQuda, or nullptr)
+   * @param[in]     mg_param    MG parameters for updates (or nullptr if mg_instance is nullptr)
+   * @since        QudaMultigridParam* parameter added with the HMC multi-trajectory
+   *               driver; this signature is stable for callers built against
+   *               this branch or later.
+   */
+  void hmcRunQuda(void *gauge, QudaHMCParam *hmc_param, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param,
+                  void *mg_instance, QudaMultigridParam *mg_param);
+
+  /**
+   * @brief Destroy any persistent HMC-internal state (coarse deflation manager, etc.)
+   */
+  void destroyHMCQuda(void);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).

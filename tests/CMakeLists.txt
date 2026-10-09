@@ -268,6 +268,13 @@ target_link_libraries(gauge_alg_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+if(QUDA_DIRAC_CLOVER)
+  add_executable(hmc_test hmc_test.cpp)
+  target_link_libraries(hmc_test ${TEST_LIBS})
+  quda_checkbuildtest(hmc_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hmc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 add_executable(heatbath_test heatbath_test.cpp)
 target_link_libraries(heatbath_test ${TEST_LIBS})
 quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
@@ -1611,6 +1618,246 @@ if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
     --matpc odd-odd-asym --dagger
     --enable-testing true --niter 1
     --gtest_output=xml:clover_force_test.xml)
+endif()
+
+# HMC tests — all prefixed "hmc_" so `ctest -R ^hmc_` runs just this group.
+# Each gtest case from tests/hmc_test.cpp is registered individually so
+# reviewers can strip or add tests by editing this block alone. All tests
+# run on a 4^4 lattice (fast; reveals algorithmic issues without masking
+# them under long autocorrelations). Reversibility coverage is mandatory:
+# hmc_reversibility_all_integrators cycles through every integrator
+# (leapfrog, Omelyan, FGI, nested FGI) in one invocation and enforces
+# delta_plaq and dH_fwd+dH_bwd tolerances per integrator.
+if(QUDA_DIRAC_CLOVER)
+  # Common argument blocks
+  set(HMC_DIM          --dim 4 4 4 4)
+  set(HMC_WILSON_PREC  --dslash-type wilson --mass 0.5
+                       --prec double --prec-sloppy double --prec-precondition double)
+  # Mixed precision required for MG-based tests (null-vector precision must match gauge sloppy)
+  set(HMC_WILSON_MIXED --dslash-type wilson --mass 0.5
+                       --prec double --prec-sloppy single --prec-precondition single)
+  # Heavy-mass Wilson: eigentracking tests that run TRLM directly need the
+  # M^dag M spectrum pushed well off zero — 4^4 hot-start gauges otherwise
+  # give pathological clustered eigenvalues that TRLM cannot resolve.
+  set(HMC_WILSON_HEAVY --dslash-type wilson --mass 2.0
+                       --prec double --prec-sloppy double --prec-precondition double)
+  set(HMC_TRAJECTORY   --hmc-tau 0.1 --hmc-n-steps 10)
+
+  # --- Parameter-only tests (no GPU compute) ---
+  add_test(NAME hmc_parameter_defaults
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} --gtest_filter=HMC.ParameterDefaults
+    --gtest_output=xml:hmc_parameter_defaults.xml)
+
+  add_test(NAME hmc_nested_fgi_parameter_setup
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} --gtest_filter=HMC.NestedFGIParameterSetup
+    --gtest_output=xml:hmc_nested_fgi_parameter_setup.xml)
+
+  # --- Single-trajectory integrators (Wilson, pure CG) ---
+  add_test(NAME hmc_leapfrog_trajectory
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC} ${HMC_TRAJECTORY}
+    --gtest_filter=HMC.LeapfrogTrajectory
+    --gtest_output=xml:hmc_leapfrog_trajectory.xml)
+
+  add_test(NAME hmc_omelyan_trajectory
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC} ${HMC_TRAJECTORY}
+    --gtest_filter=HMC.OmelyanTrajectory
+    --gtest_output=xml:hmc_omelyan_trajectory.xml)
+
+  add_test(NAME hmc_force_gradient_trajectory
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC} ${HMC_TRAJECTORY}
+    --gtest_filter=HMC.ForceGradientTrajectory
+    --gtest_output=xml:hmc_force_gradient_trajectory.xml)
+
+  # --- Force validation ---
+  add_test(NAME hmc_directional_force
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC}
+    --gtest_filter=HMC.DirectionalForceTest
+    --gtest_output=xml:hmc_directional_force.xml)
+
+  add_test(NAME hmc_per_link_force
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC}
+    --gtest_filter=HMC.PerLinkForceTest
+    --gtest_output=xml:hmc_per_link_force.xml)
+
+  add_test(NAME hmc_heatbath_identity
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC}
+    --gtest_filter=HMC.HeatbathActionIdentity
+    --gtest_output=xml:hmc_heatbath_identity.xml)
+
+  # --- Per-action force/heatbath oracles ---
+  # Each action runs the same three oracles: per-link (force vs numerical
+  # dS/dU, the sharpest static test), directional (global consistency with
+  # momAction), and the exact heatbath identity. Degenerate-limit entries
+  # (mu -> 0, csw -> 0) are the cheapest structural cross-action regressions.
+  set(HMC_CLOVER_PREC --dslash-type clover --compute-clover true --clover-csw 1.0 --mass 0.5
+                      --prec double --prec-sloppy double --prec-precondition double)
+  set(HMC_ORACLES --gtest_filter=HMC.DirectionalForceTest:HMC.PerLinkForceTest:HMC.HeatbathActionIdentity)
+
+  add_test(NAME hmc_force_oracles_clover
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_CLOVER_PREC} ${HMC_ORACLES}
+    --gtest_output=xml:hmc_force_oracles_clover.xml)
+
+  if(QUDA_DIRAC_TWISTED_MASS)
+    set(HMC_TM_PREC --dslash-type twisted-mass --mu 0.1 --flavor singlet --mass 0.5
+                    --prec double --prec-sloppy double --prec-precondition double)
+
+    add_test(NAME hmc_force_oracles_twisted_mass
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} ${HMC_TM_PREC} ${HMC_ORACLES}
+      --gtest_output=xml:hmc_force_oracles_twisted_mass.xml)
+
+    # mu -> 0 must reproduce the Wilson force (twist-dagger structural check)
+    add_test(NAME hmc_per_link_force_tm_mu0
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} --dslash-type twisted-mass --mu 1e-10 --flavor singlet --mass 0.5
+      --prec double --prec-sloppy double --prec-precondition double
+      --gtest_filter=HMC.PerLinkForceTest
+      --gtest_output=xml:hmc_per_link_force_tm_mu0.xml)
+  endif()
+
+  if(QUDA_DIRAC_TWISTED_CLOVER)
+    set(HMC_TMC_PREC --dslash-type twisted-clover --mu 0.1 --flavor singlet
+                     --compute-clover true --clover-csw 1.0 --mass 0.5
+                     --prec double --prec-sloppy double --prec-precondition double)
+
+    add_test(NAME hmc_force_oracles_twisted_clover
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} ${HMC_TMC_PREC} ${HMC_ORACLES}
+      --gtest_output=xml:hmc_force_oracles_twisted_clover.xml)
+
+    # mu -> 0 must reproduce clover; csw -> 0 must reproduce twisted mass
+    add_test(NAME hmc_per_link_force_tmc_mu0
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} --dslash-type twisted-clover --mu 1e-10 --flavor singlet
+      --compute-clover true --clover-csw 1.0 --mass 0.5
+      --prec double --prec-sloppy double --prec-precondition double
+      --gtest_filter=HMC.PerLinkForceTest
+      --gtest_output=xml:hmc_per_link_force_tmc_mu0.xml)
+
+    add_test(NAME hmc_per_link_force_tmc_csw0
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+      ${HMC_DIM} --dslash-type twisted-clover --mu 0.1 --flavor singlet
+      --compute-clover true --clover-csw 1e-8 --mass 0.5
+      --prec double --prec-sloppy double --prec-precondition double
+      --gtest_filter=HMC.PerLinkForceTest
+      --gtest_output=xml:hmc_per_link_force_tmc_csw0.xml)
+  endif()
+
+  # --- Multi-trajectory driver ---
+  add_test(NAME hmc_multi_trajectory_run
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC} ${HMC_TRAJECTORY}
+    --hmc-n-trajectories 3 --hmc-thermalization 1
+    --gtest_filter=HMC.MultiTrajectoryRun
+    --gtest_output=xml:hmc_multi_trajectory_run.xml)
+
+  # --- MG-preconditioned multi-trajectory (clover, single precision) ---
+  # Run at uniform single precision throughout: MG internal kernels (smoother
+  # WilsonClover dslash, calculateY) are instantiated for matching gauge/clover
+  # precisions; mixed double-precise + single-sloppy creates double clover with
+  # single sloppy gauge, which the smoother arg packer rejects. Pure single
+  # avoids that mismatch and is sufficient for testing the MG+HMC pipeline.
+  add_test(NAME hmc_mg_preconditioned_run
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} --dslash-type clover --mass 0.5
+    --prec single --prec-sloppy single --prec-precondition single
+    --compute-clover true --clover-coeff 1.0
+    ${HMC_TRAJECTORY}
+    --hmc-n-trajectories 2 --hmc-thermalization 1
+    --gtest_filter=HMC.MGPreconditionedRun
+    --gtest_output=xml:hmc_mg_preconditioned_run.xml)
+
+  # --- Reversibility (MANDATORY coverage of every integrator) ---
+  add_test(NAME hmc_reversibility_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC} ${HMC_TRAJECTORY}
+    --hmc-n-trajectories 3 --hmc-thermalization 1
+    --hmc-reversibility-interval 1 --hmc-reversibility-tol 1e-10
+    --gtest_filter=HMC.ReversibilityTest
+    --gtest_output=xml:hmc_reversibility_test.xml)
+
+  add_test(NAME hmc_reversibility_all_integrators
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_MIXED} ${HMC_TRAJECTORY}
+    --gtest_filter=HMC.ReversibilityAllIntegrators
+    --gtest_output=xml:hmc_reversibility_all_integrators.xml)
+
+  # --- Production driver (small config, no gauge file, plain CG) ---
+  add_test(NAME hmc_production
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_PREC} ${HMC_TRAJECTORY}
+    --hmc-n-trajectories 2 --hmc-thermalization 1
+    --mg-levels 1
+    --gtest_filter=HMC.Production
+    --gtest_output=xml:hmc_production.xml)
+
+  # --- Eigentracking unit tests ---
+  # All knobs (TRLM tol, max_restarts, n_ev, pool capacity, poly-acc settings)
+  # are CLI-driven via --eigentracking-* flags. The same flags configure
+  # production EigenTrackingState::maybeInit via QudaHMCParam.
+  # Heavy mass + a_min above the M^dag M target spectrum (~0.65) makes TRLM
+  # converge on 4^4 hot-start gauges (per QUDA eigensolver wiki guidance).
+  set(HMC_EIGENTEST_POLYACC --eigentracking-use-poly-acc true --eigentracking-a-min 1.0)
+
+  add_test(NAME hmc_eigentracking_pool_init_and_compress
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
+    --gtest_filter=EigenTracking.PoolInitAndCompress
+    --gtest_output=xml:hmc_eigentracking_pool_init_and_compress.xml)
+
+  add_test(NAME hmc_eigentracking_force_update
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
+    --gtest_filter=EigenTracking.ForceUpdate
+    --gtest_output=xml:hmc_eigentracking_force_update.xml)
+
+  add_test(NAME hmc_eigentracking_rayleigh_ritz_evolve
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
+    --gtest_filter=EigenTracking.RayleighRitzEvolve
+    --gtest_output=xml:hmc_eigentracking_rayleigh_ritz_evolve.xml)
+
+  add_test(NAME hmc_eigentracking_forecast
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY}
+    --gtest_filter=EigenTracking.Forecast
+    --gtest_output=xml:hmc_eigentracking_forecast.xml)
+
+  # CGRitzExtraction, FullTrajectory, and ThermalizeAndTrack exercise TRLM
+  # through CGRitzExtractor::extract and EigenTrackingState::maybeInit;
+  # both now accept polynomial-acceleration parameters. Poly-acc is enabled
+  # either in the test fixture (CGRitzExtraction, FullTrajectory) or via the
+  # --eigentracking-* CLI flags (ThermalizeAndTrack) with a_min = 1.0 above
+  # the heavy-mass (mass=2.0) M^dag M spectrum.
+  add_test(NAME hmc_eigentracking_cg_ritz_extraction
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_EIGENTEST_POLYACC}
+    --gtest_filter=EigenTracking.CGRitzExtraction
+    --gtest_output=xml:hmc_eigentracking_cg_ritz_extraction.xml)
+
+  add_test(NAME hmc_eigentracking_full_trajectory
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY} ${HMC_EIGENTEST_POLYACC}
+    --gtest_filter=EigenTracking.FullTrajectory
+    --gtest_output=xml:hmc_eigentracking_full_trajectory.xml)
+
+  add_test(NAME hmc_eigentracking_thermalize_and_track
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hmc_test> ${MPIEXEC_POSTFLAGS}
+    ${HMC_DIM} ${HMC_WILSON_HEAVY} ${HMC_TRAJECTORY} ${HMC_EIGENTEST_POLYACC}
+    --hmc-n-trajectories 2 --hmc-thermalization 1
+    --eigentracking true --eigentracking-n-ev 6
+    --eigentracking-pool-capacity 16 --eigentracking-n-ritz 3
+    --gtest_filter=EigenTracking.ThermalizeAndTrack
+    --gtest_output=xml:hmc_eigentracking_thermalize_and_track.xml)
 endif()
 
 add_test(NAME gauge_path

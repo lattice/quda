@@ -81,6 +81,8 @@ set (QUDA_OBJS
   reduce_helper.cu
   contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
+  hmc.cpp hmc_integrator.cpp coarse_deflation_manager.cpp low_mode_force.cpp
+  eigen_tracker.cpp eigen_forecast.cpp cg_ritz_extractor.cpp gcr_tracker.cpp eigen_tracking_state.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
@@ -111,7 +113,8 @@ set (QUDA_OBJS
   inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu pgauge_det_trace.cu clover_outer_product.cu
-  clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
+  clover_sigma_outer_product.cu
+  momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu
   madwf_ml.cpp quda_ptr.cpp
@@ -488,6 +491,20 @@ else()
   add_library(quda STATIC)
 endif()
 add_library(QUDA::quda ALIAS quda)
+
+# Optionally disable LTO for QUDA: some MPI installations built with -flto
+# provoke fatbinData symbol collisions at link time. On by default (QUDA does
+# not itself enable IPO, so this only strips LTO flags injected by compiler
+# wrappers); disable with -DQUDA_DISABLE_LTO=OFF to allow such flags through.
+option(QUDA_DISABLE_LTO "Disable link-time optimization for the QUDA targets (workaround for MPI built with -flto)" ON)
+mark_as_advanced(QUDA_DISABLE_LTO)
+if(QUDA_DISABLE_LTO)
+  set_target_properties(quda PROPERTIES INTERPROCEDURAL_OPTIMIZATION FALSE)
+  set_target_properties(quda_cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION FALSE)
+  target_compile_options(quda PRIVATE -fno-lto)
+  target_link_options(quda PRIVATE -fno-lto)
+  target_compile_options(quda_cpp PRIVATE -fno-lto)
+endif()
 
 # add target specific files
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
