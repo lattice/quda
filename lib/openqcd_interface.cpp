@@ -1732,6 +1732,33 @@ static void openQCD_qudaSolverUpdate(void *param_)
     }
     mg_set_revision(param);
   }
+
+  /**
+   * If a multigrid preconditioner exists and we did not just (re-)build it,
+   * the cached fine-level Dirac operators may still hold stale pointers to
+   * gauge fields that were freed/reallocated by checkGauge() for a previous
+   * solver with different precision settings.  Refresh those pointers via a
+   * thin update, which only re-points the Dirac operators to the current
+   * resident gauge/clover fields and does not rebuild the multigrid subspace.
+   */
+  if (in_comm()
+      && param->inv_type_precondition == QUDA_MG_INVERTER
+      && param->preconditioner != nullptr
+      && !do_multigrid_update
+      && !gauge_field_get_unset()) {
+    QudaMultigridParam *mg_param = additional_prop->mg_param;
+
+    if (mg_param == nullptr) { WITH_COMM(errorQuda("No multigrid parameter struct set.")); }
+
+    QudaBoolean saved_thin_update = mg_param->thin_update_only;
+    mg_param->thin_update_only = QUDA_BOOLEAN_TRUE;
+
+    PUSH_RANGE("updateMultigridQuda_thin", 4);
+    updateMultigridQuda(param->preconditioner, mg_param);
+    POP_RANGE;
+
+    mg_param->thin_update_only = saved_thin_update;
+  }
 }
 
 void *openQCD_qudaSolverGetHandle(int id)
