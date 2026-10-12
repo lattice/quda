@@ -391,7 +391,8 @@ namespace quda {
           from_face_dim_dir_hd[b][i][dir] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][dir];
 
           my_face_dim_dir_d[b][i][dir] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][dir];
-          from_face_dim_dir_d[b][i][dir] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir];
+          from_face_dim_dir_d[b][i][dir]
+            = from_face_d[b] ? static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir] : nullptr;
         } // loop over b
       }   // loop over direction
     } // loop over dimension
@@ -409,8 +410,9 @@ namespace quda {
           mh_recv[b][i][dir] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][dir], i, hop, ghost_face_bytes[i]);
           mh_send_rdma[b][i][dir]
             = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
-          mh_recv_rdma[b][i][dir]
-            = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
+          mh_recv_rdma[b][i][dir] = gdr && from_face_dim_dir_d[b][i][dir] ?
+            comm_declare_receive_relative(from_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) :
+            nullptr;
         }
       } // loop over b
 
@@ -488,6 +490,12 @@ namespace quda {
     for (int b=0; b<2; b++) {
       // set remote send buffer to ghost receive buffers on neighboring processes
       comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
+    }
+    if (comm_nvshmem_enabled()) {
+      comm_peer2peer_finalize_validation();
+      comm_peer2peer_report_validated();
+    }
+    for (int b = 0; b < 2; b++) {
       // get remote events
       comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
     }
@@ -495,15 +503,19 @@ namespace quda {
     if (comm_nvshmem_enabled()) {
       for (int b = 0; b < 2; b++) {
         comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
-        comm_create_local_event(ipcCopyEvent[b]);
       }
+      comm_peer2peer_finalize_validation();
+      comm_peer2peer_report_validated();
+      for (int b = 0; b < 2; b++) { comm_create_local_event(ipcCopyEvent[b]); }
     } else {
       for (int b = 0; b < 2; b++) {
         // set remote send buffer to ghost receive buffers on neighboring processes
         ghost_recv_buffer_d[b] = comm_create_local_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_bytes);
-        comm_create_local_event(ipcCopyEvent[b]);
         from_face_d[b] = ghost_recv_buffer_d[b];
       }
+      comm_peer2peer_finalize_validation();
+      comm_peer2peer_report_validated();
+      for (int b = 0; b < 2; b++) { comm_create_local_event(ipcCopyEvent[b]); }
     }
 
     // Update the receive buffers
@@ -516,6 +528,20 @@ namespace quda {
         } // loop over b
       }   // loop over direction
     } // loop over dimension
+
+    if (!comm_nvshmem_enabled() && comm_gdr_enabled()) {
+      for (int i = 0; i < nDimComms; i++) {
+        if (!commDimPartitioned(i)) continue;
+        for (int dir = 0; dir < 2; dir++) {
+          int hop = dir == 0 ? -1 : +1;
+          for (int b = 0; b < 2; ++b) {
+            if (mh_recv_rdma[b][i][dir]) comm_free(mh_recv_rdma[b][i][dir]);
+            mh_recv_rdma[b][i][dir]
+              = comm_declare_receive_relative(from_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]);
+          }
+        }
+      }
+    }
 #endif
 
     // zero the host-side signaling buffers

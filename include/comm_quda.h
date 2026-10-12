@@ -337,6 +337,28 @@ namespace quda
   bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
+     Disable peer-to-peer communication for a single directed neighbor link.
+     This is used when runtime creation of the remote mapping fails after the
+     link was identified as a peer-to-peer candidate during topology setup.
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+  */
+  void comm_peer2peer_disable(int dir, int dim);
+
+  /**
+     Collectively commit the peer-to-peer links that survived runtime
+     remote-mapping validation.  This must be called by every rank after all
+     candidate links have been validated and before the links are used.
+  */
+  void comm_peer2peer_finalize_validation();
+
+  /**
+     Report peer-to-peer links that have survived runtime remote-mapping
+     validation.  Each communicator reports its validated links only once.
+  */
+  void comm_peer2peer_report_validated();
+
+  /**
      @brief Enable / disable peer-to-peer communication: used for dslash
      policies that do not presently support peer-to-peer communication
      @param[in] enable Boolean flag to enable / disable peer-to-peer communication

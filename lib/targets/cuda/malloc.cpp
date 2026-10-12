@@ -73,6 +73,9 @@ namespace quda
   static size_t max_total_bytes[N_ALLOC_TYPE] = {0};
   static size_t total_host_bytes, max_total_host_bytes;
   static size_t total_pinned_bytes, max_total_pinned_bytes;
+#ifdef NVSHMEM_COMMS
+  static bool nvshmem_initialized = false;
+#endif
 
   size_t device_allocated() { return total_bytes[DEVICE]; }
 
@@ -436,6 +439,8 @@ namespace quda
 #ifdef NVSHMEM_COMMS
   void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
   {
+    if (!nvshmem_initialized) errorQuda("NVSHMEM allocation requested before NVSHMEM initialization");
+
     MemAlloc a(func, file, line);
 
     a.size = a.base_size = size;
@@ -507,12 +512,16 @@ namespace quda
    */
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
-    if (!comm_peer2peer_present()) {
+    if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())", file, line, func); }
+    if (alloc[DEVICE].count(ptr)) {
       device_free_(func, file, line, ptr);
       return;
     }
+    if (alloc[MANAGED].count(ptr)) {
+      managed_free_(func, file, line, ptr);
+      return;
+    }
 
-    if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())", file, line, func); }
     if (!alloc[DEVICE_PINNED].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())", file, line, func);
     }
@@ -756,23 +765,33 @@ namespace quda
         pool_init = true;
       }
 #if defined(NVSHMEM_COMMS)
-      MPI_Comm tmp = MPI_COMM_WORLD;
-      warningQuda("Init NVSHMEM");
-      nvshmemx_init_attr_t attr;
-      attr.mpi_comm = &tmp;
-      nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
+      int nvshmem_enabled_count = comm_nvshmem_enabled();
+      comm_allreduce_int(nvshmem_enabled_count);
+      if (nvshmem_enabled_count != 0 && nvshmem_enabled_count != static_cast<int>(comm_size()))
+        errorQuda("QUDA_ENABLE_NVSHMEM must have the same value on every rank");
+
+      if (nvshmem_enabled_count && !nvshmem_initialized) {
+        MPI_Comm tmp = MPI_COMM_WORLD;
+        warningQuda("Initializing NVSHMEM");
+        nvshmemx_init_attr_t attr {};
+        attr.mpi_comm = &tmp;
+        int status = nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
+        if (status != 0) errorQuda("NVSHMEM initialization failed with error %d", status);
+        nvshmem_initialized = true;
+      }
 #endif
     }
 
     void destroy()
     {
 #if defined(NVSHMEM_COMMS)
-      // Pairs with the NVSHMEM bootstrap in init().  NVSHMEM 3.7.0 defers the
-      // transport-plugin dlclose to an atexit handler, so without an explicit
-      // finalize the proxy progress thread outlives the transport module and
-      // segfaults when atexit dlcloses it.  Finalize here (collective, with the
-      // GPU context and MPI still live) before the transport is torn down.
-      nvshmem_finalize();
+      if (nvshmem_initialized) {
+        // NVSHMEM 3.7.0 defers the transport-plugin dlclose to an atexit
+        // handler, so finalize collectively while the GPU context and MPI are
+        // still live.
+        nvshmem_finalize();
+        nvshmem_initialized = false;
+      }
 #endif
     }
 
