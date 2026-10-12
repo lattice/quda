@@ -618,17 +618,15 @@ static bool is_pc_solve(const QudaInvertParam *param)
 /**
  * @brief      Replicate openQxD's twisted-mass convention on parameter struct.
  *
- * Decide how to set the twisted mass depending the param's solve_type (using
- * is_pc_solve) to replicate openQxD's logic when eoflg=1, only even block has
- * twisted mass:
+ * Decide how to set the twisted mass depending on param's solve_type (using
+ * is_pc_solve) to replicate openQxD's logic. On openQxd, when eoflg=1, only the
+ * even block has the twisted mass:
  *      Dhat = (A_ee + i*mu*g5) - D_eo * A_oo^-1 * D_oe
  *
- * - Full solve: twisted mass set on all sites, using TM on mu and tm_rho=0.0.
- *   The MG preconditioner setup takes this branch because QUDA sets it up on
- *   the full operator (override to full solve in openQCD_qudaSolverReadIn).
+ * - Full solve: twisted mass set on all sites using mu, tm_rho=0.0.
  * 
- * - PC solve (DIRECT_PC, NORMOP_PC, NORMERR_PC): twisted mass is set using
- *   tm_rho ("applied like twisted mass to diagonal (but not inverse)") with
+ * - PC solve (DIRECT_PC, NORMOP_PC, NORMERR_PC): twisted mass is set on
+ *   tm_rho ("applied like twisted mass to diagonal (but not inverse)") and
  *   mu=0.0  Override matpc_type to use the asymmetric preconditioned operator,
  *   to enable tm_rho in the diagonal (DiracTwistedCloverPC::M).
  *
@@ -645,7 +643,7 @@ static void set_openqxd_twist(QudaInvertParam *param, double mu)
   if (std::fabs(mu) > 0.0) {
     param->twist_flavor = QUDA_TWIST_SINGLET;
     param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
-    if (pc) { /* Recover assymetric types after being set up */
+    if (pc) { /* Ensure assymetric types */
       if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
         param->matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
       } else if (param->matpc_type == QUDA_MATPC_ODD_ODD) {
@@ -1772,7 +1770,6 @@ static void *openQCD_qudaSolverReadIn(int id)
   MPI_Bcast((void *)invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, qudaState.layout.world_comm);
   MPI_Bcast((void *)multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, qudaState.layout.world_comm);
   multigrid_param->invert_param = invert_param_mg;
-
 
   /**
    * We need a void* to store the multigrid_param (QudaMultigridParam) struct,
