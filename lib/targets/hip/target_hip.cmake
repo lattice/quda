@@ -23,16 +23,6 @@ mark_as_advanced(GPU_TARGETS)
 mark_as_advanced(CMAKE_HIP_ARCHITECTURES)
 message(STATUS "Building for GPU Architectures: ${QUDA_GPU_ARCH}")
 
-find_package(HIP)
-find_package(hipfft REQUIRED)
-find_package(hiprand REQUIRED)
-find_package(rocrand REQUIRED)
-find_package(hipblas REQUIRED)
-find_package(rocblas REQUIRED)
-find_package(hipcub REQUIRED)
-find_package(rocprim REQUIRED)
-
-
 # ######################################################################################################################
 # define HIP flags
 set(CMAKE_HIP_HOST_COMPILER
@@ -76,6 +66,24 @@ mark_as_advanced(CMAKE_HIP_FLAGS_SANITIZE)
 enable_language(HIP)
 message(STATUS "HIP Compiler is" ${CMAKE_HIP_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_HIP_COMPILER_ID})
+
+# enable_language records the compiler's ROCm root in CMAKE_HIP_COMPILER_ROCM_ROOT.
+# Searching before that follows ROCM_PATH or /opt/rocm and can attach a different
+# ROCm's headers and libraries to the compiler that was requested.
+if(CMAKE_HIP_COMPILER_ROCM_ROOT)
+  set(_quda_hip_hints HINTS "${CMAKE_HIP_COMPILER_ROCM_ROOT}")
+else()
+  set(_quda_hip_hints)
+endif()
+find_package(HIP ${_quda_hip_hints})
+find_package(hipfft REQUIRED ${_quda_hip_hints})
+find_package(hiprand REQUIRED ${_quda_hip_hints})
+find_package(rocrand REQUIRED ${_quda_hip_hints})
+find_package(hipblas REQUIRED ${_quda_hip_hints})
+find_package(rocblas REQUIRED ${_quda_hip_hints})
+find_package(hipcub REQUIRED ${_quda_hip_hints})
+find_package(rocprim REQUIRED ${_quda_hip_hints})
+unset(_quda_hip_hints)
 
 # ######################################################################################################################
 # data order variables

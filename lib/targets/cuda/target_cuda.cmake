@@ -2,8 +2,6 @@
 # CUDA specific part of CMakeLists
 set(CMAKE_CUDA_EXTENSIONS OFF)
 
-find_package(CUDAToolkit REQUIRED)
-
 set(QUDA_TARGET_CUDA ON)
 
 if(DEFINED ENV{QUDA_GPU_ARCH})
@@ -77,6 +75,11 @@ elseif(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC")
   set(QUDA_CUDA_BUILD_TYPE "NVHPC")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
+
+# Compiler detection records CMAKE_CUDA_COMPILER_TOOLKIT_ROOT from the nvcc in
+# CMAKE_CUDA_COMPILER. Searching before enable_language follows CUDA_PATH or PATH
+# and can attach a different toolkit's headers to that compiler.
+find_package(CUDAToolkit REQUIRED)
 
 # ######################################################################################################################
 # CUDA specific QUDA options
