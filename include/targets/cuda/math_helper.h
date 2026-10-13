@@ -81,47 +81,47 @@ namespace quda
 #define QUDA_FPMP_DECLARE_UNARY_MATH(FF)                                                                               \
   template <> inline __host__ __device__ FF exp(const FF a)                                                            \
   {                                                                                                                    \
-    return FF(cuda::experimental::exp(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                  \
+    return FF(cuda::exp(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                               \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF log(const FF a)                                                            \
   {                                                                                                                    \
-    return FF(cuda::experimental::log(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                  \
+    return FF(cuda::log(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                               \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF sin(const FF a)                                                            \
   {                                                                                                                    \
-    return FF(cuda::experimental::sin(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                  \
+    return FF(cuda::sin(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                               \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF cos(const FF a)                                                            \
   {                                                                                                                    \
-    return FF(cuda::experimental::cos(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                  \
+    return FF(cuda::cos(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                               \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF sinh(const FF a)                                                           \
   {                                                                                                                    \
-    return FF(cuda::experimental::sinh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                 \
+    return FF(cuda::sinh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                              \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF cosh(const FF a)                                                           \
   {                                                                                                                    \
-    return FF(cuda::experimental::cosh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                 \
+    return FF(cuda::cosh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                              \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF acos(const FF a)                                                           \
   {                                                                                                                    \
-    return FF(cuda::experimental::acos(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                 \
+    return FF(cuda::acos(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                              \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF acosh(const FF a)                                                          \
   {                                                                                                                    \
-    return FF(cuda::experimental::acosh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                \
+    return FF(cuda::acosh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                             \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF asinh(const FF a)                                                          \
   {                                                                                                                    \
-    return FF(cuda::experimental::asinh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                \
+    return FF(cuda::asinh(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                             \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF cbrt(const FF a)                                                           \
   {                                                                                                                    \
-    return FF(cuda::experimental::cbrt(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                 \
+    return FF(cuda::cbrt(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                              \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF sqrt(const FF a)                                                           \
   {                                                                                                                    \
-    return FF(cuda::experimental::sqrt(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                 \
+    return FF(cuda::sqrt(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                              \
   }
 
   QUDA_FPMP_DECLARE_UNARY_MATH(floatfloat_low)
@@ -138,12 +138,12 @@ namespace quda
   template <> inline __host__ __device__ FF pow(const FF a, const int b)                                               \
   {                                                                                                                    \
     using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
-    return FF(cuda::experimental::pow(static_cast<const ccc_t &>(a), static_cast<ccc_t>(FF(b))));                      \
+    return FF(cuda::pow(static_cast<const ccc_t &>(a), static_cast<ccc_t>(FF(b))));                                    \
   }                                                                                                                    \
   template <> inline __host__ __device__ FF pow(const FF a, const FF b)                                                \
   {                                                                                                                    \
     using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
-    return FF(cuda::experimental::pow(static_cast<const ccc_t &>(a), static_cast<const ccc_t &>(b)));                   \
+    return FF(cuda::pow(static_cast<const ccc_t &>(a), static_cast<const ccc_t &>(b)));                                \
   }
 
   QUDA_FPMP_DECLARE_POW(floatfloat_low)
@@ -226,8 +226,8 @@ namespace quda
   template <> inline __host__ __device__ void sincos(const FF &a, FF *s, FF *c)                                        \
   {                                                                                                                    \
     using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
-    *s = FF(cuda::experimental::sin(static_cast<const ccc_t &>(a)));                                                   \
-    *c = FF(cuda::experimental::cos(static_cast<const ccc_t &>(a)));                                                   \
+    *s = FF(cuda::sin(static_cast<const ccc_t &>(a)));                                                                 \
+    *c = FF(cuda::cos(static_cast<const ccc_t &>(a)));                                                                 \
   }
 
   QUDA_FPMP_DECLARE_SINCOS(floatfloat_low)
@@ -275,7 +275,7 @@ namespace quda
   {                                                                                                                    \
     using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
     ccc_t s_tmp, c_tmp;                                                                                                \
-    cuda::experimental::sincospi(static_cast<const ccc_t &>(a), &s_tmp, &c_tmp);                                       \
+    cuda::sincospi(static_cast<const ccc_t &>(a), &s_tmp, &c_tmp);                                                     \
     *s = FF(s_tmp);                                                                                                    \
     *c = FF(c_tmp);                                                                                                    \
   }
@@ -324,7 +324,7 @@ namespace quda
   template <> inline __host__ __device__ FF sinpi(FF a)                                                                \
   {                                                                                                                    \
     using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
-    return FF(cuda::experimental::sinpi(static_cast<const ccc_t &>(a)));                                               \
+    return FF(cuda::sinpi(static_cast<const ccc_t &>(a)));                                                             \
   }
 
   QUDA_FPMP_DECLARE_SINPI(floatfloat_low)
@@ -371,7 +371,7 @@ namespace quda
   template <> inline __host__ __device__ FF cospi(FF a)                                                                \
   {                                                                                                                    \
     using ccc_t = floatfloat_cccl_t<FF>;                                                                               \
-    return FF(cuda::experimental::cospi(static_cast<const ccc_t &>(a)));                                               \
+    return FF(cuda::cospi(static_cast<const ccc_t &>(a)));                                                             \
   }
 
   QUDA_FPMP_DECLARE_COSPI(floatfloat_low)
@@ -402,7 +402,7 @@ namespace quda
 #define QUDA_FPMP_DECLARE_RSQRT(FF)                                                                                    \
   template <> inline __host__ __device__ FF rsqrt(FF a)                                                                \
   {                                                                                                                    \
-    return FF(cuda::experimental::rsqrt(static_cast<const floatfloat_cccl_t<FF> &>(a)));                               \
+    return FF(cuda::rsqrt(static_cast<const floatfloat_cccl_t<FF> &>(a)));                                             \
   }
 
   QUDA_FPMP_DECLARE_RSQRT(floatfloat_low)

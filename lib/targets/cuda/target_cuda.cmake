@@ -567,7 +567,8 @@ if(QUDA_DOWNLOAD_CCCL)
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY NVIDIA/cccl
-      GIT_TAG main
+      # main as of 2026-10-13. FPMP lives in namespace cuda::, not cuda::experimental::.
+      GIT_TAG 358f3baa887ff7c804a1901560d689e7b6c07004
       OPTIONS "CCCL_ENABLE_INSTALL_RULES ON"
               "libcudacxx_ENABLE_INSTALL_RULES ON"
               "CUB_ENABLE_INSTALL_RULES ON"

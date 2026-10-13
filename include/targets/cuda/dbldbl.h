@@ -13,9 +13,9 @@
 // The three fp64mp2 accuracies are distinct C++ types, so reductions
 // (QUDA_REDUCTION_TYPE) can pin low/mid/high independently of the
 // `doubledouble` alias (QUDA_FPMP_DOUBLEDOUBLE_ACCURACY).
-using doubledouble_low = cuda::experimental::fp64mp2_low;
-using doubledouble_mid = cuda::experimental::fp64mp2_mid;
-using doubledouble_high = cuda::experimental::fp64mp2_high;
+using doubledouble_low = cuda::fp64mp2_low;
+using doubledouble_mid = cuda::fp64mp2_mid;
+using doubledouble_high = cuda::fp64mp2_high;
 
 #if defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW)
 using doubledouble = doubledouble_low;
@@ -38,8 +38,8 @@ namespace quda
 {
   template <typename T> struct is_doubledouble : std::false_type {
   };
-  template <cuda::experimental::fpmp2_accuracy Acc>
-  struct is_doubledouble<cuda::experimental::fpmp2<double, Acc>> : std::true_type {
+  template <cuda::fpmp2_accuracy Acc>
+  struct is_doubledouble<cuda::fpmp2<double, Acc>> : std::true_type {
   };
   template <typename T> constexpr bool is_doubledouble_v = is_doubledouble<T>::value;
   template <typename T> using enable_if_doubledouble = std::enable_if_t<is_doubledouble_v<T>, int>;
@@ -48,7 +48,7 @@ namespace quda
 // CCCL spells this operation fabs; keep QUDA's existing unqualified abs interface.
 template <typename T, quda::enable_if_doubledouble<T> = 0> __device__ __host__ inline T abs(const T &a)
 {
-  return cuda::experimental::fabs(a);
+  return cuda::fabs(a);
 }
 namespace cuda::experimental
 {

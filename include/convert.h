@@ -238,7 +238,7 @@ namespace quda
   {
 #if defined(QUDA_FPMP_FLOATFLOAT)
     if constexpr (std::is_same_v<Src, floatfloat_low>) {
-      return static_cast<Dst>(cuda::experimental::renormalize(s));
+      return static_cast<Dst>(cuda::renormalize(s));
     } else
 #endif
     {

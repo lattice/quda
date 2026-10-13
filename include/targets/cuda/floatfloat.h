@@ -15,7 +15,7 @@
 // alias for one of them, which lets the reduction accuracy
 // (QUDA_REDUCTION_TYPE) be chosen independently of the bulk accuracy
 // (QUDA_FPMP_FLOATFLOAT_ACCURACY).
-using floatfloat_low = cuda::experimental::fp32mp2_low;
+using floatfloat_low = cuda::fp32mp2_low;
 
 /**
    MID/HIGH arithmetic assumes a renormalized (hi, lo) pair.  LOW arithmetic
@@ -51,14 +51,14 @@ template <typename CccT> struct fp32mp2_normalized : CccT {
     return *this;
   }
 
-  __host__ __device__ explicit fp32mp2_normalized(const cuda::experimental::fp32mp2_low &x) :
-    CccT(cuda::experimental::renormalize(CccT(x.hi(), x.lo())))
+  __host__ __device__ explicit fp32mp2_normalized(const cuda::fp32mp2_low &x) :
+    CccT(cuda::renormalize(CccT(x.hi(), x.lo())))
   {
   }
 
-  __host__ __device__ fp32mp2_normalized &operator=(const cuda::experimental::fp32mp2_low &x)
+  __host__ __device__ fp32mp2_normalized &operator=(const cuda::fp32mp2_low &x)
   {
-    static_cast<CccT &>(*this) = cuda::experimental::renormalize(CccT(x.hi(), x.lo()));
+    static_cast<CccT &>(*this) = cuda::renormalize(CccT(x.hi(), x.lo()));
     return *this;
   }
 
@@ -192,8 +192,8 @@ template <typename CccT> struct fp32mp2_normalized : CccT {
   }
 };
 
-using floatfloat_mid = fp32mp2_normalized<cuda::experimental::fp32mp2_mid>;
-using floatfloat_high = fp32mp2_normalized<cuda::experimental::fp32mp2_high>;
+using floatfloat_mid = fp32mp2_normalized<cuda::fp32mp2_mid>;
+using floatfloat_high = fp32mp2_normalized<cuda::fp32mp2_high>;
 
 #if defined(QUDA_FPMP_FLOATFLOAT_ACCURACY_LOW)
 using floatfloat = floatfloat_low;
@@ -215,8 +215,8 @@ namespace quda
   /** True for any fp32mp2 accuracy, not just the one aliased by floatfloat. */
   template <typename T> struct is_floatfloat : std::false_type {
   };
-  template <cuda::experimental::fpmp2_accuracy Acc>
-  struct is_floatfloat<cuda::experimental::fpmp2<float, Acc>> : std::true_type {
+  template <cuda::fpmp2_accuracy Acc>
+  struct is_floatfloat<cuda::fpmp2<float, Acc>> : std::true_type {
   };
   template <typename CccT> struct is_floatfloat<fp32mp2_normalized<CccT>> : is_floatfloat<CccT> {
   };
@@ -238,8 +238,7 @@ namespace quda
   __device__ __host__ inline T floatfloat_div_high(const T &num, const T &den)
   {
     using ccc_t = floatfloat_cccl_t<T>;
-    return T(cuda::experimental::div<cuda::experimental::fpmp2_accuracy::high>(static_cast<const ccc_t &>(num),
-                                                                               static_cast<const ccc_t &>(den)));
+    return T(cuda::div<cuda::fpmp2_accuracy::high>(static_cast<const ccc_t &>(num), static_cast<const ccc_t &>(den)));
   }
 
   template <typename T, enable_if_floatfloat<T> = 0> __device__ __host__ constexpr T floatfloat_numeric_lowest(const T &)
@@ -263,7 +262,7 @@ namespace quda
 template <typename T, quda::enable_if_floatfloat<T> = 0> __device__ __host__ inline T abs(const T &a)
 {
   using ccc_t = quda::floatfloat_cccl_t<T>;
-  return T(cuda::experimental::fabs(static_cast<const ccc_t &>(a)));
+  return T(cuda::fabs(static_cast<const ccc_t &>(a)));
 }
 
 /** Two-component container mirroring double2 for an fp32mp2 accuracy. */
