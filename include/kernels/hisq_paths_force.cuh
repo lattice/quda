@@ -103,9 +103,14 @@ namespace quda {
       const real seven;
       const real lepage;
       PathCoefficients(const double *path_coeff_array)
-        : one(path_coeff_array[0]), naik(path_coeff_array[1]),
-          three(path_coeff_array[2]), five(path_coeff_array[3]),
-          seven(path_coeff_array[4]), lepage(path_coeff_array[5]) { }
+        : one(static_cast<real>(path_coeff_array[0])),
+          naik(static_cast<real>(path_coeff_array[1])),
+          three(static_cast<real>(path_coeff_array[2])),
+          five(static_cast<real>(path_coeff_array[3])),
+          seven(static_cast<real>(path_coeff_array[4])),
+          lepage(static_cast<real>(path_coeff_array[5]))
+      {
+      }
     };
 
     template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase_>
@@ -122,7 +127,7 @@ namespace quda {
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
       static constexpr bool use_inphase = (recon == QUDA_RECONSTRUCT_13 && phase == QUDA_STAGGERED_PHASE_MILC);
 
-      using Gauge = typename gauge_mapper<real, recon, 18, phase, ghost, use_inphase>::type;
+      using Gauge = typename gauge_mapper<store_t, recon, 18, phase, ghost, use_inphase>::type;
 
       const Gauge link;
       int_fastdiv X[4]; // regular grid dims
@@ -160,7 +165,7 @@ namespace quda {
         kernel_param(dim3(1, 2, 1)),
         link(link),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) },
-        tboundary(link.TBoundary()),
+        tboundary(static_cast<real>(static_cast<int>(link.TBoundary()))),
         is_first_time_slice(comm_coord(3) == 0 ? true : false),
         is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
         mu(-1), nu(-1), rho(-1), sig(-1), compute_lepage(-1), nu_next(-1)
@@ -211,7 +216,7 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
+      using Link = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
 
       Link force;
 
@@ -280,7 +285,7 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
+      using Link = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
 
       Link force;
       Link p3;
@@ -641,7 +646,7 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
+      using Link = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
 
       Link force;
       Link shortP;
@@ -1021,7 +1026,7 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
+      using Link = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
 
       Link force;        // force output accessor
       const Link oProd; // force input accessor
@@ -1058,7 +1063,7 @@ namespace quda {
 
           makeAntiHerm(Ow);
 
-          typename Arg::real coeff = (parity==1) ? -1.0 : 1.0;
+          typename Arg::real coeff = (parity==1) ? static_cast<typename Arg::real>(-1) : static_cast<typename Arg::real>(1);
           arg.force(sig, e_cb, parity) = coeff * Ow;
         }
       }
@@ -1069,7 +1074,7 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
+      using Link = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
 
       Link force;
       const Link oProd;
@@ -1077,8 +1082,8 @@ namespace quda {
 
       static constexpr int overlap = 0;
 
-      LongLinkArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod, real coeff)
-        : BaseForceArg(link, overlap), force(force), oProd(oprod), coeff(coeff)
+      LongLinkArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod, real_t coeff)
+        : BaseForceArg(link, overlap), force(force), oProd(oprod), coeff(static_cast<real>(coeff))
       { }
 
     };

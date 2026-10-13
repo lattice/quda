@@ -161,7 +161,7 @@ namespace quda
        @param[in] t The input value we want to make warp uniform
        @return The warp uniform variant
     */
-    template <typename T> constexpr bool uniform(const T &t) { return t; }
+    template <typename T> constexpr T uniform(const T &t) { return t; }
 
   } // namespace target
 

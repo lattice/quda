@@ -62,7 +62,7 @@ void covdevReference(real_t *res, real_t **link, real_t **ghostLink, const Color
     } else {
       for (int s = 0; s < in.Nspin(); s++) su3Mul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
     }
-    sum(&res[offset], &res[offset], gaugedSpinor.data(), spinor_site_size);
+    sum(&res[offset], &res[offset], gaugedSpinor.data(), my_spinor_site_size);
 
   } // 4-d volume
 }

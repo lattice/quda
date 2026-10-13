@@ -37,9 +37,9 @@ namespace quda {
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       n_flavor(doublet ? 2 : 1),
       volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB()),
-      a(0.0),
-      b(0.0),
-      c(0.0)
+      a(real(0)),
+      b(real(0)),
+      c(real(0))
     {
       for (auto i = 0u; i < in.size(); i++) {
         this->in[i] = in[i];
@@ -56,27 +56,27 @@ namespace quda {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
 	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
           b = real(2.0 * kappa * mu);
-          a = 1.0;
+          a = real(1);
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
           b = -real(2.0 * kappa * mu);
-          a = 1.0 / (1.0 + b * b);
+          a = real(1) / (real(1) + b * b);
         }
-	c = 0.0;
-        if (dagger) b *= -1.0;
+	c = real(0);
+        if (dagger) b *= real(-1);
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
           b = real(2.0 * kappa * mu);
           c = -real(2.0 * kappa * epsilon);
-          a = 1.0;
+          a = real(1);
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
           b = -real(2.0 * kappa * mu);
           c = real(2.0 * kappa * epsilon);
-          a = 1.0 / (1.0 + b * b - c * c);
+          a = real(1) / (real(1) + b * b - c * c);
           if (a <= 0)
             errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", static_cast<double>(kappa),
                       static_cast<double>(mu), static_cast<double>(epsilon));
         }
-        if (dagger) b *= -1.0;
+        if (dagger) b *= real(-1);
       }
     }
   };

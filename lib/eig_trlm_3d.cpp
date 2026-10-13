@@ -246,6 +246,9 @@ namespace quda
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
+    // The 3-d solver holds an independent operator per slice; report the largest
+    reportMatNorm(*std::max_element(mat_norm_3D.begin(), mat_norm_3D.end()));
+
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {

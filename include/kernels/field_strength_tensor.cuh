@@ -11,6 +11,7 @@ namespace quda
   struct FmunuArg : kernel_param<>
   {
     using Float = Float_;
+    using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
@@ -38,7 +39,7 @@ namespace quda
   template <typename Arg>
   __device__ __host__ inline void computeFmunuCore(const Arg &arg, int idx, int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::Float>, 3>;
+    using Link = Matrix<complex<typename Arg::real>, 3>;
 
     int x[4];
     int X[4];
@@ -166,7 +167,7 @@ namespace quda
     // 3*18 + 12*198 =  54 + 2376 = 2430
     {
       F -= conj(F);                   // 18 real subtractions + one matrix conjugation
-      F *= static_cast<typename Arg::Float>(0.125); // 18 real multiplications
+      F *= static_cast<typename Arg::real>(0.125); // 18 real multiplications
       // 36 floating point operations here
     }
 

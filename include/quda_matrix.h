@@ -49,7 +49,8 @@ namespace quda {
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
 #pragma unroll
-          for (int i = 0; i < N * N; i++) data[i] = a.data[i];
+          for (int i = 0; i < N * N; i++)
+            data[i] = T(static_cast<real>(a.data[i].real()), static_cast<real>(a.data[i].imag()));
         }
 
         __device__ __host__ inline Matrix(const T data_[])
@@ -83,14 +84,25 @@ namespace quda {
 	template<class U>
 	  __device__ __host__ inline void operator=(const Matrix<U,N> & b) {
 #pragma unroll
-	  for (int i=0; i<N*N; i++) data[i] = b.data[i];
+	  for (int i=0; i<N*N; i++)
+            data[i] = T(static_cast<real>(b.data[i].real()), static_cast<real>(b.data[i].imag()));
 	}
 
-	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_wrapper<real, S> &s);
+        /**
+           @brief Construct a Matrix from a wrapped gauge-field location.
+           If the wrapper scalar type differs from the matrix register type, convert after loading.
+           @param[in] s Wrapped gauge accessor at a field location
+         */
+	template<typename Float, typename S>
+	  __device__ __host__ inline Matrix(const gauge_wrapper<Float, S> &s);
 
-	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_wrapper<real, S> &s);
+        /**
+           @brief Assign from a wrapped gauge-field location.
+           If the wrapper scalar type differs from the matrix register type, convert after loading.
+           @param[in] s Wrapped gauge accessor at a field location
+         */
+	template<typename Float, typename S>
+	  __device__ __host__ inline void operator=(const gauge_wrapper<Float, S> &s);
 
 	template<typename S>
 	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<real, S> &s);
@@ -656,7 +668,7 @@ namespace quda {
     Matrix<Complex,N> am = m - conj(m);
 
     // second make it traceless
-    real imag_trace = 0.0;
+    real imag_trace = real(0);
 #pragma unroll
     for (int i=0; i<N; i++) imag_trace += am(i,i).y;
 #pragma unroll
@@ -673,13 +685,13 @@ namespace quda {
     Matrix<Complex, N> am = conj(m) - m;
 
     // second make it traceless
-    real imag_trace = 0.0;
+    real imag_trace = real(0);
 #pragma unroll
     for (int i = 0; i < N; i++) imag_trace += am(i, i).y;
 #pragma unroll
     for (int i = 0; i < N; i++) { am(i, i).y -= imag_trace / N; }
     // third scale out anti hermitian part
-    Complex i_2(0.0, 0.5);
+    Complex i_2(real(0), static_cast<real>(0.5));
     m = i_2 * am;
   }
 
@@ -889,7 +901,7 @@ namespace quda {
       //[34] Test for c0 < 0.
       int parity = 0;
       if(c0 < 0) {
-	c0 *= -1.0;
+	c0 *= real(-1);
 	parity = 1;
 	//calculate fj with c0 > 0 and then convert all fj.
       }

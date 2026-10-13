@@ -49,7 +49,7 @@ of the CUDA toolkit will not work, and we highly recommend the use of
 11.x.  QUDA has been tested in conjunction with x86-64, IBM
 POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
 supported, with the minimum recommended versions being 7.x and 6, respectively.
-CMake 3.15 or greater to required to build QUDA.
+CMake 3.25.2 or greater is required to build QUDA.
 
 See also Known Issues below.
 
@@ -78,7 +78,7 @@ It is recommended to build QUDA in a separate directory from the
 source directory.  For instructions on how to build QUDA using cmake
 see this page
 https://github.com/lattice/quda/wiki/QUDA-Build-With-CMake. Note
-that this requires cmake version 3.15 or later. You can obtain cmake
+that this requires cmake version 3.25.2 or later. You can obtain cmake
 from https://cmake.org/download/. On Linux the binary tar.gz archives
 unpack into a cmake directory and usually run fine from that
 directory.

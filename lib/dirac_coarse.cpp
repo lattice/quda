@@ -403,7 +403,7 @@ namespace quda {
   void DiracCoarse::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
-    if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
+    if (k != 1.0) errorQuda("k!=1.0 not supported");
 
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
@@ -464,7 +464,7 @@ namespace quda {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    real_t a = 2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
+    real_t a = 2.0 * kappa * mu * static_cast<real_t>(static_cast<int>(T.Vectors().TwistFlavor()));
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
@@ -634,7 +634,7 @@ namespace quda {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    real_t a = -2.0 * kappa * mu * static_cast<real_t>(T.Vectors().TwistFlavor());
+    real_t a = -2.0 * kappa * mu * static_cast<real_t>(static_cast<int>(T.Vectors().TwistFlavor()));
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, -mu_factor,

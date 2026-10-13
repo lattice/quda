@@ -12,7 +12,7 @@ namespace quda {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaNoiseType noise = noise_;
-    using Gauge = gauge::FieldOrder<real, nColor, 1, QUDA_NATIVE_GAUGE_ORDER, true, real>;
+    using Gauge = gauge::FieldOrder<real, nColor, 1, QUDA_NATIVE_GAUGE_ORDER, true, Float>;
 
     int geometry;
     int E[4]; // extended grid dimensions
@@ -39,7 +39,7 @@ namespace quda {
   template<typename real, typename Arg> // Gauss
   __device__ __host__ inline void genGauss(Arg &arg, RNGState& localState, int parity, int x_cb, int g, int r, int c)
   {
-    real phi = 2.0 * uniform<real>::rand(localState);
+    real phi = real(2) * uniform<real>::rand(localState);
     real radius = uniform<real>::rand(localState);
     radius = sqrt(-log(radius));
     real phi_sin, phi_cos;

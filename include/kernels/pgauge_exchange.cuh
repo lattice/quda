@@ -13,7 +13,7 @@ namespace quda {
     int_fastdiv Xh[4]; // grid dimensions
     using Gauge = typename gauge_mapper<Float, recon>::type;
     Gauge U;
-    complex<real> *array;
+    complex<Float> *array;
     int parity;
     int face;
     int dir;
@@ -87,8 +87,8 @@ namespace quda {
           arg.array[idx + arg.threads.x * i] = complex<real>(tmp[2*i+0], tmp[2*i+1]);
       } else {
         for (int i = 0; i < Arg::recon / 2; i++) {
-          tmp[2*i+0] = arg.array[idx + arg.threads.x * i].real();
-          tmp[2*i+1] = arg.array[idx + arg.threads.x * i].imag();
+          tmp[2*i+0] = static_cast<real>(arg.array[idx + arg.threads.x * i].real());
+          tmp[2*i+1] = static_cast<real>(arg.array[idx + arg.threads.x * i].imag());
         }
         arg.U.reconstruct.Unpack(data, tmp, id, arg.dir, 0, arg.U.X, arg.U.R);
         arg.U.save(data, id, arg.dir, arg.parity);

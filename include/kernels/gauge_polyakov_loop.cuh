@@ -14,7 +14,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t,recon>::type;
     using Link = Matrix<complex<real>, 3>;
 
     int X_bulk[4];
@@ -108,10 +108,10 @@ namespace quda {
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY;
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t,recon>::type;
     using AccumGauge = typename gauge_mapper<AccumFloat,recon>::type;
     using Link = Matrix<complex<real>, 3>;
-    using HighPrecLink = Matrix<complex<double>, 3>;
+    using HighPrecLink = Matrix<complex<typename mapper<double>::type>, 3>;
 
     // While the Polyakov loop doesn't need extended fields, it is a gauge
     // observable, which means it tends to get passed extended fields. This
@@ -171,9 +171,9 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t,recon>::type;
     using Link = Matrix<complex<real>, 3>;
-    using HighPrecLink = Matrix<complex<double>, 3>;
+    using HighPrecLink = Matrix<complex<typename mapper<double>::type>, 3>;
 
     // While the Polyakov loop doesn't need extended fields, it is a gauge
     // observable, which means it tends to get passed extended fields. This
@@ -229,8 +229,9 @@ namespace quda {
       }
 
       // accumulate trace
-      auto tr = getTrace( polyloop );
-      return operator()(value, {tr.real(), tr.imag()});
+      auto tr = getTrace(polyloop);
+      const array<reduction_t, 2> trace {static_cast<reduction_t>(tr.real()), static_cast<reduction_t>(tr.imag())};
+      return operator()(value, trace);
     }
 
   };

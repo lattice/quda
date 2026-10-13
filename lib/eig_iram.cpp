@@ -451,6 +451,7 @@ namespace quda
     real_t epsilon = setEpsilon(kSpace[0].Precision());
     real_t epsilon23 = std::pow(epsilon, real_t(2) / real_t(3));
     real_t beta = 0.0;
+    real_t mat_norm = 0.0;
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -470,6 +471,9 @@ namespace quda
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromUpperHess(evals, beta);
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+
+      // mat_norm over the full Hessenberg spectrum estimates ||A||
+      for (int i = 0; i < n_kr; i++) mat_norm = std::max(mat_norm, abs(evals[i]));
 
       num_keep = n_ev;
       int num_shifts = n_kr - num_keep;
@@ -544,6 +548,8 @@ namespace quda
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    reportMatNorm(mat_norm);
 
     // Post computation report
     //---------------------------------------------------------------------------
