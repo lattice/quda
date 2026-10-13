@@ -522,8 +522,10 @@ if(QUDA_OPENMP)
 endif()
 
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
+find_package(LibDL)
 target_link_libraries(quda PUBLIC CUDA::cuda_driver)
 target_link_libraries(quda PUBLIC CUDA::nvml)
+target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
 if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
@@ -668,9 +670,7 @@ endif()
 
 if(QUDA_JITIFY)
   target_compile_definitions(quda PRIVATE JITIFY)
-  find_package(LibDL)
   target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
-  target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
   target_include_directories(quda PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 
   configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/jitify_options.hpp.in
