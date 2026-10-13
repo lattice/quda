@@ -5,9 +5,7 @@
 #include <quda_cuda_api.h>
 #include <nvml.h>
 #include <algorithm>
-#if !defined(_WIN32)
-#include <dlfcn.h>
-#endif
+#include <dlfcn.h> // for dynamic loading of NVML library
 #include "monitor.h"
 
 static cudaDeviceProp deviceProp;
@@ -41,12 +39,10 @@ namespace quda
 
     static bool nvml_initialized = false;
 
-#if !defined(_WIN32)
     static void *nvml_handle = nullptr;
     using nvmlDeviceGetTemperature_t = nvmlReturn_t (*)(nvmlDevice_t, nvmlTemperatureSensors_t, unsigned int *);
 #if defined(nvmlTemperature_v1)
     using nvmlDeviceGetTemperatureV_t = nvmlReturn_t (*)(nvmlDevice_t, nvmlTemperature_t *);
-#endif
 #endif
 
     int get_driver_version()
@@ -77,7 +73,6 @@ namespace quda
 
     void init_nvml_library()
     {
-#if !defined(_WIN32)
       nvml_handle = dlopen("libnvidia-ml.so", RTLD_NOW);
       if (nvml_handle != nullptr) {
         logQuda(QUDA_DEBUG_VERBOSE, "Successfully opened libnvidia-ml.so\n");
@@ -91,21 +86,17 @@ namespace quda
         }
       }
       (void)dlerror();
-#endif
     }
 
     void destroy_nvml_library()
     {
-#if !defined(_WIN32)
       if (nvml_handle != nullptr) {
         dlclose(nvml_handle);
         nvml_handle = nullptr;
         (void)dlerror();
       }
-#endif
     }
 
-#if !defined(_WIN32)
     namespace impl
     {
 
@@ -191,7 +182,6 @@ namespace quda
       }
 
     } // namespace impl
-#endif
 
     void init(int dev)
     {
@@ -303,14 +293,6 @@ namespace quda
 
     auto get_temperature()
     {
-#if defined(_WIN32)
-      static bool unsupported_windows_printed = false;
-      if (!unsupported_windows_printed) {
-        warningQuda("We cannot query the temperature on Windows with the current implementation, returning 0.\n");
-        unsupported_windows_printed = true;
-      }
-      return 0u;
-#else
       if (nvml_handle == nullptr) {
         static bool missing_nvml_printed = false;
         if (!missing_nvml_printed) {
@@ -321,7 +303,6 @@ namespace quda
       } else {
         return impl::get_temperature_v();
       }
-#endif
     }
 
     state_t get_state()
