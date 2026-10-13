@@ -67,20 +67,20 @@ namespace quda {
       checkLocation(out, in, clover);
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          a = static_cast<real>(2.0 * kappa * mu);
+          a = real(2) * kappa * mu;
           b = real(1);
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          a = static_cast<real>(-2.0 * kappa * mu);
+          a = real(-2) * kappa * mu;
           b = real(1) / (real(1) + a * a);
         }
         if (dagger) a *= real(-1);
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT){
-          a = static_cast<real>(2.0 * kappa * mu);
-          b = static_cast<real>(-2.0 * kappa * epsilon);
+          a = real(2) * kappa * mu;
+          b = real(-2) * kappa * epsilon;
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          a = static_cast<real>(-2.0 * kappa * mu);
-          b = static_cast<real>(2.0 * kappa * epsilon);
+          a = real(-2) * kappa * mu;
+          b = real(2) * kappa * epsilon;
         }
         if (dagger) a *= real(-1);
       }
