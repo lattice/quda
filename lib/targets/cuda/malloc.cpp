@@ -778,6 +778,7 @@ namespace quda
         int status = nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
         if (status != 0) errorQuda("NVSHMEM initialization failed with error %d", status);
         nvshmem_initialized = true;
+        comm_peer2peer_validate_nvshmem();
       }
 #endif
     }

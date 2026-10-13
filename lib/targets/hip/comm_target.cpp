@@ -6,6 +6,7 @@
 
 namespace quda
 {
+  void comm_peer2peer_validate_nvshmem() { }
 
 #define CHECK_HIP_ERROR(func) target::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 

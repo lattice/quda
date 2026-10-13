@@ -358,6 +358,9 @@ namespace quda
   */
   void comm_peer2peer_report_validated();
 
+  /** Validate candidate peer links with an NVSHMEM symmetric probe allocation. */
+  void comm_peer2peer_validate_nvshmem();
+
   /**
      @brief Enable / disable peer-to-peer communication: used for dslash
      policies that do not presently support peer-to-peer communication

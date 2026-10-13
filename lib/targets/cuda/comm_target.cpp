@@ -88,6 +88,29 @@ namespace quda
   static void validate_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, const char *mapping,
                                        bool release_invalid);
 
+  void comm_peer2peer_validate_nvshmem()
+  {
+#ifdef NVSHMEM_COMMS
+    if (!comm_nvshmem_enabled()) return;
+
+    void *probe = nvshmem_malloc(1);
+    if (!probe) errorQuda("Failed to allocate NVSHMEM peer-reachability probe");
+
+    array_2d<void *, QUDA_MAX_DIM, 2> remote {};
+    for (int dim = 0; dim < 4; ++dim) {
+      for (int dir = 0; dir < 2; ++dir) {
+        if (comm_dim(dim) > 1 && comm_peer2peer_enabled(dir, dim))
+          remote[dim][dir] = nvshmem_ptr(probe, comm_neighbor_rank(dir, dim));
+      }
+    }
+
+    validate_neighbor_memory(remote, "NVSHMEM", false);
+    comm_peer2peer_finalize_validation();
+    comm_peer2peer_report_validated();
+    nvshmem_free(probe);
+#endif
+  }
+
   void *comm_create_local_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, size_t bytes)
   {
     // Allocate local memory handle
