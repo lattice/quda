@@ -13,7 +13,11 @@
 # START 1. Basic setup for cmake
 ####################################################################################
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+# 3.25.2 is the first CMake that knows the CUDA20 dialect. Older releases fail
+# inside enable_language(CUDA) ("requires the language dialect CUDA20") because
+# the host language standard is C++20. HIP goes through Clang, which has had a
+# C++20 standard flag since CMake 3.21, so it does not have this gap.
+cmake_minimum_required(VERSION 3.25.2 FATAL_ERROR)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
