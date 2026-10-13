@@ -295,10 +295,14 @@ namespace quda {
           if (!use_mnnvl_vmm_comms()) {
             // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
             ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+            // silence any false cuda-memcheck initcheck errors
+            qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
           }
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
           ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          // silence any false cuda-memcheck initcheck errors
+          qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
           // pinned buffer used for sending
           ghost_pinned_send_buffer_h[b] = host_pinned_malloc(ghost_bytes);
