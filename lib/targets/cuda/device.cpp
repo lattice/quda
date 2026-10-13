@@ -77,7 +77,7 @@ namespace quda
       if (nvml_handle != nullptr) {
         logQuda(QUDA_DEBUG_VERBOSE, "Successfully opened libnvidia-ml.so\n");
       } else {
-        (void)dlerror();
+        (void)dlerror(); // clear the error state from the previous failed load attempt
         nvml_handle = dlopen("libnvidia-ml.so.1", RTLD_NOW);
         if (nvml_handle != nullptr) {
           logQuda(QUDA_DEBUG_VERBOSE, "Successfully opened libnvidia-ml.so.1\n");
@@ -85,15 +85,13 @@ namespace quda
           warningQuda("Failed to open libnvidia-ml.so or libnvidia-ml.so.1: %s", dlerror());
         }
       }
-      (void)dlerror();
     }
 
     void destroy_nvml_library()
     {
       if (nvml_handle != nullptr) {
-        dlclose(nvml_handle);
+        if (dlclose(nvml_handle) != 0) warningQuda("Failed to close the NVML library: %s", dlerror());
         nvml_handle = nullptr;
-        (void)dlerror();
       }
     }
 
@@ -153,7 +151,6 @@ namespace quda
             logQuda(QUDA_DEBUG_VERBOSE, "We are now falling back to the nvmlDeviceGetTemperature path.\n");
           } else {
             logQuda(QUDA_DEBUG_VERBOSE, "We successfully loaded 'nvmlDeviceGetTemperatureV' from the driver library.\n");
-            (void)dlerror();
           }
           return func_temperature_v;
         }();
