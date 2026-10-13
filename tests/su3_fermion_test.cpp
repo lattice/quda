@@ -106,6 +106,8 @@ void run(test_t param)
   smear_param.alpha1 = gauge_smear_alpha1;
   smear_param.alpha2 = gauge_smear_alpha2;
   smear_param.alpha3 = gauge_smear_alpha3;
+  smear_param.smear_anisotropy = gauge_smear_anisotropy;
+  smear_param.rk_order = gauge_smear_rk_order;
   smear_param.dir_ignore = gauge_smear_dir_ignore;
 
   QudaInvertParam invParam = newQudaInvertParam();

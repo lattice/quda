@@ -22,6 +22,7 @@ namespace quda {
       TunableKernel3D(in[0], in.size(), 2), out(out), in(in), Xinv(Xinv), dagger(dagger)
     {
       if (in.Nspin() != 1 || out.Nspin() != 1) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
+      if (Xinv.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU KD-inverse application is not supported");
       if (Xinv.Geometry() != QUDA_KDINVERSE_GEOMETRY)
         errorQuda("Unsupported gauge geometry %d , expected %d for Xinv", Xinv.Geometry(), QUDA_KDINVERSE_GEOMETRY);
       if (Xinv.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct %d", Xinv.Reconstruct());

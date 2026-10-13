@@ -116,8 +116,8 @@ namespace quda {
     // While the Polyakov loop doesn't need extended fields, it is a gauge
     // observable, which means it tends to get passed extended fields. This
     // logic keeps it robust to this reality.
-    int E[4]; // extended grid dimensions
-    int X[4]; // true grid dimensions
+    int_fastdiv E[4]; // extended grid dimensions
+    int_fastdiv X[4]; // true grid dimensions
     int border[4];
 
     AccumGauge P;
@@ -178,8 +178,8 @@ namespace quda {
     // While the Polyakov loop doesn't need extended fields, it is a gauge
     // observable, which means it tends to get passed extended fields. This
     // logic keeps it robust to this reality.
-    int E[4]; // extended grid dimensions
-    int X[4]; // true grid dimensions
+    int_fastdiv E[4]; // extended grid dimensions
+    int_fastdiv X[4]; // true grid dimensions
     int border[4];
     Gauge U;
     QudaFieldGeometry geometry;
