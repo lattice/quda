@@ -100,7 +100,7 @@ namespace quda
     namespace impl
     {
 
-      auto get_temperature_orig()
+      auto get_temperature_legacy()
       {
         unsigned int temp = 0;
         if (nvml_handle != nullptr) {
@@ -130,7 +130,7 @@ namespace quda
                     "Since the NVML driver version < 580, we are taking the nvmlDeviceGetTemperature path\n");
             legacy_path_printed = true;
           }
-          return get_temperature_orig();
+          return get_temperature_legacy();
         }
 
         static bool versioned_path_printed = false;
@@ -161,7 +161,7 @@ namespace quda
           return func_temperature_v;
         }();
 
-        if (func_temperature_v == nullptr) return get_temperature_orig();
+        if (func_temperature_v == nullptr) return get_temperature_legacy();
 
         nvmlTemperature_t temperature;
         temperature.version = nvmlTemperature_v1;
@@ -177,7 +177,7 @@ namespace quda
           logQuda(QUDA_DEBUG_VERBOSE, "We are now falling back to the nvmlDeviceGetTemperature path.\n");
           fallback_printed = true;
         }
-        return get_temperature_orig();
+        return get_temperature_legacy();
 #endif
       }
 
