@@ -267,9 +267,11 @@ std::array<double, 4> run_determinant_trace(const Su3Fields &fields, bool verify
   if (verify) {
     const auto reference = link_determinant_trace_reference(fields.input);
     const double tolerance = getTolerance(fields.gauge_param.cuda_prec);
-    comparison[0] = std::abs(determinant - reference.determinant);
+    const std::complex<double> determinant_d(quda::to_double(determinant.real()), quda::to_double(determinant.imag()));
+    const std::complex<double> link_trace_d(quda::to_double(link_trace.real()), quda::to_double(link_trace.imag()));
+    comparison[0] = std::abs(determinant_d - reference.determinant);
     comparison[1] = tolerance * reference.determinant_scale;
-    comparison[2] = std::abs(link_trace - reference.trace);
+    comparison[2] = std::abs(link_trace_d - reference.trace);
     comparison[3] = tolerance * reference.trace_scale;
     printfQuda("Host determinant %.16e +/- I %.16e, difference %.3e, threshold %.3e\n", reference.determinant.real(),
                reference.determinant.imag(), comparison[0], comparison[1]);
@@ -296,7 +298,7 @@ EnergyTopologicalChargeComparison energy_topological_charge_test(QudaPrecision p
   const double tolerance = getTolerance(precision);
 
   quda::array<quda::real_t, 3> energy {};
-  const double qcharge = quda::computeQCharge(energy, fmunu.device_fmunu);
+  const double qcharge = quda::to_double(quda::computeQCharge(energy, fmunu.device_fmunu));
 
   QudaGaugeObservableParam observable = newQudaGaugeObservableParam();
   observable.compute_qcharge = QUDA_BOOLEAN_TRUE;
@@ -308,7 +310,8 @@ EnergyTopologicalChargeComparison energy_topological_charge_test(QudaPrecision p
     comparison.tolerance = tolerance * scale;
   };
   for (int i = 0; i < 3; i++) {
-    set_comparison(comparison.direct_energy[i], energy[i], reference.energy[i], std::abs(reference.energy[i]));
+    set_comparison(comparison.direct_energy[i], quda::to_double(energy[i]), reference.energy[i],
+                   std::abs(reference.energy[i]));
     set_comparison(comparison.observable_energy[i], observable.energy[i], reference.energy[i],
                    std::abs(reference.energy[i]));
   }
@@ -349,7 +352,7 @@ TopologicalChargeDensityComparison topological_charge_density_test(QudaPrecision
 
   void *device_density = device_malloc(bytes);
   quda::array<quda::real_t, 3> energy {};
-  const double qcharge = quda::computeQChargeDensity(energy, device_density, fmunu.device_fmunu);
+  const double qcharge = quda::to_double(quda::computeQChargeDensity(energy, device_density, fmunu.device_fmunu));
   const auto device_density_host = copy_density_to_double(device_density, length, precision, QUDA_CUDA_FIELD_LOCATION);
   device_free(device_density);
 
@@ -382,7 +385,8 @@ TopologicalChargeDensityComparison topological_charge_density_test(QudaPrecision
   set_comparison(comparison.direct_field, direct_field.max_deviation, 1.0);
   set_comparison(comparison.observable_field, public_field.max_deviation, 1.0);
   for (int i = 0; i < 3; i++) {
-    set_comparison(comparison.direct_energy[i], std::abs(energy[i] - reference.energy[i]), std::abs(reference.energy[i]));
+    set_comparison(comparison.direct_energy[i], std::abs(quda::to_double(energy[i]) - reference.energy[i]),
+                   std::abs(reference.energy[i]));
     set_comparison(comparison.observable_energy[i], std::abs(observable.energy[i] - reference.energy[i]),
                    std::abs(reference.energy[i]));
   }
