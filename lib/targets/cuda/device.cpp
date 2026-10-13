@@ -105,14 +105,14 @@ namespace quda
         unsigned int temp = 0;
         if (nvml_handle != nullptr) {
           static auto func_temperature = [&]() -> nvmlDeviceGetTemperature_t {
-            logQuda(QUDA_DEBUG_VERBOSE, "We are trying to load symbol 'nvmlDeviceGetTemperature'\n");
+            logQuda(QUDA_DEBUG_VERBOSE, "We are trying to load 'nvmlDeviceGetTemperature'\n");
             nvmlDeviceGetTemperature_t func_temperature = nullptr;
             *(void **)(&func_temperature) = dlsym(nvml_handle, "nvmlDeviceGetTemperature");
             if (func_temperature == nullptr)
-              warningQuda("Could not load symbol 'nvmlDeviceGetTemperature': %s; temperature reporting will return 0",
+              warningQuda("Could not load 'nvmlDeviceGetTemperature': %s; temperature reporting will return 0",
                           dlerror());
             else
-              logQuda(QUDA_DEBUG_VERBOSE, "Successfully loaded symbol 'nvmlDeviceGetTemperature'\n");
+              logQuda(QUDA_DEBUG_VERBOSE, "Successfully loaded 'nvmlDeviceGetTemperature'\n");
             return func_temperature;
           }();
 
@@ -144,18 +144,15 @@ namespace quda
 #if defined(nvmlTemperature_v1)
         static auto func_temperature_v = [&]() -> nvmlDeviceGetTemperatureV_t {
           logQuda(QUDA_DEBUG_VERBOSE,
-                  "'nvmlTemperature_v1' was defined at compile time, so we are attempting to load the symbol "
-                  "'nvmlDeviceGetTemperatureV'\n");
+                  "'nvmlTemperature_v1' was defined at compile time; attempting to load 'nvmlDeviceGetTemperatureV'\n");
           nvmlDeviceGetTemperatureV_t func_temperature_v = nullptr;
           *(void **)(&func_temperature_v) = dlsym(nvml_handle, "nvmlDeviceGetTemperatureV");
           if (func_temperature_v == nullptr) {
             logQuda(QUDA_DEBUG_VERBOSE,
-                    "We cannot load the symbol 'nvmlDeviceGetTemperatureV' from the driver library with error '%s'\n",
-                    dlerror());
+                    "We cannot load 'nvmlDeviceGetTemperatureV' from the driver library with error '%s'\n", dlerror());
             logQuda(QUDA_DEBUG_VERBOSE, "We are now falling back to the nvmlDeviceGetTemperature path.\n");
           } else {
-            logQuda(QUDA_DEBUG_VERBOSE,
-                    "We successfully loaded the symbol 'nvmlDeviceGetTemperatureV' from the driver library.\n");
+            logQuda(QUDA_DEBUG_VERBOSE, "We successfully loaded 'nvmlDeviceGetTemperatureV' from the driver library.\n");
             (void)dlerror();
           }
           return func_temperature_v;
@@ -172,9 +169,7 @@ namespace quda
         static bool fallback_printed = false;
         if (!fallback_printed) {
           logQuda(QUDA_DEBUG_VERBOSE,
-                  "'nvmlTemperature_v1' was not defined at compile time so we cannot use the "
-                  "nvmlDeviceGetTemperatureV path.\n");
-          logQuda(QUDA_DEBUG_VERBOSE, "We are now falling back to the nvmlDeviceGetTemperature path.\n");
+                  "'nvmlTemperature_v1' was not defined at compile time, falling back to nvmlDeviceGetTemperature.\n");
           fallback_printed = true;
         }
         return get_temperature_legacy();
