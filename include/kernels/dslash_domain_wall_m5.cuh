@@ -238,6 +238,7 @@ namespace quda
   __device__ __host__ inline Vector d5(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s, int src_idx,
                                        bool alive)
   {
+    QUDA_RT_CONSTS;
     const Arg &arg = ftor.arg;
     int local_src_idx = target::thread_idx().y / arg.Ls;
     using real = typename Arg::real;
@@ -432,6 +433,7 @@ namespace quda
   __device__ __host__ inline Vector constantInv(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s_,
                                                 int src_idx, bool alive)
   {
+    QUDA_RT_CONSTS;
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
     int local_src_idx = target::thread_idx().y / arg.Ls;
@@ -503,6 +505,7 @@ namespace quda
   __device__ __host__ inline Vector variableInv(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s_,
                                                 int src_idx, bool alive)
   {
+    QUDA_RT_CONSTS;
     const Arg &arg = ftor.arg;
     int local_src_idx = target::thread_idx().y / arg.Ls;
     constexpr int nSpin = 4;
