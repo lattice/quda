@@ -49,7 +49,7 @@ int laplace3D = 4;
 std::string latfile;
 bool unit_gauge = false;
 std::string gauge_input;
-double gauge_input_width = 0.2;
+double gauge_input_width = 0.25;
 bool gauge_input_width_explicit = false;
 double gaussian_sigma = 0.2;
 std::string gauge_outfile;
@@ -585,7 +585,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
         gauge_input_width = width;
         return true;
       },
-      "Gaussian width sigma for --gauge-input gaussian-su3 (default 0.2)")
+      "Gaussian width sigma for --gauge-input gaussian-su3 (default 0.25)")
     ->type_name("FLOAT");
   quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
