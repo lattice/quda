@@ -7,6 +7,19 @@ namespace quda
 {
 
   /**
+     @brief Metadata found when loading a gauge field file
+   */
+  struct GaugeFileInfo {
+    QudaFileFormat format = QUDA_FILE_FORMAT_INVALID; /** The format the file was read as */
+    QudaPrecision file_prec = QUDA_INVALID_PRECISION; /** Precision of the data in the file */
+    bool ildg = false;                                /** Whether the file has the ILDG records */
+    bool has_usqcd_info = false;                      /** Whether the file has a usqcdInfo record */
+    double plaq = 0.0;                                /** usqcdInfo average Re Tr U_P / 3 */
+    double linktr = 0.0;                              /** usqcdInfo average Re Tr U_mu / 3 */
+    bool usqcd_info_matches = false;                  /** Whether the usqcdInfo values match the loaded field */
+  };
+
+  /**
      @brief GaugeIO is a simple wrapper class for loading and saving
      host gauge fields in QDP order (one array per direction).
    */
@@ -28,8 +41,9 @@ namespace quda
        @param[out] gauge The host gauge field, one array per direction
        @param[in] prec The precision of the host gauge field
        @param[in] X The local lattice dimensions
+       @return Metadata found in the file
     */
-    void load(void *const gauge[], QudaPrecision prec, const int *X);
+    GaugeFileInfo load(void *const gauge[], QudaPrecision prec, const int *X);
 
     /**
        @brief Save a gauge field to filename

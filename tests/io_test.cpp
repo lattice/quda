@@ -19,7 +19,7 @@ namespace
   std::vector<QudaFileFormat> gauge_formats()
   {
 #ifdef HAVE_QIO
-    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO};
+    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG};
 #else
     return {};
 #endif
@@ -71,8 +71,8 @@ TEST(FileIOParamTest, conversion)
   expect_equal(FileIOParam(&param), expected);
 }
 
-// tuple types: precision, file format, io mode
-using gauge_test_t = ::testing::tuple<QudaPrecision, QudaFileFormat, QudaFileIOMode>;
+// tuple types: precision, file format, io mode, whether to write the usqcdInfo record
+using gauge_test_t = ::testing::tuple<QudaPrecision, QudaFileFormat, QudaFileIOMode, bool>;
 
 class GaugeIOTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -105,6 +105,7 @@ TEST_P(GaugeIOTest, verify)
   io_param.struct_size = sizeof(io_param);
   io_param.format = ::testing::get<1>(param);
   io_param.io_mode = ::testing::get<2>(param);
+  io_param.write_usqcd_info = ::testing::get<3>(param) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gauge_param.file_io_param = &io_param;
 
   // Allocate host side memory for the gauge field.
@@ -132,12 +133,24 @@ TEST_P(GaugeIOTest, verify)
   io.save(gauge, gauge_param.cpu_prec, gauge_param.X);
 
   // read it back
-  io.load(gauge, gauge_param.cpu_prec, gauge_param.X);
+  auto info = io.load(gauge, gauge_param.cpu_prec, gauge_param.X);
 
   auto plaq_new = get_plaq();
 
   // test the plaquette is identical
   for (int i = 0; i < 3; i++) EXPECT_EQ(plaq_old[i], plaq_new[i]);
+
+  // test the metadata found in the file; AUTO saves as QIO
+  auto format = io_param.format == QUDA_FILE_FORMAT_AUTO ? QUDA_FILE_FORMAT_QIO : io_param.format;
+  EXPECT_EQ(info.format, format);
+  EXPECT_EQ(info.file_prec, gauge_param.cpu_prec);
+  EXPECT_EQ(info.ildg, format == QUDA_FILE_FORMAT_ILDG);
+  EXPECT_EQ(info.has_usqcd_info, ::testing::get<3>(param));
+  if (info.has_usqcd_info) {
+    EXPECT_TRUE(info.usqcd_info_matches);
+    auto tol = gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION ? 1e-12 : 1e-6;
+    EXPECT_NEAR(info.plaq, plaq_new[0], tol);
+  }
 
   // cleanup after ourselves and delete the dummy lattice
   if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
@@ -313,12 +326,13 @@ using ::testing::ValuesIn;
 // gauge IO test
 INSTANTIATE_TEST_SUITE_P(Gauge, GaugeIOTest,
                          Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), ValuesIn(gauge_formats()),
-                                 Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
+                                 Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL), Values(true, false)),
                          [](testing::TestParamInfo<gauge_test_t> param) {
                            std::string name;
                            name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
                            name += quda::get_file_format_str(::testing::get<1>(param.param)) + std::string("_");
                            name += get_io_mode_str(::testing::get<2>(param.param));
+                           name += ::testing::get<3>(param.param) ? "_usqcd_info" : "_no_usqcd_info";
                            return name;
                          });
 

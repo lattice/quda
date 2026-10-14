@@ -1,4 +1,7 @@
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <qmp.h>
 #include <qio.h>
 #include <quda.h>
@@ -93,7 +96,7 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
   return infile;
 }
 
-QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int ildgstyle)
+QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int ildgstyle, const char *ildg_lfn = nullptr)
 {
   char xml_write_file[] = "Dummy user file XML";
   QIO_Filesystem filesys;
@@ -101,8 +104,12 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
 
   oflag.serpar = serpar;
   oflag.ildgstyle = ildgstyle;
-  oflag.ildgLFN = QIO_string_create();
-  QIO_string_set(oflag.ildgLFN, "monkey");
+  // QIO writes the ildg-data-lfn record only if an LFN is given
+  oflag.ildgLFN = nullptr;
+  if (ildg_lfn) {
+    oflag.ildgLFN = QIO_string_create();
+    QIO_string_set(oflag.ildgLFN, ildg_lfn);
+  }
   oflag.mode = QIO_TRUNC;
 
   filesys.my_io_node = 0;
@@ -115,7 +122,7 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
   /* Open the file for reading */
   QIO_Writer *outfile = QIO_open_write(xml_file_out, filename, volfmt, &layout, &filesys, &oflag);
 
-  QIO_string_destroy(oflag.ildgLFN);
+  if (oflag.ildgLFN) QIO_string_destroy(oflag.ildgLFN);
   if (outfile == NULL) {
     printfQuda("%s(%d): QIO_open_write returns NULL.\n", __func__, quda_this_node);
     QIO_string_destroy(xml_file_out);
@@ -130,7 +137,8 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
 }
 
 int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset, QudaParity,
-               int nSpin, int nColor, int len)
+               int nSpin, int nColor, int len, QudaPrecision *file_prec_out = nullptr,
+               std::string *record_xml_out = nullptr)
 {
   // Get the QIO record and string
   char dummy[100] = "";
@@ -193,6 +201,9 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
     }
   }
 
+  if (file_prec_out) *file_prec_out = file_prec;
+  if (record_xml_out && QIO_string_ptr(xml_record_in)) *record_xml_out = QIO_string_ptr(xml_record_in);
+
   QIO_string_destroy(xml_record_in);
   QIO_destroy_record_info(rec_info);
   printfQuda("%s: QIO_read_record_data returns status %d\n", __func__, status);
@@ -200,9 +211,46 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
   return 0;
 }
 
-int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec)
+int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaPrecision *file_prec,
+                   std::string *record_xml)
 {
-  return read_field(infile, count, field_in, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, 9, 18);
+  return read_field(infile, count, field_in, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, 9, 18, file_prec,
+                    record_xml);
+}
+
+// The USQCD gauge field record XML: <usqcdInfo> with the average plaquette and link trace
+static std::string encode_usqcd_info(double plaq, double linktr)
+{
+  char plaq_str[32], linktr_str[32];
+  snprintf(plaq_str, sizeof(plaq_str), "%.16e", plaq);
+  snprintf(linktr_str, sizeof(linktr_str), "%.16e", linktr);
+  // QIO's XML parser does not handle nested tags of the same name, so QUDA's own record XML (which has an <info>
+  // tag) cannot be embedded in the <info> field
+  char info_str[] = "QUDA";
+
+  QIO_USQCDLatticeInfo *info = QIO_create_usqcd_lattice_info(plaq_str, linktr_str, info_str);
+  QIO_String *xml = QIO_string_create();
+  QIO_encode_usqcd_lattice_info(xml, info);
+  std::string result = QIO_string_ptr(xml);
+  QIO_string_destroy(xml);
+  QIO_destroy_usqcd_lattice_info(info);
+  return result;
+}
+
+static bool decode_usqcd_info(const std::string &record_xml, double &plaq, double &linktr)
+{
+  if (record_xml.find("usqcdInfo") == std::string::npos) return false;
+
+  QIO_String *xml = QIO_string_create();
+  QIO_string_set(xml, record_xml.c_str());
+  auto info = std::make_unique<QIO_USQCDLatticeInfo>(); // too large for the stack
+  QIO_decode_usqcd_lattice_info(info.get(), xml);
+  QIO_string_destroy(xml);
+
+  if (!QIO_defined_plaq(info.get()) || !QIO_defined_linktr(info.get())) return false;
+  plaq = strtod(QIO_get_plaq(info.get()), nullptr);
+  linktr = strtod(QIO_get_linktr(info.get()), nullptr);
+  return true;
 }
 
 void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
@@ -250,7 +298,8 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
   layout.number_of_nodes = QMP_get_number_of_nodes();
 }
 
-void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, QudaFileIOMode io_mode)
+void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
+                      QudaFileIOMode io_mode, QIOGaugeInfo &info)
 {
   quda_this_node = QMP_get_node_number();
 
@@ -263,8 +312,23 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   /* Read the su3 field record */
   printfQuda("%s: reading su3 field\n", __func__);
   fflush(stdout);
-  int status = read_su3_field(infile, 4, gauge, precision);
+  std::string record_xml;
+  int status = read_su3_field(infile, 4, gauge, precision, &info.file_prec, &record_xml);
   if (status) { errorQuda("read_su3_field failed %d\n", status); }
+
+  // the ILDG style and the user record XML are only known on the QIO master I/O node
+  double usqcd_info[3] = {0.0, 0.0, 0.0}; // found, plaq, linktr
+  int ildg = 0;
+  if (quda_this_node == 0) {
+    ildg = QIO_get_ildgstyle(infile) == QIO_ILDGLAT;
+    if (decode_usqcd_info(record_xml, usqcd_info[1], usqcd_info[2])) usqcd_info[0] = 1.0;
+  }
+  QMP_broadcast(&ildg, sizeof(ildg));
+  QMP_broadcast(usqcd_info, sizeof(usqcd_info));
+  info.ildg = ildg;
+  info.has_usqcd_info = usqcd_info[0] != 0.0;
+  info.plaq = usqcd_info[1];
+  info.linktr = usqcd_info[2];
 
   /* Close the file */
   QIO_close_read(infile);
@@ -293,8 +357,9 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
   printfQuda("%s: Closed file for reading\n", __func__);
 }
 
-int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPrecision file_prec, QudaPrecision cpu_prec,
-                QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, int len, const char *type)
+int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPrecision file_prec,
+                QudaPrecision cpu_prec, QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, int len,
+                const char *type, const char *record_xml = nullptr)
 {
   // Prepare a string.
   std::string xml_record = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><quda";
@@ -355,7 +420,7 @@ int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPre
 
   // Create the record XML for the field
   QIO_String *xml_record_out = QIO_string_create();
-  QIO_string_set(xml_record_out, xml_record.c_str());
+  QIO_string_set(xml_record_out, record_xml ? record_xml : xml_record.c_str());
 
   /* Write the field record converting to desired file precision*/
   vlen = len;
@@ -387,13 +452,14 @@ int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPre
 }
 
 int write_su3_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPrecision file_prec,
-                    QudaPrecision cpu_prec, const char *type)
+                    QudaPrecision cpu_prec, const char *type, const char *record_xml)
 {
   return write_field(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3,
-                     18, type);
+                     18, type, record_xml);
 }
 
-void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, QudaFileIOMode io_mode)
+void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
+                       QudaFileIOMode io_mode, const QIOGaugeInfo &info)
 {
   quda_this_node = QMP_get_node_number();
 
@@ -401,18 +467,34 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
 
   QudaPrecision file_prec = precision;
 
+  // QIO only writes the ILDG records for the standard USQCD (or QDP) color matrix datatypes
   char type[128];
-  sprintf(type, "QUDA_%sNc%d_GaugeField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", 3);
+  if (info.ildg)
+    sprintf(type, "USQCD_%s3_ColorMatrix", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F");
+  else
+    sprintf(type, "QUDA_%sNc%d_GaugeField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", 3);
 
   /* Open the test file for writing */
-  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, qio_serpar(io_mode), QIO_ILDGNO);
+  const char *lfn = info.ildg && !info.ildg_lfn.empty() ? info.ildg_lfn.c_str() : nullptr;
+  QIO_Writer *outfile
+    = open_test_output(filename, QIO_SINGLEFILE, qio_serpar(io_mode), info.ildg ? QIO_ILDGLAT : QIO_ILDGNO, lfn);
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Write the gauge field record */
   printfQuda("%s: writing the gauge field\n", __func__);
   fflush(stdout);
-  int status = write_su3_field(outfile, 4, (const void **)gauge, precision, precision, type);
+  std::string record_xml = info.has_usqcd_info ? encode_usqcd_info(info.plaq, info.linktr) : std::string();
+  int status = write_su3_field(outfile, 4, (const void **)gauge, precision, precision, type,
+                               info.has_usqcd_info ? record_xml.c_str() : nullptr);
   if (status) { errorQuda("write_gauge_field failed %d\n", status); }
+
+  // QIO silently falls back to a plain SciDAC file if the record cannot be written as ILDG, recording this on the
+  // master I/O node
+  if (info.ildg) {
+    int ildg = outfile->ildgstyle == QIO_ILDGLAT;
+    QMP_broadcast(&ildg, sizeof(ildg));
+    if (!ildg) errorQuda("QIO did not write %s in ILDG format", filename);
+  }
 
   /* Close the file */
   QIO_close_write(outfile);
