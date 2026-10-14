@@ -3,8 +3,8 @@
 
 #include <instantiate.h>
 #include <color_spinor_field.h>
-#include <qio_field.h> // for QIO routines
-#include <vector_io.h>
+#include <io/qio_field.h> // for QIO routines
+#include <io/vector_io.h>
 #include <blas_quda.h>
 #include <quda.h>
 

@@ -1,6 +1,6 @@
 #include <color_spinor_field.h>
-#include <qio_field.h>
-#include <vector_io.h>
+#include <io/qio_field.h>
+#include <io/vector_io.h>
 #include <blas_quda.h>
 #include <timer.h>
 

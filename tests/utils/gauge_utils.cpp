@@ -1,6 +1,6 @@
 #include <quda.h>
 #include <gauge_field.h>
-#include <qio_field.h>
+#include <io/qio_field.h>
 
 #include "command_line_params.h"
 #include "host_utils.h"

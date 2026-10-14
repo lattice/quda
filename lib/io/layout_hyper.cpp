@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <qmp.h>
-#include <layout_hyper.h>
+#include <io/layout_hyper.h>
 #include <util_quda.h>
 
 /* The following globals are required:

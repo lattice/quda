@@ -16,7 +16,7 @@
 #include <random_quda.h>
 #include <unitarization_links.h>
 
-#include <qio_field.h>
+#include <io/qio_field.h>
 
 #include "test.h"
 #include "gauge_utils.h"

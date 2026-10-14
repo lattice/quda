@@ -3,7 +3,7 @@
 #include <qio.h>
 #include <quda.h>
 #include <util_quda.h>
-#include <layout_hyper.h>
+#include <io/layout_hyper.h>
 
 #include <string>
 

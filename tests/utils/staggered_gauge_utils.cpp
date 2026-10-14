@@ -7,7 +7,7 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <unitarization_links.h>
-#include <qio_field.h>
+#include <io/qio_field.h>
 
 #include "misc.h"
 #include "host_utils.h"

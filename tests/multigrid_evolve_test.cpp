@@ -6,7 +6,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 // This extended test utilizes some QUDA internals
-#include <qio_field.h>
+#include <io/qio_field.h>
 #include <gauge_field.h>
 #include <pgauge_monte.h>
 #include <unitarization_links.h>

@@ -1,7 +1,7 @@
 #include <memory>
 
 #include <deflation.h>
-#include <vector_io.h>
+#include <io/vector_io.h>
 #include <eigen_helper.h>
 
 namespace quda

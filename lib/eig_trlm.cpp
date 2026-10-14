@@ -7,7 +7,7 @@
 
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
-#include <qio_field.h>
+#include <io/qio_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>

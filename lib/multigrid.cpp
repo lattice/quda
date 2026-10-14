@@ -3,7 +3,7 @@
 #include <multigrid.h>
 #include <tune_quda.h>
 #include <random_quda.h>
-#include <vector_io.h>
+#include <io/vector_io.h>
 
 // for building the KD inverse op
 #include <staggered_kd_build_xinv.h>

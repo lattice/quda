@@ -7,7 +7,7 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-#include <qio_field.h>
+#include <io/qio_field.h>
 
 #include "util_quda.h"
 #include "host_utils.h"

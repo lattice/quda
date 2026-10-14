@@ -22,7 +22,7 @@ set (QUDA_OBJS
   coarse_op_preconditioned.cpp staggered_coarse_op.cpp
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp
   eig_trlm_3d.cpp blas_3d.cu
-  vector_io.cpp eigensolve_quda.cpp quda_arpack_interface.cpp
+  eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cpp
   prolongator.cpp restrictor.cpp staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
@@ -472,14 +472,12 @@ if(QUDA_USE_QUAD_SCALAR AND QUDA_COMPILER_HAS_GNU_FLOAT128)
   target_link_libraries(quda_cpp PUBLIC quadmath)
 endif()
 
-# add comms and QIO
+# add comms
 target_sources(
   quda_cpp
   PRIVATE
     $<IF:$<BOOL:${QUDA_MPI}>,communicator_mpi.cpp,$<IF:$<BOOL:${QUDA_QMP}>,communicator_qmp.cpp,communicator_single.cpp>>
 )
-
-target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
@@ -628,6 +626,7 @@ target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
+add_subdirectory(io)
 
 # ignore any unknown pragmas
 target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:

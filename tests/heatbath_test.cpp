@@ -12,7 +12,7 @@
 #include <random_quda.h>
 #include <unitarization_links.h>
 
-#include <qio_field.h>
+#include <io/qio_field.h>
 
 #include "host_utils.h"
 #include "command_line_params.h"
