@@ -16,7 +16,7 @@
 #include <random_quda.h>
 #include <unitarization_links.h>
 
-#include <io/qio_field.h>
+#include <io/gauge_io.h>
 
 #include "test.h"
 #include "gauge_utils.h"
@@ -285,7 +285,7 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
     saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
 
     // Write to disk
-    write_gauge_field(gauge_outfile.c_str(), cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
+    GaugeIO(gauge_outfile, FileIOParam(gauge_param.file_io_param)).save(cpu_gauge, gauge_param.cpu_prec, gauge_param.X);
 
     for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
     delete gauge;

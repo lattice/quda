@@ -173,12 +173,10 @@ if(QUDA_BUILD_NATIVE_LAPACK)
   install(TARGETS blas_interface_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_QIO)
-  add_executable(io_test io_test.cpp)
-  target_link_libraries(io_test ${TEST_LIBS})
-  quda_checkbuildtest(io_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
+add_executable(io_test io_test.cpp)
+target_link_libraries(io_test ${TEST_LIBS})
+quda_checkbuildtest(io_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(tune_test tune_test.cpp)
 target_link_libraries(tune_test ${TEST_LIBS})
@@ -1669,12 +1667,10 @@ if (TARGET dilution_test)
     --gtest_output=xml:dilution_test.xml)
 endif()
 
-if(QUDA_QIO)
-  add_test(NAME io_test
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:io_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 4 6 8 10
-                   --gtest_output=xml:io_test.xml)
-endif()
+add_test(NAME io_test
+         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:io_test> ${MPIEXEC_POSTFLAGS}
+                 --dim 4 6 8 10
+                 --gtest_output=xml:io_test.xml)
 
 add_test(NAME tune_test
          COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}

@@ -7,15 +7,61 @@
 namespace quda
 {
 
-  VectorIO::VectorIO(const std::string &filename, bool parity_inflate, bool partfile) :
-    filename(filename), parity_inflate(parity_inflate), partfile(partfile)
+  namespace
   {
-    if (strcmp(filename.c_str(), "") == 0)
-      errorQuda("No eigenspace input file defined (filename = %s, parity_inflate = %d", filename.c_str(), parity_inflate);
+    void check_vector_format(QudaFileFormat format)
+    {
+      switch (format) {
+      case QUDA_FILE_FORMAT_QIO:
+#ifndef HAVE_QIO
+        errorQuda("QIO support has not been enabled");
+#endif
+        break;
+      case QUDA_FILE_FORMAT_MILC: errorQuda("MILC vector I/O is not yet supported"); break;
+      case QUDA_FILE_FORMAT_ILDG: errorQuda("The ILDG format only supports gauge fields"); break;
+      default: errorQuda("Unexpected file format %d", format);
+      }
+    }
+
+#ifdef HAVE_QIO
+    void load_qio(const std::string &filename, void *V[], QudaPrecision prec, const int *X, QudaSiteSubset subset,
+                  QudaParity parity, int nColor, int nSpin, int Nvec, QudaFileIOMode io_mode)
+    {
+      read_spinor_field(filename.c_str(), V, prec, X, subset, parity, nColor, nSpin, Nvec, io_mode);
+    }
+
+    void save_qio(const std::string &filename, const void *V[], QudaPrecision prec, const int *X, QudaSiteSubset subset,
+                  QudaParity parity, int nColor, int nSpin, int Nvec, bool partfile, QudaFileIOMode io_mode)
+    {
+      write_spinor_field(filename.c_str(), V, prec, X, subset, parity, nColor, nSpin, Nvec, partfile, io_mode);
+    }
+#else
+    void load_qio(const std::string &, void *[], QudaPrecision, const int *, QudaSiteSubset, QudaParity, int, int, int,
+                  QudaFileIOMode)
+    {
+      errorQuda("QIO support has not been enabled");
+    }
+
+    void save_qio(const std::string &, const void *[], QudaPrecision, const int *, QudaSiteSubset, QudaParity, int, int,
+                  int, bool, QudaFileIOMode)
+    {
+      errorQuda("QIO support has not been enabled");
+    }
+#endif
+  } // namespace
+
+  VectorIO::VectorIO(const std::string &filename, const FileIOParam &param) : filename(filename), param(param)
+  {
+    if (filename.empty())
+      errorQuda("No eigenspace input file defined (filename = %s, parity_inflate = %d", filename.c_str(),
+                param.parity_inflate);
   }
 
-  void VectorIO::load(cvector_ref<ColorSpinorField> &vecs)
+  void VectorIO::load(cvector_ref<ColorSpinorField> &vecs, std::vector<complex_t> *)
   {
+    check_vector_format(resolve_load_format(filename, param.format));
+
+    const bool parity_inflate = param.parity_inflate;
     const ColorSpinorField &v0 = vecs[0];
     const int Nvec = vecs.size();
     const QudaPrecision load_prec = v0.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : v0.Precision();
@@ -63,8 +109,8 @@ namespace quda
       quda::host_timer_t host_timer;
       host_timer.start(); // start the timer
 
-      read_spinor_field(filename.c_str(), V.data(), v0.Precision(), spinor_X, spinor_site_subset, spinor_parity,
-                        v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr);
+      load_qio(filename, V.data(), v0.Precision(), spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(),
+               Nvec * Ls, param.io_mode);
 
       host_timer.stop(); // stop the timer
       logQuda(QUDA_SUMMARIZE, "Time spent loading vectors from %s = %g secs\n", filename.c_str(), host_timer.last());
@@ -83,8 +129,13 @@ namespace quda
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done loading vectors\n");
   }
 
-  void VectorIO::save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec, uint32_t size)
+  void VectorIO::save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec, uint32_t size,
+                      const std::vector<complex_t> *)
   {
+    check_vector_format(resolve_save_format(param.format));
+
+    const bool parity_inflate = param.parity_inflate;
+    const bool partfile = param.partfile;
     const ColorSpinorField &v0 = vecs[0];
     const int Nvec = (size != 0 && size < vecs.size()) ? size : vecs.size();
     if (prec < QUDA_SINGLE_PRECISION && prec != QUDA_INVALID_PRECISION) errorQuda("Unsupported precision %d", prec);
@@ -153,8 +204,8 @@ namespace quda
       quda::host_timer_t host_timer;
       host_timer.start(); // start the timer
 
-      write_spinor_field(filename.c_str(), V.data(), save_prec, spinor_X, spinor_site_subset, spinor_parity,
-                         v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr, partfile);
+      save_qio(filename, V.data(), save_prec, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(),
+               Nvec * Ls, partfile, param.io_mode);
 
       host_timer.stop(); // stop the timer
       logQuda(QUDA_SUMMARIZE, "Time spent saving vectors to %s = %g secs\n", filename.c_str(), host_timer.last());

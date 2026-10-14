@@ -1,5 +1,5 @@
 # add file I/O sources
-target_sources(quda_cpp PRIVATE vector_io.cpp)
+target_sources(quda_cpp PRIVATE field_io.cpp gauge_io.cpp vector_io.cpp)
 
 if(QUDA_QIO)
   target_sources(quda_cpp PRIVATE qio_field.cpp layout_hyper.cpp)

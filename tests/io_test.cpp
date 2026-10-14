@@ -1,9 +1,10 @@
 #include <cstdio>
+#include <cstring>
 #include <limits>
 
 #include <instantiate.h>
 #include <color_spinor_field.h>
-#include <io/qio_field.h> // for QIO routines
+#include <io/gauge_io.h>
 #include <io/vector_io.h>
 #include <blas_quda.h>
 #include <quda.h>
@@ -12,8 +13,66 @@
 #include "test.h"
 #include "misc.h"
 
-// tuple types: precision
-using gauge_test_t = ::testing::tuple<QudaPrecision>;
+namespace
+{
+  // file formats that can be written and read back in this build, for each field type
+  std::vector<QudaFileFormat> gauge_formats()
+  {
+#ifdef HAVE_QIO
+    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO};
+#else
+    return {};
+#endif
+  }
+
+  std::vector<QudaFileFormat> vector_formats()
+  {
+#ifdef HAVE_QIO
+    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO};
+#else
+    return {};
+#endif
+  }
+
+  const char *get_io_mode_str(QudaFileIOMode io_mode) { return io_mode == QUDA_FILE_IO_SERIAL ? "serial" : "parallel"; }
+} // namespace
+
+// the conversion from the public QudaFileIOParam is the single place defaults and validation are applied
+TEST(FileIOParamTest, conversion)
+{
+  using namespace quda;
+
+  auto expect_equal = [](const FileIOParam &a, const FileIOParam &b) {
+    EXPECT_EQ(a.format, b.format);
+    EXPECT_EQ(a.io_mode, b.io_mode);
+    EXPECT_EQ(a.partfile, b.partfile);
+    EXPECT_EQ(a.parity_inflate, b.parity_inflate);
+    EXPECT_EQ(a.ildg_lfn, b.ildg_lfn);
+    EXPECT_EQ(a.write_usqcd_info, b.write_usqcd_info);
+  };
+
+  const FileIOParam defaults;
+  expect_equal(FileIOParam(nullptr), defaults);
+
+  QudaFileIOParam param = newQudaFileIOParam();
+  expect_equal(FileIOParam(&param), defaults);
+
+  param.struct_size = sizeof(param);
+  param.format = QUDA_FILE_FORMAT_MILC;
+  param.io_mode = QUDA_FILE_IO_SERIAL;
+  strcpy(param.ildg_lfn, "lfn://test");
+  param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
+
+  FileIOParam expected;
+  expected.format = QUDA_FILE_FORMAT_MILC;
+  expected.io_mode = QUDA_FILE_IO_SERIAL;
+  expected.ildg_lfn = "lfn://test";
+  expected.write_usqcd_info = false;
+  expect_equal(FileIOParam(&param), expected);
+}
+
+// tuple types: precision, file format, io mode
+using gauge_test_t = ::testing::tuple<QudaPrecision, QudaFileFormat, QudaFileIOMode>;
 
 class GaugeIOTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -41,6 +100,13 @@ TEST_P(GaugeIOTest, verify)
   gauge_param.cuda_prec_eigensolver = gauge_param.cpu_prec;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
 
+  // the file options go through the public interface struct
+  QudaFileIOParam io_param = newQudaFileIOParam();
+  io_param.struct_size = sizeof(io_param);
+  io_param.format = ::testing::get<1>(param);
+  io_param.io_mode = ::testing::get<2>(param);
+  gauge_param.file_io_param = &io_param;
+
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   void *gauge[4];
@@ -60,12 +126,13 @@ TEST_P(GaugeIOTest, verify)
   auto plaq_old = get_plaq();
 
   auto file = "dummy.lat";
+  GaugeIO io(file, FileIOParam(gauge_param.file_io_param));
 
   // write out the gauge field
-  write_gauge_field(file, gauge, gauge_param.cpu_prec, gauge_param.X, 0, nullptr);
+  io.save(gauge, gauge_param.cpu_prec, gauge_param.X);
 
   // read it back
-  read_gauge_field(file, gauge, gauge_param.cpu_prec, gauge_param.X, 0, nullptr);
+  io.load(gauge, gauge_param.cpu_prec, gauge_param.X);
 
   auto plaq_new = get_plaq();
 
@@ -80,7 +147,7 @@ TEST_P(GaugeIOTest, verify)
 }
 
 using cs_test_t = ::testing::tuple<QudaSiteSubset, QudaSiteSubset, QudaParity, bool, QudaPrecision, QudaPrecision, int,
-                                   bool, QudaFieldLocation>;
+                                   bool, QudaFieldLocation, QudaFileFormat, QudaFileIOMode>;
 
 class ColorSpinorIOTest : public ::testing::TestWithParam<cs_test_t>
 {
@@ -94,6 +161,8 @@ protected:
   int nSpin;
   bool partfile;
   QudaFieldLocation location;
+  QudaFileFormat format;
+  QudaFileIOMode io_mode;
 
 public:
   ColorSpinorIOTest() :
@@ -105,7 +174,9 @@ public:
     prec_io(::testing::get<5>(GetParam())),
     nSpin(::testing::get<6>(GetParam())),
     partfile(::testing::get<7>(GetParam())),
-    location(::testing::get<8>(GetParam()))
+    location(::testing::get<8>(GetParam())),
+    format(::testing::get<9>(GetParam())),
+    io_mode(::testing::get<10>(GetParam()))
   {
   }
 };
@@ -177,11 +248,17 @@ TEST_P(ColorSpinorIOTest, verify)
 
   auto file = "dummy.cs";
 
+  FileIOParam io_param;
+  io_param.format = format;
+  io_param.io_mode = io_mode;
+  io_param.parity_inflate = inflate;
+  io_param.partfile = partfile;
+
   // create a separate VectorIO for saving and loading
   // this lets us test saving a single-parity field with inflation
   // then loading the full parity field.
-  VectorIO io_save(file, inflate, partfile);
-  VectorIO io_load(file, inflate, partfile);
+  VectorIO io_save(file, io_param);
+  VectorIO io_load(file, io_param);
 
   io_save.save({v.begin(), v.end()}, prec_io, n_vector);
   io_load.load(u);
@@ -231,11 +308,18 @@ int main(int argc, char **argv)
 
 using ::testing::Combine;
 using ::testing::Values;
+using ::testing::ValuesIn;
 
 // gauge IO test
-INSTANTIATE_TEST_SUITE_P(Gauge, GaugeIOTest, Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)),
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeIOTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), ValuesIn(gauge_formats()),
+                                 Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
                          [](testing::TestParamInfo<gauge_test_t> param) {
-                           return get_prec_str(::testing::get<0>(param.param));
+                           std::string name;
+                           name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += quda::get_file_format_str(::testing::get<1>(param.param)) + std::string("_");
+                           name += get_io_mode_str(::testing::get<2>(param.param));
+                           return name;
                          });
 
 // colorspinor full field IO test
@@ -244,14 +328,17 @@ INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,
                                  Values(QUDA_INVALID_PARITY), Values(false),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
-                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION),
+                                 ValuesIn(vector_formats()), Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
                          [](testing::TestParamInfo<cs_test_t> param) {
                            std::string name;
                            name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
                            name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
                            name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
-                           name += ::testing::get<7>(param.param) ? "_singlefile" : "_partfile";
+                           name += ::testing::get<7>(param.param) ? "_partfile" : "_singlefile";
                            name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
+                           name += std::string("_") + quda::get_file_format_str(::testing::get<9>(param.param));
+                           name += std::string("_") + get_io_mode_str(::testing::get<10>(param.param));
                            return name;
                          });
 
@@ -261,7 +348,8 @@ INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
                                  Values(QUDA_EVEN_PARITY, QUDA_ODD_PARITY), Values(false, true),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
-                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION),
+                                 ValuesIn(vector_formats()), Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
                          [](testing::TestParamInfo<cs_test_t> param) {
                            std::string name;
                            name += ::testing::get<1>(param.param) == QUDA_PARITY_SITE_SUBSET ? "load_parity_" :
@@ -271,7 +359,9 @@ INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
                            name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
                            name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
                            name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
-                           name += ::testing::get<7>(param.param) ? "_singlefile" : "_partfile";
+                           name += ::testing::get<7>(param.param) ? "_partfile" : "_singlefile";
                            name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
+                           name += std::string("_") + quda::get_file_format_str(::testing::get<9>(param.param));
+                           name += std::string("_") + get_io_mode_str(::testing::get<10>(param.param));
                            return name;
                          });

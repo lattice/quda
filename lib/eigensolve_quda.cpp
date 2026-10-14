@@ -9,7 +9,6 @@
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
 #include <random_quda.h>
-#include <io/qio_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
@@ -261,8 +260,11 @@ namespace quda
       for (auto &k : kSpace) k.setSuggestedParity(mat_parity);
 
       // save the required eigenvectors or right singular vectors to file
-      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE, eig_param->partfile);
-      io.save(kSpace, save_prec, n_conv);
+      FileIOParam io_param(eig_param->file_io_param);
+      io_param.parity_inflate = eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE;
+      io_param.partfile = eig_param->partfile == QUDA_BOOLEAN_TRUE;
+      VectorIO io(eig_param->vec_outfile, io_param);
+      io.save(kSpace, save_prec, n_conv, &evals);
     }
 
     logQuda(QUDA_SUMMARIZE, "********************************\n");
@@ -680,8 +682,10 @@ namespace quda
 
     {
       // load the vectors
-      VectorIO io(eig_param->vec_infile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
-      io.load({kSpace.begin(), kSpace.begin() + n_conv});
+      FileIOParam io_param(eig_param->file_io_param);
+      io_param.parity_inflate = eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE;
+      VectorIO io(eig_param->vec_infile, io_param);
+      io.load({kSpace.begin(), kSpace.begin() + n_conv}, &evals);
     }
 
     // Create the device side residual vector by cloning

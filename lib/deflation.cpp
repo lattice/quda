@@ -25,7 +25,7 @@ namespace quda
     printfQuda("Creating deflation space of %d vectors.\n", param.tot_dim);
 
     if (param.eig_global.import_vectors) { // whether to load eigenvectors
-      VectorIO io(param.eig_global.vec_infile);
+      VectorIO io(param.eig_global.vec_infile, FileIOParam(param.eig_global.file_io_param));
       io.load(*param.RV);
     }
     // create aux fields

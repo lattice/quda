@@ -1236,7 +1236,7 @@ namespace quda
       vec_infile += std::to_string(param.level);
       vec_infile += "_nvec_";
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
-      VectorIO io(vec_infile);
+      VectorIO io(vec_infile, FileIOParam(param.mg_global.file_io_param));
       io.load(B);
       popLevel();
       getProfile().TPSTOP(QUDA_PROFILE_IO);
@@ -1255,7 +1255,9 @@ namespace quda
       vec_outfile += std::to_string(param.level);
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-      VectorIO io(vec_outfile, false, param.mg_global.mg_vec_partfile[param.level]);
+      FileIOParam io_param(param.mg_global.file_io_param);
+      io_param.partfile = param.mg_global.mg_vec_partfile[param.level] == QUDA_BOOLEAN_TRUE;
+      VectorIO io(vec_outfile, io_param);
       io.save(B);
       popLevel();
       getProfile().TPSTOP(QUDA_PROFILE_IO);

@@ -6,8 +6,6 @@
 
 // QUDA headers
 #include <unitarization_links.h>
-#include <io/qio_field.h>
-
 // External headers
 #include "llfat_utils.h"
 #include "gauge_utils.h"

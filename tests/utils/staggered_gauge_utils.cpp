@@ -7,7 +7,7 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <unitarization_links.h>
-#include <io/qio_field.h>
+#include <io/gauge_io.h>
 
 #include "misc.h"
 #include "host_utils.h"
@@ -124,14 +124,15 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
 }
 
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
-                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu)
+                                      QudaGaugeParam &gauge_param, int, char **, bool compute_on_gpu)
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   // load a field WITHOUT PHASES
   if (latfile.size() > 0) {
-    // load in the command line supplied gauge field using QIO and LIME
-    read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    // load in the command line supplied gauge field
+    quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param))
+      .load(qdp_inlink, gauge_param.cpu_prec, gauge_param.X);
     if (dslash_type != QUDA_LAPLACE_DSLASH) {
       applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
     }

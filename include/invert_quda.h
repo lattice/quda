@@ -7,7 +7,6 @@
 #include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
-#include <io/qio_field.h>
 #include <eigensolve_quda.h>
 #include <madwf_param.h>
 

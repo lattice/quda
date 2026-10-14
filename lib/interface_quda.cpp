@@ -42,6 +42,7 @@
 
 #include <gauge_path_quda.h>
 #include <gauge_update_quda.h>
+#include <io/gauge_io.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
@@ -942,9 +943,8 @@ void writeGaugeQuda(const char *file, QudaGaugeParam *param)
   default: errorQuda("Invalid gauge type");
   }
 
-  // Write to disk using QIO writer
-  write_gauge_field(file, reinterpret_cast<void **>(cpuGauge.raw_pointer()), cpuGauge.Precision(), param->X, 0,
-                    (char **)0);
+  GaugeIO(file, FileIOParam(param->file_io_param))
+    .save(reinterpret_cast<void **>(cpuGauge.raw_pointer()), cpuGauge.Precision(), param->X);
 
 } // writeGaugeQuda
 

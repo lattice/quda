@@ -1,6 +1,6 @@
 #include <quda.h>
 #include <gauge_field.h>
-#include <io/qio_field.h>
+#include <io/gauge_io.h>
 
 #include "command_line_params.h"
 #include "host_utils.h"
@@ -583,13 +583,13 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
   }
 }
 
-void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv)
+void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_param, int, char **)
 {
   GaugeFieldConstructionType construct_type;
   if (latfile.size() > 0) {
-    // load in the command line supplied gauge field using QIO and LIME
+    // load in the command line supplied gauge field
     logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
-    read_gauge_field(latfile.c_str(), (void **)gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param)).load(gauge, gauge_param.cpu_prec, gauge_param.X);
     construct_type = GaugeFieldConstructionType::LOAD_GAUGE;
   } else {
     if (unit_gauge)

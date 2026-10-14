@@ -7,8 +7,6 @@
 
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
-#include <io/vector_io.h>
-#include <io/qio_field.h>
 #include <color_spinor_field.h>
 #include <random_quda.h>
 #include <blas_quda.h>

@@ -18,8 +18,6 @@
 #include <color_spinor_field.h>
 #include <unitarization_links.h>
 #include <dirac_quda.h>
-#include <io/qio_field.h>
-
 // External headers
 #include "llfat_utils.h"
 #include "gauge_utils.h"

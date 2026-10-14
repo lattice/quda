@@ -12,7 +12,7 @@
 #include <random_quda.h>
 #include <unitarization_links.h>
 
-#include <io/qio_field.h>
+#include <io/gauge_io.h>
 
 #include "host_utils.h"
 #include "command_line_params.h"
@@ -141,8 +141,8 @@ void teardown_gauge()
     copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
     cpuGauge = gauge;
 
-    write_gauge_field(gauge_outfile.c_str(), reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param.cpu_prec,
-                      gauge_param.X, 0, (char **)0);
+    quda::GaugeIO(gauge_outfile, quda::FileIOParam(gauge_param.file_io_param))
+      .save(reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param.cpu_prec, gauge_param.X);
   } else {
     printfQuda("No output file specified.\n");
   }
