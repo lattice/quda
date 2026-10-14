@@ -248,7 +248,7 @@ void init()
   //-----------------------------------------------------------------------------------
 }
 
-std::vector<std::array<double, 2>> solve(test_t param)
+std::vector<std::array<quda::real_t, 2>> solve(test_t param)
 {
   inv_param.inv_type = ::testing::get<0>(param);
   inv_param.solution_type = ::testing::get<1>(param);
@@ -438,7 +438,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // Compute timings
   if (!use_multi_src) performanceStats(time, gflops, iter);
 
-  std::vector<std::array<double, 2>> res(Nsrc);
+  std::vector<std::array<quda::real_t, 2>> res(Nsrc);
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int n = 0; n < Nsrc; n++) {
@@ -533,7 +533,17 @@ int main(int argc, char **argv)
       changes = true;
     }
 
-    double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-5 : 1e-6;
+    auto getStaggeredInvertTolerance = [](QudaPrecision prec) {
+      switch (prec) {
+      case QUDA_SINGLE_PRECISION: return 1e-5;
+      case QUDA_DOUBLE_PRECISION: return 1e-6;
+      default: return 0.0;
+      }
+    };
+
+    double expected_tol = getStaggeredInvertTolerance(prec);
+    if (expected_tol == 0.0) errorQuda("Unexpected precision %d", prec);
+
     if (tol != expected_tol) {
       tol = expected_tol;
       changes = true;
@@ -550,8 +560,10 @@ int main(int argc, char **argv)
     if (changes) {
       printfQuda("For gtest, various defaults are changed:\n");
       printfQuda("  --compute-fat-long true\n");
-      printfQuda("  --tol (1e-6 for double, 1e-5 for single)\n");
-      printfQuda("  --tol-hq (1e-6 for double, 1e-5 for single)\n");
+      printfQuda("  --tol (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
+      printfQuda("  --tol-hq (%e for double, %e for single)\n", getStaggeredInvertTolerance(QUDA_DOUBLE_PRECISION),
+                 getStaggeredInvertTolerance(QUDA_SINGLE_PRECISION));
       printfQuda("  --niter 1000\n");
     }
   }

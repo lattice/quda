@@ -57,7 +57,7 @@ namespace quda
   template <typename reducer, typename T, typename count_t, typename transformer>
   typename reducer::reduce_t transform_reduce(QudaFieldLocation location, const T *v, count_t n_items, transformer h)
   {
-    std::vector<typename reducer::reduce_t> result = {0.0};
+    std::vector<typename reducer::reduce_t> result(1);
     std::vector<const T *> v_ = {v};
     transform_reduce<reducer>(location, result, v_, n_items, h, identity());
     return result[0];
@@ -72,7 +72,7 @@ namespace quda
   template <typename reducer, typename T, typename count_t>
   typename reducer::reduce_t reduce(QudaFieldLocation location, const T *v, count_t n_items)
   {
-    std::vector<typename reducer::reduce_t> result = {0.0};
+    std::vector<typename reducer::reduce_t> result(1);
     std::vector<const T *> v_ = {v};
     transform_reduce<reducer>(location, result, v_, n_items, identity());
     return result[0];
@@ -80,48 +80,51 @@ namespace quda
 
   // explicit instantiation list for transform_reduce
   // abs
-  template void transform_reduce<plus<double>, complex<double>, unsigned int, abs_<double, double>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, unsigned int,
+  template void transform_reduce<plus<device_reduce_t>, complex<double>, unsigned int, abs_<double, double>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<double> *> const &, unsigned int,
     abs_<double, double>, identity);
-  template void transform_reduce<plus<double>, complex<float>, unsigned int, abs_<double, float>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, unsigned int, abs_<double, float>,
-    identity);
-  template void transform_reduce<plus<double>, complex<int>, unsigned int, abs_<double, int>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<int> *> const &, unsigned int,
+  template void transform_reduce<plus<device_reduce_t>, complex<float>, unsigned int, abs_<double, float>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<float> *> const &, unsigned int,
+    abs_<double, float>, identity);
+  template void transform_reduce<plus<device_reduce_t>, complex<int>, unsigned int, abs_<double, int>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<int> *> const &, unsigned int,
     abs_<double, int>, identity);
-  template void transform_reduce<plus<double>, complex<short>, unsigned int, abs_<double, short>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, unsigned int, abs_<double, short>,
-    identity);
-  template void transform_reduce<plus<double>, complex<signed char>, unsigned int, abs_<double, signed char>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, unsigned int,
+  template void transform_reduce<plus<device_reduce_t>, complex<short>, unsigned int, abs_<double, short>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<short> *> const &, unsigned int,
+    abs_<double, short>, identity);
+  template void
+  transform_reduce<plus<device_reduce_t>, complex<signed char>, unsigned int, abs_<double, signed char>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<signed char> *> const &, unsigned int,
     abs_<double, signed char>, identity);
-  template double transform_reduce<plus<double>, complex<double>, unsigned long, abs_<double, double>>(
+  template device_reduce_t transform_reduce<plus<device_reduce_t>, complex<double>, unsigned long, abs_<double, double>>(
     QudaFieldLocation, complex<double> const *, unsigned long, abs_<double, double>);
-  template double transform_reduce<plus<double>, complex<float>, unsigned long, abs_<double, float>>(
+  template device_reduce_t transform_reduce<plus<device_reduce_t>, complex<float>, unsigned long, abs_<double, float>>(
     QudaFieldLocation, complex<float> const *, unsigned long, abs_<double, float>);
   // square
-  template void transform_reduce<plus<double>, complex<double>, unsigned int, square_<double, double>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, unsigned int,
+  template void transform_reduce<plus<device_reduce_t>, complex<double>, unsigned int, square_<double, double>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<double> *> const &, unsigned int,
     square_<double, double>, identity);
-  template void transform_reduce<plus<double>, complex<float>, unsigned int, square_<double, float>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, unsigned int,
+  template void transform_reduce<plus<device_reduce_t>, complex<float>, unsigned int, square_<double, float>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<float> *> const &, unsigned int,
     square_<double, float>, identity);
-  template void transform_reduce<plus<double>, complex<int>, unsigned int, square_<double, int>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<int> *> const &, unsigned int, square_<double, int>,
-    identity);
-  template void transform_reduce<plus<double>, complex<signed char>, unsigned int, square_<double, signed char>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, unsigned int,
+  template void transform_reduce<plus<device_reduce_t>, complex<int>, unsigned int, square_<double, int>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<int> *> const &, unsigned int,
+    square_<double, int>, identity);
+  template void
+  transform_reduce<plus<device_reduce_t>, complex<signed char>, unsigned int, square_<double, signed char>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<signed char> *> const &, unsigned int,
     square_<double, signed char>, identity);
-  template void transform_reduce<plus<double>, complex<short>, unsigned int, square_<double, short>, identity>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, unsigned int,
+  template void transform_reduce<plus<device_reduce_t>, complex<short>, unsigned int, square_<double, short>, identity>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<complex<short> *> const &, unsigned int,
     square_<double, short>, identity);
-  template double transform_reduce<plus<double>, complex<double>, unsigned long, square_<double, double>>(
+  template device_reduce_t
+  transform_reduce<plus<device_reduce_t>, complex<double>, unsigned long, square_<double, double>>(
     QudaFieldLocation, complex<double> const *, unsigned long, square_<double, double>);
-  template double transform_reduce<plus<double>, complex<float>, unsigned long, square_<double, float>>(
+  template device_reduce_t transform_reduce<plus<device_reduce_t>, complex<float>, unsigned long, square_<double, float>>(
     QudaFieldLocation, complex<float> const *, unsigned long, square_<double, float>);
-  template double transform_reduce<plus<double>, complex<float>, unsigned int, square_<double, float>>(
+  template device_reduce_t transform_reduce<plus<device_reduce_t>, complex<float>, unsigned int, square_<double, float>>(
     QudaFieldLocation, complex<float> const *, unsigned int, square_<double, float>);
-  template double transform_reduce<plus<double>, complex<short>, unsigned int, square_<double, short>>(
+  template device_reduce_t transform_reduce<plus<device_reduce_t>, complex<short>, unsigned int, square_<double, short>>(
     QudaFieldLocation, complex<short> const *, unsigned int, square_<double, short>);
   // abs_max
   template void transform_reduce<maximum<double>, complex<double>, unsigned int, abs_max_<double, double>, identity>(
@@ -174,36 +177,45 @@ namespace quda
   template float transform_reduce<minimum<float>, complex<float>, unsigned long, abs_min_<float, float>>(
     QudaFieldLocation, complex<float> const *, unsigned long, abs_min_<float, float>);
 
-  template void quda::transform_reduce<plus<double>, complex<double>, unsigned int, square_<double, double>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<double> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<double>, unsigned int, square_<double, double>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<double> *> const &, unsigned int,
     square_<double, double>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<float>, unsigned int, square_<double, float>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<float> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<float>, unsigned int, square_<double, float>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<float> *> const &, unsigned int,
     square_<double, float>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<int>, unsigned int, square_<double, int>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<int> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<int>, unsigned int, square_<double, int>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<int> *> const &, unsigned int,
     square_<double, int>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<short>, unsigned int, square_<double, short>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<short> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<short>, unsigned int, square_<double, short>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<short> *> const &, unsigned int,
     square_<double, short>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<int8_t>, unsigned int, square_<double, int8_t>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<int8_t> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<int8_t>, unsigned int, square_<double, int8_t>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<int8_t> *> const &, unsigned int,
     square_<double, int8_t>, milc_mapper);
 
-  template void quda::transform_reduce<plus<double>, complex<double>, unsigned int, abs_<double, double>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<double> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<double>, unsigned int, abs_<double, double>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<double> *> const &, unsigned int,
     abs_<double, double>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<float>, unsigned int, abs_<double, float>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<float> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<float>, unsigned int, abs_<double, float>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<float> *> const &, unsigned int,
     abs_<double, float>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<int>, unsigned int, abs_<double, int>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<int> *> const &, unsigned int,
+  template void quda::transform_reduce<plus<device_reduce_t>, complex<int>, unsigned int, abs_<double, int>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<int> *> const &, unsigned int,
     abs_<double, int>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<short>, unsigned int, abs_<double, short>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<short> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<short>, unsigned int, abs_<double, short>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<short> *> const &, unsigned int,
     abs_<double, short>, milc_mapper);
-  template void quda::transform_reduce<plus<double>, complex<int8_t>, unsigned int, abs_<double, int8_t>, milc_mapper>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<int8_t> *> const &, unsigned int,
+  template void
+  quda::transform_reduce<plus<device_reduce_t>, complex<int8_t>, unsigned int, abs_<double, int8_t>, milc_mapper>(
+    QudaFieldLocation, std::vector<device_reduce_t> &, std::vector<quda::complex<int8_t> *> const &, unsigned int,
     abs_<double, int8_t>, milc_mapper);
 
   template void

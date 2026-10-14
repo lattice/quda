@@ -8,7 +8,10 @@ namespace quda
   struct CommKey {
 
     static constexpr int n_dim = 4;
-    array<int, n_dim> key = {0, 0, 0, 0};
+    array<int, n_dim> key {0, 0, 0, 0};
+
+    constexpr CommKey() = default;
+    constexpr CommKey(int k0, int k1, int k2, int k3) noexcept : key(k0, k1, k2, k3) { }
 
     constexpr int product() { return key[0] * key[1] * key[2] * key[3]; }
 

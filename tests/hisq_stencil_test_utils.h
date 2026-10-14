@@ -175,7 +175,7 @@ struct HisqStencilTestWrapper {
     // Input links //
     /////////////////
 
-    for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    for (int i = 0; i < 4; i++) qdp_sitelink[i] = host_pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
     // Note: this could be replaced with loading a gauge field
     createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
@@ -236,17 +236,17 @@ struct HisqStencilTestWrapper {
     ///////////////////////////////////////////////////////
 
     // Paths for step 1:
-    vlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // V links
-    wlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // W links
+    vlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // V links
+    wlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // W links
 
     // Paths for step 2:
-    fatlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // final fat ("X") links
-    longlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // final long links
+    fatlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // final fat ("X") links
+    longlink = host_pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // final long links
 
     // Place to accumulate Naiks
     if (n_naiks > 1) {
-      fatlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // epsilon fat links
-      longlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // epsilon long naiks
+      fatlink_eps = host_pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // epsilon fat links
+      longlink_eps = host_pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // epsilon long naiks
     }
   }
 

@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <byte_array.h>
+#include <packed_array.h>
 
 namespace quda
 {
@@ -22,23 +22,19 @@ namespace quda
   // Note: ops count does not include scalar-matrix mults coming from anisotropy implementation
   template <typename Arg, typename Staple, typename Int>
   __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity,
-                                                const int nu, Staple &staple, const int dir_ignore,
-                                                const double anisotropy = 1.0)
+                                                const int nu, Staple &staple, const int dir_ignore)
   {
     using Link = typename get_type<Staple>::type;
-    using real = typename Arg::real;
-    real coeff;
     staple = Link();
 
-    byte_array<int8_t, 4> dx = {};
+    packed_array<int8_t, 4> dx = {};
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
 
-      coeff = 1.0;
-      if (mu == 3) coeff = anisotropy * anisotropy;
+      auto coeff = mu == 3 ? arg.anisotropy * arg.anisotropy : static_cast<typename Arg::real>(1.0);
 
       if (mu != nu && mu != dir_ignore) {
         {
@@ -107,22 +103,19 @@ namespace quda
   template <typename Arg, typename Staple, typename Rectangle, typename Int>
   __host__ __device__ inline void computeStapleRectangle(const Arg &arg, const int *x, const Int *X, const int parity,
                                                          const int nu, Staple &staple, Rectangle &rectangle,
-                                                         const int dir_ignore, const double anisotropy = 1.0)
+                                                         const int dir_ignore)
   {
     using Link = typename get_type<Staple>::type;
-    using real = typename Arg::real;
-    real coeff;
     staple = Link();
     rectangle = Link();
 
-    byte_array<int8_t, 4> dx = {};
+    packed_array<int8_t, 4> dx = {};
     for (int mu = 0; mu < 4; mu++) { // do not unroll loop to prevent register spilling
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological
       // measurements which will include the temporal direction.
 
-      coeff = 1.0;
-      if (mu == 3) coeff = anisotropy * anisotropy;
+      auto coeff = mu == 3 ? arg.anisotropy * arg.anisotropy : static_cast<typename Arg::real>(1.0);
 
       if (mu != nu && mu != dir_ignore) {
         // RECTANGLE calculation

@@ -19,14 +19,16 @@ namespace quda {
     static constexpr bool regularToextended = regularToextended_;
     OutOrder out;
     const InOrder in;
+    real_in_t scale;
     int_fastdiv Xin[QUDA_MAX_DIM];
     int_fastdiv Xout[QUDA_MAX_DIM];
     int border[QUDA_MAX_DIM];
     int geometry;
-    CopyGaugeExArg(GaugeField &out, const GaugeField &in, store_out_t *Out, store_in_t *In) :
+    CopyGaugeExArg(GaugeField &out, const GaugeField &in, store_out_t *Out, store_in_t *In, double scale_) :
       kernel_param(dim3(in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(), 2, 1)),
       out(out, Out),
       in(in, In),
+      scale(static_cast<real_in_t>(scale_)),
       geometry(in.Geometry())
     {
       for (int d=0; d < in.Ndim(); d++) {
@@ -64,11 +66,11 @@ namespace quda {
         xin = linkIndex(x, arg.Xin);
         xout = x_cb;
       }
-      for (int d=0; d<arg.geometry; d++) {
+      for (int d = 0; d < arg.geometry; d++) {
         const Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in(d, xin, parity);
-        Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
+        Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in * arg.scale;
         arg.out(d, xout, parity) = out;
-      }//dir
+      } // dir
     }
   };
 

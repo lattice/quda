@@ -25,7 +25,7 @@ namespace quda {
     }
   }
 
-  LatticeField::LatticeField(const LatticeFieldParam &param, bool is_native_gauge) :
+  LatticeField::LatticeField(const LatticeFieldParam &param) :
     volume(1),
     localVolume(1),
     pad(param.pad),
@@ -57,7 +57,7 @@ namespace quda {
     mh_send_rdma {},
     mem_type(param.mem_type)
   {
-    create(param, is_native_gauge);
+    create(param);
   }
 
   LatticeField::LatticeField(const LatticeField &field) noexcept :
@@ -98,7 +98,7 @@ namespace quda {
   {
     LatticeFieldParam param;
     field.fill(param);
-    create(param, false);
+    create(param);
   }
 
   LatticeField::LatticeField(LatticeField &&field) noexcept { move(std::move(field)); }
@@ -111,7 +111,7 @@ namespace quda {
       destroyComms();
       LatticeFieldParam param;
       src.fill(param);
-      create(param, false);
+      create(param);
     }
     return *this;
   }
@@ -125,7 +125,7 @@ namespace quda {
     return *this;
   }
 
-  void LatticeField::create(const LatticeFieldParam &param, bool is_native_gauge)
+  void LatticeField::create(const LatticeFieldParam &param)
   {
     if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Invalid field location");
     location = param.location;
@@ -158,10 +158,6 @@ namespace quda {
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
-    if (is_native_gauge) { // if a native gauge field we need to ensure padded volume is aligned
-      stride = (stride + 31) & ~31; // round up to be a multiple of 32 to guarantee alignment
-      pad = stride - volumeCB;
-    }
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
     for (int i = 0; i < nDim; i++) {
@@ -265,6 +261,13 @@ namespace quda {
           // before we free any comms buffers
           qudaDeviceSynchronize();
           comm_barrier();
+          // Tear down any existing IPC comms before freeing the ghost
+          // buffers.  Otherwise a peer rank can still hold an
+          // hipIpcOpenMemHandle mapping of a buffer we are about to
+          // hipFree, and a subsequent hipMalloc that lands at the same
+          // virtual address can then fail hipIpcGetMemHandle with
+          // hipErrorInvalidValue.
+          destroyIPCComms();
           for (int b=0; b<2; b++) {
             device_comms_pinned_free(ghost_recv_buffer_d[b]);
             device_comms_pinned_free(ghost_send_buffer_d[b]);
@@ -287,13 +290,13 @@ namespace quda {
           qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
           // pinned buffer used for sending
-          ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
+          ghost_pinned_send_buffer_h[b] = host_pinned_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
           ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
 
           // pinned buffer used for receiving
-          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          ghost_pinned_recv_buffer_h[b] = host_pinned_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
           ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
@@ -452,6 +455,13 @@ namespace quda {
   void LatticeField::createIPCComms() const
   {
     if ( initIPCComms && !ghost_field_reset ) return;
+
+    // If we already have IPC state and the ghost field has been reset,
+    // tear it down before recreating; otherwise the IPC mem/event handle
+    // arrays would be silently overwritten and the previous events
+    // (created with hipEventCreateWithFlags) and imported handles would
+    // leak.
+    if (initIPCComms && ghost_field_reset) destroyIPCComms();
 
     if (!initComms) errorQuda("Can only be called after create comms");
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)

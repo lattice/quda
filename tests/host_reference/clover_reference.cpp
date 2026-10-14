@@ -259,14 +259,14 @@ void twistCloverGamma5(void *out, const void *in, const void *clover, const void
   double a = 0.0;
 
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-    a = 2.0 * kappa * mu * flavor;
+    a = 2.0 * kappa * mu * static_cast<double>(flavor);
 
     if (dagger) a *= -1.0;
 
     apply_clover(tmp1, clover, in, parity, precision);
     applyTwist(out, in, tmp1, a, precision);
   } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-    a = -2.0 * kappa * mu * flavor;
+    a = -2.0 * kappa * mu * static_cast<double>(flavor);
 
     if (dagger) a *= -1.0;
 

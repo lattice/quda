@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <byte_array.h>
+#include <packed_array.h>
 #include <kernel.h>
 
 namespace quda
@@ -53,7 +53,7 @@ namespace quda
     { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
 
       // load U(x)_(+mu)
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+mu)_(+nu)
@@ -76,7 +76,7 @@ namespace quda
     { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
 
       // load U(x)_(+nu)
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
@@ -103,7 +103,7 @@ namespace quda
     { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
 
       // load U(x)_(-nu)
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
       dx[nu]--;
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]++;
@@ -130,7 +130,7 @@ namespace quda
     { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
 
       // load U(x)_(-mu)
-      byte_array<int8_t, 4> dx = {};
+      packed_array<int8_t, 4> dx = {};
       dx[mu]--;
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]++;

@@ -47,7 +47,7 @@ namespace quda {
       auto k = arg.m(i);
       auto v = arg.v[j];
       auto t = arg.h(v[k]);
-      return operator()(t, value);
+      return operator()(value, t);
     }
   };
 

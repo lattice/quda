@@ -100,8 +100,8 @@ namespace quda
 
     long long bytes() const
     {
-      int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in.Precision();
-      int gauge_bytes_long = L.Reconstruct() * in.Precision();
+      int gauge_bytes_fat = static_cast<int>(QUDA_RECONSTRUCT_NO) * static_cast<int>(in.Precision());
+      int gauge_bytes_long = static_cast<int>(L.Reconstruct()) * static_cast<int>(in.Precision());
       int spinor_bytes
         = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat)
@@ -147,7 +147,7 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
     ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                           cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, double a,
+                           cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, real_t a,
                            int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;

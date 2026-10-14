@@ -6,7 +6,7 @@ namespace quda
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonApply {
     template <bool distance_pc>
     WilsonApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double alpha0, int t0, int parity,
+                cvector_ref<const ColorSpinorField> &x, const GaugeField &U, real_t a, real_t alpha0, int t0, int parity,
                 bool dagger, const int *comm_override, std::integral_constant<bool, distance_pc>, TimeProfile &profile);
   };
 
@@ -16,7 +16,7 @@ namespace quda
   // with fwd(t)=\alpha(t+1)/\alpha(t), bwd(t)=\alpha(t+1)/\alpha(t), \alpha(t)=\cosh(\alpha_0*((t-t_0)%L_t-L_t/2))
   // Uses the a normalization for the Wilson operator.
   void ApplyWilsonDistance(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                           const GaugeField &U, double a, double alpha0, int t0, cvector_ref<const ColorSpinorField> &x,
+                           const GaugeField &U, real_t a, real_t alpha0, int t0, cvector_ref<const ColorSpinorField> &x,
                            int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     if (in.Ndim() == 5) errorQuda("Unexpected nDim = 5");

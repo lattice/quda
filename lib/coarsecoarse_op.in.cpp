@@ -6,8 +6,8 @@ namespace quda
 
   template <int fineColor, int coarseColor, int... N>
   void CoarseCoarseOp2(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu,
-                       double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
+                       const GaugeField &clover, const GaugeField &cloverInv, real_t kappa, real_t mass, real_t mu,
+                       real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                        bool use_mma, IntList<coarseColor, N...>)
   {
     if (Y.Ncolor() / 2 == coarseColor) {
@@ -34,8 +34,8 @@ namespace quda
 
   template <int fineColor, int... N>
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu,
-                      double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma,
+                      const GaugeField &clover, const GaugeField &cloverInv, real_t kappa, real_t mass, real_t mu,
+                      real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma,
                       IntList<fineColor, N...>)
   {
     if (gauge.Ncolor() / T.Vectors().Nspin() == fineColor) {
@@ -55,8 +55,8 @@ namespace quda
   }
 
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu,
-                      double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma)
+                      const GaugeField &clover, const GaugeField &cloverInv, real_t kappa, real_t mass, real_t mu,
+                      real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma)
   {
     if constexpr (is_enabled_multigrid()) {
       // clang-format off

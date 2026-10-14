@@ -266,10 +266,10 @@ double blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayC
 
   // Copy data from problem sized array to reference sized array.
   // Include A and B to ensure no data corruption occurred
-  void *checkA = pinned_malloc(refA_size * data_size * batches);
-  void *checkB = pinned_malloc(refB_size * data_size * batches);
-  void *checkC = pinned_malloc(refC_size * data_size * batches);
-  void *checkCcopy = pinned_malloc(refC_size * data_size * batches);
+  void *checkA = host_pinned_malloc(refA_size * data_size * batches);
+  void *checkB = host_pinned_malloc(refB_size * data_size * batches);
+  void *checkC = host_pinned_malloc(refC_size * data_size * batches);
+  void *checkCcopy = host_pinned_malloc(refC_size * data_size * batches);
 
   memset(checkA, 0, batches * refA_size * data_size);
   memset(checkB, 0, batches * refB_size * data_size);
@@ -385,7 +385,7 @@ double blasLUInvQudaVerify(void *ref_array, void *dev_array_inv, uint64_t array_
   int batches = blas_param->batch_count;
 
   // Copy data from problem sized array to reference sized array.
-  void *dev_array_inv_copy = pinned_malloc(array_size * re_im * data_out_size * batches);
+  void *dev_array_inv_copy = host_pinned_malloc(array_size * re_im * data_out_size * batches);
 
   size_t data_in_size = 0;
   switch (blas_param->data_type) {

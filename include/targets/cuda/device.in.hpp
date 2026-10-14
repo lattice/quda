@@ -9,7 +9,7 @@ namespace quda
     constexpr int maximum_dynamic_shared_memory_override = @QUDA_MAX_SHARED_MEMORY@;
 
     /**
-      @brief A constexpr function to returns the maximum dyanmic shared memory per block.
+      @brief A constexpr function to returns the maximum dynamic shared memory per block.
         See https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#feature-availability
      */
     constexpr int maximum_dynamic_shared_memory()

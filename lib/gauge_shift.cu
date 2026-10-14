@@ -61,16 +61,16 @@ namespace quda
       errorQuda("Extended ghost exchange not supported");
     if (in.GhostExchange() == QUDA_GHOST_EXCHANGE_NO && comm_partitioned())
       errorQuda("comm_dim_partition() == true requires we have GhostExchange = QUDA_GHOST_EXCHANGE_PAD");
+
     GaugeFieldParam param(in);
     param.create = QUDA_NULL_FIELD_CREATE;
     GaugeField out(param);
-    const_cast<double&>(out.LinkMax()) = in.LinkMax();
+    const_cast<real_t &>(out.LinkMax()) = in.LinkMax();
     out.is_shifted = true;
 
     instantiate<GaugeShifter>(out, in, shift, false);
-#if 0 // set to 1 to run verification
-    instantiate<GaugeShifter>(out, in, shift, true);
-#endif
+    constexpr bool verify = false;
+    if constexpr (verify) instantiate<GaugeShifter>(out, in, shift, true);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return out;
   }

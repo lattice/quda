@@ -483,13 +483,20 @@ extern "C" {
     /** Type of eigensolver algorithm to employ **/
     QudaEigType eig_type;
 
-    /** Use Polynomial Acceleration **/
+    /** Use Polynomial Acceleration.  The Chebyshev polynomial applied by the
+        eigensolver is small on [a_min, a_max] and large only below a_min, so it
+        accelerates the smallest-real spectrum alone.  Combining this with
+        spectrum = QUDA_SPECTRUM_LR_EIG is an error. **/
     QudaBoolean use_poly_acc;
 
     /** Degree of the Chebysev polynomial **/
     int poly_deg;
 
-    /** Range used in polynomial acceleration **/
+    /** Range suppressed by the polynomial acceleration.  a_max should bound the
+        largest eigenvalue of the operator from above; if it is zero it is estimated
+        by power iteration.  a_min is the cut below which eigenvalues are amplified,
+        and should be strictly positive -- a_min = 0 yields a degenerate polynomial
+        that neither suppresses nor amplifies. **/
     double a_min;
     double a_max;
 
@@ -1175,6 +1182,13 @@ extern "C" {
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
   /**
+   * Write the gauge field to disk
+   * @param file Filename to write to
+   * @param param   Contains all metadata regarding host and device storage
+   */
+  void writeGaugeQuda(const char *file, QudaGaugeParam *param);
+
+  /**
    * Load the clover term and/or the clover inverse from the host.
    * Either h_clover or h_clovinv may be set to NULL.
    * @param h_clover    Base pointer to host clover field
@@ -1658,6 +1672,21 @@ extern "C" {
    */
   void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double coeff,
                                const QudaFermionSmearType smear_type);
+
+  /**
+   * Performs Wuppertal smearing on a given set of spinors using the gauge field
+   * gaugeSmeared, if it exists, or gaugePrecise if no smeared field is present.
+   * This smears multiple right-hand sides simultaneously.
+   * @param h_out    Result spinor fields
+   * @param h_in     Input spinor fields
+   * @param param    Contains all metadata regarding host and device
+   *                 storage and operator which will be applied to the spinor
+   * @param n_steps  Number of steps to apply.
+   * @param alpha    Alpha coefficient for Wuppertal smearing.
+   * @param nSpinors Number of spinor fields to smear
+   */
+  void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *param, unsigned int n_steps, double alpha,
+                                 size_t nSpinors);
 
   /**
    * LEGACY

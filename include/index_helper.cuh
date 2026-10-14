@@ -426,40 +426,40 @@ namespace quda {
     case 0:
       switch(dir) {
       case 0:
-	index = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+	index = ((((x[0] * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
 	break;
       case 1:
-	index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+	index = (((((x[0] - X[0] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
 	break;
       }
       break;
     case 1:
       switch(dir) {
       case 0:
-	index = (x[1]*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
+	index = ((((x[1] * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
+	index = (((((x[1] - X[1] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
     case 2:
       switch(dir) {
       case 0:
-	index = (x[2]*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	index = ((((x[2] * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
+	index = (((((x[2] - X[2] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
     case 3:
       switch(dir) {
       case 0:
-	index = (x[3]*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	index = ((((x[3] * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       case 1:
-	index = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+	index = (((((x[3] - X[3] + nFace) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
 	break;
       }
       break;
@@ -487,56 +487,40 @@ namespace quda {
     case 0:
       switch (dir) {
       case 0:
-        index = ((x[0] + nFace - 1) * X[4] * X[3] * X[2] * X[1] + x[4] * X[3] * X[2] * X[1] + x[3] * (X[2] * X[1])
-                    + x[2] * X[1] + x[1])
-            >> 1;
+        index = (((((x[0] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
         break;
       case 1:
-        index = ((x[0] - X[0] + nFace) * X[4] * X[3] * X[2] * X[1] + x[4] * X[3] * X[2] * X[1] + x[3] * (X[2] * X[1])
-                    + x[2] * X[1] + x[1])
-            >> 1;
+        index = (((((x[0] - X[0] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[1] + x[1]) >> 1;
         break;
       }
       break;
     case 1:
       switch (dir) {
       case 0:
-        index = ((x[1] + nFace - 1) * X[4] * X[3] * X[2] * X[0] + x[4] * X[3] * X[2] * X[0] + x[3] * X[2] * X[0]
-                    + x[2] * X[0] + x[0])
-            >> 1;
+        index = (((((x[1] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[1] - X[1] + nFace) * X[4] * X[3] * X[2] * X[0] + x[4] * X[3] * X[2] * X[0] + x[3] * X[2] * X[0]
-                    + x[2] * X[0] + x[0])
-            >> 1;
+        index = (((((x[1] - X[1] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[2] + x[2]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
     case 2:
       switch (dir) {
       case 0:
-        index = ((x[2] + nFace - 1) * X[4] * X[3] * X[1] * X[0] + x[4] * X[3] * X[1] * X[0] + x[3] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[2] + nFace - 1) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[2] - X[2] + nFace) * X[4] * X[3] * X[1] * X[0] + x[4] * X[3] * X[1] * X[0] + x[3] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[2] - X[2] + nFace) * X[4] + x[4]) * X[3] + x[3]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       }
       break;
     case 3:
       switch (dir) {
       case 0:
-        index = ((x[3] + nFace - 1) * X[4] * X[2] * X[1] * X[0] + x[4] * X[2] * X[1] * X[0] + x[2] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[3] + nFace - 1) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       case 1:
-        index = ((x[3] - X[3] + nFace) * X[4] * X[2] * X[1] * X[0] + x[4] * X[2] * X[1] * X[0] + x[2] * X[1] * X[0]
-                    + x[1] * X[0] + x[0])
-            >> 1;
+        index = (((((x[3] + nFace - X[3]) * X[4] + x[4]) * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         break;
       }
       break;

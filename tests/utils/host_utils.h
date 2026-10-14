@@ -8,6 +8,8 @@
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
+#include "host_rng.hpp"
+
 constexpr size_t gauge_site_size = 18;      // real numbers per link
 constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
 constexpr size_t stag_spinor_site_size = 6; // real numbers per staggered 'spinor'
@@ -43,7 +45,7 @@ extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
 // Host hypercubic RNG
-extern std::vector<std::mt19937_64> host_rand;
+extern std::vector<host_rng_t> host_rand;
 
 // Determine if we're running in multi-GPU mode
 constexpr bool is_multi_gpu()
@@ -320,7 +322,7 @@ inline int getReconstructNibble(QudaReconstructType recon)
   @param[in] prec Precision
   @return Exponent of the base-10 reasonably expected tolerance
 */
-inline int getNegLog10Tolerance(QudaPrecision prec)
+constexpr int getNegLog10Tolerance(QudaPrecision prec)
 {
   switch (prec) {
   case QUDA_QUARTER_PRECISION: return 1;
@@ -339,6 +341,39 @@ inline int getNegLog10Tolerance(QudaPrecision prec)
   @return Reasonable expected tolerance
 */
 inline double getTolerance(QudaPrecision prec) { return pow(10, -getNegLog10Tolerance(prec)); }
+
+/**
+  @brief If the residual exceeds the tolerance but is within a reasonable deviation factor
+  for reasons such as host/device accumulation differences, warn the user and return the reasonable tolerance.
+  @param[in] residual Residual
+  @param[in] tolerance Tolerance
+  @param[in] precision Precision
+  @param[in] reconstruct Reconstruction type
+  @return Tolerance adjusted for reasonable deviation factor
+*/
+inline double checkReasonableHostDeviation(double residual, double tolerance, QudaPrecision precision,
+                                           QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO)
+{
+  double factor = [precision]() {
+    switch (precision) {
+    case QUDA_QUARTER_PRECISION: return 1.03;
+    case QUDA_HALF_PRECISION: return 1.03;
+    case QUDA_SINGLE_PRECISION: return 1.03;
+    case QUDA_DOUBLE_PRECISION: return 1.0;
+    default: return 1.0;
+    }
+  }();
+
+  // If we are using low precision and reconstruct 8 or 9, we tolerate a greater deviation
+  if (precision <= QUDA_HALF_PRECISION && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9))
+    factor *= 10.0;
+
+  if (residual > tolerance && residual < tolerance * factor)
+    warningQuda("Residual %e exceeds tolerance %e but is within reasonable deviation factor of %f", residual, tolerance,
+                factor);
+
+  return tolerance * factor;
+}
 
 /**
   @brief Check if the std::string has a size smaller than the limit: if yes, copy it to a C-string;

@@ -39,7 +39,7 @@ namespace quda
 
     template <bool distance_pc>
     WilsonApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double alpha0, int t0,
+                cvector_ref<const ColorSpinorField> &x, const GaugeField &U, real_t a, real_t alpha0, int t0,
                 int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;

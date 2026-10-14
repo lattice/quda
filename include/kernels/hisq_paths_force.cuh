@@ -119,11 +119,10 @@ namespace quda {
         (phase == QUDA_STAGGERED_PHASE_NO || phase == QUDA_STAGGERED_PHASE_MILC))
         || recon == QUDA_RECONSTRUCT_NO, "Invalid reconstruct and phase combination");
 
-      static constexpr bool huge_alloc = false;
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
       static constexpr bool use_inphase = (recon == QUDA_RECONSTRUCT_13 && phase == QUDA_STAGGERED_PHASE_MILC);
 
-      using Gauge = typename gauge_mapper<real, recon, 18, phase, huge_alloc, ghost, use_inphase>::type;
+      using Gauge = typename gauge_mapper<real, recon, 18, phase, ghost, use_inphase>::type;
 
       const Gauge link;
       int_fastdiv X[4]; // regular grid dims
@@ -169,9 +168,9 @@ namespace quda {
         for (int d=0; d<4; d++) {
           E[d] = link.X()[d];
           border[d] = link.R()[d];
-          X[d] = E[d] - 2*border[d];
-          D[d] = comm_dim_partitioned(d) ? X[d]+overlap*2 : int(X[d]);
-          base_idx[d] = comm_dim_partitioned(d) ? border[d]-overlap : 0;
+          X[d] = E[d] - 2 * border[d];
+          D[d] = comm_dim_partitioned(d) ? X[d] + overlap * 2 : int(X[d]);
+          base_idx[d] = comm_dim_partitioned(d) ? border[d] - overlap : 0;
           this->threads.x *= D[d];
         }
         this->threads.x /= 2;

@@ -4,7 +4,7 @@
 #include <atomic_helper.h>
 #include <random_helper.h>
 #include <kernel.h>
-#include <byte_array.h>
+#include <packed_array.h>
 
 namespace quda
 {
@@ -589,10 +589,10 @@ namespace quda
     RNGState *rng;
     int mu;
     int parity;
-    MonteArg(GaugeField &data, Float Beta, RNGState *rng, int mu, int parity) :
+    MonteArg(GaugeField &data, real_t Beta, RNGState *rng, int mu, int parity) :
       kernel_param(dim3(data.LocalVolumeCB(), 1, 1)), dataOr(data), rng(rng), mu(mu), parity(parity)
     {
-      BetaOverNc = Beta / (Float)nColor;
+      BetaOverNc = static_cast<Float>(Beta / nColor);
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = data.R()[dir];
         X[dir] = data.X()[dir] - border[dir] * 2;
@@ -630,7 +630,7 @@ namespace quda
 #pragma unroll
       for (int nu = 0; nu < 4; nu++)
         if (mu != nu) {
-          byte_array dx = {};
+          packed_array<int8_t, 4> dx = {};
           Link link = arg.dataOr(nu, e_cb, parity);
           dx[nu]++;
           U = arg.dataOr(mu, linkIndexShift(x, dx, X), 1 - parity);

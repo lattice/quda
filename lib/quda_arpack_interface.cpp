@@ -28,7 +28,7 @@ namespace quda
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
 
-  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<complex_t> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param)
   {
     // Create Eigensolver object for member function use
@@ -104,24 +104,27 @@ namespace quda
 
     double tol_ = eig_param->tol;
 
-    // ARPACK workspace
-    Complex I(0.0, 1.0);
-    std::vector<Complex> resid_(ldv_);
+    // ARPACK workspace.  ARPACK is a double-precision library (the eigensolver
+    // cross-check requires double-precision fields), so all buffers handed to
+    // its Fortran routines must be std::complex<double> / double, independent of
+    // the host scalar type (which may be quad in a reproducible build).
+    std::complex<double> I(0.0, 1.0);
+    std::vector<std::complex<double>> resid_(ldv_);
 
     // Use initial guess?
     if (info_ > 0) {
       for (int a = 0; a < ldv_; a++) resid_[a] = drand48();
     }
 
-    Complex sigma_ = 0.0;
-    std::vector<Complex> w_workd_(3 * ldv_);
-    std::vector<Complex> w_workl_(lworkl_);
-    std::vector<Complex> w_workev_(2 * n_kr_);
+    std::complex<double> sigma_ = 0.0;
+    std::vector<std::complex<double>> w_workd_(3 * ldv_);
+    std::vector<std::complex<double>> w_workl_(lworkl_);
+    std::vector<std::complex<double>> w_workev_(2 * n_kr_);
     std::vector<double> w_rwork_(n_kr_);
     std::vector<int> select_(n_kr_);
 
-    std::vector<Complex> h_evecs_(n_kr_ * ldv_);
-    std::vector<Complex> h_evals_(n_ev_);
+    std::vector<std::complex<double>> h_evecs_(n_kr_ * ldv_);
+    std::vector<std::complex<double>> h_evals_(n_ev_);
 
     // create container wrapping the vectors returned from ARPACK
     ColorSpinorParam param(h_evecs[0]);
@@ -350,7 +353,7 @@ namespace quda
 
     // Sort the eigenvalues. To do this we use the QUDA EigenSolver method, which
     // requires transferring data to std::vector arrays.
-    std::vector<Complex> evals(nconv, 0.0);
+    std::vector<complex_t> evals(nconv, 0.0);
     std::vector<int> arpack_index(nconv, 0.0);
     for (int i = 0; i < nconv; i++) {
       evals[i] = h_evals_[i];
@@ -363,7 +366,7 @@ namespace quda
     for (int i = 0; i < nconv; i++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", i, evals[i].real(), evals[i].imag(),
-		   std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[i])));
+                   std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[i])));
     }
 
     // Compute singular/eigenvalues values from eigenvectors.
@@ -390,14 +393,14 @@ namespace quda
         // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
 	mat.Expose()->M(d_v2, d_v);
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-	double sigma_tmp = sqrt(blas::norm2(d_v2));
-	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
+        real_t sigma_tmp = sqrt(blas::norm2(d_v2));
+        // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
 	blas::ax(1.0 / sigma_tmp, d_v2);
         getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
         if (getVerbosity() >= QUDA_SUMMARIZE)
-	  printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp,
-		     sigma_tmp - sqrt(abs(evals[i].real())));
+          printfQuda("Sval[%04d] = %+.16e sigma - to_double(sqrt(|lambda|)) = %+.16e\n", i, sigma_tmp,
+                     sigma_tmp - sqrt(fabs(evals[i].real())));
       }
     } else {
       printfQuda("Computing Eigenvalues\n");
@@ -411,13 +414,13 @@ namespace quda
         // d_v2 = M*v = lambda_measured * v
 	mat(d_v2, d_v);
 	// d_v = ||lambda_measured*v - lambda_arpack*v||
-	blas::caxpby(Complex {1.0, 0.0}, d_v2, -evals[i], d_v);
-	double L2norm = blas::norm2(d_v);
+        blas::caxpby(complex_t {1.0, 0.0}, d_v2, -evals[i], d_v);
+        real_t L2norm = blas::norm2(d_v);
         getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
         if (getVerbosity() >= QUDA_SUMMARIZE)
-	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, evals[i].real(), evals[i].imag(),
-		     abs(evals[i]), sqrt(L2norm));
+          printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, evals[i].real(), evals[i].imag(),
+                     abs(evals[i]), sqrt(L2norm));
       }
     }
 
@@ -433,9 +436,9 @@ namespace quda
 	mat.Expose()->M(d_v2, d_v);
 
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-	double sigma_tmp = sqrt(blas::norm2(d_v2));
+        real_t sigma_tmp = sqrt(blas::norm2(d_v2));
 
-	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
+        // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
 	blas::ax(1.0 / sigma_tmp, d_v2);
 
 	h_evecs[i] = h_evecs_arpack[arpack_index[i]];
@@ -538,7 +541,7 @@ namespace quda
 
 #else
 
-  void arpack_solve(std::vector<ColorSpinorField> &, std::vector<Complex> &, const DiracMatrix &, QudaEigParam *)
+  void arpack_solve(std::vector<ColorSpinorField> &, std::vector<complex_t> &, const DiracMatrix &, QudaEigParam *)
   {
     errorQuda("(P)ARPACK has not been enabled for this build");
   }

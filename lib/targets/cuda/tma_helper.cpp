@@ -1,5 +1,6 @@
 #include <map>
 #include <array>
+#include <cstring>
 #include <cuda.h>
 #include <tma_helper.hpp>
 
@@ -38,7 +39,7 @@ namespace quda
       if (stride % 16 != 0) errorQuda("Volume requirements not met: stride mod 16 = %lu", stride % 16);
       uint64_t global_dim[] = {16llu * N, uint64_t(stride / 16), uint64_t(M), uint64_t(geometry), 2llu};
       uint64_t global_stride[]
-        = {precision * 16llu * N, precision * stride * N, precision * stride * (N * M + Nrem), u.Bytes() / 2};
+        = {precision * 16llu * N, precision * stride * N, precision * stride * (N * M), u.Bytes() / 2};
       uint32_t box_dim[] = {16u * N, std::max(1u, block_size / 16), M, 1, 1};
       uint32_t element_stride[] = {1, 1, 1, 1, 1};
       auto data = u.data();
@@ -57,10 +58,10 @@ namespace quda
       if (stride % 16 != 0) errorQuda("Volume requirements not met: stride mod 16 = %lu", stride % 16);
       uint64_t global_dim[]
         = {16llu * Nrem, uint64_t(stride / 16), uint64_t(geometry), 2llu}; // can remove the M dimension?
-      uint64_t global_stride[] = {precision * 16llu * Nrem, precision * stride * (N * M + Nrem), u.Bytes() / 2};
+      uint64_t global_stride[] = {precision * 16llu * Nrem, precision * stride * Nrem, u.Bytes() / 2};
       uint32_t box_dim[] = {16u * Nrem, std::max(1u, block_size / 16), 1, 1, 1};
       uint32_t element_stride[] = {1, 1, 1, 1};
-      auto data = u.data<char *>() + M * N * stride * precision;
+      auto data = u.data<char *>() + geometry * M * N * stride * precision;
       if (reinterpret_cast<uintptr_t>(data) % 16 != 0) errorQuda("Pointer is not 16-byte aligned");
       auto res = cuTensorMapEncodeTiled(&tensor.Nrem.map, dtype, 4, data, global_dim, global_stride, box_dim,
                                         element_stride, CU_TENSOR_MAP_INTERLEAVE_NONE, CU_TENSOR_MAP_SWIZZLE_NONE,

@@ -97,8 +97,8 @@ namespace quda {
     createV(); // allocate V field
 
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
-    fine_to_coarse_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
-    coarse_to_fine_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
+    fine_to_coarse_h = static_cast<int *>(pool_host_pinned_malloc(B[0].Volume() * sizeof(int)));
+    coarse_to_fine_h = static_cast<int *>(pool_host_pinned_malloc(B[0].Volume() * sizeof(int)));
 
     fine_to_coarse_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
     coarse_to_fine_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
@@ -171,8 +171,8 @@ namespace quda {
     }
     if (coarse_to_fine_d) pool_device_free(coarse_to_fine_d);
     if (fine_to_coarse_d) pool_device_free(fine_to_coarse_d);
-    if (coarse_to_fine_h) pool_pinned_free(coarse_to_fine_h);
-    if (fine_to_coarse_h) pool_pinned_free(fine_to_coarse_h);
+    if (coarse_to_fine_h) pool_host_pinned_free(coarse_to_fine_h);
+    if (fine_to_coarse_h) pool_host_pinned_free(fine_to_coarse_h);
 
     if (geo_bs) delete []geo_bs;
   }

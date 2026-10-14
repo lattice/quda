@@ -14,7 +14,7 @@ namespace quda {
   protected:
     const ColorSpinorField &x;
     const ColorSpinorField &y;
-    std::vector<Complex> &result_global;
+    std::vector<complex_t> &result_global;
     const QudaContractType cType;
     const int *const source_position;
     const int *const mom_mode;
@@ -23,11 +23,12 @@ namespace quda {
     const size_t b1;
 
   public:
-    ContractionSummed(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result_global,
+    ContractionSummed(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result_global,
                       const QudaContractType cType, const int *const source_position, const int *const mom_mode,
                       const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1) :
       TunableMultiReduction(
-        x, 1u, x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3]),
+        x, 1u, nSpinSq(x) * x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3],
+        nSpinSq(x)),
       x(x),
       y(y),
       result_global(result_global),
@@ -57,7 +58,7 @@ namespace quda {
       const int nSpinSq = x.Nspin() * x.Nspin();
 
       if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) reduction_dim = 2;
-      std::vector<double> result_local(2 * nSpinSq * x.X()[reduction_dim], 0.0);
+      std::vector<real_t> result_local(2 * nSpinSq * x.X()[reduction_dim], 0.0);
 
       // Pass the integer value of the redection dim as a template arg
       switch (cType) {
@@ -76,8 +77,7 @@ namespace quda {
       case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: {
         constexpr int nSpin = 1;
         constexpr int ft_dir = 3;
-        ContractionSummedArg<Float, nColor, nSpin, ft_dir, staggered_spinor_array> arg(x, y, source_position, mom_mode,
-                                                                                       fft_type, s1, b1);
+        ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
         launch<StaggeredContractFT>(result_local, tp, stream, arg);
       } break;
       default: errorQuda("Unexpected contraction type %d", cType);
@@ -104,7 +104,7 @@ namespace quda {
     }
   };
 
-  void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result_global,
+  void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result_global,
                           const QudaContractType cType, const int *const source_position, const int *const mom_mode,
                           const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1)
   {

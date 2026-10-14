@@ -52,7 +52,7 @@ namespace quda {
   }
 
   void DiracDomainWall::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                   QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -126,7 +126,7 @@ namespace quda {
   {
     assertNoDD(out, in); // TODO: DD not supported yet
     checkDWF(out, in);
-    double kappa2 = -kappa5*kappa5;
+    real_t kappa2 = -kappa5 * kappa5;
     auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {

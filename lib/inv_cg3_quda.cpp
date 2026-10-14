@@ -84,13 +84,13 @@ namespace quda {
     // these are only used if we use the heavy_quark_res
     const int hqmaxresIncrease = maxResIncrease + 1;
     int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
-    vector<double> heavy_quark_res(b.size(), 0.0);   // heavy quark residual
-    vector<double> heavy_quark_res_old(b.size(), 0.0); // heavy quark residual
+    vector<real_t> heavy_quark_res(b.size(), 0.0);   // heavy quark residual
+    vector<real_t> heavy_quark_res_old(b.size(), 0.0); // heavy quark residual
     int hqresIncrease = 0;
     bool L2breakdown = false;
 
     // compute initial residual depending on whether we have an initial guess or not
-    vector<double> r2;
+    vector<real_t> r2;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
@@ -113,7 +113,7 @@ namespace quda {
 
     if (use_heavy_quark_res) {
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
-      for (auto i = 0u; i < hq.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+      for (auto i = 0u; i < hq.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
       heavy_quark_res_old = heavy_quark_res;
     }
 
@@ -122,17 +122,17 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     auto r2_old = r2;
-    double rNorm = sqrt(r2[0]);
-    double r0Norm = rNorm;
-    double maxrx  = rNorm;
-    double maxrr  = rNorm;
-    double delta  = param.delta;
+    real_t rNorm = sqrt(r2[0]);
+    real_t r0Norm = rNorm;
+    real_t maxrx = rNorm;
+    real_t maxrr = rNorm;
+    real_t delta = param.delta;
     bool restart = false;
 
     int k = 0;
     PrintStats("CG3", k, r2, b2, heavy_quark_res);
-    vector<double> rho(b.size(), 1.0);
-    vector<double> gamma(b.size(), 1.0);
+    vector<real_t> rho(b.size(), 1.0);
+    vector<real_t> gamma(b.size(), 1.0);
 
     while (!convergence(r2, heavy_quark_res, stop, stop_hq) && k < param.maxiter) {
 
@@ -158,10 +158,10 @@ namespace quda {
         heavy_quark_res_old = heavy_quark_res;
         if (mixed_precision) {
           auto hq = blas::xpyHeavyQuarkResidualNorm(xS, y, rS);
-          for (auto i = 0u; i < b2.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+          for (auto i = 0u; i < b2.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
         } else {
           auto hq = blas::HeavyQuarkResidualNorm(xS, rS);
-          for (auto i = 0u; i < b2.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+          for (auto i = 0u; i < b2.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
         }
       }
 
@@ -190,7 +190,7 @@ namespace quda {
           for (auto i = 0u; i < b2.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
           if (use_heavy_quark_res) {
             auto hq = blas::HeavyQuarkResidualNorm(y, r);
-            for (auto i = 0u; i < b2.size(); i++) heavy_quark_res = sqrt(hq[i].z);
+            for (auto i = 0u; i < b2.size(); i++) heavy_quark_res = sqrt(hq[i][2]);
             param.true_res_hq = heavy_quark_res;
           }
           rNorm = sqrt(r2[0]);
@@ -292,7 +292,7 @@ namespace quda {
       for (auto i = 0u; i < b.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
       if (use_heavy_quark_res) {
         auto hq = blas::HeavyQuarkResidualNorm(x, r);
-        for (auto i = 0u; i < b.size(); i++) param.true_res_hq[i] = sqrt(hq[i].z);
+        for (auto i = 0u; i < b.size(); i++) param.true_res_hq[i] = sqrt(hq[i][2]);
       }
     }
 

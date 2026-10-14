@@ -51,7 +51,7 @@ namespace quda
     create(x, b);
 
     const int iter0 = param.iter;
-    auto b2 = param.compute_true_res ? blas::norm2(b) : vector<double>(b.size(), 0.0);
+    auto b2 = param.compute_true_res ? blas::norm2(b) : vector<real_t>(b.size(), 0.0);
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // compute initial residual
@@ -85,12 +85,12 @@ namespace quda
       mmdag.Expose()->M(xe, x);
       blas::xpay(b, -1.0, xe); // xe now holds the residual
 
-      vector<double> r2(b2.size());
+      vector<real_t> r2(b2.size());
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
         auto hq = blas::HeavyQuarkResidualNorm(x, xe);
         for (auto i = 0u; i < b.size(); i++) {
-          param.true_res_hq[i] = sqrt(hq[i].z);
-          r2[i] = hq[i].y;
+          param.true_res_hq[i] = sqrt(hq[i][2]);
+          r2[i] = hq[i][1];
         }
       } else {
         r2 = blas::norm2(xe);

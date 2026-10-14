@@ -14,7 +14,7 @@ namespace quda {
    * @param[in] nhb number of heatbath steps
    * @param[in] nover number of overrelaxation steps
    */
-  void Monte(GaugeField &data, RNG &rngstate, double Beta, int nhb, int nover);
+  void Monte(GaugeField &data, RNG &rngstate, real_t Beta, int nhb, int nover);
 
   /**
    * @brief Perform a cold start to the gauge field, identity SU(3)
@@ -56,15 +56,15 @@ namespace quda {
    * @brief Calculate the Determinant
    *
    * @param[in] data Gauge field
-   * @returns double2 complex Determinant value
+   * @returns complex Determinant value
    */
-  double2 getLinkDeterminant(GaugeField &data);
+  complex_t getLinkDeterminant(GaugeField &data);
 
   /**
    * @brief Calculate the Trace
    *
    * @param[in] data Gauge field
-   * @returns double2 complex trace value
+   * @returns complex trace value
    */
-  double2 getLinkTrace(GaugeField &data);
+  complex_t getLinkTrace(GaugeField &data);
 }

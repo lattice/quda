@@ -10,7 +10,7 @@ namespace quda
 
   void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
                           const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
-                          const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+                          const std::vector<real_t> &coeff, const std::vector<array<real_t, 2>> &epsilon,
                           double sigma_coeff, bool detratio, QudaInvertParam &inv_param)
   {
     if (inv_param.matpc_type != QUDA_MATPC_EVEN_EVEN_ASYMMETRIC && inv_param.matpc_type != QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -54,7 +54,7 @@ namespace quda
       blas::ax(1.0 / inv_param.evmax, p(parity));
       ApplyTau(x(other_parity), x(other_parity), 1);
       ApplyTau(p(parity), p(parity), 1);
-      std::vector<Complex> a(x.size());
+      std::vector<complex_t> a(x.size());
       for (auto i = 0u; i < x.size(); i++) a[i] = {0.0, -inv_param.offset[i]};
       blas::caxpy(a, x(parity), p(parity));
     }

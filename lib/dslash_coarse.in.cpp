@@ -8,7 +8,7 @@ namespace quda
 #if defined(QUDA_MMA_AVAILABLE)
   template <bool dagger, int Nc, int nVec, int... N>
   void ApplyCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                      cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                      cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                       int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision,
                       IntList<nVec, N...>)
   {
@@ -26,9 +26,8 @@ namespace quda
  #else
   template <bool dagger, int Nc, int nVec, int... N>
   void ApplyCoarseMma(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
-                      cvector_ref<const ColorSpinorField> &, const GaugeField &, const GaugeField &, double,
-                      int, bool, bool, const int *, QudaPrecision,
-                      IntList<nVec, N...>)
+                      cvector_ref<const ColorSpinorField> &, const GaugeField &, const GaugeField &, real_t, int, bool,
+                      bool, const int *, QudaPrecision, IntList<nVec, N...>)
   {
     errorQuda("MMA not instantiated");
   }
@@ -36,7 +35,7 @@ namespace quda
 
   template <bool use_mma, int Nc, int... N>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                    int parity, bool dslash, bool clover, bool dagger, const int *commDim, QudaPrecision halo_precision,
                    IntList<Nc, N...>)
   {
@@ -84,7 +83,7 @@ namespace quda
   //  out(x) = M^dagger*in = X^dagger*in - kappa*\sum_mu Y^\dagger_{-\mu}(x)in(x+mu) + Y_mu(x-mu)in(x-mu)
   //  Uses the kappa normalization for the Wilson operator.
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                    int parity, bool dslash, bool clover, bool dagger, const int *commDim, QudaPrecision halo_precision,
                    bool use_mma)
   {

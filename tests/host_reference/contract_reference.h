@@ -205,7 +205,7 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
   for (int j = 0; j < 16; j++) {
     bool pass = true;
     for (int i = 0; i < V; i++) {
-      if (abs(((Float *)h_result)[32 * i + 2 * j] - ((Float *)d_result)[32 * i + 2 * j]) > tol) {
+      if (std::abs(((Float *)h_result)[32 * i + 2 * j] - ((Float *)d_result)[32 * i + 2 * j]) > tol) {
         faults++;
         pass = false;
         // printfQuda("Contraction %d %d failed\n", i, j);
@@ -213,7 +213,7 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
         // printfQuda("Contraction %d %d passed\n", i, j);
       }
       // printfQuda("%.16f %.16f\n", ((Float*)h_result)[32*i + 2*j],((Float*)d_result)[32*i + 2*j]);
-      if (abs(((Float *)h_result)[32 * i + 2 * j + 1] - ((Float *)d_result)[32 * i + 2 * j + 1]) > tol) {
+      if (std::abs(((Float *)h_result)[32 * i + 2 * j + 1] - ((Float *)d_result)[32 * i + 2 * j + 1]) > tol) {
         faults++;
         pass = false;
         // printfQuda("Contraction %d %d failed\n", i, j);

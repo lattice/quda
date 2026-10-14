@@ -137,9 +137,9 @@ std::array<double, 2> covdev_test(test_t param)
   printfQuda("Sending spinor field to GPU\n");
   cudaSpinor = spinor;
 
-  double spinor_norm2 = blas::norm2(spinor);
-  double cuda_spinor_norm2 = blas::norm2(cudaSpinor);
-  printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
+  auto spinor_norm2 = blas::norm2(spinor);
+  auto cuda_spinor_norm2 = blas::norm2(cudaSpinor);
+  printfQuda("Source CPU = %f, CUDA=%f\n", double(spinor_norm2), double(cuda_spinor_norm2));
 
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
@@ -169,10 +169,10 @@ std::array<double, 2> covdev_test(test_t param)
   auto spinor_ref_norm2 = blas::norm2(spinorRef);
   auto spinor_out_norm2 = blas::norm2(spinorOut);
   auto cuda_spinor_out_norm2 = blas::norm2(cudaSpinorOut);
-  printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muQuda, spinor_ref_norm2, cuda_spinor_out_norm2,
-             spinor_out_norm2);
+  printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muQuda, double(spinor_ref_norm2),
+             double(cuda_spinor_out_norm2), double(spinor_out_norm2));
 
-  auto deviation = pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
+  auto deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
   double tol = getTolerance(test_prec);
 
   return std::array<double, 2> {deviation, tol};

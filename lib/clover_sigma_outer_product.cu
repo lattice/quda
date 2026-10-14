@@ -16,13 +16,13 @@ namespace quda {
     GaugeField &oprod;
     cvector_ref<const ColorSpinorField> &inA;
     cvector_ref<const ColorSpinorField> &inB;
-    const std::vector<array<double, 2>> &coeff;
+    const std::vector<array<real_t, 2>> &coeff;
     const bool doublet; // whether we are applying the operator to a doublet
     unsigned int minThreads() const override { return oprod.VolumeCB(); }
 
   public:
     CloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
-                     cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff) :
+                     cvector_ref<const ColorSpinorField> &inB, const std::vector<array<real_t, 2>> &coeff) :
       TunableKernel3D(oprod, 2, 6),
       oprod(oprod),
       inA(inA),
@@ -59,7 +59,7 @@ namespace quda {
   }; // CloverSigmaOprod
 
   void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
-                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff)
+                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<real_t, 2>> &coeff)
   {
     if constexpr (is_enabled_clover()) {
       if (x.size() > get_max_multi_rhs()) {

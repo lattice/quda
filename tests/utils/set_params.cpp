@@ -42,8 +42,6 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.anisotropy = 1.0;
   gauge_param.tadpole_coeff = 1.0;
 
-  gauge_param.ga_pad = 0;
-  gauge_param.mom_ga_pad = 0;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   gauge_param.struct_size = sizeof(gauge_param);
@@ -66,17 +64,6 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.reconstruct_precondition = link_recon_precondition;
   gauge_param.reconstruct_eigensolver = link_recon_eigensolver;
   gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-
-  int pad_size = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
-#endif
-  gauge_param.ga_pad = pad_size;
 
   gauge_param.struct_size = sizeof(gauge_param);
 }
@@ -111,16 +98,6 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.t_boundary = fermion_t_boundary;
   gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gauge_param.type = QUDA_WILSON_LINKS;
-
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
-#endif
-  gauge_param.ga_pad = pad_size;
 
   gauge_param.struct_size = sizeof(gauge_param);
 }

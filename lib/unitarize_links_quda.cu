@@ -150,18 +150,13 @@ namespace quda {
   void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
 
   template <typename Float, int nColor, QudaReconstructType recon> class ProjectSU3 : TunableKernel3D {
-    using real = typename mapper<Float>::type;
     GaugeField &u;
-    real tol;
+    real_t tol;
     int *fails;
     unsigned int minThreads() const { return u.VolumeCB(); }
 
   public:
-    ProjectSU3(GaugeField &u, double tol, int *fails) :
-      TunableKernel3D(u, 2, 4),
-      u(u),
-      tol(tol),
-      fails(fails)
+    ProjectSU3(GaugeField &u, real_t tol, int *fails) : TunableKernel3D(u, 2, 4), u(u), tol(tol), fails(fails)
     {
       apply(device::get_default_stream());
       qudaDeviceSynchronize();
@@ -182,7 +177,7 @@ namespace quda {
     long long bytes() const { return 2 * u.Bytes(); }
   };
 
-  void projectSU3(GaugeField &u, double tol, int *fails)
+  void projectSU3(GaugeField &u, real_t tol, int *fails)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     // check the the field doesn't have staggered phases applied

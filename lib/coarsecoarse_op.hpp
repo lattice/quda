@@ -16,7 +16,7 @@ namespace quda
   std::enable_if_t<!use_mma, void>
   calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, ColorSpinorField &uv,
                    const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
-                   double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
+                   real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                    bool need_bidirectional)
   {
     constexpr int fineSpin = 2;
@@ -104,8 +104,8 @@ namespace quda
   template <bool use_mma, typename Float, typename vFloat, int fineColor, int coarseColor>
   std::enable_if_t<use_mma, void> calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
                                                    ColorSpinorField &uv, const Transfer &T, const GaugeField &g,
-                                                   const GaugeField &clover, const GaugeField &cloverInv, double kappa,
-                                                   double mass, double mu, double mu_factor, QudaDiracType dirac,
+                                                   const GaugeField &clover, const GaugeField &cloverInv, real_t kappa,
+                                                   real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac,
                                                    QudaMatPCType matpc, bool need_bidirectional)
   {
     constexpr int fineSpin = 2;
@@ -165,7 +165,7 @@ namespace quda
   template <bool use_mma, int fineColor, int coarseColor>
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, ColorSpinorField &uv,
                         const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
-                        double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac,
+                        real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac,
                         QudaMatPCType matpc, bool need_bidirectional)
   {
     if constexpr (is_enabled_multigrid()) {

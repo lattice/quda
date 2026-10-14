@@ -11,8 +11,6 @@
    warp- and block-level reductions, using the CUB library
  */
 
-using namespace quda;
-
 #include <hipcub/hipcub.hpp>
 #include <hipcub/block/block_reduce.hpp>
 #include <hipcub/block/block_scan.hpp>

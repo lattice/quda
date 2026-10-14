@@ -4,14 +4,14 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <array.h>
-#include <byte_array.h>
+#include <packed_array.h>
 #include <reduction_kernel.h>
 
 namespace quda
 {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqRectArg : public ReduceArg<array<double, 4>> {
+  struct GaugePlaqRectArg : public ReduceArg<array<device_reduce_t, 4>> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -51,7 +51,7 @@ namespace quda
     // There are 10 unique links to be fetched, with two of the links
     // being common to all three objects.
     double plaq, rect;
-    byte_array<int8_t, 4> dx = {};
+    packed_array<int8_t, 4> dx = {};
 
     // Accumulate the two common links U_mu(x) and U_nu(x) in U1
     Link U1 = arg.U(mu, linkIndexShift(x, dx, arg.E), parity);                          // U_mu(x)
@@ -107,7 +107,7 @@ namespace quda
     // return the rectangle and plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t plaqRect {0, 0, 0, 0};
+      reduce_t plaqRect {};
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
@@ -125,7 +125,7 @@ namespace quda
         plaqRect[1] += tmp.x; // Temporal plaquette
         plaqRect[3] += tmp.y; // Temporal rectangle
       }
-      return operator()(plaqRect, value);
+      return operator()(value, plaqRect);
     }
   };
 } // namespace quda

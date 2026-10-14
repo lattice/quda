@@ -418,11 +418,11 @@ namespace quda
     } else if (Location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) { // H2D
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on host
-        void *buffer = pool_pinned_malloc(bytes);
+        void *buffer = pool_host_pinned_malloc(bytes);
         memset(buffer, 0, bytes); // FIXME (temporary?) bug fix for padding
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0);
         qudaMemcpy(v.data(), buffer, bytes, qudaMemcpyDefault);
-        pool_pinned_free(buffer);
+        pool_host_pinned_free(buffer);
       } else { // reorder on device
 
         if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -436,7 +436,7 @@ namespace quda
             Src = buffer;
             qudaMemcpy(Src, src.data(), src.Bytes(), qudaMemcpyDefault);
           } else {
-            buffer = pool_pinned_malloc(src.Bytes());
+            buffer = pool_host_pinned_malloc(src.Bytes());
             memcpy(buffer, src.data(), src.Bytes());
             Src = get_mapped_device_pointer(buffer);
           }
@@ -445,7 +445,7 @@ namespace quda
           copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src);
 
           if (zeroCopy)
-            pool_pinned_free(buffer);
+            pool_host_pinned_free(buffer);
           else
             pool_device_free(buffer);
         }
@@ -454,10 +454,10 @@ namespace quda
     } else if (Location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) { // D2H
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on the host
-        void *buffer = pool_pinned_malloc(src.Bytes());
+        void *buffer = pool_host_pinned_malloc(src.Bytes());
         qudaMemcpy(buffer, src.data(), src.Bytes(), qudaMemcpyDefault);
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 0, buffer);
-        pool_pinned_free(buffer);
+        pool_host_pinned_free(buffer);
       } else { // reorder on the device
 
         if (FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -470,7 +470,7 @@ namespace quda
             buffer = pool_device_malloc(bytes);
             dst = buffer;
           } else {
-            buffer = pool_pinned_malloc(bytes);
+            buffer = pool_host_pinned_malloc(bytes);
             dst = get_mapped_device_pointer(buffer);
           }
 
@@ -484,7 +484,7 @@ namespace quda
           }
 
           if (zeroCopy)
-            pool_pinned_free(buffer);
+            pool_host_pinned_free(buffer);
           else
             pool_device_free(buffer);
         }
@@ -571,8 +571,8 @@ namespace quda
       }
     } else { // FIXME add GPU_COMMS support
       if (total_bytes) {
-        total_send = pool_pinned_malloc(total_bytes);
-        total_recv = pool_pinned_malloc(total_bytes);
+        total_send = pool_host_pinned_malloc(total_bytes);
+        total_recv = pool_host_pinned_malloc(total_bytes);
       }
       size_t offset = 0;
       for (int i = 0; i < nDimComms; i++) {
@@ -652,8 +652,8 @@ namespace quda
       }
 
       if (total_bytes) {
-        pool_pinned_free(total_send);
-        pool_pinned_free(total_recv);
+        pool_host_pinned_free(total_send);
+        pool_host_pinned_free(total_recv);
       }
     }
 
@@ -964,10 +964,12 @@ namespace quda
       if (!initGhostFaceBuffer || resize) {
         freeGhostBuffer();
         for (int i = 0; i < nDimComms; i++) {
-          fwdGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          fwdGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
-          backGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+          // Use host-pinned memory for host communication buffers so the `cuda_copy` transport in
+          // UCX doesn't own the pinning; see https://github.com/lattice/quda/pull/1639 for more context
+          fwdGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          fwdGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
+          backGhostFaceSendBuffer[i] = host_pinned_malloc(ghostFaceBytes[i]);
         }
         initGhostFaceBuffer = 1;
       }

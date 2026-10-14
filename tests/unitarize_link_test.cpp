@@ -73,7 +73,6 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
   qudaGaugeParam.anisotropy = 1.0;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  qudaGaugeParam.ga_pad = 0;
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
   qudaGaugeParam.cuda_prec_sloppy = prec;
@@ -85,8 +84,6 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.reconstruct = link_recon;
   qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct;
 
-  qudaGaugeParam.llfat_ga_pad = qudaGaugeParam.site_ga_pad = qudaGaugeParam.ga_pad = qudaGaugeParam.staple_pad = 0;
-
   quda::GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -96,7 +93,7 @@ static int unitarize_link_test(int &test_rc)
   void *fatlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
 
   void *sitelink[4];
-  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
+  for (int i = 0; i < 4; i++) sitelink[i] = host_pinned_malloc(V * gauge_site_size * cpu_prec);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, SiteLinkType::SITELINK_PHASE_MILC);
 
@@ -133,7 +130,6 @@ static int unitarize_link_test(int &test_rc)
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaResult = new quda::GaugeField(gParam);
 
-  gParam.pad = 0;
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec, true);
@@ -158,7 +154,7 @@ static int unitarize_link_test(int &test_rc)
   quda::setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
                                    svd_abs_error);
 
-  int *num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  int *num_failures_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
   int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
   *num_failures_h = 0;
 

@@ -61,5 +61,5 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
  * @param[in] path_coeff Independent scaling coefficients for each loop
  * @param[in] num_paths Total number of loops
  */
-void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces, double factor,
+void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::complex_t> &loop_traces, double factor,
                                 int **input_path, int *length, double *path_coeff, int num_paths);

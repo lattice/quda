@@ -1,6 +1,7 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
+#include <float_vector.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
 #include <quda_matrix.h>
@@ -10,6 +11,9 @@
 
 namespace quda
 {
+
+  /** Per-site reduction arithmetic uses QUDA_REDUCTION_TYPE (not field precision). */
+  using compute_t = reduction_t;
 
   struct baseArg : kernel_param<> {
     int_fastdiv X[4]; // grid dimensions
@@ -26,10 +30,9 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F y;
     F x;
@@ -113,11 +116,10 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
     static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, disable_ghost>::type F;
 
     static constexpr int MAX_ORTHO_DIM = 256;
     real a[MAX_ORTHO_DIM];
@@ -125,13 +127,13 @@ namespace quda
     real b[MAX_ORTHO_DIM];
     F y;
 
-    axpby3dArg(const std::vector<double> &a, const ColorSpinorField &x, const std::vector<double> &b,
+    axpby3dArg(const std::vector<real_t> &a, const ColorSpinorField &x, const std::vector<real_t> &b,
                ColorSpinorField &y) :
       baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), x(x), y(y)
     {
       if (x.X(3) > MAX_ORTHO_DIM) errorQuda("Orthogonal dimension %d exceeds maximum %d", x.X(3), MAX_ORTHO_DIM);
-      for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-      for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      for (auto i = 0u; i < a.size(); i++) this->a[i] = static_cast<real>(a[i]);
+      for (auto i = 0u; i < b.size(); i++) this->b[i] = static_cast<real>(b[i]);
     }
   };
 
@@ -168,11 +170,10 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
     static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, disable_ghost>::type F;
 
     static constexpr int MAX_ORTHO_DIM = 256;
     complex<real> a[MAX_ORTHO_DIM];
@@ -180,13 +181,15 @@ namespace quda
     complex<real> b[MAX_ORTHO_DIM];
     F y;
 
-    caxpby3dArg(const std::vector<Complex> &a, const ColorSpinorField &x, const std::vector<Complex> &b,
+    caxpby3dArg(const std::vector<complex_t> &a, const ColorSpinorField &x, const std::vector<complex_t> &b,
                 ColorSpinorField &y) :
       baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), x(x), y(y)
     {
       if (x.X(3) > MAX_ORTHO_DIM) errorQuda("Orthogonal dimension %d exceeds maximum %d", x.X(3), MAX_ORTHO_DIM);
-      for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
-      for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+      for (auto i = 0u; i < a.size(); i++)
+        this->a[i] = {static_cast<real>(a[i].real()), static_cast<real>(a[i].imag())};
+      for (auto i = 0u; i < b.size(); i++)
+        this->b[i] = {static_cast<real>(b[i].real()), static_cast<real>(b[i].imag())};
     }
   };
 
@@ -218,40 +221,47 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor_> struct reDotProduct3dArg : public ReduceArg<double> {
+  template <typename Float, int nColor_> struct reDotProduct3dArg : public ReduceArg<device_reduce_t> {
     using real = typename mapper<Float>::type;
     static constexpr int reduction_dim = 3; // DMH Template this
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
     int_fastdiv Xh[4]; // checkerboard grid dimensions
 
     reDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double>(dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]),
-                        x.X()[reduction_dim]),
+      ReduceArg<device_reduce_t>(dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]),
+                                 x.X()[reduction_dim]),
       x(x),
       y(y)
     {
       for (int i = 0; i < 4; i++) Xh[i] = x.SiteSubset() == 2 && i == 0 ? x.X()[i] / 2 : x.X()[i];
     }
-
-    __device__ __host__ double init() const { return double(); }
   };
 
-  template <typename Arg> struct reDotProduct3d : plus<double> {
-    using reduce_t = double;
+  template <typename Arg> struct reDotProduct3d : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
+    using compute_t = reduction_t;
     using plus<reduce_t>::operator();
     static constexpr int reduce_block_dim = 2;
     const Arg &arg;
     constexpr reDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
+
+    /**
+       Compute the real dot product of x and y
+    */
+    template <typename T> __device__ __host__ auto dot_(compute_t &sum, const complex<T> &a, const complex<T> &b)
+    {
+      sum = fma(compute_t(a.real()), compute_t(b.real()), sum);
+      sum = fma(compute_t(a.imag()), compute_t(b.imag()), sum);
+    }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {
@@ -264,24 +274,23 @@ namespace quda
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
-      // Get the inner product
-      reduce_t sum = innerProduct(x, y).real();
+      compute_t sum = {};
+#pragma unroll
+      for (int k = 0; k < x.size; k++) dot_(sum, x(k), y(k));
 
-      // Apply reduction to t bucket
-      return plus::operator()(sum, result);
+      return operator()(result, sum);
     }
   };
 
-  template <typename Float, int nColor_> struct cDotProduct3dArg : public ReduceArg<array<double, 2>> {
+  template <typename Float, int nColor_> struct cDotProduct3dArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<Float>::type;
     static constexpr int reduction_dim = 3; // DMH Template this
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type F;
 
     F x;
     F y;
@@ -289,25 +298,38 @@ namespace quda
     int_fastdiv Xh[4]; // checkerboard grid dimensions
 
     cDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<array<double, 2>>(dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]),
-                                  x.X()[reduction_dim]),
+      ReduceArg<array<device_reduce_t, 2>>(
+        dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]), x.X()[reduction_dim]),
       x(x),
       y(y)
     {
       for (int i = 0; i < 4; i++) Xh[i] = x.SiteSubset() == 2 && i == 0 ? x.X()[i] / 2 : x.X()[i];
     }
 
-    __device__ __host__ reduce_t init() const { return {0.0, 0.0}; }
+    __device__ __host__ reduce_t init() const { return plus<reduce_t>::init(); }
   };
 
-  template <typename Arg> struct cDotProduct3d : plus<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct cDotProduct3d : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
+    using compute_t = reduction_t;
     using plus<reduce_t>::operator();
     static constexpr int reduce_block_dim = 2;
 
     const Arg &arg;
     constexpr cDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
+
+    /**
+       Compute complex-valued dot product of x and y
+    */
+    template <typename T>
+    __device__ __host__ auto cdot_(complex<compute_t> &sum, const complex<T> &a, const complex<T> &b)
+    {
+      sum.real(fma(compute_t(a.real()), compute_t(b.real()), sum.real()));
+      sum.real(fma(compute_t(a.imag()), compute_t(b.imag()), sum.real()));
+      sum.imag(fma(compute_t(a.real()), compute_t(b.imag()), sum.imag()));
+      sum.imag(fma(-compute_t(a.imag()), compute_t(b.real()), sum.imag()));
+    }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {
@@ -320,11 +342,12 @@ namespace quda
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
-      // Get the inner product
-      complex<double> res = innerProduct(x, y);
+      complex<compute_t> res = {};
+#pragma unroll
+      for (int k = 0; k < x.size; k++) cdot_(res, x(k), y(k));
 
-      // Apply reduction to temporal bucket
-      return plus::operator()({res.real(), res.imag()}, result);
+      return operator()(result, {res.real(), res.imag()});
     }
   };
+
 } // namespace quda

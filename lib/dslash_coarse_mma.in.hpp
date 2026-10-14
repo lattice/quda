@@ -31,7 +31,7 @@ namespace quda
     cvector_ref<const ColorSpinorField> &inB;
     const GaugeField &Y;
     const GaugeField &X;
-    const double kappa;
+    const real_t kappa;
     const int parity;
     const int nParity;
     const ColorSpinorField &halo;
@@ -100,7 +100,7 @@ namespace quda
 
   public:
     DslashCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                     int parity, MemoryLocation *halo_location, const ColorSpinorField &halo) :
       TunableKernel(out[0].Location()),
       out(out),

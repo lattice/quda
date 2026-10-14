@@ -15,8 +15,7 @@ namespace quda
      QUDA_MEMORY_DEVICE         device only
      QUDA_MEMORY_DEVICE_PINNED  device only
      QUDA_MEMORY_HOST           host only
-     QUDA_MEMORY_HOST_PINNED    both
-     QUDA_MEMORY_MAPPED         both (pinned to host)
+     QUDA_MEMORY_HOST_PINNED    both (page-locked host, mapped to device)
      QUDA_MEMORY_MANAGED        both
    */
   class quda_ptr
@@ -81,7 +80,7 @@ namespace quda
     bool is_host() const;
 
     /**
-       Return view of the pointer.  For mapped memory we return the device view.
+       Return view of the pointer.  For host-pinned memory we return the device view.
      */
     void *data() const;
 

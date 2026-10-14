@@ -5,7 +5,7 @@
 #include <dslash_quda.h>
 #include <index_helper.cuh>
 #include <inline_ptx.h>
-#include <math_helper.cuh>
+#include <math_helper.h>
 #include <shared_memory_cache_helper.h>
 
 #include <quda_fp16.cuh>
@@ -251,7 +251,7 @@ namespace quda
     }
     if (store) {
       scale = block_wise_reduce_vector(ftor, v);
-      auto scale_inv = __fdividef(1.0f, scale);
+      auto scale_inv = fdivide(1.0f, scale);
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll

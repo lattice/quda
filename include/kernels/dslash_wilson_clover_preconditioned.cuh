@@ -20,13 +20,13 @@ namespace quda
     const real a; /** xpay scale factor */
 
     WilsonCloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a,
+                    const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, real_t a,
                     cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
-                    double alpha0 = 0.0, int t0 = -1) :
+                    real_t alpha0 = 0.0, int t0 = -1) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_>(out, in, halo, U, a, x, parity, dagger,
                                                                         comm_override, alpha0, t0),
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-      a(a)
+      a(static_cast<real>(a))
     {
       checkPrecision(U, A);
       checkLocation(U, A);

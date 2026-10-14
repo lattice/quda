@@ -66,7 +66,7 @@ namespace quda {
   {
     int x = parity * arg.out[src_idx].VolumeCB() + x_cb;
     int x_coarse = arg.geo_map[x];
-    int parity_coarse = (x_coarse >= arg.in[src_idx].VolumeCB()) ? 1 : 0;
+    int parity_coarse = (static_cast<index_t>(x_coarse) >= arg.in[src_idx].VolumeCB()) ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse * arg.in[src_idx].VolumeCB();
 
 #pragma unroll

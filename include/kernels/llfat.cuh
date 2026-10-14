@@ -4,7 +4,7 @@
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
 #include <kernel.h>
-#include <byte_array.h>
+#include <packed_array.h>
 
 namespace quda {
 
@@ -166,7 +166,7 @@ namespace quda {
                                        int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
-    byte_array<int8_t, 4> dx = {};
+    packed_array<int8_t, 4> dx = {};
 
     /* Computes the upper staple :
      *                 mu (B)

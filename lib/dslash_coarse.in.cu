@@ -9,10 +9,11 @@ namespace quda {
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, bool dslash, bool clover, DslashType type>
   using D = DslashCoarse<Float, yFloat, ghostFloat, Ns, coarseColor, dslash, clover, dagger, type>;
 
-  template<>
+  template <>
   void ApplyCoarse<dagger, coarseColor>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                                        cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                                        double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
+                                        cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
+                                        const GaugeField &X, real_t kappa, int parity, bool dslash, bool clover,
+                                        const int *commDim, QudaPrecision halo_precision)
   {
     if (inA.size() > get_max_multi_rhs()) {
       ApplyCoarse<dagger, coarseColor>(

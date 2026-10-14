@@ -19,7 +19,7 @@ namespace quda
 
   protected:
     const DiracMatrix &mat;
-    QudaEigParam *eig_param = nullptr;
+    QudaEigParam *eig_param;
 
     // Problem parameters
     //------------------
@@ -27,8 +27,8 @@ namespace quda
     int n_kr = 0;         /** Size of Krylov space after extension */
     int n_conv = 0;       /** Number of converged eigenvalues requested */
     int n_ev_deflate = 0; /** Number of converged eigenvalues to use in deflation */
-    double tol = 0.0;     /** Tolerance on eigenvalues */
-    double qr_tol = 0.0;  /** Tolerance on QR (IRAM) */
+    real_t tol = 0.0;     /** Tolerance on eigenvalues */
+    real_t qr_tol = 0.0;  /** Tolerance on QR (IRAM) */
     bool reverse = false; /** True if using polynomial acceleration */
     std::string spectrum; /** Part of the spectrum to be computed */
     bool compute_svd; /** Compute the SVD if requested **/
@@ -51,7 +51,7 @@ namespace quda
     int num_locked = 0;
     int num_keep = 0;
 
-    std::vector<double> residua = {};
+    std::vector<real_t> residua = {};
 
     // Device side vector workspace
     std::vector<ColorSpinorField> r = {};
@@ -81,7 +81,7 @@ namespace quda
        @param kSpace The converged eigenvectors
        @param evals The converged eigenvalues
      */
-    virtual void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals) = 0;
+    virtual void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals) = 0;
 
     /**
        @brief Creates the eigensolver using the parameters given and the matrix.
@@ -108,14 +108,14 @@ namespace quda
        @param[in] kSpace The Krylov space vectors
        @param[in] evals The eigenvalue array
     */
-    void prepareKrylovSpace(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
+    void prepareKrylovSpace(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals);
 
     /**
        @brief Set the epsilon parameter
        @param[in] prec Precision of the solver instance
        @param[out] epsilon The deduced epsilon value
     */
-    double setEpsilon(const QudaPrecision prec);
+    real_t setEpsilon(const QudaPrecision prec);
 
     /**
        @brief Query the eigensolver precision to stdout
@@ -133,7 +133,7 @@ namespace quda
        @param[in] kSpace The Krylov space vectors
        @param[in] evals The eigenvalue array
     */
-    void cleanUpEigensolver(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
+    void cleanUpEigensolver(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals);
 
     /**
        @brief Promoted the specified matVec operation:
@@ -149,7 +149,7 @@ namespace quda
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    virtual double estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in);
+    virtual real_t estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
        @brief Orthogonalise input vectors r against
@@ -237,7 +237,7 @@ namespace quda
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
     void deflate(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
-                 cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+                 cvector_ref<const ColorSpinorField> &evecs, const std::vector<complex_t> &evals,
                  bool accumulate = false) const;
 
     /**
@@ -250,7 +250,7 @@ namespace quda
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
     void deflateSVD(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &vec,
-                    cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+                    cvector_ref<const ColorSpinorField> &evecs, const std::vector<complex_t> &evals,
                     bool accumulate = false) const;
 
     /**
@@ -259,7 +259,7 @@ namespace quda
        @param[in,out] evals Computed eigenvalues of NormOp
        @param[in] dagger Whether NormOp was MdagM (false) or MMdag (true)
     */
-    void computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, bool dagger = false);
+    void computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<complex_t> &evals, bool dagger = false);
 
     /**
        @brief Compute eigenvalues and their residiua
@@ -268,7 +268,7 @@ namespace quda
        @param[in,out] evals The eigenvalues
        @param[in] size The number of eigenvalues to compute
     */
-    virtual void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, int size = 0);
+    virtual void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<complex_t> &evals, int size = 0);
 
     /**
        @brief Load and check eigenpairs from file
@@ -276,7 +276,7 @@ namespace quda
        @param[in] eig_vecs The eigenvectors to save
        @param[in] file The filename to save
     */
-    void loadFromFile(std::vector<ColorSpinorField> &eig_vecs, std::vector<Complex> &evals);
+    void loadFromFile(std::vector<ColorSpinorField> &eig_vecs, std::vector<complex_t> &evals);
 
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
@@ -285,7 +285,7 @@ namespace quda
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
     */
-    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y);
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<complex_t> &x, std::vector<complex_t> &y);
 
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
@@ -295,7 +295,7 @@ namespace quda
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
     */
-    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y);
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<real_t> &x, std::vector<complex_t> &y);
 
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
@@ -305,7 +305,7 @@ namespace quda
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
     */
-    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y);
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<complex_t> &x, std::vector<real_t> &y);
 
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
@@ -316,7 +316,7 @@ namespace quda
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
     */
-    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<real_t> &x, std::vector<real_t> &y);
 
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
@@ -327,7 +327,7 @@ namespace quda
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
     */
-    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<int> &y);
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<complex_t> &x, std::vector<int> &y);
   };
 
   /**
@@ -337,11 +337,11 @@ namespace quda
   {
   protected:
     // Variable size matrix
-    std::vector<double> ritz_mat = {};
+    std::vector<real_t> ritz_mat = {};
 
     // Tridiagonal/Arrow matrix, fixed size.
-    std::vector<double> alpha = {};
-    std::vector<double> beta = {};
+    std::vector<real_t> alpha = {};
+    std::vector<real_t> beta = {};
 
   public:
     /**
@@ -361,7 +361,7 @@ namespace quda
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
-    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals);
 
     /**
        @brief Lanczos step: extends the Krylov space.
@@ -394,15 +394,18 @@ namespace quda
   */
   class BLKTRLM : public TRLM
   {
+    /** Debug: log block_alpha / block_beta (QUDA_DEBUG_VERBOSE only). */
+    void logBlockArrowCoeffs(const char *tag) const;
+
     // Variable size matrix
-    std::vector<Complex> block_ritz_mat = {};
+    std::vector<complex_t> block_ritz_mat = {};
 
     /** Block Tridiagonal/Arrow matrix, fixed size. */
-    std::vector<Complex> block_alpha = {};
-    std::vector<Complex> block_beta = {};
+    std::vector<complex_t> block_alpha = {};
+    std::vector<complex_t> block_beta = {};
 
     /** Temp storage used in blockLanczosStep, fixed size. */
-    std::vector<Complex> jth_block = {};
+    std::vector<complex_t> jth_block = {};
 
     /** Size of blocks of data in alpha/beta */
     int block_data_length = 0;
@@ -422,7 +425,7 @@ namespace quda
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
-    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals);
 
     /**
        @brief block lanczos step: extends the Krylov space in block step
@@ -472,10 +475,10 @@ namespace quda
     virtual bool hermitian() override { return true; } /** TRLM3D is only for Hermitian systems */
 
     // Variable size matrix (for the 3D problem)
-    std::vector<std::vector<double>> ritz_mat_3D;
+    std::vector<std::vector<real_t>> ritz_mat_3D;
 
     // Arrays for 3D residua
-    std::vector<std::vector<double>> residua_3D;
+    std::vector<std::vector<real_t>> residua_3D;
 
     // Array for convergence
     std::vector<bool> converged_3D;
@@ -488,8 +491,8 @@ namespace quda
     std::vector<int> num_converged_3D;
 
     // Tridiagonal/Arrow matrices, fixed size (for the 3D problem)
-    std::vector<std::vector<double>> alpha_3D;
-    std::vector<std::vector<double>> beta_3D;
+    std::vector<std::vector<real_t>> alpha_3D;
+    std::vector<std::vector<real_t>> beta_3D;
 
     // The orthogonal direction and size in the 3D problem
     int ortho_dim;
@@ -500,7 +503,7 @@ namespace quda
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
-    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals) override;
+    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals) override;
 
     /**
        @brief Lanczos step: extends the Krylov space.
@@ -550,7 +553,7 @@ namespace quda
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    double estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in) override;
+    real_t estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @brief Compute eigenvalues and their residiua
@@ -558,7 +561,7 @@ namespace quda
        @param[in,out] evals The eigenvalues
        @param[in] size The number of eigenvalues to compute
     */
-    void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, int size = 0) override;
+    void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<complex_t> &evals, int size = 0) override;
   };
 
   /**
@@ -566,9 +569,9 @@ namespace quda
   */
   class IRAM : public EigenSolver
   {
-    std::vector<std::vector<Complex>> upperHess = {};
-    std::vector<std::vector<Complex>> Qmat = {};
-    std::vector<std::vector<Complex>> Rmat = {};
+    std::vector<std::vector<complex_t>> upperHess = {};
+    std::vector<std::vector<complex_t>> Qmat = {};
+    std::vector<std::vector<complex_t>> Rmat = {};
 
   public:
     /**
@@ -588,7 +591,7 @@ namespace quda
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
-    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals);
 
     /**
        @brief Arnoldi step: extends the Krylov space by one vector
@@ -597,14 +600,14 @@ namespace quda
        @param[in] beta Norm of residual vector
        @param[in] j Index of vector being computed
     */
-    void arnoldiStep(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, double &beta, int j);
+    void arnoldiStep(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, real_t &beta, int j);
 
     /**
        @brief Get the eigendecomposition from the upper Hessenberg matrix via QR
-       @param[in] evals Complex eigenvalues
+       @param[in] evals complex_t eigenvalues
        @param[in] beta Norm of residual (used to compute errors on eigenvalues)
     */
-    void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
+    void eigensolveFromUpperHess(std::vector<complex_t> &evals, const real_t beta);
 
     /**
        @brief Rotate the Krylov space
@@ -618,14 +621,14 @@ namespace quda
        @param[in] evals The shifts to apply
        @param[in] num_shifts The number of shifts to apply
     */
-    void qrShifts(const std::vector<Complex> evals, const int num_shifts);
+    void qrShifts(const std::vector<complex_t> evals, const int num_shifts);
 
     /**
        @brief Apply One step of the the QR algorithm
        @param[in] Q The Q matrix
        @param[in] R The R matrix
     */
-    void qrIteration(std::vector<std::vector<Complex>> &Q, std::vector<std::vector<Complex>> &R);
+    void qrIteration(std::vector<std::vector<complex_t>> &Q, std::vector<std::vector<complex_t>> &R);
 
     /**
        @brief Reorder the Krylov space and eigenvalues
@@ -634,7 +637,7 @@ namespace quda
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that
        determines the sorting condition
     */
-    void reorder(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
+    void reorder(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals,
                  const QudaEigSpectrumType spec_type);
   };
 
@@ -652,7 +655,7 @@ namespace quda
      is to be solved.
      @param[in] eig_param Parameter structure for all QUDA eigensolvers
   */
-  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<complex_t> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param);
 
 } // namespace quda

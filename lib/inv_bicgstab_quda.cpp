@@ -64,7 +64,8 @@ namespace quda {
     return r;
   }
 
-  int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+  int reliable(real_t &rNorm, real_t &maxrx, real_t &maxrr, const real_t &r2, const real_t &delta)
+  {
     // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
@@ -83,7 +84,7 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     auto b2 = blas::norm2(b);         // norm sq of source
-    vector<double> r2(b.size(), 0.0); // norm sq of residual
+    vector<real_t> r2(b.size(), 0.0); // norm sq of residual
 
     // Check to see that we're not trying to invert on a zero-field source
     if (is_zero_src(x, b, b2)) {
@@ -156,30 +157,30 @@ namespace quda {
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    vector<double> heavy_quark_res(b.size(), 0.0);
+    vector<real_t> heavy_quark_res(b.size(), 0.0);
     if (use_heavy_quark_res) {
       auto hq = blas::HeavyQuarkResidualNorm(x, r);
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double delta = param.delta;
+    real_t delta = param.delta;
 
     int k = 0;
     int rUpdate = 0;
 
-    vector<Complex> rho(b.size(), {1.0, 0.0});
-    vector<Complex> rho0 = rho;
-    vector<Complex> alpha(b.size(), {1.0, 0.0});
-    vector<Complex> omega(b.size(), {1.0, 0.0});
-    vector<Complex> beta(b.size());
+    vector<complex_t> rho(b.size(), {1.0, 0.0});
+    vector<complex_t> rho0 = rho;
+    vector<complex_t> alpha(b.size(), {1.0, 0.0});
+    vector<complex_t> omega(b.size(), {1.0, 0.0});
+    vector<complex_t> beta(b.size());
 
-    vector<double3> rho_r2(b.size());
+    vector<array<real_t, 3>> rho_r2(b.size());
 
-    double rNorm = sqrt(r2[0]);
+    real_t rNorm = sqrt(r2[0]);
     //double r0Norm = rNorm;
-    double maxrr = rNorm;
-    double maxrx = rNorm;
+    real_t maxrr = rNorm;
+    real_t maxrx = rNorm;
 
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
 
@@ -199,7 +200,7 @@ namespace quda {
 
       matSloppy(v, p);
 
-      vector<Complex> r0v;
+      vector<complex_t> r0v;
       if (param.pipeline) {
         r0v = blas::cDotProduct(r0, v);
         if (k > 0) rho = blas::cDotProduct(r0, r);
@@ -225,9 +226,9 @@ namespace quda {
         auto r0t = blas::cDotProduct(r0, t);
 
         for (auto i = 0u; i < b.size(); i++) {
-          omega[i] = Complex {omega_t2_s2[i].x, omega_t2_s2[i].y} / omega_t2_s2[i].z;
+          omega[i] = complex_t {omega_t2_s2[i][0], omega_t2_s2[i][1]} / omega_t2_s2[i][2];
           beta[i] = -r0t[i] / r0v[i];
-          r2[i] = omega_t2_s2[i].w - real(omega[i] * conj(Complex {omega_t2_s2[i].x, omega_t2_s2[i].y}));
+          r2[i] = omega_t2_s2[i][3] - real(omega[i] * conj(complex_t {omega_t2_s2[i][0], omega_t2_s2[i][1]}));
         }
         // now we can work out if we need to do a reliable update
         updateR = reliable(rNorm, maxrx, maxrr, r2[0], delta);
@@ -235,28 +236,28 @@ namespace quda {
         // omega = (t, r) / (t, t)
         auto omega_t2 = blas::cDotProductNormA(t, r_sloppy);
         for (auto i = 0u; i < b.size(); i++)
-          omega[i] = Complex(omega_t2[i].x / omega_t2[i].z, omega_t2[i].y / omega_t2[i].z);
+          omega[i] = complex_t(omega_t2[i][0] / omega_t2[i][2], omega_t2[i][1] / omega_t2[i][2]);
       }
 
       if (param.pipeline && !updateR) {
         // x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
         blas::caxpbypzYmbw(alpha, p, omega, r_sloppy, x_sloppy, t);
-        vector<Complex> beta_omega(b.size());
+        vector<complex_t> beta_omega(b.size());
         for (auto i = 0u; i < b.size(); i++) beta_omega[i] = -beta[i] * omega[i];
-        blas::cxpaypbz(r_sloppy, beta_omega, v, beta, p);
+        blas::caxpbypzw(beta, p, beta_omega, v, r_sloppy, p);
         // tripleBiCGstabUpdate(alpha, p, omega, r_sloppy, x_sloppy, t, -beta*omega, v, beta, p
       } else {
         // x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
         rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, r_sloppy, x_sloppy, t, r0);
         rho0 = rho;
         for (auto i = 0u; i < b.size(); i++) {
-          rho[i] = Complex(rho_r2[i].x, rho_r2[i].y);
-          r2[i] = rho_r2[i].z;
+          rho[i] = complex_t(rho_r2[i][0], rho_r2[i][1]);
+          r2[i] = rho_r2[i][2];
         }
       }
 
       if (use_heavy_quark_res && k % heavy_quark_check == 0) {
-        vector<double3> hq;
+        vector<array<real_t, 3>> hq;
 
         if (x.Precision() != x_sloppy[0].Precision()) {
           hq = blas::HeavyQuarkResidualNorm(x_sloppy, r_sloppy);
@@ -264,7 +265,7 @@ namespace quda {
           blas::copy(r, r_sloppy);
           hq = blas::xpyHeavyQuarkResidualNorm(x, y, r);
         }
-        for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+        for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i][2]);
       }
 
       if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2[0], delta);
@@ -333,7 +334,7 @@ namespace quda {
         // explicitly compute the HQ residual if need be
         if (use_heavy_quark_res) {
           auto hq = blas::HeavyQuarkResidualNorm(y, r);
-          for (auto i = 0u; i < b.size(); i++) heavy_quark_res = sqrt(hq[i].z);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res = sqrt(hq[i][2]);
         }
 
         // Update convergence check
@@ -342,7 +343,7 @@ namespace quda {
 
       // update p
       if ((!param.pipeline || updateR) && !converged) { // need to update if not pipeline or did a reliable update
-        vector<Complex> beta_omega(b.size());
+        vector<complex_t> beta_omega(b.size());
         for (auto i = 0u; i < b.size(); i++) {
           if (abs(rho[i] * alpha[i]) == 0.0)
             beta[i] = 0.0;
@@ -350,7 +351,7 @@ namespace quda {
             beta[i] = (rho[i] / rho0[i]) * (alpha[i] / omega[i]);
           beta_omega[i] = -beta[i] * omega[i];
         }
-        blas::cxpaypbz(r_sloppy, beta_omega, v, beta, p);
+        blas::caxpbypzw(beta, p, beta_omega, v, r_sloppy, p);
       }
     }
 
@@ -370,10 +371,10 @@ namespace quda {
 
     if (!param.is_preconditioner) { // do not do the below if this is an inner solver
       // r2 was freshly computed
-      auto hq = use_heavy_quark_res ? blas::HeavyQuarkResidualNorm(x, r) : vector<double3>(b.size(), {});
+      auto hq = use_heavy_quark_res ? blas::HeavyQuarkResidualNorm(x, r) : vector<array<real_t, 3>>(b.size(), {});
       for (auto i = 0u; i < b.size(); i++) {
         param.true_res[i] = sqrt(r2[i] / b2[i]);
-        param.true_res_hq[i] = sqrt(hq[i].z);
+        param.true_res_hq[i] = sqrt(hq[i][2]);
       }
       PrintSummary("BiCGstab", k, r2, b2, stop, stop_hq);
     }
