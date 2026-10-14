@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdio>
 #include <memory>
 #include <util_quda.h>
 #include <timer.h>
@@ -9,6 +10,8 @@
 #include <io/gauge_io.h>
 #include <io/milc_io.h>
 #include <io/qio_field.h>
+#include <io/scidac_io.h>
+#include <io/site_io.h>
 
 namespace quda
 {
@@ -51,29 +54,52 @@ namespace quda
     }
 
 #ifdef HAVE_QIO
-    void load_qio(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
-                  QudaFileIOMode io_mode, QIOGaugeInfo &info)
+    scidac::GaugeInfo load_qio(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
+                               const FileIOParam &param)
     {
-      read_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, io_mode, info);
+      scidac::GaugeInfo info;
+      read_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, param.io_mode, info);
+      // QIO does not report the checksums stored in the file
+      if (info.has_checksum && !info.checksum_matches)
+        io::report_checksum_mismatch("Checksum mismatch in " + filename + ": computed " + io::checksum_str(info.sum),
+                                     param.allow_checksum_mismatch);
+      return info;
     }
 
-    void save_qio(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                  QudaFileIOMode io_mode, const QIOGaugeInfo &info)
+    io::Checksum save_qio(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
+                          QudaFileIOMode io_mode, const scidac::GaugeInfo &info)
     {
-      write_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, io_mode, info);
+      return write_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, io_mode, info);
     }
 #else
-    void load_qio(const std::string &, void *const[], QudaPrecision, const int *, QudaFileIOMode, QIOGaugeInfo &)
+    scidac::GaugeInfo load_qio(const std::string &, void *const[], QudaPrecision, const int *, const FileIOParam &)
     {
-      errorQuda("QIO support has not been enabled");
+      errorQuda("The external QIO backend has not been enabled");
+      return {};
     }
 
-    void save_qio(const std::string &, const void *const[], QudaPrecision, const int *, QudaFileIOMode,
-                  const QIOGaugeInfo &)
+    io::Checksum save_qio(const std::string &, const void *const[], QudaPrecision, const int *, QudaFileIOMode,
+                          const scidac::GaugeInfo &)
     {
-      errorQuda("QIO support has not been enabled");
+      errorQuda("The external QIO backend has not been enabled");
+      return {};
     }
 #endif
+
+    /**
+       @brief Log what was loaded, for every format and backend
+     */
+    void log_loaded(const std::string &filename, const GaugeFileInfo &info, bool external)
+    {
+      const char *kind = info.format == QUDA_FILE_FORMAT_MILC ? "a MILC v5" : info.ildg ? "an ILDG" : "a SciDAC";
+      logQuda(QUDA_SUMMARIZE, "Loaded %s %s precision gauge field from %s%s%s%s; checksums %s %s\n", kind,
+              info.file_prec == QUDA_DOUBLE_PRECISION ? "double" : "single", filename.c_str(),
+              external ? " with the external QIO library" : "", info.byte_swapped ? " (byte swapped)" : "",
+              info.has_info_file ? " and its .info file" : "", io::checksum_str({info.sum29, info.sum31}).c_str(),
+              !info.has_checksum      ? "(the file has none)" :
+                info.checksum_matches ? "verified" :
+                                        "NOT verified");
+    }
 
     /**
        @brief Load a QIO or ILDG gauge field, checking the ILDG records and any usqcdInfo record
@@ -81,12 +107,10 @@ namespace quda
     GaugeFileInfo load_lime(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
                             const FileIOParam &param, bool require_ildg)
     {
-      QIOGaugeInfo info;
-      load_qio(filename, gauge, prec, X, param.io_mode, info);
+      auto info = param.external_qio ? load_qio(filename, gauge, prec, X, param) :
+                                       scidac::load_gauge(filename, gauge, prec, X, param);
 
       if (require_ildg && !info.ildg) errorQuda("File %s does not have the ILDG records", filename.c_str());
-      logQuda(QUDA_SUMMARIZE, "Loaded %s %s gauge field\n", info.ildg ? "an ILDG" : "a SciDAC",
-              info.file_prec == QUDA_DOUBLE_PRECISION ? "double precision" : "single precision");
 
       GaugeFileInfo file_info;
       file_info.format = require_ildg ? QUDA_FILE_FORMAT_ILDG : QUDA_FILE_FORMAT_QIO;
@@ -95,6 +119,10 @@ namespace quda
       file_info.has_plaq_linktr = info.has_usqcd_info;
       file_info.plaq = info.plaq;
       file_info.linktr = info.linktr;
+      file_info.has_checksum = info.has_checksum;
+      file_info.checksum_matches = info.checksum_matches;
+      file_info.sum29 = info.sum.sum29;
+      file_info.sum31 = info.sum.sum31;
       return file_info;
     }
 
@@ -125,10 +153,10 @@ namespace quda
     /**
        @brief Save a QIO or ILDG gauge field, with a usqcdInfo record if requested
      */
-    void save_lime(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                   const FileIOParam &param, bool ildg)
+    io::Checksum save_lime(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
+                           const FileIOParam &param, bool ildg)
     {
-      QIOGaugeInfo info;
+      scidac::GaugeInfo info;
       info.ildg = ildg;
       if (ildg) info.ildg_lfn = param.ildg_lfn.empty() ? filename : param.ildg_lfn;
       if (param.write_usqcd_info) {
@@ -136,7 +164,8 @@ namespace quda
         info.has_usqcd_info = true;
         logQuda(QUDA_SUMMARIZE, "usqcdInfo plaquette %.16e, link trace %.16e\n", info.plaq, info.linktr);
       }
-      save_qio(filename, gauge, prec, X, param.io_mode, info);
+      return param.external_qio ? save_qio(filename, gauge, prec, X, param.io_mode, info) :
+                                  scidac::save_gauge(filename, gauge, prec, X, param.io_mode, info);
     }
   } // namespace
 
@@ -162,6 +191,7 @@ namespace quda
     }
 
     host_timer.stop();
+    log_loaded(filename, info, param.external_qio && format != QUDA_FILE_FORMAT_MILC);
     logQuda(QUDA_SUMMARIZE, "Time spent loading gauge field from %s = %g secs\n", filename.c_str(), host_timer.last());
 
     if (info.has_plaq_linktr) check_plaq_linktr(filename, gauge, prec, X, info);
@@ -176,14 +206,20 @@ namespace quda
     host_timer_t host_timer;
     host_timer.start();
 
+    io::Checksum sum;
     switch (format) {
-    case QUDA_FILE_FORMAT_QIO: save_lime(filename, gauge, prec, X, param, false); break;
-    case QUDA_FILE_FORMAT_ILDG: save_lime(filename, gauge, prec, X, param, true); break;
-    case QUDA_FILE_FORMAT_MILC: milc::save_gauge(filename, gauge, prec, X, param); break;
+    case QUDA_FILE_FORMAT_QIO: sum = save_lime(filename, gauge, prec, X, param, false); break;
+    case QUDA_FILE_FORMAT_ILDG: sum = save_lime(filename, gauge, prec, X, param, true); break;
+    case QUDA_FILE_FORMAT_MILC: sum = milc::save_gauge(filename, gauge, prec, X, param); break;
     default: errorQuda("Unexpected file format %d", format);
     }
+    // rank 0 finishes the file (checksum record or header, .info file) after the other ranks are done
+    comm_barrier();
 
     host_timer.stop();
+    const bool external = param.external_qio && format != QUDA_FILE_FORMAT_MILC;
+    logQuda(QUDA_SUMMARIZE, "Saved %s gauge field to %s%s; checksums %s\n", get_file_format_str(format),
+            filename.c_str(), external ? " with the external QIO library" : "", io::checksum_str(sum).c_str());
     logQuda(QUDA_SUMMARIZE, "Time spent saving gauge field to %s = %g secs\n", filename.c_str(), host_timer.last());
   }
 

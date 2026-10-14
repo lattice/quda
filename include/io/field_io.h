@@ -13,18 +13,20 @@ namespace quda
      elsewhere (QudaEigParam::partfile, io_parity_inflate, etc.).
    */
   struct FileIOParam {
-    QudaFileFormat format = QUDA_FILE_FORMAT_AUTO;
+    QudaFileFormat format = QUDA_FILE_FORMAT_AUTO; /** AUTO, QIO, MILC or ILDG; never an _EXTERNAL value */
+    bool external_qio = false;                     /** QIO and ILDG: use the external QIO library */
     QudaFileIOMode io_mode = QUDA_FILE_IO_PARALLEL;
     bool partfile = false;       /** QIO only, ignored on load */
     bool parity_inflate = false; /** Inflate single-parity vectors to full fields for I/O */
     std::string ildg_lfn;        /** Empty means use the file name */
     bool write_usqcd_info = true;
-    bool allow_checksum_mismatch = false; /** MILC only: warn instead of error on a checksum mismatch */
+    bool allow_checksum_mismatch = false; /** Warn instead of error on a checksum mismatch */
 
     FileIOParam() = default;
 
     /**
-       @brief Construct from the public interface struct
+       @brief Construct from the public interface struct.  An _EXTERNAL
+       format becomes the plain format with external_qio set.
        @param[in] param Public parameters, validated here; nullptr means defaults
      */
     explicit FileIOParam(const QudaFileIOParam *param);

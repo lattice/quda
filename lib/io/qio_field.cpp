@@ -5,6 +5,7 @@
 #include <qmp.h>
 #include <qio.h>
 #include <quda.h>
+#include <comm_quda.h>
 #include <util_quda.h>
 #include <io/layout_hyper.h>
 #include <io/qio_field.h>
@@ -165,10 +166,10 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
   // Further, even if the nSpin and nColor don't agree, what really matters is the
   // total typesize check.
   if (len != 18) {
-    if (in_nSpin != nSpin) warningQuda("QIO_get_spins %d does not match expected number of colors %d", in_nSpin, nSpin);
+    if (in_nSpin != nSpin) warningQuda("QIO_get_spins %d does not match expected number of spins %d", in_nSpin, nSpin);
 
     if (in_nColor != nColor)
-      warningQuda("QIO_get_colors %d does not match expected number of spins %d", in_nColor, nColor);
+      warningQuda("QIO_get_colors %d does not match expected number of colors %d", in_nColor, nColor);
   }
 
   if (in_count != count) errorQuda("QIO_get_datacount %d does not match expected number of fields %d", in_count, count);
@@ -206,9 +207,11 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
 
   QIO_string_destroy(xml_record_in);
   QIO_destroy_record_info(rec_info);
+
+  // QIO compares the checksums on its master I/O node only, after reading the whole record
+  QMP_broadcast(&status, sizeof(status));
   printfQuda("%s: QIO_read_record_data returns status %d\n", __func__, status);
-  if (status != QIO_SUCCESS) return 1;
-  return 0;
+  return status;
 }
 
 int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaPrecision *file_prec,
@@ -218,7 +221,8 @@ int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecisio
                     record_xml);
 }
 
-// The USQCD gauge field record XML: <usqcdInfo> with the average plaquette and link trace
+// The USQCD gauge field record XML: <usqcdInfo> with the average plaquette and link trace.  This uses QIO's own
+// encoder rather than quda::scidac::usqcd_info_xml, so comparing the output of the two backends checks the latter.
 static std::string encode_usqcd_info(double plaq, double linktr)
 {
   char plaq_str[32], linktr_str[32];
@@ -255,6 +259,11 @@ static bool decode_usqcd_info(const std::string &record_xml, double &plaq, doubl
 
 void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
 {
+  // QIO numbers the ranks of QMP's global communicator
+  if (static_cast<int>(comm_size()) != QMP_get_number_of_nodes())
+    errorQuda("The external QIO backend cannot be used while the communicator is split (%lu of %d ranks)", comm_size(),
+              QMP_get_number_of_nodes());
+
   /* Lattice dimensions */
   size_t lattice_dim = 4; // assume the comms topology is 4-d
   size_t lattice_volume = 1;
@@ -299,7 +308,7 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
 }
 
 void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
-                      QudaFileIOMode io_mode, QIOGaugeInfo &info)
+                      QudaFileIOMode io_mode, quda::scidac::GaugeInfo &info)
 {
   quda_this_node = QMP_get_node_number();
 
@@ -314,7 +323,9 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   fflush(stdout);
   std::string record_xml;
   int status = read_su3_field(infile, 4, gauge, precision, &info.file_prec, &record_xml);
-  if (status) { errorQuda("read_su3_field failed %d\n", status); }
+  // on a checksum mismatch QIO has read the whole record, including the checksum, so the field is complete
+  if (status != QIO_SUCCESS && status != QIO_CHECKSUM_MISMATCH) { errorQuda("read_su3_field failed %d\n", status); }
+  info.sum = {QIO_get_reader_last_checksuma(infile), QIO_get_reader_last_checksumb(infile)};
 
   // the ILDG style and the user record XML are only known on the QIO master I/O node
   double usqcd_info[3] = {0.0, 0.0, 0.0}; // found, plaq, linktr
@@ -326,6 +337,11 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   QMP_broadcast(&ildg, sizeof(ildg));
   QMP_broadcast(usqcd_info, sizeof(usqcd_info));
   info.ildg = ildg;
+  // as in QIO, ILDG files written by other codes have no checksum
+  int native = QIO_get_reader_format(infile) == QIO_SCIDAC_NATIVE;
+  QMP_broadcast(&native, sizeof(native));
+  info.has_checksum = native;
+  info.checksum_matches = native && status == QIO_SUCCESS;
   info.has_usqcd_info = usqcd_info[0] != 0.0;
   info.plaq = usqcd_info[1];
   info.linktr = usqcd_info[2];
@@ -350,7 +366,7 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
   printfQuda("%s: reading %d vector fields\n", __func__, Nvec);
   fflush(stdout);
   int status = read_field(infile, Nvec, V, precision, subset, parity, nSpin, nColor, 2 * nSpin * nColor);
-  if (status) { errorQuda("read_spinor_fields failed %d\n", status); }
+  if (status != QIO_SUCCESS) { errorQuda("read_spinor_fields failed %d\n", status); }
 
   /* Close the file */
   QIO_close_read(infile);
@@ -361,46 +377,7 @@ int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPre
                 QudaPrecision cpu_prec, QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, int len,
                 const char *type, const char *record_xml = nullptr)
 {
-  // Prepare a string.
-  std::string xml_record = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><quda";
-  switch (len) {
-  case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
-  case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
-  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
-  default: xml_record += "MGColorSpinorField>"; break;       // MG color spinor vector
-  }
-  xml_record += "<version>BETA</version>";
-  xml_record += "<type>" + std::string(type) + "</type><info>";
-
-  // if parity+even, it's a half-x-dim even only vector
-  // if parity+odd, it's a half-x-dim odd only vector
-  // if full+even, it's a full vector with only even sites filled, odd are zero
-  // if full+odd, it's a full vector with only odd sites filled, even are zero
-  // if full+full, it's a full vector with all sites filled (either a full ColorSpinorField or a GaugeField)
-
-  if (subset == QUDA_PARITY_SITE_SUBSET) {
-    xml_record += "<subset>parity</subset>";
-  } else {
-    xml_record += "<subset>full</subset>";
-  }
-  if (parity == QUDA_EVEN_PARITY) {
-    xml_record += "<parity>even</parity>";
-  } else if (parity == QUDA_ODD_PARITY) {
-    xml_record += "<parity>odd</parity>";
-  } else {
-    xml_record += "<parity>full</parity>";
-  } // abuse/hack
-
-  // A lot of this is redundant of the record info, but eh.
-  xml_record += "<nColor>" + std::to_string(nColor) + "</nColor>";
-  xml_record += "<nSpin>" + std::to_string(nSpin) + "</nSpin>";
-  xml_record += "</info></quda";
-  switch (len) {
-  case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
-  case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
-  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
-  default: xml_record += "MGColorSpinorField>";              // MG color spinor vector
-  }
+  std::string xml_record = quda::scidac::quda_record_xml(len, type, subset, parity, nColor, nSpin);
 
   int status;
 
@@ -458,8 +435,8 @@ int write_su3_field(QIO_Writer *outfile, int count, const void *field_out[], Qud
                      18, type, record_xml);
 }
 
-void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
-                       QudaFileIOMode io_mode, const QIOGaugeInfo &info)
+quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
+                                     QudaFileIOMode io_mode, const quda::scidac::GaugeInfo &info)
 {
   quda_this_node = QMP_get_node_number();
 
@@ -467,12 +444,8 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
 
   QudaPrecision file_prec = precision;
 
-  // QIO only writes the ILDG records for the standard USQCD (or QDP) color matrix datatypes
   char type[128];
-  if (info.ildg)
-    sprintf(type, "USQCD_%s3_ColorMatrix", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F");
-  else
-    sprintf(type, "QUDA_%sNc%d_GaugeField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", 3);
+  snprintf(type, sizeof(type), "%s", quda::scidac::gauge_datatype(file_prec, info.ildg).c_str());
 
   /* Open the test file for writing */
   const char *lfn = info.ildg && !info.ildg_lfn.empty() ? info.ildg_lfn.c_str() : nullptr;
@@ -495,10 +468,12 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
     QMP_broadcast(&ildg, sizeof(ildg));
     if (!ildg) errorQuda("QIO did not write %s in ILDG format", filename);
   }
+  quda::io::Checksum sum = {QIO_get_writer_last_checksuma(outfile), QIO_get_writer_last_checksumb(outfile)};
 
   /* Close the file */
   QIO_close_write(outfile);
   printfQuda("%s: Closed file for writing\n", __func__);
+  return sum;
 }
 
 void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X,

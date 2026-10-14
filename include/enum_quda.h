@@ -665,10 +665,12 @@ typedef enum QudaUpdateSplitGauge_s {
 
 // File format used when loading or saving fields
 typedef enum QudaFileFormat_s {
-  QUDA_FILE_FORMAT_AUTO, // load: detect from the file contents; save: QIO
-  QUDA_FILE_FORMAT_QIO,  // SciDAC LIME via QIO
-  QUDA_FILE_FORMAT_MILC, // MILC v5 gauge fields, MILC binary KS eigenvectors
-  QUDA_FILE_FORMAT_ILDG, // ILDG gauge fields via QIO
+  QUDA_FILE_FORMAT_AUTO,          // load: detect from the file contents; save: QIO
+  QUDA_FILE_FORMAT_QIO,           // SciDAC LIME, as written by QIO
+  QUDA_FILE_FORMAT_MILC,          // MILC v5 gauge fields, MILC binary KS eigenvectors
+  QUDA_FILE_FORMAT_ILDG,          // ILDG gauge fields
+  QUDA_FILE_FORMAT_QIO_EXTERNAL,  // QIO format through the external QIO library (requires QUDA_QIO=ON)
+  QUDA_FILE_FORMAT_ILDG_EXTERNAL, // ILDG format through the external QIO library (requires QUDA_QIO=ON)
   QUDA_FILE_FORMAT_INVALID = QUDA_INVALID_ENUM
 } QudaFileFormat;
 

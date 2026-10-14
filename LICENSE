@@ -335,9 +335,9 @@ following licence:
 QUDA reads and writes MILC format files following the MILC code
 (https://github.com/milc-qcd/milc_qcd), in particular its file layouts
 and checksums from generic/io_lat4.c and generic/io_lat_utils.c. This
-support, contained in include/io/milc_io.h, lib/io/milc_common.cpp and
-lib/io/milc_gauge.cpp, follows MILC code supplied under the following
-license:
+support, contained in include/io/milc_io.h, include/io/site_io.h,
+lib/io/milc_common.cpp, lib/io/milc_gauge.cpp and lib/io/site_io.cpp,
+follows MILC code supplied under the following license:
 
   Copyright (c) 1998-2018 MILC Developers and Contributors
 
@@ -364,3 +364,100 @@ license:
   LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
   OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+QUDA reads and writes LIME files, the container of SciDAC and ILDG
+files, with a C++ port of parts of the c-lime library
+(https://github.com/usqcd-software/c-lime): its record header layout,
+padding and record iteration from include/lime_binary_header.h,
+lib/lime_writer.c and lib/lime_reader.c. This port, contained in
+include/io/lime.h and lib/io/lime.cpp, follows c-lime code supplied
+under the following license:
+
+  Jefferson Science Associates LLC Copyright Notice:
+
+  Copyright (c) 2018 Jefferson Science Associates LLC All Rights Reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted as a licensed user provided that the
+  following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  3. The name of the author may not be used to endorse or promote
+     products derived from this software without specific prior written
+     permission.
+
+  This material resulted from work developed under a United States
+  Government Contract. The Government retains a paid-up, nonexclusive,
+  irrevocable worldwide license in such copyrighted data to reproduce,
+  distribute copies to the public, prepare derivative works, perform
+  publicly and display publicly and to permit others to do so.
+  THIS SOFTWARE IS PROVIDED BY JEFFERSON SCIENCE ASSOCIATES LLC "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JEFFRSON SCIENCE ASSOCIATES,
+  LLC OR THE U.S. GOVERNMENT BE LIABLE TO LICENSEE OR ANY THIRD PARTES
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+QUDA reads and writes SciDAC and ILDG files following the QIO library
+(https://github.com/usqcd-software/qio), in particular its record
+layouts and XML, its checksum and its handling of ILDG files. This
+support, contained in include/io/scidac_io.h, include/io/site_io.h,
+lib/io/scidac_common.cpp, lib/io/scidac_gauge.cpp and lib/io/site_io.cpp,
+follows QIO code supplied under the following license:
+
+  This software was produced by the USQCD collaboration under United
+  States Government Contracts (U.S. Department of Energy SciDAC program).
+
+  Parts of the code fall under the copyright below:
+
+  Jefferson Science Associates LLC Copyright Notice:
+
+  Copyright (c) 2014 Jefferson Science Associates LLC All Rights Reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted as a licensed user provided that the
+  following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  3. The name of the author may not be used to endorse or promote
+     products derived from this software without specific prior written
+     permission.
+
+  This material resulted from work developed under a United States
+  Government Contract. The Government retains a paid-up, nonexclusive,
+  irrevocable worldwide license in such copyrighted data to reproduce,
+  distribute copies to the public, prepare derivative works, perform
+  publicly and display publicly and to permit others to do so.
+  THIS SOFTWARE IS PROVIDED BY JEFFERSON SCIENCE ASSOCIATES LLC "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JEFFRSON SCIENCE ASSOCIATES,
+  LLC OR THE U.S. GOVERNMENT BE LIABLE TO LICENSEE OR ANY THIRD PARTES
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+  Other parts are copyrighted by their respective contributors, but are
+  distributed under the same license.

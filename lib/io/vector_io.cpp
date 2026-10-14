@@ -14,7 +14,7 @@ namespace quda
       switch (format) {
       case QUDA_FILE_FORMAT_QIO:
 #ifndef HAVE_QIO
-        errorQuda("QIO support has not been enabled");
+        errorQuda("QIO-format vector I/O currently requires the external QIO backend (QUDA_QIO=ON)");
 #endif
         break;
       case QUDA_FILE_FORMAT_MILC: errorQuda("MILC vector I/O is not yet supported"); break;

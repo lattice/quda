@@ -154,7 +154,7 @@ option(QUDA_DIRAC_COVDEV "build code for covariant derivative" ${QUDA_DIRAC_DEFA
 option(QUDA_DIRAC_DISTANCE_PRECONDITIONING "build code for distance preconditioned Wilson/clover Dirac operators" OFF)
 set(QUDA_DOMAIN_DECOMPOSITION "0" CACHE STRING "which domain decomposition to instantiate in QUDA (1-bit number - RedBlack)")
 
-option(QUDA_QIO "build QIO code for binary I/O" OFF)
+option(QUDA_QIO "build the external QIO backend for binary I/O" OFF)
 
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)

@@ -17,7 +17,17 @@ namespace quda
     QudaFileIOParam checked = *param;
     checkFileIOParam(checked);
 
-    format = checked.format;
+    switch (checked.format) {
+    case QUDA_FILE_FORMAT_QIO_EXTERNAL: format = QUDA_FILE_FORMAT_QIO; break;
+    case QUDA_FILE_FORMAT_ILDG_EXTERNAL: format = QUDA_FILE_FORMAT_ILDG; break;
+    default: format = checked.format;
+    }
+    external_qio = format != checked.format;
+#ifndef HAVE_QIO
+    if (external_qio)
+      errorQuda("The %s file format needs the external QIO library, which requires building QUDA with QUDA_QIO=ON",
+                get_file_format_str(checked.format));
+#endif
     io_mode = checked.io_mode;
     ildg_lfn = checked.ildg_lfn;
     write_usqcd_info = checked.write_usqcd_info == QUDA_BOOLEAN_TRUE;
@@ -31,6 +41,8 @@ namespace quda
     case QUDA_FILE_FORMAT_QIO: return "QIO";
     case QUDA_FILE_FORMAT_MILC: return "MILC";
     case QUDA_FILE_FORMAT_ILDG: return "ILDG";
+    case QUDA_FILE_FORMAT_QIO_EXTERNAL: return "QIO_external";
+    case QUDA_FILE_FORMAT_ILDG_EXTERNAL: return "ILDG_external";
     default: return "unknown";
     }
   }

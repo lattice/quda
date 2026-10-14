@@ -5,6 +5,7 @@
 #include <cstring>
 #include <comm_quda.h>
 #include <util_quda.h>
+#include <io/host_field.h>
 #include <io/milc_io.h>
 
 namespace quda
@@ -12,6 +13,8 @@ namespace quda
 
   namespace milc
   {
+
+    using io::byte_swap;
 
     namespace
     {
@@ -28,51 +31,6 @@ namespace quda
         uint32_t sum31;
       };
       static_assert(sizeof(GaugeHeader) == 96, "The MILC v5 gauge header is 96 bytes");
-
-      DataLayout gauge_layout()
-      {
-        DataLayout layout;
-        layout.offset = sizeof(GaugeHeader);
-        layout.site_bytes = n_dim * matrix_reals * sizeof(float);
-        layout.word_bytes = sizeof(float);
-        return layout;
-      }
-
-      // each site holds the four links as single-precision row-major 3x3 complex matrices
-      template <typename Float> void unpack_links(void *const gauge[], size_t index, const char *site)
-      {
-        for (int d = 0; d < n_dim; d++) {
-          float link[matrix_reals];
-          memcpy(link, site + d * sizeof(link), sizeof(link));
-          auto dst = static_cast<Float *>(gauge[d]) + index * matrix_reals;
-          for (int i = 0; i < matrix_reals; i++) dst[i] = link[i];
-        }
-      }
-
-      template <typename Float> void pack_links(const void *const gauge[], size_t index, char *site)
-      {
-        for (int d = 0; d < n_dim; d++) {
-          float link[matrix_reals];
-          auto src = static_cast<const Float *>(gauge[d]) + index * matrix_reals;
-          for (int i = 0; i < matrix_reals; i++) link[i] = src[i];
-          memcpy(site + d * sizeof(link), link, sizeof(link));
-        }
-      }
-
-      std::string checksum_str(uint32_t sum29, uint32_t sum31)
-      {
-        char buf[20];
-        snprintf(buf, sizeof(buf), "%x %x", sum29, sum31);
-        return buf;
-      }
-
-      void report_checksum_mismatch(const std::string &message, const FileIOParam &param)
-      {
-        if (param.allow_checksum_mismatch)
-          warningQuda("%s", message.c_str());
-        else
-          errorQuda("%s (set allow_checksum_mismatch to load the file anyway)", message.c_str());
-      }
 
       /**
          @brief Check a .info file, if there is one, against the file's header, and pick up any
@@ -94,12 +52,12 @@ namespace quda
           unsigned int sum29, sum31;
           if (sscanf(s->c_str(), "%x %x", &sum29, &sum31) != 2)
             errorQuda("Cannot read the checksums \"%s\" in %s.info", s->c_str(), filename.c_str());
-          if (sum29 != header.sum29 || sum31 != header.sum31) {
+          io::Checksum listed = {sum29, sum31}, stored = {header.sum29, header.sum31};
+          if (listed != stored) {
             info.checksum_matches = false;
-            report_checksum_mismatch("The checksums " + checksum_str(sum29, sum31) + " in " + filename
-                                       + ".info do not match those of the file, "
-                                       + checksum_str(header.sum29, header.sum31),
-                                     param);
+            io::report_checksum_mismatch("The checksums " + io::checksum_str(listed) + " in " + filename
+                                           + ".info do not match those of the file, " + io::checksum_str(stored),
+                                         param.allow_checksum_mismatch);
           }
         }
 
@@ -134,11 +92,10 @@ namespace quda
     GaugeFileInfo load_gauge(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
                              const FileIOParam &param)
     {
-      if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
-        errorQuda("Unsupported host gauge field precision %d", prec);
+      io::HostField field(gauge, n_dim, prec, matrix_reals);
 
       GaugeHeader header;
-      auto file_size = read_header(filename, &header, sizeof(header));
+      auto file_size = io::read_header(filename, &header, sizeof(header));
 
       bool swap = false;
       if (byte_swap(header.magic) == gauge_magic)
@@ -156,26 +113,21 @@ namespace quda
         errorQuda("%s has a site list (order %u): MILC checkpoint files are not supported", filename.c_str(),
                   header.order);
 
-      auto N = global_dims(X);
+      auto N = io::global_dims(X);
       for (int d = 0; d < n_dim; d++) {
         if (header.dims[d] != static_cast<uint32_t>(N[d]))
           errorQuda("%s has dimensions %u %u %u %u, but the lattice is %d %d %d %d", filename.c_str(), header.dims[0],
                     header.dims[1], header.dims[2], header.dims[3], N[0], N[1], N[2], N[3]);
       }
 
-      auto layout = gauge_layout();
-      auto expected_size = layout.offset + data_bytes(layout, N);
+      // each site holds the four links as single-precision row-major 3x3 complex matrices
+      auto layout = field.layout(QUDA_SINGLE_PRECISION, sizeof(GaugeHeader), swap, io::ChecksumType::MILC);
+      auto expected_size = layout.offset + io::data_bytes(layout, N);
       if (file_size != expected_size)
         errorQuda("%s is %lu bytes, but a MILC v5 gauge file of this size should be %lu bytes", filename.c_str(),
                   file_size, expected_size);
 
-      auto unpack = [&](int, size_t index, const char *site) {
-        if (prec == QUDA_DOUBLE_PRECISION)
-          unpack_links<double>(gauge, index, site);
-        else
-          unpack_links<float>(gauge, index, site);
-      };
-      auto sum = read_data(filename, layout, X, swap, param.io_mode, unpack);
+      auto sum = io::read_data(filename, layout, X, param.io_mode, field.unpacker(QUDA_SINGLE_PRECISION));
 
       GaugeFileInfo info;
       info.format = QUDA_FILE_FORMAT_MILC;
@@ -183,32 +135,26 @@ namespace quda
       info.byte_swapped = swap;
       info.sum29 = sum.sum29;
       info.sum31 = sum.sum31;
-      info.checksum_matches = sum.sum29 == header.sum29 && sum.sum31 == header.sum31;
-      if (!info.checksum_matches)
-        report_checksum_mismatch("Checksum mismatch in " + filename + ": computed " + checksum_str(sum.sum29, sum.sum31)
-                                   + ", but the file has " + checksum_str(header.sum29, header.sum31),
-                                 param);
+      info.has_checksum = true;
+      info.checksum_matches
+        = io::check_checksum(filename, sum, {header.sum29, header.sum31}, param.allow_checksum_mismatch);
       check_info(filename, header, param, info);
 
       std::string stamp(header.time_stamp, strnlen(header.time_stamp, sizeof(header.time_stamp)));
-      logQuda(QUDA_SUMMARIZE, "Loaded a MILC v5 gauge field%s with time stamp \"%s\"; checksums %x %x %s%s\n",
-              swap ? " (byte swapped)" : "", stamp.c_str(), sum.sum29, sum.sum31,
-              info.checksum_matches ? "verified" : "NOT verified",
-              info.has_info_file ? ", along with the .info file" : "");
+      logQuda(QUDA_VERBOSE, "MILC v5 time stamp \"%s\"\n", stamp.c_str());
       return info;
     }
 
-    void save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                    const FileIOParam &param)
+    io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
+                            const FileIOParam &param)
     {
-      if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
-        errorQuda("Unsupported host gauge field precision %d", prec);
+      io::HostField field(gauge, n_dim, prec, matrix_reals);
       if (prec == QUDA_DOUBLE_PRECISION)
         logQuda(QUDA_SUMMARIZE,
                 "MILC v5 gauge files are single precision, so the double-precision field is saved in "
                 "single precision\n");
 
-      auto N = global_dims(X);
+      auto N = io::global_dims(X);
       GaugeHeader header = {};
       header.magic = gauge_magic;
       for (int d = 0; d < n_dim; d++) header.dims[d] = N[d];
@@ -217,22 +163,17 @@ namespace quda
       if (comm_rank() == 0) {
         stamp = time_stamp();
         memcpy(header.time_stamp, stamp.c_str(), std::min(stamp.size(), sizeof(header.time_stamp) - 1));
-        File file(filename, File::Mode::CREATE);
+        io::File file(filename, io::File::Mode::CREATE);
         file.write(&header, sizeof(header), 0);
         file.close();
       }
 
-      auto pack = [&](int, size_t index, char *site) {
-        if (prec == QUDA_DOUBLE_PRECISION)
-          pack_links<double>(gauge, index, site);
-        else
-          pack_links<float>(gauge, index, site);
-      };
-      auto sum = write_data(filename, gauge_layout(), X, param.io_mode, pack);
+      auto layout = field.layout(QUDA_SINGLE_PRECISION, sizeof(GaugeHeader), false, io::ChecksumType::MILC);
+      auto sum = io::write_data(filename, layout, X, param.io_mode, field.packer(QUDA_SINGLE_PRECISION));
 
       if (comm_rank() == 0) {
         uint32_t sums[2] = {sum.sum29, sum.sum31};
-        File file(filename, File::Mode::WRITE);
+        io::File file(filename, io::File::Mode::WRITE);
         file.write(sums, sizeof(sums), offsetof(GaugeHeader, sum29));
         file.close();
       }
@@ -240,13 +181,13 @@ namespace quda
       write_info(filename,
                  {{"magic_number", std::to_string(gauge_magic)},
                   {"time_stamp", "\"" + stamp + "\""},
-                  {"checksums", "\"" + checksum_str(sum.sum29, sum.sum31) + "\""},
+                  {"checksums", "\"" + io::checksum_str(sum) + "\""},
                   {"nx", std::to_string(N[0])},
                   {"ny", std::to_string(N[1])},
                   {"nz", std::to_string(N[2])},
                   {"nt", std::to_string(N[3])}});
 
-      logQuda(QUDA_SUMMARIZE, "Saved a MILC v5 gauge field with checksums %x %x\n", sum.sum29, sum.sum31);
+      return sum;
     }
 
   } // namespace milc

@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <vector>
 
@@ -10,6 +11,7 @@
 #include <instantiate.h>
 #include <color_spinor_field.h>
 #include <io/gauge_io.h>
+#include <io/site_io.h>
 #include <io/vector_io.h>
 #include <blas_quda.h>
 #include <quda.h>
@@ -23,11 +25,56 @@ namespace
   // file formats that can be written and read back in this build, for each field type
   std::vector<QudaFileFormat> gauge_formats()
   {
+    std::vector<QudaFileFormat> formats
+      = {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG, QUDA_FILE_FORMAT_MILC};
 #ifdef HAVE_QIO
-    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG, QUDA_FILE_FORMAT_MILC};
-#else
-    return {QUDA_FILE_FORMAT_MILC};
+    formats.insert(formats.end(), {QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_FORMAT_ILDG_EXTERNAL});
 #endif
+    return formats;
+  }
+
+  // the format a file is saved in: AUTO saves as QIO, and the external backend writes the same formats
+  QudaFileFormat saved_format(QudaFileFormat format)
+  {
+    switch (format) {
+    case QUDA_FILE_FORMAT_AUTO:
+    case QUDA_FILE_FORMAT_QIO_EXTERNAL: return QUDA_FILE_FORMAT_QIO;
+    case QUDA_FILE_FORMAT_ILDG_EXTERNAL: return QUDA_FILE_FORMAT_ILDG;
+    default: return format;
+    }
+  }
+
+  std::vector<char> read_file(const std::string &file)
+  {
+    std::ifstream in(file, std::ios::binary);
+    return std::vector<char>(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+  }
+
+  bool write_file(const std::string &file, const std::vector<char> &contents)
+  {
+    std::ofstream out(file, std::ios::binary | std::ios::trunc);
+    out.write(contents.data(), contents.size());
+    return static_cast<bool>(out);
+  }
+
+  // change the stored checksum of a gauge file, keeping its size, so that it no longer matches the data
+  void corrupt_checksum(const std::string &file, QudaFileFormat format)
+  {
+    if (quda::comm_rank() == 0) {
+      auto contents = read_file(file);
+      if (format == QUDA_FILE_FORMAT_MILC) {
+        ASSERT_GE(contents.size(), 96u);
+        contents[88] ^= 1; // the low byte of sum29
+      } else {
+        const std::string tag = "<suma>";
+        auto it = std::find_end(contents.begin(), contents.end(), tag.begin(), tag.end());
+        ASSERT_NE(it, contents.end()) << "no checksum record in " << file;
+        auto &digit = *(it + tag.size());
+        digit = digit == '1' ? '2' : '1';
+      }
+      EXPECT_TRUE(write_file(file, contents)) << "could not change the checksum in " << file;
+    }
+    quda::comm_barrier();
   }
 
   std::vector<QudaFileFormat> vector_formats()
@@ -129,6 +176,7 @@ TEST(FileIOParamTest, conversion)
 
   auto expect_equal = [](const FileIOParam &a, const FileIOParam &b) {
     EXPECT_EQ(a.format, b.format);
+    EXPECT_EQ(a.external_qio, b.external_qio);
     EXPECT_EQ(a.io_mode, b.io_mode);
     EXPECT_EQ(a.partfile, b.partfile);
     EXPECT_EQ(a.parity_inflate, b.parity_inflate);
@@ -157,6 +205,28 @@ TEST(FileIOParamTest, conversion)
   expected.write_usqcd_info = false;
   expected.allow_checksum_mismatch = true;
   expect_equal(FileIOParam(&param), expected);
+
+  // the _EXTERNAL formats become the plain format and the external QIO backend
+  for (auto f : {QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG}) {
+    param.format = f;
+    expected.format = f;
+    expected.external_qio = false;
+    expect_equal(FileIOParam(&param), expected);
+#ifdef HAVE_QIO
+    param.format = f == QUDA_FILE_FORMAT_QIO ? QUDA_FILE_FORMAT_QIO_EXTERNAL : QUDA_FILE_FORMAT_ILDG_EXTERNAL;
+    expected.external_qio = true;
+    expect_equal(FileIOParam(&param), expected);
+#endif
+  }
+}
+
+// the CRC-32 used in SciDAC checksums is that of zlib
+TEST(CRC32Test, check_value)
+{
+  const char data[] = "123456789";
+  EXPECT_EQ(quda::io::crc32(data, 9), 0xcbf43926u);
+  EXPECT_EQ(quda::io::crc32(data + 4, 5, quda::io::crc32(data, 4)), 0xcbf43926u);
+  EXPECT_EQ(quda::io::crc32(data, 0), 0u);
 }
 
 // tuple types: precision, file format, io mode, whether to write the usqcdInfo record
@@ -223,8 +293,8 @@ TEST_P(GaugeIOTest, verify)
     original[dir].assign(static_cast<char *>(gauge[dir]), static_cast<char *>(gauge[dir]) + bytes);
   }
 
-  // AUTO saves as QIO; MILC files are always single precision
-  auto format = io_param.format == QUDA_FILE_FORMAT_AUTO ? QUDA_FILE_FORMAT_QIO : io_param.format;
+  // MILC files are always single precision
+  auto format = saved_format(io_param.format);
   auto file_prec = format == QUDA_FILE_FORMAT_MILC ? QUDA_SINGLE_PRECISION : gauge_param.cpu_prec;
 
   auto file = "dummy.lat";
@@ -268,29 +338,18 @@ TEST_P(GaugeIOTest, verify)
     EXPECT_NEAR(info.plaq, plaq_new[0], tol);
   }
   EXPECT_EQ(info.has_info_file, format == QUDA_FILE_FORMAT_MILC);
-  EXPECT_EQ(info.checksum_matches, format == QUDA_FILE_FORMAT_MILC);
+  EXPECT_TRUE(info.has_checksum);
+  EXPECT_TRUE(info.checksum_matches);
   EXPECT_FALSE(info.byte_swapped);
 
-  // a MILC file whose stored checksum is wrong still loads when that is allowed
-  if (format == QUDA_FILE_FORMAT_MILC) {
-    if (::quda::comm_rank() == 0) {
-      FILE *fp = fopen(file, "r+b");
-      uint32_t sum29 = 0;
-      bool ok = fp && fseek(fp, 88, SEEK_SET) == 0 && fread(&sum29, sizeof(sum29), 1, fp) == 1;
-      sum29 ^= 1;
-      ok = ok && fseek(fp, 88, SEEK_SET) == 0 && fwrite(&sum29, sizeof(sum29), 1, fp) == 1;
-      if (fp) fclose(fp);
-      EXPECT_TRUE(ok) << "could not change the checksum in " << file;
-    }
-    comm_barrier();
-
-    FileIOParam allow(gauge_param.file_io_param);
-    allow.allow_checksum_mismatch = true;
-    auto corrupt_info = GaugeIO(file, allow).load(gauge, gauge_param.cpu_prec, gauge_param.X);
-    EXPECT_FALSE(corrupt_info.checksum_matches);
-    EXPECT_EQ(corrupt_info.sum29, info.sum29);
-    EXPECT_EQ(corrupt_info.sum31, info.sum31);
-  }
+  // a file whose stored checksum is wrong still loads when that is allowed
+  corrupt_checksum(file, format);
+  FileIOParam allow(gauge_param.file_io_param);
+  allow.allow_checksum_mismatch = true;
+  auto corrupt_info = GaugeIO(file, allow).load(gauge, gauge_param.cpu_prec, gauge_param.X);
+  EXPECT_FALSE(corrupt_info.checksum_matches);
+  EXPECT_EQ(corrupt_info.sum29, info.sum29);
+  EXPECT_EQ(corrupt_info.sum31, info.sum31);
 
   // cleanup after ourselves and delete the dummy lattice
   if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
@@ -300,6 +359,88 @@ TEST_P(GaugeIOTest, verify)
   // release memory
   for (int dir = 0; dir < 4; dir++) { host_free(gauge[dir]); }
 }
+
+#ifdef HAVE_QIO
+class GaugeIOBackendTest : public ::testing::TestWithParam<gauge_test_t>
+{
+};
+
+// the native and external QIO backends write the same file, apart from the date in the private record XML, and
+// each reads the other's file
+TEST_P(GaugeIOBackendTest, compare)
+{
+  using namespace quda;
+  auto prec = ::testing::get<0>(GetParam());
+  if (!is_enabled(prec)) GTEST_SKIP();
+
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
+  gauge_param.cpu_prec = prec;
+  gauge_param.cuda_prec = prec;
+  gauge_param.cuda_prec_sloppy = prec;
+  gauge_param.cuda_prec_precondition = prec;
+  gauge_param.cuda_prec_eigensolver = prec;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+
+  const size_t bytes = V * gauge_site_size * prec;
+  void *gauge[4], *loaded[4];
+  for (int dir = 0; dir < 4; dir++) {
+    gauge[dir] = safe_malloc(bytes);
+    loaded[dir] = safe_malloc(bytes);
+  }
+  constructHostGaugeField(gauge, gauge_param, 0, nullptr);
+
+  FileIOParam native;
+  native.format = ::testing::get<1>(GetParam());
+  native.io_mode = ::testing::get<2>(GetParam());
+  native.write_usqcd_info = ::testing::get<3>(GetParam());
+  native.ildg_lfn = "lfn://quda/io_test"; // the default, the file name, differs between the two files
+  FileIOParam external = native;
+  external.external_qio = true;
+
+  const std::string native_file = "native.lat", external_file = "external.lat";
+  GaugeIO(native_file, native).save(gauge, prec, gauge_param.X);
+  GaugeIO(external_file, external).save(gauge, prec, gauge_param.X);
+
+  if (comm_rank() == 0) {
+    auto mask_date = [](std::vector<char> &contents) {
+      const std::string open = "<date>", close = "</date>";
+      auto start = std::search(contents.begin(), contents.end(), open.begin(), open.end());
+      auto end = std::search(start, contents.end(), close.begin(), close.end());
+      EXPECT_NE(end, contents.end()) << "no <date> element";
+      if (start != contents.end()) std::fill(start + open.size(), end, '#');
+    };
+    auto a = read_file(native_file), b = read_file(external_file);
+    mask_date(a);
+    mask_date(b);
+    EXPECT_EQ(a.size(), b.size());
+    auto diff = std::mismatch(a.begin(), a.begin() + std::min(a.size(), b.size()), b.begin());
+    EXPECT_EQ(diff.first - a.begin(), static_cast<ptrdiff_t>(std::min(a.size(), b.size())))
+      << "the files first differ at byte " << diff.first - a.begin();
+  }
+
+  std::vector<GaugeFileInfo> infos;
+  for (auto [file, param] : {std::make_pair(native_file, external), std::make_pair(external_file, native)}) {
+    for (int dir = 0; dir < 4; dir++) memset(loaded[dir], 0, bytes);
+    infos.push_back(GaugeIO(file, param).load(loaded, prec, gauge_param.X));
+    for (int dir = 0; dir < 4; dir++)
+      EXPECT_EQ(memcmp(loaded[dir], gauge[dir], bytes), 0) << file << " direction " << dir;
+    EXPECT_TRUE(infos.back().has_checksum);
+    EXPECT_TRUE(infos.back().checksum_matches);
+    EXPECT_EQ(infos.back().ildg, native.format == QUDA_FILE_FORMAT_ILDG);
+    EXPECT_EQ(infos.back().has_plaq_linktr, native.write_usqcd_info);
+  }
+  EXPECT_EQ(infos[0].sum29, infos[1].sum29);
+  EXPECT_EQ(infos[0].sum31, infos[1].sum31);
+
+  if (comm_rank() == 0 && (remove(native_file.c_str()) != 0 || remove(external_file.c_str()) != 0))
+    errorQuda("Error deleting file");
+  for (int dir = 0; dir < 4; dir++) {
+    host_free(gauge[dir]);
+    host_free(loaded[dir]);
+  }
+}
+#endif
 
 using cs_test_t = ::testing::tuple<QudaSiteSubset, QudaSiteSubset, QudaParity, bool, QudaPrecision, QudaPrecision, int,
                                    bool, QudaFieldLocation, QudaFileFormat, QudaFileIOMode>;
@@ -477,6 +618,22 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugeIOTest,
                            name += ::testing::get<3>(param.param) ? "_usqcd_info" : "_no_usqcd_info";
                            return name;
                          });
+
+#ifdef HAVE_QIO
+// comparison of the native and external QIO backends
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeIOBackendTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG),
+                                 Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL), Values(true, false)),
+                         [](testing::TestParamInfo<gauge_test_t> param) {
+                           std::string name;
+                           name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += quda::get_file_format_str(::testing::get<1>(param.param)) + std::string("_");
+                           name += get_io_mode_str(::testing::get<2>(param.param));
+                           name += ::testing::get<3>(param.param) ? "_usqcd_info" : "_no_usqcd_info";
+                           return name;
+                         });
+#endif
 
 // colorspinor full field IO test
 INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,

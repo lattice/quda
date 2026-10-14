@@ -37,7 +37,7 @@ extern "C" {
     QudaFileIOMode io_mode;       /**< Whether all ranks access the file, or only rank 0 */
     char ildg_lfn[256];           /**< ILDG logical file name; empty means use the file name */
     QudaBoolean write_usqcd_info; /**< Whether to write the USQCD plaquette / link-trace record on QIO and ILDG gauge saves */
-    QudaBoolean allow_checksum_mismatch; /**< Whether a MILC file whose checksums do not match its data is loaded with a warning instead of an error (default false).  This is necessary to support some legacy configurations in the MILC repository */
+    QudaBoolean allow_checksum_mismatch; /**< Whether a MILC, QIO or ILDG file whose checksums do not match its data is loaded with a warning instead of an error (default false).  This is necessary to support some legacy configurations in the MILC repository */
   } QudaFileIOParam;
 
   /**

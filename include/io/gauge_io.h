@@ -20,9 +20,10 @@ namespace quda
     bool plaq_linktr_matches = false; /** Whether plaq and linktr match the loaded field */
     bool byte_swapped = false;        /** MILC: whether the file is in the opposite byte order */
     bool has_info_file = false;       /** MILC: whether a .info file was found and checked */
-    bool checksum_matches = false;    /** MILC: whether the checksums of the data, header and .info file agree */
-    uint32_t sum29 = 0;               /** MILC: the checksums computed from the data */
-    uint32_t sum31 = 0;
+    bool has_checksum = false;        /** Whether the file has checksums (ILDG files from other codes have none) */
+    bool checksum_matches = false;    /** Whether the checksums of the data and the file (and MILC .info file) agree */
+    uint32_t sum29 = 0;               /** The checksums computed from the data: sum29 and sum31 for MILC files, suma */
+    uint32_t sum31 = 0;               /** and sumb for QIO and ILDG files */
   };
 
   /**

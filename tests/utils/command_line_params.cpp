@@ -475,7 +475,9 @@ namespace
   CLI::TransformPairs<QudaFileFormat> file_format_map {{"auto", QUDA_FILE_FORMAT_AUTO},
                                                        {"qio", QUDA_FILE_FORMAT_QIO},
                                                        {"milc", QUDA_FILE_FORMAT_MILC},
-                                                       {"ildg", QUDA_FILE_FORMAT_ILDG}};
+                                                       {"ildg", QUDA_FILE_FORMAT_ILDG},
+                                                       {"qio-external", QUDA_FILE_FORMAT_QIO_EXTERNAL},
+                                                       {"ildg-external", QUDA_FILE_FORMAT_ILDG_EXTERNAL}};
 
   CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {{"parallel", QUDA_FILE_IO_PARALLEL},
                                                         {"serial", QUDA_FILE_IO_SERIAL}};
@@ -578,9 +580,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option(
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
-  quda_app->add_option(
-    "--load-gauge", latfile,
-    "Load gauge field \" file \" for the test (SciDAC and ILDG files require QIO; MILC files do not)");
+  quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (SciDAC, ILDG or MILC v5)");
   quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
   quda_app->add_option("--mass", mass, "Mass of Dirac operator (default 0.1)");
@@ -686,11 +686,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--reliable-delta", reliable_delta, "Set reliable update delta factor");
   quda_app->add_option("--save-gauge", gauge_outfile,
-                       "Save gauge field \" file \" for the test (heatbath and gauge_alg tests only; the QIO and ILDG "
-                       "formats require QIO)");
+                       "Save gauge field \" file \" for the test (heatbath and gauge_alg tests only)");
   quda_app
     ->add_option("--gauge-file-format", gauge_file_format,
-                 "File format used to load and save the gauge field (auto (default), qio, milc, ildg)")
+                 "File format used to load and save the gauge field (auto (default), qio, milc, ildg; qio-external "
+                 "and ildg-external use the external QIO library)")
     ->transform(CLI::QUDACheckedTransformer(file_format_map));
   quda_app
     ->add_option("--gauge-file-io-mode", gauge_file_io_mode,
@@ -702,7 +702,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Whether to write the USQCD plaquette and link-trace record when saving QIO or ILDG gauge "
                        "fields (default true)");
   quda_app->add_option("--gauge-allow-checksum-mismatch", gauge_allow_checksum_mismatch,
-                       "Whether to load a MILC gauge field whose checksums do not match its data, with a warning "
+                       "Whether to load a gauge field whose checksums do not match its data, with a warning "
                        "(default false)");
 
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
@@ -855,7 +855,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "If saving eigenvectors, save in partfile format instead of singlefile (default false)");
   opgroup
     ->add_option("--eig-file-format", eig_file_format,
-                 "File format used to load and save eigenvectors (auto (default), qio, milc)")
+                 "File format used to load and save eigenvectors (auto (default), qio, qio-external, milc)")
     ->transform(CLI::QUDACheckedTransformer(file_format_map));
   opgroup
     ->add_option("--eig-file-io-mode", eig_file_io_mode,

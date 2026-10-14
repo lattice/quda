@@ -65,7 +65,8 @@ void printQudaFileIOParam(QudaFileIOParam *param)
 #elif defined CHECK_PARAM
   // the full range is checked since a caller that bypasses newQudaFileIOParam() can leave arbitrary values
   if (param->format != QUDA_FILE_FORMAT_AUTO && param->format != QUDA_FILE_FORMAT_QIO
-      && param->format != QUDA_FILE_FORMAT_MILC && param->format != QUDA_FILE_FORMAT_ILDG)
+      && param->format != QUDA_FILE_FORMAT_MILC && param->format != QUDA_FILE_FORMAT_ILDG
+      && param->format != QUDA_FILE_FORMAT_QIO_EXTERNAL && param->format != QUDA_FILE_FORMAT_ILDG_EXTERNAL)
     errorQuda("Invalid file format %d", param->format);
   if (param->io_mode != QUDA_FILE_IO_PARALLEL && param->io_mode != QUDA_FILE_IO_SERIAL)
     errorQuda("Invalid file IO mode %d", param->io_mode);
