@@ -21,14 +21,14 @@ namespace quda
     const QudaPrecision load_prec = v0.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : v0.Precision();
 
     auto spinor_parity = v0.SuggestedParity();
-    if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate &&
-        spinor_parity != QUDA_EVEN_PARITY && spinor_parity != QUDA_ODD_PARITY)
+    if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate && spinor_parity != QUDA_EVEN_PARITY
+        && spinor_parity != QUDA_ODD_PARITY)
       errorQuda("When loading single parity vectors, the suggested parity must be set.");
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start loading %04d vectors from %s\n", Nvec, filename.c_str());
 
     std::vector<ColorSpinorField> tmp(Nvec);
-    bool create_tmp = load_prec != v0.Precision() || (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate) ||
-      v0.Location() == QUDA_CUDA_FIELD_LOCATION;
+    bool create_tmp = load_prec != v0.Precision() || (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate)
+      || v0.Location() == QUDA_CUDA_FIELD_LOCATION;
 
     if (create_tmp) {
       ColorSpinorParam csParam(vecs[0]);
@@ -89,13 +89,14 @@ namespace quda
     const int Nvec = (size != 0 && size < vecs.size()) ? size : vecs.size();
     if (prec < QUDA_SINGLE_PRECISION && prec != QUDA_INVALID_PRECISION) errorQuda("Unsupported precision %d", prec);
     const QudaPrecision save_prec = prec != QUDA_INVALID_PRECISION ? prec :
-      v0.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : v0.Precision();
+      v0.Precision() < QUDA_SINGLE_PRECISION                       ? QUDA_SINGLE_PRECISION :
+                                                                     v0.Precision();
 
-    bool create_tmp = save_prec != v0.Precision() || (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate) ||
-      v0.Location() == QUDA_CUDA_FIELD_LOCATION;
+    bool create_tmp = save_prec != v0.Precision() || (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate)
+      || v0.Location() == QUDA_CUDA_FIELD_LOCATION;
     auto spinor_parity = v0.SuggestedParity();
-    if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate &&
-        spinor_parity != QUDA_EVEN_PARITY && spinor_parity != QUDA_ODD_PARITY)
+    if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate && spinor_parity != QUDA_EVEN_PARITY
+        && spinor_parity != QUDA_ODD_PARITY)
       errorQuda("When loading single parity vectors, the suggested parity must be set.");
     std::vector<ColorSpinorField> tmp(Nvec);
 
@@ -112,7 +113,7 @@ namespace quda
           tmp[i] = ColorSpinorField(csParam);
           tmp[i] = vecs[i];
         }
-      } else { // QUDA_PARITY_SITE_SUBSET
+      } else {                                      // QUDA_PARITY_SITE_SUBSET
         csParam.x[0] *= 2;                          // corrects for the factor of two in the X direction
         csParam.siteSubset = QUDA_FULL_SITE_SUBSET; // create a full-parity field.
         csParam.create = QUDA_ZERO_FIELD_CREATE;    // to explicitly zero the odd sites.
