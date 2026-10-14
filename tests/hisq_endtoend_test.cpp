@@ -15,6 +15,7 @@
 
 #include "host_utils.h"
 #include "command_line_params.h"
+#include "gauge_utils.h"
 #include "misc.h"
 #include "test.h"
 #include "hisq_force_reference.h"
@@ -22,6 +23,27 @@
 #include "momentum_utils.h"
 
 using namespace quda;
+
+static constexpr GaugeInputMode default_gauge_input = GaugeInputMode::GAUSSIAN_SU3;
+
+// Links carry no staggered phases or boundary signs, matching createSiteLinkCPU(SITELINK_PHASE_NO)
+static void createTestLinks(void *const *links, QudaPrecision precision)
+{
+  switch (resolveGaugeInputMode(default_gauge_input)) {
+  case GaugeInputMode::HAAR: createSiteLinkCPU(links, precision, SiteLinkType::SITELINK_PHASE_NO); break;
+  case GaugeInputMode::UNIT: constructIdentityGaugeField(links, precision); break;
+  case GaugeInputMode::GAUSSIAN_SU3: constructGaussianSU3GaugeField(links, precision, gauge_input_width); break;
+  case GaugeInputMode::LOAD: errorQuda("--gauge-input load is not supported by this test"); break;
+  }
+}
+
+static void createTestLinks(GaugeField &links, QudaPrecision precision)
+{
+  if (links.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", links.Order());
+  void *ptrs[4];
+  for (int d = 0; d < 4; d++) ptrs[d] = links.data<void *>(d);
+  createTestLinks(ptrs, precision);
+}
 
 static std::array<std::array<double, 6>, 3> act_paths;
 
@@ -88,7 +110,7 @@ static void init_host()
   act_paths[2] = {(1.0 / 8.0), (-1.0 / 24.0), 0.0, 0.0, 0.0, 0.0};
 
   for (int i = 0; i < 4; i++) qdp_sitelink[i] = host_pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+  createTestLinks(qdp_sitelink, gauge_param.cpu_prec);
 
   for (int i = 0; i < 4; i++) {
     v_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -361,11 +383,11 @@ static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
   }
 
-  // CPU gauge field (using sitelinks, for createSiteLinkCPU)
+  // CPU gauge field (fresh links from the selected gauge input)
   GaugeFieldParam cpuGaugeParam(gParam);
   cpuGaugeParam.create = QUDA_NULL_FIELD_CREATE;
   cpuGauge = new GaugeField(cpuGaugeParam);
-  createSiteLinkCPU(*cpuGauge, forceGaugeParam.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+  createTestLinks(*cpuGauge, forceGaugeParam.cpu_prec);
 
   cpuGauge_ex = new GaugeField(gParam_ex);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
@@ -807,10 +829,9 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   fermion_force::setUnitarizeForceConstants(1e-14, 5e-5, 1e-10, true, false, 1e-8, 1e-8);
 
   // ---- 1. Fresh U links (QDP order, host precision) ----
-  auto link_type = SiteLinkType::SITELINK_PHASE_NO;
   void *qdp_u[4];
   for (int i = 0; i < 4; i++) qdp_u[i] = safe_malloc(gsize);
-  createSiteLinkCPU(qdp_u, host_prec, link_type);
+  createTestLinks(qdp_u, host_prec);
 
   // ---- 2. Build V, W on GPU via computeKSLinkQuda ----
   QudaGaugeParam linkParam = newQudaGaugeParam();
@@ -1299,6 +1320,12 @@ int main(int argc, char **argv)
   setVerbosity(verbosity);
   initComms(argc, argv, gridsize_from_cmdline);
   initQuda(device_ordinal);
+
+  const auto input_mode = resolveGaugeInputMode(default_gauge_input);
+  if (input_mode == GaugeInputMode::GAUSSIAN_SU3)
+    printfQuda("Gauge input: %s, width %g\n", getGaugeInputStr(input_mode), gauge_input_width);
+  else
+    printfQuda("Gauge input: %s\n", getGaugeInputStr(input_mode));
 
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
