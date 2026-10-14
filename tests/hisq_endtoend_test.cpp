@@ -1122,7 +1122,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   // implementation that introduces O(eps) divergence per stage. The compound divergence
   // is volume-independent and uniformly distributed, giving ~2 digits of loss at double
   // precision. The full_chain test verifies each stage individually at full tolerance.
-  int tolerance = std::max(getNegLog10Tolerance(test_prec) - 2, 1);
+  int tolerance = getNegLog10Tolerance(test_prec) - 2;
   ASSERT_GE(accuracy_level, tolerance) << "computeHISQForceQuda momentum mismatch vs CPU reference";
 
   // ---- 8. Cleanup ----
@@ -1269,7 +1269,12 @@ TEST_P(HisqEndToEndTest, full_chain)
   }
 }
 
-TEST_P(HisqEndToEndTest, hisq_force_interface) { verify_hisq_force_interface(); }
+// computeHISQForceQuda computes at host precision, so the end-to-end check is instantiated in double only
+class HisqForceInterfaceTest : public HisqEndToEndTest
+{
+};
+
+TEST_P(HisqForceInterfaceTest, hisq_force_interface) { verify_hisq_force_interface(); }
 
 // ============================================================
 // Test instantiation
@@ -1295,9 +1300,19 @@ INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
                                             ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
                                             ::testing::Bool(), ::testing::Range(0, 16)),
                          getHisqEndToEndTestName);
+INSTANTIATE_TEST_SUITE_P(QUDA, HisqForceInterfaceTest,
+                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION),
+                                            ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
+                                            ::testing::Bool(), ::testing::Range(0, 16)),
+                         getHisqEndToEndTestName);
 #else
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
                          ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                            ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
+                                            ::testing::Bool(), ::testing::Values(0)),
+                         getHisqEndToEndTestName);
+INSTANTIATE_TEST_SUITE_P(QUDA, HisqForceInterfaceTest,
+                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION),
                                             ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
                                             ::testing::Bool(), ::testing::Values(0)),
                          getHisqEndToEndTestName);
