@@ -167,7 +167,13 @@ static TimeProfile profileInvertMultiSrc("invertMultiSrcQuda");
 static TimeProfile profileUpdateSplitGauge("UpdateSplitGauge");
 
 //!< Profiler for invertMultiShiftQuda
-static TimeProfile profileMulti("invertMultiShiftQuda");
+static TimeProfile profileInvertMultiShift("invertMultiShiftQuda");
+
+//!< Profiler for MatQuda
+static TimeProfile profileMat("MatQuda");
+
+//!< Profiler for MatDagMatQuda
+static TimeProfile profileMatDagMat("MatDagMatQuda");
 
 //!< Profiler for eigensolveQuda
 static TimeProfile profileEigensolve("eigensolveQuda");
@@ -252,6 +258,12 @@ static TimeProfile profileMomAction("momActionQuda");
 
 //!< Profiler for sink projection
 static TimeProfile profileSinkProject("sinkProjectQuda");
+
+//!< Profiler for performGaugeRotateQuda
+static TimeProfile profileGaugeRotate("performGaugeRotateQuda");
+
+//!< Profiler for performGaugeFixQuda
+static TimeProfile profileGaugeFix("performGaugeFixQuda");
 
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
@@ -466,7 +478,6 @@ static void init_default_comms()
   initCommsGridQuda(4, dims, nullptr, nullptr);
 #endif
 }
-
 
 extern char* gitversion;
 
@@ -1566,12 +1577,18 @@ void endQuda(void)
     profileDslash.Print();
     profileInvert.Print();
     profileInvertMultiSrc.Print();
-    profileMulti.Print();
+    profileInvertMultiShift.Print();
+    profileMat.Print();
+    profileMatDagMat.Print();
     profileEigensolve.Print();
     profileFatLink.Print();
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
+    profileGaugeRotate.Print();
+    profileGaugeFix.Print();
+    GaugeFixFFTQuda.Print();
+    GaugeFixOVRQuda.Print();
     profileCloverForce.Print();
     profileTMCloverForce.Print();
     profileStaggeredForce.Print();
@@ -1700,6 +1717,7 @@ namespace quda {
     case QUDA_COVDEV_DSLASH:
       diracParam.type = QUDA_GAUGE_COVDEV_DIRAC;
       diracParam.covdev_mu = inv_param->covdev_mu;
+      diracParam.covdev_shift = inv_param->covdev_shift;
       break;
     default:
       errorQuda("Unsupported dslash_type %d", inv_param->dslash_type);
@@ -2399,6 +2417,7 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  auto profile = pushProfile(profileMat, inv_param);
   pushVerbosity(inv_param->verbosity);
 
   const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
@@ -2426,6 +2445,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   ColorSpinorField out(cudaParam);
 
+  profileMat.TPSTART(QUDA_PROFILE_COMPUTE);
+
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
@@ -2451,6 +2472,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
     }
   }
 
+  profileMat.TPSTOP(QUDA_PROFILE_COMPUTE);
+
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
   ColorSpinorField out_h(cpuParam);
@@ -2463,6 +2486,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
 void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  auto profile = pushProfile(profileMatDagMat, inv_param);
   pushVerbosity(inv_param->verbosity);
 
   const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
@@ -2492,6 +2516,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   //  double kappa = inv_param->kappa;
   //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= gaugePrecise->anisotropy;
 
+  profileMatDagMat.TPSTART(QUDA_PROFILE_COMPUTE);
+
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
@@ -2516,6 +2542,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
       blas::ax(0.25/(kappa*kappa), out);
     }
   }
+
+  profileMatDagMat.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
@@ -3642,7 +3670,7 @@ void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Quda
  */
 void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 {
-  auto profile = pushProfile(profileMulti, param);
+  auto profile = pushProfile(profileInvertMultiShift, param);
   profilerStart(__func__);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -3775,7 +3803,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   std::vector<ColorSpinorField> &x = solutionResident;
   std::vector<ColorSpinorField> p;
 
-  profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
+  profileInvertMultiShift.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   // Check source norms
   real_t nb = blas::norm2(b);
@@ -3791,7 +3819,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 
   // rescale
   massRescale(b, *param, true);
-  profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  profileInvertMultiShift.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   DiracMatrix *m, *mSloppy;
 
@@ -3950,11 +3978,11 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
     if (!param->make_resident_solution) h_x[i] = x[i];
   }
 
-  profileMulti.TPSTART(QUDA_PROFILE_EPILOGUE);
+  profileInvertMultiShift.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   if (!param->make_resident_solution) solutionResident.clear();
 
-  profileMulti.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  profileInvertMultiShift.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   delete d;
   delete dSloppy;
@@ -6112,7 +6140,148 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   popVerbosity();
 }
 
-/* save list of gauge vectors */
+void performGaugeRotateQuda(void *rotation, void *gauge, QudaGaugeParam *param)
+{
+  auto profile = pushProfile(profileGaugeRotate);
+  checkGaugeParam(param);
+  lat_dim_t R1;
+  for (int d = 0; d < 4; d++) { R1[d] = (redundant_comms || commDimPartitioned(d)); }
+
+  GaugeFieldParam gParam(*param);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.gauge = rotation;
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  GaugeField cpuRotation(gParam);
+  gParam.gauge = gauge;
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  GaugeField cpuGauge = (!param->use_resident_gauge || param->return_result_gauge) ? GaugeField(gParam) : GaugeField();
+
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam.link_type = param->type;
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(param->cuda_prec, true);
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  GaugeField cudaRotation(gParam);
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  GaugeField cudaInGauge = param->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
+  GaugeField cudaOutGauge(gParam);
+
+  cudaRotation.copy(cpuRotation);
+  if (!param->use_resident_gauge) { cudaInGauge.copy(cpuGauge); }
+
+  GaugeField *cudaRotationEx = createExtendedGauge(cudaRotation, R1, profileGaugeRotate);
+
+  gaugeRotate(cudaOutGauge, cudaInGauge, *cudaRotationEx);
+
+  delete cudaRotationEx;
+  if (param->return_result_gauge) { cpuGauge.copy(cudaOutGauge); }
+  if (param->make_resident_gauge) {
+    freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+    gaugePrecise = new GaugeField();
+    std::exchange(*gaugePrecise, cudaOutGauge);
+    updateExtendedGaugeResident(true, R, profileGaugeRotate);
+  }
+}
+
+void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, QudaGaugeFixParam *fix_param)
+{
+  auto profile = pushProfile(profileGaugeFix);
+  checkGaugeParam(param);
+  checkGaugeFixParam(fix_param);
+  int *reunit_fails_h = static_cast<int *>(host_pinned_malloc(sizeof(int)));
+  int *reunit_fails_d = static_cast<int *>(get_mapped_device_pointer(reunit_fails_h));
+  lat_dim_t R1;
+  for (int d = 0; d < 4; d++) { R1[d] = (redundant_comms || commDimPartitioned(d)); }
+
+  GaugeFieldParam gParam(*param);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.gauge = rotation;
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  GaugeField cpuRotation(gParam);
+  gParam.gauge = gauge;
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  GaugeField cpuGauge = (!param->use_resident_gauge || param->return_result_gauge) ? GaugeField(gParam) : GaugeField();
+
+  if (param->use_resident_gauge && !gaugePrecise) errorQuda("No resident gauge field to use");
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam.link_type = param->type;
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(param->cuda_prec, true);
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  GaugeField cudaRotation(gParam);
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  GaugeField cudaInGauge = param->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
+  GaugeField cudaOutGauge
+    = (param->make_resident_gauge || param->return_result_gauge) ? GaugeField(gParam) : GaugeField();
+
+  cudaRotation.copy(cpuRotation);
+  if (!param->use_resident_gauge) { cudaInGauge.copy(cpuGauge); }
+
+  GaugeField *cudaRotationEx = createExtendedGauge(cudaRotation, R1, profileGaugeFix);
+  GaugeField *cudaInGaugeEx = createExtendedGauge(cudaInGauge, R1, profileGaugeFix);
+
+  double functional_old, functional, theta, diff, criterion, quality[2];
+  bool compute_theta = fix_param->compute_theta;
+  bool use_theta = fix_param->use_theta;
+  if (use_theta && !compute_theta) { errorQuda("compute_theta must be true if use_theta is true"); }
+  gaugeFixQuality(quality, *cudaRotationEx, *cudaInGaugeEx, fix_param->dir_ignore, compute_theta);
+  functional = quality[0];
+  theta = quality[1];
+  diff = 1.0;
+  criterion = use_theta ? theta : diff;
+  int iter = 0;
+  logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
+  while (iter < fix_param->maxiter && criterion > fix_param->tol) {
+    gaugeFixOVRStep(*cudaRotationEx, *cudaInGaugeEx, fix_param->omega, fix_param->dir_ignore);
+    gaugeFixQuality(quality, *cudaRotationEx, *cudaInGaugeEx, fix_param->dir_ignore, compute_theta);
+    functional_old = functional;
+    functional = quality[0];
+    theta = quality[1];
+    diff = quda::abs((functional - functional_old) / functional_old);
+    criterion = use_theta ? theta : diff;
+    iter++;
+    if (iter % fix_param->reunit_interval == 0) {
+      *reunit_fails_h = 0;
+      unitarizeLinks(*cudaRotationEx, *cudaRotationEx, reunit_fails_d);
+      if (*reunit_fails_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *reunit_fails_h);
+    }
+    if (iter % fix_param->verbose_interval == 0) {
+      logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
+              theta);
+    }
+  }
+  if (iter < fix_param->maxiter) {
+    if (iter % fix_param->reunit_interval != 0) {
+      *reunit_fails_h = 0;
+      unitarizeLinks(*cudaRotationEx, *cudaRotationEx, reunit_fails_d);
+      if (*reunit_fails_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *reunit_fails_h);
+    }
+    if (iter % fix_param->verbose_interval != 0) {
+      logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
+              theta);
+    }
+  }
+
+  // copy the field back to the host
+  copyExtendedGauge(cudaRotation, *cudaRotationEx, QUDA_CUDA_FIELD_LOCATION);
+  cpuRotation.copy(cudaRotation);
+  if (param->make_resident_gauge || param->return_result_gauge) {
+    gaugeRotate(cudaOutGauge, cudaInGauge, *cudaRotationEx);
+  }
+  if (param->return_result_gauge) { cpuGauge.copy(cudaOutGauge); }
+
+  host_free(reunit_fails_h);
+  delete cudaRotationEx;
+  delete cudaInGaugeEx;
+  if (param->make_resident_gauge) {
+    freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+    gaugePrecise = new GaugeField();
+    std::exchange(*gaugePrecise, cudaOutGauge);
+    updateExtendedGaugeResident(true, R, profileGaugeFix);
+  }
+}
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,

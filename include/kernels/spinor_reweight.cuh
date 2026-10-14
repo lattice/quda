@@ -16,9 +16,9 @@ namespace quda
 
     int X[4];
     V v;
-    real alpha0;
+    double alpha0;
     int t0;
-    SpinorDistanceReweightArg(ColorSpinorField &v, real alpha0, int t0) :
+    SpinorDistanceReweightArg(ColorSpinorField &v, double alpha0, int t0) :
       kernel_param(dim3(v.VolumeCB(), v.SiteSubset(), 1)), v(v), alpha0(alpha0), t0(t0)
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = v.X()[dir];
@@ -26,13 +26,12 @@ namespace quda
     }
   };
 
-  template <typename Arg> __device__ __host__ inline auto distanceWeight(const Arg &arg, int t, int nt)
+  template <typename Arg> __device__ __host__ inline double distanceWeight(const Arg &arg, int t, int nt)
   {
-    using real = typename Arg::real;
     if (arg.alpha0 > 0) {
-      return cosh(arg.alpha0 * real((t - arg.t0 + nt) % nt - nt / 2));
+      return cosh(arg.alpha0 * double((t - arg.t0 + nt) % nt - nt / 2));
     } else {
-      return 1 / cosh(arg.alpha0 * real((t - arg.t0 + nt) % nt - nt / 2));
+      return 1 / cosh(arg.alpha0 * double((t - arg.t0 + nt) % nt - nt / 2));
     }
   }
 
@@ -47,7 +46,8 @@ namespace quda
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       Vector tmp = arg.v(x_cb, parity);
-      tmp *= distanceWeight(arg, arg.comms_coord[3] * arg.X[3] + x[3], arg.comms_dim[3] * arg.X[3]);
+      tmp *= static_cast<typename Arg::real>(
+        distanceWeight(arg, arg.comms_coord[3] * arg.X[3] + x[3], arg.comms_dim[3] * arg.X[3]));
       arg.v(x_cb, parity) = tmp;
     }
   };

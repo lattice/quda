@@ -9,7 +9,7 @@ namespace quda
   template <typename Float, int Ns, int Nc> class SpinorDistanceReweight : TunableKernel2D
   {
     ColorSpinorField &v;
-    Float alpha0;
+    double alpha0;
     int t0;
     unsigned int minThreads() const { return v.VolumeCB(); }
 

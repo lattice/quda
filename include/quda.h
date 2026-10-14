@@ -62,6 +62,8 @@ extern "C" {
     QudaReconstructType reconstruct_eigensolver; /**< The recontruction type of the eigensolver gauge field */
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
+    QudaBoolean gauge_fix_compute_theta; /**< Compute theta in the gauge fixing algorithm */
+    QudaBoolean gauge_fix_use_theta;     /**< Use theta as the criterion in the gauge fixing algorithm */
 
     int ga_pad; /**< The pad size that native GaugeFields will use (default=0) */
 
@@ -139,8 +141,11 @@ extern "C" {
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
-    int laplace3D; /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
-    int covdev_mu; /**< Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3) */
+    int laplace3D;     /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
+    int laplace_nspin; /**< Number of spin for the Laplace operator */
+    int covdev_mu;     /**< Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3) */
+    bool covdev_shift; /**< Apply the shift instead of the covariant derivative */
+    int covdev_nspin;  /**< Number of spin for the covariant derivative operator */
 
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
@@ -892,6 +897,19 @@ extern "C" {
                                         A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
   } QudaGaugeSmearParam;
 
+  typedef struct QudaGaugeFixParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct */
+    double tol;           /**< Tolerance of the fixing */
+    int maxiter;          /**< The maximum number of fixing steps to perform. */
+    int dir_ignore;       /**< The direction to be ignored by the fixing algorithm */
+    double omega;         /**< Parameter used for OVR algorithm */
+    double alpha;         /**< Parameter used for FFT algorithm */
+    int reunit_interval;  /**< Interval at which to reunitarize the rotation field */
+    int verbose_interval; /**< Interval at which to print the gauge fixing progress */
+    bool compute_theta;   /**< Compute theta as the quality metric */
+    bool use_theta;       /**< Use theta instead of relative difference of functional as the criterion */
+  } QudaGaugeFixParam;
+
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
@@ -1102,6 +1120,15 @@ extern "C" {
   QudaGaugeSmearParam newQudaGaugeSmearParam(void);
 
   /**
+   * A new QudaGaugeFixParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeFixParam fix_param = newQudaGaugeFixParam();
+   */
+  QudaGaugeFixParam newQudaGaugeFixParam(void);
+
+  /**
    * A new QudaBLASParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
    * using this function.  Typical usage is as follows:
@@ -1139,6 +1166,18 @@ extern "C" {
    * @param param The QudaGaugeObservableParam whose elements we are to print.
    */
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
+
+  /**
+   * Print the members of QudaGaugeSmearParam.
+   * @param param The QudaGaugeSmearParam whose elements we are to print.
+   */
+  void printQudaGaugeSmearParam(QudaGaugeSmearParam *param);
+
+  /**
+   * Print the members of QudaGaugeFixParam.
+   * @param param The QudaGaugeFixParam whose elements we are to print.
+   */
+  void printQudaGaugeFixParam(QudaGaugeFixParam *param);
 
   /**
    * Print the members of QudaBLASParam.
@@ -1807,6 +1846,25 @@ extern "C" {
   void contractFTQuda(void **x, void **y, void **result, const QudaContractType cType, void *cs_param_ptr,
                       const int src_colors, const int *X, const int *const source_position, const int n_mom,
                       const int *const mom_modes, const QudaFFTSymmType *const fft_type);
+
+  /**
+   * @brief Rotate gauge field U_\mu(x) with the rotation field g(x)
+   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
+   * @param[in] rotation Rotation field g(x) to rotate the gauge
+   * @param[in,out] gauge Gauge field U_\mu(x) to be rotated
+   * @param[in] param Parameters of the external fields
+   */
+  void performGaugeRotateQuda(void *rotation, void *gauge, QudaGaugeParam *param);
+
+  /**
+   * @brief Gauge fixing with over-relaxation.
+   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
+   * @param[in,out] rotation Rotation field g(x) to fix the gauge
+   * @param[in,out] gauge Gauge field U_\mu(x) to be fixed
+   * @param[in] param Parameters of the external fields
+   * @param[in] fix_param Parameters of the gauge fixing algorithm
+   */
+  void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, QudaGaugeFixParam *fix_param);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

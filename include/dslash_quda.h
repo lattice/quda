@@ -789,11 +789,12 @@ namespace quda
      @param[in] mu Direction of the derivative. For mu > 3 it goes backwards
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
+     @param[in] shift Whether to apply the shift instead of the covariant derivative
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyCovDev(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                   int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+                   int mu, int parity, bool dagger, bool shift, const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Apply clover-matrix field to a color-spinor field
