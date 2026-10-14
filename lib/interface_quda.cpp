@@ -56,6 +56,7 @@
 #include "check_params.h"
 #undef CHECK_PARAM
 void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
+void checkFileIOParam(QudaFileIOParam &param) { checkFileIOParam(&param); }
 
 // define printQudaGaugeParam() and printQudaInvertParam()
 #define PRINT_PARAM

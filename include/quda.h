@@ -26,6 +26,20 @@ extern "C" {
 #endif
 
   /**
+   * Parameters describing how fields are loaded from and saved to
+   * files.  Referenced (optionally) from QudaGaugeParam,
+   * QudaEigParam and QudaMultigridParam; a null reference means all
+   * defaults.
+   */
+  typedef struct QudaFileIOParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    QudaFileFormat format;        /**< File format; AUTO detects the format on load and uses QIO on save */
+    QudaFileIOMode io_mode;       /**< Whether all ranks access the file, or only rank 0 */
+    char ildg_lfn[256];           /**< ILDG logical file name; empty means use the file name */
+    QudaBoolean write_usqcd_info; /**< Whether to write the USQCD plaquette / link-trace record on QIO and ILDG gauge saves */
+  } QudaFileIOParam;
+
+  /**
    * Parameters having to do with the gauge field or the
    * interpretation of the gauge field by various Dirac operators
    */
@@ -92,6 +106,8 @@ extern "C" {
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+
+    QudaFileIOParam *file_io_param; /**< How gauge fields are loaded from and saved to files (null for defaults) */
 
   } QudaGaugeParam;
 
@@ -628,6 +644,9 @@ extern "C" {
     /** Whether to save eigenvectors in QIO singlefile or partfile format */
     QudaBoolean partfile;
 
+    /** How eigenvectors are loaded from and saved to files (null for defaults) */
+    QudaFileIOParam *file_io_param;
+
     /** Which external library to use in the deflation operations (Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
@@ -819,6 +838,9 @@ extern "C" {
 
     /** Whether to store the null-space vectors in singlefile or partfile format */
     QudaBoolean mg_vec_partfile[QUDA_MAX_MG_LEVEL];
+
+    /** How the null-space vectors are loaded from and saved to files on all levels (null for defaults) */
+    QudaFileIOParam *file_io_param;
 
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
@@ -1111,6 +1133,15 @@ extern "C" {
   QudaBLASParam newQudaBLASParam(void);
 
   /**
+   * A new QudaFileIOParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaFileIOParam io_param = newQudaFileIOParam();
+   */
+  QudaFileIOParam newQudaFileIOParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -1145,6 +1176,12 @@ extern "C" {
    * @param param The QudaBLASParam whose elements we are to print.
    */
   void printQudaBLASParam(QudaBLASParam *param);
+
+  /**
+   * Print the members of QudaFileIOParam.
+   * @param param The QudaFileIOParam whose elements we are to print.
+   */
+  void printQudaFileIOParam(QudaFileIOParam *param);
 
   /**
    * Load the gauge field from the host.

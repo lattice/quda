@@ -3,6 +3,23 @@
 #include <host_utils.h>
 #include "misc.h"
 
+namespace
+{
+  // referenced from the gauge, eigensolver and multigrid parameter structs, so these must outlive them
+  QudaFileIOParam gauge_file_io_param;
+  QudaFileIOParam eig_file_io_param;
+  QudaFileIOParam mg_file_io_param;
+
+  QudaFileIOParam *setFileIOParam(QudaFileIOParam &param, QudaFileFormat format, QudaFileIOMode io_mode)
+  {
+    param = newQudaFileIOParam();
+    param.format = format;
+    param.io_mode = io_mode;
+    param.struct_size = sizeof(param);
+    return &param;
+  }
+} // namespace
+
 void setGaugeSmearParam(QudaGaugeSmearParam &smear_param)
 {
   smear_param.smear_type = gauge_smear_type;
@@ -43,6 +60,10 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.tadpole_coeff = 1.0;
 
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.file_io_param = setFileIOParam(gauge_file_io_param, gauge_file_format, gauge_file_io_mode);
+  safe_strcpy(gauge_file_io_param.ildg_lfn, gauge_ildg_lfn, 256, "gauge_ildg_lfn");
+  gauge_file_io_param.write_usqcd_info = gauge_write_usqcd_info ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   gauge_param.struct_size = sizeof(gauge_param);
 }
@@ -354,6 +375,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.partfile = eig_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.file_io_param = setFileIOParam(eig_file_io_param, eig_file_format, eig_file_io_mode);
 
   eig_param.struct_size = sizeof(eig_param);
 }
@@ -621,6 +643,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
     mg_param.mg_vec_partfile[i] = mg_vec_partfile[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
+  mg_param.file_io_param = setFileIOParam(mg_file_io_param, QUDA_FILE_FORMAT_AUTO, mg_file_io_mode);
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -1230,6 +1253,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
     mg_param.mg_vec_partfile[i] = mg_vec_partfile[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
+  mg_param.file_io_param = setFileIOParam(mg_file_io_param, QUDA_FILE_FORMAT_AUTO, mg_file_io_mode);
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -1396,6 +1420,7 @@ void setDeflationParam(QudaEigParam &df_param)
   safe_strcpy(df_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   df_param.partfile = eig_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  df_param.file_io_param = setFileIOParam(eig_file_io_param, eig_file_format, eig_file_io_mode);
 }
 
 /**********/

@@ -34,6 +34,55 @@
 #error INIT_PARAM, CHECK_PARAM, and PRINT_PARAM all undefined in check_params.h
 #endif
 
+// define the appropriate function for FileIOParam
+
+#if defined INIT_PARAM
+QudaFileIOParam newQudaFileIOParam(void)
+{
+  QudaFileIOParam ret;
+#elif defined CHECK_PARAM
+static void checkFileIOParam(QudaFileIOParam *param)
+{
+#else
+void printQudaFileIOParam(QudaFileIOParam *param)
+{
+  printfQuda("QUDA File IO Parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaFileIOParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+#if defined INIT_PARAM
+  P(format, QUDA_FILE_FORMAT_AUTO);
+  P(io_mode, QUDA_FILE_IO_PARALLEL);
+  ret.ildg_lfn[0] = '\0';
+  P(write_usqcd_info, QUDA_BOOLEAN_TRUE);
+#elif defined CHECK_PARAM
+  // the full range is checked since a caller that bypasses newQudaFileIOParam() can leave arbitrary values
+  if (param->format != QUDA_FILE_FORMAT_AUTO && param->format != QUDA_FILE_FORMAT_QIO
+      && param->format != QUDA_FILE_FORMAT_MILC && param->format != QUDA_FILE_FORMAT_ILDG)
+    errorQuda("Invalid file format %d", param->format);
+  if (param->io_mode != QUDA_FILE_IO_PARALLEL && param->io_mode != QUDA_FILE_IO_SERIAL)
+    errorQuda("Invalid file IO mode %d", param->io_mode);
+  if (strnlen(param->ildg_lfn, sizeof(param->ildg_lfn)) == sizeof(param->ildg_lfn))
+    errorQuda("ILDG logical file name is not null terminated");
+  if (param->write_usqcd_info != QUDA_BOOLEAN_FALSE && param->write_usqcd_info != QUDA_BOOLEAN_TRUE)
+    errorQuda("Invalid write_usqcd_info %d", param->write_usqcd_info);
+#else
+  P(format, QUDA_FILE_FORMAT_INVALID);
+  P(io_mode, QUDA_FILE_IO_INVALID);
+  printfQuda("ildg_lfn = \"%s\"\n", param->ildg_lfn);
+  P(write_usqcd_info, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
 
 // define the appropriate function for GaugeParam
 
@@ -156,6 +205,14 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(site_size, (size_t)INVALID_INT);
 #endif
 
+#if defined INIT_PARAM
+  P(file_io_param, nullptr);
+#elif defined CHECK_PARAM
+  if (param->file_io_param) checkFileIOParam(param->file_io_param);
+#else
+  if (param->file_io_param) printQudaFileIOParam(param->file_io_param);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -270,6 +327,14 @@ void printQudaEigParam(QudaEigParam *param) {
   P(io_parity_inflate, QUDA_BOOLEAN_FALSE);
 #else
   P(io_parity_inflate, QUDA_BOOLEAN_INVALID);
+#endif
+
+#if defined INIT_PARAM
+  P(file_io_param, nullptr);
+#elif defined CHECK_PARAM
+  if (param->file_io_param) checkFileIOParam(param->file_io_param);
+#else
+  if (param->file_io_param) printQudaFileIOParam(param->file_io_param);
 #endif
 
 #ifdef INIT_PARAM
@@ -1037,6 +1102,14 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(mg_vec_partfile[i], QUDA_BOOLEAN_INVALID);
 #endif
   }
+
+#if defined INIT_PARAM
+  P(file_io_param, nullptr);
+#elif defined CHECK_PARAM
+  if (param->file_io_param) checkFileIOParam(param->file_io_param);
+#else
+  if (param->file_io_param) printQudaFileIOParam(param->file_io_param);
+#endif
 
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(generate_all_levels, QUDA_BOOLEAN_INVALID);

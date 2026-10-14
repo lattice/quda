@@ -49,6 +49,10 @@ std::string latfile;
 bool unit_gauge = false;
 double gaussian_sigma = 0.2;
 std::string gauge_outfile;
+QudaFileFormat gauge_file_format = QUDA_FILE_FORMAT_AUTO;
+QudaFileIOMode gauge_file_io_mode = QUDA_FILE_IO_PARALLEL;
+std::string gauge_ildg_lfn;
+bool gauge_write_usqcd_info = true;
 int Nsrc = 1;
 int Msrc = 1;
 int Nsrc_tile = 1;
@@ -72,6 +76,7 @@ quda::mgarray<int> nvec_batch = {};
 quda::mgarray<std::string> mg_vec_infile;
 quda::mgarray<std::string> mg_vec_outfile;
 quda::mgarray<bool> mg_vec_partfile = {};
+QudaFileIOMode mg_file_io_mode = QUDA_FILE_IO_PARALLEL;
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
@@ -249,6 +254,8 @@ std::string eig_vec_outfile;
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 bool eig_partfile = false;
+QudaFileFormat eig_file_format = QUDA_FILE_FORMAT_AUTO;
+QudaFileIOMode eig_file_io_mode = QUDA_FILE_IO_PARALLEL;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
@@ -464,6 +471,14 @@ namespace
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}};
 
+  CLI::TransformPairs<QudaFileFormat> file_format_map {{"auto", QUDA_FILE_FORMAT_AUTO},
+                                                       {"qio", QUDA_FILE_FORMAT_QIO},
+                                                       {"milc", QUDA_FILE_FORMAT_MILC},
+                                                       {"ildg", QUDA_FILE_FORMAT_ILDG}};
+
+  CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {{"parallel", QUDA_FILE_IO_PARALLEL},
+                                                        {"serial", QUDA_FILE_IO_SERIAL}};
+
   CLI::TransformPairs<QudaContractType> contract_type_map {{"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
                                                            {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
                                                            {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}};
@@ -669,6 +684,19 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--reliable-delta", reliable_delta, "Set reliable update delta factor");
   quda_app->add_option("--save-gauge", gauge_outfile,
                        "Save gauge field \" file \" for the test (requires QIO, heatbath test only)");
+  quda_app
+    ->add_option("--gauge-file-format", gauge_file_format,
+                 "File format used to load and save the gauge field (auto (default), qio, milc, ildg)")
+    ->transform(CLI::QUDACheckedTransformer(file_format_map));
+  quda_app
+    ->add_option("--gauge-file-io-mode", gauge_file_io_mode,
+                 "Whether all ranks (parallel, default) or only rank 0 (serial) access gauge field files")
+    ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
+  quda_app->add_option("--gauge-ildg-lfn", gauge_ildg_lfn,
+                       "ILDG logical file name used when saving in ILDG format (default: the file name)");
+  quda_app->add_option("--gauge-write-usqcd-info", gauge_write_usqcd_info,
+                       "Whether to write the USQCD plaquette and link-trace record when saving QIO or ILDG gauge "
+                       "fields (default true)");
 
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
@@ -818,6 +846,14 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(prec_transform);
   opgroup->add_option("--eig-save-partfile", eig_partfile,
                       "If saving eigenvectors, save in partfile format instead of singlefile (default false)");
+  opgroup
+    ->add_option("--eig-file-format", eig_file_format,
+                 "File format used to load and save eigenvectors (auto (default), qio, milc)")
+    ->transform(CLI::QUDACheckedTransformer(file_format_map));
+  opgroup
+    ->add_option("--eig-file-io-mode", eig_file_io_mode,
+                 "Whether all ranks (parallel, default) or only rank 0 (serial) access eigenvector files")
+    ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
 
   opgroup->add_option(
     "--eig-io-parity-inflate", eig_io_parity_inflate,
@@ -996,6 +1032,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(
     opgroup, "--mg-save-partfile", mg_vec_partfile, CLI::Validator(),
     "Whether to save near-null vectors as partfile instead of singlefile (default false; singlefile)");
+  opgroup
+    ->add_option("--mg-file-io-mode", mg_file_io_mode,
+                 "Whether all ranks (parallel, default) or only rank 0 (serial) access near-null vector files")
+    ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
 
   quda_app
     ->add_mgoption("--mg-eig-save-prec", mg_eig_save_prec, CLI::Validator(),

@@ -309,6 +309,10 @@ extern std::string latfile;
 extern bool unit_gauge;
 extern double gaussian_sigma;
 extern std::string gauge_outfile;
+extern QudaFileFormat gauge_file_format;
+extern QudaFileIOMode gauge_file_io_mode;
+extern std::string gauge_ildg_lfn;
+extern bool gauge_write_usqcd_info;
 extern int Nsrc;
 extern int Msrc;
 extern int Nsrc_tile;
@@ -332,6 +336,7 @@ extern quda::mgarray<int> nvec_batch;
 extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
 extern quda::mgarray<bool> mg_vec_partfile;
+extern QudaFileIOMode mg_file_io_mode;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
@@ -502,6 +507,8 @@ extern std::string eig_vec_outfile;
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
 extern bool eig_partfile;
+extern QudaFileFormat eig_file_format;
+extern QudaFileIOMode eig_file_io_mode;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,

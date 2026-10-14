@@ -84,6 +84,8 @@ module quda_fortran
      integer(8) :: gauge_offset ! Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+
+     integer(8) :: file_io_param ! Pointer to QudaFileIOParam (null for defaults)
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
