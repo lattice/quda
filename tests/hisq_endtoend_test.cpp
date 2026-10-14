@@ -87,7 +87,7 @@ static void init_host()
 
   act_paths[2] = {(1.0 / 8.0), (-1.0 / 24.0), 0.0, 0.0, 0.0, 0.0};
 
-  for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) qdp_sitelink[i] = host_pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
   createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
   for (int i = 0; i < 4; i++) {
@@ -162,14 +162,14 @@ static void setup_links(QudaPrecision test_prec, QudaReconstructType /*recon*/, 
   milc_sitelink = safe_malloc(field_bytes);
   reorderQDPtoMILC(milc_sitelink, qdp_sitelink, V, gauge_site_size, test_prec, cpu_prec_backup);
 
-  vlink = pinned_malloc(field_bytes);
-  wlink = pinned_malloc(field_bytes);
-  fatlink = pinned_malloc(field_bytes);
-  longlink = pinned_malloc(field_bytes);
+  vlink = host_pinned_malloc(field_bytes);
+  wlink = host_pinned_malloc(field_bytes);
+  fatlink = host_pinned_malloc(field_bytes);
+  longlink = host_pinned_malloc(field_bytes);
 
   if (cur_n_naiks > 1) {
-    fatlink_eps = pinned_malloc(field_bytes);
-    longlink_eps = pinned_malloc(field_bytes);
+    fatlink_eps = host_pinned_malloc(field_bytes);
+    longlink_eps = host_pinned_malloc(field_bytes);
   }
 
   for (int i = 0; i < 4; i++) {
@@ -343,15 +343,6 @@ static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool
   forceGaugeParam.anisotropy = 1.0;
   forceGaugeParam.tadpole_coeff = 1.0;
 
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = forceGaugeParam.X[1] * forceGaugeParam.X[2] * forceGaugeParam.X[3] / 2;
-  int y_face_size = forceGaugeParam.X[0] * forceGaugeParam.X[2] * forceGaugeParam.X[3] / 2;
-  int z_face_size = forceGaugeParam.X[0] * forceGaugeParam.X[1] * forceGaugeParam.X[3] / 2;
-  int t_face_size = forceGaugeParam.X[0] * forceGaugeParam.X[1] * forceGaugeParam.X[2] / 2;
-  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
-#endif
-
   GaugeFieldParam gParam(forceGaugeParam);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -433,7 +424,6 @@ static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool
   cudaGaugeParam_ex.create = QUDA_NULL_FIELD_CREATE;
   cudaGaugeParam_ex.reconstruct = cuda_link_recon;
   cudaGaugeParam_ex.setPrecision(test_prec, true);
-  cudaGaugeParam_ex.pad = 3 * pad_size;
   for (int d = 0; d < 4; d++) {
     cudaGaugeParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
     cudaGaugeParam_ex.x[d] = forceGaugeParam.X[d] + 2 * cudaGaugeParam_ex.r[d];
@@ -757,8 +747,7 @@ void HisqEndToEndTest::verify_force_naik_oprod()
     computeStaggeredOprod(oprod, cudaQuark, coeff_reg, 3);
   }
 
-  oneLinkOprod.copy(stapleOprod);
-  ax(level2_coeff_0, oneLinkOprod);
+  oneLinkOprod.copy(stapleOprod, level2_coeff_0);
   {
     GaugeField *oprod[2] = {&oneLinkOprod, &naikOprod};
     computeStaggeredOprod(oprod, cudaQuark, coeff_naik, 3);
@@ -836,8 +825,8 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   void *milc_u_tp = safe_malloc(field_bytes_tp);
   reorderQDPtoMILC(milc_u_tp, qdp_u, V, gauge_site_size, test_prec, cpu_prec_backup);
 
-  void *vlink_milc = pinned_malloc(field_bytes_tp);
-  void *wlink_milc = pinned_malloc(field_bytes_tp);
+  void *vlink_milc = host_pinned_malloc(field_bytes_tp);
+  void *wlink_milc = host_pinned_malloc(field_bytes_tp);
   computeKSLinkQuda(vlink_milc, nullptr, wlink_milc, milc_u_tp, act_paths[0].data(), &linkParam);
 
   linkParam.cpu_prec = cpu_prec_backup;
@@ -946,10 +935,9 @@ void HisqEndToEndTest::verify_hisq_force_interface()
     computeStaggeredOprod(oprod_arr, cudaQuark, coeff_reg, 3);
   }
 
-  // Build oneLinkOprod on GPU matching computeHISQForceQuda: copy stapleOprod, scale by level2_coeff[0]
+  // Build oneLinkOprod on GPU matching computeHISQForceQuda: copy stapleOprod scaled by level2_coeff[0]
   GaugeField gpuOneLinkOprod(oParam);
-  gpuOneLinkOprod.copy(gpuStapleOprod);
-  ax(level2_coeff[0], gpuOneLinkOprod);
+  gpuOneLinkOprod.copy(gpuStapleOprod, level2_coeff[0]);
 
   if (has_naik) {
     GaugeField *oprod_naik[2] = {&gpuOneLinkOprod, &gpuNaikOprod};
@@ -1014,16 +1002,6 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   forceParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   forceParam.anisotropy = 1.0;
   forceParam.tadpole_coeff = 1.0;
-  forceParam.ga_pad = 0;
-#ifdef MULTI_GPU
-  {
-    int x_face = forceParam.X[1] * forceParam.X[2] * forceParam.X[3] / 2;
-    int y_face = forceParam.X[0] * forceParam.X[2] * forceParam.X[3] / 2;
-    int z_face = forceParam.X[0] * forceParam.X[1] * forceParam.X[3] / 2;
-    int t_face = forceParam.X[0] * forceParam.X[1] * forceParam.X[2] / 2;
-    forceParam.ga_pad = 3 * std::max({x_face, y_face, z_face, t_face});
-  }
-#endif
   forceParam.use_resident_mom = false;
   forceParam.return_result_mom = true;
   forceParam.make_resident_mom = false;
