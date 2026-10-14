@@ -19,6 +19,7 @@ namespace quda
     bool parity_inflate = false; /** Inflate single-parity vectors to full fields for I/O */
     std::string ildg_lfn;        /** Empty means use the file name */
     bool write_usqcd_info = true;
+    bool allow_checksum_mismatch = false; /** MILC only: warn instead of error on a checksum mismatch */
 
     FileIOParam() = default;
 

@@ -7,6 +7,7 @@
 #include <gauge_tools.h>
 #include <pgauge_monte.h>
 #include <io/gauge_io.h>
+#include <io/milc_io.h>
 #include <io/qio_field.h>
 
 namespace quda
@@ -15,9 +16,9 @@ namespace quda
   namespace
   {
     /**
-       @brief Compute the USQCD gauge metadata: the average plaquette and link trace, both normalized as Re Tr / 3
+       @brief Compute the average plaquette and link trace, both normalized as Re Tr / 3
      */
-    void compute_usqcd_info(const void *const gauge[], QudaPrecision prec, const int *X, double &plaq, double &linktr)
+    void compute_plaq_linktr(const void *const gauge[], QudaPrecision prec, const int *X, double &plaq, double &linktr)
     {
       QudaGaugeParam gauge_param = newQudaGaugeParam();
       for (int d = 0; d < 4; d++) gauge_param.X[d] = X[d];
@@ -91,24 +92,34 @@ namespace quda
       file_info.format = require_ildg ? QUDA_FILE_FORMAT_ILDG : QUDA_FILE_FORMAT_QIO;
       file_info.file_prec = info.file_prec;
       file_info.ildg = info.ildg;
-      file_info.has_usqcd_info = info.has_usqcd_info;
+      file_info.has_plaq_linktr = info.has_usqcd_info;
       file_info.plaq = info.plaq;
       file_info.linktr = info.linktr;
-
-      if (info.has_usqcd_info) {
-        double plaq, linktr;
-        compute_usqcd_info(gauge, prec, X, plaq, linktr);
-        // values computed from data that has passed through single precision only agree to single precision
-        double tol = (info.file_prec == QUDA_DOUBLE_PRECISION && prec == QUDA_DOUBLE_PRECISION) ? 1e-12 : 1e-6;
-        file_info.usqcd_info_matches = std::abs(plaq - info.plaq) <= tol && std::abs(linktr - info.linktr) <= tol;
-        if (!file_info.usqcd_info_matches)
-          warningQuda("usqcdInfo mismatch in %s: file plaquette %.16e, link trace %.16e; computed %.16e, %.16e",
-                      filename.c_str(), info.plaq, info.linktr, plaq, linktr);
-        else
-          logQuda(QUDA_SUMMARIZE, "usqcdInfo plaquette %.16e and link trace %.16e verified\n", info.plaq, info.linktr);
-      }
-
       return file_info;
+    }
+
+    /**
+       @brief Compare the plaquette and link trace recorded in a file's metadata with those of the loaded field
+     */
+    void check_plaq_linktr(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
+                           GaugeFileInfo &info)
+    {
+      double plaq, linktr;
+      compute_plaq_linktr(gauge, prec, X, plaq, linktr);
+
+      // MILC .info files print these values to six decimal places, and values computed from data
+      // that has passed through single precision only agree to single precision
+      double tol = info.format == QUDA_FILE_FORMAT_MILC                            ? 1e-5 :
+        (info.file_prec == QUDA_DOUBLE_PRECISION && prec == QUDA_DOUBLE_PRECISION) ? 1e-12 :
+                                                                                     1e-6;
+      const char *source = info.format == QUDA_FILE_FORMAT_MILC ? ".info file" : "usqcdInfo record";
+
+      info.plaq_linktr_matches = std::abs(plaq - info.plaq) <= tol && std::abs(linktr - info.linktr) <= tol;
+      if (!info.plaq_linktr_matches)
+        warningQuda("Mismatch with the %s of %s: plaquette %.16e, link trace %.16e; computed %.16e, %.16e", source,
+                    filename.c_str(), info.plaq, info.linktr, plaq, linktr);
+      else
+        logQuda(QUDA_SUMMARIZE, "%s plaquette %.16e and link trace %.16e verified\n", source, info.plaq, info.linktr);
     }
 
     /**
@@ -121,7 +132,7 @@ namespace quda
       info.ildg = ildg;
       if (ildg) info.ildg_lfn = param.ildg_lfn.empty() ? filename : param.ildg_lfn;
       if (param.write_usqcd_info) {
-        compute_usqcd_info(gauge, prec, X, info.plaq, info.linktr);
+        compute_plaq_linktr(gauge, prec, X, info.plaq, info.linktr);
         info.has_usqcd_info = true;
         logQuda(QUDA_SUMMARIZE, "usqcdInfo plaquette %.16e, link trace %.16e\n", info.plaq, info.linktr);
       }
@@ -146,12 +157,14 @@ namespace quda
     switch (format) {
     case QUDA_FILE_FORMAT_QIO: info = load_lime(filename, gauge, prec, X, param, false); break;
     case QUDA_FILE_FORMAT_ILDG: info = load_lime(filename, gauge, prec, X, param, true); break;
-    case QUDA_FILE_FORMAT_MILC: errorQuda("MILC gauge field I/O is not yet supported"); break;
+    case QUDA_FILE_FORMAT_MILC: info = milc::load_gauge(filename, gauge, prec, X, param); break;
     default: errorQuda("Unexpected file format %d", format);
     }
 
     host_timer.stop();
     logQuda(QUDA_SUMMARIZE, "Time spent loading gauge field from %s = %g secs\n", filename.c_str(), host_timer.last());
+
+    if (info.has_plaq_linktr) check_plaq_linktr(filename, gauge, prec, X, info);
     return info;
   }
 
@@ -166,7 +179,7 @@ namespace quda
     switch (format) {
     case QUDA_FILE_FORMAT_QIO: save_lime(filename, gauge, prec, X, param, false); break;
     case QUDA_FILE_FORMAT_ILDG: save_lime(filename, gauge, prec, X, param, true); break;
-    case QUDA_FILE_FORMAT_MILC: errorQuda("MILC gauge field I/O is not yet supported"); break;
+    case QUDA_FILE_FORMAT_MILC: milc::save_gauge(filename, gauge, prec, X, param); break;
     default: errorQuda("Unexpected file format %d", format);
     }
 

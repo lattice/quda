@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <io/field_io.h>
 
@@ -13,10 +14,15 @@ namespace quda
     QudaFileFormat format = QUDA_FILE_FORMAT_INVALID; /** The format the file was read as */
     QudaPrecision file_prec = QUDA_INVALID_PRECISION; /** Precision of the data in the file */
     bool ildg = false;                                /** Whether the file has the ILDG records */
-    bool has_usqcd_info = false;                      /** Whether the file has a usqcdInfo record */
-    double plaq = 0.0;                                /** usqcdInfo average Re Tr U_P / 3 */
-    double linktr = 0.0;                              /** usqcdInfo average Re Tr U_mu / 3 */
-    bool usqcd_info_matches = false;                  /** Whether the usqcdInfo values match the loaded field */
+    bool has_plaq_linktr = false;                     /** Whether the metadata gives plaq and linktr */
+    double plaq = 0.0;                /** Average Re Tr U_P / 3 from a usqcdInfo record or MILC .info file */
+    double linktr = 0.0;              /** Average Re Tr U_mu / 3 from a usqcdInfo record or MILC .info file */
+    bool plaq_linktr_matches = false; /** Whether plaq and linktr match the loaded field */
+    bool byte_swapped = false;        /** MILC: whether the file is in the opposite byte order */
+    bool has_info_file = false;       /** MILC: whether a .info file was found and checked */
+    bool checksum_matches = false;    /** MILC: whether the checksums of the data, header and .info file agree */
+    uint32_t sum29 = 0;               /** MILC: the checksums computed from the data */
+    uint32_t sum31 = 0;
   };
 
   /**

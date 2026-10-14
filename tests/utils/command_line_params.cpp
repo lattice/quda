@@ -53,6 +53,7 @@ QudaFileFormat gauge_file_format = QUDA_FILE_FORMAT_AUTO;
 QudaFileIOMode gauge_file_io_mode = QUDA_FILE_IO_PARALLEL;
 std::string gauge_ildg_lfn;
 bool gauge_write_usqcd_info = true;
+bool gauge_allow_checksum_mismatch = false;
 int Nsrc = 1;
 int Msrc = 1;
 int Nsrc_tile = 1;
@@ -577,7 +578,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option(
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
-  quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
+  quda_app->add_option(
+    "--load-gauge", latfile,
+    "Load gauge field \" file \" for the test (SciDAC and ILDG files require QIO; MILC files do not)");
   quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
   quda_app->add_option("--mass", mass, "Mass of Dirac operator (default 0.1)");
@@ -683,7 +686,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--reliable-delta", reliable_delta, "Set reliable update delta factor");
   quda_app->add_option("--save-gauge", gauge_outfile,
-                       "Save gauge field \" file \" for the test (requires QIO, heatbath test only)");
+                       "Save gauge field \" file \" for the test (heatbath and gauge_alg tests only; the QIO and ILDG "
+                       "formats require QIO)");
   quda_app
     ->add_option("--gauge-file-format", gauge_file_format,
                  "File format used to load and save the gauge field (auto (default), qio, milc, ildg)")
@@ -697,6 +701,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--gauge-write-usqcd-info", gauge_write_usqcd_info,
                        "Whether to write the USQCD plaquette and link-trace record when saving QIO or ILDG gauge "
                        "fields (default true)");
+  quda_app->add_option("--gauge-allow-checksum-mismatch", gauge_allow_checksum_mismatch,
+                       "Whether to load a MILC gauge field whose checksums do not match its data, with a warning "
+                       "(default false)");
 
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");

@@ -331,3 +331,36 @@ following licence:
   Credit: https://stackoverflow.com/a/71375077/12084612
 
   License: CC BY-SA 4.0
+
+QUDA reads and writes MILC format files following the MILC code
+(https://github.com/milc-qcd/milc_qcd), in particular its file layouts
+and checksums from generic/io_lat4.c and generic/io_lat_utils.c. This
+support, contained in include/io/milc_io.h, lib/io/milc_common.cpp and
+lib/io/milc_gauge.cpp, follows MILC code supplied under the following
+license:
+
+  Copyright (c) 1998-2018 MILC Developers and Contributors
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice, this permission notice and the following
+  disclaimers shall be included in all copies or substantial portions of
+  the Software.
+
+  Neither the name of the MILC collaboration, nor the names of its
+  developers or contributors may be used to endorse or promote products
+  derived from this Software without specific prior written permission.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

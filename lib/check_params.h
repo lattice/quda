@@ -61,6 +61,7 @@ void printQudaFileIOParam(QudaFileIOParam *param)
   P(io_mode, QUDA_FILE_IO_PARALLEL);
   ret.ildg_lfn[0] = '\0';
   P(write_usqcd_info, QUDA_BOOLEAN_TRUE);
+  P(allow_checksum_mismatch, QUDA_BOOLEAN_FALSE);
 #elif defined CHECK_PARAM
   // the full range is checked since a caller that bypasses newQudaFileIOParam() can leave arbitrary values
   if (param->format != QUDA_FILE_FORMAT_AUTO && param->format != QUDA_FILE_FORMAT_QIO
@@ -72,11 +73,14 @@ void printQudaFileIOParam(QudaFileIOParam *param)
     errorQuda("ILDG logical file name is not null terminated");
   if (param->write_usqcd_info != QUDA_BOOLEAN_FALSE && param->write_usqcd_info != QUDA_BOOLEAN_TRUE)
     errorQuda("Invalid write_usqcd_info %d", param->write_usqcd_info);
+  if (param->allow_checksum_mismatch != QUDA_BOOLEAN_FALSE && param->allow_checksum_mismatch != QUDA_BOOLEAN_TRUE)
+    errorQuda("Invalid allow_checksum_mismatch %d", param->allow_checksum_mismatch);
 #else
   P(format, QUDA_FILE_FORMAT_INVALID);
   P(io_mode, QUDA_FILE_IO_INVALID);
   printfQuda("ildg_lfn = \"%s\"\n", param->ildg_lfn);
   P(write_usqcd_info, QUDA_BOOLEAN_INVALID);
+  P(allow_checksum_mismatch, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

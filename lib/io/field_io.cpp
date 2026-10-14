@@ -21,6 +21,7 @@ namespace quda
     io_mode = checked.io_mode;
     ildg_lfn = checked.ildg_lfn;
     write_usqcd_info = checked.write_usqcd_info == QUDA_BOOLEAN_TRUE;
+    allow_checksum_mismatch = checked.allow_checksum_mismatch == QUDA_BOOLEAN_TRUE;
   }
 
   const char *get_file_format_str(QudaFileFormat format)

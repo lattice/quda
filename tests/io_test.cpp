@@ -1,7 +1,12 @@
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <limits>
+#include <vector>
 
+#include <comm_quda.h>
 #include <instantiate.h>
 #include <color_spinor_field.h>
 #include <io/gauge_io.h>
@@ -19,9 +24,9 @@ namespace
   std::vector<QudaFileFormat> gauge_formats()
   {
 #ifdef HAVE_QIO
-    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG};
+    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG, QUDA_FILE_FORMAT_MILC};
 #else
-    return {};
+    return {QUDA_FILE_FORMAT_MILC};
 #endif
   }
 
@@ -35,6 +40,86 @@ namespace
   }
 
   const char *get_io_mode_str(QudaFileIOMode io_mode) { return io_mode == QUDA_FILE_IO_SERIAL ? "serial" : "parallel"; }
+
+  double get_element(const void *data, QudaPrecision prec, size_t i)
+  {
+    return prec == QUDA_DOUBLE_PRECISION ? static_cast<const double *>(data)[i] : static_cast<const float *>(data)[i];
+  }
+
+  // check a saved MILC v5 gauge file independently of the library's reader: its header, where
+  // each of this rank's links is, and (on rank 0) its checksums and those in its .info file
+  void check_milc_gauge_file(const std::string &file, void *const gauge[], QudaPrecision prec, const int *X)
+  {
+    using namespace quda;
+    constexpr size_t header_bytes = 96;
+    constexpr size_t site_reals = 4 * 18;
+
+    int N[4];
+    size_t volume = 1, global_volume = 1;
+    for (int d = 0; d < 4; d++) {
+      N[d] = X[d] * comm_dim(d);
+      volume *= X[d];
+      global_volume *= N[d];
+    }
+
+    FILE *fp = fopen(file.c_str(), "rb");
+    ASSERT_NE(fp, nullptr);
+    uint32_t header[header_bytes / 4];
+    ASSERT_EQ(fread(header, 4, header_bytes / 4, fp), header_bytes / 4);
+    EXPECT_EQ(header[0], 0x4e87u);
+    for (int d = 0; d < 4; d++) EXPECT_EQ(header[1 + d], static_cast<uint32_t>(N[d]));
+    EXPECT_EQ(header[21], 0u); // order
+    fseek(fp, 0, SEEK_END);
+    EXPECT_EQ(static_cast<size_t>(ftell(fp)), header_bytes + global_volume * site_reals * sizeof(float));
+
+    size_t mismatches = 0;
+    std::vector<float> site(site_reals);
+    for (int t = 0; t < X[3]; t++) {
+      for (int z = 0; z < X[2]; z++) {
+        for (int y = 0; y < X[1]; y++) {
+          for (int x = 0; x < X[0]; x++) {
+            int g[4]
+              = {comm_coord(0) * X[0] + x, comm_coord(1) * X[1] + y, comm_coord(2) * X[2] + z, comm_coord(3) * X[3] + t};
+            size_t global_lex
+              = g[0] + N[0] * (g[1] + static_cast<size_t>(N[1]) * (g[2] + static_cast<size_t>(N[2]) * g[3]));
+            size_t lex = x + X[0] * (y + static_cast<size_t>(X[1]) * (z + static_cast<size_t>(X[2]) * t));
+            size_t index = lex / 2 + ((g[0] + g[1] + g[2] + g[3]) % 2) * (volume / 2);
+            fseek(fp, header_bytes + global_lex * site_reals * sizeof(float), SEEK_SET);
+            if (fread(site.data(), sizeof(float), site_reals, fp) != site_reals) {
+              mismatches++;
+              continue;
+            }
+            for (int mu = 0; mu < 4; mu++)
+              for (int i = 0; i < 18; i++)
+                if (site[mu * 18 + i] != static_cast<float>(get_element(gauge[mu], prec, index * 18 + i))) mismatches++;
+          }
+        }
+      }
+    }
+    EXPECT_EQ(mismatches, 0u);
+
+    if (comm_rank() == 0) {
+      std::vector<uint32_t> words(global_volume * site_reals);
+      fseek(fp, header_bytes, SEEK_SET);
+      ASSERT_EQ(fread(words.data(), 4, words.size(), fp), words.size());
+      uint32_t sum29 = 0, sum31 = 0;
+      for (size_t i = 0; i < words.size(); i++) {
+        int r29 = i % 29, r31 = i % 31;
+        sum29 ^= r29 == 0 ? words[i] : (words[i] << r29) | (words[i] >> (32 - r29));
+        sum31 ^= r31 == 0 ? words[i] : (words[i] << r31) | (words[i] >> (32 - r31));
+      }
+      EXPECT_EQ(sum29, header[22]);
+      EXPECT_EQ(sum31, header[23]);
+
+      char expected[64];
+      snprintf(expected, sizeof(expected), "checksums = \"%x %x\"", sum29, sum31);
+      std::ifstream info(file + ".info");
+      bool found = false;
+      for (std::string line; std::getline(info, line);) found = found || line == expected;
+      EXPECT_TRUE(found) << "no line '" << expected << "' in " << file << ".info";
+    }
+    fclose(fp);
+  }
 } // namespace
 
 // the conversion from the public QudaFileIOParam is the single place defaults and validation are applied
@@ -49,6 +134,7 @@ TEST(FileIOParamTest, conversion)
     EXPECT_EQ(a.parity_inflate, b.parity_inflate);
     EXPECT_EQ(a.ildg_lfn, b.ildg_lfn);
     EXPECT_EQ(a.write_usqcd_info, b.write_usqcd_info);
+    EXPECT_EQ(a.allow_checksum_mismatch, b.allow_checksum_mismatch);
   };
 
   const FileIOParam defaults;
@@ -62,12 +148,14 @@ TEST(FileIOParamTest, conversion)
   param.io_mode = QUDA_FILE_IO_SERIAL;
   strcpy(param.ildg_lfn, "lfn://test");
   param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
+  param.allow_checksum_mismatch = QUDA_BOOLEAN_TRUE;
 
   FileIOParam expected;
   expected.format = QUDA_FILE_FORMAT_MILC;
   expected.io_mode = QUDA_FILE_IO_SERIAL;
   expected.ildg_lfn = "lfn://test";
   expected.write_usqcd_info = false;
+  expected.allow_checksum_mismatch = true;
   expect_equal(FileIOParam(&param), expected);
 }
 
@@ -100,6 +188,9 @@ TEST_P(GaugeIOTest, verify)
   gauge_param.cuda_prec_eigensolver = gauge_param.cpu_prec;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
 
+  // the usqcdInfo record does not apply to MILC files
+  if (::testing::get<1>(param) == QUDA_FILE_FORMAT_MILC && ::testing::get<3>(param)) GTEST_SKIP();
+
   // the file options go through the public interface struct
   QudaFileIOParam io_param = newQudaFileIOParam();
   io_param.struct_size = sizeof(io_param);
@@ -126,34 +217,85 @@ TEST_P(GaugeIOTest, verify)
 
   auto plaq_old = get_plaq();
 
+  std::vector<std::vector<char>> original(4);
+  for (int dir = 0; dir < 4; dir++) {
+    auto bytes = V * gauge_site_size * host_gauge_data_type_size;
+    original[dir].assign(static_cast<char *>(gauge[dir]), static_cast<char *>(gauge[dir]) + bytes);
+  }
+
+  // AUTO saves as QIO; MILC files are always single precision
+  auto format = io_param.format == QUDA_FILE_FORMAT_AUTO ? QUDA_FILE_FORMAT_QIO : io_param.format;
+  auto file_prec = format == QUDA_FILE_FORMAT_MILC ? QUDA_SINGLE_PRECISION : gauge_param.cpu_prec;
+
   auto file = "dummy.lat";
   GaugeIO io(file, FileIOParam(gauge_param.file_io_param));
 
   // write out the gauge field
   io.save(gauge, gauge_param.cpu_prec, gauge_param.X);
+  if (format == QUDA_FILE_FORMAT_MILC) check_milc_gauge_file(file, gauge, gauge_param.cpu_prec, gauge_param.X);
 
   // read it back
   auto info = io.load(gauge, gauge_param.cpu_prec, gauge_param.X);
 
+  // test the links are identical, or as close as the file precision allows
+  double link_tol = file_prec == gauge_param.cpu_prec ? 0.0 : std::numeric_limits<float>::epsilon();
+  double max_dev = 0.0;
+  for (int dir = 0; dir < 4; dir++)
+    for (size_t i = 0; i < V * gauge_site_size; i++)
+      max_dev = std::max(max_dev,
+                         std::abs(get_element(gauge[dir], gauge_param.cpu_prec, i)
+                                  - get_element(original[dir].data(), gauge_param.cpu_prec, i)));
+  EXPECT_LE(max_dev, link_tol);
+
   auto plaq_new = get_plaq();
 
-  // test the plaquette is identical
-  for (int i = 0; i < 3; i++) EXPECT_EQ(plaq_old[i], plaq_new[i]);
+  // test the plaquette is identical, or as close as the file precision allows
+  for (int i = 0; i < 3; i++) {
+    if (file_prec == gauge_param.cpu_prec)
+      EXPECT_EQ(plaq_old[i], plaq_new[i]);
+    else
+      EXPECT_NEAR(plaq_old[i], plaq_new[i], 1e-6);
+  }
 
-  // test the metadata found in the file; AUTO saves as QIO
-  auto format = io_param.format == QUDA_FILE_FORMAT_AUTO ? QUDA_FILE_FORMAT_QIO : io_param.format;
+  // test the metadata found in the file
   EXPECT_EQ(info.format, format);
-  EXPECT_EQ(info.file_prec, gauge_param.cpu_prec);
+  EXPECT_EQ(info.file_prec, file_prec);
   EXPECT_EQ(info.ildg, format == QUDA_FILE_FORMAT_ILDG);
-  EXPECT_EQ(info.has_usqcd_info, ::testing::get<3>(param));
-  if (info.has_usqcd_info) {
-    EXPECT_TRUE(info.usqcd_info_matches);
+  EXPECT_EQ(info.has_plaq_linktr, ::testing::get<3>(param));
+  if (info.has_plaq_linktr) {
+    EXPECT_TRUE(info.plaq_linktr_matches);
     auto tol = gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION ? 1e-12 : 1e-6;
     EXPECT_NEAR(info.plaq, plaq_new[0], tol);
+  }
+  EXPECT_EQ(info.has_info_file, format == QUDA_FILE_FORMAT_MILC);
+  EXPECT_EQ(info.checksum_matches, format == QUDA_FILE_FORMAT_MILC);
+  EXPECT_FALSE(info.byte_swapped);
+
+  // a MILC file whose stored checksum is wrong still loads when that is allowed
+  if (format == QUDA_FILE_FORMAT_MILC) {
+    if (::quda::comm_rank() == 0) {
+      FILE *fp = fopen(file, "r+b");
+      uint32_t sum29 = 0;
+      bool ok = fp && fseek(fp, 88, SEEK_SET) == 0 && fread(&sum29, sizeof(sum29), 1, fp) == 1;
+      sum29 ^= 1;
+      ok = ok && fseek(fp, 88, SEEK_SET) == 0 && fwrite(&sum29, sizeof(sum29), 1, fp) == 1;
+      if (fp) fclose(fp);
+      EXPECT_TRUE(ok) << "could not change the checksum in " << file;
+    }
+    comm_barrier();
+
+    FileIOParam allow(gauge_param.file_io_param);
+    allow.allow_checksum_mismatch = true;
+    auto corrupt_info = GaugeIO(file, allow).load(gauge, gauge_param.cpu_prec, gauge_param.X);
+    EXPECT_FALSE(corrupt_info.checksum_matches);
+    EXPECT_EQ(corrupt_info.sum29, info.sum29);
+    EXPECT_EQ(corrupt_info.sum31, info.sum31);
   }
 
   // cleanup after ourselves and delete the dummy lattice
   if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
+  if (format == QUDA_FILE_FORMAT_MILC && ::quda::comm_rank() == 0 && remove((std::string(file) + ".info").c_str()) != 0)
+    errorQuda("Error deleting file");
 
   // release memory
   for (int dir = 0; dir < 4; dir++) { host_free(gauge[dir]); }
