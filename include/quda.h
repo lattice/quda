@@ -42,6 +42,11 @@ typedef struct QudaFileIOParam_s {
                                           to support some legacy configurations in the MILC repository */
   QudaGaugeReunitarize
     reunitarize; /**< How a gauge field is reunitarized after loading (default none); ignored for saves and other fields */
+  int io_partition_grid[4]; /**< Number of I/O partitions in each dimension, as MILC's ionode_geometry: the ranks are
+                               grouped into blocks, and only the rank at each block's lowest corner opens the file,
+                               handling the data of every rank in its block.  Each value must divide the number of
+                               ranks in that dimension; all zeros (the default) means one partition per rank.
+                               Applies only in parallel mode for single files, and to gauge fields only for now */
 } QudaFileIOParam;
 
   /**

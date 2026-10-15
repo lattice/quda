@@ -126,12 +126,12 @@ namespace quda
        @param[in] gauge The host gauge field in QDP order, one array per direction
        @param[in] prec The precision of the host gauge field
        @param[in] X The local lattice dimensions
-       @param[in] io_mode Serial or parallel
+       @param[in] param File I/O options (the I/O mode and partitions)
        @param[in] info Whether to write ILDG records and a usqcdInfo record
        @return The checksums written
      */
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                            QudaFileIOMode io_mode, const GaugeInfo &info);
+                            const FileIOParam &param, const GaugeInfo &info);
 
   } // namespace scidac
 

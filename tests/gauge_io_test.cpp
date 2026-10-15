@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -51,14 +52,17 @@ namespace
     return formats;
   }
 
-  // file options for a format and mode, through the public interface struct, without the usqcdInfo record
-  quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_mode)
+  // file options for a format, mode and I/O partition grid, through the public interface struct, without the
+  // usqcdInfo record
+  quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_mode,
+                                  const std::array<int, 4> &io_partition_grid = {})
   {
     QudaFileIOParam param = newQudaFileIOParam();
     param.struct_size = sizeof(param);
     param.format = format;
     param.io_mode = io_mode;
     param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
+    for (int d = 0; d < 4; d++) param.io_partition_grid[d] = io_partition_grid[d];
     return quda::FileIOParam(&param);
   }
 
@@ -85,7 +89,46 @@ namespace
         if (memcmp(data[dir], other.data[dir], bytes) != 0) return false;
       return true;
     }
+
+    void clear()
+    {
+      for (auto &d : data) memset(d, 0, bytes);
+    }
   };
+
+  // the I/O partition grids to test: every grid whose values divide the process grid if there are at most 8;
+  // otherwise a single partition, a partition spanning each split dimension alone, and two 2-d blocks
+  std::vector<std::array<int, 4>> partition_grids()
+  {
+    std::vector<std::array<int, 4>> all = {{1, 1, 1, 1}};
+    for (int d = 0; d < 4; d++) {
+      std::vector<std::array<int, 4>> more;
+      for (auto grid : all) {
+        for (int n = 1; n <= quda::comm_dim(d); n++) {
+          if (quda::comm_dim(d) % n != 0) continue;
+          grid[d] = n;
+          more.push_back(grid);
+        }
+      }
+      all = more;
+    }
+    if (all.size() <= 8) return all;
+
+    const std::array<int, 4> full = {quda::comm_dim(0), quda::comm_dim(1), quda::comm_dim(2), quda::comm_dim(3)};
+    std::vector<std::array<int, 4>> grids = {{1, 1, 1, 1}};
+    auto add = [&](const std::array<int, 4> &grid) {
+      if (grid != full && std::find(grids.begin(), grids.end(), grid) == grids.end()) grids.push_back(grid);
+    };
+    for (int d = 0; d < 4; d++) {
+      if (full[d] == 1) continue;
+      auto grid = full;
+      grid[d] = 1;
+      add(grid);
+    }
+    add({1, 1, full[2], full[3]});
+    add({full[0], full[1], 1, 1});
+    return grids;
+  }
 
   // change the stored checksum of a gauge file, keeping its size, so that it no longer matches the data
   void corrupt_checksum(const std::string &file, QudaFileFormat format)
@@ -216,6 +259,7 @@ TEST(FileIOParamTest, conversion)
     EXPECT_EQ(a.ildg_lfn, b.ildg_lfn);
     EXPECT_EQ(a.write_usqcd_info, b.write_usqcd_info);
     EXPECT_EQ(a.allow_checksum_mismatch, b.allow_checksum_mismatch);
+    EXPECT_EQ(a.io_partition_grid, b.io_partition_grid);
   };
 
   const FileIOParam defaults;
@@ -230,6 +274,8 @@ TEST(FileIOParamTest, conversion)
   strcpy(param.ildg_lfn, "lfn://test");
   param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
   param.allow_checksum_mismatch = QUDA_BOOLEAN_TRUE;
+  const int grid[4] = {1, 2, 1, 4};
+  for (int d = 0; d < 4; d++) param.io_partition_grid[d] = grid[d];
 
   FileIOParam expected;
   expected.format = QUDA_FILE_FORMAT_MILC;
@@ -237,6 +283,7 @@ TEST(FileIOParamTest, conversion)
   expected.ildg_lfn = "lfn://test";
   expected.write_usqcd_info = false;
   expected.allow_checksum_mismatch = true;
+  expected.io_partition_grid = {1, 2, 1, 4};
   expect_equal(FileIOParam(&param), expected);
 
   // the _EXTERNAL formats become the plain format and the external QIO backend
@@ -507,15 +554,7 @@ TEST_P(GaugeConversionTest, milc_to_lime_and_back)
   EXPECT_EQ(again_info.sum29, milc_info.sum29);
   EXPECT_EQ(again_info.sum31, milc_info.sum31);
 
-  // the two MILC files differ at most in their time stamps (bytes 20 to 83 of the header)
-  if (comm_rank() == 0) {
-    auto a = read_file(milc_file), b = read_file(milc_again);
-    ASSERT_EQ(a.size(), b.size());
-    ASSERT_GE(a.size(), 96u);
-    EXPECT_TRUE(std::equal(a.begin(), a.begin() + 20, b.begin())) << "the headers differ before the time stamp";
-    auto diff = std::mismatch(a.begin() + 84, a.end(), b.begin() + 84);
-    EXPECT_EQ(diff.first, a.end()) << "the files first differ at byte " << diff.first - a.begin();
-  }
+  if (comm_rank() == 0) expect_same_saved_file(milc_file, milc_again, true);
 
   remove_files({milc_file, milc_file + ".info", lime_file, milc_again, milc_again + ".info"});
 }
@@ -681,6 +720,85 @@ TEST(GaugeMILCPrecisionTest, precision_1_rounds)
   if (comm_rank() == 0 && remove(file.c_str()) != 0) errorQuda("Error deleting file");
 }
 
+// tuple types: precision, file format
+using partition_test_t = ::testing::tuple<QudaPrecision, QudaFileFormat>;
+
+class GaugePartitionTest : public ::testing::TestWithParam<partition_test_t>
+{
+};
+
+// the I/O partition grid changes which ranks access a file, never the file or the loaded links
+TEST_P(GaugePartitionTest, grids)
+{
+  using namespace quda;
+  auto prec = ::testing::get<0>(GetParam());
+  auto format = ::testing::get<1>(GetParam());
+  if (!is_enabled(prec)) GTEST_SKIP();
+  const bool milc = format == QUDA_FILE_FORMAT_MILC;
+  const bool external = format == QUDA_FILE_FORMAT_QIO_EXTERNAL || format == QUDA_FILE_FORMAT_ILDG_EXTERNAL;
+
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge original(prec), reference(prec), loaded(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  auto param = [&](QudaFileFormat f, QudaFileIOMode io_mode, const std::array<int, 4> &grid) {
+    auto p = file_io_param(f, io_mode, grid);
+    p.ildg_lfn = "lfn://quda/partition_test"; // the default, the file name, differs between files
+    return p;
+  };
+  auto save
+    = [&](const std::string &file, const FileIOParam &p) { GaugeIO(file, p).save(original.data, prec, gauge_param.X); };
+  auto load = [&](const std::string &file, const FileIOParam &p, HostGauge &gauge) {
+    gauge.clear();
+    return GaugeIO(file, p).load(gauge.data, prec, gauge_param.X);
+  };
+
+  const std::string ref_file = "partition_ref.lat", serial_ref_file = "partition_serial_ref.lat";
+  const std::string file = "partition.lat", serial_file = "partition_serial.lat", other_file = "partition_other.lat";
+  save(ref_file, param(format, QUDA_FILE_IO_PARALLEL, {}));
+  save(serial_ref_file, param(format, QUDA_FILE_IO_SERIAL, {}));
+  auto ref_info = load(ref_file, param(format, QUDA_FILE_IO_PARALLEL, {}), reference);
+  EXPECT_TRUE(ref_info.checksum_matches);
+
+  // a file equal to the reference loads as the reference does, so each grid's file need not be loaded
+  const auto grids = partition_grids();
+  for (auto grid : grids) {
+    SCOPED_TRACE("I/O partition grid " + std::to_string(grid[0]) + " " + std::to_string(grid[1]) + " "
+                 + std::to_string(grid[2]) + " " + std::to_string(grid[3]));
+    auto parallel = param(format, QUDA_FILE_IO_PARALLEL, grid);
+    save(file, parallel);
+    if (comm_rank() == 0) expect_same_saved_file(ref_file, file, milc);
+
+    auto info = load(ref_file, parallel, loaded);
+    EXPECT_TRUE(loaded == reference);
+    EXPECT_TRUE(info.checksum_matches);
+    EXPECT_EQ(info.sum29, ref_info.sum29);
+    EXPECT_EQ(info.sum31, ref_info.sum31);
+
+    // the native backend with the same grid writes the same file as the external one
+    if (external) {
+      save(other_file, param(saved_format(format), QUDA_FILE_IO_PARALLEL, grid));
+      if (comm_rank() == 0) expect_same_saved_file(file, other_file, false);
+    }
+  }
+
+  // serial I/O goes through rank 0 whatever the grid
+  auto serial = param(format, QUDA_FILE_IO_SERIAL, grids.back());
+  save(serial_file, serial);
+  if (comm_rank() == 0) expect_same_saved_file(serial_ref_file, serial_file, milc);
+  load(ref_file, serial, loaded);
+  EXPECT_TRUE(loaded == reference);
+
+  if (comm_rank() == 0) {
+    std::vector<std::string> files = {ref_file, serial_ref_file, file, serial_file};
+    if (external) files.push_back(other_file);
+    if (milc)
+      for (auto i = 0u, n = static_cast<unsigned>(files.size()); i < n; i++) files.push_back(files[i] + ".info");
+    for (auto &f : files)
+      if (remove(f.c_str()) != 0) errorQuda("Error deleting file %s", f.c_str());
+  }
+}
+
 #ifdef HAVE_QIO
 class GaugeIOBackendTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -716,22 +834,7 @@ TEST_P(GaugeIOBackendTest, compare)
   GaugeIO(native_file, native).save(gauge, prec, gauge_param.X);
   GaugeIO(external_file, external).save(gauge, prec, gauge_param.X);
 
-  if (comm_rank() == 0) {
-    auto mask_date = [](std::vector<char> &contents) {
-      const std::string open = "<date>", close = "</date>";
-      auto start = std::search(contents.begin(), contents.end(), open.begin(), open.end());
-      auto end = std::search(start, contents.end(), close.begin(), close.end());
-      EXPECT_NE(end, contents.end()) << "no <date> element";
-      if (start != contents.end()) std::fill(start + open.size(), end, '#');
-    };
-    auto a = read_file(native_file), b = read_file(external_file);
-    mask_date(a);
-    mask_date(b);
-    EXPECT_EQ(a.size(), b.size());
-    auto diff = std::mismatch(a.begin(), a.begin() + std::min(a.size(), b.size()), b.begin());
-    EXPECT_EQ(diff.first - a.begin(), static_cast<ptrdiff_t>(std::min(a.size(), b.size())))
-      << "the files first differ at byte " << diff.first - a.begin();
-  }
+  if (comm_rank() == 0) expect_same_saved_file(native_file, external_file, false);
 
   std::vector<GaugeFileInfo> infos;
   for (auto [file, param] : {std::make_pair(native_file, external), std::make_pair(external_file, native)}) {
@@ -818,6 +921,20 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugeReunitarizeTest,
                            case QUDA_GAUGE_REUNITARIZE_POLAR: return name + "polar";
                            default: return name + "unknown";
                            }
+                         });
+
+// I/O partition grids, with every format but AUTO
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugePartitionTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), ValuesIn([] {
+                                   auto formats = gauge_formats();
+                                   formats.erase(std::find(formats.begin(), formats.end(), QUDA_FILE_FORMAT_AUTO));
+                                   return formats;
+                                 }())),
+                         [](testing::TestParamInfo<partition_test_t> param) {
+                           std::string name;
+                           name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += quda::get_file_format_str(::testing::get<1>(param.param));
+                           return name;
                          });
 
 #ifdef HAVE_QIO

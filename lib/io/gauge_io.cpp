@@ -76,7 +76,8 @@ namespace quda
                                const FileIOParam &param)
     {
       scidac::GaugeInfo info;
-      read_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, param.io_mode, info);
+      read_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, param.io_mode, param.io_partition_grid,
+                       info);
       // QIO does not report the checksums stored in the file
       if (info.has_checksum && !info.checksum_matches)
         io::report_checksum_mismatch("Checksum mismatch in " + filename + ": computed " + io::checksum_str(info.sum),
@@ -85,9 +86,10 @@ namespace quda
     }
 
     io::Checksum save_qio(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                          QudaFileIOMode io_mode, const scidac::GaugeInfo &info)
+                          const FileIOParam &param, const scidac::GaugeInfo &info)
     {
-      return write_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, io_mode, info);
+      return write_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, param.io_mode,
+                               param.io_partition_grid, info);
     }
 #else
     scidac::GaugeInfo load_qio(const std::string &, void *const[], QudaPrecision, const int *, const FileIOParam &)
@@ -96,7 +98,7 @@ namespace quda
       return {};
     }
 
-    io::Checksum save_qio(const std::string &, const void *const[], QudaPrecision, const int *, QudaFileIOMode,
+    io::Checksum save_qio(const std::string &, const void *const[], QudaPrecision, const int *, const FileIOParam &,
                           const scidac::GaugeInfo &)
     {
       errorQuda("The external QIO backend has not been enabled");
@@ -271,8 +273,8 @@ namespace quda
         info.has_usqcd_info = true;
         logQuda(QUDA_SUMMARIZE, "usqcdInfo plaquette %.16e, link trace %.16e\n", info.plaq, info.linktr);
       }
-      return param.external_qio ? save_qio(filename, gauge, prec, X, param.io_mode, info) :
-                                  scidac::save_gauge(filename, gauge, prec, X, param.io_mode, info);
+      return param.external_qio ? save_qio(filename, gauge, prec, X, param, info) :
+                                  scidac::save_gauge(filename, gauge, prec, X, param, info);
     }
   } // namespace
 

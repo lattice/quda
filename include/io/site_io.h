@@ -1,7 +1,7 @@
 #pragma once
 
 // Format-neutral storage engine: moves the sites of a lattice field between a file and each rank's
-// host memory, in serial or parallel mode, and computes the file's checksum on the way
+// host memory, through the leaders of the I/O partitions, and computes the file's checksum on the way
 
 #include <array>
 #include <cstddef>
@@ -175,26 +175,77 @@ namespace quda
     size_t data_bytes(const DataLayout &layout, const std::array<int, 4> &dims);
 
     /**
-       @brief Read the data section of a file.  Each rank receives its
-       own sites, in parallel mode by reading them itself and in serial
-       mode from rank 0.
+       @brief Check an I/O partition grid against the process grid and
+       log how it applies.  A grid that does not divide the process
+       grid is an error in either mode; a valid grid is ignored in
+       serial mode.
+       @param[in] io_mode Serial or parallel
+       @param[in] grid Number of partitions in each dimension, or all zeros for one per rank
+       @param[in] dims The process grid
+       @return Whether the grid groups the ranks: false for a zero grid and in serial mode
+     */
+    bool check_partition_grid(QudaFileIOMode io_mode, const std::array<int, 4> &grid, const std::array<int, 4> &dims);
+
+    /**
+       @brief The I/O partitions: blocks of the process grid, each led
+       by the rank at its lowest corner (as MILC's io_node), which is
+       the only rank of its block to open the file and reads or writes
+       the data of every rank in the block.  Serial mode is a single
+       partition led by rank 0, whatever the grid; in parallel mode a
+       zero grid means one partition per rank.  Constructing one is
+       collective.
+     */
+    class Partitions
+    {
+      std::vector<std::array<int, 4>> rank_coords;
+      std::array<int, 4> extent; // ranks per partition in each dimension
+      int my_leader;
+      bool leads;
+      std::vector<int> my_ranks;
+
+    public:
+      /**
+         @param[in] io_mode Serial or parallel
+         @param[in] grid Number of partitions in each dimension, or all zeros for one per rank
+       */
+      Partitions(QudaFileIOMode io_mode, const std::array<int, 4> &grid);
+
+      /** The leader of this rank's partition */
+      int leader() const { return my_leader; }
+
+      /** Whether this rank leads its partition */
+      bool is_leader() const { return leads; }
+
+      /** On a leader, the ranks of its partition in ascending order, itself included; empty elsewhere */
+      const std::vector<int> &ranks() const { return my_ranks; }
+
+      /** The coordinates of a rank in the process grid */
+      const std::array<int, 4> &coords(int rank) const { return rank_coords[rank]; }
+    };
+
+    /**
+       @brief Read the data section of a file.  Each partition's leader
+       reads the sites of every rank in its partition and sends them
+       to their ranks.
        @param[in] filename The file
        @param[in] layout Layout of the data section
        @param[in] X The local lattice dimensions
-       @param[in] io_mode Serial or parallel
+       @param[in] partitions Which ranks open the file, and for which ranks they read
        @param[in] unpack Called for each local site of each block
        @return The checksum of the data section, combined over all ranks
      */
-    Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X, QudaFileIOMode io_mode,
-                       const SiteUnpack &unpack);
+    Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X,
+                       const Partitions &partitions, const SiteUnpack &unpack);
 
     /**
        @brief Write the data section of a file.  The file must already
        exist (rank 0 creates it and writes everything else beforehand).
+       Each partition's leader receives the sites of every rank in its
+       partition and writes them.
        @return The checksum of the data section, combined over all ranks
      */
-    Checksum write_data(const std::string &filename, const DataLayout &layout, const int *X, QudaFileIOMode io_mode,
-                        const SitePack &pack);
+    Checksum write_data(const std::string &filename, const DataLayout &layout, const int *X,
+                        const Partitions &partitions, const SitePack &pack);
 
     /**
        @brief Report a checksum mismatch: a warning if allowed, otherwise an error

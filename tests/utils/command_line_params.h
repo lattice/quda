@@ -311,6 +311,7 @@ extern double gaussian_sigma;
 extern std::string gauge_outfile;
 extern QudaFileFormat gauge_file_format;
 extern QudaFileIOMode gauge_file_io_mode;
+extern std::array<int, 4> gauge_file_io_partitions;
 extern std::string gauge_ildg_lfn;
 extern bool gauge_write_usqcd_info;
 extern bool gauge_allow_checksum_mismatch;

@@ -51,6 +51,7 @@ double gaussian_sigma = 0.2;
 std::string gauge_outfile;
 QudaFileFormat gauge_file_format = QUDA_FILE_FORMAT_AUTO;
 QudaFileIOMode gauge_file_io_mode = QUDA_FILE_IO_PARALLEL;
+std::array<int, 4> gauge_file_io_partitions = {0, 0, 0, 0};
 std::string gauge_ildg_lfn;
 bool gauge_write_usqcd_info = true;
 bool gauge_allow_checksum_mismatch = false;
@@ -703,6 +704,12 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option("--gauge-file-io-mode", gauge_file_io_mode,
                  "Whether all ranks (parallel, default) or only rank 0 (serial) access gauge field files")
     ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
+  quda_app
+    ->add_option("--gauge-file-io-partitions", gauge_file_io_partitions,
+                 "Number of I/O partitions in each dimension for gauge field files, as MILC's ionode_geometry: in "
+                 "parallel mode only the rank at each partition's lowest corner opens the file (default 0 0 0 0, one "
+                 "partition per rank)")
+    ->expected(4);
   quda_app->add_option("--gauge-ildg-lfn", gauge_ildg_lfn,
                        "ILDG logical file name used when saving in ILDG format (default: the file name)");
   quda_app->add_option("--gauge-write-usqcd-info", gauge_write_usqcd_info,

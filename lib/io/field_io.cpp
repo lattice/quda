@@ -33,6 +33,7 @@ namespace quda
     write_usqcd_info = checked.write_usqcd_info == QUDA_BOOLEAN_TRUE;
     allow_checksum_mismatch = checked.allow_checksum_mismatch == QUDA_BOOLEAN_TRUE;
     reunitarize = checked.reunitarize;
+    for (int d = 0; d < 4; d++) io_partition_grid[d] = checked.io_partition_grid[d];
   }
 
   const char *get_file_format_str(QudaFileFormat format)

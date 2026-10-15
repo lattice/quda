@@ -127,7 +127,8 @@ namespace quda
         errorQuda("%s is %lu bytes, but a MILC v5 gauge file of this size should be %lu bytes", filename.c_str(),
                   file_size, expected_size);
 
-      auto sum = io::read_data(filename, layout, X, param.io_mode, field.unpacker(QUDA_SINGLE_PRECISION));
+      auto sum = io::read_data(filename, layout, X, io::Partitions(param.io_mode, param.io_partition_grid),
+                               field.unpacker(QUDA_SINGLE_PRECISION));
 
       GaugeFileInfo info;
       info.format = QUDA_FILE_FORMAT_MILC;
@@ -148,6 +149,8 @@ namespace quda
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
                             const FileIOParam &param)
     {
+      // checks the grid before rank 0 truncates the file
+      const io::Partitions partitions(param.io_mode, param.io_partition_grid);
       io::HostField field(gauge, n_dim, prec, matrix_reals);
       if (prec == QUDA_DOUBLE_PRECISION)
         logQuda(QUDA_SUMMARIZE,
@@ -169,7 +172,7 @@ namespace quda
       }
 
       auto layout = field.layout(QUDA_SINGLE_PRECISION, sizeof(GaugeHeader), false, io::ChecksumType::MILC);
-      auto sum = io::write_data(filename, layout, X, param.io_mode, field.packer(QUDA_SINGLE_PRECISION));
+      auto sum = io::write_data(filename, layout, X, partitions, field.packer(QUDA_SINGLE_PRECISION));
 
       if (comm_rank() == 0) {
         uint32_t sums[2] = {sum.sum29, sum.sum31};

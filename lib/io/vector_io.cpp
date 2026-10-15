@@ -23,6 +23,13 @@ namespace quda
       }
     }
 
+    void warn_partition_grid(const FileIOParam &param)
+    {
+      const auto &grid = param.io_partition_grid;
+      if (grid != std::array<int, 4> {})
+        warningQuda("The I/O partition grid %d %d %d %d is ignored for vectors", grid[0], grid[1], grid[2], grid[3]);
+    }
+
 #ifdef HAVE_QIO
     void load_qio(const std::string &filename, void *V[], QudaPrecision prec, const int *X, QudaSiteSubset subset,
                   QudaParity parity, int nColor, int nSpin, int Nvec, QudaFileIOMode io_mode)
@@ -60,6 +67,7 @@ namespace quda
   void VectorIO::load(cvector_ref<ColorSpinorField> &vecs, std::vector<complex_t> *)
   {
     check_vector_format(resolve_load_format(filename, param.format));
+    warn_partition_grid(param);
 
     const bool parity_inflate = param.parity_inflate;
     const ColorSpinorField &v0 = vecs[0];
@@ -133,6 +141,7 @@ namespace quda
                       const std::vector<complex_t> *)
   {
     check_vector_format(resolve_save_format(param.format));
+    warn_partition_grid(param);
 
     const bool parity_inflate = param.parity_inflate;
     const bool partfile = param.partfile;

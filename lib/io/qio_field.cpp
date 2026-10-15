@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -39,6 +40,48 @@ std::ostream &operator<<(std::ostream &out, const QIO_Layout &layout)
 
 static int vlen;
 
+// QIO calls the I/O node map with only a node number, so the grid of the open file lives here
+static std::array<int, 4> partition_grid;
+
+// The I/O node of a QMP node: the node at the lowest corner of its partition
+static int partition_io_node(const int node)
+{
+  const int *dims = QMP_get_logical_dimensions();
+  int coords[4];
+  QMP_get_logical_coordinates_from2(coords, node);
+  for (int d = 0; d < 4; d++) coords[d] -= coords[d] % (dims[d] / partition_grid[d]);
+  return QMP_get_node_number_from(coords);
+}
+
+// The file system to pass to QIO for a gauge field read or write: none with a zero grid or in serial mode (where QIO
+// ignores the map), else one whose I/O node map follows the grid while this object exists.  The QMP topology must
+// already be declared.
+class PartitionFilesystem
+{
+  QIO_Filesystem fs = {};
+  bool used = false;
+
+public:
+  PartitionFilesystem(QudaFileIOMode io_mode, const std::array<int, 4> &grid)
+  {
+    const int *qmp_dims = QMP_get_logical_dimensions();
+    if (!quda::io::check_partition_grid(io_mode, grid, {qmp_dims[0], qmp_dims[1], qmp_dims[2], qmp_dims[3]})) return;
+    partition_grid = grid;
+    fs.my_io_node = partition_io_node;
+    used = true;
+  }
+
+  ~PartitionFilesystem()
+  {
+    if (used) partition_grid = {};
+  }
+
+  PartitionFilesystem(const PartitionFilesystem &) = delete;
+  PartitionFilesystem &operator=(const PartitionFilesystem &) = delete;
+
+  QIO_Filesystem *get() { return used ? &fs : nullptr; }
+};
+
 // for matrix fields this order implies [color][color][complex]
 // for vector fields this order implies [spin][color][complex]
 // templatized version to allow for precision conversion
@@ -71,7 +114,7 @@ template <typename oFloat, typename iFloat> void vget(char *s1, size_t index, in
   }
 }
 
-QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
+QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar, QIO_Filesystem *fs = nullptr)
 {
   QIO_Iflag iflag;
 
@@ -82,7 +125,7 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
   QIO_String *xml_file_in = QIO_string_create();
 
   /* Open the file for reading */
-  QIO_Reader *infile = QIO_open_read(xml_file_in, filename, &layout, NULL, &iflag);
+  QIO_Reader *infile = QIO_open_read(xml_file_in, filename, &layout, fs, &iflag);
 
   if (infile == NULL) {
     printfQuda("%s(%d): QIO_open_read returns NULL.\n", __func__, quda_this_node);
@@ -97,10 +140,10 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
   return infile;
 }
 
-QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int ildgstyle, const char *ildg_lfn = nullptr)
+QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int ildgstyle,
+                             const char *ildg_lfn = nullptr, QIO_Filesystem *fs = nullptr)
 {
   char xml_write_file[] = "Dummy user file XML";
-  QIO_Filesystem filesys;
   QIO_Oflag oflag;
 
   oflag.serpar = serpar;
@@ -113,15 +156,12 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
   }
   oflag.mode = QIO_TRUNC;
 
-  filesys.my_io_node = 0;
-  filesys.master_io_node = 0;
-
   /* Create the file XML */
   QIO_String *xml_file_out = QIO_string_create();
   QIO_string_set(xml_file_out, xml_write_file);
 
   /* Open the file for reading */
-  QIO_Writer *outfile = QIO_open_write(xml_file_out, filename, volfmt, &layout, &filesys, &oflag);
+  QIO_Writer *outfile = QIO_open_write(xml_file_out, filename, volfmt, &layout, fs, &oflag);
 
   if (oflag.ildgLFN) QIO_string_destroy(oflag.ildgLFN);
   if (outfile == NULL) {
@@ -308,14 +348,15 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
 }
 
 void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
-                      QudaFileIOMode io_mode, quda::scidac::GaugeInfo &info)
+                      QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid, quda::scidac::GaugeInfo &info)
 {
   quda_this_node = QMP_get_node_number();
 
   set_layout(X);
+  PartitionFilesystem fs(io_mode, io_partition_grid);
 
   /* Open the test file for reading */
-  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, qio_serpar(io_mode));
+  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, qio_serpar(io_mode), fs.get());
   if (infile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Read the su3 field record */
@@ -436,11 +477,13 @@ int write_su3_field(QIO_Writer *outfile, int count, const void *field_out[], Qud
 }
 
 quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
-                                     QudaFileIOMode io_mode, const quda::scidac::GaugeInfo &info)
+                                     QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
+                                     const quda::scidac::GaugeInfo &info)
 {
   quda_this_node = QMP_get_node_number();
 
   set_layout(X);
+  PartitionFilesystem fs(io_mode, io_partition_grid);
 
   QudaPrecision file_prec = precision;
 
@@ -449,8 +492,8 @@ quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPr
 
   /* Open the test file for writing */
   const char *lfn = info.ildg && !info.ildg_lfn.empty() ? info.ildg_lfn.c_str() : nullptr;
-  QIO_Writer *outfile
-    = open_test_output(filename, QIO_SINGLEFILE, qio_serpar(io_mode), info.ildg ? QIO_ILDGLAT : QIO_ILDGNO, lfn);
+  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, qio_serpar(io_mode),
+                                         info.ildg ? QIO_ILDGLAT : QIO_ILDGNO, lfn, fs.get());
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Write the gauge field record */

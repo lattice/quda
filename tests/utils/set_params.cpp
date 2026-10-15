@@ -62,6 +62,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   gauge_param.file_io_param = setFileIOParam(gauge_file_io_param, gauge_file_format, gauge_file_io_mode);
+  for (int d = 0; d < 4; d++) gauge_file_io_param.io_partition_grid[d] = gauge_file_io_partitions[d];
   safe_strcpy(gauge_file_io_param.ildg_lfn, gauge_ildg_lfn, 256, "gauge_ildg_lfn");
   gauge_file_io_param.write_usqcd_info = gauge_write_usqcd_info ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gauge_file_io_param.allow_checksum_mismatch = gauge_allow_checksum_mismatch ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

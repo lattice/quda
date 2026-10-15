@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <quda.h>
 
@@ -24,6 +25,9 @@ namespace quda
 
     /** How to reunitarize a gauge field after loading it; ignored for saves and vectors */
     QudaGaugeReunitarize reunitarize = QUDA_GAUGE_REUNITARIZE_NONE;
+
+    /** Number of I/O partitions in each dimension; all zeros means one per rank.  Gauge fields only for now */
+    std::array<int, 4> io_partition_grid {};
 
     FileIOParam() = default;
 

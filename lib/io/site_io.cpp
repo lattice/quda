@@ -321,13 +321,6 @@ namespace quda
         return {static_cast<uint32_t>(sums >> 32), static_cast<uint32_t>(sums)};
       }
 
-      coords_t my_coords()
-      {
-        coords_t c;
-        for (int d = 0; d < 4; d++) c[d] = comm_coord(d);
-        return c;
-      }
-
       std::vector<coords_t> all_coords()
       {
         std::vector<double> c(4 * comm_size(), 0.0);
@@ -398,11 +391,61 @@ namespace quda
       }
     } // namespace
 
-    Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X, QudaFileIOMode io_mode,
-                       const SiteUnpack &unpack)
+    bool check_partition_grid(QudaFileIOMode io_mode, const std::array<int, 4> &grid, const std::array<int, 4> &dims)
+    {
+      if (grid == coords_t {}) return false;
+      const bool serial = io_mode == QUDA_FILE_IO_SERIAL;
+
+      for (int d = 0; d < 4; d++)
+        if (grid[d] <= 0 || dims[d] % grid[d] != 0)
+          errorQuda("The I/O partition grid %d %d %d %d does not divide the process grid %d %d %d %d", grid[0], grid[1],
+                    grid[2], grid[3], dims[0], dims[1], dims[2], dims[3]);
+
+      if (serial) {
+        logQuda(QUDA_VERBOSE, "Serial I/O goes through rank 0 alone, so the I/O partition grid %d %d %d %d is ignored\n",
+                grid[0], grid[1], grid[2], grid[3]);
+        return false;
+      }
+      logQuda(QUDA_VERBOSE, "I/O partition grid %d %d %d %d: each partition has %d x %d x %d x %d ranks\n", grid[0],
+              grid[1], grid[2], grid[3], dims[0] / grid[0], dims[1] / grid[1], dims[2] / grid[2], dims[3] / grid[3]);
+      return true;
+    }
+
+    Partitions::Partitions(QudaFileIOMode io_mode, const std::array<int, 4> &grid) : rank_coords(all_coords())
+    {
+      const bool serial = io_mode == QUDA_FILE_IO_SERIAL;
+      const coords_t dims = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
+      const bool grouped = check_partition_grid(io_mode, grid, dims);
+      for (int d = 0; d < 4; d++) extent[d] = serial ? dims[d] : grouped ? dims[d] / grid[d] : 1;
+
+      auto corner = [&](int rank) {
+        coords_t c = rank_coords[rank];
+        for (int d = 0; d < 4; d++) c[d] -= c[d] % extent[d];
+        return c;
+      };
+
+      const int me = comm_rank();
+      const auto my_corner = corner(me);
+      if (serial) {
+        my_leader = 0;
+      } else {
+        auto it = std::find(rank_coords.begin(), rank_coords.end(), my_corner);
+        if (it == rank_coords.end())
+          errorQuda("No rank has the coordinates %d %d %d %d", my_corner[0], my_corner[1], my_corner[2], my_corner[3]);
+        my_leader = static_cast<int>(it - rank_coords.begin());
+      }
+      leads = my_leader == me;
+      if (leads)
+        for (int rank = 0; rank < static_cast<int>(rank_coords.size()); rank++)
+          if (serial || corner(rank) == my_corner) my_ranks.push_back(rank);
+    }
+
+    Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X,
+                       const Partitions &partitions, const SiteUnpack &unpack)
     {
       Geometry g(layout, X);
-      const auto me = my_coords();
+      const int my_rank = comm_rank();
+      const auto &me = partitions.coords(my_rank);
       std::vector<char> buffer(g.local_bytes());
       Checksum sum;
 
@@ -414,39 +457,31 @@ namespace quda
           me, [&](size_t index, size_t pos) { unpack(block, index, buffer.data() + pos * layout.site_bytes); });
       };
 
-      if (io_mode == QUDA_FILE_IO_PARALLEL) {
-        File file(filename, File::Mode::READ);
-        for (int block = 0; block < layout.n_block; block++) {
-          read_rows(file, g, me, block, buffer.data());
-          process(block);
-        }
-      } else {
-        const auto coords = all_coords();
-        const bool root = comm_rank() == 0;
-        std::unique_ptr<File> file(root ? new File(filename, File::Mode::READ) : nullptr);
-        std::vector<char> staging(root && comm_size() > 1 ? g.local_bytes() : 0);
-        for (int block = 0; block < layout.n_block; block++) {
-          if (root) {
-            for (auto rank = 1u; rank < coords.size(); rank++) {
-              read_rows(*file, g, coords[rank], block, staging.data());
-              send(staging.data(), staging.size(), rank);
-            }
+      const auto &ranks = partitions.ranks();
+      std::unique_ptr<File> file(partitions.is_leader() ? new File(filename, File::Mode::READ) : nullptr);
+      std::vector<char> staging(ranks.size() > 1 ? g.local_bytes() : 0);
+      for (int block = 0; block < layout.n_block; block++) {
+        for (int rank : ranks) {
+          if (rank == my_rank) {
             read_rows(*file, g, me, block, buffer.data());
           } else {
-            recv(buffer.data(), buffer.size(), 0);
+            read_rows(*file, g, partitions.coords(rank), block, staging.data());
+            send(staging.data(), staging.size(), rank);
           }
-          process(block);
         }
+        if (!partitions.is_leader()) recv(buffer.data(), buffer.size(), partitions.leader());
+        process(block);
       }
 
       return combine(sum);
     }
 
-    Checksum write_data(const std::string &filename, const DataLayout &layout, const int *X, QudaFileIOMode io_mode,
-                        const SitePack &pack)
+    Checksum write_data(const std::string &filename, const DataLayout &layout, const int *X,
+                        const Partitions &partitions, const SitePack &pack)
     {
       Geometry g(layout, X);
-      const auto me = my_coords();
+      const int my_rank = comm_rank();
+      const auto &me = partitions.coords(my_rank);
       std::vector<char> buffer(g.local_bytes());
       Checksum sum;
 
@@ -461,32 +496,22 @@ namespace quda
       // rank 0 has created the file and written everything but the data
       comm_barrier();
 
-      if (io_mode == QUDA_FILE_IO_PARALLEL) {
-        File file(filename, File::Mode::WRITE);
-        for (int block = 0; block < layout.n_block; block++) {
-          process(block);
-          write_rows(file, g, me, block, buffer.data());
-        }
-        file.close();
-      } else {
-        const auto coords = all_coords();
-        const bool root = comm_rank() == 0;
-        std::unique_ptr<File> file(root ? new File(filename, File::Mode::WRITE) : nullptr);
-        std::vector<char> staging(root && comm_size() > 1 ? g.local_bytes() : 0);
-        for (int block = 0; block < layout.n_block; block++) {
-          process(block);
-          if (root) {
+      const auto &ranks = partitions.ranks();
+      std::unique_ptr<File> file(partitions.is_leader() ? new File(filename, File::Mode::WRITE) : nullptr);
+      std::vector<char> staging(ranks.size() > 1 ? g.local_bytes() : 0);
+      for (int block = 0; block < layout.n_block; block++) {
+        process(block);
+        if (!partitions.is_leader()) send(buffer.data(), buffer.size(), partitions.leader());
+        for (int rank : ranks) {
+          if (rank == my_rank) {
             write_rows(*file, g, me, block, buffer.data());
-            for (auto rank = 1u; rank < coords.size(); rank++) {
-              recv(staging.data(), staging.size(), rank);
-              write_rows(*file, g, coords[rank], block, staging.data());
-            }
           } else {
-            send(buffer.data(), buffer.size(), 0);
+            recv(staging.data(), staging.size(), rank);
+            write_rows(*file, g, partitions.coords(rank), block, staging.data());
           }
         }
-        if (root) file->close();
       }
+      if (file) file->close();
 
       // every rank's data is in the file before anyone reads it
       comm_barrier();

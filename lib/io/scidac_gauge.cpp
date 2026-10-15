@@ -139,7 +139,8 @@ namespace quda
         errorQuda("The binary data of %s is %lu bytes, but should be %lu bytes", filename.c_str(), data->data_bytes,
                   io::data_bytes(layout, N));
 
-      info.sum = io::read_data(filename, layout, X, param.io_mode, field.unpacker(info.file_prec));
+      info.sum = io::read_data(filename, layout, X, io::Partitions(param.io_mode, param.io_partition_grid),
+                               field.unpacker(info.file_prec));
 
       // as in QIO, a SciDAC file must have a checksum, while ILDG files from other codes have none
       if (native) {
@@ -157,8 +158,10 @@ namespace quda
     }
 
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                            QudaFileIOMode io_mode, const GaugeInfo &info)
+                            const FileIOParam &param, const GaugeInfo &info)
     {
+      // checks the grid before rank 0 truncates the file
+      const io::Partitions partitions(param.io_mode, param.io_partition_grid);
       io::HostField field(gauge, n_dim, prec, matrix_reals);
       const QudaPrecision file_prec = prec;
       const int typesize = matrix_reals * file_prec;
@@ -190,7 +193,7 @@ namespace quda
       comm_broadcast(&data_offset, sizeof(data_offset));
       layout.offset = data_offset;
 
-      auto sum = io::write_data(filename, layout, X, io_mode, field.packer(file_prec));
+      auto sum = io::write_data(filename, layout, X, partitions, field.packer(file_prec));
 
       if (comm_rank() == 0) {
         io::File file(filename, io::File::Mode::WRITE);
