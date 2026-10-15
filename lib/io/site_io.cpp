@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -91,15 +92,48 @@ namespace quda
       }
     }
 
+    namespace
+    {
+      using crc_tables_t = std::array<std::array<uint32_t, 256>, 8>;
+
+      /**
+         @brief Tables for slicing-by-8: table[0][n] is the CRC of the byte n, and table[k][n]
+         advances table[k - 1][n] by one zero byte
+       */
+      constexpr crc_tables_t make_crc_tables()
+      {
+        constexpr uint32_t polynomial = 0xedb88320;
+        crc_tables_t table {};
+        for (uint32_t n = 0; n < 256; n++) {
+          uint32_t c = n;
+          for (int bit = 0; bit < 8; bit++) c = (c >> 1) ^ (polynomial & (0u - (c & 1u)));
+          table[0][n] = c;
+        }
+        for (int k = 1; k < 8; k++)
+          for (int n = 0; n < 256; n++) table[k][n] = (table[k - 1][n] >> 8) ^ table[0][table[k - 1][n] & 0xff];
+        return table;
+      }
+
+      constexpr crc_tables_t crc_tables = make_crc_tables();
+
+      inline uint32_t load_le32(const unsigned char *p)
+      {
+        return uint32_t(p[0]) | uint32_t(p[1]) << 8 | uint32_t(p[2]) << 16 | uint32_t(p[3]) << 24;
+      }
+    } // namespace
+
     uint32_t crc32(const void *data, size_t bytes, uint32_t crc)
     {
-      constexpr uint32_t polynomial = 0xedb88320;
+      const auto &t = crc_tables;
       auto p = static_cast<const unsigned char *>(data);
       crc = ~crc;
-      for (size_t i = 0; i < bytes; i++) {
-        crc ^= p[i];
-        for (int bit = 0; bit < 8; bit++) crc = (crc >> 1) ^ (polynomial & (0u - (crc & 1u)));
+      for (; bytes >= 8; bytes -= 8, p += 8) {
+        uint32_t a = crc ^ load_le32(p);
+        uint32_t b = load_le32(p + 4);
+        crc = t[7][a & 0xff] ^ t[6][(a >> 8) & 0xff] ^ t[5][(a >> 16) & 0xff] ^ t[4][a >> 24] ^ t[3][b & 0xff]
+          ^ t[2][(b >> 8) & 0xff] ^ t[1][(b >> 16) & 0xff] ^ t[0][b >> 24];
       }
+      for (; bytes > 0; bytes--, p++) crc = (crc >> 8) ^ t[0][(crc ^ *p) & 0xff];
       return ~crc;
     }
 
@@ -333,14 +367,21 @@ namespace quda
       void checksum_rows(Checksum &sum, const Geometry &g, const coords_t &c, int block, const char *buffer)
       {
         const auto &layout = g.layout;
-        g.for_each_run(c, [&](size_t first_row, size_t n_rows, size_t file_index) {
-          const char *data = buffer + first_row * g.row_bytes();
-          size_t first_site = block * g.file_sites + file_index;
+        uint32_t sum29 = 0, sum31 = 0;
+#pragma omp parallel for reduction(^ : sum29, sum31)
+        for (size_t r = 0; r < g.n_row; r++) {
+          Checksum row;
+          const char *data = buffer + r * g.row_bytes();
+          size_t first_site = block * g.file_sites + g.row_file_index(c, r);
           if (layout.checksum == ChecksumType::MILC)
-            accumulate(sum, layout, data, n_rows * g.row_bytes() / 4, first_site * layout.site_bytes / 4);
+            accumulate(row, layout, data, g.row_bytes() / 4, first_site * layout.site_bytes / 4);
           else
-            accumulate(sum, layout, data, n_rows * g.row_sites, first_site);
-        });
+            accumulate(row, layout, data, g.row_sites, first_site);
+          sum29 ^= row.sum29;
+          sum31 ^= row.sum31;
+        }
+        sum.sum29 ^= sum29;
+        sum.sum31 ^= sum31;
       }
     } // namespace
 
