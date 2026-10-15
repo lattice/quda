@@ -22,6 +22,9 @@ namespace quda
     bool write_usqcd_info = true;
     bool allow_checksum_mismatch = false; /** Warn instead of error on a checksum mismatch */
 
+    /** How to reunitarize a gauge field after loading it; ignored for saves and vectors */
+    QudaGaugeReunitarize reunitarize = QUDA_GAUGE_REUNITARIZE_NONE;
+
     FileIOParam() = default;
 
     /**
@@ -36,6 +39,11 @@ namespace quda
      @brief Return a string naming a file format, for messages
    */
   const char *get_file_format_str(QudaFileFormat format);
+
+  /**
+     @brief Return a string naming a reunitarization method, for messages
+   */
+  const char *get_gauge_reunitarize_str(QudaGaugeReunitarize reunitarize);
 
   /**
      @brief Determine the format of an existing file from its

@@ -10,6 +10,7 @@
 #include <io/gauge_io.h>
 #include <io/milc_io.h>
 #include <io/qio_field.h>
+#include <io/reunitarize.h>
 #include <io/scidac_io.h>
 #include <io/site_io.h>
 
@@ -19,9 +20,9 @@ namespace quda
   namespace
   {
     /**
-       @brief Compute the average plaquette and link trace, both normalized as Re Tr / 3
+       @brief Parameters for a reference field wrapping host arrays in QDP order
      */
-    void compute_plaq_linktr(const void *const gauge[], QudaPrecision prec, const int *X, double &plaq, double &linktr)
+    GaugeFieldParam host_field_param(const void *const gauge[], QudaPrecision prec, const int *X)
     {
       QudaGaugeParam gauge_param = newQudaGaugeParam();
       for (int d = 0; d < 4; d++) gauge_param.X[d] = X[d];
@@ -34,14 +35,31 @@ namespace quda
 
       GaugeFieldParam field_param(gauge_param, const_cast<void **>(gauge));
       field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      GaugeField host(field_param);
+      return field_param;
+    }
 
+    /**
+       @brief Parameters for a native device field with the same contents as a host field
+     */
+    GaugeFieldParam device_field_param(const GaugeFieldParam &host_param)
+    {
+      GaugeFieldParam field_param = host_param;
       field_param.create = QUDA_NULL_FIELD_CREATE;
       field_param.reconstruct = QUDA_RECONSTRUCT_NO;
-      field_param.setPrecision(prec, true);
+      field_param.setPrecision(host_param.Precision(), true);
       field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
       field_param.location = QUDA_CUDA_FIELD_LOCATION;
-      GaugeField device(field_param);
+      return field_param;
+    }
+
+    /**
+       @brief Compute the average plaquette and link trace, both normalized as Re Tr / 3
+     */
+    void compute_plaq_linktr(const void *const gauge[], QudaPrecision prec, const int *X, double &plaq, double &linktr)
+    {
+      auto field_param = host_field_param(gauge, prec, X);
+      GaugeField host(field_param);
+      GaugeField device(device_field_param(field_param));
       device.copy(host);
 
       // getLinkTrace averages Tr U over the links of a field without a halo
@@ -151,6 +169,95 @@ namespace quda
     }
 
     /**
+       @brief Project the links of a host gauge field onto SU(3) with QUDA's polar projection, on the device
+     */
+    void project_polar(void *const gauge[], QudaPrecision prec, const int *X)
+    {
+      auto field_param = host_field_param(gauge, prec, X);
+      GaugeField host(field_param);
+      GaugeField device(device_field_param(field_param));
+      device.copy(host);
+
+      int *num_failures_h = static_cast<int *>(pool_host_pinned_malloc(sizeof(int)));
+      int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
+      *num_failures_h = 0;
+      projectSU3(device, device.toleranceSU3(), num_failures_d);
+      int failures = *num_failures_h;
+      pool_host_pinned_free(num_failures_h);
+      comm_allreduce_int(failures);
+      if (failures > 0) errorQuda("The polar projection onto SU(3) failed for %d links", failures);
+
+      host.copy(device);
+    }
+
+    /**
+       @brief Measure the deviation from unitarity of a loaded gauge field, and reunitarize it if requested
+     */
+    void reunitarize(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
+                     QudaGaugeReunitarize method, GaugeFileInfo &info)
+    {
+      const bool requested = method != QUDA_GAUGE_REUNITARIZE_NONE;
+      const bool less_precise = info.file_prec < prec;
+      if (!requested && !less_precise && getVerbosity() < QUDA_VERBOSE) return;
+
+      if (method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2 && prec != QUDA_DOUBLE_PRECISION)
+        errorQuda("Reunitarizing as MILC's double-precision builds do needs a double-precision host gauge field");
+
+      const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
+
+      // MILC's single-precision builds hold the links in single precision, and check them after rounding
+      const bool round = method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1 && prec == QUDA_DOUBLE_PRECISION;
+      if (round) {
+        for (int dir = 0; dir < 4; dir++) {
+          auto u = static_cast<double *>(gauge[dir]);
+#pragma omp parallel for
+          for (size_t i = 0; i < volume * 18; i++) u[i] = static_cast<float>(u[i]);
+        }
+      }
+
+      auto deviation = [&]() {
+        double d = io::unitarity_deviation(gauge, prec, volume);
+        comm_allreduce_max(d);
+        return d;
+      };
+      info.unitarity_deviation = deviation();
+
+      if (!requested) {
+        const QudaVerbosity level = less_precise ? QUDA_SUMMARIZE : QUDA_VERBOSE;
+        logQuda(level, "Largest deviation from unitarity of the links from %s: %.2e%s\n", filename.c_str(),
+                info.unitarity_deviation,
+                less_precise ? " (the file is less precise than the host field; set reunitarize to reunitarize it)" : "");
+        return;
+      }
+
+      if (info.unitarity_deviation > io::milc_unitarity_tolerance)
+        errorQuda("The gauge field from %s deviates from unitarity by up to %.2e, more than MILC's tolerance %.0e",
+                  filename.c_str(), info.unitarity_deviation, io::milc_unitarity_tolerance);
+
+      // MILC's single-precision builds check unitarity but never reunitarize (reload_lattice in generic/io_helpers.c)
+      if (method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1) {
+        logQuda(QUDA_SUMMARIZE,
+                "Gauge field from %s%s checked as MILC's single-precision builds do: largest deviation from "
+                "unitarity %.2e; not reunitarized\n",
+                filename.c_str(), round ? " rounded to single precision and" : "", info.unitarity_deviation);
+        return;
+      }
+
+      switch (method) {
+      case QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2:
+        io::reunitarize_gram_schmidt(gauge, prec, volume);
+        break;
+      case QUDA_GAUGE_REUNITARIZE_POLAR: project_polar(gauge, prec, X); break;
+      default: errorQuda("Unexpected reunitarization method %d", method);
+      }
+
+      info.reunitarized_deviation = deviation();
+      logQuda(QUDA_SUMMARIZE,
+              "Reunitarized the gauge field from %s (%s): largest deviation from unitarity %.2e changed to %.2e\n",
+              filename.c_str(), get_gauge_reunitarize_str(method), info.unitarity_deviation, info.reunitarized_deviation);
+    }
+
+    /**
        @brief Save a QIO or ILDG gauge field, with a usqcdInfo record if requested
      */
     io::Checksum save_lime(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
@@ -195,6 +302,7 @@ namespace quda
     logQuda(QUDA_SUMMARIZE, "Time spent loading gauge field from %s = %g secs\n", filename.c_str(), host_timer.last());
 
     if (info.has_plaq_linktr) check_plaq_linktr(filename, gauge, prec, X, info);
+    reunitarize(filename, gauge, prec, X, param.reunitarize, info);
     return info;
   }
 

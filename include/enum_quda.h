@@ -681,6 +681,19 @@ typedef enum QudaFileIOMode_s {
   QUDA_FILE_IO_INVALID = QUDA_INVALID_ENUM
 } QudaFileIOMode;
 
+// How a gauge field is reunitarized after it is loaded from a file
+typedef enum QudaGaugeReunitarize_s {
+  QUDA_GAUGE_REUNITARIZE_NONE, // keep the links as stored in the file
+  // as MILC's single-precision (PRECISION=1) builds load: round the links to single precision and check their
+  // unitarity, without reunitarizing them
+  QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1,
+  // as MILC's double-precision (PRECISION=2) builds load: check the links' unitarity and reunitarize them with
+  // Gram-Schmidt (rows 0 and 1, row 2 from their cross product); needs a double-precision host field
+  QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2,
+  QUDA_GAUGE_REUNITARIZE_POLAR, // polar projection onto SU(3)
+  QUDA_GAUGE_REUNITARIZE_INVALID = QUDA_INVALID_ENUM
+} QudaGaugeReunitarize;
+
 #ifdef __cplusplus
 }
 #endif

@@ -8,6 +8,7 @@
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <io/gauge_io.h>
+#include <io/reunitarize.h>
 #include <io/site_io.h>
 #include <quda.h>
 
@@ -523,6 +524,137 @@ TEST_P(GaugeConversionTest, lime_to_milc)
   remove_files({lime_file, milc_file, milc_file + ".info"});
 }
 
+// the deviation from unitarity is MILC's measure: the row norm errors and the overlaps between rows
+TEST(UnitarityDeviationTest, measure)
+{
+  constexpr size_t volume = 2;
+  std::vector<std::vector<double>> links(4, std::vector<double>(volume * 18, 0.0));
+  for (auto &dir : links)
+    for (size_t s = 0; s < volume; s++)
+      for (int i = 0; i < 3; i++) dir[s * 18 + 8 * i] = 1.0;
+  const void *gauge[4] = {links[0].data(), links[1].data(), links[2].data(), links[3].data()};
+  EXPECT_EQ(quda::io::unitarity_deviation(gauge, QUDA_DOUBLE_PRECISION, volume), 0.0);
+
+  // row 1 of one link longer by 1e-3
+  for (int j = 0; j < 6; j++) links[2][18 + 6 + j] *= 1.001;
+  EXPECT_NEAR(quda::io::unitarity_deviation(gauge, QUDA_DOUBLE_PRECISION, volume), 1e-3, 1e-12);
+
+  // element (1, 0) of another link 1e-2, so row 1 overlaps row 0 by 1e-2 (its norm grows by only 5e-5)
+  links[3][6] = 1e-2;
+  EXPECT_NEAR(quda::io::unitarity_deviation(gauge, QUDA_DOUBLE_PRECISION, volume), 1e-2, 1e-12);
+
+  links[0][0] = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_EQ(quda::io::unitarity_deviation(gauge, QUDA_DOUBLE_PRECISION, volume), std::numeric_limits<double>::infinity());
+}
+
+// tuple types: precision, reunitarization method
+using reunitarize_test_t = ::testing::tuple<QudaPrecision, QudaGaugeReunitarize>;
+
+class GaugeReunitarizeTest : public ::testing::TestWithParam<reunitarize_test_t>
+{
+};
+
+// a MILC file, which is single precision, loaded with each reunitarization method
+TEST_P(GaugeReunitarizeTest, milc_file)
+{
+  using namespace quda;
+  auto prec = ::testing::get<0>(GetParam());
+  auto method = ::testing::get<1>(GetParam());
+  if (!is_enabled(prec)) GTEST_SKIP();
+  // reunitarizing as MILC's double-precision builds do is an error for a single-precision host field
+  if (method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2 && prec == QUDA_SINGLE_PRECISION) GTEST_SKIP();
+
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge original(prec), raw(prec), loaded(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  const std::string file = "reunitarize.milc";
+  auto param = file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
+  GaugeIO(file, param).save(original.data, prec, gauge_param.X);
+  auto raw_info = GaugeIO(file, param).load(raw.data, prec, gauge_param.X);
+  param.reunitarize = method;
+  auto info = GaugeIO(file, param).load(loaded.data, prec, gauge_param.X);
+
+  // the deviation is measured when reunitarizing, when the file is less precise than the host field, or at
+  // verbose verbosity
+  const bool measured = prec == QUDA_DOUBLE_PRECISION || getVerbosity() >= QUDA_VERBOSE;
+  EXPECT_EQ(raw_info.unitarity_deviation >= 0.0, measured);
+  EXPECT_EQ(info.unitarity_deviation >= 0.0, measured || method != QUDA_GAUGE_REUNITARIZE_NONE);
+  if (info.unitarity_deviation >= 0.0) {
+    EXPECT_GT(info.unitarity_deviation, 0.0);
+    EXPECT_LT(info.unitarity_deviation, 1e-5);
+  }
+
+  // as MILC's single-precision builds, PRECISION_1 only checks the links, which in a MILC file are already single
+  // precision
+  if (method == QUDA_GAUGE_REUNITARIZE_NONE || method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1) {
+    EXPECT_LT(info.reunitarized_deviation, 0.0);
+    EXPECT_TRUE(loaded == raw);
+  } else {
+    const double tol = prec == QUDA_DOUBLE_PRECISION ? 1e-14 : 1e-6;
+    EXPECT_GE(info.reunitarized_deviation, 0.0);
+    EXPECT_LE(info.reunitarized_deviation, tol);
+    EXPECT_LE(io::unitarity_deviation(loaded.data, prec, V), tol);
+
+    // reunitarization moves each link by about its deviation from unitarity; Gram-Schmidt keeps the direction
+    // of row 0, while the polar projection does not
+    double max_change = 0.0, max_row0 = 0.0;
+    for (int dir = 0; dir < 4; dir++) {
+      for (size_t s = 0; s < static_cast<size_t>(V); s++) {
+        double norm = 0.0;
+        for (int k = 0; k < 6; k++) norm += std::pow(get_element(raw.data[dir], prec, s * 18 + k), 2);
+        norm = std::sqrt(norm);
+        for (int k = 0; k < 18; k++) {
+          double a = get_element(loaded.data[dir], prec, s * 18 + k), b = get_element(raw.data[dir], prec, s * 18 + k);
+          max_change = std::max(max_change, std::abs(a - b));
+          if (k < 6) max_row0 = std::max(max_row0, std::abs(a - b / norm));
+        }
+      }
+    }
+    EXPECT_LE(max_change, 1e-5);
+    if (method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2) {
+      EXPECT_LE(max_row0, 1e-15);
+    } else if (prec == QUDA_DOUBLE_PRECISION) {
+      EXPECT_GT(max_row0, 1e-9);
+    }
+  }
+
+  if (comm_rank() == 0 && (remove(file.c_str()) != 0 || remove((file + ".info").c_str()) != 0))
+    errorQuda("Error deleting file");
+}
+
+// as MILC's single-precision builds, PRECISION_1 rounds a double-precision file's links to single precision
+TEST(GaugeMILCPrecisionTest, precision_1_rounds)
+{
+  using namespace quda;
+  if (!is_enabled(QUDA_DOUBLE_PRECISION)) GTEST_SKIP();
+
+  QudaGaugeParam gauge_param = gauge_param_for(QUDA_DOUBLE_PRECISION);
+  HostGauge original(QUDA_DOUBLE_PRECISION), loaded(QUDA_DOUBLE_PRECISION);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  const std::string file = "reunitarize.lat";
+  auto param = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  GaugeIO(file, param).save(original.data, QUDA_DOUBLE_PRECISION, gauge_param.X);
+  param.reunitarize = QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1;
+  auto info = GaugeIO(file, param).load(loaded.data, QUDA_DOUBLE_PRECISION, gauge_param.X);
+
+  EXPECT_EQ(info.file_prec, QUDA_DOUBLE_PRECISION);
+  EXPECT_GT(info.unitarity_deviation, 0.0);
+  EXPECT_LT(info.unitarity_deviation, 1e-5);
+  EXPECT_LT(info.reunitarized_deviation, 0.0);
+
+  size_t mismatches = 0;
+  for (int dir = 0; dir < 4; dir++)
+    for (size_t i = 0; i < V * gauge_site_size; i++) {
+      double expected = static_cast<float>(static_cast<const double *>(original.data[dir])[i]);
+      if (static_cast<const double *>(loaded.data[dir])[i] != expected) mismatches++;
+    }
+  EXPECT_EQ(mismatches, 0u);
+
+  if (comm_rank() == 0 && remove(file.c_str()) != 0) errorQuda("Error deleting file");
+}
+
 #ifdef HAVE_QIO
 class GaugeIOBackendTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -643,6 +775,23 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugeConversionTest,
                            name += quda::get_file_format_str(::testing::get<1>(param.param)) + std::string("_");
                            name += get_io_mode_str(::testing::get<2>(param.param));
                            return name;
+                         });
+
+// reunitarization of a loaded gauge field
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeReunitarizeTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(QUDA_GAUGE_REUNITARIZE_NONE, QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1,
+                                        QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2,
+                                        QUDA_GAUGE_REUNITARIZE_POLAR)),
+                         [](testing::TestParamInfo<reunitarize_test_t> param) {
+                           std::string name = get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           switch (::testing::get<1>(param.param)) {
+                           case QUDA_GAUGE_REUNITARIZE_NONE: return name + "none";
+                           case QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1: return name + "milc_precision_1";
+                           case QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2: return name + "milc_precision_2";
+                           case QUDA_GAUGE_REUNITARIZE_POLAR: return name + "polar";
+                           default: return name + "unknown";
+                           }
                          });
 
 #ifdef HAVE_QIO

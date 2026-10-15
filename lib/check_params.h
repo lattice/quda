@@ -62,6 +62,7 @@ void printQudaFileIOParam(QudaFileIOParam *param)
   ret.ildg_lfn[0] = '\0';
   P(write_usqcd_info, QUDA_BOOLEAN_TRUE);
   P(allow_checksum_mismatch, QUDA_BOOLEAN_FALSE);
+  P(reunitarize, QUDA_GAUGE_REUNITARIZE_NONE);
 #elif defined CHECK_PARAM
   // the full range is checked since a caller that bypasses newQudaFileIOParam() can leave arbitrary values
   if (param->format != QUDA_FILE_FORMAT_AUTO && param->format != QUDA_FILE_FORMAT_QIO
@@ -76,12 +77,18 @@ void printQudaFileIOParam(QudaFileIOParam *param)
     errorQuda("Invalid write_usqcd_info %d", param->write_usqcd_info);
   if (param->allow_checksum_mismatch != QUDA_BOOLEAN_FALSE && param->allow_checksum_mismatch != QUDA_BOOLEAN_TRUE)
     errorQuda("Invalid allow_checksum_mismatch %d", param->allow_checksum_mismatch);
+  if (param->reunitarize != QUDA_GAUGE_REUNITARIZE_NONE
+      && param->reunitarize != QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1
+      && param->reunitarize != QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2
+      && param->reunitarize != QUDA_GAUGE_REUNITARIZE_POLAR)
+    errorQuda("Invalid reunitarize %d", param->reunitarize);
 #else
   P(format, QUDA_FILE_FORMAT_INVALID);
   P(io_mode, QUDA_FILE_IO_INVALID);
   printfQuda("ildg_lfn = \"%s\"\n", param->ildg_lfn);
   P(write_usqcd_info, QUDA_BOOLEAN_INVALID);
   P(allow_checksum_mismatch, QUDA_BOOLEAN_INVALID);
+  P(reunitarize, QUDA_GAUGE_REUNITARIZE_INVALID);
 #endif
 
 #ifdef INIT_PARAM

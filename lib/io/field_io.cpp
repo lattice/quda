@@ -32,6 +32,7 @@ namespace quda
     ildg_lfn = checked.ildg_lfn;
     write_usqcd_info = checked.write_usqcd_info == QUDA_BOOLEAN_TRUE;
     allow_checksum_mismatch = checked.allow_checksum_mismatch == QUDA_BOOLEAN_TRUE;
+    reunitarize = checked.reunitarize;
   }
 
   const char *get_file_format_str(QudaFileFormat format)
@@ -43,6 +44,17 @@ namespace quda
     case QUDA_FILE_FORMAT_ILDG: return "ILDG";
     case QUDA_FILE_FORMAT_QIO_EXTERNAL: return "QIO_external";
     case QUDA_FILE_FORMAT_ILDG_EXTERNAL: return "ILDG_external";
+    default: return "unknown";
+    }
+  }
+
+  const char *get_gauge_reunitarize_str(QudaGaugeReunitarize reunitarize)
+  {
+    switch (reunitarize) {
+    case QUDA_GAUGE_REUNITARIZE_NONE: return "none";
+    case QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1: return "MILC Gram-Schmidt, PRECISION=1";
+    case QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2: return "MILC Gram-Schmidt, PRECISION=2";
+    case QUDA_GAUGE_REUNITARIZE_POLAR: return "polar";
     default: return "unknown";
     }
   }

@@ -24,6 +24,12 @@ namespace quda
     bool checksum_matches = false;    /** Whether the checksums of the data and the file (and MILC .info file) agree */
     uint32_t sum29 = 0;               /** The checksums computed from the data: sum29 and sum31 for MILC files, suma */
     uint32_t sum31 = 0;               /** and sumb for QIO and ILDG files */
+
+    /** Largest deviation from unitarity of the loaded links over all ranks, as MILC measures it, before any
+        reunitarization; negative if not measured */
+    double unitarity_deviation = -1.0;
+    /** The same after reunitarization; negative if the field was not reunitarized */
+    double reunitarized_deviation = -1.0;
   };
 
   /**

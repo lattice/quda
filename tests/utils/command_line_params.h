@@ -314,6 +314,7 @@ extern QudaFileIOMode gauge_file_io_mode;
 extern std::string gauge_ildg_lfn;
 extern bool gauge_write_usqcd_info;
 extern bool gauge_allow_checksum_mismatch;
+extern QudaGaugeReunitarize gauge_reunitarize;
 extern int Nsrc;
 extern int Msrc;
 extern int Nsrc_tile;

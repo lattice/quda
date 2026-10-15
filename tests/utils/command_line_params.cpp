@@ -54,6 +54,7 @@ QudaFileIOMode gauge_file_io_mode = QUDA_FILE_IO_PARALLEL;
 std::string gauge_ildg_lfn;
 bool gauge_write_usqcd_info = true;
 bool gauge_allow_checksum_mismatch = false;
+QudaGaugeReunitarize gauge_reunitarize = QUDA_GAUGE_REUNITARIZE_NONE;
 int Nsrc = 1;
 int Msrc = 1;
 int Nsrc_tile = 1;
@@ -482,6 +483,12 @@ namespace
   CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {{"parallel", QUDA_FILE_IO_PARALLEL},
                                                         {"serial", QUDA_FILE_IO_SERIAL}};
 
+  CLI::TransformPairs<QudaGaugeReunitarize> gauge_reunitarize_map {
+    {"none", QUDA_GAUGE_REUNITARIZE_NONE},
+    {"milc-gram-schmidt-precision-1", QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1},
+    {"milc-gram-schmidt-precision-2", QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2},
+    {"polar", QUDA_GAUGE_REUNITARIZE_POLAR}};
+
   CLI::TransformPairs<QudaContractType> contract_type_map {{"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
                                                            {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
                                                            {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}};
@@ -704,6 +711,15 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--gauge-allow-checksum-mismatch", gauge_allow_checksum_mismatch,
                        "Whether to load a gauge field whose checksums do not match its data, with a warning "
                        "(default false)");
+  quda_app
+    ->add_option("--gauge-reunitarize", gauge_reunitarize,
+                 "How to reunitarize a gauge field loaded with --load-gauge, in any file format: none (default) keeps "
+                 "the file's links; milc-gram-schmidt-precision-1 loads as MILC's single-precision (PRECISION=1) "
+                 "builds do, rounding the links to single precision and checking their unitarity without "
+                 "reunitarizing them; milc-gram-schmidt-precision-2 loads as MILC's double-precision (PRECISION=2) "
+                 "builds do, checking the links and reunitarizing them with Gram-Schmidt in MILC's order of "
+                 "operations; polar uses QUDA's polar projection onto SU(3)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_reunitarize_map));
 
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
