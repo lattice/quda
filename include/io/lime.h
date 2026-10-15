@@ -47,8 +47,16 @@ namespace quda
     std::vector<Record> read_records(const std::string &filename);
 
     /**
+       @brief The largest record read_string accepts.  Metadata records
+       are XML of at most a few kilobytes; the cap keeps a corrupt or
+       unexpected record from being allocated on every rank.
+     */
+    constexpr size_t max_string_bytes = size_t(16) << 20;
+
+    /**
        @brief Read the data of a (small) record as a string, without
        any trailing NUL characters.  Rank 0 reads it and broadcasts it.
+       Errors if the record is longer than max_string_bytes.
      */
     std::string read_string(const std::string &filename, const Record &record);
 

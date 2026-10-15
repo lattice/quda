@@ -262,6 +262,32 @@ TEST(CRC32Test, check_value)
   EXPECT_EQ(quda::io::crc32(data, 0), 0u);
 }
 
+// strings and vectors broadcast from rank 0 take rank 0's contents and size on every rank
+TEST(BroadcastTest, resize)
+{
+  using namespace quda;
+  const bool root = comm_rank() == 0;
+
+  std::string expected_string(1000, '\0');
+  for (auto i = 0u; i < expected_string.size(); i++) expected_string[i] = static_cast<char>(i * 7);
+  std::string s = root ? expected_string : std::string(5, 'x');
+  io::broadcast(s);
+  EXPECT_EQ(s, expected_string);
+
+  std::vector<int64_t> expected_vector(333);
+  for (auto i = 0u; i < expected_vector.size(); i++) expected_vector[i] = (int64_t(1) << 40) + i;
+  std::vector<int64_t> v = root ? expected_vector : std::vector<int64_t>(5000, -1);
+  io::broadcast(v);
+  EXPECT_EQ(v, expected_vector);
+
+  s = root ? std::string() : expected_string;
+  io::broadcast(s);
+  EXPECT_TRUE(s.empty());
+  v = root ? std::vector<int64_t>() : expected_vector;
+  io::broadcast(v);
+  EXPECT_TRUE(v.empty());
+}
+
 // tuple types: precision, file format, io mode, whether to write the usqcdInfo record
 using gauge_test_t = ::testing::tuple<QudaPrecision, QudaFileFormat, QudaFileIOMode, bool>;
 

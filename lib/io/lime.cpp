@@ -39,7 +39,6 @@ namespace quda
     std::vector<Record> read_records(const std::string &filename)
     {
       std::vector<RecordData> list;
-      size_t n = 0;
       if (comm_rank() == 0) {
         io::File file(filename, io::File::Mode::READ);
         const size_t size = file.size();
@@ -63,27 +62,29 @@ namespace quda
           list.push_back(r);
           offset = r.data_offset + r.data_bytes + padding(r.data_bytes);
         }
-        n = list.size();
       }
+      io::broadcast(list);
 
-      comm_broadcast(&n, sizeof(n));
-      list.resize(n);
-      if (n > 0) comm_broadcast(list.data(), n * sizeof(RecordData));
-
-      std::vector<Record> records(n);
-      for (size_t i = 0; i < n; i++)
+      std::vector<Record> records(list.size());
+      for (size_t i = 0; i < list.size(); i++)
         records[i] = {list[i].type, list[i].data_offset, list[i].data_bytes, list[i].mb != 0, list[i].me != 0};
       return records;
     }
 
     std::string read_string(const std::string &filename, const Record &record)
     {
-      std::string data(record.data_bytes, '\0');
+      if (record.data_bytes > max_string_bytes)
+        errorQuda("Record %s at byte %lu of %s has %lu bytes, more than the %lu bytes allowed for a metadata record",
+                  record.type.c_str(), record.data_offset - header_bytes, filename.c_str(), record.data_bytes,
+                  max_string_bytes);
+
+      std::string data;
       if (comm_rank() == 0) {
+        data.resize(record.data_bytes);
         io::File file(filename, io::File::Mode::READ);
         file.read(data.data(), data.size(), record.data_offset);
       }
-      if (!data.empty()) comm_broadcast(data.data(), data.size());
+      io::broadcast(data);
       auto end = data.find_last_not_of('\0');
       data.resize(end == std::string::npos ? 0 : end + 1);
       return data;

@@ -34,7 +34,6 @@ namespace quda
     std::optional<std::map<std::string, std::string>> read_info(const std::string &filename)
     {
       int found = 0;
-      size_t length = 0;
       std::string contents;
       if (comm_rank() == 0) {
         std::ifstream in(filename + ".info");
@@ -42,15 +41,12 @@ namespace quda
           std::stringstream ss;
           ss << in.rdbuf();
           contents = ss.str();
-          length = contents.size();
           found = 1;
         }
       }
       comm_broadcast(&found, sizeof(found));
       if (!found) return std::nullopt;
-      comm_broadcast(&length, sizeof(length));
-      contents.resize(length);
-      if (length > 0) comm_broadcast(contents.data(), length);
+      io::broadcast(contents);
 
       auto trim = [](const std::string &s) {
         auto first = s.find_first_not_of(" \t\r");

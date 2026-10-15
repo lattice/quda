@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <type_traits>
+#include <vector>
 #include <enum_quda.h>
 
 namespace quda
@@ -122,6 +124,35 @@ namespace quda
        @param[in] crc The CRC of any preceding data, to continue a computation
      */
     uint32_t crc32(const void *data, size_t bytes, uint32_t crc = 0);
+
+    /**
+       @brief The most bytes handed to the communications layer in one
+       message or broadcast: the MPI and QMP backends pass byte counts
+       to MPI as an int
+     */
+    constexpr size_t max_message_bytes = size_t(1) << 30;
+
+    /**
+       @brief Broadcast from rank 0, in pieces of at most max_message_bytes
+     */
+    void broadcast(void *data, size_t bytes);
+
+    /**
+       @brief Broadcast a string from rank 0, resizing it on the other ranks
+     */
+    void broadcast(std::string &data);
+
+    /**
+       @brief Broadcast a vector from rank 0, resizing it on the other ranks
+     */
+    template <typename T> void broadcast(std::vector<T> &data)
+    {
+      static_assert(std::is_trivially_copyable_v<T>, "broadcast copies the elements' bytes");
+      size_t n = data.size();
+      broadcast(&n, sizeof(n));
+      data.resize(n);
+      broadcast(data.data(), n * sizeof(T));
+    }
 
     /**
        @brief Read the start of a file on rank 0 and broadcast it, along with the file size

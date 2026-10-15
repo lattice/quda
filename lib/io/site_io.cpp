@@ -137,6 +137,21 @@ namespace quda
       return ~crc;
     }
 
+    void broadcast(void *data, size_t bytes)
+    {
+      auto p = static_cast<char *>(data);
+      for (size_t offset = 0; offset < bytes; offset += max_message_bytes)
+        comm_broadcast(p + offset, std::min(max_message_bytes, bytes - offset));
+    }
+
+    void broadcast(std::string &data)
+    {
+      size_t n = data.size();
+      broadcast(&n, sizeof(n));
+      data.resize(n);
+      broadcast(data.data(), n);
+    }
+
     size_t read_header(const std::string &filename, void *data, size_t bytes)
     {
       size_t size = 0;
@@ -147,7 +162,7 @@ namespace quda
         file.read(data, bytes, 0);
       }
       comm_broadcast(&size, sizeof(size));
-      comm_broadcast(data, bytes);
+      broadcast(data, bytes);
       return size;
     }
 
@@ -325,8 +340,6 @@ namespace quda
         return coords;
       }
 
-      // the MPI backend limits a message to INT_MAX bytes
-      constexpr size_t max_message_bytes = size_t(1) << 30;
       constexpr int message_tag = 0x4e87;
 
       void send(const char *data, size_t bytes, int rank)
