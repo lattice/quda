@@ -484,6 +484,8 @@ TEST_P(MILCGaugeFileTest, layout)
   GaugeIO(file, param).save(gauge, prec, gauge_param.X);
   check_milc_gauge_file(file, gauge, prec, gauge_param.X);
 
+  // every rank reads the file on its own
+  comm_barrier();
   if (comm_rank() == 0 && (remove(file.c_str()) != 0 || remove((file + ".info").c_str()) != 0))
     errorQuda("Error deleting file");
   for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
