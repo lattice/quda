@@ -40,6 +40,52 @@ namespace
     }
   }
 
+  // the LIME formats (SciDAC and ILDG) with each backend available in this build
+  std::vector<QudaFileFormat> lime_formats()
+  {
+    std::vector<QudaFileFormat> formats = {QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG};
+#ifdef HAVE_QIO
+    formats.insert(formats.end(), {QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_FORMAT_ILDG_EXTERNAL});
+#endif
+    return formats;
+  }
+
+  // file options for a format and mode, through the public interface struct, without the usqcdInfo record
+  quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_mode)
+  {
+    QudaFileIOParam param = newQudaFileIOParam();
+    param.struct_size = sizeof(param);
+    param.format = format;
+    param.io_mode = io_mode;
+    param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
+    return quda::FileIOParam(&param);
+  }
+
+  // a host gauge field in QDP order, one array per direction
+  struct HostGauge {
+    QudaPrecision prec;
+    size_t bytes;
+    void *data[4];
+
+    HostGauge(QudaPrecision prec) : prec(prec), bytes(V * gauge_site_size * prec)
+    {
+      for (auto &d : data) d = safe_malloc(bytes);
+    }
+    ~HostGauge()
+    {
+      for (auto &d : data) host_free(d);
+    }
+    HostGauge(const HostGauge &) = delete;
+    HostGauge &operator=(const HostGauge &) = delete;
+
+    bool operator==(const HostGauge &other) const
+    {
+      for (int dir = 0; dir < 4; dir++)
+        if (memcmp(data[dir], other.data[dir], bytes) != 0) return false;
+      return true;
+    }
+  };
+
   // change the stored checksum of a gauge file, keeping its size, so that it no longer matches the data
   void corrupt_checksum(const std::string &file, QudaFileFormat format)
   {
@@ -369,6 +415,114 @@ TEST_P(MILCGaugeFileTest, layout)
   for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
 }
 
+// tuple types: precision, LIME file format (SciDAC or ILDG, with either backend), io mode
+using conversion_test_t = ::testing::tuple<QudaPrecision, QudaFileFormat, QudaFileIOMode>;
+
+class GaugeConversionTest : public ::testing::TestWithParam<conversion_test_t>
+{
+protected:
+  QudaPrecision prec;
+  quda::FileIOParam milc;
+  quda::FileIOParam lime;
+  QudaGaugeParam gauge_param;
+
+public:
+  GaugeConversionTest() :
+    prec(::testing::get<0>(GetParam())),
+    milc(file_io_param(QUDA_FILE_FORMAT_MILC, ::testing::get<2>(GetParam()))),
+    lime(file_io_param(::testing::get<1>(GetParam()), ::testing::get<2>(GetParam()))),
+    gauge_param(gauge_param_for(prec))
+  {
+  }
+
+  quda::GaugeFileInfo load(const std::string &file, const quda::FileIOParam &param, HostGauge &gauge)
+  {
+    return quda::GaugeIO(file, param).load(gauge.data, prec, gauge_param.X);
+  }
+
+  void save(const std::string &file, const quda::FileIOParam &param, const HostGauge &gauge)
+  {
+    quda::GaugeIO(file, param).save(gauge.data, prec, gauge_param.X);
+  }
+
+  void remove_files(const std::vector<std::string> &files)
+  {
+    if (quda::comm_rank() == 0)
+      for (auto &file : files)
+        if (remove(file.c_str()) != 0) errorQuda("Error deleting file %s", file.c_str());
+  }
+};
+
+// a MILC file converted to SciDAC or ILDG and back gives the same links and the same MILC file
+TEST_P(GaugeConversionTest, milc_to_lime_and_back)
+{
+  using namespace quda;
+  if (!is_enabled(prec)) GTEST_SKIP();
+
+  HostGauge original(prec), from_milc(prec), from_lime(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  const std::string milc_file = "conv.milc", lime_file = "conv.lat", milc_again = "conv_again.milc";
+  save(milc_file, milc, original);
+  auto milc_info = load(milc_file, milc, from_milc);
+
+  // the LIME file is in the host precision, so it holds the MILC file's values exactly
+  save(lime_file, lime, from_milc);
+  auto lime_info = load(lime_file, lime, from_lime);
+  EXPECT_EQ(lime_info.file_prec, prec);
+  EXPECT_TRUE(lime_info.checksum_matches);
+  EXPECT_TRUE(from_lime == from_milc);
+
+  save(milc_again, milc, from_lime);
+  auto again_info = load(milc_again, milc, from_milc);
+  EXPECT_TRUE(from_milc == from_lime);
+  EXPECT_TRUE(again_info.checksum_matches);
+  EXPECT_EQ(again_info.sum29, milc_info.sum29);
+  EXPECT_EQ(again_info.sum31, milc_info.sum31);
+
+  // the two MILC files differ at most in their time stamps (bytes 20 to 83 of the header)
+  if (comm_rank() == 0) {
+    auto a = read_file(milc_file), b = read_file(milc_again);
+    ASSERT_EQ(a.size(), b.size());
+    ASSERT_GE(a.size(), 96u);
+    EXPECT_TRUE(std::equal(a.begin(), a.begin() + 20, b.begin())) << "the headers differ before the time stamp";
+    auto diff = std::mismatch(a.begin() + 84, a.end(), b.begin() + 84);
+    EXPECT_EQ(diff.first, a.end()) << "the files first differ at byte " << diff.first - a.begin();
+  }
+
+  remove_files({milc_file, milc_file + ".info", lime_file, milc_again, milc_again + ".info"});
+}
+
+// a SciDAC or ILDG file converted to MILC gives its links rounded to single precision
+TEST_P(GaugeConversionTest, lime_to_milc)
+{
+  using namespace quda;
+  if (!is_enabled(prec)) GTEST_SKIP();
+
+  HostGauge original(prec), from_lime(prec), from_milc(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  const std::string lime_file = "conv.lat", milc_file = "conv.milc";
+  save(lime_file, lime, original);
+  load(lime_file, lime, from_lime);
+  EXPECT_TRUE(from_lime == original);
+
+  save(milc_file, milc, from_lime);
+  auto milc_info = load(milc_file, milc, from_milc);
+  EXPECT_EQ(milc_info.file_prec, QUDA_SINGLE_PRECISION);
+  EXPECT_TRUE(milc_info.checksum_matches);
+
+  size_t mismatches = 0;
+  for (int dir = 0; dir < 4; dir++)
+    for (size_t i = 0; i < V * gauge_site_size; i++) {
+      double expected = static_cast<float>(get_element(from_lime.data[dir], prec, i));
+      if (get_element(from_milc.data[dir], prec, i) != expected) mismatches++;
+    }
+  EXPECT_EQ(mismatches, 0u);
+
+  remove_files({lime_file, milc_file, milc_file + ".info"});
+}
+
 #ifdef HAVE_QIO
 class GaugeIOBackendTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -476,6 +630,18 @@ INSTANTIATE_TEST_SUITE_P(Gauge, MILCGaugeFileTest,
                            std::string name;
                            name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
                            name += get_io_mode_str(::testing::get<1>(param.param));
+                           return name;
+                         });
+
+// conversions between MILC and the LIME formats
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeConversionTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), ValuesIn(lime_formats()),
+                                 Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
+                         [](testing::TestParamInfo<conversion_test_t> param) {
+                           std::string name;
+                           name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += quda::get_file_format_str(::testing::get<1>(param.param)) + std::string("_");
+                           name += get_io_mode_str(::testing::get<2>(param.param));
                            return name;
                          });
 
