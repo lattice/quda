@@ -346,7 +346,7 @@ void printQudaEigParam(QudaEigParam *param) {
 #elif defined CHECK_PARAM
   if (param->file_io_param) checkFileIOParam(param->file_io_param);
 #else
-  if (param->file_io_param) printQudaFileIOParam(param->file_io_param);
+    if (param->file_io_param) printQudaFileIOParam(param->file_io_param);
 #endif
 
 #ifdef INIT_PARAM
