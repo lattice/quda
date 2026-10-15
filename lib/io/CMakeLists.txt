@@ -10,6 +10,7 @@ target_sources(
           reunitarize.cpp
           scidac_common.cpp
           scidac_gauge.cpp
+          scidac_vector.cpp
           site_io.cpp
           vector_io.cpp)
 

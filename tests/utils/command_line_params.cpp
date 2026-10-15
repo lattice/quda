@@ -80,6 +80,7 @@ quda::mgarray<std::string> mg_vec_infile;
 quda::mgarray<std::string> mg_vec_outfile;
 quda::mgarray<bool> mg_vec_partfile = {};
 QudaFileIOMode mg_file_io_mode = QUDA_FILE_IO_PARALLEL;
+std::array<int, 4> mg_file_io_partitions = {0, 0, 0, 0};
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
@@ -259,6 +260,7 @@ QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 bool eig_partfile = false;
 QudaFileFormat eig_file_format = QUDA_FILE_FORMAT_AUTO;
 QudaFileIOMode eig_file_io_mode = QUDA_FILE_IO_PARALLEL;
+std::array<int, 4> eig_file_io_partitions = {0, 0, 0, 0};
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
@@ -867,8 +869,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--eig-require-convergence",
     eig_require_convergence, "If true, the solver will error out if convergence is not attained. If false, a warning will be given (default true)");
-  opgroup->add_option("--eig-save-vec", eig_vec_outfile, "Save eigenvectors to <file> (requires QIO)");
-  opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)");
+  opgroup->add_option("--eig-save-vec", eig_vec_outfile, "Save eigenvectors to <file>");
+  opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file>");
   opgroup
     ->add_option("--eig-save-prec", eig_save_prec,
                  "If saving eigenvectors, use this precision to save. No-op if eig-save-prec is greater than or equal "
@@ -884,6 +886,13 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option("--eig-file-io-mode", eig_file_io_mode,
                  "Whether all ranks (parallel, default) or only rank 0 (serial) access eigenvector files")
     ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
+  opgroup
+    ->add_option(
+      "--eig-file-io-partitions", eig_file_io_partitions,
+      "Number of I/O partitions in each dimension for eigenvector files, as MILC's ionode_geometry: only the "
+      "rank at each partition's lowest corner opens a single file in parallel mode, and partfiles have one "
+      "file per partition (default 0 0 0 0, one partition per rank)")
+    ->expected(4);
 
   opgroup->add_option(
     "--eig-io-parity-inflate", eig_io_parity_inflate,
@@ -1056,9 +1065,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   // TODO
   quda_app->add_mgoption(opgroup, "--mg-load-vec", mg_vec_infile, CLI::Validator(),
-                         "Load the vectors <file> for the multigrid_test (requires QIO)");
+                         "Load the vectors <file> for the multigrid_test");
   quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
-                         "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
+                         "Save the generated null-space vectors <file> from the multigrid_test");
   quda_app->add_mgoption(
     opgroup, "--mg-save-partfile", mg_vec_partfile, CLI::Validator(),
     "Whether to save near-null vectors as partfile instead of singlefile (default false; singlefile)");
@@ -1066,6 +1075,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option("--mg-file-io-mode", mg_file_io_mode,
                  "Whether all ranks (parallel, default) or only rank 0 (serial) access near-null vector files")
     ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
+  opgroup
+    ->add_option("--mg-file-io-partitions", mg_file_io_partitions,
+                 "Number of I/O partitions in each dimension for near-null vector files, as MILC's ionode_geometry: "
+                 "only the rank at each partition's lowest corner opens a single file in parallel mode, and partfiles "
+                 "have one file per partition (default 0 0 0 0, one partition per rank)")
+    ->expected(4);
 
   quda_app
     ->add_mgoption("--mg-eig-save-prec", mg_eig_save_prec, CLI::Validator(),

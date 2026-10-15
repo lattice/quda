@@ -4,6 +4,7 @@
 
 #include <array>
 #include <string>
+#include <utility>
 #include <enum_quda.h>
 #include <io/scidac_io.h>
 
@@ -13,9 +14,11 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, c
 quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, const int *X,
                                      QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
                                      const quda::scidac::GaugeInfo &info);
-void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                       QudaParity parity, int nColor, int nSpin, int Nvec, QudaFileIOMode io_mode);
-void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X,
-                        QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec, bool partfile,
-                        QudaFileIOMode io_mode);
+std::pair<QudaPrecision, quda::scidac::FieldChecksum>
+read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
+                  QudaParity parity, int nColor, int nSpin, int Nvec, QudaFileIOMode io_mode,
+                  const std::array<int, 4> &io_partition_grid);
+quda::io::Checksum write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X,
+                                      QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec,
+                                      bool partfile, QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid);
 #endif

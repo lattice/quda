@@ -3,17 +3,109 @@
 // Helpers shared by the file IO tests (gauge_io_test and vector_io_test)
 
 #include <algorithm>
+#include <array>
+#include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <comm_quda.h>
 #include <enum_quda.h>
+#include <quda.h>
+#include <io/field_io.h>
 
 inline const char *get_io_mode_str(QudaFileIOMode io_mode)
 {
   return io_mode == QUDA_FILE_IO_SERIAL ? "serial" : "parallel";
+}
+
+/**
+   @brief File options for a format, mode and I/O partition grid,
+   through the public interface struct (which splits the _EXTERNAL
+   formats), without the usqcdInfo record
+ */
+inline quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_mode,
+                                       const std::array<int, 4> &io_partition_grid = {})
+{
+  QudaFileIOParam param = newQudaFileIOParam();
+  param.struct_size = sizeof(param);
+  param.format = format;
+  param.io_mode = io_mode;
+  param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
+  for (int d = 0; d < 4; d++) param.io_partition_grid[d] = io_partition_grid[d];
+  return quda::FileIOParam(&param);
+}
+
+/**
+   @brief The I/O partition grids to test: every grid whose values
+   divide the process grid if there are at most 8; otherwise a single
+   partition, a partition spanning each split dimension alone, and
+   two 2-d blocks
+ */
+inline std::vector<std::array<int, 4>> partition_grids()
+{
+  std::vector<std::array<int, 4>> all = {{1, 1, 1, 1}};
+  for (int d = 0; d < 4; d++) {
+    std::vector<std::array<int, 4>> more;
+    for (auto grid : all) {
+      for (int n = 1; n <= quda::comm_dim(d); n++) {
+        if (quda::comm_dim(d) % n != 0) continue;
+        grid[d] = n;
+        more.push_back(grid);
+      }
+    }
+    all = more;
+  }
+  if (all.size() <= 8) return all;
+
+  const std::array<int, 4> full = {quda::comm_dim(0), quda::comm_dim(1), quda::comm_dim(2), quda::comm_dim(3)};
+  std::vector<std::array<int, 4>> grids = {{1, 1, 1, 1}};
+  auto add = [&](const std::array<int, 4> &grid) {
+    if (grid != full && std::find(grids.begin(), grids.end(), grid) == grids.end()) grids.push_back(grid);
+  };
+  for (int d = 0; d < 4; d++) {
+    if (full[d] == 1) continue;
+    auto grid = full;
+    grid[d] = 1;
+    add(grid);
+  }
+  add({1, 1, full[2], full[3]});
+  add({full[0], full[1], 1, 1});
+  return grids;
+}
+
+inline std::string grid_str(const std::array<int, 4> &grid)
+{
+  return std::to_string(grid[0]) + " " + std::to_string(grid[1]) + " " + std::to_string(grid[2]) + " "
+    + std::to_string(grid[3]);
+}
+
+/**
+   @brief The name of a QIO partfile's volume for a rank: <file>.volNNNN
+ */
+inline std::string volume_file(const std::string &file, int rank)
+{
+  char suffix[16];
+  snprintf(suffix, sizeof(suffix), ".vol%04d", rank);
+  return file + suffix;
+}
+
+/**
+   @brief Delete a saved file once every rank is done with it: the
+   single file, or the volumes of a partfile, which are named after
+   their partitions' leaders, so any rank number can occur
+ */
+inline void remove_saved_file(const std::string &file)
+{
+  quda::comm_barrier();
+  if (quda::comm_rank() == 0) {
+    int removed = std::remove(file.c_str()) == 0;
+    for (int rank = 0; rank < static_cast<int>(quda::comm_size()); rank++)
+      removed += std::remove(volume_file(file, rank).c_str()) == 0;
+    EXPECT_GT(removed, 0) << "no saved file " << file;
+  }
 }
 
 inline std::vector<char> read_file(const std::string &file)

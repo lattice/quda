@@ -1,10 +1,13 @@
+#include <array>
 #include <cstdio>
 #include <limits>
 #include <vector>
+#include <unistd.h>
 
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <color_spinor_field.h>
+#include <io/site_io.h>
 #include <io/vector_io.h>
 #include <blas_quda.h>
 #include <quda.h>
@@ -19,15 +22,61 @@ namespace
   std::vector<QudaFileFormat> vector_formats()
   {
 #ifdef HAVE_QIO
-    return {QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO};
+    return {QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_QIO_EXTERNAL};
 #else
-    return {};
+    return {QUDA_FILE_FORMAT_QIO};
 #endif
+  }
+
+  // parameters of vectors on the test lattice: full or single parity, on the host or the device, 4-d or 5-d
+  quda::ColorSpinorParam vector_param(QudaSiteSubset subset, QudaParity parity, int nSpin, QudaPrecision prec,
+                                      QudaFieldLocation location, int Ls = 1)
+  {
+    QudaGaugeParam gauge_param = newQudaGaugeParam();
+    QudaInvertParam inv_param = newQudaInvertParam();
+    setWilsonGaugeParam(gauge_param);
+    setInvertParam(inv_param);
+
+    quda::ColorSpinorParam param;
+    constructWilsonTestSpinorParam(&param, &inv_param, &gauge_param);
+    param.siteSubset = subset;
+    param.suggested_parity = parity; // ignored for full parity
+    param.nSpin = nSpin;
+    param.setPrecision(prec, prec, true); // change order to native order
+    param.location = location;
+    if (location == QUDA_CPU_FIELD_LOCATION) param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    if (subset == QUDA_PARITY_SITE_SUBSET) param.x[0] /= 2;
+    if (Ls > 1) {
+      param.nDim = 5;
+      param.x[4] = Ls;
+    }
+    return param;
+  }
+
+  std::vector<quda::ColorSpinorField> random_vectors(int n, const quda::ColorSpinorParam &param)
+  {
+    std::vector<quda::ColorSpinorField> v(n, param);
+    quda::RNG rng(v[0], 1234);
+    for (auto &vi : v) quda::spinorNoise(vi, rng, QUDA_NOISE_GAUSS);
+    return v;
+  }
+
+  std::vector<quda::ColorSpinorField> zero_vectors(int n, quda::ColorSpinorParam param)
+  {
+    param.create = QUDA_ZERO_FIELD_CREATE;
+    return std::vector<quda::ColorSpinorField>(n, param);
+  }
+
+  void expect_same_vectors(const std::vector<quda::ColorSpinorField> &u, const std::vector<quda::ColorSpinorField> &v)
+  {
+    ASSERT_EQ(u.size(), v.size());
+    for (auto i = 0u; i < v.size(); i++) EXPECT_EQ(quda::blas::max_deviation(u[i], v[i])[0], 0.0) << "vector " << i;
   }
 } // namespace
 
 using cs_test_t = ::testing::tuple<QudaSiteSubset, QudaSiteSubset, QudaParity, bool, QudaPrecision, QudaPrecision, int,
-                                   bool, QudaFieldLocation, QudaFileFormat, QudaFileIOMode>;
+                                   bool, QudaFieldLocation, QudaFileFormat, QudaFileIOMode, int, int>;
 
 class ColorSpinorIOTest : public ::testing::TestWithParam<cs_test_t>
 {
@@ -43,6 +92,8 @@ protected:
   QudaFieldLocation location;
   QudaFileFormat format;
   QudaFileIOMode io_mode;
+  int n_vector;
+  int Ls;
 
 public:
   ColorSpinorIOTest() :
@@ -56,7 +107,9 @@ public:
     partfile(::testing::get<7>(GetParam())),
     location(::testing::get<8>(GetParam())),
     format(::testing::get<9>(GetParam())),
-    io_mode(::testing::get<10>(GetParam()))
+    io_mode(::testing::get<10>(GetParam())),
+    n_vector(::testing::get<11>(GetParam())),
+    Ls(::testing::get<12>(GetParam()))
   {
   }
 };
@@ -81,6 +134,9 @@ TEST_P(ColorSpinorIOTest, verify)
       || (prec < QUDA_SINGLE_PRECISION && nSpin == 2))
     GTEST_SKIP();
 
+  // only the external QIO backend writes partfiles so far
+  if (partfile && format != QUDA_FILE_FORMAT_QIO_EXTERNAL) GTEST_SKIP();
+
   // There's no meaningful way to save a full parity spinor field and load a
   // single-parity field
   if (site_subset_saved == QUDA_FULL_SITE_SUBSET && site_subset_loaded == QUDA_PARITY_SITE_SUBSET) GTEST_SKIP();
@@ -92,45 +148,17 @@ TEST_P(ColorSpinorIOTest, verify)
   bool mixed_inflated_full_test
     = (site_subset_saved == QUDA_PARITY_SITE_SUBSET && site_subset_loaded == QUDA_FULL_SITE_SUBSET && inflate);
 
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  QudaInvertParam inv_param = newQudaInvertParam();
-  setWilsonGaugeParam(gauge_param);
-  setInvertParam(inv_param);
-
   // We create a separate parameter struct for saved and loaded ColorSpinorFields
-  ColorSpinorParam param_save, param_load;
-
-  // Saved
-  constructWilsonTestSpinorParam(&param_save, &inv_param, &gauge_param);
-  param_save.siteSubset = site_subset_saved;
-  param_save.suggested_parity = parity; // ignored for full parity
-  param_save.nSpin = nSpin;
-  param_save.setPrecision(prec, prec, true); // change order to native order
-  param_save.location = location;
-  if (location == QUDA_CPU_FIELD_LOCATION) param_save.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  param_save.create = QUDA_NULL_FIELD_CREATE;
-
-  // Loaded
-  param_load = param_save;
-  param_load.siteSubset = site_subset_loaded;
-
-  // Update ColorSpinorField size appropriately depending on the site subset
-  if (site_subset_saved == QUDA_PARITY_SITE_SUBSET) param_save.x[0] /= 2;
-  if (site_subset_loaded == QUDA_PARITY_SITE_SUBSET) param_load.x[0] /= 2;
+  auto param_save = vector_param(site_subset_saved, parity, nSpin, prec, location, Ls);
+  auto param_load = vector_param(site_subset_loaded, parity, nSpin, prec, location, Ls);
 
   // create some random vectors
-  auto n_vector = 1;
-  std::vector<ColorSpinorField> v(n_vector, param_save);
+  auto v = random_vectors(n_vector, param_save);
   std::vector<ColorSpinorField> u(n_vector, param_load);
-
-  RNG rng(v[0], 1234);
-  for (auto &vi : v) spinorNoise(vi, rng, QUDA_NOISE_GAUSS);
 
   auto file = "dummy.cs";
 
-  FileIOParam io_param;
-  io_param.format = format;
-  io_param.io_mode = io_mode;
+  auto io_param = file_io_param(format, io_mode);
   io_param.parity_inflate = inflate;
   io_param.partfile = partfile;
 
@@ -166,16 +194,150 @@ TEST_P(ColorSpinorIOTest, verify)
       EXPECT_LE(dev[0], get_tolerance(prec, prec_io));
   }
 
-  // cleanup after ourselves and delete the dummy lattice
-  if (partfile && ::quda::comm_size() > 1) {
-    // each rank created its own file, we need to generate the custom filename
-    // an exception is single-rank runs where QIO skips appending the volume string
-    char volstr[9];
-    sprintf(volstr, ".vol%04d", ::quda::comm_rank());
-    std::string part_filename = std::string(file) + volstr;
-    if (remove(part_filename.c_str()) != 0) errorQuda("Error deleting file");
-  } else {
-    if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
+  remove_saved_file(file);
+}
+
+#ifdef HAVE_QIO
+// how the vectors cover the lattice: full, a single parity stored on the half-x lattice, or a single parity
+// inflated to the full lattice
+enum class VectorSubset { FULL, EVEN, ODD, INFLATED };
+
+const char *get_vector_subset_str(VectorSubset subset)
+{
+  switch (subset) {
+  case VectorSubset::FULL: return "full";
+  case VectorSubset::EVEN: return "even";
+  case VectorSubset::ODD: return "odd";
+  case VectorSubset::INFLATED: return "inflated";
+  default: return "unknown";
+  }
+}
+
+// tuple types: precision, number of spins, subset, I/O mode
+using backend_test_t = ::testing::tuple<QudaPrecision, int, VectorSubset, QudaFileIOMode>;
+
+class VectorIOBackendTest : public ::testing::TestWithParam<backend_test_t>
+{
+};
+
+// the native and external QIO backends write the same file, apart from the date in the private record XML, and
+// each reads the other's file
+TEST_P(VectorIOBackendTest, compare)
+{
+  using namespace quda;
+  auto prec = ::testing::get<0>(GetParam());
+  auto nSpin = ::testing::get<1>(GetParam());
+  auto subset = ::testing::get<2>(GetParam());
+  auto io_mode = ::testing::get<3>(GetParam());
+  if (!is_enabled(prec) || !is_enabled_spin(nSpin)) GTEST_SKIP();
+
+  const auto site_subset = subset == VectorSubset::FULL ? QUDA_FULL_SITE_SUBSET : QUDA_PARITY_SITE_SUBSET;
+  const auto parity = subset == VectorSubset::ODD ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+  const auto param = vector_param(site_subset, parity, nSpin, prec, QUDA_CPU_FIELD_LOCATION);
+  const int n = 3;
+  auto v = random_vectors(n, param);
+
+  const std::string native_file = "native.cs", external_file = "external.cs";
+  // serial I/O of a single file goes through rank 0 whatever the grid
+  std::vector<std::array<int, 4>> grids = {{}};
+  if (io_mode == QUDA_FILE_IO_PARALLEL) grids.push_back({1, 1, 1, 1});
+  for (auto grid : grids) {
+    SCOPED_TRACE("I/O partition grid " + grid_str(grid));
+    auto native = file_io_param(QUDA_FILE_FORMAT_QIO, io_mode, grid);
+    auto external = file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, io_mode, grid);
+    native.parity_inflate = external.parity_inflate = subset == VectorSubset::INFLATED;
+
+    VectorIO(native_file, native).save({v.begin(), v.end()}, prec, n);
+    VectorIO(external_file, external).save({v.begin(), v.end()}, prec, n);
+    if (comm_rank() == 0) expect_same_saved_file(native_file, external_file, false);
+
+    for (auto [file, p] : {std::make_pair(native_file, external), std::make_pair(external_file, native)}) {
+      SCOPED_TRACE("loading " + file);
+      auto u = zero_vectors(n, param);
+      VectorIO(file, p).load(u);
+      expect_same_vectors(u, v);
+    }
+  }
+  remove_saved_file(native_file);
+  remove_saved_file(external_file);
+}
+#endif
+
+// tuple types: file format, site subset
+using vector_partition_test_t = ::testing::tuple<QudaFileFormat, QudaSiteSubset>;
+
+class VectorPartitionTest : public ::testing::TestWithParam<vector_partition_test_t>
+{
+};
+
+// the I/O partition grid changes which ranks access a single file, never the file or the loaded vectors
+TEST_P(VectorPartitionTest, grids)
+{
+  using namespace quda;
+  auto format = ::testing::get<0>(GetParam());
+  auto subset = ::testing::get<1>(GetParam());
+  const bool external = format == QUDA_FILE_FORMAT_QIO_EXTERNAL;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  const int n = 3;
+
+  const auto param = vector_param(subset, QUDA_EVEN_PARITY, 1, prec, QUDA_CPU_FIELD_LOCATION);
+  auto v = random_vectors(n, param);
+  auto save
+    = [&](const std::string &file, const FileIOParam &p) { VectorIO(file, p).save({v.begin(), v.end()}, prec, n); };
+  auto expect_load = [&](const std::string &file, const FileIOParam &p) {
+    auto u = zero_vectors(n, param);
+    VectorIO(file, p).load(u);
+    expect_same_vectors(u, v);
+  };
+
+  const std::string ref_file = "partition_ref.cs", serial_ref_file = "partition_serial_ref.cs";
+  const std::string file = "partition.cs", serial_file = "partition_serial.cs", other_file = "partition_other.cs";
+  save(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL));
+  save(serial_ref_file, file_io_param(format, QUDA_FILE_IO_SERIAL));
+
+  const auto grids = partition_grids();
+  for (auto grid : grids) {
+    SCOPED_TRACE("I/O partition grid " + grid_str(grid));
+    auto parallel = file_io_param(format, QUDA_FILE_IO_PARALLEL, grid);
+    save(file, parallel);
+    if (comm_rank() == 0) expect_same_saved_file(ref_file, file, false);
+    expect_load(ref_file, parallel);
+
+    // the native backend with the same grid writes the same file as the external one
+    if (external) {
+      save(other_file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, grid));
+      if (comm_rank() == 0) expect_same_saved_file(file, other_file, false);
+    }
+  }
+
+  // serial I/O goes through rank 0 whatever the grid
+  auto serial = file_io_param(format, QUDA_FILE_IO_SERIAL, grids.back());
+  save(serial_file, serial);
+  if (comm_rank() == 0) expect_same_saved_file(serial_ref_file, serial_file, false);
+  expect_load(ref_file, serial);
+
+  for (auto &f : {ref_file, serial_ref_file, file, serial_file}) remove_saved_file(f);
+  if (external) remove_saved_file(other_file);
+
+  // external partfiles: one volume per partition, named after its leader, in either mode
+  if (external) {
+    const std::string part_file = "partition_part.cs";
+    for (auto grid : grids) {
+      for (auto io_mode : {QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL}) {
+        if (io_mode == QUDA_FILE_IO_SERIAL && grid != grids.back()) continue;
+        SCOPED_TRACE("partfile, I/O partition grid " + grid_str(grid) + ", " + get_io_mode_str(io_mode));
+        auto p = file_io_param(format, io_mode, grid);
+        p.partfile = true;
+        save(part_file, p);
+        // on one rank QIO writes a single file
+        if (comm_size() > 1) {
+          const bool leader = io::Partitions(QUDA_FILE_IO_PARALLEL, grid).is_leader();
+          EXPECT_EQ(access(volume_file(part_file, comm_rank()).c_str(), F_OK) == 0, leader);
+        }
+        expect_load(part_file, p);
+        remove_saved_file(part_file);
+      }
+    }
   }
 }
 
@@ -190,6 +352,30 @@ using ::testing::Combine;
 using ::testing::Values;
 using ::testing::ValuesIn;
 
+namespace
+{
+  std::string cs_test_name(const testing::TestParamInfo<cs_test_t> &param)
+  {
+    std::string name;
+    if (::testing::get<0>(param.param) == QUDA_PARITY_SITE_SUBSET) {
+      name += ::testing::get<1>(param.param) == QUDA_PARITY_SITE_SUBSET ? "load_parity_" : "load_full_";
+      name += ::testing::get<2>(param.param) == QUDA_EVEN_PARITY ? "even_" : "odd_";
+      if (::testing::get<3>(param.param)) name += std::string("inflate_");
+    }
+    name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
+    name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
+    name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
+    name += ::testing::get<7>(param.param) ? "_partfile" : "_singlefile";
+    name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
+    name += std::string("_") + quda::get_file_format_str(::testing::get<9>(param.param));
+    name += std::string("_") + get_io_mode_str(::testing::get<10>(param.param));
+    name += std::string("_nvec") + std::to_string(::testing::get<11>(param.param));
+    if (::testing::get<12>(param.param) > 1)
+      name += std::string("_Ls") + std::to_string(::testing::get<12>(param.param));
+    return name;
+  }
+} // namespace
+
 // colorspinor full field IO test
 INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,
                          Combine(Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_FULL_SITE_SUBSET),
@@ -197,18 +383,9 @@ INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
                                  Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION),
-                                 ValuesIn(vector_formats()), Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
-                         [](testing::TestParamInfo<cs_test_t> param) {
-                           std::string name;
-                           name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
-                           name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
-                           name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
-                           name += ::testing::get<7>(param.param) ? "_partfile" : "_singlefile";
-                           name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
-                           name += std::string("_") + quda::get_file_format_str(::testing::get<9>(param.param));
-                           name += std::string("_") + get_io_mode_str(::testing::get<10>(param.param));
-                           return name;
-                         });
+                                 ValuesIn(vector_formats()), Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL),
+                                 Values(1), Values(1)),
+                         cs_test_name);
 
 // colorspinor parity field IO test
 INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
@@ -217,19 +394,67 @@ INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
                                  Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION),
-                                 ValuesIn(vector_formats()), Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
-                         [](testing::TestParamInfo<cs_test_t> param) {
+                                 ValuesIn(vector_formats()), Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL),
+                                 Values(1), Values(1)),
+                         cs_test_name);
+
+// several vectors interleaved at each site, in fewer combinations (VectorIOBackendTest and VectorPartitionTest also
+// save several vectors, including single-parity ones)
+INSTANTIATE_TEST_SUITE_P(Interleaved, ColorSpinorIOTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_INVALID_PARITY),
+                                 Values(false), Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 4),
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION), ValuesIn(vector_formats()),
+                                 Values(QUDA_FILE_IO_PARALLEL), Values(3), Values(1)),
+                         cs_test_name);
+
+// AUTO detects the format on load and saves as QIO
+INSTANTIATE_TEST_SUITE_P(Auto, ColorSpinorIOTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_FULL_SITE_SUBSET),
+                                 Values(QUDA_INVALID_PARITY), Values(false), Values(QUDA_DOUBLE_PRECISION),
+                                 Values(QUDA_DOUBLE_PRECISION), Values(4), Values(false), Values(QUDA_CPU_FIELD_LOCATION),
+                                 Values(QUDA_FILE_FORMAT_AUTO), Values(QUDA_FILE_IO_PARALLEL), Values(3), Values(1)),
+                         cs_test_name);
+
+// 5-d fields, stored as Ls 4-d items per vector
+INSTANTIATE_TEST_SUITE_P(FiveD, ColorSpinorIOTest,
+                         Combine(Values(QUDA_PARITY_SITE_SUBSET), Values(QUDA_PARITY_SITE_SUBSET, QUDA_FULL_SITE_SUBSET),
+                                 Values(QUDA_EVEN_PARITY, QUDA_ODD_PARITY), Values(false, true),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(4), Values(false),
+                                 Values(QUDA_CUDA_FIELD_LOCATION), ValuesIn(vector_formats()),
+                                 Values(QUDA_FILE_IO_PARALLEL), Values(2), Values(4)),
+                         cs_test_name);
+
+INSTANTIATE_TEST_SUITE_P(FiveDFull, ColorSpinorIOTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_INVALID_PARITY),
+                                 Values(false), Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(4), Values(false),
+                                 Values(QUDA_CUDA_FIELD_LOCATION), ValuesIn(vector_formats()),
+                                 Values(QUDA_FILE_IO_PARALLEL), Values(2), Values(4)),
+                         cs_test_name);
+
+#ifdef HAVE_QIO
+// comparison of the native and external QIO backends
+INSTANTIATE_TEST_SUITE_P(Vector, VectorIOBackendTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 4),
+                                 Values(VectorSubset::FULL, VectorSubset::EVEN, VectorSubset::ODD, VectorSubset::INFLATED),
+                                 Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
+                         [](testing::TestParamInfo<backend_test_t> param) {
                            std::string name;
-                           name += ::testing::get<1>(param.param) == QUDA_PARITY_SITE_SUBSET ? "load_parity_" :
-                                                                                               "load_full_";
-                           name += ::testing::get<2>(param.param) == QUDA_EVEN_PARITY ? "even_" : "odd_";
-                           if (::testing::get<3>(param.param)) name += std::string("inflate_");
-                           name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
-                           name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
-                           name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
-                           name += ::testing::get<7>(param.param) ? "_partfile" : "_singlefile";
-                           name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
-                           name += std::string("_") + quda::get_file_format_str(::testing::get<9>(param.param));
-                           name += std::string("_") + get_io_mode_str(::testing::get<10>(param.param));
+                           name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += std::string("spin") + std::to_string(::testing::get<1>(param.param)) + "_";
+                           name += get_vector_subset_str(::testing::get<2>(param.param)) + std::string("_");
+                           name += get_io_mode_str(::testing::get<3>(param.param));
+                           return name;
+                         });
+#endif
+
+// I/O partition grids
+INSTANTIATE_TEST_SUITE_P(Vector, VectorPartitionTest,
+                         Combine(ValuesIn(vector_formats()), Values(QUDA_FULL_SITE_SUBSET, QUDA_PARITY_SITE_SUBSET)),
+                         [](testing::TestParamInfo<vector_partition_test_t> param) {
+                           std::string name = quda::get_file_format_str(::testing::get<0>(param.param));
+                           name += ::testing::get<1>(param.param) == QUDA_FULL_SITE_SUBSET ? "_full" : "_parity";
                            return name;
                          });

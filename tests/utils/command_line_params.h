@@ -340,6 +340,7 @@ extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
 extern quda::mgarray<bool> mg_vec_partfile;
 extern QudaFileIOMode mg_file_io_mode;
+extern std::array<int, 4> mg_file_io_partitions;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
@@ -512,6 +513,7 @@ extern QudaPrecision eig_save_prec;
 extern bool eig_partfile;
 extern QudaFileFormat eig_file_format;
 extern QudaFileIOMode eig_file_io_mode;
+extern std::array<int, 4> eig_file_io_partitions;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,

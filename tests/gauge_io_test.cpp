@@ -52,20 +52,6 @@ namespace
     return formats;
   }
 
-  // file options for a format, mode and I/O partition grid, through the public interface struct, without the
-  // usqcdInfo record
-  quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_mode,
-                                  const std::array<int, 4> &io_partition_grid = {})
-  {
-    QudaFileIOParam param = newQudaFileIOParam();
-    param.struct_size = sizeof(param);
-    param.format = format;
-    param.io_mode = io_mode;
-    param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
-    for (int d = 0; d < 4; d++) param.io_partition_grid[d] = io_partition_grid[d];
-    return quda::FileIOParam(&param);
-  }
-
   // a host gauge field in QDP order, one array per direction
   struct HostGauge {
     QudaPrecision prec;
@@ -95,40 +81,6 @@ namespace
       for (auto &d : data) memset(d, 0, bytes);
     }
   };
-
-  // the I/O partition grids to test: every grid whose values divide the process grid if there are at most 8;
-  // otherwise a single partition, a partition spanning each split dimension alone, and two 2-d blocks
-  std::vector<std::array<int, 4>> partition_grids()
-  {
-    std::vector<std::array<int, 4>> all = {{1, 1, 1, 1}};
-    for (int d = 0; d < 4; d++) {
-      std::vector<std::array<int, 4>> more;
-      for (auto grid : all) {
-        for (int n = 1; n <= quda::comm_dim(d); n++) {
-          if (quda::comm_dim(d) % n != 0) continue;
-          grid[d] = n;
-          more.push_back(grid);
-        }
-      }
-      all = more;
-    }
-    if (all.size() <= 8) return all;
-
-    const std::array<int, 4> full = {quda::comm_dim(0), quda::comm_dim(1), quda::comm_dim(2), quda::comm_dim(3)};
-    std::vector<std::array<int, 4>> grids = {{1, 1, 1, 1}};
-    auto add = [&](const std::array<int, 4> &grid) {
-      if (grid != full && std::find(grids.begin(), grids.end(), grid) == grids.end()) grids.push_back(grid);
-    };
-    for (int d = 0; d < 4; d++) {
-      if (full[d] == 1) continue;
-      auto grid = full;
-      grid[d] = 1;
-      add(grid);
-    }
-    add({1, 1, full[2], full[3]});
-    add({full[0], full[1], 1, 1});
-    return grids;
-  }
 
   // change the stored checksum of a gauge file, keeping its size, so that it no longer matches the data
   void corrupt_checksum(const std::string &file, QudaFileFormat format)
@@ -765,8 +717,7 @@ TEST_P(GaugePartitionTest, grids)
   // a file equal to the reference loads as the reference does, so each grid's file need not be loaded
   const auto grids = partition_grids();
   for (auto grid : grids) {
-    SCOPED_TRACE("I/O partition grid " + std::to_string(grid[0]) + " " + std::to_string(grid[1]) + " "
-                 + std::to_string(grid[2]) + " " + std::to_string(grid[3]));
+    SCOPED_TRACE("I/O partition grid " + grid_str(grid));
     auto parallel = param(format, QUDA_FILE_IO_PARALLEL, grid);
     save(file, parallel);
     if (comm_rank() == 0) expect_same_saved_file(ref_file, file, milc);

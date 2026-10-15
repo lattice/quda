@@ -36,9 +36,19 @@ namespace quda
       HostField(const void *const arrays[], int n, QudaPrecision prec, int reals);
 
       /**
+         @brief Number of items
+       */
+      int items() const { return static_cast<int>(arrays.size()); }
+
+      /**
+         @brief Size of an item at a site in a file of the given precision
+       */
+      size_t item_bytes(QudaPrecision file_prec) const { return reals * file_prec; }
+
+      /**
          @brief Size of a site in a file of the given precision
        */
-      size_t site_bytes(QudaPrecision file_prec) const { return arrays.size() * reals * file_prec; }
+      size_t site_bytes(QudaPrecision file_prec) const { return arrays.size() * item_bytes(file_prec); }
 
       /**
          @brief The layout of this field's sites in a file
