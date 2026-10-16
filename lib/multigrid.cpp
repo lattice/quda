@@ -1256,6 +1256,10 @@ namespace quda
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
       FileIOParam io_param(param.mg_global.file_io_param);
+      if (io_param.milc_eigenvectors)
+        errorQuda("MILC's eigenvector format (milc_eigenvectors) is only for eigensolver saves, not for the near-null "
+                  "vectors of %s; QUDA's default format saves them",
+                  vec_outfile.c_str());
       io_param.partfile = param.mg_global.mg_vec_partfile[param.level] == QUDA_BOOLEAN_TRUE;
       VectorIO io(vec_outfile, io_param);
       io.save(B);

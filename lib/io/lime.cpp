@@ -89,21 +89,42 @@ namespace quda
 
     std::string read_string(const std::string &filename, const Record &record)
     {
-      if (record.data_bytes > max_string_bytes)
-        errorQuda("Record %s at byte %lu of %s has %lu bytes, more than the %lu bytes allowed for a metadata record",
-                  record.type.c_str(), record.data_offset - header_bytes, filename.c_str(), record.data_bytes,
-                  max_string_bytes);
+      return read_strings(filename, {record})[0];
+    }
 
+    std::vector<std::string> read_strings(const std::string &filename, const std::vector<Record> &records)
+    {
+      std::vector<uint64_t> lengths;
+      for (auto &record : records) {
+        if (record.data_bytes > max_string_bytes)
+          errorQuda("Record %s at byte %lu of %s has %lu bytes, more than the %lu bytes allowed for a metadata record",
+                    record.type.c_str(), record.data_offset - header_bytes, filename.c_str(), record.data_bytes,
+                    max_string_bytes);
+        lengths.push_back(record.data_bytes);
+      }
+
+      // rank 0 reads them all, and broadcasts them one after another
       std::string data;
-      if (comm_rank() == 0) {
-        data.resize(record.data_bytes);
+      if (comm_rank() == 0 && !records.empty()) {
         io::File file(filename, io::File::Mode::READ);
-        file.read(data.data(), data.size(), record.data_offset);
+        for (auto &record : records) {
+          const auto start = data.size();
+          data.resize(start + record.data_bytes);
+          file.read(data.data() + start, record.data_bytes, record.data_offset);
+        }
       }
       io::broadcast(data);
-      auto end = data.find_last_not_of('\0');
-      data.resize(end == std::string::npos ? 0 : end + 1);
-      return data;
+
+      std::vector<std::string> strings;
+      size_t start = 0;
+      for (auto length : lengths) {
+        auto s = data.substr(start, length);
+        start += length;
+        auto end = s.find_last_not_of('\0');
+        s.resize(end == std::string::npos ? 0 : end + 1);
+        strings.push_back(std::move(s));
+      }
+      return strings;
     }
 
     size_t Writer::reserve(const std::string &type, size_t bytes, bool mb, bool me)

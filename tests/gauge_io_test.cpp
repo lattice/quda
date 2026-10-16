@@ -213,6 +213,7 @@ TEST(FileIOParamTest, conversion)
     EXPECT_EQ(a.write_usqcd_info, b.write_usqcd_info);
     EXPECT_EQ(a.allow_checksum_mismatch, b.allow_checksum_mismatch);
     EXPECT_EQ(a.io_partition_grid, b.io_partition_grid);
+    EXPECT_EQ(a.milc_eigenvectors, b.milc_eigenvectors);
   };
 
   const FileIOParam defaults;
@@ -229,6 +230,7 @@ TEST(FileIOParamTest, conversion)
   param.allow_checksum_mismatch = QUDA_BOOLEAN_TRUE;
   const int grid[4] = {1, 2, 1, 4};
   for (int d = 0; d < 4; d++) param.io_partition_grid[d] = grid[d];
+  param.milc_eigenvectors = QUDA_BOOLEAN_TRUE;
 
   FileIOParam expected;
   expected.format = QUDA_FILE_FORMAT_MILC;
@@ -237,6 +239,7 @@ TEST(FileIOParamTest, conversion)
   expected.write_usqcd_info = false;
   expected.allow_checksum_mismatch = true;
   expected.io_partition_grid = {1, 2, 1, 4};
+  expected.milc_eigenvectors = true;
   expect_equal(FileIOParam(&param), expected);
 
   // the _EXTERNAL formats become the plain format and the external QIO backend

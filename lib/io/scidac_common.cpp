@@ -28,6 +28,13 @@ namespace quda
 
       std::string element(const std::string &tag, int value) { return element(tag, std::to_string(value)); }
 
+      std::string format(const char *fmt, double value)
+      {
+        char buf[64];
+        snprintf(buf, sizeof(buf), fmt, value);
+        return buf;
+      }
+
       std::string hex(uint32_t value)
       {
         char buf[16];
@@ -160,7 +167,7 @@ namespace quda
     }
 
     std::string quda_record_xml(int len, const std::string &datatype, QudaSiteSubset subset, QudaParity parity,
-                                int nColor, int nSpin)
+                                int nColor, int nSpin, std::optional<double> eval, std::optional<double> resid)
     {
       std::string name;
       switch (len) {
@@ -178,9 +185,29 @@ namespace quda
       std::string info = element("subset", subset == QUDA_PARITY_SITE_SUBSET ? "parity" : "full");
       info += element("parity", parity == QUDA_EVEN_PARITY ? "even" : parity == QUDA_ODD_PARITY ? "odd" : "full");
       info += element("nColor", nColor) + element("nSpin", nSpin);
+      // with the precision of MILC's eigenvector records
+      if (eval) info += element("eigVal", format("%.18e", *eval));
+      if (resid) info += element("resid", format("%e", *resid));
 
       return xml_declaration
         + element(name, element("version", "BETA") + element("type", datatype) + element("info", info));
+    }
+
+    std::string milc_vector_datatype(QudaPrecision file_prec)
+    {
+      return std::string("USQCD_") + (file_prec == QUDA_DOUBLE_PRECISION ? "D" : "F") + "3_ColorVector";
+    }
+
+    std::string milc_eigen_file_xml(int n_vectors)
+    {
+      return xml_declaration
+        + element("info", element("title", "KS eigenvalues and vectors") + element("Nvecs", n_vectors));
+    }
+
+    std::string milc_eigen_record_xml(double eval, double resid)
+    {
+      return xml_declaration
+        + element("info", element("eigVal", format("%.18e", eval)) + element("resid", format("%e", resid)));
     }
 
     std::string usqcd_info_xml(double plaq, double linktr)
@@ -272,9 +299,58 @@ namespace quda
       if (records[0].type == sitelist && !partfile.empty())
         errorQuda("%s is a volume of a partfile: load the partfile by the name %s", file.c_str(), partfile.c_str());
 
+      // each field is a message with binary data; ILDG files from other codes hold one gauge field
+      struct Message {
+        const std::vector<lime::Record> *records;
+        size_t data;
+      };
+      std::vector<Message> found;
+      for (auto &m : messages) {
+        for (auto i = 0u; i < m.size(); i++) {
+          if (m[i].type != binary_data && m[i].type != ildg_binary_data) continue;
+          found.push_back({&m, i});
+          break;
+        }
+      }
+      if (found.empty()) errorQuda("%s has no %s or %s record", file.c_str(), binary_data, ildg_binary_data);
+      if (!f.native) found.resize(1);
+
+      // rank 0 reads every metadata record at once
+      std::vector<lime::Record> wanted;
+      auto want = [&](const lime::Record *r) {
+        if (!r) return -1;
+        wanted.push_back(*r);
+        return static_cast<int>(wanted.size()) - 1;
+      };
+      const int file_info_index = f.native ? want(&records[0]) : -1;
+      const int user_file_index = f.native ? want(find_record(records, file_xml)) : -1;
+      struct Strings {
+        int private_record, user_record, checksum, ildg_format;
+      };
+      std::vector<Strings> indices;
+      std::vector<bool> has_ildg_format;
+      for (auto &m : found) {
+        const auto &message = *m.records;
+        const lime::Record *sum = nullptr;
+        for (auto i = m.data + 1; i < message.size() && !sum; i++)
+          if (message[i].type == checksum) sum = &message[i];
+        const lime::Record *format_record = find_record(message, ildg_format);
+        if (!f.native && !format_record) format_record = find_record(records, ildg_format);
+        has_ildg_format.push_back(format_record != nullptr);
+        // SciDAC files give the metadata in their private records; ILDG files from other codes only in ildg-format
+        if (f.native)
+          indices.push_back(
+            {want(find_record(message, private_record_xml)), want(find_record(message, record_xml)), want(sum), -1});
+        else
+          indices.push_back({-1, -1, -1, want(format_record)});
+      }
+      const auto strings = lime::read_strings(file, wanted);
+      auto text = [&](int index) { return index < 0 ? std::string() : strings[index]; };
+
       std::string file_info;
       if (f.native) {
-        file_info = lime::read_string(file, records[0]);
+        file_info = text(file_info_index);
+        f.user_file_xml = text(user_file_index);
         f.volfmt = int_value(file_info, "volfmt", file, private_file_xml);
         if (f.volfmt == partfile_volfmt && !partfile_name) {
           if (!partfile.empty())
@@ -287,30 +363,6 @@ namespace quda
           errorQuda("%s has volume format %d; only single files and partfiles are supported", file.c_str(), f.volfmt);
       }
 
-      // the field is in the first message with binary data
-      const std::vector<lime::Record> *message = nullptr;
-      size_t data_index = 0;
-      for (auto &m : messages) {
-        for (auto i = 0u; i < m.size(); i++) {
-          if (m[i].type != binary_data && m[i].type != ildg_binary_data) continue;
-          if (!message) {
-            message = &m;
-            data_index = i;
-          }
-          f.n_binary++;
-          break;
-        }
-      }
-      if (!message) errorQuda("%s has no %s or %s record", file.c_str(), binary_data, ildg_binary_data);
-      f.data = (*message)[data_index];
-      for (auto i = data_index + 1; i < message->size() && !f.checksum; i++)
-        if ((*message)[i].type == checksum) f.checksum = (*message)[i];
-
-      auto &m = f.metadata;
-      const lime::Record *format_record = find_record(*message, ildg_format);
-      if (!f.native && !format_record) format_record = find_record(records, ildg_format);
-      m.ildg = format_record != nullptr;
-
       if (f.native) {
         if (int_value(file_info, "spacetime", file, private_file_xml) != 4)
           errorQuda("%s is not a 4-d lattice field file", file.c_str());
@@ -318,37 +370,53 @@ namespace quda
         for (auto &n : f.dims)
           if (!(dims_str >> n))
             errorQuda("Cannot read the dimensions in the %s record of %s", private_file_xml, file.c_str());
+      }
 
-        auto private_record = find_record(*message, private_record_xml);
-        if (!private_record) errorQuda("%s has no %s record for its binary data", file.c_str(), private_record_xml);
-        auto record_info = lime::read_string(file, *private_record);
-        // version 1.0 records give <globaldata>, version 1.1 records <recordtype>; 0 means a lattice field
-        auto recordtype = xml_value(record_info, "recordtype");
-        if (!recordtype) recordtype = xml_value(record_info, "globaldata");
-        if (recordtype && std::strtol(recordtype->c_str(), nullptr, 10) != 0)
-          errorQuda("The binary data of %s is not a lattice field (record type %s)", file.c_str(), recordtype->c_str());
-        m.datatype = xml_value(record_info, "datatype").value_or("");
-        m.prec = xml_value(record_info, "precision").value_or("") == "F" ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
-        // QIO omits colors and spins when they are zero
-        m.colors = std::strtol(xml_value(record_info, "colors").value_or("0").c_str(), nullptr, 10);
-        m.spins = std::strtol(xml_value(record_info, "spins").value_or("0").c_str(), nullptr, 10);
-        m.typesize = int_value(record_info, "typesize", file, private_record_xml);
-        m.datacount = int_value(record_info, "datacount", file, private_record_xml);
+      for (auto k = 0u; k < found.size(); k++) {
+        FieldRecord r;
+        r.data = (*found[k].records)[found[k].data];
+        auto &m = r.metadata;
+        m.ildg = has_ildg_format[k];
+        const auto &index = indices[k];
+        const std::string what = found.size() > 1 ? "binary record " + std::to_string(k) + " of " + file : file;
 
-        if (auto user_record = find_record(*message, record_xml)) m.user_xml = lime::read_string(file, *user_record);
-      } else {
-        if (!format_record)
-          errorQuda("%s is neither a SciDAC file (its first record is %s) nor an ILDG file (it has no %s record)",
-                    file.c_str(), records[0].type.c_str(), ildg_format);
-        auto format = lime::read_string(file, *format_record);
-        auto bits = int_value(format, "precision", file, ildg_format);
-        if (bits != 32 && bits != 64) errorQuda("Unsupported ILDG precision %ld in %s", bits, file.c_str());
-        m.prec = bits == 64 ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-        const char *dim_tags[] = {"lx", "ly", "lz", "lt"};
-        for (int d = 0; d < 4; d++) f.dims[d] = int_value(format, dim_tags[d], file, ildg_format);
-        // ILDG files hold gauge fields: four 3x3 complex matrices per site
-        m.typesize = 18 * m.prec;
-        m.datacount = 4;
+        if (f.native) {
+          if (index.private_record < 0)
+            errorQuda("%s has no %s record for its binary data", what.c_str(), private_record_xml);
+          const auto record_info = text(index.private_record);
+          // version 1.0 records give <globaldata>, version 1.1 records <recordtype>; 0 means a lattice field
+          auto recordtype = xml_value(record_info, "recordtype");
+          if (!recordtype) recordtype = xml_value(record_info, "globaldata");
+          if (recordtype && std::strtol(recordtype->c_str(), nullptr, 10) != 0)
+            errorQuda("The binary data of %s is not a lattice field (record type %s)", what.c_str(), recordtype->c_str());
+          m.datatype = xml_value(record_info, "datatype").value_or("");
+          m.prec
+            = xml_value(record_info, "precision").value_or("") == "F" ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
+          // QIO omits colors and spins when they are zero
+          m.colors = std::strtol(xml_value(record_info, "colors").value_or("0").c_str(), nullptr, 10);
+          m.spins = std::strtol(xml_value(record_info, "spins").value_or("0").c_str(), nullptr, 10);
+          m.typesize = int_value(record_info, "typesize", what, private_record_xml);
+          m.datacount = int_value(record_info, "datacount", what, private_record_xml);
+          m.user_xml = text(index.user_record);
+          if (index.checksum >= 0) {
+            const auto xml = text(index.checksum);
+            r.checksum = io::Checksum {hex_value(xml, "suma", what), hex_value(xml, "sumb", what)};
+          }
+        } else {
+          if (index.ildg_format < 0)
+            errorQuda("%s is neither a SciDAC file (its first record is %s) nor an ILDG file (it has no %s record)",
+                      file.c_str(), records[0].type.c_str(), ildg_format);
+          const auto format = text(index.ildg_format);
+          auto bits = int_value(format, "precision", file, ildg_format);
+          if (bits != 32 && bits != 64) errorQuda("Unsupported ILDG precision %ld in %s", bits, file.c_str());
+          m.prec = bits == 64 ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+          const char *dim_tags[] = {"lx", "ly", "lz", "lt"};
+          for (int d = 0; d < 4; d++) f.dims[d] = int_value(format, dim_tags[d], file, ildg_format);
+          // ILDG files hold gauge fields: four 3x3 complex matrices per site
+          m.typesize = 18 * m.prec;
+          m.datacount = 4;
+        }
+        f.fields.push_back(r);
       }
 
       return f;
@@ -450,32 +518,46 @@ namespace quda
         return volumes;
       }
 
-      // what rank 0 broadcasts about each volume
+      // what rank 0 broadcasts about each volume, besides its records' data offsets
       struct VolumeBox {
-        uint64_t offset;
         coords_t corner;
         coords_t extent;
       };
 
       /**
-         @brief Find the binary data of a partfile volume, and check that
-         its site list is a box of the lattice in lexicographic order
+         @brief Find the binary records of a partfile volume, and check
+         that its site list is a box of the lattice in lexicographic order
          @param[in] name The volume
-         @param[in] data_type The type of the binary data record, as in the first volume
+         @param[in] data_type The type of the binary data records, as in the first volume
+         @param[in] n_records The number of binary records in the first volume
+         @param[in] first_volume The first volume's name, for messages
          @param[in] site_bytes Size of a site
          @param[in] S The lattice of the file
+         @param[out] offsets The data offsets of the volume's binary records are appended
        */
-      VolumeBox scan_volume(const std::string &name, const std::string &data_type, size_t site_bytes, const coords_t &S)
+      VolumeBox scan_volume(const std::string &name, const std::string &data_type, size_t n_records,
+                            const std::string &first_volume, size_t site_bytes, const coords_t &S,
+                            std::vector<uint64_t> &offsets)
       {
         io::File file(name, io::File::Mode::READ);
         const auto records = lime::list_records(file, name);
-        const lime::Record *list = nullptr, *data = nullptr;
+        const lime::Record *list = nullptr;
+        std::vector<const lime::Record *> data_records;
         for (auto &r : records) {
           if (!list && r.type == sitelist) list = &r;
-          if (!data && r.type == data_type) data = &r;
+          if (r.type == data_type) data_records.push_back(&r);
         }
         if (!list) errorQuda("The partfile volume %s has no %s record", name.c_str(), sitelist);
-        if (!data) errorQuda("The partfile volume %s has no %s record", name.c_str(), data_type.c_str());
+        if (data_records.empty()) errorQuda("The partfile volume %s has no %s record", name.c_str(), data_type.c_str());
+        if (data_records.size() != n_records)
+          errorQuda("The partfile volume %s holds %lu %s records, but %s holds %lu", name.c_str(), data_records.size(),
+                    data_type.c_str(), first_volume.c_str(), n_records);
+        const auto data = data_records[0];
+        for (auto i = 1u; i < data_records.size(); i++)
+          if (data_records[i]->data_bytes != data->data_bytes)
+            errorQuda("Binary record %u of the partfile volume %s has %lu bytes, but its first has %lu", i,
+                      name.c_str(), data_records[i]->data_bytes, data->data_bytes);
+        for (auto r : data_records) offsets.push_back(r->data_offset);
 
         const size_t n = data->data_bytes / site_bytes;
         if (n == 0 || data->data_bytes % site_bytes != 0)
@@ -505,7 +587,7 @@ namespace quda
         const uint64_t first = entry(ends[0]), last = entry(ends[1]);
         if (last >= lattice_volume(S)) not_a_box("outside the lattice", n - 1, last, lattice_volume(S) - 1);
         if (last < first) not_a_box("not ascending", n - 1, last, first);
-        VolumeBox box = {data->data_offset, lattice_coords(first, S), {}};
+        VolumeBox box = {lattice_coords(first, S), {}};
         const auto hi = lattice_coords(last, S);
         size_t box_volume = 1;
         for (int d = 0; d < 4; d++) {
@@ -535,18 +617,23 @@ namespace quda
       }
 
       /**
-         @brief Save a field as a partfile; see write_field
+         @brief Save fields as a partfile; see write_fields
        */
-      io::Checksum write_partfile(const std::string &filename, const FieldMetadata &m, const io::HostField &field,
-                                  const int *X, QudaParity parity, const FileIOParam &param)
+      std::vector<io::Checksum> write_partfile(const std::string &filename, const std::string &user_file_xml,
+                                               const std::vector<FieldMetadata> &metadata,
+                                               const std::vector<io::HostField> &fields, const int *X,
+                                               QudaParity parity, const FileIOParam &param)
       {
-        if (m.ildg) errorQuda("%s: ILDG files cannot be saved as partfiles", filename.c_str());
+        for (auto &m : metadata)
+          if (m.ildg) errorQuda("%s: ILDG files cannot be saved as partfiles", filename.c_str());
         const auto &grid = param.partfile_grid;
         const bool virtual_grid = grid != coords_t {};
         // checks the grid before any volume is truncated
         const io::Partitions partitions(param.io_mode, param.io_partition_grid, !virtual_grid);
         const auto S = file_dims(X, parity);
-        const auto layout = field_layout(field, m.prec, 0, parity);
+        std::vector<io::DataLayout> layouts;
+        for (auto k = 0u; k < fields.size(); k++)
+          layouts.push_back(field_layout(fields[k], metadata[k].prec, 0, parity));
 
         // each volume holds a box of the lattice, and is created by its writer
         std::vector<io::FilePart> parts;
@@ -585,61 +672,83 @@ namespace quda
         }
         logQuda(QUDA_VERBOSE, "Saving %s as a partfile of %lu volumes\n", filename.c_str(), parts.size());
 
-        // every volume but the first has a site list and the binary data, so its data offset is known to all
+        // every volume but the first has a site list and then the records' binary data, so the data offsets are
+        // known to all: offsets[k][i] is that of record k in volume i
         auto list_bytes = [&](const io::FilePart &p) { return p.volume() * sitelist_width(p, S); };
-        auto data_bytes = [&](const io::FilePart &p) { return p.volume() * layout.site_bytes; };
-        for (auto i = 1u; i < parts.size(); i++)
-          parts[i].offset = 2 * lime::header_bytes + list_bytes(parts[i]) + lime::padding(list_bytes(parts[i]));
+        auto data_bytes = [&](const io::FilePart &p, size_t k) { return p.volume() * layouts[k].site_bytes; };
+        std::vector<std::vector<uint64_t>> offsets(fields.size(), std::vector<uint64_t>(parts.size()));
+        for (auto i = 1u; i < parts.size(); i++) {
+          uint64_t next = lime::header_bytes + list_bytes(parts[i]) + lime::padding(list_bytes(parts[i]));
+          for (auto k = 0u; k < fields.size(); k++) {
+            offsets[k][i] = next + lime::header_bytes;
+            next = offsets[k][i] + data_bytes(parts[i], k) + lime::padding(data_bytes(parts[i], k));
+          }
+        }
 
-        // the first volume holds the metadata, as in QIO; each record of the others is a message of its own
+        // the first volume holds the metadata, as in QIO, and rank 0 appends each record's metadata to it; each
+        // record of the others is a message of its own
+        std::optional<io::File> first_file;
+        std::optional<lime::Writer> first_writer;
         for (auto i = 0u; i < parts.size(); i++) {
           if (writers[i] != comm_rank()) continue;
-          auto &p = parts[i];
-          const bool first = i == 0;
+          const auto &p = parts[i];
+          if (i == 0) {
+            first_file.emplace(p.filename, io::File::Mode::CREATE);
+            first_writer.emplace(*first_file);
+            first_writer->write(private_file_xml, file_info_xml(S, partfile_volfmt), true, false);
+            write_sitelist(*first_file, first_writer->reserve(sitelist, list_bytes(p), false, false), p, S);
+            first_writer->write(file_xml, user_file_xml, false, true);
+            continue;
+          }
           io::File file(p.filename, io::File::Mode::CREATE);
           lime::Writer writer(file);
-          if (first) writer.write(private_file_xml, file_info_xml(S, partfile_volfmt), true, false);
-          write_sitelist(file, writer.reserve(sitelist, list_bytes(p), !first, !first), p, S);
-          if (first) {
-            writer.write(file_xml, std::string("Dummy user file XML"), false, true);
-            writer.write(private_record_xml,
-                         record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount), true, false);
-            writer.write(record_xml, m.user_xml, false, false);
+          write_sitelist(file, writer.reserve(sitelist, list_bytes(p), true, true), p, S);
+          for (auto k = 0u; k < fields.size(); k++) {
+            const auto offset = writer.reserve(binary_data, data_bytes(p, k), true, true);
+            if (offset != offsets[k][i])
+              errorQuda("Binary record %u of %s starts at byte %lu rather than at byte %lu, where the other ranks "
+                        "expect it",
+                        k, p.filename.c_str(), offset, offsets[k][i]);
           }
-          const auto offset = writer.reserve(binary_data, data_bytes(p), !first, !first);
-          if (!first && offset != p.offset)
-            errorQuda(
-              "The binary data of %s starts at byte %lu rather than at byte %lu, where the other ranks expect it",
-              p.filename.c_str(), offset, p.offset);
-          p.offset = offset;
           file.close();
         }
-        uint64_t first_offset = parts[0].offset;
-        comm_broadcast(&first_offset, sizeof(first_offset));
-        parts[0].offset = first_offset;
 
-        auto sum = io::write_data(parts, layout, X, partitions, field.packer(m.prec));
+        std::vector<io::Checksum> sums;
+        for (auto k = 0u; k < fields.size(); k++) {
+          const auto &m = metadata[k];
+          uint64_t first_offset = 0;
+          if (comm_rank() == 0) {
+            first_writer->write(private_record_xml,
+                                record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount), true,
+                                false);
+            first_writer->write(record_xml, m.user_xml, false, false);
+            first_offset = first_writer->reserve(binary_data, data_bytes(parts[0], k), false, false);
+          }
+          comm_broadcast(&first_offset, sizeof(first_offset));
+          auto record_parts = parts;
+          record_parts[0].offset = first_offset;
+          for (auto i = 1u; i < parts.size(); i++) record_parts[i].offset = offsets[k][i];
 
-        if (comm_rank() == 0) {
-          const auto &p = parts[0];
-          io::File file(p.filename, io::File::Mode::WRITE);
-          lime::Writer writer(file, p.offset + data_bytes(p) + lime::padding(data_bytes(p)));
-          writer.write(checksum, checksum_xml(sum.sum29, sum.sum31), false, true);
-          file.close();
+          auto sum = io::write_data(record_parts, layouts[k], X, partitions, fields[k].packer(m.prec));
+          if (comm_rank() == 0) first_writer->write(checksum, checksum_xml(sum.sum29, sum.sum31), false, true);
+          sums.push_back(sum);
         }
-        return sum;
+        if (first_file) first_file->close();
+        return sums;
       }
     } // namespace
 
-    std::vector<io::FilePart> find_volumes(const FieldRecords &records, size_t site_bytes)
+    std::vector<std::vector<io::FilePart>> find_volumes(const FieldRecords &records, size_t site_bytes)
     {
       const auto &S = records.dims;
+      const size_t n_records = records.fields.size();
       std::vector<VolumeBox> boxes;
-      std::string names; // each followed by a newline
+      std::vector<uint64_t> offsets; // the data offsets of each volume's records, one volume after another
+      std::string names;             // each followed by a newline
       if (comm_rank() == 0) {
         const auto volumes = list_volumes(records.filename);
         for (auto &v : volumes) {
-          boxes.push_back(scan_volume(v, records.data.type, site_bytes, S));
+          boxes.push_back(scan_volume(v, records.fields[0].data.type, n_records, records.file, site_bytes, S, offsets));
           names += v + "\n";
         }
 
@@ -665,102 +774,149 @@ namespace quda
                     volumes.size(), records.filename.c_str(), sites, lattice_volume(S), S[0], S[1], S[2], S[3]);
       }
       io::broadcast(boxes);
+      io::broadcast(offsets);
       io::broadcast(names);
 
-      std::vector<io::FilePart> parts;
+      std::vector<std::vector<io::FilePart>> parts(n_records);
       std::istringstream in(names);
-      for (auto &b : boxes) {
-        io::FilePart p = {"", b.offset, b.corner, b.extent};
-        std::getline(in, p.filename);
-        parts.push_back(p);
+      for (auto i = 0u; i < boxes.size(); i++) {
+        std::string name;
+        std::getline(in, name);
+        for (auto k = 0u; k < n_records; k++)
+          parts[k].push_back({name, offsets[i * n_records + k], boxes[i].corner, boxes[i].extent});
       }
-      logQuda(QUDA_VERBOSE, "Found %lu volumes of the partfile %s\n", parts.size(), records.filename.c_str());
+      logQuda(QUDA_VERBOSE, "Found %lu volumes of the partfile %s, with %lu binary records each\n", boxes.size(),
+              records.filename.c_str(), n_records);
       return parts;
     }
 
-    FieldChecksum read_field(const FieldRecords &records, const io::HostField &field, const int *X, QudaParity parity,
-                             const FileIOParam &param)
+    std::vector<FieldChecksum> read_fields(const FieldRecords &records, const std::vector<io::HostField> &fields,
+                                           const int *X, QudaParity parity, const FileIOParam &param)
     {
       const auto &file = records.file;
-      const auto &m = records.metadata;
+      if (fields.size() > records.fields.size())
+        errorQuda("%s holds %lu fields, fewer than the %lu to be read", file.c_str(), records.fields.size(),
+                  fields.size());
       const auto N = file_dims(X, parity);
       const auto &D = records.dims;
       if (D != N)
         errorQuda("%s has dimensions %d %d %d %d, but the field's lattice is %d %d %d %d%s", file.c_str(), D[0], D[1],
                   D[2], D[3], N[0], N[1], N[2], N[3],
                   single_parity(parity) ? " (half the global x extent, as single-parity fields are stored)" : "");
-      if (m.typesize != static_cast<int>(field.item_bytes(m.prec)))
-        errorQuda("The typesize %d of %s does not match the expected datasize %lu", m.typesize, file.c_str(),
-                  field.item_bytes(m.prec));
 
-      auto layout = field_layout(field, m.prec, records.data.data_offset, parity);
+      auto what = [&](size_t k) {
+        return records.fields.size() > 1 ? "binary record " + std::to_string(k) + " of " + file : file;
+      };
+      std::vector<io::DataLayout> layouts;
+      for (auto k = 0u; k < fields.size(); k++) {
+        const auto &r = records.fields[k];
+        const auto &m = r.metadata;
+        if (m.typesize != static_cast<int>(fields[k].item_bytes(m.prec)))
+          errorQuda("The typesize %d of %s does not match the expected datasize %lu", m.typesize, what(k).c_str(),
+                    fields[k].item_bytes(m.prec));
+        layouts.push_back(field_layout(fields[k], m.prec, r.data.data_offset, parity));
+      }
+
       const io::Partitions partitions(param.io_mode, param.io_partition_grid);
-      FieldChecksum c;
-      if (records.volfmt == partfile_volfmt) {
-        auto parts = find_volumes(records, layout.site_bytes);
-        c.sum = io::read_data(parts, layout, X, partitions, field.unpacker(m.prec));
-      } else {
-        const auto bytes = io::data_bytes(layout, io::global_dims(X));
-        if (records.data.data_bytes != bytes)
-          errorQuda("The binary data of %s is %lu bytes, but should be %lu bytes", file.c_str(),
-                    records.data.data_bytes, bytes);
-        c.sum = io::read_data(file, layout, X, partitions, field.unpacker(m.prec));
+      const bool partfile = records.volfmt == partfile_volfmt;
+      std::vector<std::vector<io::FilePart>> volumes;
+      if (partfile && !fields.empty()) {
+        for (auto k = 1u; k < layouts.size(); k++)
+          if (layouts[k].site_bytes != layouts[0].site_bytes)
+            errorQuda("The sites of %s have %lu bytes, but those of its first binary record %lu", what(k).c_str(),
+                      layouts[k].site_bytes, layouts[0].site_bytes);
+        volumes = find_volumes(records, layouts[0].site_bytes);
       }
 
-      // as in QIO, a SciDAC file must have a checksum, while ILDG files from other codes have none
-      if (records.native) {
-        if (!records.checksum) errorQuda("%s has no %s record after its binary data", file.c_str(), checksum);
-        auto xml = lime::read_string(file, *records.checksum);
-        io::Checksum stored = {hex_value(xml, "suma", file), hex_value(xml, "sumb", file)};
-        c.has_checksum = true;
-        c.checksum_matches = io::check_checksum(file, c.sum, stored, param.allow_checksum_mismatch);
+      std::vector<FieldChecksum> sums;
+      for (auto k = 0u; k < fields.size(); k++) {
+        const auto &r = records.fields[k];
+        const auto unpack = fields[k].unpacker(r.metadata.prec);
+        FieldChecksum c;
+        if (partfile) {
+          c.sum = io::read_data(volumes[k], layouts[k], X, partitions, unpack);
+        } else {
+          const auto bytes = io::data_bytes(layouts[k], io::global_dims(X));
+          if (r.data.data_bytes != bytes)
+            errorQuda("The binary data of %s is %lu bytes, but should be %lu bytes", what(k).c_str(), r.data.data_bytes,
+                      bytes);
+          c.sum = io::read_data(file, layouts[k], X, partitions, unpack);
+        }
+
+        // as in QIO, a SciDAC file must have a checksum, while ILDG files from other codes have none
+        if (records.native) {
+          if (!r.checksum) errorQuda("%s has no %s record after its binary data", what(k).c_str(), checksum);
+          c.has_checksum = true;
+          c.checksum_matches = io::check_checksum(what(k), c.sum, *r.checksum, param.allow_checksum_mismatch);
+        }
+        sums.push_back(c);
       }
-      return c;
+      return sums;
+    }
+
+    FieldChecksum read_field(const FieldRecords &records, const io::HostField &field, const int *X, QudaParity parity,
+                             const FileIOParam &param)
+    {
+      return read_fields(records, {field}, X, parity, param)[0];
+    }
+
+    std::vector<io::Checksum> write_fields(const std::string &filename, const std::string &user_file_xml,
+                                           const std::vector<FieldMetadata> &metadata,
+                                           const std::vector<io::HostField> &fields, const int *X, QudaParity parity,
+                                           const FileIOParam &param)
+    {
+      if (metadata.size() != fields.size())
+        errorQuda("%lu metadata records for %lu fields in %s", metadata.size(), fields.size(), filename.c_str());
+
+      // as QIO, a partfile on one rank is a single file
+      if (param.partfile && (comm_size() > 1 || param.partfile_grid != std::array<int, 4> {}))
+        return write_partfile(filename, user_file_xml, metadata, fields, X, parity, param);
+
+      // checks the grid before rank 0 truncates the file
+      const io::Partitions partitions(param.io_mode, param.io_partition_grid);
+      const auto N = file_dims(X, parity);
+
+      // rank 0 writes everything but the binary data, appending each record's checksum after its data
+      std::optional<io::File> file;
+      std::optional<lime::Writer> writer;
+      if (comm_rank() == 0) {
+        file.emplace(filename, io::File::Mode::CREATE);
+        writer.emplace(*file);
+        writer->write(private_file_xml, file_info_xml(N, 0), true, false);
+        writer->write(file_xml, user_file_xml, false, true);
+      }
+
+      std::vector<io::Checksum> sums;
+      for (auto k = 0u; k < fields.size(); k++) {
+        const auto &m = metadata[k];
+        auto layout = field_layout(fields[k], m.prec, 0, parity);
+        const size_t bytes = io::data_bytes(layout, io::global_dims(X));
+        uint64_t data_offset = 0;
+        if (comm_rank() == 0) {
+          writer->write(private_record_xml,
+                        record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount), true, false);
+          writer->write(record_xml, m.user_xml, false, false);
+          if (m.ildg) {
+            writer->write(ildg_format, ildg_format_xml(m.prec, N), false, false);
+            if (!m.ildg_lfn.empty()) writer->write(ildg_data_lfn, m.ildg_lfn, false, false);
+          }
+          data_offset = writer->reserve(m.ildg ? ildg_binary_data : binary_data, bytes, false, false);
+        }
+        comm_broadcast(&data_offset, sizeof(data_offset));
+        layout.offset = data_offset;
+
+        auto sum = io::write_data(filename, layout, X, partitions, fields[k].packer(m.prec));
+        if (comm_rank() == 0) writer->write(checksum, checksum_xml(sum.sum29, sum.sum31), false, true);
+        sums.push_back(sum);
+      }
+      if (file) file->close();
+      return sums;
     }
 
     io::Checksum write_field(const std::string &filename, const FieldMetadata &metadata, const io::HostField &field,
                              const int *X, QudaParity parity, const FileIOParam &param)
     {
-      // as QIO, a partfile on one rank is a single file
-      if (param.partfile && (comm_size() > 1 || param.partfile_grid != std::array<int, 4> {}))
-        return write_partfile(filename, metadata, field, X, parity, param);
-
-      // checks the grid before rank 0 truncates the file
-      const io::Partitions partitions(param.io_mode, param.io_partition_grid);
-      const auto &m = metadata;
-      const auto N = file_dims(X, parity);
-      auto layout = field_layout(field, m.prec, 0, parity);
-      const size_t bytes = io::data_bytes(layout, io::global_dims(X));
-
-      // rank 0 writes everything but the binary data and the checksum, which follows it
-      uint64_t data_offset = 0;
-      if (comm_rank() == 0) {
-        io::File file(filename, io::File::Mode::CREATE);
-        lime::Writer writer(file);
-        writer.write(private_file_xml, file_info_xml(N, 0), true, false);
-        writer.write(file_xml, std::string("Dummy user file XML"), false, true);
-        writer.write(private_record_xml,
-                     record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount), true, false);
-        writer.write(record_xml, m.user_xml, false, false);
-        if (m.ildg) {
-          writer.write(ildg_format, ildg_format_xml(m.prec, N), false, false);
-          if (!m.ildg_lfn.empty()) writer.write(ildg_data_lfn, m.ildg_lfn, false, false);
-        }
-        data_offset = writer.reserve(m.ildg ? ildg_binary_data : binary_data, bytes, false, false);
-        file.close();
-      }
-      comm_broadcast(&data_offset, sizeof(data_offset));
-      layout.offset = data_offset;
-
-      auto sum = io::write_data(filename, layout, X, partitions, field.packer(m.prec));
-
-      if (comm_rank() == 0) {
-        io::File file(filename, io::File::Mode::WRITE);
-        lime::Writer writer(file, data_offset + bytes + lime::padding(bytes));
-        writer.write(checksum, checksum_xml(sum.sum29, sum.sum31), false, true);
-        file.close();
-      }
-      return sum;
+      return write_fields(filename, quda_user_file_xml, {metadata}, {field}, X, parity, param)[0];
     }
 
   } // namespace scidac

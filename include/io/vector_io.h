@@ -29,21 +29,24 @@ namespace quda
     VectorIO(const std::string &filename, const FileIOParam &param = {});
 
     /**
-       @brief Load vectors from filename
+       @brief Load vectors from filename: the first vecs.size() of the file
        @param[in] vecs The set of vectors to load
-       @param[out] evals Optional eigenvalues, filled if the file format stores them
+       @param[out] evals Optional eigenvalues, filled (as real numbers) if the file has one for each vector; those
+       of MILC's eigenvector files are in MILC's convention
     */
     void load(cvector_ref<ColorSpinorField> &vecs, std::vector<complex_t> *evals = nullptr);
 
     /**
-       @brief Save vectors to filename
+       @brief Save vectors to filename, one record per vector
        @param[in] vecs The set of vectors to save
        @param[in] prec Optional change of precision when saving
        @param[in] size Optional cap to number of vectors saved
-       @param[in] evals Optional eigenvalues, saved if the file format stores them
+       @param[in] evals Optional eigenvalues, one per vector, whose real parts are saved; required for MILC's
+       eigenvector format
+       @param[in] resids Optional residuals, one per vector
     */
     void save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0,
-              const std::vector<complex_t> *evals = nullptr);
+              const std::vector<complex_t> *evals = nullptr, const std::vector<real_t> *resids = nullptr);
   };
 
 } // namespace quda

@@ -32,7 +32,7 @@ namespace quda
     {
       io::HostField field(gauge, n_dim, prec, matrix_reals);
       auto records = find_field(filename);
-      const auto &m = records.metadata;
+      const auto &m = records.fields[0].metadata;
       if (m.datacount != n_dim)
         errorQuda("The datacount %d of %s does not match the expected number of fields %d", m.datacount,
                   records.file.c_str(), n_dim);

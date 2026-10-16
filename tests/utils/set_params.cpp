@@ -11,12 +11,13 @@ namespace
   QudaFileIOParam mg_file_io_param;
 
   QudaFileIOParam *setFileIOParam(QudaFileIOParam &param, QudaFileFormat format, QudaFileIOMode io_mode,
-                                  const std::array<int, 4> &io_partitions)
+                                  const std::array<int, 4> &io_partitions, bool milc_eigenvectors = false)
   {
     param = newQudaFileIOParam();
     param.format = format;
     param.io_mode = io_mode;
     for (int d = 0; d < 4; d++) param.io_partition_grid[d] = io_partitions[d];
+    param.milc_eigenvectors = milc_eigenvectors ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     param.struct_size = sizeof(param);
     return &param;
   }
@@ -380,7 +381,8 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.partfile = eig_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.file_io_param = setFileIOParam(eig_file_io_param, eig_file_format, eig_file_io_mode, eig_file_io_partitions);
+  eig_param.file_io_param
+    = setFileIOParam(eig_file_io_param, eig_file_format, eig_file_io_mode, eig_file_io_partitions, eig_save_milc_format);
 
   eig_param.struct_size = sizeof(eig_param);
 }
@@ -1427,7 +1429,8 @@ void setDeflationParam(QudaEigParam &df_param)
   safe_strcpy(df_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   df_param.partfile = eig_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  df_param.file_io_param = setFileIOParam(eig_file_io_param, eig_file_format, eig_file_io_mode, eig_file_io_partitions);
+  df_param.file_io_param
+    = setFileIOParam(eig_file_io_param, eig_file_format, eig_file_io_mode, eig_file_io_partitions, eig_save_milc_format);
 }
 
 /**********/

@@ -13,6 +13,8 @@ namespace quda
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
+  struct FileIOParam;
+
   class EigenSolver
   {
     using range = std::pair<int, int>;
@@ -134,6 +136,26 @@ namespace quda
        @param[in] evals The eigenvalue array
     */
     void cleanUpEigensolver(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals);
+
+    /**
+       @brief Check that the eigenvectors can be saved in MILC's
+       eigenvector format: those of the preconditioned staggered or
+       asqtad operator M, solved for as M.  Errors otherwise.
+     */
+    static void checkMILCEigenvectorSave(const QudaEigParam &eig_param, const DiracMatrix &mat);
+
+    /**
+       @brief Save the eigenvectors in MILC's eigenvector format: on the
+       full lattice, the other parity holding the eigenvector's image
+       under the hopping term, normalized, as MILC's
+       construct_eigen_other_parity makes it, and the eigenvalues of the
+       massless operator -D_eo D_oe
+       @param[in] kSpace The eigenvectors
+       @param[in] evals The eigenvalues
+       @param[in] param File I/O options
+     */
+    void saveMILCEigenvectors(const std::vector<ColorSpinorField> &kSpace, const std::vector<complex_t> &evals,
+                              const FileIOParam &param);
 
     /**
        @brief Promoted the specified matVec operation:

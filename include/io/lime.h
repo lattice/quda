@@ -68,6 +68,13 @@ namespace quda
     std::string read_string(const std::string &filename, const Record &record);
 
     /**
+       @brief Read the data of several (small) records as strings, as
+       read_string does, with one open of the file on rank 0 and one
+       broadcast
+     */
+    std::vector<std::string> read_strings(const std::string &filename, const std::vector<Record> &records);
+
+    /**
        @brief Writes records one after another to a file.  Used on rank 0 only.
      */
     class Writer
@@ -81,6 +88,11 @@ namespace quda
          @param[in] offset Where the next record starts
        */
       Writer(const io::File &file, size_t offset = 0) : file(file), offset(offset) { }
+
+      /**
+         @brief Where the next record starts
+       */
+      size_t end() const { return offset; }
 
       /**
          @brief Write a record's header and the padding after its data,

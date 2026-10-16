@@ -514,6 +514,7 @@ extern bool eig_partfile;
 extern QudaFileFormat eig_file_format;
 extern QudaFileIOMode eig_file_io_mode;
 extern std::array<int, 4> eig_file_io_partitions;
+extern bool eig_save_milc_format;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,

@@ -41,6 +41,7 @@ namespace quda
       {
         const auto &a = site_arrays(arrays, odd_arrays, half_volume, index);
         for (auto i = 0u; i < a.size(); i++) {
+          if (!a[i]) continue;
           auto dst = static_cast<Host *>(a[i]) + index * reals;
           for (int j = 0; j < reals; j++) {
             Stored value;
@@ -56,6 +57,10 @@ namespace quda
       {
         const auto &a = site_arrays(arrays, odd_arrays, half_volume, index);
         for (auto i = 0u; i < a.size(); i++) {
+          if (!a[i]) {
+            memset(site + i * reals * sizeof(Stored), 0, reals * sizeof(Stored));
+            continue;
+          }
           auto src = static_cast<const Host *>(a[i]) + index * reals;
           for (int j = 0; j < reals; j++) {
             Stored value = src[j];
@@ -64,6 +69,25 @@ namespace quda
         }
       }
     } // namespace
+
+    HostField HostField::slice(int first, int n) const
+    {
+      if (first < 0 || n < 0 || first + n > items())
+        errorQuda("Items %d to %d of a host field of %d items", first, first + n - 1, items());
+      HostField f = *this;
+      f.arrays.assign(arrays.begin() + first, arrays.begin() + first + n);
+      if (!odd_arrays.empty()) f.odd_arrays.assign(odd_arrays.begin() + first, odd_arrays.begin() + first + n);
+      return f;
+    }
+
+    HostField HostField::extend(int n) const
+    {
+      if (n < items()) errorQuda("Cannot extend a host field of %d items to %d", items(), n);
+      HostField f = *this;
+      f.arrays.resize(n, nullptr);
+      if (!odd_arrays.empty()) f.odd_arrays.resize(n, nullptr);
+      return f;
+    }
 
     HostField::HostField(void *const arrays[], int n, QudaPrecision prec, int reals) :
       arrays(arrays, arrays + n), prec(prec), reals(reals)

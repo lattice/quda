@@ -39,6 +39,16 @@ namespace quda
     */
     std::array<int, 4> partfile_grid {};
 
+    /** Save vectors in MILC's SciDAC eigenvector format (QudaFileIOParam::milc_eigenvectors); ignored on load */
+    bool milc_eigenvectors = false;
+
+    /**
+       Native vector saves, for tests: all the vectors in one record,
+       interleaved at each site, as QUDA saved them before it saved one
+       record per vector
+    */
+    bool interleaved_vectors = false;
+
     FileIOParam() = default;
 
     /**

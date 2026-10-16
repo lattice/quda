@@ -261,6 +261,7 @@ bool eig_partfile = false;
 QudaFileFormat eig_file_format = QUDA_FILE_FORMAT_AUTO;
 QudaFileIOMode eig_file_io_mode = QUDA_FILE_IO_PARALLEL;
 std::array<int, 4> eig_file_io_partitions = {0, 0, 0, 0};
+bool eig_save_milc_format = false;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
@@ -893,6 +894,10 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
       "rank at each partition's lowest corner opens a single file in parallel mode, and partfiles have one "
       "file per partition (default 0 0 0 0, one partition per rank)")
     ->expected(4);
+  opgroup->add_option("--eig-save-milc-format", eig_save_milc_format,
+                      "Save eigenvectors in MILC's SciDAC eigenvector format, on the full lattice with the other "
+                      "parity reconstructed and the eigenvalues in MILC's convention; only for the preconditioned "
+                      "staggered or asqtad operator M (default false)");
 
   opgroup->add_option(
     "--eig-io-parity-inflate", eig_io_parity_inflate,

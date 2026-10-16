@@ -50,6 +50,13 @@ typedef struct QudaFileIOParam_s {
                                mode goes through rank 0 alone); a partfile is saved as one file per partition,
                                whatever the mode.  The native backend loads partfiles saved with any rank layout and
                                grid; the external QIO backend only those saved with its own layout and grid */
+  QudaBoolean milc_eigenvectors; /**< Whether to save eigenvectors in MILC's SciDAC format (default false), on the full
+                                    lattice with both parities filled and the eigenvalues in MILC's convention.  Only
+                                    for eigensolver saves of the preconditioned staggered or asqtad operator M; any
+                                    other save with it set is an error.  Ignored on load, where the format is detected,
+                                    and for gauge fields.  MILC's double-precision builds reunitarize the links they
+                                    load, so with single-precision links from a file, load them with
+                                    QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2 to solve MILC's operator */
 } QudaFileIOParam;
 
   /**
@@ -650,11 +657,17 @@ typedef struct QudaFileIOParam_s {
     QudaPrecision save_prec;
 
     /** Whether to inflate single-parity eigen-vector I/O to a full
-        field (e.g., enabling this is required for compatability with
-        MILC I/O) */
+        field, with the other parity zero; otherwise single-parity
+        vectors are saved on a lattice of half the x extent.  Ignored
+        for saves in MILC's eigenvector format
+        (QudaFileIOParam::milc_eigenvectors), which are always on the
+        full lattice, and for loads of such files, which load the
+        vectors' parity from the full lattice */
     QudaBoolean io_parity_inflate;
 
-    /** Whether to save eigenvectors in QIO singlefile or partfile format */
+    /** Whether to save eigenvectors in QIO singlefile or partfile
+        format.  Either way each eigenvector is a record of its own,
+        with its eigenvalue and residual */
     QudaBoolean partfile;
 
     /** How eigenvectors are loaded from and saved to files (null for defaults) */
@@ -837,13 +850,13 @@ typedef struct QudaFileIOParam_s {
     /** Whether to run null vector oblique checks once set up is complete */
     QudaBoolean run_oblique_proj_check;
 
-    /** Whether to load the null-space vectors to disk (requires QIO) */
+    /** Whether to load the null-space vectors from disk */
     QudaBoolean vec_load[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[QUDA_MAX_MG_LEVEL][256];
 
-    /** Whether to store the null-space vectors to disk (requires QIO) */
+    /** Whether to store the null-space vectors to disk */
     QudaBoolean vec_store[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix for where to save the null-space vectors */

@@ -16,7 +16,8 @@ namespace quda
        file holds the items one after another.  An item is one array,
        or two when its even and odd sites lie apart in memory, as for
        the 4-d slices of a full 5-d vector (see host_field() in
-       vector_io.cpp for which fields need which).
+       vector_io.cpp for which fields need which).  A null array holds
+       no sites: they are skipped on unpacking and packed as zeros.
      */
     class HostField
     {
@@ -63,6 +64,16 @@ namespace quda
          @brief Number of items
        */
       int items() const { return static_cast<int>(arrays.size()); }
+
+      /**
+         @brief The field of items first to first + n - 1
+       */
+      HostField slice(int first, int n) const;
+
+      /**
+         @brief The field with n items: its own, then null ones
+       */
+      HostField extend(int n) const;
 
       /**
          @brief Precision of the arrays

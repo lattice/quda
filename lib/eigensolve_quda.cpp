@@ -140,9 +140,91 @@ namespace quda
     // Cannot compute SVD of non-normal operators
     if (!eig_param->use_norm_op && eig_param->compute_svd)
       errorQuda("Computation of SVD supported for normal operators only");
+
+    // the eigenvectors are saved after the solve, unless they are loaded instead
+    if (strcmp(eig_param->vec_outfile, "") != 0 && strcmp(eig_param->vec_infile, "") == 0
+        && FileIOParam(eig_param->file_io_param).milc_eigenvectors)
+      checkMILCEigenvectorSave(*eig_param, mat);
     //--------------------------------------------------------------------------
 
     return eig_solver;
+  }
+
+  void EigenSolver::checkMILCEigenvectorSave(const QudaEigParam &eig_param, const DiracMatrix &mat)
+  {
+    auto check = [](bool ok, const char *what) {
+      if (!ok)
+        errorQuda("MILC's eigenvector format (milc_eigenvectors) is only for the eigenvectors of the preconditioned "
+                  "staggered or asqtad operator M, solved for as M, but %s; QUDA's default format saves these vectors",
+                  what);
+    };
+    const auto type = mat.Expose()->getDiracType();
+    check(type == QUDA_STAGGEREDPC_DIRAC || type == QUDA_ASQTADPC_DIRAC,
+          "the operator is not a preconditioned staggered or asqtad operator");
+    check(eig_param.use_norm_op == QUDA_BOOLEAN_FALSE, "the solve is for MdagM (use_norm_op)");
+    check(eig_param.use_dagger == QUDA_BOOLEAN_FALSE, "the solve is for Mdag (use_dagger)");
+    check(eig_param.compute_gamma5 == QUDA_BOOLEAN_FALSE, "the solve is for gamma5 M (compute_gamma5)");
+    check(eig_param.compute_svd == QUDA_BOOLEAN_FALSE, "the solve is for singular vectors (compute_svd)");
+    check(eig_param.eig_type != QUDA_EIG_TR_LANCZOS_3D, "the 3-d Lanczos solver solves on time slices");
+    const auto parity = impliedParityFromMatPC(mat.getMatPCType());
+    check(parity == QUDA_EVEN_PARITY || parity == QUDA_ODD_PARITY, "the operator has no parity");
+  }
+
+  void EigenSolver::saveMILCEigenvectors(const std::vector<ColorSpinorField> &kSpace,
+                                         const std::vector<complex_t> &evals, const FileIOParam &param)
+  {
+    checkMILCEigenvectorSave(*eig_param, mat);
+    const Dirac &dirac = *mat.Expose();
+    const QudaParity parity = impliedParityFromMatPC(mat.getMatPCType());
+    const QudaParity other = parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+    const ColorSpinorField &v0 = kSpace[0];
+    const QudaPrecision prec = save_prec != QUDA_INVALID_PRECISION ? save_prec :
+      v0.Precision() < QUDA_SINGLE_PRECISION                       ? QUDA_SINGLE_PRECISION :
+                                                                     v0.Precision();
+
+    // the full vectors, on the host as VectorIO saves them
+    ColorSpinorParam full_param(v0);
+    full_param.x[0] *= 2;
+    full_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    full_param.location = QUDA_CPU_FIELD_LOCATION;
+    full_param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    full_param.setPrecision(prec);
+    full_param.create = QUDA_NULL_FIELD_CREATE;
+    std::vector<ColorSpinorField> full(n_conv, full_param);
+
+    // the other parity, in batches on the device: D v, normalized, as MILC's construct_eigen_other_parity makes it;
+    // QUDA's Dslash is -1 times MILC's dslash_fn, so the normalization flips the sign
+    const int batch = std::max(1, std::min(eig_param->compute_evals_batch_size, n_conv));
+    ColorSpinorParam image_param(v0);
+    image_param.create = QUDA_NULL_FIELD_CREATE;
+    std::vector<ColorSpinorField> image(batch, image_param);
+    for (int i = 0; i < n_conv; i += batch) {
+      const int n = std::min(batch, n_conv - i);
+      dirac.Dslash({image.begin(), image.begin() + n}, {kSpace.begin() + i, kSpace.begin() + i + n}, other);
+      auto norm = blas::norm2({image.begin(), image.begin() + n});
+      for (int j = 0; j < n; j++) {
+        if (norm[j] == 0.0) errorQuda("The other parity of eigenvector %d is zero", i + j);
+        blas::ax(-1.0 / sqrt(norm[j]), image[j]);
+        blas::copy(parity == QUDA_EVEN_PARITY ? full[i + j].Even() : full[i + j].Odd(), kSpace[i + j]);
+        blas::copy(parity == QUDA_EVEN_PARITY ? full[i + j].Odd() : full[i + j].Even(), image[j]);
+      }
+    }
+    image.clear();
+
+    // M is 4m^2 - D_eo D_oe on even sites and 4m^2 - D_oe D_eo on odd ones, with the same spectrum
+    const real_t shift = 4 * dirac.Mass() * dirac.Mass() + mat.shift;
+    std::vector<complex_t> milc_evals(n_conv);
+    for (int i = 0; i < n_conv; i++) milc_evals[i] = evals[i].real() - shift;
+    logQuda(
+      QUDA_SUMMARIZE,
+      "Saving %d eigenvectors in MILC's eigenvector format: the %s sites hold the eigenvectors and the %s sites "
+      "MILC's D applied to them, normalized; the eigenvalues are those of -D_eo D_oe, those of M less 4m^2 = %.6e, "
+      "which is right only with MILC's link conventions (not checked)\n",
+      n_conv, parity == QUDA_EVEN_PARITY ? "even" : "odd", other == QUDA_EVEN_PARITY ? "even" : "odd",
+      static_cast<double>(shift));
+
+    VectorIO io(eig_param->vec_outfile, param);
+    io.save(full, prec, n_conv, &milc_evals, &residua);
   }
 
   // Utilities and functions common to all Eigensolver instances
@@ -263,8 +345,14 @@ namespace quda
       FileIOParam io_param(eig_param->file_io_param);
       io_param.parity_inflate = eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE;
       io_param.partfile = eig_param->partfile == QUDA_BOOLEAN_TRUE;
-      VectorIO io(eig_param->vec_outfile, io_param);
-      io.save(kSpace, save_prec, n_conv, &evals);
+      if (io_param.milc_eigenvectors) {
+        saveMILCEigenvectors(kSpace, evals, io_param);
+      } else {
+        // the 3-d solver's eigenvalues belong to time slices, not to the vectors
+        const bool per_vector = eig_param->eig_type != QUDA_EIG_TR_LANCZOS_3D;
+        VectorIO io(eig_param->vec_outfile, io_param);
+        io.save(kSpace, save_prec, n_conv, per_vector ? &evals : nullptr, per_vector ? &residua : nullptr);
+      }
     }
 
     logQuda(QUDA_SUMMARIZE, "********************************\n");

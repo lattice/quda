@@ -1,3 +1,4 @@
+#include <array>
 #include <type_traits>
 #include <color_spinor_field.h>
 #include <comm_quda.h>
@@ -83,37 +84,85 @@ namespace quda
       return io::HostField(arrays.data(), n, v0.Precision(), reals);
     }
 
-#ifdef HAVE_QIO
-    std::pair<QudaPrecision, scidac::FieldChecksum> load_qio(const std::string &filename, const io::HostField &field,
-                                                             const int *X, QudaSiteSubset subset, QudaParity parity,
-                                                             int nColor, int nSpin, const FileIOParam &param)
+    /**
+       @brief The host field of single-parity 4-d host vectors as that
+       parity of the full lattice, for files of the full lattice: the
+       other parity's sites are skipped on load and saved as zeros
+     */
+    template <typename Field> io::HostField host_field_in_full(const std::vector<Field *> &vecs, QudaParity parity)
     {
-      auto result = read_spinor_field(filename.c_str(), field, X, subset, parity, nColor, nSpin, param.io_mode,
-                                      param.io_partition_grid);
-      // QIO does not report the checksums stored in the file
-      const auto &sum = result.second;
-      if (!sum.checksum_matches)
-        io::report_checksum_mismatch("Checksum mismatch in " + filename + ": computed " + io::checksum_str(sum.sum),
-                                     param.allow_checksum_mismatch);
-      return result;
+      using ptr_t = std::conditional_t<std::is_const_v<Field>, const void *, void *>;
+      const Field &v0 = *vecs[0];
+      const int n = vecs.size();
+      std::vector<ptr_t> even(n, nullptr), odd(n, nullptr);
+      for (int i = 0; i < n; i++) (parity == QUDA_ODD_PARITY ? odd : even)[i] = vecs[i]->data();
+      return io::HostField(even.data(), odd.data(), n, v0.Precision(), 2 * v0.Nspin() * v0.Ncolor(), v0.Volume());
     }
 
-    io::Checksum save_qio(const std::string &filename, const io::HostField &field, const int *X, QudaSiteSubset subset,
-                          QudaParity parity, int nColor, int nSpin, const FileIOParam &param)
+    /**
+       @brief The local dimensions of the lattice a file holds a set of vectors on
+       @param[in] v A vector
+       @param[in] full Whether the file holds a single-parity vector on the full lattice
+     */
+    std::array<int, 4> file_dims(const ColorSpinorField &v, bool full)
     {
-      return write_spinor_field(filename.c_str(), field, X, subset, parity, nColor, nSpin, param.partfile,
-                                param.io_mode, param.io_partition_grid);
+      std::array<int, 4> X = {v.X(0), v.X(1), v.X(2), v.X(3)};
+      if (full && v.SiteSubset() == QUDA_PARITY_SITE_SUBSET) X[0] *= 2;
+      return X;
+    }
+
+    // how the vectors were found in a file or saved, for messages
+    const char *layout_str(scidac::VectorStrings strings, bool interleaved)
+    {
+      if (strings == scidac::VectorStrings::MILC) return "in MILC's eigenvector format";
+      return interleaved ? "in QUDA's format, all in one record" : "in QUDA's format, one record per vector";
+    }
+
+    // the checksums of a set of records, for messages
+    template <typename Sum> std::string checksums_str(const std::vector<Sum> &sums)
+    {
+      if (sums.size() == 1) return io::checksum_str(sums[0]);
+      return "of " + std::to_string(sums.size()) + " records";
+    }
+
+#ifdef HAVE_QIO
+    std::vector<scidac::FieldChecksum> load_qio(const std::string &filename, const scidac::VectorFile &file,
+                                                const std::vector<io::HostField> &fields, const int *X,
+                                                QudaSiteSubset subset, int nColor, int nSpin, const FileIOParam &param)
+    {
+      auto sums = read_spinor_field(filename.c_str(), fields, X, subset, nColor, nSpin,
+                                    file.strings == scidac::VectorStrings::MILC, param.io_mode, param.io_partition_grid);
+      // QIO does not report the checksums stored in the file
+      for (auto k = 0u; k < sums.size(); k++)
+        if (!sums[k].checksum_matches)
+          io::report_checksum_mismatch("Checksum mismatch in binary record " + std::to_string(k) + " of " + filename
+                                         + ": computed " + io::checksum_str(sums[k].sum),
+                                       param.allow_checksum_mismatch);
+      return sums;
+    }
+
+    std::vector<io::Checksum> save_qio(const std::string &filename, const io::HostField &field, int n_vectors,
+                                       const int *X, QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
+                                       const scidac::VectorSaveInfo &info, const FileIOParam &param)
+    {
+      const int Ls = field.items() / n_vectors;
+      const auto records = scidac::vector_records(field.precision(), n_vectors, Ls, subset, parity, nColor, nSpin, info);
+      std::vector<io::HostField> fields;
+      for (int i = 0; i < n_vectors; i++) fields.push_back(field.slice(i * Ls, Ls));
+      return write_spinor_field(filename.c_str(), records, fields, X, subset, param.partfile, param.io_mode,
+                                param.io_partition_grid);
     }
 #else
-    std::pair<QudaPrecision, scidac::FieldChecksum> load_qio(const std::string &, const io::HostField &, const int *,
-                                                             QudaSiteSubset, QudaParity, int, int, const FileIOParam &)
+    std::vector<scidac::FieldChecksum> load_qio(const std::string &, const scidac::VectorFile &,
+                                                const std::vector<io::HostField> &, const int *, QudaSiteSubset, int,
+                                                int, const FileIOParam &)
     {
       errorQuda("The external QIO backend has not been enabled");
       return {};
     }
 
-    io::Checksum save_qio(const std::string &, const io::HostField &, const int *, QudaSiteSubset, QudaParity, int, int,
-                          const FileIOParam &)
+    std::vector<io::Checksum> save_qio(const std::string &, const io::HostField &, int, const int *, QudaSiteSubset,
+                                       QudaParity, int, int, const scidac::VectorSaveInfo &, const FileIOParam &)
     {
       errorQuda("The external QIO backend has not been enabled");
       return {};
@@ -133,24 +182,34 @@ namespace quda
                 param.parity_inflate);
   }
 
-  void VectorIO::load(cvector_ref<ColorSpinorField> &vecs, std::vector<complex_t> *)
+  void VectorIO::load(cvector_ref<ColorSpinorField> &vecs, std::vector<complex_t> *evals)
   {
     check_vector_format(resolve_load_format(filename, param.format));
 
-    const bool parity_inflate = param.parity_inflate;
     const ColorSpinorField &v0 = vecs[0];
     const int Nvec = vecs.size();
     const QudaPrecision load_prec = v0.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : v0.Precision();
-
-    auto spinor_parity = v0.SuggestedParity();
-    if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate && spinor_parity != QUDA_EVEN_PARITY
-        && spinor_parity != QUDA_ODD_PARITY)
-      errorQuda("When loading single parity vectors, the suggested parity must be set.");
+    if (v0.Ndim() != 4 && v0.Ndim() != 5) errorQuda("Unexpected field dimension %d", v0.Ndim());
+    const bool single_parity = v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET;
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start loading %04d vectors from %s\n", Nvec, filename.c_str());
 
+    const auto file = scidac::find_vectors(filename);
+    const bool milc = file.strings == scidac::VectorStrings::MILC;
+    if (milc && (v0.Nspin() != 1 || v0.Ncolor() != 3 || v0.Ndim() != 4))
+      errorQuda("%s is in MILC's eigenvector format, which holds 4-d vectors of 1 spin and 3 colors, but the vectors "
+                "have %d spins, %d colors and %d dimensions",
+                filename.c_str(), v0.Nspin(), v0.Ncolor(), v0.Ndim());
+    // MILC's files hold the full lattice, from which a single-parity field takes its parity whatever parity_inflate
+    // says; QUDA's hold single-parity fields inflated, or on half the lattice
+    const bool parity_in_full = milc && single_parity;
+    const bool inflate = param.parity_inflate && single_parity && !milc;
+
+    auto spinor_parity = v0.SuggestedParity();
+    if ((inflate || parity_in_full) && spinor_parity != QUDA_EVEN_PARITY && spinor_parity != QUDA_ODD_PARITY)
+      errorQuda("When loading single parity vectors, the suggested parity must be set.");
+
     std::vector<ColorSpinorField> tmp(Nvec);
-    bool create_tmp = load_prec != v0.Precision() || (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate)
-      || v0.Location() == QUDA_CUDA_FIELD_LOCATION;
+    bool create_tmp = load_prec != v0.Precision() || inflate || v0.Location() == QUDA_CUDA_FIELD_LOCATION;
 
     if (create_tmp) {
       ColorSpinorParam csParam(vecs[0]);
@@ -158,44 +217,55 @@ namespace quda
       csParam.setPrecision(load_prec);
       csParam.location = QUDA_CPU_FIELD_LOCATION;
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      if (csParam.siteSubset == QUDA_PARITY_SITE_SUBSET && parity_inflate) {
+      if (inflate) {
         csParam.x[0] *= 2;
         csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       }
       for (int i = 0; i < Nvec; i++) tmp[i] = ColorSpinorField(csParam);
     }
 
-    if (v0.Ndim() == 4 || v0.Ndim() == 5) {
-      // the file formats hold 4-d fields, so 5-d vectors are split into their 4-d slices
-      auto Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
-      std::vector<ColorSpinorField *> V(Nvec);
-      for (int i = 0; i < Nvec; i++) V[i] = create_tmp ? &tmp[i] : &vecs[i];
-      const auto field = host_field(V);
+    // the file formats hold 4-d fields, so 5-d vectors are split into their 4-d slices
+    const int Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
+    std::vector<ColorSpinorField *> V(Nvec);
+    for (int i = 0; i < Nvec; i++) V[i] = create_tmp ? &tmp[i] : &vecs[i];
+    const auto field = parity_in_full ? host_field_in_full(V, spinor_parity) : host_field(V);
+    const auto fields = scidac::vector_fields(file, field, Nvec);
 
-      // if we're loading inflated vectors, we need to grab the spinor size from `tmp` instead of `v0`.
-      auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
-      auto spinor_site_subset = (create_tmp && parity_inflate) ? tmp[0].SiteSubset() : v0.SiteSubset();
+    // the lattice of the file: that of the inflated temporaries, or the full lattice of MILC's files
+    const auto X = file_dims(*V[0], parity_in_full);
+    const auto subset = (inflate || parity_in_full) ? QUDA_FULL_SITE_SUBSET : v0.SiteSubset();
 
-      // time loading
-      quda::host_timer_t host_timer;
-      host_timer.start(); // start the timer
+    quda::host_timer_t host_timer;
+    host_timer.start();
 
-      auto [file_prec, sum] = param.external_qio ?
-        load_qio(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(), param) :
-        scidac::load_vectors(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(),
-                             param);
+    auto sums = param.external_qio ?
+      load_qio(filename, file, fields, X.data(), subset, v0.Ncolor(), v0.Nspin(), param) :
+      scidac::load_vectors(file, fields, X.data(), subset, spinor_parity, v0.Ncolor(), v0.Nspin(), param);
 
-      host_timer.stop(); // stop the timer
-      logQuda(QUDA_VERBOSE, "Loaded %d %s precision vector fields from %s%s; checksums %s %s\n", Nvec * Ls,
-              file_prec == QUDA_DOUBLE_PRECISION ? "double" : "single", filename.c_str(), backend_str(param),
-              io::checksum_str(sum.sum).c_str(), sum.checksum_matches ? "verified" : "NOT verified");
-      logQuda(QUDA_SUMMARIZE, "Time spent loading vectors from %s = %g secs\n", filename.c_str(), host_timer.last());
-    } else {
-      errorQuda("Unexpected field dimension %d", v0.Ndim());
+    host_timer.stop();
+    bool verified = true;
+    for (auto &s : sums) verified = verified && s.checksum_matches;
+    std::vector<io::Checksum> checksums;
+    for (auto &s : sums) checksums.push_back(s.sum);
+    const auto &first = file.records.fields[0].metadata;
+    const bool interleaved = file.records.fields.size() == 1 && first.datacount > Ls;
+    logQuda(QUDA_VERBOSE, "Loaded %d %s precision vector fields from %s%s, %s; checksums %s %s\n", Nvec * Ls,
+            first.prec == QUDA_DOUBLE_PRECISION ? "double" : "single", filename.c_str(), backend_str(param),
+            layout_str(file.strings, interleaved), checksums_str(checksums).c_str(),
+            verified ? "verified" : "NOT verified");
+    for (auto k = 0u; checksums.size() > 1 && k < checksums.size(); k++)
+      logQuda(QUDA_DEBUG_VERBOSE, "Checksums of binary record %u: %s\n", k, io::checksum_str(checksums[k]).c_str());
+    logQuda(QUDA_SUMMARIZE, "Time spent loading vectors from %s = %g secs\n", filename.c_str(), host_timer.last());
+
+    if (evals && file.evals.size() >= static_cast<size_t>(Nvec)) {
+      if (evals->size() < static_cast<size_t>(Nvec)) evals->resize(Nvec);
+      for (int i = 0; i < Nvec; i++) (*evals)[i] = complex_t(file.evals[i], 0.0);
+      logQuda(QUDA_VERBOSE, "Loaded %d eigenvalues from %s%s\n", Nvec, filename.c_str(),
+              milc ? ", in MILC's convention (of the massless operator -D_eo D_oe)" : "");
     }
 
     if (create_tmp) {
-      if (v0.SiteSubset() == QUDA_FULL_SITE_SUBSET || !parity_inflate) {
+      if (!inflate) {
         for (int i = 0; i < Nvec; i++) vecs[i] = tmp[i];
       } else {
         for (int i = 0; i < Nvec; i++) vecs[i] = spinor_parity == QUDA_EVEN_PARITY ? tmp[i].Even() : tmp[i].Odd();
@@ -206,25 +276,40 @@ namespace quda
   }
 
   void VectorIO::save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec, uint32_t size,
-                      const std::vector<complex_t> *)
+                      const std::vector<complex_t> *evals, const std::vector<real_t> *resids)
   {
     check_vector_format(resolve_save_format(param.format));
 
-    const bool parity_inflate = param.parity_inflate;
-    const bool partfile = param.partfile;
+    const bool milc = param.milc_eigenvectors;
     const ColorSpinorField &v0 = vecs[0];
     const int Nvec = (size != 0 && size < vecs.size()) ? size : vecs.size();
+    if (v0.Ndim() != 4 && v0.Ndim() != 5) errorQuda("Unexpected field dimension %d", v0.Ndim());
+    if (milc && (v0.Nspin() != 1 || v0.Ncolor() != 3 || v0.Ndim() != 4))
+      errorQuda("MILC's eigenvector format (milc_eigenvectors) holds 4-d vectors of 1 spin and 3 colors, but the "
+                "vectors have %d spins, %d colors and %d dimensions; QUDA's default format saves them",
+                v0.Nspin(), v0.Ncolor(), v0.Ndim());
+    if (milc && !evals) errorQuda("MILC's eigenvector format (milc_eigenvectors) needs the eigenvalues");
+    if (milc && param.interleaved_vectors) errorQuda("MILC's eigenvector format has one record per vector");
+    if (param.interleaved_vectors && param.external_qio)
+      errorQuda("Only the native backend saves vectors interleaved in one record");
+    if (evals && evals->size() < static_cast<size_t>(Nvec))
+      errorQuda("%lu eigenvalues for %d vectors", evals->size(), Nvec);
+    if (resids && resids->size() < static_cast<size_t>(Nvec))
+      errorQuda("%lu residuals for %d vectors", resids->size(), Nvec);
+
     if (prec < QUDA_SINGLE_PRECISION && prec != QUDA_INVALID_PRECISION) errorQuda("Unsupported precision %d", prec);
     const QudaPrecision save_prec = prec != QUDA_INVALID_PRECISION ? prec :
       v0.Precision() < QUDA_SINGLE_PRECISION                       ? QUDA_SINGLE_PRECISION :
                                                                      v0.Precision();
 
-    bool create_tmp = save_prec != v0.Precision() || (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate)
-      || v0.Location() == QUDA_CUDA_FIELD_LOCATION;
+    // MILC's files are always on the full lattice; QUDA's hold single-parity fields inflated, or on half the lattice
+    const bool single_parity = v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET;
+    const bool parity_in_full = milc && single_parity;
+    const bool inflate = param.parity_inflate && single_parity && !milc;
+    bool create_tmp = save_prec != v0.Precision() || inflate || v0.Location() == QUDA_CUDA_FIELD_LOCATION;
     auto spinor_parity = v0.SuggestedParity();
-    if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate && spinor_parity != QUDA_EVEN_PARITY
-        && spinor_parity != QUDA_ODD_PARITY)
-      errorQuda("When loading single parity vectors, the suggested parity must be set.");
+    if ((inflate || parity_in_full) && spinor_parity != QUDA_EVEN_PARITY && spinor_parity != QUDA_ODD_PARITY)
+      errorQuda("When saving single parity vectors, the suggested parity must be set.");
     std::vector<ColorSpinorField> tmp(Nvec);
 
     if (create_tmp) {
@@ -233,7 +318,7 @@ namespace quda
       csParam.setPrecision(save_prec);
       csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-      if (csParam.siteSubset == QUDA_FULL_SITE_SUBSET || !parity_inflate) {
+      if (!inflate) {
         // We're good, copy as is.
         csParam.create = QUDA_NULL_FIELD_CREATE;
         for (int i = 0; i < Nvec; i++) {
@@ -254,42 +339,46 @@ namespace quda
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      if (partfile)
+      if (param.partfile)
         printfQuda("Start saving %d vectors to %s in PARTFILE format\n", Nvec, filename.c_str());
       else
         printfQuda("Start saving %d vectors to %s in SINGLEFILE format\n", Nvec, filename.c_str());
     }
 
-    if (v0.Ndim() == 4 || v0.Ndim() == 5) {
-      // the file formats hold 4-d fields, so 5-d vectors are split into their 4-d slices
-      auto Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
-      std::vector<const ColorSpinorField *> V(Nvec);
-      for (int i = 0; i < Nvec; i++) V[i] = create_tmp ? &tmp[i] : &vecs[i];
-      const auto field = host_field(V);
+    // the file formats hold 4-d fields, so 5-d vectors are split into their 4-d slices
+    const int Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
+    std::vector<const ColorSpinorField *> V(Nvec);
+    for (int i = 0; i < Nvec; i++) V[i] = create_tmp ? &tmp[i] : &vecs[i];
+    const auto field = parity_in_full ? host_field_in_full(V, spinor_parity) : host_field(V);
 
-      // if we performed parity inflation, we need to grab the spinor size from `tmp` instead of `v0`.
-      auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
-      auto spinor_site_subset = (create_tmp && parity_inflate) ? tmp[0].SiteSubset() : v0.SiteSubset();
+    // the lattice of the file: that of the inflated temporaries, or the full lattice of MILC's files
+    const auto X = file_dims(*V[0], parity_in_full);
+    const auto subset = (inflate || parity_in_full) ? QUDA_FULL_SITE_SUBSET : v0.SiteSubset();
 
-      // time saving
-      quda::host_timer_t host_timer;
-      host_timer.start(); // start the timer
+    scidac::VectorSaveInfo info;
+    info.strings = milc ? scidac::VectorStrings::MILC : scidac::VectorStrings::QUDA;
+    info.interleaved = param.interleaved_vectors;
+    for (int i = 0; evals && i < Nvec; i++) info.evals.push_back(static_cast<double>((*evals)[i].real()));
+    for (int i = 0; resids && i < Nvec; i++) info.resids.push_back(static_cast<double>((*resids)[i]));
 
-      auto sum = param.external_qio ?
-        save_qio(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(), param) :
-        scidac::save_vectors(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(),
-                             param);
-      // rank 0 appends the checksum record after the other ranks are done
-      comm_barrier();
+    quda::host_timer_t host_timer;
+    host_timer.start();
 
-      host_timer.stop(); // stop the timer
-      logQuda(QUDA_VERBOSE, "Saved %d %s precision vector fields to %s%s; checksums %s\n", Nvec * Ls,
-              save_prec == QUDA_DOUBLE_PRECISION ? "double" : "single", filename.c_str(), backend_str(param),
-              io::checksum_str(sum).c_str());
-      logQuda(QUDA_SUMMARIZE, "Time spent saving vectors to %s = %g secs\n", filename.c_str(), host_timer.last());
-    } else {
-      errorQuda("Unexpected field dimension %d", v0.Ndim());
-    }
+    auto sums = param.external_qio ?
+      save_qio(filename, field, Nvec, X.data(), subset, spinor_parity, v0.Ncolor(), v0.Nspin(), info, param) :
+      scidac::save_vectors(filename, field, Nvec, X.data(), subset, spinor_parity, v0.Ncolor(), v0.Nspin(), info, param);
+    // rank 0 appends the checksum record after the other ranks are done
+    comm_barrier();
+
+    host_timer.stop();
+    logQuda(QUDA_SUMMARIZE, "Saved %d vectors to %s %s (%lu records)%s\n", Nvec, filename.c_str(),
+            layout_str(info.strings, info.interleaved), sums.size(), backend_str(param));
+    logQuda(QUDA_VERBOSE, "Saved %d %s precision vector fields to %s%s; checksums %s\n", Nvec * Ls,
+            save_prec == QUDA_DOUBLE_PRECISION ? "double" : "single", filename.c_str(), backend_str(param),
+            checksums_str(sums).c_str());
+    for (auto k = 0u; sums.size() > 1 && k < sums.size(); k++)
+      logQuda(QUDA_DEBUG_VERBOSE, "Checksums of binary record %u: %s\n", k, io::checksum_str(sums[k]).c_str());
+    logQuda(QUDA_SUMMARIZE, "Time spent saving vectors to %s = %g secs\n", filename.c_str(), host_timer.last());
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
   }
