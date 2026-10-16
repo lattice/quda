@@ -5,6 +5,7 @@
 #include <cstring>
 #include <limits>
 #include <vector>
+#include <unistd.h>
 
 #include <comm_quda.h>
 #include <instantiate.h>
@@ -752,6 +753,63 @@ TEST_P(GaugePartitionTest, grids)
   }
 }
 
+class GaugePartfileTest : public ::testing::TestWithParam<QudaPrecision>
+{
+};
+
+// SciDAC gauge partfiles, which only the native backend saves, load natively with any grid and rank layout, and with
+// the external backend with the grid that saved them
+TEST_P(GaugePartfileTest, grids)
+{
+  using namespace quda;
+  auto prec = GetParam();
+  if (!is_enabled(prec)) GTEST_SKIP();
+
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge original(prec), loaded(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+  auto save
+    = [&](const std::string &file, const FileIOParam &p) { GaugeIO(file, p).save(original.data, prec, gauge_param.X); };
+  auto expect_load = [&](const std::string &file, const FileIOParam &p) {
+    loaded.clear();
+    auto info = GaugeIO(file, p).load(loaded.data, prec, gauge_param.X);
+    EXPECT_TRUE(loaded == original);
+    EXPECT_TRUE(info.checksum_matches);
+  };
+
+  const std::string file = "partfile.lat";
+  const auto grids = partition_grids();
+  for (auto i = 0u; i < grids.size(); i++) {
+    const auto &grid = grids[i];
+    SCOPED_TRACE("I/O partition grid " + grid_str(grid));
+    save(file, partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, grid));
+    const bool single = comm_size() == 1;
+    const auto volumes = single ? std::vector<std::string>() : expected_volumes(file, grid);
+    if (comm_rank() == 0) {
+      EXPECT_EQ(access(file.c_str(), F_OK) == 0, single) << file;
+      EXPECT_EQ(saved_volumes(file), volumes);
+    }
+    expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, grids[(i + 1) % grids.size()]));
+#ifdef HAVE_QIO
+    // QIO reads partfiles only with the rank layout and grid that saved them
+    expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL, grid));
+#endif
+    remove_saved_file(file);
+  }
+
+  // volumes as if saved by another rank layout, crossing this layout's rank boundaries where the lattice allows
+  auto p = partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  for (int d = 0; d < 4; d++) {
+    const int N = gauge_param.X[d] * comm_dim(d);
+    p.partfile_grid[d] = N % 3 == 0 ? 3 : N % 2 == 0 ? 2 : 1;
+  }
+  SCOPED_TRACE("volumes " + grid_str(p.partfile_grid));
+  save(file, p);
+  expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL));
+  expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_SERIAL));
+  remove_saved_file(file);
+}
+
 #ifdef HAVE_QIO
 class GaugeIOBackendTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -888,6 +946,12 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugePartitionTest,
                            name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
                            name += quda::get_file_format_str(::testing::get<1>(param.param));
                            return name;
+                         });
+
+// SciDAC gauge partfiles
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugePartfileTest, Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                         [](testing::TestParamInfo<QudaPrecision> param) {
+                           return std::string(get_prec_str(param.param));
                          });
 
 #ifdef HAVE_QIO

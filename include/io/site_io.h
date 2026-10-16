@@ -34,7 +34,7 @@ namespace quda
        global lattice in lexicographic order with x running fastest
      */
     struct DataLayout {
-      size_t offset = 0;                       /** Byte offset of the first block */
+      size_t offset = 0;                       /** Byte offset of the first block, for a single file */
       size_t site_bytes = 0;                   /** Bytes per site */
       size_t word_bytes = 4;                   /** Size of the floating-point words, for byte swapping */
       int n_block = 1;                         /** Number of blocks, stored one after another */
@@ -58,6 +58,25 @@ namespace quda
        @brief The two checksums as "%x %x", as MILC .info files and messages print them
      */
     std::string checksum_str(const Checksum &sum);
+
+    /**
+       @brief A file holding a box of the lattice: the stored sites
+       (half the x extent when a single parity is stored) whose
+       coordinates lie in [corner, corner + extent), in lexicographic
+       order within the box with x running fastest.  The blocks of the
+       data layout follow one another within each file.  A single
+       file is one part holding the whole lattice; the volumes of a
+       partfile are one part each.
+     */
+    struct FilePart {
+      std::string filename;
+      size_t offset = 0;            /** Byte offset of the data of the first block */
+      std::array<int, 4> corner {}; /** Lowest corner of the box */
+      std::array<int, 4> extent {}; /** Extent of the box */
+
+      /** Number of sites in the box */
+      size_t volume() const { return static_cast<size_t>(extent[0]) * extent[1] * extent[2] * extent[3]; }
+    };
 
     /**
        @brief Called for each local site with the site's data in native byte order.
@@ -189,26 +208,29 @@ namespace quda
     /**
        @brief The I/O partitions: blocks of the process grid, each led
        by the rank at its lowest corner (as MILC's io_node), which is
-       the only rank of its block to open the file and reads or writes
-       the data of every rank in the block.  Serial mode is a single
-       partition led by rank 0, whatever the grid; in parallel mode a
-       zero grid means one partition per rank.  Constructing one is
-       collective.
+       the only rank of its block to open the files and reads or
+       writes the data of every rank in the block.  Serial mode is a
+       single partition led by rank 0, whatever the grid, except for
+       partfiles, which have one volume per partition in either mode
+       (as in QIO).  A zero grid means one partition per rank.
+       Constructing one is collective.
      */
     class Partitions
     {
       std::vector<std::array<int, 4>> rank_coords;
-      std::array<int, 4> extent; // ranks per partition in each dimension
+      std::array<int, 4> rank_extent; // ranks per partition in each dimension
       int my_leader;
       bool leads;
       std::vector<int> my_ranks;
+      std::vector<int> all_leaders;
 
     public:
       /**
          @param[in] io_mode Serial or parallel
          @param[in] grid Number of partitions in each dimension, or all zeros for one per rank
+         @param[in] partfile Whether the partitions are those of a partfile, which apply in serial mode too
        */
-      Partitions(QudaFileIOMode io_mode, const std::array<int, 4> &grid);
+      Partitions(QudaFileIOMode io_mode, const std::array<int, 4> &grid, bool partfile = false);
 
       /** The leader of this rank's partition */
       int leader() const { return my_leader; }
@@ -218,6 +240,12 @@ namespace quda
 
       /** On a leader, the ranks of its partition in ascending order, itself included; empty elsewhere */
       const std::vector<int> &ranks() const { return my_ranks; }
+
+      /** The leaders of all the partitions, in ascending order */
+      const std::vector<int> &leaders() const { return all_leaders; }
+
+      /** The number of ranks of a partition in each dimension; a leader's coordinates are its partition's corner */
+      const std::array<int, 4> &extent() const { return rank_extent; }
 
       /** The coordinates of a rank in the process grid */
       const std::array<int, 4> &coords(int rank) const { return rank_coords[rank]; }
@@ -238,6 +266,17 @@ namespace quda
                        const Partitions &partitions, const SiteUnpack &unpack);
 
     /**
+       @brief Read the data section of a field stored in several files,
+       each holding a box of the lattice.  The boxes must tile the
+       lattice.  Each partition's leader reads, for every rank in its
+       partition, the rank's overlap with each file, and sends it to
+       the rank.  A leader keeps at most a few dozen files open at once.
+       @param[in] parts The files; their offsets replace layout.offset
+     */
+    Checksum read_data(const std::vector<FilePart> &parts, const DataLayout &layout, const int *X,
+                       const Partitions &partitions, const SiteUnpack &unpack);
+
+    /**
        @brief Write the data section of a file.  The file must already
        exist (rank 0 creates it and writes everything else beforehand).
        Each partition's leader receives the sites of every rank in its
@@ -245,6 +284,17 @@ namespace quda
        @return The checksum of the data section, combined over all ranks
      */
     Checksum write_data(const std::string &filename, const DataLayout &layout, const int *X,
+                        const Partitions &partitions, const SitePack &pack);
+
+    /**
+       @brief Write the data section of a field stored in several files,
+       each holding a box of the lattice.  The files must already exist,
+       with everything but the data written.  Each partition's leader
+       receives the sites of every rank in its partition and writes the
+       rank's overlap with each file.
+       @param[in] parts The files; their offsets replace layout.offset
+     */
+    Checksum write_data(const std::vector<FilePart> &parts, const DataLayout &layout, const int *X,
                         const Partitions &partitions, const SitePack &pack);
 
     /**

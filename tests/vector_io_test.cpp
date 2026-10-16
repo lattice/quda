@@ -136,9 +136,6 @@ TEST_P(ColorSpinorIOTest, verify)
       || (prec < QUDA_SINGLE_PRECISION && nSpin == 2))
     GTEST_SKIP();
 
-  // only the external QIO backend writes partfiles so far
-  if (partfile && format != QUDA_FILE_FORMAT_QIO_EXTERNAL) GTEST_SKIP();
-
   // There's no meaningful way to save a full parity spinor field and load a
   // single-parity field
   if (site_subset_saved == QUDA_FULL_SITE_SUBSET && site_subset_loaded == QUDA_PARITY_SITE_SUBSET) GTEST_SKIP();
@@ -320,27 +317,147 @@ TEST_P(VectorPartitionTest, grids)
 
   for (auto &f : {ref_file, serial_ref_file, file, serial_file}) remove_saved_file(f);
   if (external) remove_saved_file(other_file);
+}
 
-  // external partfiles: one volume per partition, named after its leader, in either mode
-  if (external) {
-    const std::string part_file = "partition_part.cs";
-    for (auto grid : grids) {
-      for (auto io_mode : {QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL}) {
-        if (io_mode == QUDA_FILE_IO_SERIAL && grid != grids.back()) continue;
-        SCOPED_TRACE("partfile, I/O partition grid " + grid_str(grid) + ", " + get_io_mode_str(io_mode));
-        auto p = file_io_param(format, io_mode, grid);
-        p.partfile = true;
-        save(part_file, p);
-        // on one rank QIO writes a single file
-        if (comm_size() > 1) {
-          const bool leader = io::Partitions(QUDA_FILE_IO_PARALLEL, grid).is_leader();
-          EXPECT_EQ(access(volume_file(part_file, comm_rank()).c_str(), F_OK) == 0, leader);
-        }
-        expect_load(part_file, p);
-        remove_saved_file(part_file);
-      }
+namespace
+{
+  // expect two partfiles to be the same apart from the date in their first volume's metadata
+  void expect_same_partfile(const std::string &a, const std::string &b)
+  {
+    auto u = saved_volumes(a), v = saved_volumes(b);
+    ASSERT_EQ(u.size(), v.size()) << a << " and " << b << " have different numbers of volumes";
+    for (auto i = 0u; i < u.size(); i++) {
+      if (i == 0)
+        expect_same_saved_file(u[i], v[i], false);
+      else
+        expect_same_file(u[i], v[i]);
     }
   }
+} // namespace
+
+// tuple types: site subset, I/O mode
+using vector_partfile_test_t = ::testing::tuple<QudaSiteSubset, QudaFileIOMode>;
+
+class VectorPartfileTest : public ::testing::TestWithParam<vector_partfile_test_t>
+{
+};
+
+// partfiles have one volume per I/O partition, named after its leader, in either mode, and load with any grid; the
+// native and external backends save the same volumes, and each loads the other's partfiles
+TEST_P(VectorPartfileTest, grids)
+{
+  using namespace quda;
+  auto subset = ::testing::get<0>(GetParam());
+  auto io_mode = ::testing::get<1>(GetParam());
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  const int n = 3;
+
+  const auto param = vector_param(subset, QUDA_EVEN_PARITY, 1, prec, QUDA_CPU_FIELD_LOCATION);
+  auto v = random_vectors(n, param);
+  auto save
+    = [&](const std::string &file, const FileIOParam &p) { VectorIO(file, p).save({v.begin(), v.end()}, prec, n); };
+  auto expect_load = [&](const std::string &file, const FileIOParam &p) {
+    auto u = zero_vectors(n, param);
+    VectorIO(file, p).load(u);
+    expect_same_vectors(u, v);
+  };
+
+  const std::string file = "partfile.cs";
+  const auto grids = partition_grids();
+  for (auto i = 0u; i < grids.size(); i++) {
+    const auto &grid = grids[i];
+    const auto &next_grid = grids[(i + 1) % grids.size()];
+    SCOPED_TRACE("I/O partition grid " + grid_str(grid));
+    save(file, partfile_param(QUDA_FILE_FORMAT_QIO, io_mode, grid));
+    const bool single = comm_size() == 1;
+    const auto volumes = single ? std::vector<std::string>() : expected_volumes(file, grid);
+    if (comm_rank() == 0) {
+      EXPECT_EQ(access(file.c_str(), F_OK) == 0, single) << file;
+      EXPECT_EQ(saved_volumes(file), volumes);
+    }
+
+    // serial loads go through rank 0 whatever the grid
+    std::vector<std::array<int, 4>> load_grids = {grid};
+    if (io_mode == QUDA_FILE_IO_PARALLEL)
+      for (auto g : {std::array<int, 4> {}, std::array<int, 4> {1, 1, 1, 1}, next_grid})
+        if (std::find(load_grids.begin(), load_grids.end(), g) == load_grids.end()) load_grids.push_back(g);
+    for (auto &g : load_grids) {
+      SCOPED_TRACE("loading with I/O partition grid " + grid_str(g));
+      expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, io_mode, g));
+    }
+
+#ifdef HAVE_QIO
+    const std::string external_file = "partfile_external.cs";
+    save(external_file, partfile_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, io_mode, grid));
+    if (comm_rank() == 0) {
+      if (comm_size() == 1)
+        expect_same_saved_file(file, external_file, false);
+      else
+        expect_same_partfile(file, external_file);
+    }
+    {
+      SCOPED_TRACE("native load of the external partfile with I/O partition grid " + grid_str(next_grid));
+      expect_load(external_file, file_io_param(QUDA_FILE_FORMAT_QIO, io_mode, next_grid));
+    }
+    {
+      // QIO reads partfiles only with the rank layout and grid that saved them
+      SCOPED_TRACE("external load of the native partfile");
+      expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, io_mode, grid));
+    }
+    remove_saved_file(external_file);
+#endif
+    remove_saved_file(file);
+  }
+}
+
+// tuple types: site subset, the grid of volumes
+using vector_layout_test_t = ::testing::tuple<QudaSiteSubset, std::array<int, 4>>;
+
+class VectorPartfileLayoutTest : public ::testing::TestWithParam<vector_layout_test_t>
+{
+};
+
+// partfiles saved as if by another rank layout, whose volumes need not line up with this layout's ranks, load with
+// this layout and any grid
+TEST_P(VectorPartfileLayoutTest, load)
+{
+  using namespace quda;
+  auto subset = ::testing::get<0>(GetParam());
+  auto volumes = ::testing::get<1>(GetParam());
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  const int n = 3;
+
+  const auto param = vector_param(subset, QUDA_ODD_PARITY, 1, prec, QUDA_CPU_FIELD_LOCATION);
+  auto v = random_vectors(n, param);
+  auto save
+    = [&](const std::string &file, const FileIOParam &p) { VectorIO(file, p).save({v.begin(), v.end()}, prec, n); };
+
+  const std::string file = "partfile_layout.cs", serial_file = "partfile_layout_serial.cs";
+  auto p = partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  p.partfile_grid = volumes;
+  save(file, p);
+  p.io_mode = QUDA_FILE_IO_SERIAL;
+  save(serial_file, p);
+  if (comm_rank() == 0) {
+    std::vector<std::string> expected;
+    for (int i = 0; i < volumes[0] * volumes[1] * volumes[2] * volumes[3]; i++)
+      expected.push_back(volume_file(file, i));
+    EXPECT_EQ(saved_volumes(file), expected);
+    expect_same_partfile(file, serial_file);
+  }
+
+  for (auto io_mode : {QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL}) {
+    for (auto grid : {std::array<int, 4> {}, std::array<int, 4> {1, 1, 1, 1}, partition_grids().back()}) {
+      if (io_mode == QUDA_FILE_IO_SERIAL && grid != std::array<int, 4> {}) continue;
+      SCOPED_TRACE(std::string("loading in ") + get_io_mode_str(io_mode) + " mode with I/O partition grid "
+                   + grid_str(grid));
+      auto u = zero_vectors(n, param);
+      VectorIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, io_mode, grid)).load(u);
+      expect_same_vectors(u, v);
+    }
+  }
+  remove_saved_file(file);
+  remove_saved_file(serial_file);
 }
 
 // full 5-d vectors, or single-parity 5-d vectors inflated to the full lattice
@@ -364,11 +481,11 @@ namespace
     return static_cast<double>(v * reals + k + 1);
   }
 
-  // fill one parity of a 5-d double-precision host field, stored [s][4-d checkerboard site], with encoded values;
-  // with 5-d preconditioning the parity includes s, so slice s holds the 4-d parity parity + s
+  // fill one parity of a 4-d or 5-d double-precision host field, stored [s][4-d checkerboard site], with encoded
+  // values; with 5-d preconditioning the parity includes s, so slice s holds the 4-d parity parity + s
   void fill_parity(quda::ColorSpinorField &f, int parity, int i, QudaPCType pc_type)
   {
-    const int Ls = f.X(4), reals = 2 * f.Nspin() * f.Ncolor();
+    const int Ls = f.Ndim() == 5 ? f.X(4) : 1, reals = 2 * f.Nspin() * f.Ncolor();
     const std::array<int, 4> X = {2 * f.X(0), f.X(1), f.X(2), f.X(3)};
     std::array<int, 4> N;
     for (int d = 0; d < 4; d++) N[d] = X[d] * quda::comm_dim(d);
@@ -478,9 +595,90 @@ TEST_P(FiveDLayoutTest, file_contents)
   remove_saved_file(file);
 }
 
+namespace
+{
+  // PartfileCrossRun's options
+  std::string cross_run_save;
+  std::string cross_run_load;
+  bool cross_run_external = false;
+  std::array<int, 4> cross_run_volumes = {};
+
+  // 4-d vectors whose values depend only on the global site, the vector and the component
+  std::vector<quda::ColorSpinorField> encoded_vectors(int n, const quda::ColorSpinorParam &param)
+  {
+    std::vector<quda::ColorSpinorField> v(n, param);
+    for (int i = 0; i < n; i++) {
+      if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+        fill_parity(v[i], param.suggested_parity == QUDA_ODD_PARITY, i, QUDA_4D_PC);
+      } else {
+        fill_parity(v[i].Even(), 0, i, QUDA_4D_PC);
+        fill_parity(v[i].Odd(), 1, i, QUDA_4D_PC);
+      }
+    }
+    return v;
+  }
+} // namespace
+
+// partfiles across runs with different rank layouts (run_partfile_cross.sh): --partfile-save saves full and
+// single-parity vectors to <prefix>_full and <prefix>_parity, and --partfile-load loads them
+TEST(PartfileCrossRun, vectors)
+{
+  using namespace quda;
+  if (cross_run_save.empty() && cross_run_load.empty()) GTEST_SKIP();
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  const int n = 3;
+  for (auto subset : {QUDA_FULL_SITE_SUBSET, QUDA_PARITY_SITE_SUBSET}) {
+    const auto param = vector_param(subset, QUDA_EVEN_PARITY, 1, prec, QUDA_CPU_FIELD_LOCATION);
+    const auto v = encoded_vectors(n, param);
+    const std::string suffix = subset == QUDA_FULL_SITE_SUBSET ? "_full" : "_parity";
+
+    if (!cross_run_save.empty()) {
+      auto p = partfile_param(cross_run_external ? QUDA_FILE_FORMAT_QIO_EXTERNAL : QUDA_FILE_FORMAT_QIO,
+                              QUDA_FILE_IO_PARALLEL);
+      p.partfile_grid = cross_run_volumes;
+      VectorIO(cross_run_save + suffix, p).save({v.begin(), v.end()}, prec, n);
+    }
+
+    if (!cross_run_load.empty()) {
+      for (auto io_mode : {QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL}) {
+        for (auto grid : {std::array<int, 4> {}, std::array<int, 4> {1, 1, 1, 1}}) {
+          if (io_mode == QUDA_FILE_IO_SERIAL && grid != std::array<int, 4> {}) continue;
+          SCOPED_TRACE(cross_run_load + suffix + ", " + get_io_mode_str(io_mode) + " mode, I/O partition grid "
+                       + grid_str(grid));
+          auto u = zero_vectors(n, param);
+          VectorIO(cross_run_load + suffix, file_io_param(QUDA_FILE_FORMAT_QIO, io_mode, grid)).load(u);
+          expect_same_vectors(u, v);
+        }
+      }
+    }
+  }
+}
+
+struct vector_io_test : quda_test {
+  using quda_test::quda_test;
+
+  void add_command_line_group(std::shared_ptr<QUDAApp> app) const override
+  {
+    quda_test::add_command_line_group(app);
+    auto group = app->add_option_group("Partfile cross-run");
+    group->add_option("--partfile-save", cross_run_save,
+                      "Save partfiles of vectors set by their global sites to <prefix>_full and <prefix>_parity "
+                      "(PartfileCrossRun)");
+    group->add_option("--partfile-load", cross_run_load,
+                      "Load and check the vectors of --partfile-save, natively (PartfileCrossRun)");
+    group->add_flag("--partfile-save-external", cross_run_external,
+                    "Save with the external QIO backend (PartfileCrossRun)");
+    group
+      ->add_option("--partfile-volumes", cross_run_volumes,
+                   "Save natively as if on a process grid of this shape, one volume per rank (PartfileCrossRun; "
+                   "default 0 0 0 0, the real layout)")
+      ->expected(4);
+  }
+};
+
 int main(int argc, char **argv)
 {
-  quda_test test("Vector IO Test", argc, argv);
+  vector_io_test test("Vector IO Test", argc, argv);
   test.init();
   return test.execute();
 }
@@ -608,5 +806,27 @@ INSTANTIATE_TEST_SUITE_P(Vector, VectorPartitionTest,
                          [](testing::TestParamInfo<vector_partition_test_t> param) {
                            std::string name = quda::get_file_format_str(::testing::get<0>(param.param));
                            name += ::testing::get<1>(param.param) == QUDA_FULL_SITE_SUBSET ? "_full" : "_parity";
+                           return name;
+                         });
+
+// partfiles with I/O partition grids
+INSTANTIATE_TEST_SUITE_P(Vector, VectorPartfileTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET, QUDA_PARITY_SITE_SUBSET),
+                                 Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
+                         [](testing::TestParamInfo<vector_partfile_test_t> param) {
+                           std::string name
+                             = ::testing::get<0>(param.param) == QUDA_FULL_SITE_SUBSET ? "full_" : "parity_";
+                           return name + get_io_mode_str(::testing::get<1>(param.param));
+                         });
+
+// partfiles saved as if by other rank layouts, with volumes that divide the stored local lattice of every layout
+// run_io_test.sh uses (4 6 8 10 per rank, half the x extent for a single parity)
+INSTANTIATE_TEST_SUITE_P(Vector, VectorPartfileLayoutTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET, QUDA_PARITY_SITE_SUBSET),
+                                 Values(std::array<int, 4> {1, 1, 1, 1}, std::array<int, 4> {1, 3, 1, 5},
+                                        std::array<int, 4> {2, 1, 4, 1}, std::array<int, 4> {2, 3, 2, 2})),
+                         [](testing::TestParamInfo<vector_layout_test_t> param) {
+                           std::string name = ::testing::get<0>(param.param) == QUDA_FULL_SITE_SUBSET ? "full" : "parity";
+                           for (auto n : ::testing::get<1>(param.param)) name += "_" + std::to_string(n);
                            return name;
                          });

@@ -27,13 +27,23 @@ namespace quda
     constexpr const char *ildg_format = "ildg-format";
     constexpr const char *ildg_data_lfn = "ildg-data-lfn";
     constexpr const char *ildg_binary_data = "ildg-binary-data";
+    constexpr const char *sitelist = "scidac-sitelist";
+
+    // volume formats of the private file XML
+    constexpr int single_file_volfmt = 0;
+    constexpr int partfile_volfmt = 2;
 
     /**
        @brief The private file XML
        @param[in] dims The global lattice dimensions
-       @param[in] volfmt 0 for a single file, 2 for a partfile
+       @param[in] volfmt single_file_volfmt or partfile_volfmt
      */
     std::string file_info_xml(const std::array<int, 4> &dims, int volfmt);
+
+    /**
+       @brief The name of volume n of a partfile: <filename>.volNNNN, as QIO names them
+     */
+    std::string volume_name(const std::string &filename, int n);
 
     /**
        @brief The private record XML of a lattice field, dated now.
@@ -66,8 +76,8 @@ namespace quda
 
     /**
        @brief The metadata of the lattice field in a SciDAC or ILDG
-       single file: what the private record XML, the user record XML
-       and the ILDG records hold (or should hold)
+       file: what the private record XML, the user record XML and the
+       ILDG records hold (or should hold)
      */
     struct FieldMetadata {
       std::string datatype;
@@ -85,22 +95,39 @@ namespace quda
        @brief Where the lattice field of a SciDAC or ILDG file is, as found on load
      */
     struct FieldRecords {
-      std::string file;           /** The file that holds the field */
-      bool native = false;        /** Whether the file has the SciDAC records (ILDG files from other codes need not) */
-      std::array<int, 4> dims {}; /** The lattice of the file */
-      FieldMetadata metadata;     /** From the private record XML, or the ildg-format record */
-      int n_binary = 0;           /** Number of messages with binary data in the file */
-      lime::Record data;          /** The field's binary data */
+      std::string filename; /** The name the field was loaded by */
+      std::string file;     /** The file that holds the field, or the first volume of a partfile */
+      bool native = false;  /** Whether the file has the SciDAC records (ILDG files from other codes need not) */
+      int volfmt = single_file_volfmt;
+      std::array<int, 4> dims {};           /** The lattice of the file */
+      FieldMetadata metadata;               /** From the private record XML, or the ildg-format record */
+      int n_binary = 0;                     /** Number of messages with binary data in the file */
+      lime::Record data;                    /** The field's binary data (in a partfile, that of the first volume) */
       std::optional<lime::Record> checksum; /** The first checksum record after the data */
     };
 
     /**
-       @brief Find the field of a SciDAC or ILDG single file: the
-       first message with binary data.  As QIO, this reads <filename>,
-       or <filename>.vol0000 if there is no such file.  Errors if the
-       file is not a single file or not a lattice field.
+       @brief Find the field of a SciDAC or ILDG file: the first
+       message with binary data.  As QIO, this reads <filename>, or
+       <filename>.vol0000 if there is no such file, which holds the
+       metadata of a partfile.  Errors if the file is neither a single
+       file nor a partfile, or not a lattice field.
      */
     FieldRecords find_field(const std::string &filename);
+
+    /**
+       @brief Find the volumes of a partfile and check that they tile
+       the lattice.  Rank 0 lists the directory for <filename>.vol
+       followed by four or more digits, as the volumes' numbers have
+       gaps when they were saved with I/O partitions.  Each volume's
+       site list must be a box of the lattice in lexicographic order,
+       and the boxes must not overlap and must cover the lattice.
+       Collective.
+       @param[in] records The field, as found by find_field
+       @param[in] site_bytes Size of a site in the files
+       @return The volumes, with their data and boxes
+     */
+    std::vector<io::FilePart> find_volumes(const FieldRecords &records, size_t site_bytes);
 
     /**
        @brief The checksum of a field's binary data
@@ -112,10 +139,11 @@ namespace quda
     };
 
     /**
-       @brief Read the field found by find_field into a host field,
-       after checking its dimensions, typesize and length.  The
-       checksum is verified, and a mismatch is an error unless param
-       allows it.  The datacount is the caller's to check.
+       @brief Read the field found by find_field, from a single file
+       or a partfile, into a host field, after checking its
+       dimensions, typesize and length.  The checksum is verified, and
+       a mismatch is an error unless param allows it.  The datacount is
+       the caller's to check.
        @param[in] records The field's records
        @param[out] field The host field, one item per datacount
        @param[in] X The local lattice dimensions of a full field
@@ -127,17 +155,22 @@ namespace quda
                              const FileIOParam &param);
 
     /**
-       @brief Save a field as a SciDAC single file with one record: a
-       first message with the private file XML and QUDA's file XML,
-       then one with the private record XML, the user record XML, the
-       ILDG records if requested, the binary data and its checksum
+       @brief Save a field as a SciDAC file with one record: a first
+       message with the private file XML and QUDA's file XML, then one
+       with the private record XML, the user record XML, the ILDG
+       records if requested, the binary data and its checksum.  With
+       param.partfile on more than one rank, the field is saved as QIO
+       saves a partfile: one volume per I/O partition, named after its
+       leader, each with a site list before its data, and the metadata
+       and the checksum only in the first volume.  On one rank, as in
+       QIO, a single file.
        @param[in] filename The file
        @param[in] metadata What to write in the metadata records; the field is saved in its precision
        @param[in] field The host field, one item per datacount
        @param[in] X The local lattice dimensions of a full field
        @param[in] parity Even or odd for a single-parity field, stored on
        a lattice of half the global x extent; otherwise the full lattice
-       @param[in] param File I/O options (the I/O mode and partitions)
+       @param[in] param File I/O options (the I/O mode, partitions and partfile options)
        @return The checksums written
      */
     io::Checksum write_field(const std::string &filename, const FieldMetadata &metadata, const io::HostField &field,
@@ -221,10 +254,11 @@ namespace quda
                             const FileIOParam &param, const GaugeInfo &info);
 
     /**
-       @brief Load a set of vectors from a single file in QUDA's layout,
-       in which each site holds all the vectors one after another.
-       The checksum is verified, and a mismatch is an error unless
-       param allows it.
+       @brief Load a set of vectors in QUDA's layout, in which each site
+       holds all the vectors one after another, from a single file or
+       a partfile saved with any rank layout and partition grid.  The
+       checksum is verified, and a mismatch is an error unless param
+       allows it.
        @param[in] filename The file
        @param[out] field The host vectors, one item per 4-d vector (a vector, or a slice of a 5-d one), each
        [spin][color][complex] at the QUDA host index
@@ -239,14 +273,15 @@ namespace quda
                                                          int nColor, int nSpin, const FileIOParam &param);
 
     /**
-       @brief Save a set of vectors to a single file in QUDA's layout, in the file precision equal to the host precision
+       @brief Save a set of vectors in QUDA's layout, as a single file or a partfile, in the file precision equal to
+       the host precision
        @param[in] filename The file
        @param[in] field The host vectors, one item per 4-d vector (a vector, or a slice of a 5-d one), each
        [spin][color][complex] at the QUDA host index
        @param[in] X The local lattice dimensions of the vectors (half the x extent for single-parity vectors)
        @param[in] subset Whether the vectors are full or single parity; single-parity files have half the x extent
        @param[in] parity The parity of the vectors, recorded in the user record XML
-       @param[in] param File I/O options (the I/O mode and partitions; partfiles are not supported yet)
+       @param[in] param File I/O options (the I/O mode, partitions and partfile options)
        @return The checksums written
      */
     io::Checksum save_vectors(const std::string &filename, const io::HostField &field, const int *X,

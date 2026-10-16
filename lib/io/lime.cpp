@@ -36,11 +36,11 @@ namespace quda
       };
     } // namespace
 
-    std::vector<Record> read_records(const std::string &filename)
+    namespace
     {
-      std::vector<RecordData> list;
-      if (comm_rank() == 0) {
-        io::File file(filename, io::File::Mode::READ);
+      std::vector<RecordData> list_record_data(const io::File &file, const std::string &filename)
+      {
+        std::vector<RecordData> list;
         const size_t size = file.size();
         for (size_t offset = 0; offset < size;) {
           unsigned char header[header_bytes];
@@ -62,13 +62,29 @@ namespace quda
           list.push_back(r);
           offset = r.data_offset + r.data_bytes + padding(r.data_bytes);
         }
+        return list;
       }
-      io::broadcast(list);
 
-      std::vector<Record> records(list.size());
-      for (size_t i = 0; i < list.size(); i++)
-        records[i] = {list[i].type, list[i].data_offset, list[i].data_bytes, list[i].mb != 0, list[i].me != 0};
-      return records;
+      std::vector<Record> to_records(const std::vector<RecordData> &list)
+      {
+        std::vector<Record> records(list.size());
+        for (size_t i = 0; i < list.size(); i++)
+          records[i] = {list[i].type, list[i].data_offset, list[i].data_bytes, list[i].mb != 0, list[i].me != 0};
+        return records;
+      }
+    } // namespace
+
+    std::vector<Record> read_records(const std::string &filename)
+    {
+      std::vector<RecordData> list;
+      if (comm_rank() == 0) list = list_record_data(io::File(filename, io::File::Mode::READ), filename);
+      io::broadcast(list);
+      return to_records(list);
+    }
+
+    std::vector<Record> list_records(const io::File &file, const std::string &filename)
+    {
+      return to_records(list_record_data(file, filename));
     }
 
     std::string read_string(const std::string &filename, const Record &record)

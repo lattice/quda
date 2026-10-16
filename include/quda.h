@@ -47,8 +47,9 @@ typedef struct QudaFileIOParam_s {
                                handling the data of every rank in its block.  Each value must divide the number of
                                ranks in that dimension; all zeros (the default) means one partition per rank.
                                Applies to gauge fields and vectors: for single files in parallel mode only (serial
-                               mode goes through rank 0 alone); for partfiles (external QIO backend only, for now)
-                               one file per partition, whatever the mode */
+                               mode goes through rank 0 alone); a partfile is saved as one file per partition,
+                               whatever the mode.  The native backend loads partfiles saved with any rank layout and
+                               grid; the external QIO backend only those saved with its own layout and grid */
 } QudaFileIOParam;
 
   /**

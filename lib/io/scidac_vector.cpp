@@ -63,11 +63,6 @@ namespace quda
     io::Checksum save_vectors(const std::string &filename, const io::HostField &field, const int *X,
                               QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, const FileIOParam &param)
     {
-      if (param.partfile)
-        errorQuda("The native QIO backend cannot write partfiles yet: save %s with the qio-external format, or as a "
-                  "single file",
-                  filename.c_str());
-
       const int reals = 2 * nSpin * nColor;
       const QudaPrecision prec = field.precision();
       FieldMetadata m;

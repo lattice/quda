@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -15,6 +16,7 @@
 #include <enum_quda.h>
 #include <quda.h>
 #include <io/field_io.h>
+#include <io/site_io.h>
 
 inline const char *get_io_mode_str(QudaFileIOMode io_mode)
 {
@@ -93,17 +95,59 @@ inline std::string volume_file(const std::string &file, int rank)
 }
 
 /**
+   @brief File options as file_io_param, saving partfiles
+ */
+inline quda::FileIOParam partfile_param(QudaFileFormat format, QudaFileIOMode io_mode,
+                                        const std::array<int, 4> &grid = {})
+{
+  auto p = file_io_param(format, io_mode, grid);
+  p.partfile = true;
+  return p;
+}
+
+/**
+   @brief The volumes of a partfile saved on this rank layout with an
+   I/O partition grid: one per partition, named after its leader (on
+   one rank, QIO and QUDA save a single file instead).  Collective.
+ */
+inline std::vector<std::string> expected_volumes(const std::string &file, const std::array<int, 4> &grid)
+{
+  const quda::io::Partitions partitions(QUDA_FILE_IO_PARALLEL, grid, true);
+  std::vector<std::string> volumes;
+  for (int leader : partitions.leaders()) volumes.push_back(volume_file(file, leader));
+  return volumes;
+}
+
+/**
+   @brief The partfile volumes of a saved file in its directory, every
+   <file>.vol..., in ascending order (of their numbers, which have four
+   digits up to 9999)
+ */
+inline std::vector<std::string> saved_volumes(const std::string &file)
+{
+  namespace fs = std::filesystem;
+  const fs::path path(file);
+  const std::string prefix = path.filename().string() + ".vol";
+  std::vector<std::string> volumes;
+  for (auto &entry : fs::directory_iterator(path.has_parent_path() ? path.parent_path() : fs::path("."))) {
+    auto name = entry.path().filename().string();
+    if (name.compare(0, prefix.size(), prefix) == 0) volumes.push_back((path.parent_path() / name).string());
+  }
+  std::sort(volumes.begin(), volumes.end());
+  return volumes;
+}
+
+/**
    @brief Delete a saved file once every rank is done with it: the
    single file, or the volumes of a partfile, which are named after
-   their partitions' leaders, so any rank number can occur
+   their partitions' leaders, so their numbers can have gaps
  */
 inline void remove_saved_file(const std::string &file)
 {
   quda::comm_barrier();
   if (quda::comm_rank() == 0) {
     int removed = std::remove(file.c_str()) == 0;
-    for (int rank = 0; rank < static_cast<int>(quda::comm_size()); rank++)
-      removed += std::remove(volume_file(file, rank).c_str()) == 0;
+    for (auto &volume : saved_volumes(file)) removed += std::remove(volume.c_str()) == 0;
     EXPECT_GT(removed, 0) << "no saved file " << file;
   }
 }
@@ -158,6 +202,19 @@ inline std::vector<std::string> read_info_without_time_stamp(const std::string &
   for (std::string line; std::getline(in, line);)
     if (line.rfind("time_stamp", 0) != 0) lines.push_back(line);
   return lines;
+}
+
+/**
+   @brief Expect two files to be the same, byte for byte
+ */
+inline void expect_same_file(const std::string &a, const std::string &b)
+{
+  auto x = read_file(a), y = read_file(b);
+  EXPECT_FALSE(x.empty()) << "no file " << a;
+  EXPECT_EQ(x.size(), y.size()) << a << " and " << b << " differ in size";
+  auto n = std::min(x.size(), y.size());
+  auto diff = std::mismatch(x.begin(), x.begin() + n, y.begin()).first - x.begin();
+  EXPECT_EQ(diff, static_cast<std::ptrdiff_t>(n)) << a << " and " << b << " first differ at byte " << diff;
 }
 
 /**

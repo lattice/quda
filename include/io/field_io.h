@@ -26,8 +26,18 @@ namespace quda
     /** How to reunitarize a gauge field after loading it; ignored for saves and vectors */
     QudaGaugeReunitarize reunitarize = QUDA_GAUGE_REUNITARIZE_NONE;
 
-    /** Number of I/O partitions in each dimension; all zeros means one per rank.  Gauge fields only for now */
+    /** Number of I/O partitions in each dimension; all zeros means one per rank */
     std::array<int, 4> io_partition_grid {};
+
+    /**
+       Native partfile saves, for tests: the number of volumes in each
+       dimension, as if saved by a process grid of that shape with one
+       partition per rank, numbered as QUDA's default rank map numbers
+       ranks (lexicographically, t fastest).
+       Rank 0 creates them all, also on one rank.  All zeros means one
+       volume per I/O partition, as QIO saves.
+    */
+    std::array<int, 4> partfile_grid {};
 
     FileIOParam() = default;
 

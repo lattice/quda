@@ -47,6 +47,13 @@ namespace quda
     std::vector<Record> read_records(const std::string &filename);
 
     /**
+       @brief List the records of an open LIME file on the calling rank alone, with the same checks as read_records
+       @param[in] file The file
+       @param[in] filename Its name, for messages
+     */
+    std::vector<Record> list_records(const io::File &file, const std::string &filename);
+
+    /**
        @brief The largest record read_string accepts.  Metadata records
        are XML of at most a few kilobytes; the cap keeps a corrupt or
        unexpected record from being allocated on every rank.
