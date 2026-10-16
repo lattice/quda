@@ -226,34 +226,31 @@ namespace quda
        The checksum is verified, and a mismatch is an error unless
        param allows it.
        @param[in] filename The file
-       @param[out] V The host vectors, each [spin][color][complex] at the QUDA host index
-       @param[in] prec The precision of the host vectors
+       @param[out] field The host vectors, one item per 4-d vector (a vector, or a slice of a 5-d one), each
+       [spin][color][complex] at the QUDA host index
        @param[in] X The local lattice dimensions of the vectors (half the x extent for single-parity vectors)
        @param[in] subset Whether the vectors are full or single parity; single-parity files have half the x extent
        @param[in] parity The parity of single-parity vectors
-       @param[in] Nvec Number of vectors
        @param[in] param File I/O options
        @return The file precision and the checksums
      */
-    std::pair<QudaPrecision, FieldChecksum> load_vectors(const std::string &filename, void *const V[], QudaPrecision prec,
+    std::pair<QudaPrecision, FieldChecksum> load_vectors(const std::string &filename, const io::HostField &field,
                                                          const int *X, QudaSiteSubset subset, QudaParity parity,
-                                                         int nColor, int nSpin, int Nvec, const FileIOParam &param);
+                                                         int nColor, int nSpin, const FileIOParam &param);
 
     /**
        @brief Save a set of vectors to a single file in QUDA's layout, in the file precision equal to the host precision
        @param[in] filename The file
-       @param[in] V The host vectors, each [spin][color][complex] at the QUDA host index
-       @param[in] prec The precision of the host vectors
+       @param[in] field The host vectors, one item per 4-d vector (a vector, or a slice of a 5-d one), each
+       [spin][color][complex] at the QUDA host index
        @param[in] X The local lattice dimensions of the vectors (half the x extent for single-parity vectors)
        @param[in] subset Whether the vectors are full or single parity; single-parity files have half the x extent
        @param[in] parity The parity of the vectors, recorded in the user record XML
-       @param[in] Nvec Number of vectors
        @param[in] param File I/O options (the I/O mode and partitions; partfiles are not supported yet)
        @return The checksums written
      */
-    io::Checksum save_vectors(const std::string &filename, const void *const V[], QudaPrecision prec, const int *X,
-                              QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec,
-                              const FileIOParam &param);
+    io::Checksum save_vectors(const std::string &filename, const io::HostField &field, const int *X,
+                              QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, const FileIOParam &param);
 
   } // namespace scidac
 

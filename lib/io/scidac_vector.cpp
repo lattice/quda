@@ -32,11 +32,11 @@ namespace quda
       }
     } // namespace
 
-    std::pair<QudaPrecision, FieldChecksum> load_vectors(const std::string &filename, void *const V[], QudaPrecision prec,
+    std::pair<QudaPrecision, FieldChecksum> load_vectors(const std::string &filename, const io::HostField &field,
                                                          const int *X, QudaSiteSubset subset, QudaParity parity,
-                                                         int nColor, int nSpin, int Nvec, const FileIOParam &param)
+                                                         int nColor, int nSpin, const FileIOParam &param)
     {
-      io::HostField field(V, Nvec, prec, 2 * nSpin * nColor);
+      const int Nvec = field.items();
       auto records = find_field(filename);
       const auto &file = records.file;
       const auto &m = records.metadata;
@@ -60,9 +60,8 @@ namespace quda
       return {m.prec, read_field(records, field, X_full.data(), file_parity(subset, parity), param)};
     }
 
-    io::Checksum save_vectors(const std::string &filename, const void *const V[], QudaPrecision prec, const int *X,
-                              QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec,
-                              const FileIOParam &param)
+    io::Checksum save_vectors(const std::string &filename, const io::HostField &field, const int *X,
+                              QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, const FileIOParam &param)
     {
       if (param.partfile)
         errorQuda("The native QIO backend cannot write partfiles yet: save %s with the qio-external format, or as a "
@@ -70,14 +69,14 @@ namespace quda
                   filename.c_str());
 
       const int reals = 2 * nSpin * nColor;
-      io::HostField field(V, Nvec, prec, reals);
+      const QudaPrecision prec = field.precision();
       FieldMetadata m;
       m.datatype = vector_datatype(prec, nSpin, nColor);
       m.prec = prec;
       m.colors = nColor;
       m.spins = nSpin;
       m.typesize = reals * prec;
-      m.datacount = Nvec;
+      m.datacount = field.items();
       m.user_xml = quda_record_xml(reals, m.datatype, subset, parity, nColor, nSpin);
 
       const auto X_full = full_dims(X, subset);

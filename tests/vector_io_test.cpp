@@ -1,5 +1,6 @@
 #include <array>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <vector>
 #include <unistd.h>
@@ -7,6 +8,7 @@
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <color_spinor_field.h>
+#include <io/lime.h>
 #include <io/site_io.h>
 #include <io/vector_io.h>
 #include <blas_quda.h>
@@ -341,6 +343,141 @@ TEST_P(VectorPartitionTest, grids)
   }
 }
 
+// full 5-d vectors, or single-parity 5-d vectors inflated to the full lattice
+enum class FiveDCase { FULL, INFLATED_EVEN, INFLATED_ODD };
+
+// tuple types: preconditioning type, field, file format
+using five_d_test_t = ::testing::tuple<QudaPCType, FiveDCase, QudaFileFormat>;
+
+class FiveDLayoutTest : public ::testing::TestWithParam<five_d_test_t>
+{
+};
+
+namespace
+{
+  // the value of real k of slice s of vector i at the global 4-d coordinates g: different for every (i, s, g, k),
+  // never zero, and exact in double precision
+  double encoded_value(int i, int s, const std::array<int, 4> &g, int k, int Ls, int reals, const std::array<int, 4> &N)
+  {
+    size_t v = static_cast<size_t>(i) * Ls + s;
+    for (int d = 3; d >= 0; d--) v = v * N[d] + g[d];
+    return static_cast<double>(v * reals + k + 1);
+  }
+
+  // fill one parity of a 5-d double-precision host field, stored [s][4-d checkerboard site], with encoded values;
+  // with 5-d preconditioning the parity includes s, so slice s holds the 4-d parity parity + s
+  void fill_parity(quda::ColorSpinorField &f, int parity, int i, QudaPCType pc_type)
+  {
+    const int Ls = f.X(4), reals = 2 * f.Nspin() * f.Ncolor();
+    const std::array<int, 4> X = {2 * f.X(0), f.X(1), f.X(2), f.X(3)};
+    std::array<int, 4> N;
+    for (int d = 0; d < 4; d++) N[d] = X[d] * quda::comm_dim(d);
+    const size_t half_volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3] / 2;
+    auto data = f.data<double *>();
+    for (int s = 0; s < Ls; s++) {
+      const int p4 = (parity + (pc_type == QUDA_5D_PC ? s : 0)) % 2;
+      for (size_t cb = 0; cb < half_volume; cb++) {
+        // QUDA's 4-d checkerboard order
+        std::array<int, 4> x;
+        size_t za = cb / (X[0] / 2);
+        x[1] = za % X[1];
+        x[2] = (za / X[1]) % X[2];
+        x[3] = za / (static_cast<size_t>(X[1]) * X[2]);
+        x[0] = 2 * (cb % (X[0] / 2)) + ((x[1] + x[2] + x[3] + p4) & 1);
+        std::array<int, 4> g;
+        for (int d = 0; d < 4; d++) g[d] = x[d] + quda::comm_coord(d) * X[d];
+        for (int k = 0; k < reals; k++)
+          data[(s * half_volume + cb) * reals + k] = encoded_value(i, s, g, k, Ls, reals, N);
+      }
+    }
+  }
+} // namespace
+
+// a saved 5-d vector file holds, in item i * Ls + s of every site, slice s of vector i at that site, so that the file
+// means what the format says
+TEST_P(FiveDLayoutTest, file_contents)
+{
+  using namespace quda;
+  auto pc_type = ::testing::get<0>(GetParam());
+  auto kind = ::testing::get<1>(GetParam());
+  auto format = ::testing::get<2>(GetParam());
+  const bool inflated = kind != FiveDCase::FULL;
+  const QudaParity parity = kind == FiveDCase::INFLATED_ODD ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+  const int n = 2, Ls = 4, nSpin = 4;
+  const int reals = 2 * nSpin * 3;
+
+  auto param = vector_param(inflated ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET, parity, nSpin,
+                            QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION, Ls);
+  param.pc_type = pc_type;
+  std::vector<ColorSpinorField> v(n, param);
+  for (int i = 0; i < n; i++) {
+    if (inflated) {
+      fill_parity(v[i], parity == QUDA_ODD_PARITY, i, pc_type);
+    } else {
+      fill_parity(v[i].Even(), 0, i, pc_type);
+      fill_parity(v[i].Odd(), 1, i, pc_type);
+    }
+  }
+
+  const std::string file = "five_d.cs";
+  auto p = file_io_param(format, QUDA_FILE_IO_PARALLEL);
+  p.parity_inflate = inflated;
+  VectorIO(file, p).save({v.begin(), v.end()}, QUDA_DOUBLE_PRECISION, n);
+
+  // every rank takes part in reading the record list
+  auto records = lime::read_records(file);
+  if (comm_rank() == 0) {
+    const lime::Record *data = nullptr;
+    for (auto &r : records)
+      if (r.type == "scidac-binary-data") data = &r;
+    ASSERT_NE(data, nullptr) << "no binary data in " << file;
+
+    std::array<int, 4> N;
+    const auto X = v[0].X();
+    for (int d = 0; d < 4; d++) N[d] = (d == 0 && inflated ? 2 * X[0] : X[d]) * comm_dim(d);
+    const size_t sites = static_cast<size_t>(N[0]) * N[1] * N[2] * N[3];
+    const size_t items = static_cast<size_t>(n) * Ls;
+    ASSERT_EQ(data->data_bytes, sites * items * reals * sizeof(double));
+
+    auto contents = read_file(file);
+    ASSERT_GE(contents.size(), data->data_offset + data->data_bytes);
+    const char *bytes = contents.data() + data->data_offset;
+    size_t mismatches = 0;
+    for (size_t site = 0; site < sites; site++) {
+      std::array<int, 4> g;
+      size_t r = site;
+      for (int d = 0; d < 4; d++) {
+        g[d] = r % N[d];
+        r /= N[d];
+      }
+      const int site_parity = (g[0] + g[1] + g[2] + g[3]) % 2;
+      for (int i = 0; i < n; i++) {
+        for (int s = 0; s < Ls; s++) {
+          // an inflated field holds the 4-d parity parity + s (5-d preconditioning) or parity; the rest is zero
+          const int held = (parity == QUDA_ODD_PARITY) + (pc_type == QUDA_5D_PC ? s : 0);
+          const bool present = !inflated || site_parity == held % 2;
+          for (int k = 0; k < reals; k++) {
+            uint64_t word;
+            memcpy(&word, bytes + ((site * items + i * Ls + s) * reals + k) * sizeof(double), sizeof(word));
+            word = __builtin_bswap64(word); // big endian
+            double value;
+            memcpy(&value, &word, sizeof(value));
+            if (value != (present ? encoded_value(i, s, g, k, Ls, reals, N) : 0.0)) mismatches++;
+          }
+        }
+      }
+    }
+    EXPECT_EQ(mismatches, 0u) << "of " << sites * items * reals << " values in " << file;
+  }
+
+  // and it loads back as it was saved
+  auto u = zero_vectors(n, param);
+  VectorIO(file, p).load(u);
+  expect_same_vectors(u, v);
+
+  remove_saved_file(file);
+}
+
 int main(int argc, char **argv)
 {
   quda_test test("Vector IO Test", argc, argv);
@@ -449,6 +586,21 @@ INSTANTIATE_TEST_SUITE_P(Vector, VectorIOBackendTest,
                            return name;
                          });
 #endif
+
+// what the files of 5-d vectors hold
+INSTANTIATE_TEST_SUITE_P(Vector, FiveDLayoutTest,
+                         Combine(Values(QUDA_4D_PC, QUDA_5D_PC),
+                                 Values(FiveDCase::FULL, FiveDCase::INFLATED_EVEN, FiveDCase::INFLATED_ODD),
+                                 ValuesIn(vector_formats())),
+                         [](testing::TestParamInfo<five_d_test_t> param) {
+                           std::string name = ::testing::get<0>(param.param) == QUDA_5D_PC ? "pc5d_" : "pc4d_";
+                           switch (::testing::get<1>(param.param)) {
+                           case FiveDCase::FULL: name += "full_"; break;
+                           case FiveDCase::INFLATED_EVEN: name += "inflated_even_"; break;
+                           case FiveDCase::INFLATED_ODD: name += "inflated_odd_"; break;
+                           }
+                           return name + quda::get_file_format_str(::testing::get<2>(param.param));
+                         });
 
 // I/O partition grids
 INSTANTIATE_TEST_SUITE_P(Vector, VectorPartitionTest,

@@ -1,3 +1,4 @@
+#include <type_traits>
 #include <color_spinor_field.h>
 #include <comm_quda.h>
 #include <io/qio_field.h>
@@ -21,12 +22,73 @@ namespace quda
       }
     }
 
-#ifdef HAVE_QIO
-    std::pair<QudaPrecision, scidac::FieldChecksum> load_qio(const std::string &filename, void *V[], QudaPrecision prec,
-                                                             const int *X, QudaSiteSubset subset, QudaParity parity,
-                                                             int nColor, int nSpin, int Nvec, const FileIOParam &param)
+    /**
+       @brief The host field of a set of host vectors in space-spin-color
+       order.  The files hold 4-d fields, so each item is a 4-d vector:
+       a whole vector, or one fifth-dimension slice s of a 5-d vector.
+       Where each item's sites are in memory depends on the field:
+
+       - 4-d vectors (Wilson, clover, twisted mass, staggered, MG
+         near-null vectors), full or single parity: one array per
+         vector.  A full field is stored [parity][4-d checkerboard
+         site], which is the host index, even sites first.
+       - 5-d vectors (domain wall, Mobius), single parity, as the
+         eigenvectors of their even-odd preconditioned operators are:
+         stored [s][4-d checkerboard site], so slice s is one block at s
+         times the 4-d half volume.
+       - 5-d vectors, full: either fields of the unpreconditioned
+         operator, or single-parity ones saved or loaded with parity
+         inflation (through a full temporary).  Stored [parity][s][4-d
+         checkerboard site], so slice s's sites are split between
+         Even() and Odd(), each at s times the 4-d half volume: two
+         arrays per slice.
+
+       Which half holds a slice's 4-d even sites depends on the
+       preconditioning.  With 4-d preconditioning (QUDA_4D_PC: Mobius,
+       4-d domain wall, and every 4-d operator) the parity is that of
+       x + y + z + t, so they are in Even().  With 5-d preconditioning
+       (QUDA_5D_PC, which QUDA uses only for QUDA_DOMAIN_WALL_DSLASH)
+       the parity is that of x + y + z + t + s, so for odd s they are in
+       Odd(), and the two halves are swapped.
+     */
+    template <typename Field> io::HostField host_field(const std::vector<Field *> &vecs)
     {
-      auto result = read_spinor_field(filename.c_str(), V, prec, X, subset, parity, nColor, nSpin, Nvec, param.io_mode,
+      using ptr_t = std::conditional_t<std::is_const_v<Field>, const void *, void *>;
+      using byte_t = std::conditional_t<std::is_const_v<Field>, const char *, char *>;
+      const Field &v0 = *vecs[0];
+      const int Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
+      const int n = vecs.size() * Ls;
+      const int reals = 2 * v0.Nspin() * v0.Ncolor();
+      const size_t site_bytes = reals * v0.Precision();
+
+      if (Ls > 1 && v0.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+        const size_t half_volume = v0.VolumeCB() / Ls;
+        std::vector<ptr_t> even(n), odd(n);
+        for (auto i = 0u; i < vecs.size(); i++) {
+          for (int s = 0; s < Ls; s++) {
+            const bool swap = v0.PCType() == QUDA_5D_PC && s % 2 == 1;
+            auto &e = swap ? vecs[i]->Odd() : vecs[i]->Even();
+            auto &o = swap ? vecs[i]->Even() : vecs[i]->Odd();
+            even[i * Ls + s] = e.template data<byte_t>() + s * half_volume * site_bytes;
+            odd[i * Ls + s] = o.template data<byte_t>() + s * half_volume * site_bytes;
+          }
+        }
+        return io::HostField(even.data(), odd.data(), n, v0.Precision(), reals, half_volume);
+      }
+
+      const size_t stride = v0.Volume() / Ls * site_bytes;
+      std::vector<ptr_t> arrays(n);
+      for (auto i = 0u; i < vecs.size(); i++)
+        for (int s = 0; s < Ls; s++) arrays[i * Ls + s] = vecs[i]->template data<byte_t>() + s * stride;
+      return io::HostField(arrays.data(), n, v0.Precision(), reals);
+    }
+
+#ifdef HAVE_QIO
+    std::pair<QudaPrecision, scidac::FieldChecksum> load_qio(const std::string &filename, const io::HostField &field,
+                                                             const int *X, QudaSiteSubset subset, QudaParity parity,
+                                                             int nColor, int nSpin, const FileIOParam &param)
+    {
+      auto result = read_spinor_field(filename.c_str(), field, X, subset, parity, nColor, nSpin, param.io_mode,
                                       param.io_partition_grid);
       // QIO does not report the checksums stored in the file
       const auto &sum = result.second;
@@ -36,24 +98,22 @@ namespace quda
       return result;
     }
 
-    io::Checksum save_qio(const std::string &filename, const void *V[], QudaPrecision prec, const int *X,
-                          QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec,
-                          const FileIOParam &param)
+    io::Checksum save_qio(const std::string &filename, const io::HostField &field, const int *X, QudaSiteSubset subset,
+                          QudaParity parity, int nColor, int nSpin, const FileIOParam &param)
     {
-      return write_spinor_field(filename.c_str(), V, prec, X, subset, parity, nColor, nSpin, Nvec, param.partfile,
+      return write_spinor_field(filename.c_str(), field, X, subset, parity, nColor, nSpin, param.partfile,
                                 param.io_mode, param.io_partition_grid);
     }
 #else
-    std::pair<QudaPrecision, scidac::FieldChecksum> load_qio(const std::string &, void *[], QudaPrecision, const int *,
-                                                             QudaSiteSubset, QudaParity, int, int, int,
-                                                             const FileIOParam &)
+    std::pair<QudaPrecision, scidac::FieldChecksum> load_qio(const std::string &, const io::HostField &, const int *,
+                                                             QudaSiteSubset, QudaParity, int, int, const FileIOParam &)
     {
       errorQuda("The external QIO backend has not been enabled");
       return {};
     }
 
-    io::Checksum save_qio(const std::string &, const void *[], QudaPrecision, const int *, QudaSiteSubset, QudaParity,
-                          int, int, int, const FileIOParam &)
+    io::Checksum save_qio(const std::string &, const io::HostField &, const int *, QudaSiteSubset, QudaParity, int, int,
+                          const FileIOParam &)
     {
       errorQuda("The external QIO backend has not been enabled");
       return {};
@@ -106,17 +166,11 @@ namespace quda
     }
 
     if (v0.Ndim() == 4 || v0.Ndim() == 5) {
-      // since QIO routines presently assume we have 4-d fields, we need to convert to array of 4-d fields
+      // the file formats hold 4-d fields, so 5-d vectors are split into their 4-d slices
       auto Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
-      auto V4 = v0.Volume() / Ls;
-      if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate) V4 *= 2;
-      // the vectors passed on are in load_prec, either the temporary fields or vecs itself
-      auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * load_prec;
-      std::vector<void *> V(Nvec * Ls);
-      for (int i = 0; i < Nvec; i++) {
-        auto &v = create_tmp ? tmp[i] : vecs[i];
-        for (int j = 0; j < Ls; j++) { V[i * Ls + j] = v.data<char *>() + j * stride; }
-      }
+      std::vector<ColorSpinorField *> V(Nvec);
+      for (int i = 0; i < Nvec; i++) V[i] = create_tmp ? &tmp[i] : &vecs[i];
+      const auto field = host_field(V);
 
       // if we're loading inflated vectors, we need to grab the spinor size from `tmp` instead of `v0`.
       auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
@@ -127,10 +181,9 @@ namespace quda
       host_timer.start(); // start the timer
 
       auto [file_prec, sum] = param.external_qio ?
-        load_qio(filename, V.data(), load_prec, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(),
-                 Nvec * Ls, param) :
-        scidac::load_vectors(filename, V.data(), load_prec, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(),
-                             v0.Nspin(), Nvec * Ls, param);
+        load_qio(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(), param) :
+        scidac::load_vectors(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(),
+                             param);
 
       host_timer.stop(); // stop the timer
       logQuda(QUDA_VERBOSE, "Loaded %d %s precision vector fields from %s%s; checksums %s %s\n", Nvec * Ls,
@@ -208,17 +261,11 @@ namespace quda
     }
 
     if (v0.Ndim() == 4 || v0.Ndim() == 5) {
-      // since QIO routines presently assume we have 4-d fields, we need to convert to array of 4-d fields
+      // the file formats hold 4-d fields, so 5-d vectors are split into their 4-d slices
       auto Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
-      auto V4 = v0.Volume() / Ls;
-      if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate) V4 *= 2;
-      // the vectors passed on are in save_prec, either the temporary fields or vecs itself
-      auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * save_prec;
-      std::vector<const void *> V(Nvec * Ls);
-      for (int i = 0; i < Nvec; i++) {
-        auto &v = create_tmp ? tmp[i] : vecs[i];
-        for (int j = 0; j < Ls; j++) { V[i * Ls + j] = v.data<const char *>() + j * stride; }
-      }
+      std::vector<const ColorSpinorField *> V(Nvec);
+      for (int i = 0; i < Nvec; i++) V[i] = create_tmp ? &tmp[i] : &vecs[i];
+      const auto field = host_field(V);
 
       // if we performed parity inflation, we need to grab the spinor size from `tmp` instead of `v0`.
       auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
@@ -228,10 +275,10 @@ namespace quda
       quda::host_timer_t host_timer;
       host_timer.start(); // start the timer
 
-      auto sum = param.external_qio ? save_qio(filename, V.data(), save_prec, spinor_X, spinor_site_subset,
-                                               spinor_parity, v0.Ncolor(), v0.Nspin(), Nvec * Ls, param) :
-                                      scidac::save_vectors(filename, V.data(), save_prec, spinor_X, spinor_site_subset,
-                                                           spinor_parity, v0.Ncolor(), v0.Nspin(), Nvec * Ls, param);
+      auto sum = param.external_qio ?
+        save_qio(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(), param) :
+        scidac::save_vectors(filename, field, spinor_X, spinor_site_subset, spinor_parity, v0.Ncolor(), v0.Nspin(),
+                             param);
       // rank 0 appends the checksum record after the other ranks are done
       comm_barrier();
 
