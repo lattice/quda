@@ -443,22 +443,6 @@ TEST_P(VectorPartitionTest, grids)
   if (external) remove_saved_file(other_file);
 }
 
-namespace
-{
-  // expect two partfiles to be the same apart from the date in their first volume's metadata
-  void expect_same_partfile(const std::string &a, const std::string &b)
-  {
-    auto u = saved_volumes(a), v = saved_volumes(b);
-    ASSERT_EQ(u.size(), v.size()) << a << " and " << b << " have different numbers of volumes";
-    for (auto i = 0u; i < u.size(); i++) {
-      if (i == 0)
-        expect_same_saved_file(u[i], v[i], false);
-      else
-        expect_same_file(u[i], v[i]);
-    }
-  }
-} // namespace
-
 // tuple types: site subset, I/O mode
 using vector_partfile_test_t = ::testing::tuple<QudaSiteSubset, QudaFileIOMode>;
 

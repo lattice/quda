@@ -1260,6 +1260,9 @@ namespace quda
         errorQuda("MILC's eigenvector format (milc_eigenvectors) is only for eigensolver saves, not for the near-null "
                   "vectors of %s; QUDA's default format saves them",
                   vec_outfile.c_str());
+      if (param.mg_global.file_io_param && param.mg_global.file_io_param->partfile == QUDA_BOOLEAN_TRUE)
+        warningQuda("QudaFileIOParam::partfile is ignored for near-null vector saves; "
+                    "QudaMultigridParam::mg_vec_partfile chooses partfiles");
       io_param.partfile = param.mg_global.mg_vec_partfile[param.level] == QUDA_BOOLEAN_TRUE;
       VectorIO io(vec_outfile, io_param);
       io.save(B);

@@ -65,6 +65,7 @@ void printQudaFileIOParam(QudaFileIOParam *param)
   P(reunitarize, QUDA_GAUGE_REUNITARIZE_NONE);
   for (int d = 0; d < 4; d++) P(io_partition_grid[d], 0);
   P(milc_eigenvectors, QUDA_BOOLEAN_FALSE);
+  P(partfile, QUDA_BOOLEAN_FALSE);
 #elif defined CHECK_PARAM
   // the full range is checked since a caller that bypasses newQudaFileIOParam() can leave arbitrary values
   if (param->format != QUDA_FILE_FORMAT_AUTO && param->format != QUDA_FILE_FORMAT_QIO
@@ -96,6 +97,8 @@ void printQudaFileIOParam(QudaFileIOParam *param)
   }
   if (param->milc_eigenvectors != QUDA_BOOLEAN_FALSE && param->milc_eigenvectors != QUDA_BOOLEAN_TRUE)
     errorQuda("Invalid milc_eigenvectors %d", param->milc_eigenvectors);
+  if (param->partfile != QUDA_BOOLEAN_FALSE && param->partfile != QUDA_BOOLEAN_TRUE)
+    errorQuda("Invalid partfile %d", param->partfile);
 #else
   P(format, QUDA_FILE_FORMAT_INVALID);
   P(io_mode, QUDA_FILE_IO_INVALID);
@@ -105,6 +108,7 @@ void printQudaFileIOParam(QudaFileIOParam *param)
   P(reunitarize, QUDA_GAUGE_REUNITARIZE_INVALID);
   for (int d = 0; d < 4; d++) P(io_partition_grid[d], INVALID_INT);
   P(milc_eigenvectors, QUDA_BOOLEAN_INVALID);
+  P(partfile, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

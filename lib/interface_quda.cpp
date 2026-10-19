@@ -948,6 +948,42 @@ void writeGaugeQuda(const char *file, QudaGaugeParam *param)
 
 } // writeGaugeQuda
 
+void readGaugeQuda(const char *file, QudaGaugeParam *param)
+{
+  auto profile = pushProfile(profileGauge);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  QudaGaugeParam host_param = *param;
+  host_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  host_param.location = QUDA_CPU_FIELD_LOCATION;
+  host_param.use_resident_gauge = 0;
+  checkGaugeParam(&host_param);
+
+  switch (param->type) {
+  case QUDA_WILSON_LINKS:
+  case QUDA_ASQTAD_FAT_LINKS:
+  case QUDA_ASQTAD_LONG_LINKS:
+  case QUDA_SMEARED_LINKS: break;
+  default: errorQuda("Invalid gauge type %d", param->type);
+  }
+
+  GaugeFieldParam cpu_param(host_param);
+  cpu_param.pad = 0;
+  cpu_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cpu_param.create = QUDA_NULL_FIELD_CREATE;
+  cpu_param.setPrecision(host_param.cpu_prec);
+  GaugeField cpuGauge(cpu_param);
+  void *gauge[4];
+  for (int d = 0; d < 4; d++) gauge[d] = cpuGauge.data(d);
+
+  getProfile().TPSTART(QUDA_PROFILE_IO);
+  GaugeIO(file, FileIOParam(param->file_io_param)).load(gauge, cpuGauge.Precision(), param->X);
+  getProfile().TPSTOP(QUDA_PROFILE_IO);
+
+  loadGaugeQuda(gauge, &host_param);
+} // readGaugeQuda
+
 void loadSloppyCloverQuda(const QudaPrecision prec[]);
 void freeSloppyCloverQuda();
 

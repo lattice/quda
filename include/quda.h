@@ -57,6 +57,13 @@ typedef struct QudaFileIOParam_s {
                                     and for gauge fields.  MILC's double-precision builds reunitarize the links they
                                     load, so with single-precision links from a file, load them with
                                     QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2 to solve MILC's operator */
+  QudaBoolean partfile; /**< Whether to save a gauge field as a SciDAC (QIO) partfile (default false): one file per
+                           I/O partition (see io_partition_grid) named <file>.volNNNN after the partition's leader,
+                           as QIO does; on one rank a single file.  Applies to gauge saves only.  Vector saves are
+                           chosen by QudaEigParam::partfile and QudaMultigridParam::mg_vec_partfile, which take
+                           precedence; setting this in an eigensolver or multigrid struct's file I/O parameters is
+                           ignored with a warning.  An error with the ILDG and MILC formats.  Loads detect partfiles
+                           whatever it says */
 } QudaFileIOParam;
 
   /**
@@ -1250,6 +1257,28 @@ typedef struct QudaFileIOParam_s {
    * @param param   Contains all metadata regarding host and device storage
    */
   void writeGaugeQuda(const char *file, QudaGaugeParam *param);
+
+  /**
+   * Load a gauge field from a file into QUDA's resident gauge field
+   * of type param->type, as loadGaugeQuda loads one from the host.
+   * The format and options come from param->file_io_param (null for
+   * defaults; the format is detected on load).
+   *
+   * The file's links are loaded as they are: no phases, boundary
+   * conditions or anisotropy are applied, so param->t_boundary,
+   * param->staggered_phase_applied and the other fields that describe
+   * the links must describe the file's (for files that writeGaugeQuda
+   * saved, as they were saved).  To apply them on the host, copy the
+   * field back with saveGaugeQuda, apply them (e.g., with
+   * staggeredPhaseQuda for staggered phases) and call loadGaugeQuda.
+   *
+   * param->gauge_order, param->location and param->use_resident_gauge
+   * are ignored (there is no host field, and the links come from the
+   * file).  Requires initQuda.
+   * @param file Filename to read from
+   * @param param Contains all metadata regarding the links and device storage
+   */
+  void readGaugeQuda(const char *file, QudaGaugeParam *param);
 
   /**
    * Load the clover term and/or the clover inverse from the host.

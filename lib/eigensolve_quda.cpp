@@ -344,6 +344,9 @@ namespace quda
       // save the required eigenvectors or right singular vectors to file
       FileIOParam io_param(eig_param->file_io_param);
       io_param.parity_inflate = eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE;
+      if (eig_param->file_io_param && eig_param->file_io_param->partfile == QUDA_BOOLEAN_TRUE)
+        warningQuda("QudaFileIOParam::partfile is ignored for eigenvector saves; QudaEigParam::partfile chooses "
+                    "partfiles");
       io_param.partfile = eig_param->partfile == QUDA_BOOLEAN_TRUE;
       if (io_param.milc_eigenvectors) {
         saveMILCEigenvectors(kSpace, evals, io_param);

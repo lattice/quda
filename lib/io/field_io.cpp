@@ -35,6 +35,7 @@ namespace quda
     reunitarize = checked.reunitarize;
     for (int d = 0; d < 4; d++) io_partition_grid[d] = checked.io_partition_grid[d];
     milc_eigenvectors = checked.milc_eigenvectors == QUDA_BOOLEAN_TRUE;
+    partfile = checked.partfile == QUDA_BOOLEAN_TRUE;
   }
 
   const char *get_file_format_str(QudaFileFormat format)

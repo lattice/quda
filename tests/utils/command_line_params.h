@@ -315,6 +315,7 @@ extern std::array<int, 4> gauge_file_io_partitions;
 extern std::string gauge_ildg_lfn;
 extern bool gauge_write_usqcd_info;
 extern bool gauge_allow_checksum_mismatch;
+extern bool gauge_save_partfile;
 extern QudaGaugeReunitarize gauge_reunitarize;
 extern int Nsrc;
 extern int Msrc;

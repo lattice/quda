@@ -24,12 +24,11 @@ inline const char *get_io_mode_str(QudaFileIOMode io_mode)
 }
 
 /**
-   @brief File options for a format, mode and I/O partition grid,
-   through the public interface struct (which splits the _EXTERNAL
-   formats), without the usqcdInfo record
+   @brief The public file options for a format, mode, I/O partition
+   grid and partfile saves, without the usqcdInfo record
  */
-inline quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_mode,
-                                       const std::array<int, 4> &io_partition_grid = {})
+inline QudaFileIOParam quda_file_io_param(QudaFileFormat format, QudaFileIOMode io_mode,
+                                          const std::array<int, 4> &io_partition_grid = {}, bool partfile = false)
 {
   QudaFileIOParam param = newQudaFileIOParam();
   param.struct_size = sizeof(param);
@@ -37,6 +36,18 @@ inline quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_
   param.io_mode = io_mode;
   param.write_usqcd_info = QUDA_BOOLEAN_FALSE;
   for (int d = 0; d < 4; d++) param.io_partition_grid[d] = io_partition_grid[d];
+  param.partfile = partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  return param;
+}
+
+/**
+   @brief File options as quda_file_io_param, through the public
+   interface struct (which splits the _EXTERNAL formats)
+ */
+inline quda::FileIOParam file_io_param(QudaFileFormat format, QudaFileIOMode io_mode,
+                                       const std::array<int, 4> &io_partition_grid = {}, bool partfile = false)
+{
+  auto param = quda_file_io_param(format, io_mode, io_partition_grid, partfile);
   return quda::FileIOParam(&param);
 }
 
@@ -100,9 +111,7 @@ inline std::string volume_file(const std::string &file, int rank)
 inline quda::FileIOParam partfile_param(QudaFileFormat format, QudaFileIOMode io_mode,
                                         const std::array<int, 4> &grid = {})
 {
-  auto p = file_io_param(format, io_mode, grid);
-  p.partfile = true;
-  return p;
+  return file_io_param(format, io_mode, grid, true);
 }
 
 /**
@@ -234,5 +243,21 @@ inline void expect_same_saved_file(const std::string &a, const std::string &b, b
     auto info_a = read_info_without_time_stamp(a + ".info"), info_b = read_info_without_time_stamp(b + ".info");
     EXPECT_FALSE(info_a.empty()) << "no " << a << ".info";
     EXPECT_EQ(info_a, info_b) << "the .info files of " << a << " and " << b << " differ";
+  }
+}
+
+/**
+   @brief Expect two saved partfiles to have the same volumes, the
+   same apart from the time of writing (only the first volume has one)
+ */
+inline void expect_same_partfile(const std::string &a, const std::string &b)
+{
+  auto u = saved_volumes(a), v = saved_volumes(b);
+  ASSERT_EQ(u.size(), v.size()) << a << " and " << b << " have different numbers of volumes";
+  for (auto i = 0u; i < u.size(); i++) {
+    if (i == 0)
+      expect_same_saved_file(u[i], v[i], false);
+    else
+      expect_same_file(u[i], v[i]);
   }
 }

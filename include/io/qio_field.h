@@ -12,7 +12,7 @@
 void read_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, const int *X, QudaFileIOMode io_mode,
                       const std::array<int, 4> &io_partition_grid, quda::scidac::GaugeInfo &info);
 quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, const int *X,
-                                     QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
+                                     bool partfile, QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
                                      const quda::scidac::GaugeInfo &info);
 // reads the first records of a vector file, one per host field; milc means MILC's eigenvector records, which have no
 // spins

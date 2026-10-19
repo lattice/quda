@@ -329,7 +329,7 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   quda_this_node = QMP_get_node_number();
 
   set_layout(X);
-  PartitionFilesystem fs(io_mode, io_partition_grid);
+  PartitionFilesystem fs(io_mode, io_partition_grid, partfile_name(filename));
 
   /* Open the test file for reading */
   QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, qio_serpar(io_mode), fs.get());
@@ -453,13 +453,13 @@ int write_su3_field(QIO_Writer *outfile, const quda::io::HostField &field, QudaP
 }
 
 quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
-                                     QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
+                                     bool partfile, QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
                                      const quda::scidac::GaugeInfo &info)
 {
   quda_this_node = QMP_get_node_number();
 
   set_layout(X);
-  PartitionFilesystem fs(io_mode, io_partition_grid);
+  PartitionFilesystem fs(io_mode, io_partition_grid, partfile);
 
   QudaPrecision file_prec = precision;
 
@@ -468,7 +468,7 @@ quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPr
 
   /* Open the test file for writing */
   const char *lfn = info.ildg && !info.ildg_lfn.empty() ? info.ildg_lfn.c_str() : nullptr;
-  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, qio_serpar(io_mode),
+  QIO_Writer *outfile = open_test_output(filename, partfile ? QIO_PARTFILE : QIO_SINGLEFILE, qio_serpar(io_mode),
                                          info.ildg ? QIO_ILDGLAT : QIO_ILDGNO, lfn, fs.get());
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 

@@ -88,7 +88,7 @@ namespace quda
     io::Checksum save_qio(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
                           const FileIOParam &param, const scidac::GaugeInfo &info)
     {
-      return write_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, param.io_mode,
+      return write_gauge_field(filename.c_str(), const_cast<void **>(gauge), prec, X, param.partfile, param.io_mode,
                                param.io_partition_grid, info);
     }
 #else
@@ -311,7 +311,12 @@ namespace quda
   void GaugeIO::save(const void *const gauge[], QudaPrecision prec, const int *X)
   {
     auto format = resolve_save_format(param.format);
-    logQuda(QUDA_SUMMARIZE, "Start saving %s gauge field to %s\n", get_file_format_str(format), filename.c_str());
+    if (param.partfile && format == QUDA_FILE_FORMAT_ILDG)
+      errorQuda("%s: ILDG files cannot be saved as partfiles", filename.c_str());
+    if (param.partfile && format == QUDA_FILE_FORMAT_MILC)
+      errorQuda("%s: MILC's gauge format has no partfiles", filename.c_str());
+    logQuda(QUDA_SUMMARIZE, "Start saving %s gauge field to %s%s\n", get_file_format_str(format), filename.c_str(),
+            param.partfile ? " as a partfile" : "");
 
     host_timer_t host_timer;
     host_timer.start();

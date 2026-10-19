@@ -55,6 +55,7 @@ std::array<int, 4> gauge_file_io_partitions = {0, 0, 0, 0};
 std::string gauge_ildg_lfn;
 bool gauge_write_usqcd_info = true;
 bool gauge_allow_checksum_mismatch = false;
+bool gauge_save_partfile = false;
 QudaGaugeReunitarize gauge_reunitarize = QUDA_GAUGE_REUNITARIZE_NONE;
 int Nsrc = 1;
 int Msrc = 1;
@@ -721,6 +722,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--gauge-allow-checksum-mismatch", gauge_allow_checksum_mismatch,
                        "Whether to load a gauge field whose checksums do not match its data, with a warning "
                        "(default false)");
+  quda_app->add_option("--gauge-save-partfile", gauge_save_partfile,
+                       "Whether to save the gauge field as a SciDAC partfile, one file per I/O partition (default "
+                       "false; QIO formats only)");
   quda_app
     ->add_option("--gauge-reunitarize", gauge_reunitarize,
                  "How to reunitarize a gauge field loaded with --load-gauge, in any file format: none (default) keeps "

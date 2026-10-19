@@ -220,6 +220,7 @@ TEST(FileIOParamTest, conversion)
   expect_equal(FileIOParam(nullptr), defaults);
 
   QudaFileIOParam param = newQudaFileIOParam();
+  EXPECT_EQ(param.partfile, QUDA_BOOLEAN_FALSE);
   expect_equal(FileIOParam(&param), defaults);
 
   param.struct_size = sizeof(param);
@@ -231,6 +232,7 @@ TEST(FileIOParamTest, conversion)
   const int grid[4] = {1, 2, 1, 4};
   for (int d = 0; d < 4; d++) param.io_partition_grid[d] = grid[d];
   param.milc_eigenvectors = QUDA_BOOLEAN_TRUE;
+  param.partfile = QUDA_BOOLEAN_TRUE;
 
   FileIOParam expected;
   expected.format = QUDA_FILE_FORMAT_MILC;
@@ -240,6 +242,7 @@ TEST(FileIOParamTest, conversion)
   expected.allow_checksum_mismatch = true;
   expected.io_partition_grid = {1, 2, 1, 4};
   expected.milc_eigenvectors = true;
+  expected.partfile = true;
   expect_equal(FileIOParam(&param), expected);
 
   // the _EXTERNAL formats become the plain format and the external QIO backend
@@ -760,8 +763,9 @@ class GaugePartfileTest : public ::testing::TestWithParam<QudaPrecision>
 {
 };
 
-// SciDAC gauge partfiles, which only the native backend saves, load natively with any grid and rank layout, and with
-// the external backend with the grid that saved them
+// SciDAC gauge partfiles, saved through QudaFileIOParam::partfile, load natively with any grid and rank layout; the
+// external backend saves the same volumes, loads the native ones with the grid that saved them, and the native backend
+// loads its partfiles
 TEST_P(GaugePartfileTest, grids)
 {
   using namespace quda;
@@ -773,17 +777,30 @@ TEST_P(GaugePartfileTest, grids)
   constructHostGaugeField(original.data, gauge_param, 0, nullptr);
   auto save
     = [&](const std::string &file, const FileIOParam &p) { GaugeIO(file, p).save(original.data, prec, gauge_param.X); };
-  auto expect_load = [&](const std::string &file, const FileIOParam &p) {
+  auto expect_load = [&](const std::string &file, const FileIOParam &p, bool usqcd_info = false) {
     loaded.clear();
     auto info = GaugeIO(file, p).load(loaded.data, prec, gauge_param.X);
     EXPECT_TRUE(loaded == original);
     EXPECT_TRUE(info.checksum_matches);
+    EXPECT_EQ(info.has_plaq_linktr, usqcd_info);
+    if (usqcd_info) { EXPECT_TRUE(info.plaq_linktr_matches); }
   };
+#ifdef HAVE_QIO
+  // on one rank a partfile is a single file
+  auto expect_same = [](const std::string &a, const std::string &b) {
+    if (comm_rank() != 0) return;
+    if (comm_size() == 1)
+      expect_same_saved_file(a, b, false);
+    else
+      expect_same_partfile(a, b);
+  };
+#endif
 
-  const std::string file = "partfile.lat";
+  const std::string file = "partfile.lat", external_file = "partfile_external.lat";
   const auto grids = partition_grids();
   for (auto i = 0u; i < grids.size(); i++) {
     const auto &grid = grids[i];
+    const auto &next_grid = grids[(i + 1) % grids.size()];
     SCOPED_TRACE("I/O partition grid " + grid_str(grid));
     save(file, partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, grid));
     const bool single = comm_size() == 1;
@@ -792,10 +809,40 @@ TEST_P(GaugePartfileTest, grids)
       EXPECT_EQ(access(file.c_str(), F_OK) == 0, single) << file;
       EXPECT_EQ(saved_volumes(file), volumes);
     }
-    expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, grids[(i + 1) % grids.size()]));
+    expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, next_grid));
 #ifdef HAVE_QIO
-    // QIO reads partfiles only with the rank layout and grid that saved them
-    expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL, grid));
+    save(external_file, partfile_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL, grid));
+    expect_same(file, external_file);
+    {
+      SCOPED_TRACE("native load of the external partfile with I/O partition grid " + grid_str(next_grid));
+      expect_load(external_file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, next_grid));
+    }
+    {
+      // QIO reads partfiles only with the rank layout and grid that saved them
+      SCOPED_TRACE("external load of the native partfile");
+      expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL, grid));
+    }
+    remove_saved_file(external_file);
+#endif
+    remove_saved_file(file);
+  }
+
+  {
+    // the usqcdInfo record goes in the first volume, with the record's other metadata
+    SCOPED_TRACE("with the usqcdInfo record");
+    auto with_info = [](QudaFileFormat format) {
+      auto p = partfile_param(format, QUDA_FILE_IO_PARALLEL);
+      p.write_usqcd_info = true;
+      return p;
+    };
+    save(file, with_info(QUDA_FILE_FORMAT_QIO));
+    expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL), true);
+#ifdef HAVE_QIO
+    save(external_file, with_info(QUDA_FILE_FORMAT_QIO_EXTERNAL));
+    expect_same(file, external_file);
+    expect_load(external_file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL), true);
+    expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL), true);
+    remove_saved_file(external_file);
 #endif
     remove_saved_file(file);
   }
@@ -811,6 +858,150 @@ TEST_P(GaugePartfileTest, grids)
   expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL));
   expect_load(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_SERIAL));
   remove_saved_file(file);
+}
+
+namespace
+{
+  // links of a type on the device at the host precision, without reconstruction, so they hold the host's exactly
+  QudaGaugeParam read_gauge_param(QudaPrecision prec, QudaLinkType type = QUDA_WILSON_LINKS)
+  {
+    QudaGaugeParam gauge_param = gauge_param_for(prec);
+    gauge_param.type = type;
+    gauge_param.cuda_prec_refinement_sloppy = prec;
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_eigensolver = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
+    return gauge_param;
+  }
+
+  // readGaugeQuda of a file, copied back to the host, gives the links GaugeIO loads from it with the same options
+  void expect_read_as_loaded(const std::string &file, QudaGaugeParam gauge_param, QudaFileIOParam io_param)
+  {
+    using namespace quda;
+    const auto prec = gauge_param.cpu_prec;
+    HostGauge expected(prec), read(prec);
+    GaugeIO(file, FileIOParam(&io_param)).load(expected.data, prec, gauge_param.X);
+
+    gauge_param.file_io_param = &io_param;
+    readGaugeQuda(file.c_str(), &gauge_param);
+    read.clear();
+    saveGaugeQuda(read.data, &gauge_param);
+    freeGaugeQuda();
+    EXPECT_TRUE(read == expected);
+  }
+} // namespace
+
+// tuple types: file format, io mode
+using read_gauge_test_t = ::testing::tuple<QudaFileFormat, QudaFileIOMode>;
+
+class ReadGaugeQudaTest : public ::testing::TestWithParam<read_gauge_test_t>
+{
+};
+
+// readGaugeQuda loads a file into the resident gauge field as GaugeIO loads it, for every format, single files and
+// partfiles
+TEST_P(ReadGaugeQudaTest, load)
+{
+  using namespace quda;
+  auto format = ::testing::get<0>(GetParam());
+  auto io_mode = ::testing::get<1>(GetParam());
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+
+  auto gauge_param = read_gauge_param(prec);
+  HostGauge original(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+  auto save = [&](const std::string &file, QudaFileIOParam io_param) {
+    GaugeIO(file, FileIOParam(&io_param)).save(original.data, prec, gauge_param.X);
+  };
+
+  const std::string file = "read_gauge.lat";
+  const auto io_param = quda_file_io_param(format, io_mode);
+  save(file, io_param);
+  expect_read_as_loaded(file, gauge_param, io_param);
+  remove_saved_file(file);
+  if (saved_format(format) == QUDA_FILE_FORMAT_MILC) remove_saved_file(file + ".info");
+
+  if (saved_format(format) == QUDA_FILE_FORMAT_QIO) {
+    const auto grid = partition_grids().back();
+    SCOPED_TRACE("partfile with I/O partition grid " + grid_str(grid));
+    const auto partfile = quda_file_io_param(format, io_mode, grid, true);
+    save(file, partfile);
+    expect_read_as_loaded(file, gauge_param, partfile);
+    remove_saved_file(file);
+  }
+}
+
+// writeGaugeQuda then readGaugeQuda gives back the resident links exactly, for each type of links, in single files and
+// partfiles; writeGaugeQuda saves the same partfile as GaugeIO
+TEST(ReadGaugeQudaWriteTest, round_trip)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+
+  HostGauge original(prec), read(prec);
+  constructHostGaugeField(original.data, read_gauge_param(prec), 0, nullptr);
+  const std::string file = "write_gauge.lat", internal_file = "write_gauge_internal.lat";
+  for (auto type : {QUDA_WILSON_LINKS, QUDA_ASQTAD_FAT_LINKS, QUDA_ASQTAD_LONG_LINKS, QUDA_SMEARED_LINKS}) {
+    SCOPED_TRACE("link type " + std::to_string(type));
+    auto gauge_param = read_gauge_param(prec, type);
+    for (bool partfile : {false, true}) {
+      SCOPED_TRACE(partfile ? "partfile" : "single file");
+      auto io_param = quda_file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL, {}, partfile);
+      gauge_param.file_io_param = &io_param;
+      loadGaugeQuda(original.data, &gauge_param);
+      writeGaugeQuda(file.c_str(), &gauge_param);
+      freeGaugeQuda();
+
+      readGaugeQuda(file.c_str(), &gauge_param);
+      read.clear();
+      saveGaugeQuda(read.data, &gauge_param);
+      freeGaugeQuda();
+      EXPECT_TRUE(read == original);
+
+      if (partfile && type == QUDA_WILSON_LINKS) {
+        GaugeIO(internal_file, FileIOParam(&io_param)).save(original.data, prec, gauge_param.X);
+        if (comm_rank() == 0) {
+          if (comm_size() == 1)
+            expect_same_saved_file(file, internal_file, false);
+          else
+            expect_same_partfile(file, internal_file);
+        }
+        remove_saved_file(internal_file);
+      }
+      remove_saved_file(file);
+    }
+  }
+}
+
+// readGaugeQuda reunitarizes as GaugeIO does
+TEST(ReadGaugeQudaWriteTest, reunitarize)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+
+  auto gauge_param = read_gauge_param(prec);
+  HostGauge original(prec), raw(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  // a MILC file is single precision, so reunitarizing in double precision changes its links
+  const std::string file = "read_gauge_reunitarize.milc";
+  auto io_param = quda_file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
+  GaugeIO(file, FileIOParam(&io_param)).save(original.data, prec, gauge_param.X);
+  GaugeIO(file, FileIOParam(&io_param)).load(raw.data, prec, gauge_param.X);
+  io_param.reunitarize = QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2;
+  expect_read_as_loaded(file, gauge_param, io_param);
+
+  HostGauge reunitarized(prec);
+  GaugeIO(file, FileIOParam(&io_param)).load(reunitarized.data, prec, gauge_param.X);
+  EXPECT_FALSE(reunitarized == raw);
+
+  remove_saved_file(file);
+  remove_saved_file(file + ".info");
 }
 
 #ifdef HAVE_QIO
@@ -955,6 +1146,16 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugePartitionTest,
 INSTANTIATE_TEST_SUITE_P(Gauge, GaugePartfileTest, Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
                          [](testing::TestParamInfo<QudaPrecision> param) {
                            return std::string(get_prec_str(param.param));
+                         });
+
+// readGaugeQuda
+INSTANTIATE_TEST_SUITE_P(Gauge, ReadGaugeQudaTest,
+                         Combine(ValuesIn(gauge_formats()), Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL)),
+                         [](testing::TestParamInfo<read_gauge_test_t> param) {
+                           std::string name;
+                           name += quda::get_file_format_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += get_io_mode_str(::testing::get<1>(param.param));
+                           return name;
                          });
 
 #ifdef HAVE_QIO
