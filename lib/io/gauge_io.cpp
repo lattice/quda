@@ -266,6 +266,7 @@ namespace quda
                            const FileIOParam &param, bool ildg)
     {
       scidac::GaugeInfo info;
+      info.legacy_strings = param.legacy_strings;
       info.ildg = ildg;
       if (ildg) info.ildg_lfn = param.ildg_lfn.empty() ? filename : param.ildg_lfn;
       if (param.write_usqcd_info) {

@@ -1004,6 +1004,141 @@ TEST(ReadGaugeQudaWriteTest, reunitarize)
   remove_saved_file(file + ".info");
 }
 
+namespace
+{
+  // the backends that save and load a LIME format (QIO or ILDG) in this build
+  std::vector<QudaFileFormat> lime_backends(QudaFileFormat format)
+  {
+    std::vector<QudaFileFormat> formats = {format};
+#ifdef HAVE_QIO
+    formats.push_back(format == QUDA_FILE_FORMAT_ILDG ? QUDA_FILE_FORMAT_ILDG_EXTERNAL : QUDA_FILE_FORMAT_QIO_EXTERNAL);
+#endif
+    return formats;
+  }
+
+  // QUDA's record XML of a gauge field, without usqcdInfo, written out here rather than with the library's builders
+  std::string expected_gauge_record_xml(const std::string &version_and_type)
+  {
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><qudaGaugeFieldFile>" + version_and_type
+      + "<info><subset>full</subset><parity>full</parity><nColor>3</nColor><nSpin>0</nSpin></info>"
+        "</qudaGaugeFieldFile>";
+  }
+
+  // the private record XML of a gauge field holds these values
+  void expect_gauge_private_record(const std::string &xml, const std::string &datatype, QudaPrecision prec)
+  {
+    using quda::scidac::xml_value;
+    EXPECT_EQ(xml_value(xml, "datatype").value_or(""), datatype) << xml;
+    EXPECT_EQ(xml_value(xml, "colors").value_or(""), "3") << xml;
+    EXPECT_FALSE(xml_value(xml, "spins")) << xml;
+    EXPECT_EQ(xml_value(xml, "typesize").value_or(""), std::to_string(18 * prec)) << xml;
+    EXPECT_EQ(xml_value(xml, "datacount").value_or(""), "4") << xml;
+  }
+} // namespace
+
+class GaugeStringsTest : public ::testing::TestWithParam<QudaFileFormat>
+{
+};
+
+// QUDA's strings in gauge files, against literals, for both backends: its file XML, USQCD's datatype for SciDAC and
+// ILDG files, and its record XML without usqcdInfo, in single files and in the first volume of partfiles
+TEST_P(GaugeStringsTest, saved)
+{
+  using namespace quda;
+  auto format = GetParam();
+  const std::string file = "strings.lat";
+  for (auto prec : {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION}) {
+    if (!is_enabled(prec)) continue;
+    QudaGaugeParam gauge_param = gauge_param_for(prec);
+    HostGauge gauge(prec);
+    constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+    const std::string datatype = prec == QUDA_DOUBLE_PRECISION ? "USQCD_D3_ColorMatrix" : "USQCD_F3_ColorMatrix";
+    for (auto backend : lime_backends(format)) {
+      const char *kinds[] = {"single file", "partfile", "single file with usqcdInfo"};
+      for (int k = 0; k < (format == QUDA_FILE_FORMAT_QIO ? 3 : 1); k++) {
+        const bool partfile = k == 1, usqcd_info = k == 2;
+        SCOPED_TRACE(std::string(get_file_format_str(backend)) + ", " + get_prec_str(prec) + ", " + kinds[k]);
+        auto p = file_io_param(backend, QUDA_FILE_IO_PARALLEL, {}, partfile);
+        p.write_usqcd_info = usqcd_info;
+        GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
+        if (comm_rank() == 0) {
+          const auto s = saved_strings(partfile && comm_size() > 1 ? volume_file(file, 0) : file);
+          EXPECT_EQ(s.user_file, expected_file_xml("gauge field"));
+          ASSERT_EQ(s.private_record.size(), 1u);
+          expect_gauge_private_record(s.private_record[0], datatype, prec);
+          if (usqcd_info)
+            EXPECT_TRUE(scidac::xml_value(s.user_record[0], "usqcdInfo")) << s.user_record[0];
+          else
+            EXPECT_EQ(s.user_record[0], expected_gauge_record_xml("<version>1.0</version>"));
+        }
+        remove_saved_file(file);
+      }
+    }
+  }
+}
+
+class GaugeLegacyStringsTest : public ::testing::TestWithParam<QudaFileFormat>
+{
+};
+
+// gauge files with the strings QUDA saved before (FileIOParam::legacy_strings), single files and partfiles, are
+// the same from both backends and load exactly with both
+TEST_P(GaugeLegacyStringsTest, load)
+{
+  using namespace quda;
+  auto format = GetParam();
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge original(prec), loaded(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+  // QIO only writes the ILDG records with USQCD's datatype
+  const std::string datatype = format == QUDA_FILE_FORMAT_ILDG ? "USQCD_D3_ColorMatrix" : "QUDA_DNc3_GaugeField";
+
+  // ILDG files have no partfiles
+  for (bool partfile : {false, true}) {
+    if (partfile && format == QUDA_FILE_FORMAT_ILDG) continue;
+    SCOPED_TRACE(partfile ? "partfile" : "single file");
+    const bool volumes = partfile && comm_size() > 1;
+    std::vector<std::string> files;
+    for (auto backend : lime_backends(format)) {
+      const std::string file = std::string("legacy_") + get_file_format_str(backend) + ".lat";
+      files.push_back(file);
+      auto p = file_io_param(backend, QUDA_FILE_IO_PARALLEL, {}, partfile);
+      p.legacy_strings = true;
+      p.ildg_lfn = "lfn://quda/io_test"; // the default, the file name, differs between the files
+      GaugeIO(file, p).save(original.data, prec, gauge_param.X);
+      if (comm_rank() == 0) {
+        SCOPED_TRACE(file);
+        const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
+        EXPECT_EQ(s.user_file, "Dummy user file XML");
+        ASSERT_EQ(s.private_record.size(), 1u);
+        expect_gauge_private_record(s.private_record[0], datatype, prec);
+        EXPECT_EQ(s.user_record[0], expected_gauge_record_xml("<version>BETA</version><type>" + datatype + "</type>"));
+      }
+    }
+#ifdef HAVE_QIO
+    if (comm_rank() == 0) {
+      if (volumes)
+        expect_same_partfile(files[0], files[1]);
+      else
+        expect_same_saved_file(files[0], files[1], false);
+    }
+#endif
+    for (auto &file : files) {
+      for (auto backend : lime_backends(format)) {
+        SCOPED_TRACE("loading " + file + " with " + get_file_format_str(backend));
+        loaded.clear();
+        auto info = GaugeIO(file, file_io_param(backend, QUDA_FILE_IO_PARALLEL)).load(loaded.data, prec, gauge_param.X);
+        EXPECT_TRUE(loaded == original);
+        EXPECT_TRUE(info.checksum_matches);
+        EXPECT_EQ(info.ildg, format == QUDA_FILE_FORMAT_ILDG);
+      }
+    }
+    for (auto &file : files) remove_saved_file(file);
+  }
+}
+
 #ifdef HAVE_QIO
 class GaugeIOBackendTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -1156,6 +1291,17 @@ INSTANTIATE_TEST_SUITE_P(Gauge, ReadGaugeQudaTest,
                            name += quda::get_file_format_str(::testing::get<0>(param.param)) + std::string("_");
                            name += get_io_mode_str(::testing::get<1>(param.param));
                            return name;
+                         });
+
+// QUDA's strings, and those it saved before
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeStringsTest, Values(QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG),
+                         [](testing::TestParamInfo<QudaFileFormat> param) {
+                           return std::string(quda::get_file_format_str(param.param));
+                         });
+
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeLegacyStringsTest, Values(QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG),
+                         [](testing::TestParamInfo<QudaFileFormat> param) {
+                           return std::string(quda::get_file_format_str(param.param));
                          });
 
 #ifdef HAVE_QIO

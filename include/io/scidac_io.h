@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <complex>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -91,8 +92,16 @@ namespace quda
       std::string ildg_lfn; /** ILDG logical file name to write; empty means none (save only) */
     };
 
-    // the user file XML that QUDA writes
-    constexpr const char *quda_user_file_xml = "Dummy user file XML";
+    /**
+       @brief QUDA's user file XML: <qudaFile> with its version, the git
+       version of the QUDA library (if it was built with one) and a
+       description of the content
+       @param[in] content What the file holds, e.g. "gauge field" or "3 vectors"
+     */
+    std::string quda_file_xml(const std::string &content);
+
+    // the user file XML that QUDA wrote before quda_file_xml (FileIOParam::legacy_strings)
+    constexpr const char *legacy_file_xml = "Dummy user file XML";
 
     /**
        @brief A lattice field of a SciDAC or ILDG file, as found on load: a message with binary data
@@ -201,12 +210,6 @@ namespace quda
                                            const FileIOParam &param);
 
     /**
-       @brief Save a field as a SciDAC file with one record and QUDA's user file XML; see write_fields
-     */
-    io::Checksum write_field(const std::string &filename, const FieldMetadata &metadata, const io::HostField &field,
-                             const int *X, QudaParity parity, const FileIOParam &param);
-
-    /**
        @brief Gauge field metadata beyond the links themselves, for
        both the native and the external QIO backend.  On save these
        describe what to write; on load they report what was found.
@@ -221,35 +224,64 @@ namespace quda
       bool has_checksum = false; /** Whether the file has a checksum (load only; not in ILDG files from other codes) */
       bool checksum_matches = false; /** Whether it matches the data (load only) */
       io::Checksum sum;              /** The checksums suma and sumb computed from the data (load only) */
+      bool legacy_strings = false;   /** Save with the strings of FileIOParam::legacy_strings (save only) */
     };
 
     /**
-       @brief The datatype that QUDA writes in the private record XML of a gauge field
-       @param[in] file_prec Precision of the file
-       @param[in] ildg Whether the file is an ILDG file, which requires a USQCD datatype
+       @brief The metadata records of a gauge field: the user file XML and the record's metadata
      */
-    std::string gauge_datatype(QudaPrecision file_prec, bool ildg);
+    struct GaugeRecords {
+      std::string user_file_xml;
+      FieldMetadata record;
+    };
 
     /**
-       @brief The datatype that QUDA writes in the private record XML of a set of vectors
+       @brief The metadata records to save a gauge field with, for both backends
        @param[in] file_prec Precision of the file
+       @param[in] info Whether to write the ILDG records, a usqcdInfo record and the legacy strings
      */
-    std::string vector_datatype(QudaPrecision file_prec, int nSpin, int nColor);
+    GaugeRecords gauge_records(QudaPrecision file_prec, const GaugeInfo &info);
+
+    /**
+       @brief The datatype that QUDA writes in the private record XML of a set of vectors: USQCD's for 3-color
+       staggered and Wilson vectors, otherwise QUDA's own
+       @param[in] file_prec Precision of the file
+       @param[in] legacy Always QUDA's own, as QUDA wrote them before (FileIOParam::legacy_strings)
+     */
+    std::string vector_datatype(QudaPrecision file_prec, int nSpin, int nColor, bool legacy = false);
+
+    /**
+       @brief The datatype of 3-color vectors without spin, USQCD_[FD]3_ColorVector: that of MILC's
+       eigenvectors and of QUDA's staggered vectors
+     */
+    std::string color_vector_datatype(QudaPrecision file_prec);
+
+    /**
+       @brief Whether a record's spins are those of vectors with nSpin spins.  Records of
+       color_vector_datatype have no spins, as QIO and MILC write them, and hold 1-spin vectors.
+     */
+    bool spins_match(const std::string &datatype, int spins, int nSpin);
 
     /**
        @brief QUDA's own record XML for a field, written as the user record XML
        @param[in] len Reals per site of each field (18 for gauge fields)
-       @param[in] datatype The datatype of the private record XML
        @param[in] eval An eigenvalue, written as <eigVal> in the <info> element if given
+       @param[in] eval_imag Its imaginary part, written as <eigValImag> after <eigVal> if given
        @param[in] resid A residual, written as <resid> in the <info> element if given
      */
-    std::string quda_record_xml(int len, const std::string &datatype, QudaSiteSubset subset, QudaParity parity,
-                                int nColor, int nSpin, std::optional<double> eval = {}, std::optional<double> resid = {});
+    std::string quda_record_xml(int len, QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
+                                std::optional<double> eval = {}, std::optional<double> eval_imag = {},
+                                std::optional<double> resid = {});
 
     /**
-       @brief The datatype of MILC's eigenvector records, USQCD_[FD]3_ColorVector
+       @brief QUDA's record XML as it was written before quda_record_xml
+       (FileIOParam::legacy_strings): version BETA, with the datatype as
+       <type>, and without imaginary parts of eigenvalues
+       @param[in] datatype The datatype of the private record XML
      */
-    std::string milc_vector_datatype(QudaPrecision file_prec);
+    std::string legacy_quda_record_xml(int len, const std::string &datatype, QudaSiteSubset subset, QudaParity parity,
+                                       int nColor, int nSpin, std::optional<double> eval = {},
+                                       std::optional<double> resid = {});
 
     /**
        @brief The user file XML of MILC's eigenvector files, with the number of eigenvectors
@@ -294,7 +326,7 @@ namespace quda
        @param[in] prec The precision of the host gauge field
        @param[in] X The local lattice dimensions
        @param[in] param File I/O options (the I/O mode and partitions)
-       @param[in] info Whether to write ILDG records and a usqcdInfo record
+       @param[in] info Whether to write ILDG records, a usqcdInfo record and the legacy strings
        @return The checksums written
      */
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
@@ -311,7 +343,8 @@ namespace quda
     struct VectorFile {
       FieldRecords records;
       VectorStrings strings = VectorStrings::QUDA;
-      std::vector<double> evals; /** The <eigVal> of every record, or none if a record has none */
+      /** The <eigVal> of every record with its <eigValImag> (0 if none), or none if a record has no <eigVal> */
+      std::vector<std::complex<double>> evals;
     };
 
     /**
@@ -360,8 +393,11 @@ namespace quda
      */
     struct VectorSaveInfo {
       VectorStrings strings = VectorStrings::QUDA;
-      bool interleaved = false;   /** All vectors in one record, as QUDA saved them before (QUDA's strings only) */
-      std::vector<double> evals;  /** One eigenvalue per vector, or none */
+      bool interleaved = false;    /** All vectors in one record, as QUDA saved them before (QUDA's strings only) */
+      bool legacy_strings = false; /** QUDA's strings as before (FileIOParam::legacy_strings); implied by interleaved */
+      std::vector<double> evals;   /** One eigenvalue per vector, or none */
+      /** Their imaginary parts, or none; QUDA's strings hold them in every record if any is nonzero */
+      std::vector<double> evals_imag;
       std::vector<double> resids; /** One residual per vector, or none */
     };
 

@@ -50,22 +50,35 @@ namespace quda
       return info;
     }
 
+    GaugeRecords gauge_records(QudaPrecision file_prec, const GaugeInfo &info)
+    {
+      GaugeRecords g;
+      g.user_file_xml = info.legacy_strings ? legacy_file_xml : quda_file_xml("gauge field");
+      auto &m = g.record;
+      const std::string p = file_prec == QUDA_DOUBLE_PRECISION ? "D" : "F";
+      // QIO only writes the ILDG records for the USQCD (or QDP) color matrix datatypes
+      m.datatype = info.legacy_strings && !info.ildg ? "QUDA_" + p + "Nc3_GaugeField" : "USQCD_" + p + "3_ColorMatrix";
+      m.prec = file_prec;
+      m.colors = 3;
+      m.typesize = matrix_reals * file_prec;
+      m.datacount = n_dim;
+      if (info.has_usqcd_info)
+        m.user_xml = usqcd_info_xml(info.plaq, info.linktr);
+      else if (info.legacy_strings)
+        m.user_xml = legacy_quda_record_xml(matrix_reals, m.datatype, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 3, 0);
+      else
+        m.user_xml = quda_record_xml(matrix_reals, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 3, 0);
+      m.ildg = info.ildg;
+      m.ildg_lfn = info.ildg_lfn;
+      return g;
+    }
+
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
                             const FileIOParam &param, const GaugeInfo &info)
     {
       io::HostField field(gauge, n_dim, prec, matrix_reals);
-      FieldMetadata m;
-      m.datatype = gauge_datatype(prec, info.ildg);
-      m.prec = prec;
-      m.colors = 3;
-      m.typesize = matrix_reals * prec;
-      m.datacount = n_dim;
-      m.user_xml = info.has_usqcd_info ?
-        usqcd_info_xml(info.plaq, info.linktr) :
-        quda_record_xml(matrix_reals, m.datatype, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 3, 0);
-      m.ildg = info.ildg;
-      m.ildg_lfn = info.ildg_lfn;
-      return write_field(filename, m, field, X, QUDA_INVALID_PARITY, param);
+      const auto g = gauge_records(prec, info);
+      return write_fields(filename, g.user_file_xml, {g.record}, {field}, X, QUDA_INVALID_PARITY, param)[0];
     }
 
   } // namespace scidac

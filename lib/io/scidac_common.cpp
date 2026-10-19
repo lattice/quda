@@ -11,6 +11,8 @@
 #include <util_quda.h>
 #include <io/scidac_io.h>
 
+extern const char *gitversion;
+
 namespace quda
 {
 
@@ -153,49 +155,81 @@ namespace quda
         + "</ildgFormat>";
     }
 
-    std::string gauge_datatype(QudaPrecision file_prec, bool ildg)
+    std::string quda_file_xml(const std::string &content)
     {
-      const char *p = file_prec == QUDA_DOUBLE_PRECISION ? "D" : "F";
-      // QIO only writes the ILDG records for the standard USQCD (or QDP) color matrix datatypes
-      return ildg ? std::string("USQCD_") + p + "3_ColorMatrix" : std::string("QUDA_") + p + "Nc3_GaugeField";
+      std::string tags = element("version", "1.0");
+      if (gitversion) tags += element("commit", gitversion);
+      return xml_declaration + element("qudaFile", tags + element("content", content));
     }
 
-    std::string vector_datatype(QudaPrecision file_prec, int nSpin, int nColor)
+    std::string vector_datatype(QudaPrecision file_prec, int nSpin, int nColor, bool legacy)
     {
-      return std::string("QUDA_") + (file_prec == QUDA_DOUBLE_PRECISION ? "D" : "F") + "Ns" + std::to_string(nSpin)
-        + "Nc" + std::to_string(nColor) + "_ColorSpinorField";
+      const std::string p = file_prec == QUDA_DOUBLE_PRECISION ? "D" : "F";
+      if (!legacy && nColor == 3 && nSpin == 1) return color_vector_datatype(file_prec);
+      if (!legacy && nColor == 3 && nSpin == 4) return "USQCD_" + p + "3_DiracFermion";
+      return "QUDA_" + p + "Ns" + std::to_string(nSpin) + "Nc" + std::to_string(nColor) + "_ColorSpinorField";
     }
 
-    std::string quda_record_xml(int len, const std::string &datatype, QudaSiteSubset subset, QudaParity parity,
-                                int nColor, int nSpin, std::optional<double> eval, std::optional<double> resid)
-    {
-      std::string name;
-      switch (len) {
-      case 6: name = "qudaStaggeredColorSpinorField"; break; // SU(3) staggered
-      case 18: name = "qudaGaugeFieldFile"; break;           // SU(3) gauge field
-      case 24: name = "qudaWilsonColorSpinorField"; break;   // SU(3) Wilson
-      default: name = "qudaMGColorSpinorField"; break;       // MG color spinor vector
-      }
-
-      // if parity+even, it's a half-x-dim even only vector
-      // if parity+odd, it's a half-x-dim odd only vector
-      // if full+even, it's a full vector with only even sites filled, odd are zero
-      // if full+odd, it's a full vector with only odd sites filled, even are zero
-      // if full+full, it's a full vector with all sites filled (either a full ColorSpinorField or a GaugeField)
-      std::string info = element("subset", subset == QUDA_PARITY_SITE_SUBSET ? "parity" : "full");
-      info += element("parity", parity == QUDA_EVEN_PARITY ? "even" : parity == QUDA_ODD_PARITY ? "odd" : "full");
-      info += element("nColor", nColor) + element("nSpin", nSpin);
-      // with the precision of MILC's eigenvector records
-      if (eval) info += element("eigVal", format("%.18e", *eval));
-      if (resid) info += element("resid", format("%e", *resid));
-
-      return xml_declaration
-        + element(name, element("version", "BETA") + element("type", datatype) + element("info", info));
-    }
-
-    std::string milc_vector_datatype(QudaPrecision file_prec)
+    std::string color_vector_datatype(QudaPrecision file_prec)
     {
       return std::string("USQCD_") + (file_prec == QUDA_DOUBLE_PRECISION ? "D" : "F") + "3_ColorVector";
+    }
+
+    bool spins_match(const std::string &datatype, int spins, int nSpin)
+    {
+      if (spins == nSpin) return true;
+      return spins == 0 && nSpin == 1
+        && (datatype == color_vector_datatype(QUDA_SINGLE_PRECISION)
+            || datatype == color_vector_datatype(QUDA_DOUBLE_PRECISION));
+    }
+
+    namespace
+    {
+      // the element name of QUDA's record XML
+      const char *quda_record_name(int len)
+      {
+        switch (len) {
+        case 6: return "qudaStaggeredColorSpinorField"; // SU(3) staggered
+        case 18: return "qudaGaugeFieldFile";           // SU(3) gauge field
+        case 24: return "qudaWilsonColorSpinorField";   // SU(3) Wilson
+        default: return "qudaMGColorSpinorField";       // MG color spinor vector
+        }
+      }
+
+      // the content of the <info> element of QUDA's record XML
+      std::string quda_record_info(QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
+                                   std::optional<double> eval, std::optional<double> eval_imag,
+                                   std::optional<double> resid)
+      {
+        // if parity+even, it's a half-x-dim even only vector
+        // if parity+odd, it's a half-x-dim odd only vector
+        // if full+even, it's a full vector with only even sites filled, odd are zero
+        // if full+odd, it's a full vector with only odd sites filled, even are zero
+        // if full+full, it's a full vector with all sites filled (either a full ColorSpinorField or a GaugeField)
+        std::string info = element("subset", subset == QUDA_PARITY_SITE_SUBSET ? "parity" : "full");
+        info += element("parity", parity == QUDA_EVEN_PARITY ? "even" : parity == QUDA_ODD_PARITY ? "odd" : "full");
+        info += element("nColor", nColor) + element("nSpin", nSpin);
+        // with the precision of MILC's eigenvector records
+        if (eval) info += element("eigVal", format("%.18e", *eval));
+        if (eval_imag) info += element("eigValImag", format("%.18e", *eval_imag));
+        if (resid) info += element("resid", format("%e", *resid));
+        return info;
+      }
+    } // namespace
+
+    std::string quda_record_xml(int len, QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
+                                std::optional<double> eval, std::optional<double> eval_imag, std::optional<double> resid)
+    {
+      const auto info = quda_record_info(subset, parity, nColor, nSpin, eval, eval_imag, resid);
+      return xml_declaration + element(quda_record_name(len), element("version", "1.0") + element("info", info));
+    }
+
+    std::string legacy_quda_record_xml(int len, const std::string &datatype, QudaSiteSubset subset, QudaParity parity,
+                                       int nColor, int nSpin, std::optional<double> eval, std::optional<double> resid)
+    {
+      const auto info = quda_record_info(subset, parity, nColor, nSpin, eval, {}, resid);
+      return xml_declaration
+        + element(quda_record_name(len), element("version", "BETA") + element("type", datatype) + element("info", info));
     }
 
     std::string milc_eigen_file_xml(int n_vectors)
@@ -911,12 +945,6 @@ namespace quda
       }
       if (file) file->close();
       return sums;
-    }
-
-    io::Checksum write_field(const std::string &filename, const FieldMetadata &metadata, const io::HostField &field,
-                             const int *X, QudaParity parity, const FileIOParam &param)
-    {
-      return write_fields(filename, quda_user_file_xml, {metadata}, {field}, X, parity, param)[0];
     }
 
   } // namespace scidac

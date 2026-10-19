@@ -49,6 +49,15 @@ namespace quda
     */
     bool interleaved_vectors = false;
 
+    /**
+       SciDAC saves, for tests: the strings QUDA saved its files with
+       before they had a file XML, USQCD datatypes and record XML of
+       version 1.0 (the user file XML "Dummy user file XML", QUDA's own
+       datatypes, and record XML of version BETA with a <type>).
+       Implied by interleaved_vectors.
+    */
+    bool legacy_strings = false;
+
     FileIOParam() = default;
 
     /**

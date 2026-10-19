@@ -16,7 +16,12 @@
 #include <enum_quda.h>
 #include <quda.h>
 #include <io/field_io.h>
+#include <io/lime.h>
+#include <io/scidac_io.h>
 #include <io/site_io.h>
+
+// the git version of the QUDA library (lib/version.cpp), null if it was built without one
+extern const char *gitversion;
 
 inline const char *get_io_mode_str(QudaFileIOMode io_mode)
 {
@@ -172,6 +177,65 @@ inline bool write_file(const std::string &file, const std::vector<char> &content
   std::ofstream out(file, std::ios::binary | std::ios::trunc);
   out.write(contents.data(), contents.size());
   return static_cast<bool>(out);
+}
+
+/**
+   @brief The records of a LIME file, listed on the calling rank alone
+ */
+inline std::vector<quda::lime::Record> local_records(const std::string &file)
+{
+  quda::io::File f(file, quda::io::File::Mode::READ);
+  return quda::lime::list_records(f, file);
+}
+
+/**
+   @brief The data of a record, in a file's contents, without its trailing NULs
+ */
+inline std::string record_string(const std::vector<char> &contents, const quda::lime::Record *r)
+{
+  if (!r) return "";
+  std::string s(contents.data() + r->data_offset, r->data_bytes);
+  while (!s.empty() && s.back() == '\0') s.pop_back();
+  return s;
+}
+
+/**
+   @brief The user file XML of a SciDAC file, and the private and user
+   record XML of each of its binary records
+ */
+struct SavedStrings {
+  std::string user_file;
+  std::vector<std::string> private_record;
+  std::vector<std::string> user_record;
+};
+
+/**
+   @brief The strings of a SciDAC file, read on the calling rank alone
+ */
+inline SavedStrings saved_strings(const std::string &file)
+{
+  using namespace quda::scidac;
+  const auto contents = read_file(file);
+  const auto records = local_records(file);
+  SavedStrings s;
+  s.user_file = record_string(contents, find_record(records, file_xml));
+  for (auto &m : group_messages(records)) {
+    if (!find_record(m, binary_data) && !find_record(m, ildg_binary_data)) continue;
+    s.private_record.push_back(record_string(contents, find_record(m, private_record_xml)));
+    s.user_record.push_back(record_string(contents, find_record(m, record_xml)));
+  }
+  return s;
+}
+
+/**
+   @brief QUDA's user file XML, written out here rather than with the library's builder
+   @param[in] content What the file holds
+ */
+inline std::string expected_file_xml(const std::string &content)
+{
+  const std::string commit = gitversion ? std::string("<commit>") + gitversion + "</commit>" : "";
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><qudaFile><version>1.0</version>" + commit + "<content>" + content
+    + "</content></qudaFile>";
 }
 
 /**

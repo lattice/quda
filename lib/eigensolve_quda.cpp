@@ -353,8 +353,12 @@ namespace quda
       } else {
         // the 3-d solver's eigenvalues belong to time slices, not to the vectors
         const bool per_vector = eig_param->eig_type != QUDA_EIG_TR_LANCZOS_3D;
+        // a Hermitian operator's eigenvalues are real: their imaginary parts here are rounding errors
+        std::vector<complex_t> saved_evals(evals);
+        if (mat.hermitian())
+          for (auto &e : saved_evals) e = e.real();
         VectorIO io(eig_param->vec_outfile, io_param);
-        io.save(kSpace, save_prec, n_conv, per_vector ? &evals : nullptr, per_vector ? &residua : nullptr);
+        io.save(kSpace, save_prec, n_conv, per_vector ? &saved_evals : nullptr, per_vector ? &residua : nullptr);
       }
     }
 

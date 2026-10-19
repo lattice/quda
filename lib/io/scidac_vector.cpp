@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <util_quda.h>
@@ -59,7 +60,7 @@ namespace quda
           errorQuda("%s holds MILC's packed eigenvectors, which are not supported", file.c_str());
         for (auto k = 0u; k < records.fields.size(); k++) {
           const auto &m = records.fields[k].metadata;
-          const auto datatype = milc_vector_datatype(m.prec);
+          const auto datatype = color_vector_datatype(m.prec);
           const char *prec = m.prec == QUDA_DOUBLE_PRECISION ? "D" : "F";
           if (m.datatype != datatype)
             errorQuda("Record %u of the MILC eigenvector file %s has the datatype %s, but MILC's eigenvectors of "
@@ -88,7 +89,8 @@ namespace quda
           v.evals.clear();
           break;
         }
-        v.evals.push_back(std::strtod(eval->c_str(), nullptr));
+        auto imag = xml_value(r.metadata.user_xml, "eigValImag");
+        v.evals.emplace_back(std::strtod(eval->c_str(), nullptr), imag ? std::strtod(imag->c_str(), nullptr) : 0.0);
       }
       return v;
     }
@@ -131,7 +133,7 @@ namespace quda
       if (file.strings == VectorStrings::QUDA) {
         for (auto k = 0u; k < fields.size(); k++) {
           const auto &m = records.fields[k].metadata;
-          if (m.spins == nSpin && m.colors == nColor) continue;
+          if (spins_match(m.datatype, m.spins, nSpin) && m.colors == nColor) continue;
           warningQuda("The file %s has %d spins and %d colors, but the vectors have %d and %d", records.file.c_str(),
                       m.spins, m.colors, nSpin, nColor);
           break;
@@ -159,7 +161,7 @@ namespace quda
         v.user_file_xml = milc_eigen_file_xml(n_vectors);
         for (int i = 0; i < n_vectors; i++) {
           FieldMetadata m;
-          m.datatype = milc_vector_datatype(prec);
+          m.datatype = color_vector_datatype(prec);
           m.prec = prec;
           m.colors = 3;
           m.typesize = milc_vector_reals * prec;
@@ -170,24 +172,32 @@ namespace quda
         return v;
       }
 
+      const bool legacy = info.legacy_strings || info.interleaved;
       const int reals = 2 * nSpin * nColor;
-      v.user_file_xml = quda_user_file_xml;
+      v.user_file_xml = legacy ? legacy_file_xml :
+                                 quda_file_xml(n_vectors == 1 ? "1 vector" : std::to_string(n_vectors) + " vectors");
       FieldMetadata m;
-      m.datatype = vector_datatype(prec, nSpin, nColor);
+      m.datatype = vector_datatype(prec, nSpin, nColor, legacy);
       m.prec = prec;
       m.colors = nColor;
-      m.spins = nSpin;
+      m.spins = m.datatype == color_vector_datatype(prec) ? 0 : nSpin;
       m.typesize = reals * prec;
       if (info.interleaved) {
         m.datacount = n_vectors * Ls;
-        m.user_xml = quda_record_xml(reals, m.datatype, subset, parity, nColor, nSpin);
+        m.user_xml = legacy_quda_record_xml(reals, m.datatype, subset, parity, nColor, nSpin);
         v.records.push_back(m);
         return v;
       }
       m.datacount = Ls;
+      const bool complex_evals
+        = std::any_of(info.evals_imag.begin(), info.evals_imag.end(), [](double x) { return x != 0.0; });
       for (int i = 0; i < n_vectors; i++) {
-        m.user_xml = quda_record_xml(reals, m.datatype, subset, parity, nColor, nSpin, value(info.evals, i),
-                                     value(info.resids, i));
+        if (legacy)
+          m.user_xml = legacy_quda_record_xml(reals, m.datatype, subset, parity, nColor, nSpin, value(info.evals, i),
+                                              value(info.resids, i));
+        else
+          m.user_xml = quda_record_xml(reals, subset, parity, nColor, nSpin, value(info.evals, i),
+                                       complex_evals ? value(info.evals_imag, i) : std::nullopt, value(info.resids, i));
         v.records.push_back(m);
       }
       return v;

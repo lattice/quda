@@ -259,7 +259,7 @@ namespace quda
 
     if (evals && file.evals.size() >= static_cast<size_t>(Nvec)) {
       if (evals->size() < static_cast<size_t>(Nvec)) evals->resize(Nvec);
-      for (int i = 0; i < Nvec; i++) (*evals)[i] = complex_t(file.evals[i], 0.0);
+      for (int i = 0; i < Nvec; i++) (*evals)[i] = complex_t(file.evals[i].real(), file.evals[i].imag());
       logQuda(QUDA_VERBOSE, "Loaded %d eigenvalues from %s%s\n", Nvec, filename.c_str(),
               milc ? ", in MILC's convention (of the massless operator -D_eo D_oe)" : "");
     }
@@ -358,7 +358,11 @@ namespace quda
     scidac::VectorSaveInfo info;
     info.strings = milc ? scidac::VectorStrings::MILC : scidac::VectorStrings::QUDA;
     info.interleaved = param.interleaved_vectors;
-    for (int i = 0; evals && i < Nvec; i++) info.evals.push_back(static_cast<double>((*evals)[i].real()));
+    info.legacy_strings = param.legacy_strings;
+    for (int i = 0; evals && i < Nvec; i++) {
+      info.evals.push_back(static_cast<double>((*evals)[i].real()));
+      info.evals_imag.push_back(static_cast<double>((*evals)[i].imag()));
+    }
     for (int i = 0; resids && i < Nvec; i++) info.resids.push_back(static_cast<double>((*resids)[i]));
 
     quda::host_timer_t host_timer;

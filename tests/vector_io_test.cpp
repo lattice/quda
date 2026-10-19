@@ -99,22 +99,6 @@ namespace
     return g;
   }
 
-  // the records of a LIME file, listed on the calling rank alone
-  std::vector<quda::lime::Record> local_records(const std::string &file)
-  {
-    quda::io::File f(file, quda::io::File::Mode::READ);
-    return quda::lime::list_records(f, file);
-  }
-
-  // the data of a record, in a file's contents, without its trailing NULs
-  std::string record_string(const std::vector<char> &contents, const quda::lime::Record *r)
-  {
-    if (!r) return "";
-    std::string s(contents.data() + r->data_offset, r->data_bytes);
-    while (!s.empty() && s.back() == '\0') s.pop_back();
-    return s;
-  }
-
   // the binary records of a SciDAC single file, as big-endian doubles, read on the calling rank alone
   std::vector<std::vector<double>> binary_records(const std::string &file)
   {
@@ -132,29 +116,6 @@ namespace
       data.push_back(values);
     }
     return data;
-  }
-
-  // the user file XML of a SciDAC file, and the private and user record XML of each of its binary records, read on
-  // the calling rank alone
-  struct SavedStrings {
-    std::string user_file;
-    std::vector<std::string> private_record;
-    std::vector<std::string> user_record;
-  };
-
-  SavedStrings saved_strings(const std::string &file)
-  {
-    using namespace quda::scidac;
-    const auto contents = read_file(file);
-    const auto records = local_records(file);
-    SavedStrings s;
-    s.user_file = record_string(contents, find_record(records, file_xml));
-    for (auto &m : group_messages(records)) {
-      if (!find_record(m, binary_data)) continue;
-      s.private_record.push_back(record_string(contents, find_record(m, private_record_xml)));
-      s.user_record.push_back(record_string(contents, find_record(m, record_xml)));
-    }
-    return s;
   }
 
   // the number of binary records in a SciDAC file, counted on the calling rank alone
@@ -187,13 +148,16 @@ namespace
     return buf;
   }
 
-  // the loaded eigenvalues are the real parts of those saved
-  void expect_loaded_evals(const std::vector<quda::complex_t> &loaded, const std::vector<quda::complex_t> &saved, int n)
+  // the loaded eigenvalues are those saved, or, from files without their imaginary parts (MILC's format and QUDA's
+  // legacy strings), their real parts
+  void expect_loaded_evals(const std::vector<quda::complex_t> &loaded, const std::vector<quda::complex_t> &saved, int n,
+                           bool imag = true)
   {
     ASSERT_GE(loaded.size(), static_cast<size_t>(n));
     for (int i = 0; i < n; i++) {
       EXPECT_EQ(static_cast<double>(loaded[i].real()), static_cast<double>(saved[i].real())) << "eigenvalue " << i;
-      EXPECT_EQ(static_cast<double>(loaded[i].imag()), 0.0) << "eigenvalue " << i;
+      EXPECT_EQ(static_cast<double>(loaded[i].imag()), imag ? static_cast<double>(saved[i].imag()) : 0.0)
+        << "eigenvalue " << i;
     }
   }
 } // namespace
@@ -764,8 +728,8 @@ class VectorEigenvalueTest : public ::testing::TestWithParam<eigenvalue_test_t>
 {
 };
 
-// QUDA's files hold an eigenvalue and a residual in each vector's record when they are given, and loads give the
-// eigenvalues back
+// QUDA's files hold an eigenvalue, with its imaginary part (some eigenvalues here are complex), and a residual in each
+// vector's record when they are given, and loads give the eigenvalues back
 TEST_P(VectorEigenvalueTest, records)
 {
   using namespace quda;
@@ -789,13 +753,15 @@ TEST_P(VectorEigenvalueTest, records)
     if (comm_rank() == 0) {
       SCOPED_TRACE(file);
       const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
-      EXPECT_EQ(s.user_file, "Dummy user file XML");
+      EXPECT_EQ(s.user_file, expected_file_xml("3 vectors"));
       ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
       for (int i = 0; i < n; i++) {
-        EXPECT_EQ(scidac::xml_value(s.private_record[i], "datatype").value_or(""), "QUDA_DNs4Nc3_ColorSpinorField");
+        EXPECT_EQ(scidac::xml_value(s.private_record[i], "datatype").value_or(""), "USQCD_D3_DiracFermion");
         EXPECT_EQ(scidac::xml_value(s.private_record[i], "datacount").value_or(""), "1");
         EXPECT_EQ(scidac::xml_value(s.user_record[i], "eigVal").value_or(""),
                   format_value("%.18e", static_cast<double>(evals[i].real())));
+        EXPECT_EQ(scidac::xml_value(s.user_record[i], "eigValImag").value_or(""),
+                  format_value("%.18e", static_cast<double>(evals[i].imag())));
         EXPECT_EQ(scidac::xml_value(s.user_record[i], "resid").value_or(""),
                   format_value("%e", static_cast<double>(resids[i])));
       }
@@ -838,6 +804,236 @@ TEST_P(VectorEigenvalueTest, records)
 
   for (auto &file : files) remove_saved_file(file);
   remove_saved_file(plain);
+}
+
+namespace
+{
+  // QUDA's record XML of a vector, written out here rather than with the library's builders
+  std::string expected_record_xml(const std::string &name, const std::string &subset, const std::string &parity,
+                                  int nColor, int nSpin, const std::string &evals = "")
+  {
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><" + name + "><version>1.0</version><info><subset>" + subset
+      + "</subset><parity>" + parity + "</parity><nColor>" + std::to_string(nColor) + "</nColor><nSpin>"
+      + std::to_string(nSpin) + "</nSpin>" + evals + "</info></" + name + ">";
+  }
+
+  // the eigenvalue elements of QUDA's record XML
+  std::string expected_eval_xml(const quda::complex_t &eval, double resid, bool imag)
+  {
+    std::string xml = "<eigVal>" + format_value("%.18e", static_cast<double>(eval.real())) + "</eigVal>";
+    if (imag) xml += "<eigValImag>" + format_value("%.18e", static_cast<double>(eval.imag())) + "</eigValImag>";
+    return xml + "<resid>" + format_value("%e", resid) + "</resid>";
+  }
+
+  // the private record XML of a saved record holds these values, and no spins if spins is 0
+  void expect_private_record(const std::string &xml, const std::string &datatype, int colors, int spins, int typesize,
+                             int datacount)
+  {
+    using quda::scidac::xml_value;
+    EXPECT_EQ(xml_value(xml, "datatype").value_or(""), datatype) << xml;
+    EXPECT_EQ(xml_value(xml, "colors").value_or(""), std::to_string(colors)) << xml;
+    if (spins == 0)
+      EXPECT_FALSE(xml_value(xml, "spins")) << xml;
+    else
+      EXPECT_EQ(xml_value(xml, "spins").value_or(""), std::to_string(spins)) << xml;
+    EXPECT_EQ(xml_value(xml, "typesize").value_or(""), std::to_string(typesize)) << xml;
+    EXPECT_EQ(xml_value(xml, "datacount").value_or(""), std::to_string(datacount)) << xml;
+  }
+} // namespace
+
+class VectorStringsTest : public ::testing::TestWithParam<QudaFileFormat>
+{
+};
+
+// QUDA's strings, against literals: the file XML, the datatype of each shape of vectors, and the record XML, with
+// <eigValImag> in every record when an eigenvalue is complex and in none when they are real
+TEST_P(VectorStringsTest, saved)
+{
+  using namespace quda;
+  auto format = GetParam();
+  const auto p = file_io_param(format, QUDA_FILE_IO_PARALLEL);
+  const std::string file = "strings.cs";
+
+  // staggered vectors: USQCD's color vectors, without spins
+  for (auto [n, prec] : {std::make_pair(1, QUDA_DOUBLE_PRECISION), std::make_pair(3, QUDA_SINGLE_PRECISION)}) {
+    if (!is_enabled_spin(1) || !is_enabled(prec)) continue;
+    SCOPED_TRACE(std::to_string(n) + " staggered vectors");
+    const auto v
+      = random_vectors(n, vector_param(QUDA_PARITY_SITE_SUBSET, QUDA_EVEN_PARITY, 1, prec, QUDA_CPU_FIELD_LOCATION));
+    VectorIO(file, p).save({v.begin(), v.end()}, prec, n);
+    if (comm_rank() == 0) {
+      const auto s = saved_strings(file);
+      EXPECT_EQ(s.user_file, expected_file_xml(n == 1 ? "1 vector" : "3 vectors"));
+      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n; i++) {
+        expect_private_record(s.private_record[i],
+                              prec == QUDA_DOUBLE_PRECISION ? "USQCD_D3_ColorVector" : "USQCD_F3_ColorVector", 3, 0,
+                              6 * prec, 1);
+        EXPECT_EQ(s.user_record[i], expected_record_xml("qudaStaggeredColorSpinorField", "parity", "even", 3, 1));
+      }
+    }
+    remove_saved_file(file);
+  }
+
+  // Wilson vectors: USQCD's Dirac fermions, with real and with complex eigenvalues
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (is_enabled_spin(4)) {
+    const int n = 2;
+    const auto param = vector_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 4, prec, QUDA_CPU_FIELD_LOCATION);
+    const auto v = random_vectors(n, param);
+    const auto resids = test_resids(n);
+    const auto complex_evals = test_evals(n);
+    std::vector<complex_t> real_evals;
+    for (auto &e : complex_evals) real_evals.emplace_back(e.real(), 0.0);
+    ASSERT_EQ(complex_evals[0].imag(), 0.0);
+    ASSERT_NE(complex_evals[1].imag(), 0.0);
+    for (bool imag : {false, true}) {
+      SCOPED_TRACE(imag ? "Wilson vectors with complex eigenvalues" : "Wilson vectors with real eigenvalues");
+      const auto &evals = imag ? complex_evals : real_evals;
+      VectorIO(file, p).save({v.begin(), v.end()}, prec, n, &evals, &resids);
+      if (comm_rank() == 0) {
+        const auto s = saved_strings(file);
+        EXPECT_EQ(s.user_file, expected_file_xml("2 vectors"));
+        ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
+        for (int i = 0; i < n; i++) {
+          expect_private_record(s.private_record[i], "USQCD_D3_DiracFermion", 3, 4, 24 * prec, 1);
+          EXPECT_EQ(s.user_record[i],
+                    expected_record_xml("qudaWilsonColorSpinorField", "full", "full", 3, 4,
+                                        expected_eval_xml(evals[i], resids[i], imag)));
+        }
+      }
+      auto u = zero_vectors(n, param);
+      std::vector<complex_t> loaded;
+      VectorIO(file, p).load(u, &loaded);
+      expect_same_vectors(u, v);
+      expect_loaded_evals(loaded, evals, n);
+      remove_saved_file(file);
+    }
+
+    // 5-d vectors: a record per vector of an item per slice, with the slices' datatype
+    SCOPED_TRACE("5-d vectors");
+    const int Ls = 4;
+    const auto v5
+      = random_vectors(n, vector_param(QUDA_PARITY_SITE_SUBSET, QUDA_ODD_PARITY, 4, prec, QUDA_CUDA_FIELD_LOCATION, Ls));
+    VectorIO(file, p).save({v5.begin(), v5.end()}, prec, n);
+    if (comm_rank() == 0) {
+      const auto s = saved_strings(file);
+      EXPECT_EQ(s.user_file, expected_file_xml("2 vectors"));
+      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n; i++) {
+        expect_private_record(s.private_record[i], "USQCD_D3_DiracFermion", 3, 4, 24 * prec, Ls);
+        EXPECT_EQ(s.user_record[i], expected_record_xml("qudaWilsonColorSpinorField", "parity", "odd", 3, 4));
+      }
+    }
+    remove_saved_file(file);
+  }
+
+  // vectors of shapes without a USQCD datatype, as multigrid's near-null vectors, saved natively from host arrays
+  if (format == QUDA_FILE_FORMAT_QIO) {
+    SCOPED_TRACE("vectors of 2 spins and 24 colors");
+    const int n = 2, nSpin = 2, nColor = 24, reals = 2 * nSpin * nColor;
+    const auto x = vector_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 4, prec, QUDA_CPU_FIELD_LOCATION).x;
+    const int X[4] = {x[0], x[1], x[2], x[3]};
+    const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
+    std::vector<std::vector<double>> data(n, std::vector<double>(volume * reals, 1.0));
+    const void *arrays[n] = {data[0].data(), data[1].data()};
+    scidac::save_vectors(file, io::HostField(arrays, n, prec, reals), n, X, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY,
+                         nColor, nSpin, scidac::VectorSaveInfo(), p);
+    comm_barrier();
+    if (comm_rank() == 0) {
+      const auto s = saved_strings(file);
+      EXPECT_EQ(s.user_file, expected_file_xml("2 vectors"));
+      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n; i++) {
+        expect_private_record(s.private_record[i], "QUDA_DNs2Nc24_ColorSpinorField", nColor, nSpin, reals * prec, 1);
+        EXPECT_EQ(s.user_record[i], expected_record_xml("qudaMGColorSpinorField", "full", "full", nColor, nSpin));
+      }
+    }
+    remove_saved_file(file);
+  }
+}
+
+// records of color vectors have no spins, as QIO and MILC write them, and hold 1-spin vectors
+TEST(VectorSpinsTest, color_vectors)
+{
+  using quda::scidac::spins_match;
+  EXPECT_TRUE(spins_match("USQCD_D3_ColorVector", 0, 1));
+  EXPECT_TRUE(spins_match("USQCD_F3_ColorVector", 0, 1));
+  EXPECT_TRUE(spins_match("USQCD_D3_ColorVector", 1, 1));
+  EXPECT_FALSE(spins_match("USQCD_D3_ColorVector", 0, 4));
+  EXPECT_FALSE(spins_match("QUDA_DNs1Nc3_ColorSpinorField", 0, 1));
+  EXPECT_TRUE(spins_match("QUDA_DNs1Nc3_ColorSpinorField", 1, 1));
+  EXPECT_TRUE(spins_match("USQCD_D3_DiracFermion", 4, 4));
+  EXPECT_FALSE(spins_match("USQCD_D3_DiracFermion", 0, 4));
+}
+
+// tuple types: spins, partfile
+using legacy_test_t = ::testing::tuple<int, bool>;
+
+class VectorLegacyStringsTest : public ::testing::TestWithParam<legacy_test_t>
+{
+};
+
+// files with the strings QUDA saved before (FileIOParam::legacy_strings) load with both backends, and their
+// eigenvalues come back as before, without imaginary parts
+TEST_P(VectorLegacyStringsTest, load)
+{
+  using namespace quda;
+  auto nSpin = ::testing::get<0>(GetParam());
+  auto partfile = ::testing::get<1>(GetParam());
+  if (!is_enabled_spin(nSpin)) GTEST_SKIP();
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  const int n = 3;
+  const auto param = vector_param(QUDA_PARITY_SITE_SUBSET, QUDA_EVEN_PARITY, nSpin, prec, QUDA_CPU_FIELD_LOCATION);
+  const auto v = random_vectors(n, param);
+  const auto evals = test_evals(n);
+  const auto resids = test_resids(n);
+  const bool volumes = partfile && comm_size() > 1;
+  const std::string datatype = "QUDA_DNs" + std::to_string(nSpin) + "Nc3_ColorSpinorField";
+  const std::string name = nSpin == 1 ? "qudaStaggeredColorSpinorField" : "qudaWilsonColorSpinorField";
+
+  std::vector<std::string> files;
+  for (auto format : vector_formats()) {
+    const std::string file = std::string("legacy_") + get_file_format_str(format) + ".cs";
+    files.push_back(file);
+    auto p = partfile ? partfile_param(format, QUDA_FILE_IO_PARALLEL) : file_io_param(format, QUDA_FILE_IO_PARALLEL);
+    p.legacy_strings = true;
+    VectorIO(file, p).save({v.begin(), v.end()}, prec, n, &evals, &resids);
+    if (comm_rank() == 0) {
+      SCOPED_TRACE(file);
+      const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
+      EXPECT_EQ(s.user_file, "Dummy user file XML");
+      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n; i++) {
+        expect_private_record(s.private_record[i], datatype, 3, nSpin, 6 * nSpin * prec, 1);
+        EXPECT_EQ(s.user_record[i],
+                  "<?xml version=\"1.0\" encoding=\"UTF-8\"?><" + name + "><version>BETA</version><type>" + datatype
+                    + "</type><info><subset>parity</subset><parity>even</parity><nColor>3</nColor><nSpin>"
+                    + std::to_string(nSpin) + "</nSpin>" + expected_eval_xml(evals[i], resids[i], false) + "</info></"
+                    + name + ">");
+      }
+    }
+  }
+#ifdef HAVE_QIO
+  if (comm_rank() == 0) {
+    if (volumes)
+      expect_same_partfile(files[0], files[1]);
+    else
+      expect_same_saved_file(files[0], files[1], false);
+  }
+#endif
+
+  for (auto &file : files) {
+    for (auto format : vector_formats()) {
+      SCOPED_TRACE("loading " + file + " with " + get_file_format_str(format));
+      auto u = zero_vectors(n, param);
+      std::vector<complex_t> loaded;
+      VectorIO(file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).load(u, &loaded);
+      expect_same_vectors(u, v);
+      expect_loaded_evals(loaded, evals, n, false);
+    }
+  }
+  for (auto &file : files) remove_saved_file(file);
 }
 
 namespace
@@ -959,7 +1155,7 @@ TEST_P(MILCEigenvectorTest, save_load)
         std::vector<complex_t> loaded;
         VectorIO(file, lp).load(u, &loaded);
         expect_same_vectors(u, v);
-        expect_loaded_evals(loaded, evals, n);
+        expect_loaded_evals(loaded, evals, n, false);
       }
       {
         auto u = zero_vectors(n - 1, param);
@@ -1031,7 +1227,7 @@ TEST_P(MILCEigenvectorLayoutTest, load)
       std::vector<complex_t> loaded;
       VectorIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, io_mode, g)).load(u, &loaded);
       expect_same_vectors(u, v);
-      expect_loaded_evals(loaded, evals, n);
+      expect_loaded_evals(loaded, evals, n, false);
     }
   }
   remove_saved_file(file);
@@ -1068,7 +1264,7 @@ TEST(MILCEigenvectorPrecisionTest, single)
       std::vector<complex_t> loaded;
       VectorIO(file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).load(u, &loaded);
       expect_same_vectors(u, v);
-      expect_loaded_evals(loaded, evals, n);
+      expect_loaded_evals(loaded, evals, n, false);
     }
   }
   for (auto &file : files) remove_saved_file(file);
@@ -1112,7 +1308,7 @@ TEST(PartfileCrossRun, vectors)
           std::vector<complex_t> loaded;
           VectorIO(cross_run_load + suffix, p).load(u, &loaded);
           expect_same_vectors(u, v);
-          if (!interleaved) expect_loaded_evals(loaded, evals, n);
+          if (!interleaved) expect_loaded_evals(loaded, evals, n, !milc);
           if (interleaved) {
             auto w = zero_vectors(1, param);
             VectorIO(cross_run_load + suffix, p).load(w);
@@ -1325,6 +1521,19 @@ INSTANTIATE_TEST_SUITE_P(Vector, VectorEigenvalueTest,
                          Combine(Values(QUDA_FULL_SITE_SUBSET, QUDA_PARITY_SITE_SUBSET), Values(false, true)),
                          [](testing::TestParamInfo<eigenvalue_test_t> param) {
                            std::string name = ::testing::get<0>(param.param) == QUDA_FULL_SITE_SUBSET ? "full" : "parity";
+                           return name + (::testing::get<1>(param.param) ? "_partfile" : "_singlefile");
+                         });
+
+// QUDA's strings
+INSTANTIATE_TEST_SUITE_P(Vector, VectorStringsTest, ValuesIn(vector_formats()),
+                         [](testing::TestParamInfo<QudaFileFormat> param) {
+                           return std::string(quda::get_file_format_str(param.param));
+                         });
+
+// the strings QUDA saved before
+INSTANTIATE_TEST_SUITE_P(Vector, VectorLegacyStringsTest, Combine(Values(1, 4), Values(false, true)),
+                         [](testing::TestParamInfo<legacy_test_t> param) {
+                           std::string name = "spin" + std::to_string(::testing::get<0>(param.param));
                            return name + (::testing::get<1>(param.param) ? "_partfile" : "_singlefile");
                          });
 

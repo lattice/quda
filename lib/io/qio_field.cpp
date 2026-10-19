@@ -131,8 +131,8 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar, QIO_Fi
   return infile;
 }
 
-QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int ildgstyle, const char *ildg_lfn = nullptr,
-                             QIO_Filesystem *fs = nullptr, const char *xml_write_file = quda::scidac::quda_user_file_xml)
+QIO_Writer *open_test_output(const char *filename, const char *xml_write_file, int volfmt, int serpar, int ildgstyle,
+                             const char *ildg_lfn, QIO_Filesystem *fs)
 {
   QIO_Oflag oflag;
 
@@ -196,7 +196,8 @@ int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, 
   // Further, even if the nSpin and nColor don't agree, what really matters is the
   // total typesize check.
   if (len != 18) {
-    if (in_nSpin != nSpin) warningQuda("QIO_get_spins %d does not match expected number of spins %d", in_nSpin, nSpin);
+    if (!quda::scidac::spins_match(QIO_get_datatype(rec_info), in_nSpin, nSpin))
+      warningQuda("QIO_get_spins %d does not match expected number of spins %d", in_nSpin, nSpin);
 
     if (in_nColor != nColor)
       warningQuda("QIO_get_colors %d does not match expected number of colors %d", in_nColor, nColor);
@@ -407,94 +408,6 @@ std::vector<quda::scidac::FieldChecksum> read_spinor_field(const char *filename,
   return sums;
 }
 
-int write_field(QIO_Writer *outfile, const quda::io::HostField &field, QudaPrecision file_prec, QudaSiteSubset subset,
-                QudaParity parity, int nSpin, int nColor, int len, const char *type, const char *record_xml = nullptr)
-{
-  const int count = field.items();
-  std::string xml_record = quda::scidac::quda_record_xml(len, type, subset, parity, nColor, nSpin);
-
-  int status;
-
-  // Create the record info for the field
-  if (file_prec != QUDA_DOUBLE_PRECISION && file_prec != QUDA_SINGLE_PRECISION)
-    errorQuda("Error, file_prec=%d not supported", file_prec);
-
-  const char *precision = (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F";
-
-  // presently assumes 4-d
-  const int nDim = 4;
-  int lower[nDim] = {0, 0, 0, 0};
-  int upper[nDim] = {lattice_size[0], lattice_size[1], lattice_size[2], lattice_size[3]};
-
-  QIO_RecordInfo *rec_info = QIO_create_record_info(QIO_FIELD, lower, upper, nDim, const_cast<char *>(type),
-                                                    const_cast<char *>(precision), nColor, nSpin, file_prec * len, count);
-
-  // Create the record XML for the field
-  QIO_String *xml_record_out = QIO_string_create();
-  QIO_string_set(xml_record_out, record_xml ? record_xml : xml_record.c_str());
-
-  /* Write the field record converting to desired file precision*/
-  size_t rec_size = file_prec * count * len;
-  auto pack = field.packer(file_prec);
-  status = QIO_write(outfile, rec_info, xml_record_out, get_site, rec_size, file_prec, &pack);
-
-  printfQuda("%s: QIO_write_record_data returns status %d\n", __func__, status);
-  QIO_destroy_record_info(rec_info);
-  QIO_string_destroy(xml_record_out);
-
-  if (status != QIO_SUCCESS) return 1;
-  return 0;
-}
-
-int write_su3_field(QIO_Writer *outfile, const quda::io::HostField &field, QudaPrecision file_prec, const char *type,
-                    const char *record_xml)
-{
-  return write_field(outfile, field, file_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3, 18, type, record_xml);
-}
-
-quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
-                                     bool partfile, QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
-                                     const quda::scidac::GaugeInfo &info)
-{
-  quda_this_node = QMP_get_node_number();
-
-  set_layout(X);
-  PartitionFilesystem fs(io_mode, io_partition_grid, partfile);
-
-  QudaPrecision file_prec = precision;
-
-  char type[128];
-  snprintf(type, sizeof(type), "%s", quda::scidac::gauge_datatype(file_prec, info.ildg).c_str());
-
-  /* Open the test file for writing */
-  const char *lfn = info.ildg && !info.ildg_lfn.empty() ? info.ildg_lfn.c_str() : nullptr;
-  QIO_Writer *outfile = open_test_output(filename, partfile ? QIO_PARTFILE : QIO_SINGLEFILE, qio_serpar(io_mode),
-                                         info.ildg ? QIO_ILDGLAT : QIO_ILDGNO, lfn, fs.get());
-  if (outfile == NULL) { errorQuda("Open file failed\n"); }
-
-  /* Write the gauge field record */
-  printfQuda("%s: writing the gauge field\n", __func__);
-  fflush(stdout);
-  std::string record_xml = info.has_usqcd_info ? encode_usqcd_info(info.plaq, info.linktr) : std::string();
-  int status = write_su3_field(outfile, quda::io::HostField(gauge, 4, precision, 18), precision, type,
-                               info.has_usqcd_info ? record_xml.c_str() : nullptr);
-  if (status) { errorQuda("write_gauge_field failed %d\n", status); }
-
-  // QIO silently falls back to a plain SciDAC file if the record cannot be written as ILDG, recording this on the
-  // master I/O node
-  if (info.ildg) {
-    int ildg = outfile->ildgstyle == QIO_ILDGLAT;
-    QMP_broadcast(&ildg, sizeof(ildg));
-    if (!ildg) errorQuda("QIO did not write %s in ILDG format", filename);
-  }
-  quda::io::Checksum sum = {QIO_get_writer_last_checksuma(outfile), QIO_get_writer_last_checksumb(outfile)};
-
-  /* Close the file */
-  QIO_close_write(outfile);
-  printfQuda("%s: Closed file for writing\n", __func__);
-  return sum;
-}
-
 // Write a record with the given metadata, converting to its precision
 static int write_record(QIO_Writer *outfile, const quda::io::HostField &field, const quda::scidac::FieldMetadata &m)
 {
@@ -518,6 +431,49 @@ static int write_record(QIO_Writer *outfile, const quda::io::HostField &field, c
   return status != QIO_SUCCESS;
 }
 
+quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X,
+                                     bool partfile, QudaFileIOMode io_mode, const std::array<int, 4> &io_partition_grid,
+                                     const quda::scidac::GaugeInfo &info)
+{
+  quda_this_node = QMP_get_node_number();
+
+  set_layout(X);
+  PartitionFilesystem fs(io_mode, io_partition_grid, partfile);
+
+  if (precision != QUDA_DOUBLE_PRECISION && precision != QUDA_SINGLE_PRECISION)
+    errorQuda("Error, file_prec=%d not supported", precision);
+  auto records = quda::scidac::gauge_records(precision, info);
+  if (info.has_usqcd_info) records.record.user_xml = encode_usqcd_info(info.plaq, info.linktr);
+
+  /* Open the test file for writing */
+  const char *lfn = info.ildg && !info.ildg_lfn.empty() ? info.ildg_lfn.c_str() : nullptr;
+  QIO_Writer *outfile
+    = open_test_output(filename, records.user_file_xml.c_str(), partfile ? QIO_PARTFILE : QIO_SINGLEFILE,
+                       qio_serpar(io_mode), info.ildg ? QIO_ILDGLAT : QIO_ILDGNO, lfn, fs.get());
+  if (outfile == NULL) { errorQuda("Open file failed\n"); }
+
+  /* Write the gauge field record */
+  printfQuda("%s: writing the gauge field\n", __func__);
+  fflush(stdout);
+  if (write_record(outfile, quda::io::HostField(gauge, 4, precision, 18), records.record)) {
+    errorQuda("write_gauge_field failed\n");
+  }
+
+  // QIO silently falls back to a plain SciDAC file if the record cannot be written as ILDG, recording this on the
+  // master I/O node
+  if (info.ildg) {
+    int ildg = outfile->ildgstyle == QIO_ILDGLAT;
+    QMP_broadcast(&ildg, sizeof(ildg));
+    if (!ildg) errorQuda("QIO did not write %s in ILDG format", filename);
+  }
+  quda::io::Checksum sum = {QIO_get_writer_last_checksuma(outfile), QIO_get_writer_last_checksumb(outfile)};
+
+  /* Close the file */
+  QIO_close_write(outfile);
+  printfQuda("%s: Closed file for writing\n", __func__);
+  return sum;
+}
+
 std::vector<quda::io::Checksum> write_spinor_field(const char *filename, const quda::scidac::VectorRecords &records,
                                                    const std::vector<quda::io::HostField> &fields, const int *X,
                                                    QudaSiteSubset subset, bool partfile, QudaFileIOMode io_mode,
@@ -529,8 +485,9 @@ std::vector<quda::io::Checksum> write_spinor_field(const char *filename, const q
   PartitionFilesystem fs(io_mode, io_partition_grid, partfile);
 
   /* Open the test file for writing */
-  QIO_Writer *outfile = open_test_output(filename, (partfile ? QIO_PARTFILE : QIO_SINGLEFILE), qio_serpar(io_mode),
-                                         QIO_ILDGNO, nullptr, fs.get(), records.user_file_xml.c_str());
+  QIO_Writer *outfile
+    = open_test_output(filename, records.user_file_xml.c_str(), partfile ? QIO_PARTFILE : QIO_SINGLEFILE,
+                       qio_serpar(io_mode), QIO_ILDGNO, nullptr, fs.get());
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Write the spinor field records */
