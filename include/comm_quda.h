@@ -277,6 +277,12 @@ namespace quda
   */
   void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
+  /**
+     @brief Allocate local Fabric memory and map peer-to-peer neighbors
+     @param[out] remote Array of remote pointers; null for inaccessible links
+     @param[in] bytes Local allocation size in bytes
+     @return Local memory pointer
+  */
   void *comm_create_local_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, size_t bytes);
 
   /**
@@ -287,6 +293,11 @@ namespace quda
   */
   void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
 
+  /**
+     @brief Release local Fabric memory and its remote mappings
+     @param[in] local Local memory pointer
+     @param[in,out] remote Array of remote pointers, cleared on return
+  */
   void comm_destroy_local_neighbor_memory(void *local, array_2d<void *, QUDA_MAX_DIM, 2> &remote);
 
   /**
@@ -302,6 +313,10 @@ namespace quda
   void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
+  /**
+     @brief Create local events for peer-to-peer neighbors without exchanging handles
+     @param[out] local Array of local events to neighboring processes
+  */
   void comm_create_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
@@ -312,6 +327,10 @@ namespace quda
   void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                    array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
+  /**
+     @brief Destroy events created by comm_create_local_event()
+     @param[in] local Array of local events to neighboring processes
+  */
   void comm_destroy_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
@@ -358,7 +377,10 @@ namespace quda
   */
   void comm_peer2peer_report_validated();
 
-  /** Validate candidate peer links with an NVSHMEM symmetric probe allocation. */
+  /**
+     @brief Collectively validate candidate peer links with an NVSHMEM symmetric probe
+     No operation when NVSHMEM is not active.
+  */
   void comm_peer2peer_validate_nvshmem();
 
   /**

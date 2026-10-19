@@ -519,7 +519,7 @@ namespace quda {
     }
 
     // Update the receive buffers
-    for (int i=0; i<nDimComms; i++) {
+    for (int i = 0; i < nDimComms; i++) {
       if (!commDimPartitioned(i)) continue;
 
       for (int dir = 0; dir < 2; dir++) {
@@ -527,7 +527,7 @@ namespace quda {
           from_face_dim_dir_d[b][i][dir] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir];
         } // loop over b
       }   // loop over direction
-    } // loop over dimension
+    }     // loop over dimension
 
     if (!comm_nvshmem_enabled() && comm_gdr_enabled()) {
       for (int i = 0; i < nDimComms; i++) {
