@@ -97,10 +97,17 @@ namespace quda
     if (!probe) errorQuda("Failed to allocate NVSHMEM peer-reachability probe");
 
     array_2d<void *, QUDA_MAX_DIM, 2> remote {};
+#ifdef MNNVL_COMMS
+    int cross_clique_links = 0;
+#endif
     for (int dim = 0; dim < 4; ++dim) {
       for (int dir = 0; dir < 2; ++dir) {
-        if (comm_dim(dim) > 1 && comm_peer2peer_enabled(dir, dim))
-          remote[dim][dir] = nvshmem_ptr(probe, comm_neighbor_rank(dir, dim));
+        if (comm_dim(dim) <= 1) continue;
+        void *neighbor = nvshmem_ptr(probe, comm_neighbor_rank(dir, dim));
+#ifdef MNNVL_COMMS
+        if (!neighbor) cross_clique_links++;
+#endif
+        if (comm_peer2peer_enabled(dir, dim)) remote[dim][dir] = neighbor;
       }
     }
 
@@ -108,6 +115,13 @@ namespace quda
     comm_peer2peer_finalize_validation();
     comm_peer2peer_report_validated();
     nvshmem_free(probe);
+#ifdef MNNVL_COMMS
+    comm_allreduce_int(cross_clique_links);
+    if (cross_clique_links)
+      warningQuda("You are working with MNNVL=ON, NVSHMEM=ON and enabled, using cross-clique communications "
+                  "(neighbors without direct NVSHMEM mappings). This mode has known issues with MPI communications "
+                  "across clique boundaries. A current workaround is to disable GDR with QUDA_ENABLE_GDR=0.");
+#endif
 #endif
   }
 
