@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <type_traits>
 #include <color_spinor_field.h>
@@ -6,6 +7,7 @@
 #include <io/scidac_io.h>
 #include <io/vector_io.h>
 #include <blas_quda.h>
+#include <staggered_sign_convention.h>
 #include <timer.h>
 
 namespace quda
@@ -173,6 +175,21 @@ namespace quda
     {
       return param.external_qio ? " with the external QIO library" : "";
     }
+
+    // log the staggered sign convention that the records of a file state, if any
+    void log_sign_convention(const scidac::VectorFile &file, const std::string &filename)
+    {
+      std::vector<std::string> conventions;
+      for (auto &f : file.records.fields)
+        conventions.push_back(scidac::xml_value(f.metadata.user_xml, "staggeredSignConvention").value_or(""));
+      if (std::all_of(conventions.begin(), conventions.end(), [](auto &s) { return s.empty(); })) return;
+      if (std::any_of(conventions.begin(), conventions.end(), [&](auto &s) { return s != conventions[0]; })) {
+        warningQuda("The records of %s state different staggered sign conventions", filename.c_str());
+        return;
+      }
+      logQuda(QUDA_SUMMARIZE, "The vectors of %s are in %s's staggered sign convention\n", filename.c_str(),
+              conventions[0].c_str());
+    }
   } // namespace
 
   VectorIO::VectorIO(const std::string &filename, const FileIOParam &param) : filename(filename), param(param)
@@ -194,6 +211,7 @@ namespace quda
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start loading %04d vectors from %s\n", Nvec, filename.c_str());
 
     const auto file = scidac::find_vectors(filename);
+    log_sign_convention(file, filename);
     const bool milc = file.strings == scidac::VectorStrings::MILC;
     if (milc && (v0.Nspin() != 1 || v0.Ncolor() != 3 || v0.Ndim() != 4))
       errorQuda("%s is in MILC's eigenvector format, which holds 4-d vectors of 1 spin and 3 colors, but the vectors "
@@ -290,6 +308,10 @@ namespace quda
                 v0.Nspin(), v0.Ncolor(), v0.Ndim());
     if (milc && !evals) errorQuda("MILC's eigenvector format (milc_eigenvectors) needs the eigenvalues");
     if (milc && param.interleaved_vectors) errorQuda("MILC's eigenvector format has one record per vector");
+    if (param.staggered_sign_convention && (v0.Nspin() != 1 || v0.Ndim() != 4))
+      errorQuda("A staggered sign convention is recorded only for 4-d staggered vectors (1 spin), but the vectors have "
+                "%d spins and %d dimensions",
+                v0.Nspin(), v0.Ndim());
     if (param.interleaved_vectors && param.external_qio)
       errorQuda("Only the native backend saves vectors interleaved in one record");
     if (evals && evals->size() < static_cast<size_t>(Nvec))
@@ -364,6 +386,8 @@ namespace quda
       info.evals_imag.push_back(static_cast<double>((*evals)[i].imag()));
     }
     for (int i = 0; resids && i < Nvec; i++) info.resids.push_back(static_cast<double>((*resids)[i]));
+    if (param.staggered_sign_convention)
+      info.sign_convention = get_staggered_sign_convention_str(*param.staggered_sign_convention);
 
     quda::host_timer_t host_timer;
     host_timer.start();
@@ -375,8 +399,10 @@ namespace quda
     comm_barrier();
 
     host_timer.stop();
-    logQuda(QUDA_SUMMARIZE, "Saved %d vectors to %s %s (%lu records)%s\n", Nvec, filename.c_str(),
-            layout_str(info.strings, info.interleaved), sums.size(), backend_str(param));
+    const std::string convention
+      = info.sign_convention.empty() ? "" : ", in " + info.sign_convention + "'s staggered sign convention";
+    logQuda(QUDA_SUMMARIZE, "Saved %d vectors to %s %s (%lu records)%s%s\n", Nvec, filename.c_str(),
+            layout_str(info.strings, info.interleaved), sums.size(), backend_str(param), convention.c_str());
     logQuda(QUDA_VERBOSE, "Saved %d %s precision vector fields to %s%s; checksums %s\n", Nvec * Ls,
             save_prec == QUDA_DOUBLE_PRECISION ? "double" : "single", filename.c_str(), backend_str(param),
             checksums_str(sums).c_str());

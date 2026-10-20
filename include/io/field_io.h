@@ -1,11 +1,15 @@
 #pragma once
 
 #include <array>
+#include <optional>
 #include <string>
 #include <quda.h>
 
 namespace quda
 {
+
+  /** Defined in staggered_sign_convention.h */
+  enum class StaggeredSignConvention;
 
   /**
      @brief Internal options for loading and saving fields.  This is
@@ -41,6 +45,12 @@ namespace quda
 
     /** Save vectors in MILC's SciDAC eigenvector format (QudaFileIOParam::milc_eigenvectors); ignored on load */
     bool milc_eigenvectors = false;
+
+    /**
+       Staggered vector saves in QUDA's format: the sign convention the vectors are in, recorded in each record's
+       XML; none records nothing.  Ignored on load.
+    */
+    std::optional<StaggeredSignConvention> staggered_sign_convention;
 
     /**
        Native vector saves, for tests: all the vectors in one record,

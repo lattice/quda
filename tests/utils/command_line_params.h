@@ -615,6 +615,10 @@ extern double prop_sink_smear_coeff;
 extern bool prop_read_sources;
 extern int prop_n_sources;
 extern QudaPrecision prop_save_prec;
+extern bool prop_milc_sign_convention;
+extern QudaFileFormat prop_file_format;
+extern QudaFileIOMode prop_file_io_mode;
+extern std::array<int, 4> prop_file_io_partitions;
 
 extern bool enable_testing;
 

@@ -8,6 +8,9 @@
 #include <quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
+#include <staggered_sign_convention.h>
+#include <io/ks_io.h>
+#include <io/vector_io.h>
 
 // External headers
 #include <misc.h>
@@ -248,6 +251,92 @@ void init()
   //-----------------------------------------------------------------------------------
 }
 
+// the files of the propagator options, of which this test uses index 0
+std::string prop_load_source;
+std::string prop_load_sink;
+std::string prop_save_sink;
+
+bool use_propagator_options()
+{
+  return !prop_load_source.empty() || !prop_load_sink.empty() || !prop_save_sink.empty() || prop_milc_sign_convention;
+}
+
+void check_propagator_options()
+{
+  auto index_0 = [](const quda::file_array<char[256]> &files, const char *flag) {
+    for (auto i = 1u; i < files.size(); i++)
+      if (files[i][0] != '\0')
+        errorQuda("%s %u %s: staggered_invert_test uses only index 0 of the propagator file options", flag, i, files[i]);
+    return std::string(files[0]);
+  };
+  prop_load_source = index_0(prop_source_infile, "--prop-load-source-file");
+  prop_load_sink = index_0(prop_sink_infile, "--prop-load-sink-file");
+  prop_save_sink = index_0(prop_sink_outfile, "--prop-save-sink-file");
+  for (auto &file : prop_source_outfile)
+    if (file[0] != '\0') errorQuda("--prop-save-source-file is not used by staggered_invert_test");
+  if (!use_propagator_options()) return;
+
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
+    errorQuda("The propagator options need --dslash-type staggered or asqtad, not %s", get_dslash_str(dslash_type));
+  if (solution_type != QUDA_MAT_SOLUTION)
+    errorQuda("The propagator options need --solution-type mat (solutions on the full lattice), not %s",
+              get_solution_str(solution_type));
+  if (multishift != 1) errorQuda("The propagator options need --multishift 1, not %d", multishift);
+  if (enable_testing) errorQuda("The propagator options are not used with --enable-testing");
+}
+
+quda::FileIOParam propagator_file_io_param()
+{
+  QudaFileIOParam param;
+  setPropagatorFileIOParam(param);
+  return quda::FileIOParam(&param);
+}
+
+// MILC's sources replace the random ones, and MILC's solutions are the initial guesses; then, with
+// --prop-milc-sign-convention, both are converted to QUDA's sign convention
+void load_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector<quda::ColorSpinorField> &out)
+{
+  const auto param = propagator_file_io_param();
+  if (!prop_load_source.empty()) quda::KSSourceIO(prop_load_source, param).load(in);
+  if (!prop_load_sink.empty()) {
+    if (prop_load_source.empty())
+      quda::KSPropagatorIO(prop_load_sink, param).load(out, in);
+    else
+      quda::KSPropagatorIO(prop_load_sink, param).load(out, {});
+    inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    if (!prop_milc_sign_convention)
+      warningQuda(
+        "The initial guesses from %s are MILC's solutions, in MILC's sign convention, so their odd sites have "
+        "the wrong sign for QUDA's operator; --prop-milc-sign-convention true converts them",
+        prop_load_sink.c_str());
+  }
+  if (prop_milc_sign_convention) {
+    quda::staggeredMILCToQUDASignConvention(in);
+    if (!prop_load_sink.empty()) quda::staggeredMILCToQUDASignConvention(out);
+  }
+}
+
+// with --prop-milc-sign-convention, the sources and solutions are converted back to MILC's sign convention; then the
+// solutions are saved, with their sign convention
+void save_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector<quda::ColorSpinorField> &out)
+{
+  if (prop_milc_sign_convention) {
+    quda::staggeredQUDAToMILCSignConvention(in);
+    quda::staggeredQUDAToMILCSignConvention(out);
+  }
+  if (prop_save_sink.empty()) return;
+
+  auto param = propagator_file_io_param();
+  param.staggered_sign_convention
+    = prop_milc_sign_convention ? quda::StaggeredSignConvention::MILC : quda::StaggeredSignConvention::QUDA;
+  if (!prop_milc_sign_convention)
+    warningQuda("The solutions saved to %s are in QUDA's staggered sign convention, so they differ from MILC's: on the "
+                "odd sites for sources on even sites only, and beyond that for sources on both parities; "
+                "--prop-milc-sign-convention true gives MILC's solutions",
+                prop_save_sink.c_str());
+  quda::VectorIO(prop_save_sink, param).save({out.begin(), out.end()}, prop_save_prec);
+}
+
 std::vector<std::array<quda::real_t, 2>> solve(test_t param)
 {
   inv_param.inv_type = ::testing::get<0>(param);
@@ -367,6 +456,7 @@ std::vector<std::array<quda::real_t, 2>> solve(test_t param)
     quda::spinorNoise(in[n], rng, QUDA_NOISE_UNIFORM);
     out[n] = quda::ColorSpinorField(cs_param);
   }
+  if (use_propagator_options()) load_propagator_fields(in, out);
 
   // Prepare rng, fill host spinors with random numbers END
   //-----------------------------------------------------------------------------------
@@ -453,6 +543,7 @@ std::vector<std::array<quda::real_t, 2>> solve(test_t param)
       }
     }
   }
+  if (use_propagator_options()) save_propagator_fields(in, out);
 
   return res;
 }
@@ -477,6 +568,7 @@ int main(int argc, char **argv)
   add_multigrid_option_group(app);
   add_comms_option_group(app);
   add_testing_option_group(app);
+  add_propagator_option_group(app);
   app->add_option("--legacy-test-info", print_legacy_info,
                   "Print info on how to reproduce the old '--test #' behavior with flags, then exit");
   try {
@@ -518,6 +610,7 @@ int main(int argc, char **argv)
       errorQuda("dslash_type %s not supported for multigrid preconditioner", get_dslash_str(dslash_type));
     }
   }
+  check_propagator_options();
 
   display_test_info();
 

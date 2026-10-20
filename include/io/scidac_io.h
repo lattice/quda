@@ -301,10 +301,12 @@ namespace quda
        @param[in] eval An eigenvalue, written as <eigVal> in the <info> element if given
        @param[in] eval_imag Its imaginary part, written as <eigValImag> after <eigVal> if given
        @param[in] resid A residual, written as <resid> in the <info> element if given
+       @param[in] sign_convention A staggered sign convention, written as <staggeredSignConvention> in the <info>
+       element if not empty
      */
     std::string quda_record_xml(int len, QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
                                 std::optional<double> eval = {}, std::optional<double> eval_imag = {},
-                                std::optional<double> resid = {});
+                                std::optional<double> resid = {}, const std::string &sign_convention = "");
 
     /**
        @brief QUDA's record XML as it was written before quda_record_xml
@@ -431,7 +433,8 @@ namespace quda
       std::vector<double> evals;   /** One eigenvalue per vector, or none */
       /** Their imaginary parts, or none; QUDA's strings hold them in every record if any is nonzero */
       std::vector<double> evals_imag;
-      std::vector<double> resids; /** One residual per vector, or none */
+      std::vector<double> resids;  /** One residual per vector, or none */
+      std::string sign_convention; /** The staggered sign convention ("QUDA" or "MILC"), or empty (QUDA's strings) */
     };
 
     /**

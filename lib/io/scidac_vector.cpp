@@ -155,6 +155,10 @@ namespace quda
         return x.empty() ? std::optional<double>() : std::optional<double>(x[i]);
       };
       VectorRecords v;
+      const bool legacy = info.legacy_strings || info.interleaved;
+      if (!info.sign_convention.empty() && (info.strings == VectorStrings::MILC || legacy))
+        errorQuda("Only QUDA's current strings record a staggered sign convention, not %s",
+                  info.strings == VectorStrings::MILC ? "MILC's eigenvector format" : "QUDA's legacy strings");
       if (info.strings == VectorStrings::MILC) {
         if (info.interleaved) errorQuda("MILC's eigenvector format has one record per vector");
         if (nSpin != 1 || nColor != 3 || Ls != 1)
@@ -176,7 +180,6 @@ namespace quda
         return v;
       }
 
-      const bool legacy = info.legacy_strings || info.interleaved;
       const int reals = 2 * nSpin * nColor;
       v.user_file_xml = legacy ? legacy_file_xml :
                                  quda_file_xml(n_vectors == 1 ? "1 vector" : std::to_string(n_vectors) + " vectors");
@@ -201,7 +204,8 @@ namespace quda
                                               value(info.resids, i));
         else
           m.user_xml = quda_record_xml(reals, subset, parity, nColor, nSpin, value(info.evals, i),
-                                       complex_evals ? value(info.evals_imag, i) : std::nullopt, value(info.resids, i));
+                                       complex_evals ? value(info.evals_imag, i) : std::nullopt, value(info.resids, i),
+                                       info.sign_convention);
         v.records.push_back(m);
       }
       return v;

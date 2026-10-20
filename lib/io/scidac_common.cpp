@@ -226,7 +226,7 @@ namespace quda
       // the content of the <info> element of QUDA's record XML
       std::string quda_record_info(QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
                                    std::optional<double> eval, std::optional<double> eval_imag,
-                                   std::optional<double> resid)
+                                   std::optional<double> resid, const std::string &sign_convention = "")
       {
         // if parity+even, it's a half-x-dim even only vector
         // if parity+odd, it's a half-x-dim odd only vector
@@ -240,14 +240,16 @@ namespace quda
         if (eval) info += element("eigVal", format("%.18e", *eval));
         if (eval_imag) info += element("eigValImag", format("%.18e", *eval_imag));
         if (resid) info += element("resid", format("%e", *resid));
+        if (!sign_convention.empty()) info += element("staggeredSignConvention", sign_convention);
         return info;
       }
     } // namespace
 
     std::string quda_record_xml(int len, QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
-                                std::optional<double> eval, std::optional<double> eval_imag, std::optional<double> resid)
+                                std::optional<double> eval, std::optional<double> eval_imag,
+                                std::optional<double> resid, const std::string &sign_convention)
     {
-      const auto info = quda_record_info(subset, parity, nColor, nSpin, eval, eval_imag, resid);
+      const auto info = quda_record_info(subset, parity, nColor, nSpin, eval, eval_imag, resid, sign_convention);
       return xml_declaration + element(quda_record_name(len), element("version", "1.0") + element("info", info));
     }
 

@@ -357,6 +357,10 @@ double prop_sink_smear_coeff = 2.0;
 bool prop_read_sources = false;
 int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
+bool prop_milc_sign_convention = false;
+QudaFileFormat prop_file_format = QUDA_FILE_FORMAT_AUTO;
+QudaFileIOMode prop_file_io_mode = QUDA_FILE_IO_PARALLEL;
+std::array<int, 4> prop_file_io_partitions = {0, 0, 0, 0};
 
 int covdev_mu = 3;
 
@@ -484,6 +488,9 @@ namespace
                                                        {"ildg", QUDA_FILE_FORMAT_ILDG},
                                                        {"qio-external", QUDA_FILE_FORMAT_QIO_EXTERNAL},
                                                        {"ildg-external", QUDA_FILE_FORMAT_ILDG_EXTERNAL}};
+
+  CLI::TransformPairs<QudaFileFormat> prop_file_format_map {
+    {"auto", QUDA_FILE_FORMAT_AUTO}, {"qio", QUDA_FILE_FORMAT_QIO}, {"qio-external", QUDA_FILE_FORMAT_QIO_EXTERNAL}};
 
   CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {{"parallel", QUDA_FILE_IO_PARALLEL},
                                                         {"serial", QUDA_FILE_IO_SERIAL}};
@@ -1323,12 +1330,13 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--prop-n-sources", prop_n_sources, "The number of point sources to construct (default 1)");
 
   quda_app->add_fileoption(opgroup, "--prop-save-sink-file", prop_sink_outfile, CLI::Validator(),
-                           "Save propagators to <file> (requires QIO)");
+                           "Save the solutions to <file> as a QUDA vector file, recording their staggered sign "
+                           "convention (staggered_invert_test, index 0 only)");
 
-  quda_app
-    ->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(),
-                     "Load propagators from <file> (requires QIO)")
-    ->check(CLI::ExistingFile);
+  quda_app->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(),
+                           "Load the solutions of a USQCD KS propagator file of source/solution pairs, as MILC saves "
+                           "them, as initial guesses, and its sources unless --prop-load-source-file is given "
+                           "(staggered_invert_test, index 0 only)");
 
   quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(),
                            "Save source to <file> (requires QIO)");
@@ -1336,7 +1344,9 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   // Do not check for an existing file as QUDA will append any
   // string with a dilution index: "string_<dilution_index>"
   quda_app->add_fileoption(opgroup, "--prop-load-source-file", prop_source_infile, CLI::Validator(),
-                           "Load source to <file> (requires QIO)");
+                           "Load the sources from a staggered source file (color-vector or complex-field) or a USQCD "
+                           "KS propagator file of source/solution pairs, as MILC saves them (staggered_invert_test, "
+                           "index 0 only)");
 
   opgroup->add_option("--prop-source-smear-coeff", prop_source_smear_coeff,
                       "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
@@ -1356,6 +1366,24 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
     ->transform(prec_transform);
+
+  opgroup->add_option("--prop-milc-sign-convention", prop_milc_sign_convention,
+                      "Convert the staggered sources and initial guesses from MILC's sign convention before the "
+                      "solves, and the sources and solutions back to it after them, so that the solutions are MILC's "
+                      "(odd sites negated; default false)");
+  opgroup
+    ->add_option("--prop-file-format", prop_file_format,
+                 "File format used to load and save sources and propagators (auto (default), qio, qio-external)")
+    ->transform(CLI::QUDACheckedTransformer(prop_file_format_map));
+  opgroup
+    ->add_option("--prop-file-io-mode", prop_file_io_mode,
+                 "Whether all ranks (parallel, default) or only rank 0 (serial) access source and propagator files")
+    ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
+  opgroup
+    ->add_option("--prop-file-io-partitions", prop_file_io_partitions,
+                 "Number of I/O partitions in each dimension for source and propagator files, as MILC's "
+                 "ionode_geometry (default 0 0 0 0, one partition per rank)")
+    ->expected(4);
 }
 
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)

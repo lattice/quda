@@ -10,6 +10,7 @@
 #include <instantiate.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
+#include <staggered_sign_convention.h>
 #include <io/ks_io.h>
 #include <io/lime.h>
 #include <io/scidac_io.h>
@@ -669,6 +670,129 @@ TEST(KSDetectionTest, kinds)
   remove_files({quda_file, milc_file, source_file, vv_file, complex_file});
 }
 
+namespace
+{
+  // full staggered fields of the target's precision and location, field i holding encoded(i, g, k)
+  std::vector<quda::ColorSpinorField> encoded_fields(int n, const Target &t)
+  {
+    using namespace quda;
+    const auto X = local_dims();
+    ColorSpinorField h(
+      ks_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION));
+    auto data = h.data<double *>();
+    std::vector<ColorSpinorField> fields;
+    for (int i = 0; i < n; i++) {
+      for (size_t s = 0; s < h.Volume(); s++) {
+        const auto g = host_coords(s, X, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
+        for (int k = 0; k < 6; k++) data[s * 6 + k] = encoded(i, g, k, 6);
+      }
+      fields.emplace_back(ks_param(t.subset, t.parity, t.prec, t.location));
+      fields.back() = h;
+    }
+    return fields;
+  }
+
+  // the bytes of a field, copied to the host in its own precision
+  std::vector<char> field_bytes(const quda::ColorSpinorField &f)
+  {
+    quda::ColorSpinorParam p(f);
+    p.location = QUDA_CPU_FIELD_LOCATION;
+    p.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    p.create = QUDA_NULL_FIELD_CREATE;
+    quda::ColorSpinorField h(p);
+    h = f;
+    auto data = h.data<const char *>();
+    return std::vector<char>(data, data + h.Bytes());
+  }
+
+  bool odd_site(const std::array<int, 4> &g) { return (g[0] + g[1] + g[2] + g[3]) % 2 == 1; }
+} // namespace
+
+using sign_test_t = ::testing::tuple<QudaFieldLocation, QudaPrecision>;
+
+class StaggeredSignConventionTest : public ::testing::TestWithParam<sign_test_t>
+{
+};
+
+// the conversion negates the odd sites exactly and leaves the even ones as they are, both directions do the same, and
+// converting twice restores the fields bit for bit
+TEST_P(StaggeredSignConventionTest, convert)
+{
+  using namespace quda;
+  const auto location = ::testing::get<0>(GetParam());
+  const auto prec = ::testing::get<1>(GetParam());
+  if (!is_enabled_spin(1) || !is_enabled(prec)) GTEST_SKIP();
+  const Target t = {QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, prec, location};
+  const int n = 3;
+  auto x = encoded_fields(n, t), y = encoded_fields(n, t);
+  std::vector<std::vector<char>> original;
+  for (auto &f : x) original.push_back(field_bytes(f));
+
+  auto converted
+    = [](int i, const std::array<int, 4> &g, int k) { return (odd_site(g) ? -1.0 : 1.0) * encoded(i, g, k, 6); };
+  staggeredMILCToQUDASignConvention(x);
+  EXPECT_EQ(mismatches(x, converted), 0);
+  staggeredQUDAToMILCSignConvention(y);
+  for (int i = 0; i < n; i++) EXPECT_EQ(field_bytes(y[i]), field_bytes(x[i])) << "field " << i;
+
+  staggeredQUDAToMILCSignConvention(x);
+  for (int i = 0; i < n; i++) EXPECT_EQ(field_bytes(x[i]), original[i]) << "field " << i;
+  staggeredMILCToQUDASignConvention(y);
+  for (int i = 0; i < n; i++) EXPECT_EQ(field_bytes(y[i]), original[i]) << "field " << i;
+}
+
+// QUDA's staggered vector files record the sign convention they were saved in, in each record's XML, identically in
+// both backends; without one they record none
+TEST(VectorSignConventionTest, records)
+{
+  using namespace quda;
+  if (!is_enabled_spin(1)) GTEST_SKIP();
+  const Target t = {QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION};
+  const int n = 2;
+  const auto v = encoded_fields(n, t);
+  const std::vector<std::optional<StaggeredSignConvention>> conventions
+    = {std::nullopt, StaggeredSignConvention::QUDA, StaggeredSignConvention::MILC};
+
+  for (auto &convention : conventions) {
+    const std::string name = convention ? get_staggered_sign_convention_str(*convention) : "none";
+    SCOPED_TRACE("sign convention " + name);
+    const std::string element
+      = convention ? "<staggeredSignConvention>" + name + "</staggeredSignConvention>" : std::string();
+    std::vector<std::string> files;
+    for (auto format : ks_formats()) {
+      files.push_back("sign_" + name + "_" + get_file_format_str(format) + ".cs");
+      auto p = file_io_param(format, QUDA_FILE_IO_PARALLEL);
+      p.staggered_sign_convention = convention;
+      VectorIO(files.back(), p).save({v.begin(), v.end()});
+    }
+
+    if (comm_rank() == 0) {
+      for (auto &file : files) {
+        SCOPED_TRACE(file);
+        const auto s = saved_strings(file);
+        ASSERT_EQ(s.user_record.size(), static_cast<size_t>(n));
+        for (int i = 0; i < n; i++)
+          EXPECT_EQ(s.user_record[i],
+                    xml_head + "<qudaStaggeredColorSpinorField><version>1.0</version><info><subset>full</subset>"
+                      + "<parity>full</parity><nColor>3</nColor><nSpin>1</nSpin>" + element
+                      + "</info></qudaStaggeredColorSpinorField>")
+            << "record " << i;
+      }
+      if (files.size() > 1) expect_same_saved_file(files[0], files[1], false);
+    }
+
+    for (auto &file : files) {
+      for (auto format : ks_formats()) {
+        SCOPED_TRACE("loading " + file + " with " + get_file_format_str(format));
+        auto u = zero_fields(n, t);
+        VectorIO(file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).load(u);
+        EXPECT_EQ(mismatches(u, [](int i, const std::array<int, 4> &g, int k) { return encoded(i, g, k, 6); }), 0);
+      }
+    }
+    remove_files(files);
+  }
+}
+
 int main(int argc, char **argv)
 {
   quda_test test("Propagator IO Test", argc, argv);
@@ -697,4 +821,13 @@ INSTANTIATE_TEST_SUITE_P(KS, KSSourceLoadTest,
                                 SourceKind::COMPLEX, SourceKind::COMPLEX_SLICE),
                          [](testing::TestParamInfo<SourceKind> param) {
                            return std::string(source_kind_str(param.param));
+                         });
+
+INSTANTIATE_TEST_SUITE_P(KS, StaggeredSignConventionTest,
+                         Combine(Values(QUDA_CPU_FIELD_LOCATION, QUDA_CUDA_FIELD_LOCATION),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)),
+                         [](testing::TestParamInfo<sign_test_t> param) {
+                           std::string name
+                             = ::testing::get<0>(param.param) == QUDA_CPU_FIELD_LOCATION ? "host" : "device";
+                           return name + "_" + get_prec_str(::testing::get<1>(param.param));
                          });

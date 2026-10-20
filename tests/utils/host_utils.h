@@ -414,6 +414,9 @@ void setGaugeParam(QudaGaugeParam &gauge_param);
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
 
+// File I/O param types: of staggered sources and propagators (the --prop-file-* options)
+void setPropagatorFileIOParam(QudaFileIOParam &param);
+
 // Smear param types
 void setGaugeSmearParam(QudaGaugeSmearParam &smear_param);
 void setFermionSmearParam(QudaInvertParam &inv_param, double omega, int steps);
