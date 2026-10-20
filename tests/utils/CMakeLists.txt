@@ -12,7 +12,8 @@ target_sources(
   momentum_utils.cpp
   set_params.cpp
   staggered_gauge_utils.cpp
-  staggered_host_utils.cpp)
+  staggered_host_utils.cpp
+  staggered_source_utils.cpp)
 
 target_include_directories(quda_test PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda_test SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/include/externals)

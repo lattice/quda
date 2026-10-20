@@ -19,6 +19,7 @@
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
+#include <staggered_source_utils.h>
 #include <llfat_utils.h>
 #include "test.h"
 
@@ -254,14 +255,76 @@ void init()
 // the files of the propagator options, of which this test uses index 0
 std::string prop_load_source;
 std::string prop_load_sink;
+std::string prop_save_source;
 std::string prop_save_sink;
 
 bool use_propagator_options()
 {
-  return !prop_load_source.empty() || !prop_load_sink.empty() || !prop_save_sink.empty() || prop_milc_sign_convention;
+  return !prop_load_source.empty() || !prop_load_sink.empty() || !prop_save_source.empty() || !prop_save_sink.empty()
+    || prop_milc_sign_convention || is_built_ks_source(prop_source_type);
 }
 
-void check_propagator_options()
+KSSourceParam ks_source_param()
+{
+  KSSourceParam param;
+  param.type = prop_source_type;
+  param.t0 = prop_source_t0;
+  param.origin = prop_source_position[0];
+  param.momentum = prop_source_momentum;
+  param.subset = prop_source_subset;
+  param.seed = prop_source_seed;
+  return param;
+}
+
+// errors for source options that can't be met, or that would change the source if they were ignored; warnings for
+// those given that have no effect on it
+void check_source_options(const CLI::App &app)
+{
+  const auto type = prop_source_type;
+  const char *name = get_ks_source_type_str(type);
+  const bool built = is_built_ks_source(type);
+  const auto &p = prop_source_momentum;
+  const bool momentum = p[0] != 0 || p[1] != 0 || p[2] != 0;
+  auto given = [&app](const char *flag) { return app.count(flag) > 0; };
+  auto disregarded = [name](const char *flag, const char *why) {
+    warningQuda("%s is disregarded with --prop-source-type %s%s", flag, name, why);
+  };
+
+  if (type == KSSourceType::LOAD && prop_load_source.empty() && prop_load_sink.empty())
+    errorQuda("--prop-source-type load needs --prop-load-source-file or --prop-load-sink-file");
+  if (built && !prop_load_source.empty())
+    errorQuda("--prop-source-type %s builds the sources, so they can't be loaded from --prop-load-source-file %s", name,
+              prop_load_source.c_str());
+  if (!built && momentum)
+    errorQuda("--prop-source-momentum %d %d %d needs a built source, not --prop-source-type %s", p[0], p[1], p[2], name);
+  if (prop_source_subset == KSSourceSubset::CORNER && !is_random_ks_source(type))
+    errorQuda("--prop-source-subset corner applies to the built random walls only (random-complex-wall and "
+              "random-color-wall), as in MILC, not to --prop-source-type %s",
+              name);
+  if (is_complex_field_ks_source(type) && Nsrc > 3)
+    errorQuda("--prop-source-type %s has 3 colors, one per source, so --nsrc %d is too many", name, Nsrc);
+
+  if (given("--prop-source-t0") && type == KSSourceType::POINT)
+    disregarded("--prop-source-t0", " (its time slice is that of --prop-source-position 0)");
+  else if (given("--prop-source-t0") && !built)
+    disregarded("--prop-source-t0", "");
+  if (given("--prop-source-seed") && !is_random_ks_source(type)) disregarded("--prop-source-seed", "");
+  if (given("--prop-source-momentum") && type == KSSourceType::POINT)
+    disregarded("--prop-source-momentum", " (the phase is 1 at the point, its origin)");
+  else if (given("--prop-source-momentum") && !built)
+    disregarded("--prop-source-momentum", "");
+  if (given("--prop-source-position")) {
+    if (!built)
+      disregarded("--prop-source-position", "");
+    else if (type != KSSourceType::POINT && !momentum)
+      disregarded("--prop-source-position", " without --prop-source-momentum");
+    for (auto i = 1u; i < prop_source_position.size(); i++)
+      if (prop_source_position[i] != std::array<int, 4> {})
+        warningQuda("--prop-source-position %u is disregarded: staggered_invert_test uses only index 0", i);
+  }
+}
+
+void check_propagator_options(const CLI::App &app)
 {
   auto index_0 = [](const quda::file_array<char[256]> &files, const char *flag) {
     for (auto i = 1u; i < files.size(); i++)
@@ -271,9 +334,9 @@ void check_propagator_options()
   };
   prop_load_source = index_0(prop_source_infile, "--prop-load-source-file");
   prop_load_sink = index_0(prop_sink_infile, "--prop-load-sink-file");
+  prop_save_source = index_0(prop_source_outfile, "--prop-save-source-file");
   prop_save_sink = index_0(prop_sink_outfile, "--prop-save-sink-file");
-  for (auto &file : prop_source_outfile)
-    if (file[0] != '\0') errorQuda("--prop-save-source-file is not used by staggered_invert_test");
+  check_source_options(app);
   if (!use_propagator_options()) return;
 
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
@@ -292,14 +355,14 @@ quda::FileIOParam propagator_file_io_param()
   return quda::FileIOParam(&param);
 }
 
-// MILC's sources replace the random ones, and MILC's solutions are the initial guesses; then, with
-// --prop-milc-sign-convention, both are converted to QUDA's sign convention
+// MILC's sources replace the random ones unless the sources are built, and MILC's solutions are the initial guesses;
+// then, with --prop-milc-sign-convention, both are converted to QUDA's sign convention, built sources included
 void load_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector<quda::ColorSpinorField> &out)
 {
   const auto param = propagator_file_io_param();
   if (!prop_load_source.empty()) quda::KSSourceIO(prop_load_source, param).load(in);
   if (!prop_load_sink.empty()) {
-    if (prop_load_source.empty())
+    if (prop_load_source.empty() && !is_built_ks_source(prop_source_type))
       quda::KSPropagatorIO(prop_load_sink, param).load(out, in);
     else
       quda::KSPropagatorIO(prop_load_sink, param).load(out, {});
@@ -317,18 +380,20 @@ void load_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector
 }
 
 // with --prop-milc-sign-convention, the sources and solutions are converted back to MILC's sign convention; then the
-// solutions are saved, with their sign convention
+// sources and solutions are saved, with their sign convention
 void save_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector<quda::ColorSpinorField> &out)
 {
   if (prop_milc_sign_convention) {
     quda::staggeredQUDAToMILCSignConvention(in);
     quda::staggeredQUDAToMILCSignConvention(out);
   }
-  if (prop_save_sink.empty()) return;
+  if (prop_save_source.empty() && prop_save_sink.empty()) return;
 
   auto param = propagator_file_io_param();
   param.staggered_sign_convention
     = prop_milc_sign_convention ? quda::StaggeredSignConvention::MILC : quda::StaggeredSignConvention::QUDA;
+  if (!prop_save_source.empty()) quda::VectorIO(prop_save_source, param).save({in.begin(), in.end()}, prop_save_prec);
+  if (prop_save_sink.empty()) return;
   if (!prop_milc_sign_convention)
     warningQuda("The solutions saved to %s are in QUDA's staggered sign convention, so they differ from MILC's: on the "
                 "odd sites for sources on even sites only, and beyond that for sources on both parities; "
@@ -456,6 +521,7 @@ std::vector<std::array<quda::real_t, 2>> solve(test_t param)
     quda::spinorNoise(in[n], rng, QUDA_NOISE_UNIFORM);
     out[n] = quda::ColorSpinorField(cs_param);
   }
+  if (is_built_ks_source(prop_source_type)) constructKSSources(in, ks_source_param());
   if (use_propagator_options()) load_propagator_fields(in, out);
 
   // Prepare rng, fill host spinors with random numbers END
@@ -610,7 +676,7 @@ int main(int argc, char **argv)
       errorQuda("dslash_type %s not supported for multigrid preconditioner", get_dslash_str(dslash_type));
     }
   }
-  check_propagator_options();
+  check_propagator_options(*app);
 
   display_test_info();
 

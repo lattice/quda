@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <complex>
 #include <functional>
 #include <optional>
 #include <string>
@@ -23,6 +25,8 @@
 
 #include "test.h"
 #include "misc.h"
+#include "host_utils.h"
+#include "staggered_source_utils.h"
 #include "io_test_utils.h"
 
 namespace
@@ -793,6 +797,296 @@ TEST(VectorSignConventionTest, records)
   }
 }
 
+namespace
+{
+  using cplx = std::complex<double>;
+  using coords_t = std::array<int, 4>;
+
+  const std::vector<KSSourceType> deterministic_ks_sources
+    = {KSSourceType::POINT,          KSSourceType::CORNER_WALL,     KSSourceType::CORNER_WALL_X,
+       KSSourceType::CORNER_WALL_Y,  KSSourceType::CORNER_WALL_XY,  KSSourceType::CORNER_WALL_Z,
+       KSSourceType::CORNER_WALL_ZX, KSSourceType::CORNER_WALL_YZ,  KSSourceType::CORNER_WALL_XYZ,
+       KSSourceType::EVEN_WALL,      KSSourceType::EVENANDODD_WALL, KSSourceType::EVENMINUSODD_WALL};
+
+  // the time slices of the tests: the first, an interior one, either side of the boundary between ranks in t (only
+  // the last local slice when t isn't split), the last one, and every slice
+  std::vector<int> test_slices()
+  {
+    const int T = local_dims()[3], N = global_dims()[3];
+    std::vector<int> t = {0, 3, T - 1};
+    if (T < N) t.push_back(T);
+    t.push_back(N - 1);
+    t.push_back(ks_source_all_t_slices);
+    std::sort(t.begin(), t.end());
+    t.erase(std::unique(t.begin(), t.end()), t.end());
+    return t;
+  }
+
+  bool on_slice(const coords_t &g, int t0) { return t0 == ks_source_all_t_slices || g[3] == t0; }
+
+  bool in_corner_subset(const coords_t &g) { return g[0] % 2 == 0 && g[1] % 2 == 0 && g[2] % 2 == 0; }
+
+  // exp(i 2 pi sum_i p_i (g_i - o_i) / N_i), computed otherwise than MILC's order of operations
+  cplx momentum_factor(const KSSourceParam &p, const coords_t &g)
+  {
+    const auto N = global_dims();
+    double f = 0.0;
+    for (int i = 0; i < 3; i++) f += static_cast<double>(p.momentum[i] * (g[i] - p.origin[i])) / N[i];
+    return std::polar(1.0, 2.0 * M_PI * f);
+  }
+
+  // MILC's deterministic complex-field sources on their slice (generic/quark_source.c)
+  double definition(KSSourceType type, const coords_t &origin, const coords_t &g)
+  {
+    const bool even = (g[0] + g[1] + g[2] + g[3]) % 2 == 0;
+    const std::vector<std::pair<KSSourceType, int>> corner_walls
+      = {{KSSourceType::CORNER_WALL, 0},    {KSSourceType::CORNER_WALL_X, 1},  {KSSourceType::CORNER_WALL_Y, 2},
+         {KSSourceType::CORNER_WALL_XY, 3}, {KSSourceType::CORNER_WALL_Z, 4},  {KSSourceType::CORNER_WALL_ZX, 5},
+         {KSSourceType::CORNER_WALL_YZ, 6}, {KSSourceType::CORNER_WALL_XYZ, 7}};
+    for (auto &[t, r0] : corner_walls)
+      if (t == type) return g[0] % 2 + 2 * (g[1] % 2) + 4 * (g[2] % 2) == r0 ? 1.0 : 0.0;
+    switch (type) {
+    case KSSourceType::POINT: return g == origin ? 1.0 : 0.0;
+    case KSSourceType::EVEN_WALL: return even ? 1.0 : 0.0;
+    case KSSourceType::EVENANDODD_WALL: return 1.0;
+    case KSSourceType::EVENMINUSODD_WALL: return even ? 1.0 : -1.0;
+    default: ADD_FAILURE() << get_ks_source_type_str(type) << " is not deterministic";
+    }
+    return 0.0;
+  }
+
+  struct Comparison {
+    double max_difference = 0.0;     // on the support
+    int nonzero_off_support = 0;     // reals
+    double max_norm_deviation = 0.0; // of the 3-color vectors on the support from 1
+  };
+
+  /**
+     @brief Compare host fields with expected(field, host index, g, color) on the sites where on_support(g), and count
+     their nonzero reals elsewhere, on all ranks
+   */
+  Comparison compare(const std::vector<quda::ColorSpinorField> &fields,
+                     const std::function<cplx(int, size_t, const coords_t &, int)> &expected,
+                     const std::function<bool(const coords_t &)> &on_support)
+  {
+    using namespace quda;
+    const auto X = local_dims();
+    Comparison r;
+    for (auto i = 0u; i < fields.size(); i++) {
+      ColorSpinorParam p(fields[i]);
+      p.setPrecision(QUDA_DOUBLE_PRECISION);
+      p.create = QUDA_NULL_FIELD_CREATE;
+      ColorSpinorField h(p);
+      h = fields[i];
+      auto data = h.data<const double *>();
+      for (size_t s = 0; s < h.Volume(); s++) {
+        const auto g = host_coords(s, X, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
+        const bool support = on_support(g);
+        double norm2 = 0.0;
+        for (int c = 0; c < 3; c++) {
+          const cplx v(data[s * 6 + 2 * c], data[s * 6 + 2 * c + 1]);
+          norm2 += std::norm(v);
+          if (support)
+            r.max_difference = std::max(r.max_difference, std::abs(v - expected(i, s, g, c)));
+          else
+            r.nonzero_off_support += (v.real() != 0.0) + (v.imag() != 0.0);
+        }
+        if (support) r.max_norm_deviation = std::max(r.max_norm_deviation, std::abs(norm2 - 1.0));
+      }
+    }
+    comm_allreduce_max(r.max_difference);
+    comm_allreduce_int(r.nonzero_off_support);
+    comm_allreduce_max(r.max_norm_deviation);
+    return r;
+  }
+
+  std::vector<quda::ColorSpinorField> host_sources(int n, QudaPrecision prec)
+  {
+    return zero_fields(n, {QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, prec, QUDA_CPU_FIELD_LOCATION});
+  }
+
+  std::string ks_source_str(const KSSourceParam &p)
+  {
+    return std::string(get_ks_source_type_str(p.type)) + " t0 " + std::to_string(p.t0) + " origin " + int_list(p.origin)
+      + "momentum " + std::to_string(p.momentum[0]) + " " + std::to_string(p.momentum[1]) + " "
+      + std::to_string(p.momentum[2]) + " subset " + get_ks_source_subset_str(p.subset);
+  }
+
+  /**
+     The random walls as constructKSSources draws them, from per-site generators seeded here from the seed and each
+     site's global lexicographic index, so that the values are those of any rank layout: per site, one complex Gaussian
+     for random_complex_wall, three per source for random_color_wall, each normalized
+   */
+  class ReferenceWalls
+  {
+    std::vector<host_rng_t> rng;
+
+    cplx gaussian(size_t h)
+    {
+      std::normal_distribution<double> re {0.0, 1.0}, im {0.0, 1.0};
+      const double r = re(rng[h]);
+      return {r, im(rng[h])};
+    }
+
+  public:
+    explicit ReferenceWalls(uint64_t seed)
+    {
+      const auto X = local_dims();
+      const auto N = global_dims();
+      rng.resize(static_cast<size_t>(X[0]) * X[1] * X[2] * X[3]);
+      for (size_t h = 0; h < rng.size(); h++) {
+        const auto g = host_coords(h, X, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
+        const uint64_t index = ((static_cast<uint64_t>(g[3]) * N[2] + g[2]) * N[1] + g[1]) * N[0] + g[0];
+        rng[h] = host_rng_t(host_source_rand_seed(seed, index));
+      }
+    }
+
+    // the next draw of n sources of the type on slice t0, unmasked and without a momentum: [source][site][color]
+    std::vector<std::vector<std::array<cplx, 3>>> draw(KSSourceType type, int t0, int n)
+    {
+      const auto X = local_dims();
+      std::vector<std::vector<std::array<cplx, 3>>> v(n, std::vector<std::array<cplx, 3>>(rng.size()));
+      for (size_t h = 0; h < rng.size(); h++) {
+        if (!on_slice(host_coords(h, X, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY), t0)) continue;
+        if (type == KSSourceType::RANDOM_COMPLEX_WALL) {
+          const auto z = gaussian(h);
+          const double x = 1.0 / std::sqrt(z.real() * z.real() + z.imag() * z.imag());
+          for (int c = 0; c < n; c++) v[c][h][c] = {x * z.real(), x * z.imag()};
+        } else {
+          for (int i = 0; i < n; i++) {
+            for (auto &c : v[i][h]) c = gaussian(h);
+            double magsq = 0.0;
+            for (auto &c : v[i][h]) magsq += c.real() * c.real() + c.imag() * c.imag();
+            const double x = 1.0 / std::sqrt(magsq);
+            for (auto &c : v[i][h]) c = {x * c.real(), x * c.imag()};
+          }
+        }
+      }
+      return v;
+    }
+  };
+
+  std::vector<char> host_rand_bytes()
+  {
+    auto p = reinterpret_cast<const char *>(host_rand.data());
+    return std::vector<char>(p, p + host_rand.size() * sizeof(host_rng_t));
+  }
+} // namespace
+
+class KSSourceBuildTest : public ::testing::TestWithParam<KSSourceType>
+{
+};
+
+// each of MILC's deterministic sources equals its definition, computed here from global coordinates, on time slices on
+// either side of the boundary between ranks and on every slice, with and without a momentum from a nonzero origin, in
+// double and single precision; it is exactly zero off its slice
+TEST_P(KSSourceBuildTest, deterministic)
+{
+  const auto type = GetParam();
+  if (!quda::is_enabled_spin(1)) GTEST_SKIP();
+  for (auto prec : {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION}) {
+    for (int t : test_slices()) {
+      if (type == KSSourceType::POINT && t == ks_source_all_t_slices) continue;
+      for (bool momentum : {false, true}) {
+        KSSourceParam p;
+        p.type = type;
+        p.t0 = type == KSSourceType::POINT ? 0 : t;
+        p.origin = {1, 2, 3, type == KSSourceType::POINT ? t : 0};
+        if (momentum) p.momentum = {1, -2, 3};
+        SCOPED_TRACE(ks_source_str(p) + " " + get_prec_str(prec));
+        auto f = host_sources(3, prec);
+        constructKSSources(f, p);
+        const auto r = compare(
+          f,
+          [&](int i, size_t, const coords_t &g, int c) {
+            return c == i ? definition(type, p.origin, g) * momentum_factor(p, g) : cplx(0.0);
+          },
+          [&](const coords_t &g) { return on_slice(g, type == KSSourceType::POINT ? t : p.t0); });
+        EXPECT_LE(r.max_difference, prec == QUDA_DOUBLE_PRECISION ? 1e-13 : 1e-6);
+        EXPECT_EQ(r.nonzero_off_support, 0);
+      }
+    }
+  }
+}
+
+class KSRandomSourceBuildTest : public ::testing::TestWithParam<KSSourceType>
+{
+};
+
+// the random walls: unit-norm color vectors (or unit-modulus values) on their slice and subset, zero elsewhere, with
+// the values of per-site generators seeded from the global site, so the same on every rank layout; a second build
+// continues the streams, a new seed starts others, source c doesn't depend on how many are built, and host_rand is
+// untouched
+TEST_P(KSRandomSourceBuildTest, random)
+{
+  const auto type = GetParam();
+  if (!quda::is_enabled_spin(1)) GTEST_SKIP();
+  const int n = 3;
+  const auto host_rand_before = host_rand_bytes();
+  const int T = local_dims()[3], N = global_dims()[3];
+
+  for (auto prec : {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION}) {
+    for (int t : {0, T < N ? T : T - 1, ks_source_all_t_slices}) {
+      for (auto subset : {KSSourceSubset::FULL, KSSourceSubset::CORNER}) {
+        for (bool momentum : {false, true}) {
+          KSSourceParam p;
+          p.type = type;
+          p.t0 = t;
+          p.subset = subset;
+          p.origin = {1, 2, 3, 0};
+          if (momentum) p.momentum = {1, -2, 3};
+          SCOPED_TRACE(ks_source_str(p) + " " + get_prec_str(prec));
+          const double tol = prec == QUDA_DOUBLE_PRECISION ? 1e-13 : 1e-6;
+          auto support = [&](const coords_t &g) {
+            return on_slice(g, t) && (subset == KSSourceSubset::FULL || in_corner_subset(g));
+          };
+
+          initSourceRand(p.seed);
+          ReferenceWalls reference(p.seed);
+          for (int build = 0; build < 2; build++) {
+            SCOPED_TRACE("build " + std::to_string(build));
+            const auto v = reference.draw(type, t, n);
+            auto f = host_sources(n, prec);
+            constructKSSources(f, p);
+            const auto r = compare(
+              f, [&](int i, size_t h, const coords_t &g, int c) { return v[i][h][c] * momentum_factor(p, g); }, support);
+            EXPECT_LE(r.max_difference, momentum || prec == QUDA_SINGLE_PRECISION ? tol : 0.0);
+            EXPECT_EQ(r.nonzero_off_support, 0);
+            EXPECT_LE(r.max_norm_deviation, prec == QUDA_DOUBLE_PRECISION ? 1e-14 : 1e-6);
+          }
+
+          // source 0 of a single build is source 0 of three
+          initSourceRand(p.seed);
+          const auto v = ReferenceWalls(p.seed).draw(type, t, n);
+          auto f = host_sources(1, prec);
+          constructKSSources(f, p);
+          const auto r = compare(
+            f, [&](int, size_t h, const coords_t &g, int c) { return v[0][h][c] * momentum_factor(p, g); }, support);
+          EXPECT_LE(r.max_difference, tol) << "a single source";
+          EXPECT_EQ(r.nonzero_off_support, 0) << "a single source";
+        }
+      }
+    }
+  }
+
+  // a new seed reinitializes the generator, without initSourceRand; a second build gives new values
+  KSSourceParam p;
+  p.type = type;
+  p.t0 = ks_source_all_t_slices;
+  p.seed = 99;
+  ReferenceWalls reference(p.seed);
+  for (int build = 0; build < 2; build++) {
+    const auto v = reference.draw(type, p.t0, n);
+    auto f = host_sources(n, QUDA_DOUBLE_PRECISION);
+    constructKSSources(f, p);
+    const auto r = compare(
+      f, [&](int i, size_t h, const coords_t &, int c) { return v[i][h][c]; }, [](const coords_t &) { return true; });
+    EXPECT_EQ(r.max_difference, 0.0) << "seed 99, build " << build;
+  }
+
+  EXPECT_EQ(host_rand_bytes(), host_rand_before) << "host_rand was used";
+}
+
 int main(int argc, char **argv)
 {
   quda_test test("Propagator IO Test", argc, argv);
@@ -821,6 +1115,21 @@ INSTANTIATE_TEST_SUITE_P(KS, KSSourceLoadTest,
                                 SourceKind::COMPLEX, SourceKind::COMPLEX_SLICE),
                          [](testing::TestParamInfo<SourceKind> param) {
                            return std::string(source_kind_str(param.param));
+                         });
+
+INSTANTIATE_TEST_SUITE_P(KS, KSSourceBuildTest, ::testing::ValuesIn(deterministic_ks_sources),
+                         [](testing::TestParamInfo<KSSourceType> param) {
+                           std::string name = get_ks_source_type_str(param.param);
+                           std::replace(name.begin(), name.end(), '-', '_');
+                           return name;
+                         });
+
+INSTANTIATE_TEST_SUITE_P(KS, KSRandomSourceBuildTest,
+                         Values(KSSourceType::RANDOM_COMPLEX_WALL, KSSourceType::RANDOM_COLOR_WALL),
+                         [](testing::TestParamInfo<KSSourceType> param) {
+                           std::string name = get_ks_source_type_str(param.param);
+                           std::replace(name.begin(), name.end(), '-', '_');
+                           return name;
                          });
 
 INSTANTIATE_TEST_SUITE_P(KS, StaggeredSignConventionTest,

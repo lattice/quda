@@ -47,6 +47,11 @@ extern QudaPrecision &cuda_prec_ritz;
 // Host hypercubic RNG
 extern std::vector<host_rng_t> host_rand;
 
+// Host hypercubic RNG of the built staggered sources (staggered_source_utils.h), separate from host_rand, and the
+// seed it was last initialized with
+extern std::vector<host_rng_t> host_source_rand;
+extern uint64_t host_source_seed;
+
 // Determine if we're running in multi-GPU mode
 constexpr bool is_multi_gpu()
 {
@@ -175,6 +180,20 @@ void finalizeComms();
  * are initialized
  */
 void initRand();
+
+/**
+ * @brief The seed of the generator of the site with the given global lexicographic index in host_source_rand
+ * (SplitMix64's mixing of the seed, then of its combination with the index, so that the streams are distinct from
+ * host_rand's)
+ */
+uint64_t host_source_rand_seed(uint64_t seed, uint64_t global_index);
+
+/**
+ * @brief Initialize host_source_rand on the local lattice from the seed, each site's generator from
+ * host_source_rand_seed, so that its values don't depend on the rank layout. Needs to be called after comms are
+ * initialized; host_rand is not touched
+ */
+void initSourceRand(uint64_t seed);
 
 //------------------------------------------------------
 

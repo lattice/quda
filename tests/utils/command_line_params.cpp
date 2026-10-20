@@ -1,4 +1,5 @@
 #include "command_line_params.h"
+#include "staggered_source_utils.h"
 #include <cmath>
 #include <comm_quda.h>
 
@@ -365,6 +366,11 @@ bool prop_milc_sign_convention = false;
 QudaFileFormat prop_file_format = QUDA_FILE_FORMAT_AUTO;
 QudaFileIOMode prop_file_io_mode = QUDA_FILE_IO_PARALLEL;
 std::array<int, 4> prop_file_io_partitions = {0, 0, 0, 0};
+KSSourceType prop_source_type = KSSourceType::RANDOM;
+int prop_source_t0 = 0;
+std::array<int, 3> prop_source_momentum = {0, 0, 0};
+KSSourceSubset prop_source_subset = KSSourceSubset::FULL;
+uint64_t prop_source_seed = 1234;
 
 int covdev_mu = 3;
 
@@ -498,6 +504,26 @@ namespace
 
   CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {{"parallel", QUDA_FILE_IO_PARALLEL},
                                                         {"serial", QUDA_FILE_IO_SERIAL}};
+
+  CLI::TransformPairs<KSSourceType> ks_source_type_map {{"random", KSSourceType::RANDOM},
+                                                        {"load", KSSourceType::LOAD},
+                                                        {"point", KSSourceType::POINT},
+                                                        {"corner-wall", KSSourceType::CORNER_WALL},
+                                                        {"corner-wall-x", KSSourceType::CORNER_WALL_X},
+                                                        {"corner-wall-y", KSSourceType::CORNER_WALL_Y},
+                                                        {"corner-wall-xy", KSSourceType::CORNER_WALL_XY},
+                                                        {"corner-wall-z", KSSourceType::CORNER_WALL_Z},
+                                                        {"corner-wall-zx", KSSourceType::CORNER_WALL_ZX},
+                                                        {"corner-wall-yz", KSSourceType::CORNER_WALL_YZ},
+                                                        {"corner-wall-xyz", KSSourceType::CORNER_WALL_XYZ},
+                                                        {"even-wall", KSSourceType::EVEN_WALL},
+                                                        {"evenandodd-wall", KSSourceType::EVENANDODD_WALL},
+                                                        {"evenminusodd-wall", KSSourceType::EVENMINUSODD_WALL},
+                                                        {"random-complex-wall", KSSourceType::RANDOM_COMPLEX_WALL},
+                                                        {"random-color-wall", KSSourceType::RANDOM_COLOR_WALL}};
+
+  CLI::TransformPairs<KSSourceSubset> ks_source_subset_map {{"full", KSSourceSubset::FULL},
+                                                            {"corner", KSSourceSubset::CORNER}};
 
   CLI::TransformPairs<QudaGaugeReunitarize> gauge_reunitarize_map {
     {"none", QUDA_GAUGE_REUNITARIZE_NONE},
@@ -1364,7 +1390,8 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                            "(staggered_invert_test, index 0 only)");
 
   quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(),
-                           "Save source to <file> (requires QIO)");
+                           "Save the sources (built, loaded or random) to <file> as a QUDA vector file, recording "
+                           "their staggered sign convention (staggered_invert_test, index 0 only)");
 
   // Do not check for an existing file as QUDA will append any
   // string with a dilution index: "string_<dilution_index>"
@@ -1386,7 +1413,28 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Set the number of sink smearing steps (default 0)");
 
   quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
-                         "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
+                         "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0)); in "
+                         "staggered_invert_test, index 0 is the point of a point source and the origin of "
+                         "--prop-source-momentum");
+
+  opgroup
+    ->add_option("--prop-source-type", prop_source_type,
+                 "The sources of staggered_invert_test: random (default), load (from --prop-load-source-file or "
+                 "--prop-load-sink-file), or one of MILC's sources, built as ks_spectrum defines them: point, "
+                 "corner-wall, corner-wall-x, -y, -xy, -z, -zx, -yz, -xyz, even-wall, evenandodd-wall, "
+                 "evenminusodd-wall, random-complex-wall (at most 3 sources, one per color) or random-color-wall")
+    ->transform(CLI::QUDACheckedTransformer(ks_source_type_map));
+  opgroup->add_option("--prop-source-t0", prop_source_t0,
+                      "The time slice of the built walls, or -1 for every slice (default 0)");
+  opgroup->add_option("--prop-source-momentum", prop_source_momentum,
+                      "The momentum px py pz of the built sources, in units of 2 pi / the global extent, from the "
+                      "origin --prop-source-position 0 (default 0 0 0)");
+  opgroup
+    ->add_option("--prop-source-subset", prop_source_subset,
+                 "The subset of the built random walls: full (default), or corner (x, y and z even), as MILC's")
+    ->transform(CLI::QUDACheckedTransformer(ks_source_subset_map));
+  opgroup->add_option("--prop-source-seed", prop_source_seed,
+                      "The seed of the generator of the built random walls (default 1234)");
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")

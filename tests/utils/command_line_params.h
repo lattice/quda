@@ -622,6 +622,14 @@ extern bool prop_milc_sign_convention;
 extern QudaFileFormat prop_file_format;
 extern QudaFileIOMode prop_file_io_mode;
 extern std::array<int, 4> prop_file_io_partitions;
+// defined in staggered_source_utils.h
+enum class KSSourceType : int;
+enum class KSSourceSubset : int;
+extern KSSourceType prop_source_type;
+extern int prop_source_t0;
+extern std::array<int, 3> prop_source_momentum;
+extern KSSourceSubset prop_source_subset;
+extern uint64_t prop_source_seed;
 
 extern bool enable_testing;
 
