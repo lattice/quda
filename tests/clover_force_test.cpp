@@ -130,16 +130,23 @@ std::tuple<int, double> clover_force_test(test_t param)
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gauge_param.overwrite_mom = 1;
 
+  // the non-degenerate doublet is only supported in the (two-flavor) RHMC, where there is no determinant ratio
+  // and the detratio test parameter only removes the trlog term, consistent with TMCloverForce_reference
+  bool ndeg = inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET;
+  int rhmc_flavors = ndeg ? 2 : 0;
+  bool trlog = !detratio;
+  int quda_detratio = detratio && !ndeg;
+
   if (getTuning())
     computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
-                             detratio, !detratio, 0);
+                             quda_detratio, trlog, rhmc_flavors);
 
   // Multiple execution to exclude warmup time in the first run
   double time_sec = 0.0;
   double gflops = 0.0;
   for (int i = 0; i < niter; i++) {
     computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
-                             detratio, !detratio, 0);
+                             quda_detratio, trlog, rhmc_flavors);
     time_sec += inv_param.secs;
     gflops += inv_param.gflops;
   }

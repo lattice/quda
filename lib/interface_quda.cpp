@@ -4889,9 +4889,13 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   updateExtendedGaugeResident(false, R, profileTMCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
+  // Normalization of the tr log term relative to tmLQCD (sw_deriv): for mu -> 0 the twisted branch of
+  // computeCloverSigmaTrace yields 1/4 * A^{-1}, the non-twisted branch yields A^{-1}, while tmLQCD yields
+  // 1 * A^{-1} for two flavors and 0.5 * A^{-1} for a single flavor. The coefficient 32 matches tmLQCD for
+  // the twisted case (32 * 1/4 = 8), hence the single flavor case, which uses the non-twisted clover
+  // operator, requires 8 * 1/2 = 4.
   computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
-                     k_csw_ov_8 * 4.0 * (rhmc_flavors==1 ? 1 : 8), detratio, trlog, rhmc_flavors, *inv_param);
-  // for the single flavor rhmc case we need a factor 1/8 for the trlog term
+                     k_csw_ov_8 * 4.0 * (rhmc_flavors == 1 ? 1 : 8), detratio, trlog, rhmc_flavors, *inv_param);
 
   if (gauge_param->return_result_mom) cpuMom.copy(gpuMom);
   if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)
