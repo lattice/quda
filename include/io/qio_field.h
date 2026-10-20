@@ -21,9 +21,16 @@ std::vector<quda::scidac::FieldChecksum> read_spinor_field(const char *filename,
                                                            QudaSiteSubset subset, int nColor, int nSpin, bool milc,
                                                            QudaFileIOMode io_mode,
                                                            const std::array<int, 4> &io_partition_grid);
-// writes one record per host field, with the metadata of quda::scidac::vector_records
+// writes one record per host field, with the metadata of quda::scidac::vector_records (or any records of
+// quda::scidac::FieldMetadata: those with a box are written as hypercube records)
 std::vector<quda::io::Checksum> write_spinor_field(const char *filename, const quda::scidac::VectorRecords &records,
                                                    const std::vector<quda::io::HostField> &fields, const int *X,
                                                    QudaSiteSubset subset, bool partfile, QudaFileIOMode io_mode,
                                                    const std::array<int, 4> &io_partition_grid);
+// reads the first records of a staggered source or KS propagator file on the full lattice, one per host field of
+// one item (those of records not to be loaded have null arrays); hypercube records fill only their boxes
+std::vector<quda::scidac::FieldChecksum> read_ks_fields(const char *filename,
+                                                        const std::vector<quda::io::HostField> &fields, const int *X,
+                                                        QudaFileIOMode io_mode,
+                                                        const std::array<int, 4> &io_partition_grid);
 #endif

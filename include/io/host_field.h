@@ -18,6 +18,9 @@ namespace quda
        the 4-d slices of a full 5-d vector (see host_field() in
        vector_io.cpp for which fields need which).  A null array holds
        no sites: they are skipped on unpacking and packed as zeros.
+       Consecutive sites of an item are stride reals apart in memory,
+       which is more than its reals per site when the item is part of
+       each site's data, e.g. one color of a 3-color vector.
      */
     class HostField
     {
@@ -26,6 +29,7 @@ namespace quda
       size_t half_volume = 0;         // for two-array items, the local 4-d half volume
       QudaPrecision prec;
       int reals;
+      int stride; // reals from one site to the next in the arrays
 
     public:
       /**
@@ -33,13 +37,14 @@ namespace quda
          @param[in] n Number of items
          @param[in] prec Precision of the arrays (double or single)
          @param[in] reals Reals per item and site
+         @param[in] stride Reals from one site to the next in the arrays; 0 means reals
        */
-      HostField(void *const arrays[], int n, QudaPrecision prec, int reals);
+      HostField(void *const arrays[], int n, QudaPrecision prec, int reals, int stride = 0);
 
       /**
          @brief A field that is only packed (saved), never unpacked
        */
-      HostField(const void *const arrays[], int n, QudaPrecision prec, int reals);
+      HostField(const void *const arrays[], int n, QudaPrecision prec, int reals, int stride = 0);
 
       /**
          @brief Items given by their even and their odd sites: host
@@ -51,14 +56,16 @@ namespace quda
          @param[in] prec Precision of the arrays (double or single)
          @param[in] reals Reals per item and site
          @param[in] half_volume The local 4-d half volume
+         @param[in] stride Reals from one site to the next in the arrays; 0 means reals
        */
-      HostField(void *const even[], void *const odd[], int n, QudaPrecision prec, int reals, size_t half_volume);
+      HostField(void *const even[], void *const odd[], int n, QudaPrecision prec, int reals, size_t half_volume,
+                int stride = 0);
 
       /**
          @brief Items given by their even and their odd sites that are only packed (saved), never unpacked
        */
       HostField(const void *const even[], const void *const odd[], int n, QudaPrecision prec, int reals,
-                size_t half_volume);
+                size_t half_volume, int stride = 0);
 
       /**
          @brief Number of items

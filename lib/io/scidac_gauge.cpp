@@ -32,6 +32,7 @@ namespace quda
     {
       io::HostField field(gauge, n_dim, prec, matrix_reals);
       auto records = find_field(filename);
+      check_no_hypercube(records, 1);
       const auto &m = records.fields[0].metadata;
       if (m.datacount != n_dim)
         errorQuda("The datacount %d of %s does not match the expected number of fields %d", m.datacount,

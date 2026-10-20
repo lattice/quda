@@ -4,12 +4,14 @@ target_sources(
   PRIVATE field_io.cpp
           gauge_io.cpp
           host_field.cpp
+          ks_io.cpp
           lime.cpp
           milc_common.cpp
           milc_gauge.cpp
           reunitarize.cpp
           scidac_common.cpp
           scidac_gauge.cpp
+          scidac_ks.cpp
           scidac_vector.cpp
           site_io.cpp
           vector_io.cpp)

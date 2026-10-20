@@ -127,11 +127,38 @@ namespace quda
       }
     } // namespace
 
-    std::string record_info_xml(const std::string &datatype, QudaPrecision prec, int colors, int spins, int typesize,
-                                int datacount)
+    std::string hypercube_str(const io::Hypercube &box)
     {
-      std::string tags = element("version", "1.1") + element("date", record_date()) + element("recordtype", 0)
-        + element("datatype", datatype) + element("precision", prec == QUDA_DOUBLE_PRECISION ? "D" : "F");
+      char buf[128];
+      snprintf(buf, sizeof(buf), "%d %d %d %d .. %d %d %d %d", box.lower[0], box.lower[1], box.lower[2], box.lower[3],
+               box.upper[0], box.upper[1], box.upper[2], box.upper[3]);
+      return buf;
+    }
+
+    namespace
+    {
+      // the record types of QIO's private record XML
+      constexpr int field_recordtype = 0;
+      constexpr int hypercube_recordtype = 2;
+
+      // an integer list as QIO writes it, each integer followed by a space
+      std::string int_list(const std::array<int, 4> &values)
+      {
+        std::string s;
+        for (auto v : values) s += std::to_string(v) + " ";
+        return s;
+      }
+    } // namespace
+
+    std::string record_info_xml(const std::string &datatype, QudaPrecision prec, int colors, int spins, int typesize,
+                                int datacount, const std::optional<io::Hypercube> &hypercube)
+    {
+      std::string tags = element("version", "1.1") + element("date", record_date())
+        + element("recordtype", hypercube ? hypercube_recordtype : field_recordtype);
+      if (hypercube)
+        tags += element("spacetime", 4) + element("hyperlower", int_list(hypercube->lower))
+          + element("hyperupper", int_list(hypercube->upper));
+      tags += element("datatype", datatype) + element("precision", prec == QUDA_DOUBLE_PRECISION ? "D" : "F");
       if (colors != 0) tags += element("colors", colors);
       if (spins != 0) tags += element("spins", spins);
       if (typesize != 0) tags += element("typesize", typesize);
@@ -306,16 +333,74 @@ namespace quda
       return nullptr;
     }
 
+    namespace
+    {
+      // whether <filename> and the first volume of a partfile of that name exist, decided on rank 0
+      std::array<int, 2> files_named(const std::string &filename)
+      {
+        std::array<int, 2> exists = {0, 0};
+        if (comm_rank() == 0) {
+          exists[0] = access(filename.c_str(), F_OK) == 0;
+          exists[1] = access(volume_name(filename, 0).c_str(), F_OK) == 0;
+        }
+        comm_broadcast(exists.data(), sizeof(exists));
+        return exists;
+      }
+    } // namespace
+
+    bool partfile_named(const std::string &filename)
+    {
+      const auto exists = files_named(filename);
+      return !exists[0] && exists[1];
+    }
+
+    namespace
+    {
+      /**
+         @brief The box of a hypercube record from its private record XML: <hyperlower> and <hyperupper> of four
+         integers each, within the lattice, after a <spacetime> of 4 if there is one
+       */
+      io::Hypercube parse_hypercube(const std::string &record_info, const std::array<int, 4> &dims,
+                                    const std::string &what)
+      {
+        auto spacetime = xml_value(record_info, "spacetime");
+        if (spacetime && std::strtol(spacetime->c_str(), nullptr, 10) != 4)
+          errorQuda("%s is a hypercube record with <spacetime>%s</spacetime>, but only 4-d records are supported",
+                    what.c_str(), spacetime->c_str());
+        io::Hypercube box;
+        for (auto [tag, bound] : {std::pair {"hyperlower", &box.lower}, std::pair {"hyperupper", &box.upper}}) {
+          auto value = xml_value(record_info, tag);
+          if (!value) errorQuda("%s is a hypercube record without a <%s> element", what.c_str(), tag);
+          std::istringstream in(*value);
+          std::string extra;
+          for (auto &n : *bound)
+            if (!(in >> n)) errorQuda("The <%s> of %s, a hypercube record, is not 4 integers", tag, what.c_str());
+          if (in >> extra) errorQuda("The <%s> of %s, a hypercube record, is not 4 integers", tag, what.c_str());
+        }
+        for (int d = 0; d < 4; d++)
+          if (box.lower[d] < 0 || box.lower[d] > box.upper[d] || box.upper[d] >= dims[d])
+            errorQuda("%s is a hypercube record of the sites %s, which are not a box of the lattice %d %d %d %d",
+                      what.c_str(), hypercube_str(box).c_str(), dims[0], dims[1], dims[2], dims[3]);
+        return box;
+      }
+    } // namespace
+
+    void check_no_hypercube(const FieldRecords &records, int n)
+    {
+      const auto count = n < 0 ? records.fields.size() : std::min(records.fields.size(), static_cast<size_t>(n));
+      for (auto k = 0u; k < count; k++) {
+        const auto &box = records.fields[k].metadata.hypercube;
+        if (box)
+          errorQuda("Binary record %u of %s is a hypercube record (sites %s), which only staggered source files hold",
+                    k, records.file.c_str(), hypercube_str(*box).c_str());
+      }
+    }
+
     FieldRecords find_field(const std::string &filename)
     {
       FieldRecords f;
       f.filename = filename;
-      int exists[2] = {0, 0}; // <filename>, and the first volume of a partfile of that name
-      if (comm_rank() == 0) {
-        exists[0] = access(filename.c_str(), F_OK) == 0;
-        exists[1] = access(volume_name(filename, 0).c_str(), F_OK) == 0;
-      }
-      comm_broadcast(exists, sizeof(exists));
+      const auto exists = files_named(filename);
       const bool partfile_name = !exists[0] && exists[1];
       if (exists[0] && exists[1])
         warningQuda("Loading %s rather than the partfile volumes %s...: as in QIO, a file of the name given comes "
@@ -408,6 +493,7 @@ namespace quda
 
       for (auto k = 0u; k < found.size(); k++) {
         FieldRecord r;
+        r.index = k;
         r.data = (*found[k].records)[found[k].data];
         auto &m = r.metadata;
         m.ildg = has_ildg_format[k];
@@ -418,10 +504,14 @@ namespace quda
           if (index.private_record < 0)
             errorQuda("%s has no %s record for its binary data", what.c_str(), private_record_xml);
           const auto record_info = text(index.private_record);
-          // version 1.0 records give <globaldata>, version 1.1 records <recordtype>; 0 means a lattice field
+          // version 1.0 records give <globaldata>, version 1.1 records <recordtype>; 0 means a lattice field, 2 a
+          // hypercube (a box of the lattice)
           auto recordtype = xml_value(record_info, "recordtype");
           if (!recordtype) recordtype = xml_value(record_info, "globaldata");
-          if (recordtype && std::strtol(recordtype->c_str(), nullptr, 10) != 0)
+          const long type = recordtype ? std::strtol(recordtype->c_str(), nullptr, 10) : field_recordtype;
+          if (type == hypercube_recordtype)
+            m.hypercube = parse_hypercube(record_info, f.dims, what);
+          else if (type != field_recordtype)
             errorQuda("The binary data of %s is not a lattice field (record type %s)", what.c_str(), recordtype->c_str());
           m.datatype = xml_value(record_info, "datatype").value_or("");
           m.prec
@@ -839,7 +929,8 @@ namespace quda
                   single_parity(parity) ? " (half the global x extent, as single-parity fields are stored)" : "");
 
       auto what = [&](size_t k) {
-        return records.fields.size() > 1 ? "binary record " + std::to_string(k) + " of " + file : file;
+        const auto index = records.fields[k].index;
+        return records.fields.size() > 1 || index > 0 ? "binary record " + std::to_string(index) + " of " + file : file;
       };
       std::vector<io::DataLayout> layouts;
       for (auto k = 0u; k < fields.size(); k++) {
@@ -853,6 +944,9 @@ namespace quda
 
       const io::Partitions partitions(param.io_mode, param.io_partition_grid);
       const bool partfile = records.volfmt == partfile_volfmt;
+      for (auto k = 0u; partfile && k < fields.size(); k++)
+        if (records.fields[k].metadata.hypercube)
+          errorQuda("%s is a hypercube record in a partfile, which is not supported", what(k).c_str());
       std::vector<std::vector<io::FilePart>> volumes;
       if (partfile && !fields.empty()) {
         for (auto k = 1u; k < layouts.size(); k++)
@@ -870,11 +964,12 @@ namespace quda
         if (partfile) {
           c.sum = io::read_data(volumes[k], layouts[k], X, partitions, unpack);
         } else {
-          const auto bytes = io::data_bytes(layouts[k], io::global_dims(X));
+          const auto &box = r.metadata.hypercube;
+          const auto bytes = box ? box->volume() * layouts[k].site_bytes : io::data_bytes(layouts[k], io::global_dims(X));
           if (r.data.data_bytes != bytes)
-            errorQuda("The binary data of %s is %lu bytes, but should be %lu bytes", what(k).c_str(), r.data.data_bytes,
-                      bytes);
-          c.sum = io::read_data(file, layouts[k], X, partitions, unpack);
+            errorQuda("The binary data of %s is %lu bytes, but should be %lu bytes%s", what(k).c_str(),
+                      r.data.data_bytes, bytes, box ? (" for the sites " + hypercube_str(*box)).c_str() : "");
+          c.sum = io::read_data(file, layouts[k], X, partitions, unpack, box ? &*box : nullptr);
         }
 
         // as in QIO, a SciDAC file must have a checksum, while ILDG files from other codes have none
@@ -903,8 +998,11 @@ namespace quda
         errorQuda("%lu metadata records for %lu fields in %s", metadata.size(), fields.size(), filename.c_str());
 
       // as QIO, a partfile on one rank is a single file
-      if (param.partfile && (comm_size() > 1 || param.partfile_grid != std::array<int, 4> {}))
+      if (param.partfile && (comm_size() > 1 || param.partfile_grid != std::array<int, 4> {})) {
+        for (auto &m : metadata)
+          if (m.hypercube) errorQuda("%s: hypercube records cannot be saved in partfiles", filename.c_str());
         return write_partfile(filename, user_file_xml, metadata, fields, X, parity, param);
+      }
 
       // checks the grid before rank 0 truncates the file
       const io::Partitions partitions(param.io_mode, param.io_partition_grid);
@@ -924,11 +1022,13 @@ namespace quda
       for (auto k = 0u; k < fields.size(); k++) {
         const auto &m = metadata[k];
         auto layout = field_layout(fields[k], m.prec, 0, parity);
-        const size_t bytes = io::data_bytes(layout, io::global_dims(X));
+        const auto box = m.hypercube ? &*m.hypercube : nullptr;
+        const size_t bytes = box ? box->volume() * layout.site_bytes : io::data_bytes(layout, io::global_dims(X));
         uint64_t data_offset = 0;
         if (comm_rank() == 0) {
           writer->write(private_record_xml,
-                        record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount), true, false);
+                        record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount, m.hypercube),
+                        true, false);
           writer->write(record_xml, m.user_xml, false, false);
           if (m.ildg) {
             writer->write(ildg_format, ildg_format_xml(m.prec, N), false, false);
@@ -939,7 +1039,7 @@ namespace quda
         comm_broadcast(&data_offset, sizeof(data_offset));
         layout.offset = data_offset;
 
-        auto sum = io::write_data(filename, layout, X, partitions, fields[k].packer(m.prec));
+        auto sum = io::write_data(filename, layout, X, partitions, fields[k].packer(m.prec), box);
         if (comm_rank() == 0) writer->write(checksum, checksum_xml(sum.sum29, sum.sum31), false, true);
         sums.push_back(sum);
       }

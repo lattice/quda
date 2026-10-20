@@ -16,6 +16,13 @@ namespace quda
           errorQuda("Unsupported %s precision %d", what, prec);
       }
 
+      int check_stride(int reals, int stride)
+      {
+        if (stride == 0) return reals;
+        if (stride < reals) errorQuda("A host field of %d reals per site cannot have a stride of %d", reals, stride);
+        return stride;
+      }
+
       std::vector<void *> to_vector(const void *const arrays[], int n)
       {
         std::vector<void *> v(n);
@@ -37,12 +44,12 @@ namespace quda
 
       template <typename Host, typename Stored>
       void unpack_site(const std::vector<void *> &arrays, const std::vector<void *> &odd_arrays, size_t half_volume,
-                       int reals, size_t index, const char *site)
+                       int reals, int stride, size_t index, const char *site)
       {
         const auto &a = site_arrays(arrays, odd_arrays, half_volume, index);
         for (auto i = 0u; i < a.size(); i++) {
           if (!a[i]) continue;
-          auto dst = static_cast<Host *>(a[i]) + index * reals;
+          auto dst = static_cast<Host *>(a[i]) + index * stride;
           for (int j = 0; j < reals; j++) {
             Stored value;
             memcpy(&value, site + (i * reals + j) * sizeof(Stored), sizeof(Stored));
@@ -53,7 +60,7 @@ namespace quda
 
       template <typename Host, typename Stored>
       void pack_site(const std::vector<void *> &arrays, const std::vector<void *> &odd_arrays, size_t half_volume,
-                     int reals, size_t index, char *site)
+                     int reals, int stride, size_t index, char *site)
       {
         const auto &a = site_arrays(arrays, odd_arrays, half_volume, index);
         for (auto i = 0u; i < a.size(); i++) {
@@ -61,7 +68,7 @@ namespace quda
             memset(site + i * reals * sizeof(Stored), 0, reals * sizeof(Stored));
             continue;
           }
-          auto src = static_cast<const Host *>(a[i]) + index * reals;
+          auto src = static_cast<const Host *>(a[i]) + index * stride;
           for (int j = 0; j < reals; j++) {
             Stored value = src[j];
             memcpy(site + (i * reals + j) * sizeof(Stored), &value, sizeof(Stored));
@@ -89,27 +96,38 @@ namespace quda
       return f;
     }
 
-    HostField::HostField(void *const arrays[], int n, QudaPrecision prec, int reals) :
-      arrays(arrays, arrays + n), prec(prec), reals(reals)
+    HostField::HostField(void *const arrays[], int n, QudaPrecision prec, int reals, int stride) :
+      arrays(arrays, arrays + n), prec(prec), reals(reals), stride(check_stride(reals, stride))
     {
       check_precision(prec, "host field");
     }
 
-    HostField::HostField(const void *const arrays[], int n, QudaPrecision prec, int reals) :
-      arrays(to_vector(arrays, n)), prec(prec), reals(reals)
+    HostField::HostField(const void *const arrays[], int n, QudaPrecision prec, int reals, int stride) :
+      arrays(to_vector(arrays, n)), prec(prec), reals(reals), stride(check_stride(reals, stride))
     {
       check_precision(prec, "host field");
     }
 
-    HostField::HostField(void *const even[], void *const odd[], int n, QudaPrecision prec, int reals, size_t half_volume) :
-      arrays(even, even + n), odd_arrays(odd, odd + n), half_volume(half_volume), prec(prec), reals(reals)
+    HostField::HostField(void *const even[], void *const odd[], int n, QudaPrecision prec, int reals,
+                         size_t half_volume, int stride) :
+      arrays(even, even + n),
+      odd_arrays(odd, odd + n),
+      half_volume(half_volume),
+      prec(prec),
+      reals(reals),
+      stride(check_stride(reals, stride))
     {
       check_precision(prec, "host field");
     }
 
     HostField::HostField(const void *const even[], const void *const odd[], int n, QudaPrecision prec, int reals,
-                         size_t half_volume) :
-      arrays(to_vector(even, n)), odd_arrays(to_vector(odd, n)), half_volume(half_volume), prec(prec), reals(reals)
+                         size_t half_volume, int stride) :
+      arrays(to_vector(even, n)),
+      odd_arrays(to_vector(odd, n)),
+      half_volume(half_volume),
+      prec(prec),
+      reals(reals),
+      stride(check_stride(reals, stride))
     {
       check_precision(prec, "host field");
     }
@@ -120,8 +138,8 @@ namespace quda
       auto f = prec == QUDA_DOUBLE_PRECISION ?
         (file_prec == QUDA_DOUBLE_PRECISION ? unpack_site<double, double> : unpack_site<double, float>) :
         (file_prec == QUDA_DOUBLE_PRECISION ? unpack_site<float, double> : unpack_site<float, float>);
-      return [arrays = arrays, odd_arrays = odd_arrays, half_volume = half_volume, reals = reals,
-              f](int, size_t index, const char *site) { f(arrays, odd_arrays, half_volume, reals, index, site); };
+      return [arrays = arrays, odd_arrays = odd_arrays, half_volume = half_volume, reals = reals, stride = stride, f](
+               int, size_t index, const char *site) { f(arrays, odd_arrays, half_volume, reals, stride, index, site); };
     }
 
     SitePack HostField::packer(QudaPrecision file_prec) const
@@ -130,8 +148,8 @@ namespace quda
       auto f = prec == QUDA_DOUBLE_PRECISION ?
         (file_prec == QUDA_DOUBLE_PRECISION ? pack_site<double, double> : pack_site<double, float>) :
         (file_prec == QUDA_DOUBLE_PRECISION ? pack_site<float, double> : pack_site<float, float>);
-      return [arrays = arrays, odd_arrays = odd_arrays, half_volume = half_volume, reals = reals,
-              f](int, size_t index, char *site) { f(arrays, odd_arrays, half_volume, reals, index, site); };
+      return [arrays = arrays, odd_arrays = odd_arrays, half_volume = half_volume, reals = reals, stride = stride,
+              f](int, size_t index, char *site) { f(arrays, odd_arrays, half_volume, reals, stride, index, site); };
     }
 
   } // namespace io

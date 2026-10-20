@@ -79,6 +79,27 @@ namespace quda
     };
 
     /**
+       @brief A box of a file's lattice with inclusive bounds, as QIO's
+       hypercube records give it: the sites with lower[d] <= x[d] <=
+       upper[d], in the stored coordinates of the file's lattice
+     */
+    struct Hypercube {
+      std::array<int, 4> lower {};
+      std::array<int, 4> upper {};
+
+      /** Number of sites in the box */
+      size_t volume() const
+      {
+        size_t v = 1;
+        for (int d = 0; d < 4; d++) v *= upper[d] - lower[d] + 1;
+        return v;
+      }
+
+      bool operator==(const Hypercube &other) const { return lower == other.lower && upper == other.upper; }
+      bool operator!=(const Hypercube &other) const { return !(*this == other); }
+    };
+
+    /**
        @brief Called for each local site with the site's data in native byte order.
        @param[in] block The block (vector) index
        @param[in] index The QUDA host checkerboard index of the site: even
@@ -260,31 +281,38 @@ namespace quda
        @param[in] X The local lattice dimensions
        @param[in] partitions Which ranks open the file, and for which ranks they read
        @param[in] unpack Called for each local site of each block
+       @param[in] region The box of the lattice the file holds, in
+       lexicographic order within the box; null for the whole lattice.
+       A rank's sites outside it are not unpacked, and a rank holding
+       none of it sends and receives nothing.  The checksum's site
+       index is still the site's index in the whole lattice.
        @return The checksum of the data section, combined over all ranks
      */
     Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X,
-                       const Partitions &partitions, const SiteUnpack &unpack);
+                       const Partitions &partitions, const SiteUnpack &unpack, const Hypercube *region = nullptr);
 
     /**
        @brief Read the data section of a field stored in several files,
        each holding a box of the lattice.  The boxes must tile the
-       lattice.  Each partition's leader reads, for every rank in its
-       partition, the rank's overlap with each file, and sends it to
-       the rank.  A leader keeps at most a few dozen files open at once.
+       region (the lattice, by default).  Each partition's leader reads,
+       for every rank in its partition, the rank's overlap with each
+       file, and sends it to the rank.  A leader keeps at most a few
+       dozen files open at once.
        @param[in] parts The files; their offsets replace layout.offset
      */
     Checksum read_data(const std::vector<FilePart> &parts, const DataLayout &layout, const int *X,
-                       const Partitions &partitions, const SiteUnpack &unpack);
+                       const Partitions &partitions, const SiteUnpack &unpack, const Hypercube *region = nullptr);
 
     /**
        @brief Write the data section of a file.  The file must already
        exist (rank 0 creates it and writes everything else beforehand).
        Each partition's leader receives the sites of every rank in its
        partition and writes them.
+       @param[in] region The box of the lattice to write, as for read_data; a rank's sites outside it are not packed
        @return The checksum of the data section, combined over all ranks
      */
     Checksum write_data(const std::string &filename, const DataLayout &layout, const int *X,
-                        const Partitions &partitions, const SitePack &pack);
+                        const Partitions &partitions, const SitePack &pack, const Hypercube *region = nullptr);
 
     /**
        @brief Write the data section of a field stored in several files,
@@ -292,10 +320,10 @@ namespace quda
        with everything but the data written.  Each partition's leader
        receives the sites of every rank in its partition and writes the
        rank's overlap with each file.
-       @param[in] parts The files; their offsets replace layout.offset
+       @param[in] parts The files, which must tile the region; their offsets replace layout.offset
      */
     Checksum write_data(const std::vector<FilePart> &parts, const DataLayout &layout, const int *X,
-                        const Partitions &partitions, const SitePack &pack);
+                        const Partitions &partitions, const SitePack &pack, const Hypercube *region = nullptr);
 
     /**
        @brief Report a checksum mismatch: a warning if allowed, otherwise an error

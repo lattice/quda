@@ -209,7 +209,19 @@ namespace quda
       using coords_t = std::array<int, 4>;
 
       /**
-         @brief Where each rank's sites are in the lattice and the files, and in QUDA's host ordering
+         @brief A box of stored sites, [lo, hi) in each dimension
+       */
+      struct Box {
+        coords_t lo;
+        coords_t hi;
+
+        size_t extent(int d) const { return hi[d] - lo[d]; }
+        size_t volume() const { return extent(0) * extent(1) * extent(2) * extent(3); }
+      };
+
+      /**
+         @brief Where each rank's sites of the region are in the lattice and the files, and in QUDA's host ordering.
+         A rank's buffer holds its sites of the region in file order: its box of the region in lexicographic order.
        */
       struct Geometry {
         const DataLayout &layout;
@@ -217,13 +229,12 @@ namespace quda
         coords_t N;
         coords_t L; // stored local dimensions: X with the x extent halved when a single parity is stored
         coords_t S; // stored global dimensions
+        Box region; // the stored sites the files hold
         bool single_parity;
         size_t volume;     // local sites
-        size_t row_sites;  // stored sites per local x row
-        size_t n_row;      // local x rows
         size_t file_sites; // stored sites per block in the lattice
 
-        Geometry(const DataLayout &layout, const int *X_) :
+        Geometry(const DataLayout &layout, const int *X_, const Hypercube *box) :
           layout(layout), single_parity(layout.parity == QUDA_EVEN_PARITY || layout.parity == QUDA_ODD_PARITY)
         {
           for (int d = 0; d < 4; d++) X[d] = X_[d];
@@ -235,34 +246,49 @@ namespace quda
           if (layout.n_block > 1 && layout.checksum == ChecksumType::SCIDAC)
             errorQuda("A SciDAC checksum covers one record; read or write each record with its own call");
           volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
-          row_sites = single_parity ? X[0] / 2 : X[0];
-          n_row = static_cast<size_t>(X[1]) * X[2] * X[3];
           L = X;
           S = N;
-          L[0] = row_sites;
-          if (single_parity) S[0] /= 2;
+          if (single_parity) {
+            L[0] /= 2;
+            S[0] /= 2;
+          }
           file_sites = static_cast<size_t>(S[0]) * S[1] * S[2] * S[3];
+          region = {{}, S};
+          if (box) {
+            for (int d = 0; d < 4; d++)
+              if (box->lower[d] < 0 || box->lower[d] > box->upper[d] || box->upper[d] >= S[d])
+                errorQuda("The hypercube %d %d %d %d .. %d %d %d %d is not a box of the lattice %d %d %d %d",
+                          box->lower[0], box->lower[1], box->lower[2], box->lower[3], box->upper[0], box->upper[1],
+                          box->upper[2], box->upper[3], S[0], S[1], S[2], S[3]);
+            region.lo = box->lower;
+            for (int d = 0; d < 4; d++) region.hi[d] = box->upper[d] + 1;
+          }
         }
 
-        size_t row_bytes() const { return row_sites * layout.site_bytes; }
-        size_t local_bytes() const { return n_row * row_bytes(); }
-
         /**
-           @brief The global lexicographic index, in stored sites, of the first site of local row r on the rank at c
+           @brief The stored sites of the rank at c in the region (empty if it holds none)
          */
-        size_t row_site_index(const coords_t &c, size_t r) const
+        Box local_box(const coords_t &c) const
         {
-          size_t y = c[1] * X[1] + r % X[1];
-          size_t z = c[2] * X[2] + (r / X[1]) % X[2];
-          size_t t = c[3] * X[3] + r / (static_cast<size_t>(X[1]) * X[2]);
-          size_t g = c[0] * X[0] + N[0] * (y + N[1] * (z + N[2] * t));
-          return single_parity ? g / 2 : g;
+          Box b;
+          for (int d = 0; d < 4; d++) {
+            b.lo[d] = std::max(c[d] * L[d], region.lo[d]);
+            b.hi[d] = std::max(b.lo[d], std::min((c[d] + 1) * L[d], region.hi[d]));
+          }
+          return b;
         }
 
+        size_t local_bytes(const coords_t &c) const { return local_box(c).volume() * layout.site_bytes; }
+
         /**
-           @brief The part holding the whole lattice in one file
+           @brief The part holding the region in one file
          */
-        FilePart whole_lattice(const std::string &filename) const { return {filename, layout.offset, {}, S}; }
+        FilePart whole_region(const std::string &filename) const
+        {
+          FilePart part = {filename, layout.offset, region.lo, {}};
+          for (int d = 0; d < 4; d++) part.extent[d] = region.extent(d);
+          return part;
+        }
 
         size_t file_offset(const FilePart &part, int block, size_t file_index) const
         {
@@ -277,10 +303,11 @@ namespace quda
          */
         template <typename F> size_t for_each_run(const coords_t &c, const FilePart &part, F &&f) const
         {
+          const auto b = local_box(c);
           coords_t lo, hi;
           for (int d = 0; d < 4; d++) {
-            lo[d] = std::max(c[d] * L[d], part.corner[d]);
-            hi[d] = std::min((c[d] + 1) * L[d], part.corner[d] + part.extent[d]);
+            lo[d] = std::max(b.lo[d], part.corner[d]);
+            hi[d] = std::min(b.hi[d], part.corner[d] + part.extent[d]);
             if (lo[d] >= hi[d]) return 0;
           }
           const auto &P = part.corner;
@@ -290,9 +317,8 @@ namespace quda
           for (int t = lo[3]; t < hi[3]; t++) {
             for (int z = lo[2]; z < hi[2]; z++) {
               for (int y = lo[1]; y < hi[1]; y++) {
-                size_t row
-                  = (y - c[1] * L[1]) + L[1] * ((z - c[2] * L[2]) + static_cast<size_t>(L[2]) * (t - c[3] * L[3]));
-                size_t buffer_site = row * L[0] + (lo[0] - c[0] * L[0]);
+                size_t row = (y - b.lo[1]) + b.extent(1) * ((z - b.lo[2]) + b.extent(2) * (t - b.lo[3]));
+                size_t buffer_site = row * b.extent(0) + (lo[0] - b.lo[0]);
                 size_t file_index
                   = (lo[0] - P[0]) + E[0] * ((y - P[1]) + E[1] * ((z - P[2]) + static_cast<size_t>(E[2]) * (t - P[3])));
                 if (run_sites > 0 && buffer_site == run_buffer + run_sites && file_index == run_file + run_sites) {
@@ -312,19 +338,27 @@ namespace quda
         }
 
         /**
-           @brief Call f(index, position) for each local site, where index is the QUDA host index
+           @brief Call f(index, position) for each local site in the region, where index is the QUDA host index
            and position is the site's place in the rank's buffer (in file order)
          */
         template <typename F> void for_each_site(const coords_t &c, F &&f) const
         {
-          for (size_t r = 0; r < n_row; r++) {
-            int y = r % X[1], z = (r / X[1]) % X[2], t = r / (static_cast<size_t>(X[1]) * X[2]);
-            int base = (c[0] * X[0] + c[1] * X[1] + y + c[2] * X[2] + z + c[3] * X[3] + t) & 1;
-            for (size_t k = 0; k < row_sites; k++) {
-              size_t x = single_parity ? 2 * k + ((layout.parity ^ base) & 1) : k;
-              size_t lex = x + X[0] * r;
-              size_t parity = (base + x) & 1;
-              f(single_parity ? lex / 2 : lex / 2 + parity * (volume / 2), r * row_sites + k);
+          const auto b = local_box(c);
+          if (b.volume() == 0) return;
+          size_t position = 0;
+          for (int t = b.lo[3]; t < b.hi[3]; t++) {
+            for (int z = b.lo[2]; z < b.hi[2]; z++) {
+              for (int y = b.lo[1]; y < b.hi[1]; y++) {
+                const size_t r
+                  = (y - c[1] * X[1]) + X[1] * ((z - c[2] * X[2]) + static_cast<size_t>(X[2]) * (t - c[3] * X[3]));
+                const int base = (c[0] * X[0] + y + z + t) & 1;
+                for (int k = b.lo[0] - c[0] * L[0]; k < b.hi[0] - c[0] * L[0]; k++) {
+                  size_t x = single_parity ? 2 * k + ((layout.parity ^ base) & 1) : k;
+                  size_t lex = x + X[0] * r;
+                  size_t parity = (base + x) & 1;
+                  f(single_parity ? lex / 2 : lex / 2 + parity * (volume / 2), position++);
+                }
+              }
             }
           }
         }
@@ -448,8 +482,9 @@ namespace quda
                    g.file_offset(parts[i], block, file_index));
           });
         }
-        if (sites != g.n_row * g.row_sites)
-          errorQuda("The files hold %lu of the %lu sites of the rank at %d %d %d %d", sites, g.n_row * g.row_sites,
+        const size_t expected = g.local_box(c).volume();
+        if (sites != expected)
+          errorQuda("The files hold %lu of the %lu sites of the rank at %d %d %d %d in the region", sites, expected,
                     c[0], c[1], c[2], c[3]);
       }
 
@@ -472,16 +507,24 @@ namespace quda
       void checksum_rows(Checksum &sum, const Geometry &g, const coords_t &c, int block, const char *buffer)
       {
         const auto &layout = g.layout;
+        const auto b = g.local_box(c);
+        const size_t row_sites = b.extent(0), row_bytes = row_sites * layout.site_bytes;
+        const size_t n_row = b.extent(1) * b.extent(2) * b.extent(3);
+        const auto &S = g.S;
         uint32_t sum29 = 0, sum31 = 0;
 #pragma omp parallel for reduction(^ : sum29, sum31)
-        for (size_t r = 0; r < g.n_row; r++) {
+        for (size_t r = 0; r < n_row; r++) {
           Checksum row;
-          const char *data = buffer + r * g.row_bytes();
-          size_t first_site = block * g.file_sites + g.row_site_index(c, r);
+          const char *data = buffer + r * row_bytes;
+          const size_t y = b.lo[1] + r % b.extent(1);
+          const size_t z = b.lo[2] + (r / b.extent(1)) % b.extent(2);
+          const size_t t = b.lo[3] + r / (b.extent(1) * b.extent(2));
+          // the site's index in the whole lattice, also for a record of a box of it
+          size_t first_site = block * g.file_sites + b.lo[0] + S[0] * (y + S[1] * (z + S[2] * t));
           if (layout.checksum == ChecksumType::MILC)
-            accumulate(row, layout, data, g.row_bytes() / 4, first_site * layout.site_bytes / 4);
+            accumulate(row, layout, data, row_bytes / 4, first_site * layout.site_bytes / 4);
           else
-            accumulate(row, layout, data, g.row_sites, first_site);
+            accumulate(row, layout, data, row_sites, first_site);
           sum29 ^= row.sum29;
           sum31 ^= row.sum31;
         }
@@ -546,19 +589,31 @@ namespace quda
           if (corner(rank) == rank_coords[rank]) all_leaders.push_back(rank);
     }
 
-    Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X,
-                       const Partitions &partitions, const SiteUnpack &unpack)
+    namespace
     {
-      return read_data({Geometry(layout, X).whole_lattice(filename)}, layout, X, partitions, unpack);
+      // the size of the staging buffer of a leader: the largest share of the region of the other ranks it handles
+      size_t staging_bytes(const Geometry &g, const Partitions &partitions)
+      {
+        size_t bytes = 0;
+        for (int rank : partitions.ranks())
+          if (rank != comm_rank()) bytes = std::max(bytes, g.local_bytes(partitions.coords(rank)));
+        return bytes;
+      }
+    } // namespace
+
+    Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X,
+                       const Partitions &partitions, const SiteUnpack &unpack, const Hypercube *region)
+    {
+      return read_data({Geometry(layout, X, region).whole_region(filename)}, layout, X, partitions, unpack, region);
     }
 
     Checksum read_data(const std::vector<FilePart> &parts, const DataLayout &layout, const int *X,
-                       const Partitions &partitions, const SiteUnpack &unpack)
+                       const Partitions &partitions, const SiteUnpack &unpack, const Hypercube *region)
     {
-      Geometry g(layout, X);
+      Geometry g(layout, X, region);
       const int my_rank = comm_rank();
       const auto &me = partitions.coords(my_rank);
-      std::vector<char> buffer(g.local_bytes());
+      std::vector<char> buffer(g.local_bytes(me));
       Checksum sum;
 
       auto process = [&](int block) {
@@ -571,14 +626,14 @@ namespace quda
 
       const auto &ranks = partitions.ranks();
       FileCache files(parts, File::Mode::READ);
-      std::vector<char> staging(ranks.size() > 1 ? g.local_bytes() : 0);
+      std::vector<char> staging(staging_bytes(g, partitions));
       for (int block = 0; block < layout.n_block; block++) {
         for (int rank : ranks) {
           if (rank == my_rank) {
             read_rows(files, parts, g, me, block, buffer.data());
           } else {
             read_rows(files, parts, g, partitions.coords(rank), block, staging.data());
-            send(staging.data(), staging.size(), rank);
+            send(staging.data(), g.local_bytes(partitions.coords(rank)), rank);
           }
         }
         if (!partitions.is_leader()) recv(buffer.data(), buffer.size(), partitions.leader());
@@ -589,18 +644,18 @@ namespace quda
     }
 
     Checksum write_data(const std::string &filename, const DataLayout &layout, const int *X,
-                        const Partitions &partitions, const SitePack &pack)
+                        const Partitions &partitions, const SitePack &pack, const Hypercube *region)
     {
-      return write_data({Geometry(layout, X).whole_lattice(filename)}, layout, X, partitions, pack);
+      return write_data({Geometry(layout, X, region).whole_region(filename)}, layout, X, partitions, pack, region);
     }
 
     Checksum write_data(const std::vector<FilePart> &parts, const DataLayout &layout, const int *X,
-                        const Partitions &partitions, const SitePack &pack)
+                        const Partitions &partitions, const SitePack &pack, const Hypercube *region)
     {
-      Geometry g(layout, X);
+      Geometry g(layout, X, region);
       const int my_rank = comm_rank();
       const auto &me = partitions.coords(my_rank);
-      std::vector<char> buffer(g.local_bytes());
+      std::vector<char> buffer(g.local_bytes(me));
       Checksum sum;
 
       auto process = [&](int block) {
@@ -616,7 +671,7 @@ namespace quda
 
       const auto &ranks = partitions.ranks();
       FileCache files(parts, File::Mode::WRITE);
-      std::vector<char> staging(ranks.size() > 1 ? g.local_bytes() : 0);
+      std::vector<char> staging(staging_bytes(g, partitions));
       for (int block = 0; block < layout.n_block; block++) {
         process(block);
         if (!partitions.is_leader()) send(buffer.data(), buffer.size(), partitions.leader());
@@ -624,7 +679,7 @@ namespace quda
           if (rank == my_rank) {
             write_rows(files, parts, g, me, block, buffer.data());
           } else {
-            recv(staging.data(), staging.size(), rank);
+            recv(staging.data(), g.local_bytes(partitions.coords(rank)), rank);
             write_rows(files, parts, g, partitions.coords(rank), block, staging.data());
           }
         }

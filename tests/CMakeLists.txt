@@ -183,6 +183,11 @@ target_link_libraries(vector_io_test ${TEST_LIBS})
 quda_checkbuildtest(vector_io_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS vector_io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(propagator_io_test propagator_io_test.cpp)
+target_link_libraries(propagator_io_test ${TEST_LIBS})
+quda_checkbuildtest(propagator_io_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS propagator_io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(tune_test tune_test.cpp)
 target_link_libraries(tune_test ${TEST_LIBS})
 quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
@@ -1681,6 +1686,11 @@ add_test(NAME vector_io_test
          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:vector_io_test> ${MPIEXEC_POSTFLAGS}
                  --dim 4 6 8 10
                  --gtest_output=xml:vector_io_test.xml)
+
+add_test(NAME propagator_io_test
+         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:propagator_io_test> ${MPIEXEC_POSTFLAGS}
+                 --dim 4 6 8 10
+                 --gtest_output=xml:propagator_io_test.xml)
 
 add_test(NAME tune_test
          COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}

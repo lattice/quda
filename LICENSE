@@ -417,8 +417,9 @@ QUDA reads and writes SciDAC and ILDG files following the QIO library
 (https://github.com/usqcd-software/qio), in particular its record
 layouts and XML, its checksum and its handling of ILDG files. This
 support, contained in include/io/scidac_io.h, include/io/site_io.h,
-lib/io/scidac_common.cpp, lib/io/scidac_gauge.cpp and lib/io/site_io.cpp,
-follows QIO code supplied under the following license:
+lib/io/scidac_common.cpp, lib/io/scidac_gauge.cpp, lib/io/scidac_ks.cpp
+and lib/io/site_io.cpp, follows QIO code supplied under the following
+license:
 
   This software was produced by the USQCD collaboration under United
   States Government Contracts (U.S. Department of Energy SciDAC program).

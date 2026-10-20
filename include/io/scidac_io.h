@@ -15,6 +15,13 @@
 namespace quda
 {
 
+  /**
+     @brief The staggered field files of MILC that QUDA loads: USQCD KS
+     propagator files of source/solution pairs, color-vector source
+     files, and complex-field source files
+   */
+  enum class KSFileType { Propagator, VectorSource, ComplexSource };
+
   namespace scidac
   {
 
@@ -51,9 +58,10 @@ namespace quda
        Colors, spins, typesize and datacount are omitted when zero.
        @param[in] typesize Bytes per item and site
        @param[in] datacount Items per site
+       @param[in] hypercube The box of a hypercube record (record type 2), or none for a lattice field
      */
     std::string record_info_xml(const std::string &datatype, QudaPrecision prec, int colors, int spins, int typesize,
-                                int datacount);
+                                int datacount, const std::optional<io::Hypercube> &hypercube = {});
 
     /**
        @brief The checksum record XML
@@ -90,7 +98,14 @@ namespace quda
       std::string user_xml; /** The user record XML */
       bool ildg = false;    /** Whether the file has (or should have) the ILDG records */
       std::string ildg_lfn; /** ILDG logical file name to write; empty means none (save only) */
+      /** The box of the file's lattice that a hypercube record (record type 2) holds; none for a lattice field */
+      std::optional<io::Hypercube> hypercube;
     };
+
+    /**
+       @brief The box of a hypercube record, "l0 l1 l2 l3 .. u0 u1 u2 u3", for messages
+     */
+    std::string hypercube_str(const io::Hypercube &box);
 
     /**
        @brief QUDA's user file XML: <qudaFile> with its version, the git
@@ -110,6 +125,7 @@ namespace quda
       FieldMetadata metadata;               /** From the private record XML, or the ildg-format record */
       lime::Record data;                    /** The binary data (in a partfile, that of the first volume) */
       std::optional<io::Checksum> checksum; /** From the first checksum record after the data */
+      size_t index = 0;                     /** The record's place among the file's binary records */
     };
 
     /**
@@ -132,9 +148,22 @@ namespace quda
        <filename>.vol0000 if there is no such file, which holds the
        metadata of a partfile.  Rank 0 reads every metadata record in
        one pass.  Errors if the file is neither a single file nor a
-       partfile, or holds no lattice field.
+       partfile, or holds no lattice field or hypercube record.
      */
     FieldRecords find_field(const std::string &filename);
+
+    /**
+       @brief Whether loading a file reads a partfile: there is no
+       <filename>, but there is <filename>.vol0000.  Collective.
+     */
+    bool partfile_named(const std::string &filename);
+
+    /**
+       @brief Error if any of the first n binary records of a file is a
+       hypercube record, which only staggered source files hold
+       @param[in] n The number of records to check (all of them if negative)
+     */
+    void check_no_hypercube(const FieldRecords &records, int n = -1);
 
     /**
        @brief Find the volumes of a partfile and check that they tile
@@ -164,9 +193,10 @@ namespace quda
        @brief Read the first fields found by find_field, from a single
        file or a partfile, into host fields, one record at a time,
        after checking the dimensions, and each record's typesize and
-       length.  Each record's checksum is verified, and a mismatch is
-       an error unless param allows it.  The datacounts are the
-       caller's to check.
+       length.  A hypercube record fills only its box's sites, and only
+       in single files.  Each record's checksum is verified, and a
+       mismatch is an error unless param allows it.  The datacounts and
+       whether boxes are expected are the caller's to check.
        @param[in] records The fields' records
        @param[out] fields The host fields, one per record from the first, each with one item per datacount
        @param[in] X The local lattice dimensions of a full field
@@ -196,7 +226,10 @@ namespace quda
        first volume.  On one rank, as in QIO, a single file.
        @param[in] filename The file
        @param[in] user_file_xml The user file XML
-       @param[in] metadata What to write in each record's metadata records; each field is saved in its precision
+       @param[in] metadata What to write in each record's metadata
+       records; each field is saved in its precision, and as a
+       hypercube record of its box's sites if it has one (single files
+       only)
        @param[in] fields The host fields, one per record, each with one item per datacount
        @param[in] X The local lattice dimensions of a full field
        @param[in] parity Even or odd for single-parity fields, stored on
@@ -440,6 +473,36 @@ namespace quda
     std::vector<io::Checksum> save_vectors(const std::string &filename, const io::HostField &field, int n_vectors,
                                            const int *X, QudaSiteSubset subset, QudaParity parity, int nColor,
                                            int nSpin, const VectorSaveInfo &info, const FileIOParam &param);
+
+    /**
+       @brief A staggered source or KS propagator file, as found on load
+     */
+    struct KSFile {
+      FieldRecords records;
+      KSFileType type = KSFileType::VectorSource;
+      std::string file_info;         /** The <info> of usqcdKSPropFile, or a source file's whole file XML */
+      std::vector<std::string> info; /** Each binary record's <info>, empty if it has none */
+    };
+
+    /**
+       @brief The kind of staggered file whose records find_field found,
+       by find_ks_file's rules, without checking the records; none if it
+       is not one.  USQCD Dirac propagator files and MILC's Dirac source
+       files are errors.
+     */
+    std::optional<KSFileType> ks_file_type(const FieldRecords &records);
+
+    /**
+       @brief Find the records of a staggered source or KS propagator
+       file and check them: a USQCD KS propagator file of
+       source/solution pairs (VV pairs), a file of complex fields (of
+       which the first is the source), or a file of color-vector
+       sources with color 0, 1, ... in turn.  Sources may be hypercube
+       records.  Partfiles, other USQCD propagator files and any other
+       file are errors.  Collective.
+       @param[in] filename The file
+     */
+    KSFile find_ks_file(const std::string &filename);
 
   } // namespace scidac
 

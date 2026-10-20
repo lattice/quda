@@ -167,8 +167,21 @@ QIO_Writer *open_test_output(const char *filename, const char *xml_write_file, i
   return outfile;
 }
 
+// the box of a hypercube record, as quda::scidac::hypercube_str gives it
+static std::string hypercube_str(QIO_RecordInfo *rec_info)
+{
+  quda::io::Hypercube box;
+  for (int d = 0; d < 4 && d < QIO_get_hyper_spacetime(rec_info); d++) {
+    box.lower[d] = QIO_get_hyperlower(rec_info)[d];
+    box.upper[d] = QIO_get_hyperupper(rec_info)[d];
+  }
+  return quda::scidac::hypercube_str(box);
+}
+
+// reads the next record into a host field; a hypercube record is an error unless allowed, when it fills only its box
 int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, int nColor, int len,
-               QudaPrecision *file_prec_out = nullptr, std::string *record_xml_out = nullptr)
+               QudaPrecision *file_prec_out = nullptr, std::string *record_xml_out = nullptr,
+               const char *filename = nullptr, int record = 0, bool allow_hypercube = false)
 {
   const int count = field.items();
   // Get the QIO record and string
@@ -182,6 +195,10 @@ int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, 
   // Check if the read was successful or not.
   logQuda(QUDA_VERBOSE, "%s: QIO_read_record_info returns status %d\n", __func__, status);
   if (status != QIO_SUCCESS) { errorQuda("get_prec failed\n"); }
+
+  if (QIO_get_recordtype(rec_info) == QIO_HYPER && !allow_hypercube)
+    errorQuda("Binary record %d of %s is a hypercube record (sites %s), which only staggered source files hold", record,
+              filename ? filename : "the file", hypercube_str(rec_info).c_str());
 
   // Query components of record
   int in_nSpin = QIO_get_spins(rec_info);
@@ -233,9 +250,10 @@ int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, 
   return status;
 }
 
-int read_su3_field(QIO_Reader *infile, const quda::io::HostField &field, QudaPrecision *file_prec, std::string *record_xml)
+int read_su3_field(QIO_Reader *infile, const quda::io::HostField &field, QudaPrecision *file_prec,
+                   std::string *record_xml, const char *filename)
 {
-  return read_field(infile, field, 1, 9, 18, file_prec, record_xml);
+  return read_field(infile, field, 1, 9, 18, file_prec, record_xml, filename);
 }
 
 // The USQCD gauge field record XML: <usqcdInfo> with the average plaquette and link trace.  This uses QIO's own
@@ -340,7 +358,8 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   printfQuda("%s: reading su3 field\n", __func__);
   fflush(stdout);
   std::string record_xml;
-  int status = read_su3_field(infile, quda::io::HostField(gauge, 4, precision, 18), &info.file_prec, &record_xml);
+  int status
+    = read_su3_field(infile, quda::io::HostField(gauge, 4, precision, 18), &info.file_prec, &record_xml, filename);
   // on a checksum mismatch QIO has read the whole record, including the checksum, so the field is complete
   if (status != QIO_SUCCESS && status != QIO_CHECKSUM_MISMATCH) { errorQuda("read_su3_field failed %d\n", status); }
   info.sum = {QIO_get_reader_last_checksuma(infile), QIO_get_reader_last_checksumb(infile)};
@@ -389,8 +408,8 @@ std::vector<quda::scidac::FieldChecksum> read_spinor_field(const char *filename,
   fflush(stdout);
   const int len = 2 * nSpin * nColor;
   std::vector<quda::scidac::FieldChecksum> sums;
-  for (auto &field : fields) {
-    int status = read_field(infile, field, milc ? 0 : nSpin, nColor, len);
+  for (auto k = 0u; k < fields.size(); k++) {
+    int status = read_field(infile, fields[k], milc ? 0 : nSpin, nColor, len, nullptr, nullptr, filename, k);
     // on a checksum mismatch QIO has read the whole record, including the checksum, so the vectors are complete
     if (status != QIO_SUCCESS && status != QIO_CHECKSUM_MISMATCH) {
       errorQuda("read_spinor_fields failed %d\n", status);
@@ -415,9 +434,16 @@ static int write_record(QIO_Writer *outfile, const quda::io::HostField &field, c
   const int nDim = 4;
   int lower[nDim] = {0, 0, 0, 0};
   int upper[nDim] = {lattice_size[0], lattice_size[1], lattice_size[2], lattice_size[3]};
+  if (m.hypercube) {
+    for (int d = 0; d < nDim; d++) {
+      lower[d] = m.hypercube->lower[d];
+      upper[d] = m.hypercube->upper[d];
+    }
+  }
   char precision[] = {m.prec == QUDA_DOUBLE_PRECISION ? 'D' : 'F', '\0'};
-  QIO_RecordInfo *rec_info = QIO_create_record_info(QIO_FIELD, lower, upper, nDim, const_cast<char *>(m.datatype.c_str()),
-                                                    precision, m.colors, m.spins, m.typesize, m.datacount);
+  QIO_RecordInfo *rec_info = QIO_create_record_info(m.hypercube ? QIO_HYPER : QIO_FIELD, lower, upper, nDim,
+                                                    const_cast<char *>(m.datatype.c_str()), precision, m.colors,
+                                                    m.spins, m.typesize, m.datacount);
 
   QIO_String *xml_record_out = QIO_string_create();
   QIO_string_set(xml_record_out, m.user_xml.c_str());
@@ -502,5 +528,39 @@ std::vector<quda::io::Checksum> write_spinor_field(const char *filename, const q
   /* Close the file */
   QIO_close_write(outfile);
   printfQuda("%s: Closed file for writing\n", __func__);
+  return sums;
+}
+
+std::vector<quda::scidac::FieldChecksum> read_ks_fields(const char *filename,
+                                                        const std::vector<quda::io::HostField> &fields, const int *X,
+                                                        QudaFileIOMode io_mode,
+                                                        const std::array<int, 4> &io_partition_grid)
+{
+  quda_this_node = QMP_get_node_number();
+
+  set_layout(X);
+  PartitionFilesystem fs(io_mode, io_partition_grid, partfile_name(filename));
+
+  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, qio_serpar(io_mode), fs.get());
+  if (infile == NULL) { errorQuda("Open file failed\n"); }
+
+  printfQuda("%s: reading %lu records\n", __func__, fields.size());
+  fflush(stdout);
+  std::vector<quda::scidac::FieldChecksum> sums;
+  for (auto k = 0u; k < fields.size(); k++) {
+    // color vectors or complex fields, without spins
+    const int len = fields[k].item_bytes(QUDA_SINGLE_PRECISION) / QUDA_SINGLE_PRECISION;
+    int status = read_field(infile, fields[k], 0, len == 6 ? 3 : 0, len, nullptr, nullptr, filename, k, true);
+    // on a checksum mismatch QIO has read the whole record, including the checksum, so the field is complete
+    if (status != QIO_SUCCESS && status != QIO_CHECKSUM_MISMATCH) errorQuda("read_ks_fields failed %d\n", status);
+    quda::scidac::FieldChecksum sum;
+    sum.sum = {QIO_get_reader_last_checksuma(infile), QIO_get_reader_last_checksumb(infile)};
+    sum.has_checksum = true;
+    sum.checksum_matches = status == QIO_SUCCESS;
+    sums.push_back(sum);
+  }
+
+  QIO_close_read(infile);
+  printfQuda("%s: Closed file for reading\n", __func__);
   return sums;
 }

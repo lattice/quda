@@ -49,8 +49,12 @@ namespace quda
         errorQuda("%s is an ILDG file without the SciDAC records, so it holds no vectors", file.c_str());
 
       const auto &file_xml = records.user_file_xml;
-      if (xml_value(file_xml, "usqcdKSPropFile"))
-        errorQuda("%s is a USQCD KS propagator file, which cannot be loaded yet", file.c_str());
+      if (auto type = ks_file_type(records)) {
+        if (*type == KSFileType::Propagator)
+          errorQuda("%s is a USQCD KS propagator file; load it with KSPropagatorIO", file.c_str());
+        errorQuda("%s is a staggered source file; load it with KSSourceIO", file.c_str());
+      }
+      check_no_hypercube(records);
 
       // as MILC's parse_file_xml_Nvec, which reads a file without a positive <Nvecs> as QUDA's
       const long n_vecs = std::strtol(xml_value(file_xml, "Nvecs").value_or("0").c_str(), nullptr, 10);
