@@ -30,21 +30,13 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
                                 QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
 {
   if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
-    // Set fatlink to the identity matrix
+    // Set fatlink and longlink to the identity matrix
     constructIdentityGaugeField(fatlink, precision);
-
-    // Apply anisotropy, temporal boundary conditions, and emulate temporal
-    // gauge fixing as appropriate
-    applyGaugeFieldScaling(fatlink, Vh, param, precision);
-
-    // Repeat for the longlink field
     constructIdentityGaugeField(longlink, precision);
-    applyGaugeFieldScaling(longlink, Vh, param, precision);
 
-    // apply MILC phases... and temporal boundary conditions? again?
+    // apply MILC phases and temporal boundary conditions
     applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
 
-    // also apply MILC phases and temporal boundary conditions (again?)
     if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
       applyGaugeFieldScaling_long(longlink, Vh, param, dslash_type, precision);
     }
@@ -128,17 +120,29 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  // load a field WITHOUT PHASES
-  if (latfile.size() > 0) {
-    // load in the command line supplied gauge field
-    quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param))
-      .load(qdp_inlink, gauge_param.cpu_prec, gauge_param.X);
+  const auto input_mode = resolveGaugeInputMode(staggered_default_gauge_input);
+  // load or generate a field WITHOUT PHASES
+  if (input_mode == GaugeInputMode::LOAD || input_mode == GaugeInputMode::GAUSSIAN_SU3) {
+    if (input_mode == GaugeInputMode::LOAD) {
+      // load in the command line supplied gauge field
+      quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param))
+        .load(qdp_inlink, gauge_param.cpu_prec, gauge_param.X);
+    } else {
+      printfQuda("Gauge input: %s, width %g\n", getGaugeInputStr(input_mode), gauge_input_width);
+      constructGaussianSU3GaugeField(qdp_inlink, gauge_param.cpu_prec, gauge_input_width);
+      if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
+        // the long links are not computed from the thin links, so they are independent Gaussian links
+        constructGaussianSU3GaugeField(qdp_longlink, gauge_param.cpu_prec, gauge_input_width);
+        applyGaugeFieldScaling_long(qdp_longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, gauge_param.cpu_prec);
+      }
+    }
     if (dslash_type != QUDA_LAPLACE_DSLASH) {
       applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
     }
   } else {
-    GaugeFieldConstructionType construct_type
-      = (unit_gauge) ? GaugeFieldConstructionType::UNIT_GAUGE : GaugeFieldConstructionType::RANDOM_GAUGE;
+    GaugeFieldConstructionType construct_type = input_mode == GaugeInputMode::UNIT ?
+      GaugeFieldConstructionType::UNIT_GAUGE :
+      GaugeFieldConstructionType::RANDOM_GAUGE;
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       constructQudaGaugeField(qdp_inlink, construct_type, gauge_param, gauge_param.cpu_prec);
     } else {

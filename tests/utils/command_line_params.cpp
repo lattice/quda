@@ -606,8 +606,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (SciDAC, ILDG or MILC v5)");
   quda_app
     ->add_option(
-      "--gauge-input",
-      gauge_input, "Gauge field input mode: haar, unit, gaussian-su3, or load (default: legacy --unit-gauge / --load-gauge selection)")
+      "--gauge-input", gauge_input,
+      "Gauge field input mode: haar, unit, gaussian-su3, or load (default: load with --load-gauge, unit with "
+      "--unit-gauge, otherwise gaussian-su3; used by the staggered dslash, invert, eigensolve and gsmear tests)")
     ->check(CLI::IsMember({"haar", "unit", "gaussian-su3", "load"}));
   quda_app
     ->add_option(

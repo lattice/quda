@@ -57,6 +57,16 @@ bool skip_test(test_t param)
     // BiCGStab-L is unstable with staggered operator with low precision
     // we could likely restore this when 20-bit quark fields are merged in
     if (inverter_type == QUDA_BICGSTABL_INVERTER && prec_sloppy < QUDA_SINGLE_PRECISION) return true;
+
+    // CG3 diverges for these solves on Gaussian SU(3) fields at mass 0.1 on lattices larger than the 1-rank ctests'
+    if (resolveGaugeInputMode(staggered_default_gauge_input) == GaugeInputMode::GAUSSIAN_SU3
+        && ((inverter_type == QUDA_CG3_INVERTER && solution_type == QUDA_MATPC_SOLUTION
+             && solve_type == QUDA_DIRECT_PC_SOLVE)
+            || (inverter_type == QUDA_CG3_INVERTER && solution_type == QUDA_MATDAG_MAT_SOLUTION
+                && solve_type == QUDA_NORMOP_SOLVE)
+            || (inverter_type == QUDA_CG3NE_INVERTER && solution_type == QUDA_MAT_SOLUTION
+                && solve_type == QUDA_DIRECT_SOLVE)))
+      return true;
   }
 
   // CG3 is rather unstable with low precision

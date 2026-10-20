@@ -1,6 +1,10 @@
 #pragma once
 #include <quda_internal.h>
 #include <color_spinor_field.h>
+#include "gauge_utils.h"
+
+/** The gauge field of the staggered tests without --gauge-input, --load-gauge or --unit-gauge */
+constexpr GaugeInputMode staggered_default_gauge_input = GaugeInputMode::GAUSSIAN_SU3;
 
 extern int Z[4];
 extern int Vh;
