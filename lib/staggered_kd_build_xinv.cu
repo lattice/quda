@@ -107,6 +107,7 @@ namespace quda
 
     QudaFieldLocation location = checkLocation(Xinv, gauge);
     checkPrecision(Xinv, gauge);
+    if (location == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU KD-inverse construction is not supported");
 
     if (Xinv.Geometry() != QUDA_KDINVERSE_GEOMETRY)
       errorQuda("Unsupported gauge geometry %d , expected %d for Xinv", Xinv.Geometry(), QUDA_KDINVERSE_GEOMETRY);
