@@ -63,10 +63,6 @@ QudaPrecision &cuda_prec_ritz = prec_ritz;
 // Host hypercubic RNG
 std::vector<host_rng_t> host_rand;
 
-std::vector<host_rng_t> host_source_rand;
-uint64_t host_source_seed = 0;
-std::array<int, 4> host_source_dims = {};
-
 size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_clover_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -488,11 +484,9 @@ uint64_t host_source_rand_seed(uint64_t seed, uint64_t global_index)
   return mix(mix(seed) ^ global_index);
 }
 
-void initSourceRand(uint64_t seed, const std::array<int, 4> &X)
+void initSourceRand(std::vector<host_rng_t> &rng, uint64_t seed, const std::array<int, 4> &X)
 {
-  initHypercubicRNG(host_source_rand, X, [seed](uint64_t global_idx) { return host_source_rand_seed(seed, global_idx); });
-  host_source_seed = seed;
-  host_source_dims = X;
+  initHypercubicRNG(rng, X, [seed](uint64_t global_idx) { return host_source_rand_seed(seed, global_idx); });
 }
 
 void setDims(int *X)

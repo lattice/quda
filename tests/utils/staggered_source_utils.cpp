@@ -8,6 +8,7 @@
 #include <util_quda.h>
 
 #include "host_utils.h"
+#include "index_utils.hpp"
 #include "staggered_source_utils.h"
 
 const char *get_ks_source_type_str(KSSourceType type)
@@ -64,14 +65,8 @@ namespace
   coords_t global_coords(size_t h, const coords_t &X)
   {
     const size_t half = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3] / 2;
-    const int parity = h >= half;
-    const size_t cb = h % half;
     coords_t x;
-    const size_t za = cb / (X[0] / 2);
-    x[1] = za % X[1];
-    x[2] = (za / X[1]) % X[2];
-    x[3] = za / (static_cast<size_t>(X[1]) * X[2]);
-    x[0] = 2 * (cb % (X[0] / 2)) + ((x[1] + x[2] + x[3] + parity) & 1);
+    getCoords(x, h % half, X, h >= half);
     for (int d = 0; d < 4; d++) x[d] += quda::comm_coord(d) * X[d];
     return x;
   }
@@ -136,7 +131,7 @@ namespace
 
   template <typename real_t>
   void build(std::vector<quda::ColorSpinorField> &sources, const KSSourceParam &param, const coords_t &X,
-             const coords_t &N)
+             const coords_t &N, KSSourceRNG *rng)
   {
     const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
     const int t0 = param.type == KSSourceType::POINT ? param.origin[3] : param.t0;
@@ -156,8 +151,8 @@ namespace
         for (int i = 0; i < n; i++) {
           std::array<complex_t, 3> v;
           for (auto &c : v) {
-            const double re = gaussian(host_source_rand[h]);
-            c = {re, gaussian(host_source_rand[h])};
+            const double re = gaussian((*rng)[h]);
+            c = {re, gaussian((*rng)[h])};
           }
           double magsq = 0.0;
           for (auto &c : v) magsq += c.real() * c.real() + c.imag() * c.imag();
@@ -175,8 +170,8 @@ namespace
 
       complex_t z;
       if (param.type == KSSourceType::RANDOM_COMPLEX_WALL) {
-        const double re = gaussian(host_source_rand[h]);
-        z = {re, gaussian(host_source_rand[h])};
+        const double re = gaussian((*rng)[h]);
+        z = {re, gaussian((*rng)[h])};
         const double x = 1.0 / sqrt(z.real() * z.real() + z.imag() * z.imag());
         z = {x * z.real(), x * z.imag()};
         if (masked(param, g)) z = 0.0;
@@ -192,7 +187,12 @@ namespace
   }
 } // namespace
 
-void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSourceParam &param)
+KSSourceRNG::KSSourceRNG(uint64_t seed, const std::array<int, 4> &X) : seed_(seed), X_(X)
+{
+  initSourceRand(rng, seed, X);
+}
+
+void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSourceParam &param, KSSourceRNG *rng)
 {
   using namespace quda;
   const char *type = get_ks_source_type_str(param.type);
@@ -235,17 +235,22 @@ void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSo
   if (param.subset == KSSourceSubset::CORNER && !is_random_ks_source(param.type))
     errorQuda("The corner subset applies to the random walls only, as in MILC, not to %s sources", type);
 
-  if (is_random_ks_source(param.type) && (host_source_dims != X || host_source_seed != param.seed))
-    initSourceRand(param.seed, X);
+  if (is_random_ks_source(param.type)) {
+    if (!rng) errorQuda("A %s source draws from a generator, but none was given", type);
+    const auto &R = rng->X();
+    if (R != X)
+      errorQuda("The generator of the %s source is on the %d %d %d %d local lattice, not on the sources' %d %d %d %d",
+                type, R[0], R[1], R[2], R[3], X[0], X[1], X[2], X[3]);
+  }
 
   if (sources[0].Precision() == QUDA_DOUBLE_PRECISION) {
     for (auto &s : sources)
       if (s.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("The sources have different precisions");
-    build<double>(sources, param, X, N);
+    build<double>(sources, param, X, N, rng);
   } else {
     for (auto &s : sources)
       if (s.Precision() != QUDA_SINGLE_PRECISION) errorQuda("The sources have different precisions");
-    build<float>(sources, param, X, N);
+    build<float>(sources, param, X, N, rng);
   }
 
   auto list = [](const auto &v, int n) {
@@ -262,7 +267,7 @@ void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSo
     where = "on time slice " + std::to_string(param.t0);
   if (p[0] != 0 || p[1] != 0 || p[2] != 0) where += ", momentum " + list(p, 3) + " from " + list(param.origin, 3);
   if (param.subset == KSSourceSubset::CORNER) where += ", corner subset";
-  if (is_random_ks_source(param.type)) where += ", seed " + std::to_string(param.seed);
+  if (is_random_ks_source(param.type)) where += ", seed " + std::to_string(rng->seed());
   logQuda(QUDA_SUMMARIZE, "Built %lu %s sources (MILC's definition) %s\n", sources.size(), type, where.c_str());
 }
 

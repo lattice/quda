@@ -1,4 +1,5 @@
 #include <iostream>
+#include <optional>
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -271,8 +272,17 @@ KSSourceParam ks_source_param()
   param.origin = prop_source_position[0];
   param.momentum = prop_source_momentum;
   param.subset = prop_source_subset;
-  param.seed = prop_source_seed;
   return param;
+}
+
+// the generator of the built random walls, kept over the solves so that each build gives new values, and made again
+// only for fields on another lattice
+KSSourceRNG *ks_source_rng(const quda::ColorSpinorField &field)
+{
+  static std::optional<KSSourceRNG> rng;
+  const std::array<int, 4> X = {field.X(0), field.X(1), field.X(2), field.X(3)};
+  if (!rng || rng->X() != X) rng.emplace(prop_source_seed, X);
+  return &*rng;
 }
 
 // errors for source options that can't be met, or that would change the source if they were ignored; warnings for
@@ -549,7 +559,8 @@ std::vector<std::array<quda::real_t, 2>> solve(test_t param)
     quda::spinorNoise(in[n], rng, QUDA_NOISE_UNIFORM);
     out[n] = quda::ColorSpinorField(cs_param);
   }
-  if (is_built_ks_source(prop_source_type)) constructKSSources(in, ks_source_param());
+  if (is_built_ks_source(prop_source_type) && !in.empty())
+    constructKSSources(in, ks_source_param(), is_random_ks_source(prop_source_type) ? ks_source_rng(in[0]) : nullptr);
   if (use_propagator_options()) load_propagator_fields(in, out);
 
   // Prepare rng, fill host spinors with random numbers END

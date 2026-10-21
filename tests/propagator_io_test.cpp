@@ -984,6 +984,7 @@ TEST_P(KSRandomSourceBuildTest, random)
   const auto type = GetParam();
   if (!quda::is_enabled_spin(1)) GTEST_SKIP();
   const int n = 3;
+  const uint64_t seed = 1234;
   const auto host_rand_before = host_rand_bytes();
   const int T = local_dims()[3], N = global_dims()[3];
 
@@ -1003,13 +1004,13 @@ TEST_P(KSRandomSourceBuildTest, random)
             return on_slice(g, t) && (subset == KSSourceSubset::FULL || in_corner_subset(g));
           };
 
-          initSourceRand(p.seed, local_dims());
-          ReferenceWalls reference(p.seed);
+          KSSourceRNG rng(seed, local_dims());
+          ReferenceWalls reference(seed);
           for (int build = 0; build < 2; build++) {
             SCOPED_TRACE("build " + std::to_string(build));
             const auto v = reference.draw(type, t, n);
             auto f = host_sources(n, prec);
-            constructKSSources(f, p);
+            constructKSSources(f, p, &rng);
             const auto r = compare(
               f, [&](int i, size_t h, const coords_t &g, int c) { return v[i][h][c] * momentum_factor(p, g); }, support);
             EXPECT_LE(r.max_difference, momentum || prec == QUDA_SINGLE_PRECISION ? tol : 0.0);
@@ -1019,10 +1020,10 @@ TEST_P(KSRandomSourceBuildTest, random)
           }
 
           // source 0 of a single build is source 0 of three
-          initSourceRand(p.seed, local_dims());
-          const auto v = ReferenceWalls(p.seed).draw(type, t, n);
+          KSSourceRNG single_rng(seed, local_dims());
+          const auto v = ReferenceWalls(seed).draw(type, t, n);
           auto f = host_sources(1, prec);
-          constructKSSources(f, p);
+          constructKSSources(f, p, &single_rng);
           const auto r = compare(
             f, [&](int, size_t h, const coords_t &g, int c) { return v[0][h][c] * momentum_factor(p, g); }, support);
           EXPECT_LE(r.max_difference, tol) << "a single source";
@@ -1033,16 +1034,16 @@ TEST_P(KSRandomSourceBuildTest, random)
     }
   }
 
-  // a new seed reinitializes the generator, without initSourceRand; a second build gives new values
+  // a generator with another seed gives its own streams; a second build gives new values
   KSSourceParam p;
   p.type = type;
   p.t0 = ks_source_all_t_slices;
-  p.seed = 99;
-  ReferenceWalls reference(p.seed);
+  KSSourceRNG rng(99, local_dims());
+  ReferenceWalls reference(99);
   for (int build = 0; build < 2; build++) {
     const auto v = reference.draw(type, p.t0, n);
     auto f = host_sources(n, QUDA_DOUBLE_PRECISION);
-    constructKSSources(f, p);
+    constructKSSources(f, p, &rng);
     const auto r = compare(
       f, [&](int i, size_t h, const coords_t &, int c) { return v[i][h][c]; }, [](const coords_t &) { return true; });
     EXPECT_EQ(r.max_difference, 0.0) << "seed 99, build " << build;
