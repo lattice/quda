@@ -4891,11 +4891,15 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
 
   // Normalization of the tr log term relative to tmLQCD (sw_deriv): for mu -> 0 the twisted branch of
   // computeCloverSigmaTrace yields 1/4 * A^{-1}, the non-twisted branch yields A^{-1}, while tmLQCD yields
-  // 1 * A^{-1} for two flavors and 0.5 * A^{-1} for a single flavor. The coefficient 32 matches tmLQCD for
-  // the twisted case (32 * 1/4 = 8), hence the single flavor case, which uses the non-twisted clover
-  // operator, requires 8 * 1/2 = 4.
-  computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
-                     k_csw_ov_8 * 4.0 * (rhmc_flavors == 1 ? 1 : 8), detratio, trlog, rhmc_flavors, *inv_param);
+  // 1 * A^{-1} for two flavors and 0.5 * A^{-1} for a single flavor, independent of the twist. Hence the
+  // coefficient 32 for a twisted clover field corresponds to 8 for a non-twisted one, with an additional
+  // factor 1/2 for a single flavor.
+  bool twisted = cloverPrecise->TwistFlavor() == QUDA_TWIST_SINGLET
+    || cloverPrecise->TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET;
+  double sigma_coeff = k_csw_ov_8 * 32.0 * (twisted ? 1.0 : 0.25) * (rhmc_flavors == 1 ? 0.5 : 1.0);
+
+  computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon, sigma_coeff,
+                     detratio, trlog, rhmc_flavors, *inv_param);
 
   if (gauge_param->return_result_mom) cpuMom.copy(gpuMom);
   if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)
