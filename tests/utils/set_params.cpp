@@ -75,11 +75,6 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.struct_size = sizeof(gauge_param);
 }
 
-void setPropagatorFileIOParam(QudaFileIOParam &param)
-{
-  setFileIOParam(param, prop_file_format, prop_file_io_mode, prop_file_io_partitions);
-}
-
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
 {
   setGaugeParam(gauge_param);
@@ -133,6 +128,11 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.type = QUDA_WILSON_LINKS;
 
   gauge_param.struct_size = sizeof(gauge_param);
+}
+
+void setPropagatorFileIOParam(QudaFileIOParam &param)
+{
+  setFileIOParam(param, prop_file_format, prop_file_io_mode, prop_file_io_partitions);
 }
 
 void setInvertParam(QudaInvertParam &inv_param)

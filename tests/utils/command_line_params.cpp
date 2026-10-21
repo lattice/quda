@@ -1387,8 +1387,8 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(),
                            "Load the solutions of a USQCD KS propagator file of source/solution pairs, as MILC saves "
-                           "them, as initial guesses, and its sources unless --prop-load-source-file is given "
-                           "(staggered_invert_test, index 0 only)");
+                           "them, as initial guesses, and its sources unless --prop-load-source-file is given or the "
+                           "sources are built (staggered_invert_test, index 0 only)");
 
   quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(),
                            "Save the sources (built, loaded or random) to <file> as a QUDA vector file, recording "
@@ -1423,7 +1423,8 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "The sources of staggered_invert_test: random (default), load (from --prop-load-source-file or "
                  "--prop-load-sink-file), or one of MILC's sources, built as ks_spectrum defines them: point, "
                  "corner-wall, corner-wall-x, -y, -xy, -z, -zx, -yz, -xyz, even-wall, evenandodd-wall, "
-                 "evenminusodd-wall, random-complex-wall (at most 3 sources, one per color) or random-color-wall")
+                 "evenminusodd-wall, random-complex-wall or random-color-wall. Each built type but random-color-wall "
+                 "is a complex field, so at most 3 sources (one per color); random-color-wall takes any --nsrc")
     ->transform(CLI::QUDACheckedTransformer(ks_source_type_map));
   opgroup->add_option("--prop-source-t0", prop_source_t0,
                       "The time slice of the built walls, or -1 for every slice (default 0)");
@@ -1438,7 +1439,10 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "The seed of the generator of the built random walls (default 1234)");
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
-  opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
+  opgroup
+    ->add_option("--prop-save-prec", prop_save_prec,
+                 "Precision with which to save the sources and solutions (--prop-save-source-file and "
+                 "--prop-save-sink-file; default single)")
     ->transform(prec_transform);
 
   opgroup->add_option("--prop-milc-sign-convention", prop_milc_sign_convention,

@@ -62,8 +62,9 @@ bool is_random_ks_source(KSSourceType type);
    built on slice t0, then (random walls only) masked to the subset, then multiplied by exp(i theta) on slice t0, with
    theta = 2 pi sum_i p_i (x_i - origin_i) / N_i over x, y and z.  Source c of a complex-field type holds the field in
    color c (at most 3 sources); each source of random_color_wall is a new draw.  Off the slice the sources are zero.
-   The random walls draw from host_source_rand (initialized with param.seed on first use, or when the seed changes)
-   and leave it advanced, so later builds give new values.
+   The random walls draw from host_source_rand (initialized with param.seed on the fields' lattice on first use, or
+   when the seed or the lattice changes) and leave it advanced, so later builds give new values.  Returning to an
+   earlier seed reinitializes its streams: seeds A, B, A repeat A's first draws.
    @param[out] sources Host fields, full, 1 spin, 3 colors, double or single precision, space-spin-color order
    @param[in] param The source
  */

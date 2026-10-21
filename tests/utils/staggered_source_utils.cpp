@@ -75,6 +75,8 @@ namespace
     return x;
   }
 
+  static_assert(static_cast<int>(KSSourceType::CORNER_WALL_XYZ) - static_cast<int>(KSSourceType::CORNER_WALL) == 7,
+                "the corner walls must be consecutive, in the order of MILC's r0");
   int corner_wall_r0(KSSourceType type) { return static_cast<int>(type) - static_cast<int>(KSSourceType::CORNER_WALL); }
 
   bool is_corner_wall(KSSourceType type)
@@ -211,22 +213,29 @@ void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSo
 
   coords_t N;
   for (int d = 0; d < 4; d++) N[d] = X[d] * comm_dim(d);
-  if (param.t0 < ks_source_all_t_slices || param.t0 >= N[3])
+  const auto &o = param.origin;
+  const auto &p = param.momentum;
+  if (param.type != KSSourceType::POINT && (param.t0 < ks_source_all_t_slices || param.t0 >= N[3]))
     errorQuda("The time slice t0 = %d of the %s source is outside the lattice (0 to %d, or %d for every slice)",
               param.t0, type, N[3] - 1, ks_source_all_t_slices);
-  for (int d = 0; d < 4; d++)
-    if (param.origin[d] < 0 || param.origin[d] >= N[d])
-      errorQuda("The origin %d %d %d %d of the %s source is outside the %d %d %d %d lattice", param.origin[0],
-                param.origin[1], param.origin[2], param.origin[3], type, N[0], N[1], N[2], N[3]);
+  if (param.type == KSSourceType::POINT) {
+    for (int d = 0; d < 4; d++)
+      if (o[d] < 0 || o[d] >= N[d])
+        errorQuda("The point %d %d %d %d of the point source is outside the %d %d %d %d lattice", o[0], o[1], o[2],
+                  o[3], N[0], N[1], N[2], N[3]);
+  } else if (p[0] != 0 || p[1] != 0 || p[2] != 0) {
+    for (int d = 0; d < 3; d++)
+      if (o[d] < 0 || o[d] >= N[d])
+        errorQuda("The momentum origin %d %d %d of the %s source is outside the %d %d %d spatial lattice", o[0], o[1],
+                  o[2], type, N[0], N[1], N[2]);
+  }
   if (is_complex_field_ks_source(param.type) && sources.size() > 3)
     errorQuda("A %s source has 3 colors, one per source, but %lu sources were asked for", type, sources.size());
   if (param.subset == KSSourceSubset::CORNER && !is_random_ks_source(param.type))
     errorQuda("The corner subset applies to the random walls only, as in MILC, not to %s sources", type);
 
-  if (is_random_ks_source(param.type)) {
-    const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
-    if (host_source_rand.size() != volume || host_source_seed != param.seed) initSourceRand(param.seed);
-  }
+  if (is_random_ks_source(param.type) && (host_source_dims != X || host_source_seed != param.seed))
+    initSourceRand(param.seed, X);
 
   if (sources[0].Precision() == QUDA_DOUBLE_PRECISION) {
     for (auto &s : sources)
@@ -250,7 +259,6 @@ void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSo
     where = "on every time slice";
   else
     where = "on time slice " + std::to_string(param.t0);
-  const auto &p = param.momentum;
   if (p[0] != 0 || p[1] != 0 || p[2] != 0) where += ", momentum " + list(p, 3) + " from " + list(param.origin, 3);
   if (param.subset == KSSourceSubset::CORNER) where += ", corner subset";
   if (is_random_ks_source(param.type)) where += ", seed " + std::to_string(param.seed);

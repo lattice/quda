@@ -334,13 +334,15 @@ following licence:
 
 QUDA reads and writes MILC format files following the MILC code
 (https://github.com/milc-qcd/milc_qcd), in particular its file layouts
-and checksums from generic/io_lat4.c and generic/io_lat_utils.c, and
+and checksums from generic/io_lat4.c and generic/io_lat_utils.c,
 checks and reunitarizes loaded gauge fields as MILC does, following
-generic/check_unitarity.c and generic/reunitarize2.c. This support,
-contained in include/io/milc_io.h, include/io/reunitarize.h,
-include/io/site_io.h, lib/io/milc_common.cpp, lib/io/milc_gauge.cpp,
-lib/io/reunitarize.cpp and lib/io/site_io.cpp, follows MILC code
-supplied under the following license:
+generic/check_unitarity.c and generic/reunitarize2.c, and builds MILC's
+staggered sources in the test utilities following
+generic/quark_source.c. This support, contained in include/io/milc_io.h,
+include/io/reunitarize.h, include/io/site_io.h, lib/io/milc_common.cpp,
+lib/io/milc_gauge.cpp, lib/io/reunitarize.cpp, lib/io/site_io.cpp and
+tests/utils/staggered_source_utils.cpp, follows MILC code supplied
+under the following license:
 
   Copyright (c) 1998-2018 MILC Developers and Contributors
 

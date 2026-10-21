@@ -304,6 +304,28 @@ void check_source_options(const CLI::App &app)
   if (is_complex_field_ks_source(type) && Nsrc > 3)
     errorQuda("--prop-source-type %s has 3 colors, one per source, so --nsrc %d is too many", name, Nsrc);
 
+  const std::array<int, 4> N
+    = {xdim * quda::comm_dim(0), ydim * quda::comm_dim(1), zdim * quda::comm_dim(2), tdim * quda::comm_dim(3)};
+  const auto t0 = prop_source_t0;
+  if (built && type != KSSourceType::POINT && (t0 < ks_source_all_t_slices || t0 >= N[3]))
+    errorQuda("--prop-source-t0 %d of --prop-source-type %s is outside the %d %d %d %d lattice (0 to %d, or %d for "
+              "every slice)",
+              t0, name, N[0], N[1], N[2], N[3], N[3] - 1, ks_source_all_t_slices);
+  const auto &o = prop_source_position[0];
+  if (type == KSSourceType::POINT) {
+    for (int d = 0; d < 4; d++)
+      if (o[d] < 0 || o[d] >= N[d])
+        errorQuda("--prop-source-position 0 %d %d %d %d, the point of --prop-source-type point, is outside the %d %d "
+                  "%d %d lattice",
+                  o[0], o[1], o[2], o[3], N[0], N[1], N[2], N[3]);
+  } else if (built && momentum) {
+    for (int d = 0; d < 3; d++)
+      if (o[d] < 0 || o[d] >= N[d])
+        errorQuda("--prop-source-position 0 %d %d %d, the origin of --prop-source-momentum with --prop-source-type %s, "
+                  "is outside the %d %d %d spatial lattice",
+                  o[0], o[1], o[2], name, N[0], N[1], N[2]);
+  }
+
   if (given("--prop-source-t0") && type == KSSourceType::POINT)
     disregarded("--prop-source-t0", " (its time slice is that of --prop-source-position 0)");
   else if (given("--prop-source-t0") && !built)
@@ -322,6 +344,13 @@ void check_source_options(const CLI::App &app)
       if (prop_source_position[i] != std::array<int, 4> {})
         warningQuda("--prop-source-position %u is disregarded: staggered_invert_test uses only index 0", i);
   }
+}
+
+quda::FileIOParam propagator_file_io_param()
+{
+  QudaFileIOParam param;
+  setPropagatorFileIOParam(param);
+  return quda::FileIOParam(&param);
 }
 
 void check_propagator_options(const CLI::App &app)
@@ -346,13 +375,13 @@ void check_propagator_options(const CLI::App &app)
               get_solution_str(solution_type));
   if (multishift != 1) errorQuda("The propagator options need --multishift 1, not %d", multishift);
   if (enable_testing) errorQuda("The propagator options are not used with --enable-testing");
-}
-
-quda::FileIOParam propagator_file_io_param()
-{
-  QudaFileIOParam param;
-  setPropagatorFileIOParam(param);
-  return quda::FileIOParam(&param);
+  const auto &g = grid_partition;
+  if (!prop_load_sink.empty() && g[0] * g[1] * g[2] * g[3] > 1)
+    errorQuda("--prop-load-sink-file %s gives initial guesses, which a split grid (--grid-partition %d %d %d %d) would "
+              "ignore: invertMultiSrcQuda splits only the sources into the sub-partitions",
+              prop_load_sink.c_str(), g[0], g[1], g[2], g[3]);
+  // checks the --prop-file-* options, which are otherwise first used after the setup
+  propagator_file_io_param();
 }
 
 // MILC's sources replace the random ones unless the sources are built, and MILC's solutions are the initial guesses;

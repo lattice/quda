@@ -1041,7 +1041,7 @@ TEST_P(KSRandomSourceBuildTest, random)
             return on_slice(g, t) && (subset == KSSourceSubset::FULL || in_corner_subset(g));
           };
 
-          initSourceRand(p.seed);
+          initSourceRand(p.seed, local_dims());
           ReferenceWalls reference(p.seed);
           for (int build = 0; build < 2; build++) {
             SCOPED_TRACE("build " + std::to_string(build));
@@ -1056,7 +1056,7 @@ TEST_P(KSRandomSourceBuildTest, random)
           }
 
           // source 0 of a single build is source 0 of three
-          initSourceRand(p.seed);
+          initSourceRand(p.seed, local_dims());
           const auto v = ReferenceWalls(p.seed).draw(type, t, n);
           auto f = host_sources(1, prec);
           constructKSSources(f, p);

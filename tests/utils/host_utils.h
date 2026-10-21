@@ -48,9 +48,10 @@ extern QudaPrecision &cuda_prec_ritz;
 extern std::vector<host_rng_t> host_rand;
 
 // Host hypercubic RNG of the built staggered sources (staggered_source_utils.h), separate from host_rand, and the
-// seed it was last initialized with
+// seed and local lattice it was last initialized with
 extern std::vector<host_rng_t> host_source_rand;
 extern uint64_t host_source_seed;
+extern std::array<int, 4> host_source_dims;
 
 // Determine if we're running in multi-GPU mode
 constexpr bool is_multi_gpu()
@@ -189,11 +190,13 @@ void initRand();
 uint64_t host_source_rand_seed(uint64_t seed, uint64_t global_index);
 
 /**
- * @brief Initialize host_source_rand on the local lattice from the seed, each site's generator from
- * host_source_rand_seed, so that its values don't depend on the rank layout. Needs to be called after comms are
- * initialized; host_rand is not touched
+ * @brief Initialize host_source_rand on the local lattice X of the fields it will fill, each site's generator from
+ * host_source_rand_seed with the site's global lexicographic index (X times the process grid), so that its values
+ * don't depend on the rank layout. Needs to be called after comms are initialized; host_rand is not touched
+ * @param[in] seed The seed, recorded in host_source_seed
+ * @param[in] X The local lattice dimensions, recorded in host_source_dims
  */
-void initSourceRand(uint64_t seed);
+void initSourceRand(uint64_t seed, const std::array<int, 4> &X);
 
 //------------------------------------------------------
 
@@ -433,7 +436,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param);
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
 
-// File I/O param types: of staggered sources and propagators (the --prop-file-* options)
+// File I/O params of staggered sources and propagators (--prop-file-*)
 void setPropagatorFileIOParam(QudaFileIOParam &param);
 
 // Smear param types

@@ -65,6 +65,7 @@ std::vector<host_rng_t> host_rand;
 
 std::vector<host_rng_t> host_source_rand;
 uint64_t host_source_seed = 0;
+std::array<int, 4> host_source_dims = {};
 
 size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -429,11 +430,39 @@ void finalizeComms()
 #endif
 }
 
+namespace
+{
+  // a generator per site of the local lattice X, in QUDA's checkerboard order, each seeded with seed(the site's
+  // global lexicographic index), so that its values don't depend on the rank layout
+  template <typename Seed>
+  void initHypercubicRNG(std::vector<host_rng_t> &rng, const std::array<int, 4> &X_local, Seed seed)
+  {
+    using quda::comm_coord;
+    using quda::comm_dim;
+
+    std::array<uint64_t, 4> X;
+    for (int d = 0; d < 4; d++) X[d] = X_local[d];
+    uint64_t volume = X[0] * X[1] * X[2] * X[3];
+    uint64_t volume_h = volume / 2;
+
+    rng.resize(volume);
+    std::array<uint64_t, 4> X_global;
+    for (int d = 0; d < 4; d++) X_global[d] = static_cast<uint64_t>(X[d] * comm_dim(d));
+
+    for (int parity = 0; parity < 2; parity++)
+      for (uint32_t i = 0; i < volume_h; i++) {
+        // get the local coordinate
+        std::array<uint64_t, 4> x;
+        getCoords(x, i, X, parity);
+        for (int d = 0; d < 4; d++) x[d] += X[d] * comm_coord(d);
+        uint64_t global_idx = (((x[3] * X_global[2] + x[2]) * X_global[1]) + x[1]) * X_global[0] + x[0];
+        rng[parity * volume_h + i] = host_rng_t(seed(global_idx));
+      }
+  }
+} // namespace
+
 void initRand()
 {
-  using quda::comm_coord;
-  using quda::comm_dim;
-
   int rank = 0;
 
 #if defined(QMP_COMMS)
@@ -445,23 +474,7 @@ void initRand()
   srand(17 * rank + 137);
 
   // initialize the hypercubic RNG
-  std::array<uint64_t, 4> X = {1llu * xdim, 1llu * ydim, 1llu * zdim, 1llu * tdim};
-  uint64_t volume = X[0] * X[1] * X[2] * X[3];
-  uint64_t volume_h = volume / 2;
-
-  host_rand.resize(volume);
-  std::array<uint64_t, 4> X_global;
-  for (int d = 0; d < 4; d++) X_global[d] = static_cast<uint64_t>(X[d] * comm_dim(d));
-
-  for (int parity = 0; parity < 2; parity++)
-    for (uint32_t i = 0; i < volume_h; i++) {
-      // get the local coordinate
-      std::array<uint64_t, 4> x;
-      getCoords(x, i, X, parity);
-      for (int d = 0; d < 4; d++) x[d] += X[d] * comm_coord(d);
-      uint64_t global_idx = (((x[3] * X_global[2] + x[2]) * X_global[1]) + x[1]) * X_global[0] + x[0];
-      host_rand[parity * volume_h + i] = host_rng_t(17ul * global_idx + 137);
-    }
+  initHypercubicRNG(host_rand, {xdim, ydim, zdim, tdim}, [](uint64_t global_idx) { return 17ul * global_idx + 137; });
 }
 
 uint64_t host_source_rand_seed(uint64_t seed, uint64_t global_index)
@@ -475,28 +488,11 @@ uint64_t host_source_rand_seed(uint64_t seed, uint64_t global_index)
   return mix(mix(seed) ^ global_index);
 }
 
-void initSourceRand(uint64_t seed)
+void initSourceRand(uint64_t seed, const std::array<int, 4> &X)
 {
-  using quda::comm_coord;
-  using quda::comm_dim;
-
-  std::array<uint64_t, 4> X = {1llu * xdim, 1llu * ydim, 1llu * zdim, 1llu * tdim};
-  uint64_t volume = X[0] * X[1] * X[2] * X[3];
-  uint64_t volume_h = volume / 2;
-
-  host_source_rand.resize(volume);
+  initHypercubicRNG(host_source_rand, X, [seed](uint64_t global_idx) { return host_source_rand_seed(seed, global_idx); });
   host_source_seed = seed;
-  std::array<uint64_t, 4> X_global;
-  for (int d = 0; d < 4; d++) X_global[d] = static_cast<uint64_t>(X[d] * comm_dim(d));
-
-  for (int parity = 0; parity < 2; parity++)
-    for (uint32_t i = 0; i < volume_h; i++) {
-      std::array<uint64_t, 4> x;
-      getCoords(x, i, X, parity);
-      for (int d = 0; d < 4; d++) x[d] += X[d] * comm_coord(d);
-      uint64_t global_idx = (((x[3] * X_global[2] + x[2]) * X_global[1]) + x[1]) * X_global[0] + x[0];
-      host_source_rand[parity * volume_h + i] = host_rng_t(host_source_rand_seed(seed, global_idx));
-    }
+  host_source_dims = X;
 }
 
 void setDims(int *X)
