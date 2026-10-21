@@ -26,8 +26,8 @@ public:
    * @brief Construct an immutable QDP-ordered host gauge field for test cases.
    *
    * @param[in] gauge_param Parameters that define the host field.
-   * @param[in] argc Command-line argument count used to resolve the input mode.
-   * @param[in] argv Command-line arguments used to resolve or load the input field.
+   * @param[in] argc Command-line argument count (unused: the mode and file come from the parsed options).
+   * @param[in] argv Command-line arguments (unused: the mode and file come from the parsed options).
    * @param[in] default_mode Input mode used when no explicit mode is requested.
    */
   HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv,
@@ -38,6 +38,8 @@ public:
 
 /**
  * @brief Resolve the active gauge-input mode from command-line options.
+ *
+ * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
  */
 GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMode::HAAR);
 
@@ -103,6 +105,18 @@ void applyGaugeStaggeredPhase(void *const *gauge, int Vh, const int X[], QudaPre
  * @param[in] precision Gauge field floating point precision
  */
 void applyGaugeFieldScaling(void *const *gauge, int Vh, const QudaGaugeParam &param, QudaPrecision precision);
+
+/**
+ * @brief Apply temporal boundary conditions
+ *
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] t_boundary Temporal boundary conditions
+ * @param[in] precision Floating-point precision of the field
+ * @param[in] three_link Whether or not this is for the asqtad long links, default false
+ */
+void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision,
+                           bool three_link = false);
 
 /**
  * @brief Apply staggered phases as well as HISQ long-link scaling factors as requested
@@ -181,8 +195,9 @@ void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision,
  *
  * @param[out] gauge Generated QDP-ordered gauge field.
  * @param[in] gauge_param Information about the desired gauge field.
- * @param[in] argc Input command-line argument count.
- * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] argc Input command-line argument count (unused: the mode and file come from the parsed options).
+ * @param[in] argv Input command-line arguments (unused: the mode and file come from the parsed options).
+ * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
  */
 void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
                                   GaugeInputMode default_mode = GaugeInputMode::HAAR);
@@ -192,8 +207,9 @@ void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gaug
  *
  * @param[out] gauge Generated gauge field.
  * @param[in] gauge_param Information about the desired gauge field.
- * @param[in] argc Input command-line argument count.
- * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] argc Input command-line argument count (unused: the mode and file come from the parsed options).
+ * @param[in] argv Input command-line arguments (unused: the mode and file come from the parsed options).
+ * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
  */
 void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
                                   GaugeInputMode default_mode = GaugeInputMode::HAAR);

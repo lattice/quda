@@ -72,17 +72,7 @@ template <typename real_t> struct ApplyGaugeTemporalBCs {
   }
 };
 
-/**
- * @brief Apply temporal boundary conditions
- *
- * @param[out] gauge Generated QDP-ordered gauge field
- * @param[in] Vh One-half of the local volume
- * @param[in] t_boundary Temporal boundary conditions
- * @param[in] precision Floating-point precision of the field
- * @param[in] three_link Whether or not this is for the asqtad long links, default false
- */
-void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision,
-                           bool three_link = false)
+void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision, bool three_link)
 {
   instantiate_host<ApplyGaugeTemporalBCs>(precision, gauge, Vh, t_boundary, three_link);
 }
@@ -443,8 +433,9 @@ template <typename real_t> struct ConstructGaussianSU3GaugeField {
           Matrix<3, complex> matrix;
           for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
-              matrix(row, col) = complex(random_gaussian_host<real_t>(i, parity, 0, width),
-                                         random_gaussian_host<real_t>(i, parity, 0, width));
+              const real_t re = random_gaussian_host<real_t>(i, parity, 0, width);
+              const real_t im = random_gaussian_host<real_t>(i, parity, 0, width);
+              matrix(row, col) = complex(re, im);
             }
           }
           make_herm(matrix);

@@ -17,6 +17,7 @@
 #include <misc.h>
 #include <host_utils.h>
 #include "gauge_utils.h"
+#include "staggered_gauge_utils.h"
 #include "command_line_params.h"
 
 using namespace quda;
@@ -73,8 +74,6 @@ void initExtendedField(void *sitelink_ex[4], void *sitelink[4])
 }
 
 gsmear_test_type gtest_type = gsmear_test_type::TwoLink;
-
-constexpr GaugeInputMode default_gauge_input = GaugeInputMode::GAUSSIAN_SU3;
 
 CLI::TransformPairs<gsmear_test_type> gtest_type_map {{"TwoLink", gsmear_test_type::TwoLink},
                                                       {"GaussianSmear", gsmear_test_type::GaussianSmear}};
@@ -232,7 +231,7 @@ struct StaggeredGSmearTestWrapper { //
 
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-    constructHostGaugeInputField(qdp_inlink, gauge_param, argc, argv, default_gauge_input);
+    constructHostGaugeInputField(qdp_inlink, gauge_param, argc, argv, staggered_default_gauge_input);
     initExtendedField(qdp_inlink_ex, qdp_inlink);
     // Prepare two link field:
     if (verify_results or (gtest_type == gsmear_test_type::GaussianSmear and smear_compute_two_link == false))

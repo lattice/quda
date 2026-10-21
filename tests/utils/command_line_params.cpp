@@ -829,7 +829,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--tol-precondition", tol_precondition, "Set L2 residual tolerance for preconditioner");
   quda_app->add_option(
     "--unit-gauge", unit_gauge,
-    "Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)");
+    "Generate a unit valued gauge field in the tests. If false, the tests that take --gauge-input use its default "
+    "and the others generate a random gauge (default false)");
 
   quda_app->add_option("--verbosity", verbosity, "The the verbosity on the top level of QUDA( default summarize)")
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));

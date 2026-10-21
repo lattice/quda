@@ -26,6 +26,30 @@ static double svd_rel_error = 1e-4;
 static double svd_abs_error = 1e-4;
 static double max_allowed_error = 1e-11;
 
+// multiply each link by exp(i angle(i, parity)), one angle per link, drawn in the order dir, site, parity
+template <typename F> static void applyLinkU1Phase(void *const *links, QudaPrecision precision, F &&angle)
+{
+  for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
+    for (int i = 0; i < Vh; ++i) {
+      for (int parity = 0; parity < 2; parity++) {
+        std::complex<double> z = std::polar(1.0, angle(i, parity));
+        for (auto j = 0lu; j < gauge_site_size; j += 2) {
+          if (precision == QUDA_DOUBLE_PRECISION) {
+            std::complex<double> *l
+              = (std::complex<double> *)(&(((double *)links[dir])[(parity * Vh + i) * gauge_site_size + j]));
+            *l *= z;
+          } else {
+            std::complex<float> *l
+              = (std::complex<float> *)(&(((float *)links[dir])[(parity * Vh + i) * gauge_site_size + j]));
+            *l *= z;
+          }
+        }
+      }
+    }
+  }
+}
+
 void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, GaugeFieldConstructionType type,
                                 QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
 {
@@ -52,26 +76,8 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       constructRandomGaugeField(longlink, param, precision, dslash_type);
       // incorporate non-trivial phase into long links
-      for (int dir = 0; dir < 4; ++dir) {
-#pragma omp parallel for
-        for (int i = 0; i < Vh; ++i) {
-          for (int parity = 0; parity < 2; parity++) {
-            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
-            std::complex<double> z = std::polar(1.0, phase);
-            for (auto j = 0lu; j < gauge_site_size; j += 2) {
-              if (precision == QUDA_DOUBLE_PRECISION) {
-                std::complex<double> *l
-                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
-                *l *= z;
-              } else {
-                std::complex<float> *l
-                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
-                *l *= z;
-              }
-            }
-          }
-        }
-      }
+      applyLinkU1Phase(longlink, precision,
+                       [](int i, int parity) { return random_uniform_host<double>(i, parity, 0, 2 * M_PI); });
     }
   } else {
     // if doing naive staggered then set to long links so that the staggered phase is applied
@@ -85,26 +91,8 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
       constructRandomGaugeField(longlink, param, precision, dslash_type);
 
       // incorporate non-trivial phase into long links
-      for (int dir = 0; dir < 4; ++dir) {
-#pragma omp parallel for
-        for (int i = 0; i < Vh; ++i) {
-          for (int parity = 0; parity < 2; parity++) {
-            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
-            std::complex<double> z = std::polar(1.0, phase);
-            for (auto j = 0lu; j < gauge_site_size; j += 2) {
-              if (precision == QUDA_DOUBLE_PRECISION) {
-                std::complex<double> *l
-                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
-                *l *= z;
-              } else {
-                std::complex<float> *l
-                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
-                *l *= z;
-              }
-            }
-          }
-        }
-      }
+      applyLinkU1Phase(longlink, precision,
+                       [](int i, int parity) { return random_uniform_host<double>(i, parity, 0, 2 * M_PI); });
     }
   }
 
@@ -121,6 +109,11 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   const auto input_mode = resolveGaugeInputMode(staggered_default_gauge_input);
+  if (input_mode == GaugeInputMode::GAUSSIAN_SU3)
+    printfQuda("Gauge input: %s, width %g\n", getGaugeInputStr(input_mode), gauge_input_width);
+  else
+    printfQuda("Gauge input: %s\n", getGaugeInputStr(input_mode));
+
   // load or generate a field WITHOUT PHASES
   if (input_mode == GaugeInputMode::LOAD || input_mode == GaugeInputMode::GAUSSIAN_SU3) {
     if (input_mode == GaugeInputMode::LOAD) {
@@ -128,17 +121,22 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
       quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param))
         .load(qdp_inlink, gauge_param.cpu_prec, gauge_param.X);
     } else {
-      printfQuda("Gauge input: %s, width %g\n", getGaugeInputStr(input_mode), gauge_input_width);
       constructGaussianSU3GaugeField(qdp_inlink, gauge_param.cpu_prec, gauge_input_width);
       if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
-        // the long links are not computed from the thin links, so they are independent Gaussian links
+        // the long links are not computed from the thin links, so they are independent Gaussian links, with a
+        // U(1) phase for reconstruct 13/9 to recover
         constructGaussianSU3GaugeField(qdp_longlink, gauge_param.cpu_prec, gauge_input_width);
+        applyLinkU1Phase(qdp_longlink, gauge_param.cpu_prec, [](int i, int parity) {
+          return random_gaussian_host<double>(i, parity, 0, gauge_input_width);
+        });
         applyGaugeFieldScaling_long(qdp_longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, gauge_param.cpu_prec);
       }
     }
-    if (dslash_type != QUDA_LAPLACE_DSLASH) {
+    // the Laplace operator takes the t boundary but no staggered phases
+    if (dslash_type == QUDA_LAPLACE_DSLASH)
+      applyGaugeTemporalBCs(qdp_inlink, Vh, gauge_param.t_boundary, gauge_param.cpu_prec);
+    else
       applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-    }
   } else {
     GaugeFieldConstructionType construct_type = input_mode == GaugeInputMode::UNIT ?
       GaugeFieldConstructionType::UNIT_GAUGE :

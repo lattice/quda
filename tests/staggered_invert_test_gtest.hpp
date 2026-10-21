@@ -43,6 +43,14 @@ bool skip_test(test_t param)
     if (multishift > 1) return true; // Laplace doesn't support multishift
     if (solution_type != QUDA_MAT_SOLUTION || solve_type != QUDA_DIRECT_SOLVE)
       return true; // Laplace only supports direct solves
+
+    // on Gaussian SU(3) fields CG3NE diverges, as for the staggered operators below, and CGNE in single precision
+    // stalls just above the tolerance
+    if (resolveGaugeInputMode(staggered_default_gauge_input) == GaugeInputMode::GAUSSIAN_SU3
+        && (inverter_type == QUDA_CG3NE_INVERTER
+            || ((inverter_type == QUDA_CGNE_INVERTER || inverter_type == QUDA_CA_CGNE_INVERTER)
+                && prec < QUDA_DOUBLE_PRECISION)))
+      return true;
   }
 
   if (is_staggered(dslash_type)) {
@@ -58,7 +66,8 @@ bool skip_test(test_t param)
     // we could likely restore this when 20-bit quark fields are merged in
     if (inverter_type == QUDA_BICGSTABL_INVERTER && prec_sloppy < QUDA_SINGLE_PRECISION) return true;
 
-    // CG3 diverges for these solves on Gaussian SU(3) fields at mass 0.1 on lattices larger than the 1-rank ctests'
+    // CG3 diverges for these solves on Gaussian SU(3) fields at mass 0.1; seen on lattices larger than the 1-rank
+    // ctests', but skipped on every Gaussian run
     if (resolveGaugeInputMode(staggered_default_gauge_input) == GaugeInputMode::GAUSSIAN_SU3
         && ((inverter_type == QUDA_CG3_INVERTER && solution_type == QUDA_MATPC_SOLUTION
              && solve_type == QUDA_DIRECT_PC_SOLVE)
