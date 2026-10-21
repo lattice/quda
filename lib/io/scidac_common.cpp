@@ -226,7 +226,7 @@ namespace quda
       // the content of the <info> element of QUDA's record XML
       std::string quda_record_info(QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
                                    std::optional<double> eval, std::optional<double> eval_imag,
-                                   std::optional<double> resid, const std::string &sign_convention = "")
+                                   std::optional<double> resid, const std::string &sign_convention)
       {
         // if parity+even, it's a half-x-dim even only vector
         // if parity+odd, it's a half-x-dim odd only vector
@@ -256,7 +256,7 @@ namespace quda
     std::string legacy_quda_record_xml(int len, const std::string &datatype, QudaSiteSubset subset, QudaParity parity,
                                        int nColor, int nSpin, std::optional<double> eval, std::optional<double> resid)
     {
-      const auto info = quda_record_info(subset, parity, nColor, nSpin, eval, {}, resid);
+      const auto info = quda_record_info(subset, parity, nColor, nSpin, eval, {}, resid, "");
       return xml_declaration
         + element(quda_record_name(len), element("version", "BETA") + element("type", datatype) + element("info", info));
     }

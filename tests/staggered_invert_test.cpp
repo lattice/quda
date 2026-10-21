@@ -321,9 +321,9 @@ void check_source_options(const CLI::App &app)
   } else if (built && momentum) {
     for (int d = 0; d < 3; d++)
       if (o[d] < 0 || o[d] >= N[d])
-        errorQuda("--prop-source-position 0 %d %d %d, the origin of --prop-source-momentum with --prop-source-type %s, "
-                  "is outside the %d %d %d spatial lattice",
-                  o[0], o[1], o[2], name, N[0], N[1], N[2]);
+        errorQuda("--prop-source-position 0 %d %d %d %d, the origin of --prop-source-momentum with --prop-source-type "
+                  "%s, is outside the %d %d %d spatial lattice (its t is not used)",
+                  o[0], o[1], o[2], o[3], name, N[0], N[1], N[2]);
   }
 
   if (given("--prop-source-t0") && type == KSSourceType::POINT)
@@ -377,8 +377,8 @@ void check_propagator_options(const CLI::App &app)
   if (enable_testing) errorQuda("The propagator options are not used with --enable-testing");
   const auto &g = grid_partition;
   if (!prop_load_sink.empty() && g[0] * g[1] * g[2] * g[3] > 1)
-    errorQuda("--prop-load-sink-file %s gives initial guesses, which a split grid (--grid-partition %d %d %d %d) would "
-              "ignore: invertMultiSrcQuda splits only the sources into the sub-partitions",
+    errorQuda("--prop-load-sink-file %s gives initial guesses, which invertMultiSrcQuda doesn't take with a split grid "
+              "(--grid-partition %d %d %d %d): it splits only the sources into the sub-partitions",
               prop_load_sink.c_str(), g[0], g[1], g[2], g[3]);
   // checks the --prop-file-* options, which are otherwise first used after the setup
   propagator_file_io_param();

@@ -615,15 +615,16 @@ TEST_P(FiveDLayoutTest, file_contents)
 
   if (comm_rank() == 0) {
     const auto data = binary_records(file);
-    ASSERT_EQ(data.size(), static_cast<size_t>(n)) << "binary records in " << file;
+    EXPECT_EQ(data.size(), static_cast<size_t>(n)) << "binary records in " << file;
 
     std::array<int, 4> N;
     const auto X = v[0].X();
     for (int d = 0; d < 4; d++) N[d] = (d == 0 && inflated ? 2 * X[0] : X[d]) * comm_dim(d);
     const size_t sites = static_cast<size_t>(N[0]) * N[1] * N[2] * N[3];
     size_t mismatches = 0;
-    for (int i = 0; i < n; i++) {
-      ASSERT_EQ(data[i].size(), sites * Ls * reals) << "values in binary record " << i << " of " << file;
+    for (int i = 0; i < n && i < static_cast<int>(data.size()); i++) {
+      EXPECT_EQ(data[i].size(), sites * Ls * reals) << "values in binary record " << i << " of " << file;
+      if (data[i].size() != sites * Ls * reals) continue;
       for (size_t site = 0; site < sites; site++) {
         const auto g = lattice_coords(site, N);
         const int site_parity = (g[0] + g[1] + g[2] + g[3]) % 2;
@@ -701,8 +702,10 @@ TEST_P(InterleavedFileTest, load)
     const bool volumes = partfile && comm_size() > 1;
     const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
     EXPECT_EQ(s.user_file, "Dummy user file XML");
-    ASSERT_EQ(s.private_record.size(), 1u);
-    EXPECT_EQ(scidac::xml_value(s.private_record[0], "datacount").value_or(""), std::to_string(n));
+    EXPECT_EQ(s.private_record.size(), 1u);
+    if (!s.private_record.empty()) {
+      EXPECT_EQ(scidac::xml_value(s.private_record[0], "datacount").value_or(""), std::to_string(n));
+    }
     for (auto &volume : saved_volumes(file)) EXPECT_EQ(count_binary_records(volume), 1u) << volume;
   }
 
@@ -754,8 +757,8 @@ TEST_P(VectorEigenvalueTest, records)
       SCOPED_TRACE(file);
       const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
       EXPECT_EQ(s.user_file, expected_file_xml("3 vectors"));
-      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
-      for (int i = 0; i < n; i++) {
+      EXPECT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n && i < static_cast<int>(s.private_record.size()); i++) {
         EXPECT_EQ(scidac::xml_value(s.private_record[i], "datatype").value_or(""), "USQCD_D3_DiracFermion");
         EXPECT_EQ(scidac::xml_value(s.private_record[i], "datacount").value_or(""), "1");
         EXPECT_EQ(scidac::xml_value(s.user_record[i], "eigVal").value_or(""),
@@ -864,8 +867,8 @@ TEST_P(VectorStringsTest, saved)
     if (comm_rank() == 0) {
       const auto s = saved_strings(file);
       EXPECT_EQ(s.user_file, expected_file_xml(n == 1 ? "1 vector" : "3 vectors"));
-      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
-      for (int i = 0; i < n; i++) {
+      EXPECT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n && i < static_cast<int>(s.private_record.size()); i++) {
         expect_private_record(s.private_record[i],
                               prec == QUDA_DOUBLE_PRECISION ? "USQCD_D3_ColorVector" : "USQCD_F3_ColorVector", 3, 0,
                               6 * prec, 1);
@@ -894,8 +897,8 @@ TEST_P(VectorStringsTest, saved)
       if (comm_rank() == 0) {
         const auto s = saved_strings(file);
         EXPECT_EQ(s.user_file, expected_file_xml("2 vectors"));
-        ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
-        for (int i = 0; i < n; i++) {
+        EXPECT_EQ(s.private_record.size(), static_cast<size_t>(n));
+        for (int i = 0; i < n && i < static_cast<int>(s.private_record.size()); i++) {
           expect_private_record(s.private_record[i], "USQCD_D3_DiracFermion", 3, 4, 24 * prec, 1);
           EXPECT_EQ(s.user_record[i],
                     expected_record_xml("qudaWilsonColorSpinorField", "full", "full", 3, 4,
@@ -919,8 +922,8 @@ TEST_P(VectorStringsTest, saved)
     if (comm_rank() == 0) {
       const auto s = saved_strings(file);
       EXPECT_EQ(s.user_file, expected_file_xml("2 vectors"));
-      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
-      for (int i = 0; i < n; i++) {
+      EXPECT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n && i < static_cast<int>(s.private_record.size()); i++) {
         expect_private_record(s.private_record[i], "USQCD_D3_DiracFermion", 3, 4, 24 * prec, Ls);
         EXPECT_EQ(s.user_record[i], expected_record_xml("qudaWilsonColorSpinorField", "parity", "odd", 3, 4));
       }
@@ -943,8 +946,8 @@ TEST_P(VectorStringsTest, saved)
     if (comm_rank() == 0) {
       const auto s = saved_strings(file);
       EXPECT_EQ(s.user_file, expected_file_xml("2 vectors"));
-      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
-      for (int i = 0; i < n; i++) {
+      EXPECT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n && i < static_cast<int>(s.private_record.size()); i++) {
         expect_private_record(s.private_record[i], "QUDA_DNs2Nc24_ColorSpinorField", nColor, nSpin, reals * prec, 1);
         EXPECT_EQ(s.user_record[i], expected_record_xml("qudaMGColorSpinorField", "full", "full", nColor, nSpin));
       }
@@ -1003,8 +1006,8 @@ TEST_P(VectorLegacyStringsTest, load)
       SCOPED_TRACE(file);
       const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
       EXPECT_EQ(s.user_file, "Dummy user file XML");
-      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
-      for (int i = 0; i < n; i++) {
+      EXPECT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int i = 0; i < n && i < static_cast<int>(s.private_record.size()); i++) {
         expect_private_record(s.private_record[i], datatype, 3, nSpin, 6 * nSpin * prec, 1);
         EXPECT_EQ(s.user_record[i],
                   "<?xml version=\"1.0\" encoding=\"UTF-8\"?><" + name + "><version>BETA</version><type>" + datatype

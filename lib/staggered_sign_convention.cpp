@@ -18,11 +18,19 @@ namespace quda
     {
       for (auto i = 0u; i < fields.size(); i++) {
         const ColorSpinorField &x = fields[i];
+        if (x.IsComposite())
+          errorQuda("Field %u of %lu is a composite field, so it cannot be converted from %s to %s sign convention", i,
+                    fields.size(), from, to);
         if (x.SiteSubset() != QUDA_FULL_SITE_SUBSET || x.Nspin() != 1 || x.Ndim() != 4)
           errorQuda("Field %u of %lu is not a full 4-d staggered field (it is %s, with %d spins and %d dimensions), so "
                     "it cannot be converted from %s to %s sign convention",
                     i, fields.size(), x.SiteSubset() == QUDA_FULL_SITE_SUBSET ? "full" : "single-parity", x.Nspin(),
                     x.Ndim(), from, to);
+        if (x.Location() == QUDA_CPU_FIELD_LOCATION && x.Precision() != QUDA_DOUBLE_PRECISION
+            && x.Precision() != QUDA_SINGLE_PRECISION)
+          errorQuda("Field %u of %lu is a host field of precision %d, not double or single, so it cannot be converted "
+                    "from %s to %s sign convention",
+                    i, fields.size(), x.Precision(), from, to);
       }
 
       for (auto i = 0u; i < fields.size(); i++) {

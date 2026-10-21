@@ -11,7 +11,6 @@
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <color_spinor_field.h>
-#include <blas_quda.h>
 #include <staggered_sign_convention.h>
 #include <io/ks_io.h>
 #include <io/lime.h>
@@ -294,6 +293,26 @@ namespace
     return std::vector<quda::ColorSpinorField>(n, ks_param(t.subset, t.parity, t.prec, t.location));
   }
 
+  // full staggered fields of the target's precision and location, field i holding encoded(i, g, k)
+  std::vector<quda::ColorSpinorField> encoded_fields(int n, const Target &t)
+  {
+    using namespace quda;
+    const auto X = local_dims();
+    ColorSpinorField h(
+      ks_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION));
+    auto data = h.data<double *>();
+    std::vector<ColorSpinorField> fields;
+    for (int i = 0; i < n; i++) {
+      for (size_t s = 0; s < h.Volume(); s++) {
+        const auto g = host_coords(s, X, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
+        for (int k = 0; k < 6; k++) data[s * 6 + k] = encoded(i, g, k, 6);
+      }
+      fields.emplace_back(ks_param(t.subset, t.parity, t.prec, t.location));
+      fields.back() = h;
+    }
+    return fields;
+  }
+
   // the content of every <date> element replaced by a single #
   std::string mask_dates(std::string s)
   {
@@ -387,8 +406,8 @@ TEST_P(HypercubeTest, boxes)
     if (comm_rank() == 0) {
       SCOPED_TRACE(files[0]);
       const auto s = saved_strings(files[0]);
-      ASSERT_EQ(s.private_record.size(), static_cast<size_t>(n));
-      for (int k = 0; k < n; k++)
+      EXPECT_EQ(s.private_record.size(), static_cast<size_t>(n));
+      for (int k = 0; k < n && k < static_cast<int>(s.private_record.size()); k++)
         EXPECT_EQ(mask_dates(s.private_record[k]),
                   xml_head + "<scidacRecord><version>1.1</version><date>#</date><recordtype>2</recordtype>"
                     + "<spacetime>4</spacetime><hyperlower>" + int_list(boxes[k].lower) + "</hyperlower><hyperupper>"
@@ -399,8 +418,7 @@ TEST_P(HypercubeTest, boxes)
       int k = 0;
       for (auto &r : local_records(files[0]))
         if (r.type == scidac::binary_data) {
-          ASSERT_LT(k, n);
-          EXPECT_EQ(r.data_bytes, boxes[k].volume() * 48) << "record " << k;
+          if (k < n) { EXPECT_EQ(r.data_bytes, boxes[k].volume() * 48) << "record " << k; }
           k++;
         }
       EXPECT_EQ(k, n);
@@ -633,8 +651,8 @@ TEST(KSDetectionTest, kinds)
   using namespace quda;
   if (!is_enabled_spin(1)) GTEST_SKIP();
   const auto prec = QUDA_DOUBLE_PRECISION;
-  const auto param = ks_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, prec, QUDA_CPU_FIELD_LOCATION);
-  std::vector<ColorSpinorField> v(2, param);
+  const Target t = {QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, prec, QUDA_CPU_FIELD_LOCATION};
+  const auto v = encoded_fields(2, t);
   const std::vector<complex_t> evals = {0.5, 0.75};
   const std::vector<real_t> resids = {1e-12, 2e-12};
 
@@ -647,9 +665,9 @@ TEST(KSDetectionTest, kinds)
     SCOPED_TRACE(file);
     EXPECT_FALSE(scidac::ks_file_type(scidac::find_field(file)));
     // and they still load as vectors
-    std::vector<ColorSpinorField> u(2, param);
+    auto u = zero_fields(2, t);
     VectorIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL)).load(u);
-    for (int i = 0; i < 2; i++) EXPECT_EQ(blas::max_deviation(u[i], v[i])[0], 0.0);
+    EXPECT_EQ(mismatches(u, [](int i, const std::array<int, 4> &g, int k) { return encoded(i, g, k, 6); }), 0);
   }
 
   const std::string source_file = "detect.src", vv_file = "detect.prop", complex_file = "detect_complex.src";
@@ -676,26 +694,6 @@ TEST(KSDetectionTest, kinds)
 
 namespace
 {
-  // full staggered fields of the target's precision and location, field i holding encoded(i, g, k)
-  std::vector<quda::ColorSpinorField> encoded_fields(int n, const Target &t)
-  {
-    using namespace quda;
-    const auto X = local_dims();
-    ColorSpinorField h(
-      ks_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION));
-    auto data = h.data<double *>();
-    std::vector<ColorSpinorField> fields;
-    for (int i = 0; i < n; i++) {
-      for (size_t s = 0; s < h.Volume(); s++) {
-        const auto g = host_coords(s, X, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
-        for (int k = 0; k < 6; k++) data[s * 6 + k] = encoded(i, g, k, 6);
-      }
-      fields.emplace_back(ks_param(t.subset, t.parity, t.prec, t.location));
-      fields.back() = h;
-    }
-    return fields;
-  }
-
   // the bytes of a field, copied to the host in its own precision
   std::vector<char> field_bytes(const quda::ColorSpinorField &f)
   {
@@ -707,6 +705,14 @@ namespace
     h = f;
     auto data = h.data<const char *>();
     return std::vector<char>(data, data + h.Bytes());
+  }
+
+  // the number of ranks on which b is true (collective)
+  int ranks_where(bool b)
+  {
+    int n = b;
+    quda::comm_allreduce_int(n);
+    return n;
   }
 
   bool odd_site(const std::array<int, 4> &g) { return (g[0] + g[1] + g[2] + g[3]) % 2 == 1; }
@@ -737,12 +743,12 @@ TEST_P(StaggeredSignConventionTest, convert)
   staggeredMILCToQUDASignConvention(x);
   EXPECT_EQ(mismatches(x, converted), 0);
   staggeredQUDAToMILCSignConvention(y);
-  for (int i = 0; i < n; i++) EXPECT_EQ(field_bytes(y[i]), field_bytes(x[i])) << "field " << i;
+  for (int i = 0; i < n; i++) EXPECT_EQ(ranks_where(field_bytes(y[i]) != field_bytes(x[i])), 0) << "field " << i;
 
   staggeredQUDAToMILCSignConvention(x);
-  for (int i = 0; i < n; i++) EXPECT_EQ(field_bytes(x[i]), original[i]) << "field " << i;
+  for (int i = 0; i < n; i++) EXPECT_EQ(ranks_where(field_bytes(x[i]) != original[i]), 0) << "field " << i;
   staggeredMILCToQUDASignConvention(y);
-  for (int i = 0; i < n; i++) EXPECT_EQ(field_bytes(y[i]), original[i]) << "field " << i;
+  for (int i = 0; i < n; i++) EXPECT_EQ(ranks_where(field_bytes(y[i]) != original[i]), 0) << "field " << i;
 }
 
 // QUDA's staggered vector files record the sign convention they were saved in, in each record's XML, identically in
@@ -774,8 +780,8 @@ TEST(VectorSignConventionTest, records)
       for (auto &file : files) {
         SCOPED_TRACE(file);
         const auto s = saved_strings(file);
-        ASSERT_EQ(s.user_record.size(), static_cast<size_t>(n));
-        for (int i = 0; i < n; i++)
+        EXPECT_EQ(s.user_record.size(), static_cast<size_t>(n));
+        for (int i = 0; i < n && i < static_cast<int>(s.user_record.size()); i++)
           EXPECT_EQ(s.user_record[i],
                     xml_head + "<qudaStaggeredColorSpinorField><version>1.0</version><info><subset>full</subset>"
                       + "<parity>full</parity><nColor>3</nColor><nSpin>1</nSpin>" + element
@@ -859,11 +865,12 @@ namespace
     double max_difference = 0.0;     // on the support
     int nonzero_off_support = 0;     // reals
     double max_norm_deviation = 0.0; // of the 3-color vectors on the support from 1
+    int nonfinite_on_support = 0;    // reals, which the maxima above ignore
   };
 
   /**
-     @brief Compare host fields with expected(field, host index, g, color) on the sites where on_support(g), and count
-     their nonzero reals elsewhere, on all ranks
+     @brief Compare host fields with expected(field, host index, g, color) on the sites where on_support(g), count
+     their reals that are not finite there and their nonzero reals elsewhere, on all ranks
    */
   Comparison compare(const std::vector<quda::ColorSpinorField> &fields,
                      const std::function<cplx(int, size_t, const coords_t &, int)> &expected,
@@ -886,10 +893,12 @@ namespace
         for (int c = 0; c < 3; c++) {
           const cplx v(data[s * 6 + 2 * c], data[s * 6 + 2 * c + 1]);
           norm2 += std::norm(v);
-          if (support)
+          if (support) {
             r.max_difference = std::max(r.max_difference, std::abs(v - expected(i, s, g, c)));
-          else
+            r.nonfinite_on_support += !std::isfinite(v.real()) + !std::isfinite(v.imag());
+          } else {
             r.nonzero_off_support += (v.real() != 0.0) + (v.imag() != 0.0);
+          }
         }
         if (support) r.max_norm_deviation = std::max(r.max_norm_deviation, std::abs(norm2 - 1.0));
       }
@@ -897,6 +906,7 @@ namespace
     comm_allreduce_max(r.max_difference);
     comm_allreduce_int(r.nonzero_off_support);
     comm_allreduce_max(r.max_norm_deviation);
+    comm_allreduce_int(r.nonfinite_on_support);
     return r;
   }
 
@@ -1003,6 +1013,7 @@ TEST_P(KSSourceBuildTest, deterministic)
           },
           [&](const coords_t &g) { return on_slice(g, type == KSSourceType::POINT ? t : p.t0); });
         EXPECT_LE(r.max_difference, prec == QUDA_DOUBLE_PRECISION ? 1e-13 : 1e-6);
+        EXPECT_EQ(r.nonfinite_on_support, 0);
         EXPECT_EQ(r.nonzero_off_support, 0);
       }
     }
@@ -1051,6 +1062,7 @@ TEST_P(KSRandomSourceBuildTest, random)
             const auto r = compare(
               f, [&](int i, size_t h, const coords_t &g, int c) { return v[i][h][c] * momentum_factor(p, g); }, support);
             EXPECT_LE(r.max_difference, momentum || prec == QUDA_SINGLE_PRECISION ? tol : 0.0);
+            EXPECT_EQ(r.nonfinite_on_support, 0);
             EXPECT_EQ(r.nonzero_off_support, 0);
             EXPECT_LE(r.max_norm_deviation, prec == QUDA_DOUBLE_PRECISION ? 1e-14 : 1e-6);
           }
@@ -1063,6 +1075,7 @@ TEST_P(KSRandomSourceBuildTest, random)
           const auto r = compare(
             f, [&](int, size_t h, const coords_t &g, int c) { return v[0][h][c] * momentum_factor(p, g); }, support);
           EXPECT_LE(r.max_difference, tol) << "a single source";
+          EXPECT_EQ(r.nonfinite_on_support, 0) << "a single source";
           EXPECT_EQ(r.nonzero_off_support, 0) << "a single source";
         }
       }
@@ -1082,9 +1095,10 @@ TEST_P(KSRandomSourceBuildTest, random)
     const auto r = compare(
       f, [&](int i, size_t h, const coords_t &, int c) { return v[i][h][c]; }, [](const coords_t &) { return true; });
     EXPECT_EQ(r.max_difference, 0.0) << "seed 99, build " << build;
+    EXPECT_EQ(r.nonfinite_on_support, 0) << "seed 99, build " << build;
   }
 
-  EXPECT_EQ(host_rand_bytes(), host_rand_before) << "host_rand was used";
+  EXPECT_EQ(ranks_where(host_rand_bytes() != host_rand_before), 0) << "host_rand was used";
 }
 
 int main(int argc, char **argv)

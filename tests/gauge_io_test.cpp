@@ -88,17 +88,24 @@ namespace
   {
     if (quda::comm_rank() == 0) {
       auto contents = read_file(file);
+      bool changed = false;
       if (format == QUDA_FILE_FORMAT_MILC) {
-        ASSERT_GE(contents.size(), 96u);
-        contents[88] ^= 1; // the low byte of sum29
+        EXPECT_GE(contents.size(), 96u);
+        if (contents.size() >= 96) {
+          contents[88] ^= 1; // the low byte of sum29
+          changed = true;
+        }
       } else {
         const std::string tag = "<suma>";
         auto it = std::find_end(contents.begin(), contents.end(), tag.begin(), tag.end());
-        ASSERT_NE(it, contents.end()) << "no checksum record in " << file;
-        auto &digit = *(it + tag.size());
-        digit = digit == '1' ? '2' : '1';
+        EXPECT_NE(it, contents.end()) << "no checksum record in " << file;
+        if (it != contents.end()) {
+          auto &digit = *(it + tag.size());
+          digit = digit == '1' ? '2' : '1';
+          changed = true;
+        }
       }
-      EXPECT_TRUE(write_file(file, contents)) << "could not change the checksum in " << file;
+      if (changed) { EXPECT_TRUE(write_file(file, contents)) << "could not change the checksum in " << file; }
     }
     quda::comm_barrier();
   }
@@ -1064,12 +1071,14 @@ TEST_P(GaugeStringsTest, saved)
         if (comm_rank() == 0) {
           const auto s = saved_strings(partfile && comm_size() > 1 ? volume_file(file, 0) : file);
           EXPECT_EQ(s.user_file, expected_file_xml("gauge field"));
-          ASSERT_EQ(s.private_record.size(), 1u);
-          expect_gauge_private_record(s.private_record[0], datatype, prec);
-          if (usqcd_info)
-            EXPECT_TRUE(scidac::xml_value(s.user_record[0], "usqcdInfo")) << s.user_record[0];
-          else
-            EXPECT_EQ(s.user_record[0], expected_gauge_record_xml("<version>1.0</version>"));
+          EXPECT_EQ(s.private_record.size(), 1u);
+          if (!s.private_record.empty()) {
+            expect_gauge_private_record(s.private_record[0], datatype, prec);
+            if (usqcd_info)
+              EXPECT_TRUE(scidac::xml_value(s.user_record[0], "usqcdInfo")) << s.user_record[0];
+            else
+              EXPECT_EQ(s.user_record[0], expected_gauge_record_xml("<version>1.0</version>"));
+          }
         }
         remove_saved_file(file);
       }
@@ -1112,9 +1121,11 @@ TEST_P(GaugeLegacyStringsTest, load)
         SCOPED_TRACE(file);
         const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
         EXPECT_EQ(s.user_file, "Dummy user file XML");
-        ASSERT_EQ(s.private_record.size(), 1u);
-        expect_gauge_private_record(s.private_record[0], datatype, prec);
-        EXPECT_EQ(s.user_record[0], expected_gauge_record_xml("<version>BETA</version><type>" + datatype + "</type>"));
+        EXPECT_EQ(s.private_record.size(), 1u);
+        if (!s.private_record.empty()) {
+          expect_gauge_private_record(s.private_record[0], datatype, prec);
+          EXPECT_EQ(s.user_record[0], expected_gauge_record_xml("<version>BETA</version><type>" + datatype + "</type>"));
+        }
       }
     }
 #ifdef HAVE_QIO
