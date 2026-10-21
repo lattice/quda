@@ -46,7 +46,7 @@ namespace quda {
       typename mapper<typename Arg::store_in_t>::type in[Arg::length];
       arg.in.load(in, x_cb, parity);
 #pragma unroll
-      for (int i=0; i<Arg::length; i++) out[i] = in[i];
+      for (int i=0; i<Arg::length; i++) copy(out[i], in[i]);
 
       if (arg.compute_diagonal) {
         *arg.diagonal = (out[0] + out[3]);
@@ -74,7 +74,7 @@ namespace quda {
       typename mapper<typename Arg::store_in_t>::type in[length];
       arg.in.raw_load(in, x_cb, parity);
 #pragma unroll
-      for (int i=0; i<length; i++) out[i] = in[i];
+      for (int i=0; i<length; i++) copy(out[i], in[i]);
 
       arg.out.raw_save(out, x_cb, parity);
     }

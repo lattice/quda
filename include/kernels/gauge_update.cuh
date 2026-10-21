@@ -20,12 +20,12 @@ namespace quda {
     Gauge in;
     Mom mom;
     real dt;
-    UpdateGaugeArg(GaugeField &out, const GaugeField &in, const GaugeField &mom, real dt) :
+    UpdateGaugeArg(GaugeField &out, const GaugeField &in, const GaugeField &mom, real_t dt) :
       kernel_param(dim3(in.VolumeCB(), 2, in.Geometry())),
       out(out),
       in(in),
       mom(mom),
-      dt(dt) { }
+      dt(static_cast<real>(dt)) { }
   };
 
   template <typename Arg> struct UpdateGauge {

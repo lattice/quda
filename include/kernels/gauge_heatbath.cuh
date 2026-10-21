@@ -578,6 +578,7 @@ namespace quda
 
   template <typename Float_, int nColor_, QudaReconstructType recon, bool heatbath_> struct MonteArg : kernel_param<> {
     using Float = Float_;
+    using real = typename promote_mapper<Float>::type;
     static constexpr int nColor = nColor_;
     using Gauge = typename gauge_mapper<Float, recon>::type;
     static constexpr bool heatbath = heatbath_;
@@ -585,14 +586,14 @@ namespace quda
     int X[4]; // grid dimensions
     int border[4];
     Gauge dataOr;
-    Float BetaOverNc;
+    real BetaOverNc;
     RNGState *rng;
     int mu;
     int parity;
     MonteArg(GaugeField &data, real_t Beta, RNGState *rng, int mu, int parity) :
       kernel_param(dim3(data.LocalVolumeCB(), 1, 1)), dataOr(data), rng(rng), mu(mu), parity(parity)
     {
-      BetaOverNc = static_cast<Float>(Beta / nColor);
+      BetaOverNc = static_cast<real>(Beta / nColor);
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = data.R()[dir];
         X[dir] = data.X()[dir] - border[dir] * 2;
@@ -607,7 +608,7 @@ namespace quda
 
     __device__ __host__ void operator()(int x_cb)
     {
-      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       auto mu = arg.mu;
       auto parity = arg.parity;
 

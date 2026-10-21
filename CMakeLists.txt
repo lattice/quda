@@ -13,7 +13,11 @@
 # START 1. Basic setup for cmake
 ####################################################################################
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+# 3.25.2 is the first CMake that knows the CUDA20 dialect. Older releases fail
+# inside enable_language(CUDA) ("requires the language dialect CUDA20") because
+# the host language standard is C++20. HIP goes through Clang, which has had a
+# C++20 standard flag since CMake 3.21, so it does not have this gap.
+cmake_minimum_required(VERSION 3.25.2 FATAL_ERROR)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -240,7 +244,6 @@ option(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST "Whether to run eigensolver cte
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
-option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
 if(NOT DEFINED QUDA_BLAS_PREFETCH_TYPE)
   set(QUDA_BLAS_PREFETCH_TYPE "THREAD" CACHE STRING "BLAS grid-stride prefetch: NONE, THREAD (per-cache-line L2), BULK (CUDA sm_90+; CMake rejects older arches)")
@@ -282,7 +285,6 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)

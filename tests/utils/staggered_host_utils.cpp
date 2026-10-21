@@ -290,7 +290,7 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
   } else if (oddBit == QUDA_ODD_PARITY) {
     otherparity = QUDA_EVEN_PARITY;
   } else {
-    errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
+    errorQuda("Full parity not supported");
   }
   const int nFace = 3;
 

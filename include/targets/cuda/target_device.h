@@ -265,7 +265,7 @@ namespace quda
        @param[in] t The input value we want to make warp uniform
        @return The warp uniform variant
     */
-    template <typename T> __device__ __host__ inline bool uniform(const T &t)
+    template <typename T> __device__ __host__ inline T uniform(const T &t)
     {
       return target::dispatch<uniform_impl>(t);
     }

@@ -192,6 +192,13 @@ namespace quda
     }
   }
 
+  void EigenSolver::reportMatNorm(real_t krylov_norm)
+  {
+    real_t norm = eig_param->use_poly_acc ? static_cast<real_t>(eig_param->a_max) : krylov_norm;
+    eig_param->mat_norm = static_cast<std::remove_cvref_t<decltype(eig_param->mat_norm)>>(norm);
+    logQuda(QUDA_VERBOSE, "Operator norm estimate: %e\n", eig_param->mat_norm);
+  }
+
   void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     resize(kSpace, n_kr + block_size, QUDA_ZERO_FIELD_CREATE); // increase Krylov space to n_kr + block_size
@@ -222,15 +229,11 @@ namespace quda
 
   real_t EigenSolver::setEpsilon(const QudaPrecision prec)
   {
-    real_t eps = 0.0;
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION: eps = DBL_EPSILON; break;
-    case QUDA_SINGLE_PRECISION: eps = FLT_EPSILON; break;
-    case QUDA_HALF_PRECISION: eps = 2e-3; break;
-    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
-    default: errorQuda("Invalid precision %d", prec);
+    case QUDA_HALF_PRECISION: return 2e-3;
+    case QUDA_QUARTER_PRECISION: return 5e-2;
+    default: return compute_epsilon(prec);
     }
-    return eps;
   }
 
   void EigenSolver::queryPrec(const QudaPrecision prec)
