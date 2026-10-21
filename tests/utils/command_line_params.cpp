@@ -1435,9 +1435,11 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(ks_source_type_map));
   opgroup->add_option("--prop-source-t0", prop_source_t0,
                       "The time slice of the built walls, or -1 for every slice (default 0)");
-  opgroup->add_option("--prop-source-momentum", prop_source_momentum,
-                      "The momentum px py pz of the built sources, in units of 2 pi / the global extent, from the "
-                      "origin --prop-source-position 0 (default 0 0 0)");
+  opgroup
+    ->add_option("--prop-source-momentum", prop_source_momentum,
+                 "The momentum px py pz of the built sources, in units of 2 pi / the global extent, from the "
+                 "origin --prop-source-position 0 (default 0 0 0)")
+    ->expected(3);
   opgroup
     ->add_option("--prop-source-subset", prop_source_subset,
                  "The subset of the built random walls: full (default), or corner (x, y and z even), as MILC's")
