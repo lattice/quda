@@ -5,36 +5,13 @@
 #include <gauge_field.h>
 
 #include "host_utils.h"
+#include "gauge_input.h"
 
 using quda::GaugeField;
 using quda::GaugeFieldParam;
 
 // Local enums for gauge field construction types
 enum class GaugeFieldConstructionType { UNIT_GAUGE, RANDOM_GAUGE, LOAD_GAUGE };
-
-enum class GaugeInputMode { HAAR, UNIT, GAUSSIAN_SU3, LOAD };
-
-/**
- * @brief Immutable host gauge input shared by independent test cases.
- */
-class HostGaugeInput
-{
-  quda::GaugeField input;
-
-public:
-  /**
-   * @brief Construct an immutable QDP-ordered host gauge field for test cases.
-   *
-   * @param[in] gauge_param Parameters that define the host field.
-   * @param[in] argc Command-line argument count (unused: the mode and file come from the parsed options).
-   * @param[in] argv Command-line arguments (unused: the mode and file come from the parsed options).
-   * @param[in] default_mode Input mode used when no explicit mode is requested.
-   */
-  HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv,
-                 GaugeInputMode default_mode = GaugeInputMode::HAAR);
-
-  const quda::GaugeField &field() const { return input; }
-};
 
 /**
  * @brief Resolve the active gauge-input mode from command-line options.
@@ -48,7 +25,14 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMod
  *
  * @param[in] mode Gauge-input mode.
  */
-const char *getGaugeInputStr(GaugeInputMode mode);
+const char *get_gauge_input_str(GaugeInputMode mode);
+
+/**
+ * @brief Print a gauge-input mode, and the Gaussian width for gaussian-su3.
+ *
+ * @param[in] mode Gauge-input mode.
+ */
+void printGaugeInput(GaugeInputMode mode);
 
 /**
  * @brief Constructs a QDP-ordered gauge field: either unit, random, or based on a file
@@ -195,21 +179,7 @@ void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision,
  *
  * @param[out] gauge Generated QDP-ordered gauge field.
  * @param[in] gauge_param Information about the desired gauge field.
- * @param[in] argc Input command-line argument count (unused: the mode and file come from the parsed options).
- * @param[in] argv Input command-line arguments (unused: the mode and file come from the parsed options).
  * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
  */
-void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
-                                  GaugeInputMode default_mode = GaugeInputMode::HAAR);
-
-/**
- * @brief Construct a host gauge field from the resolved gauge-input mode.
- *
- * @param[out] gauge Generated gauge field.
- * @param[in] gauge_param Information about the desired gauge field.
- * @param[in] argc Input command-line argument count (unused: the mode and file come from the parsed options).
- * @param[in] argv Input command-line arguments (unused: the mode and file come from the parsed options).
- * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
- */
-void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param,
                                   GaugeInputMode default_mode = GaugeInputMode::HAAR);

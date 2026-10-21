@@ -4,6 +4,7 @@
 #include <array>
 #include <quda.h>
 #include "misc.h"
+#include "gauge_input.h"
 
 // for compatibility while porting - remove later
 extern void usage(char **);
@@ -307,7 +308,8 @@ extern QudaDslashType dslash_type;
 extern int laplace3D;
 extern std::string latfile;
 extern bool unit_gauge;
-extern std::string gauge_input;
+extern GaugeInputMode gauge_input;
+extern bool gauge_input_explicit;
 extern double gauge_input_width;
 extern bool gauge_input_width_explicit;
 extern double gaussian_sigma;

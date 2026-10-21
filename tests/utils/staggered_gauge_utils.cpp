@@ -109,10 +109,7 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   const auto input_mode = resolveGaugeInputMode(staggered_default_gauge_input);
-  if (input_mode == GaugeInputMode::GAUSSIAN_SU3)
-    printfQuda("Gauge input: %s, width %g\n", getGaugeInputStr(input_mode), gauge_input_width);
-  else
-    printfQuda("Gauge input: %s\n", getGaugeInputStr(input_mode));
+  printGaugeInput(input_mode);
 
   // load or generate a field WITHOUT PHASES
   if (input_mode == GaugeInputMode::LOAD || input_mode == GaugeInputMode::GAUSSIAN_SU3) {

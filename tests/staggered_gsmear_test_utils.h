@@ -208,7 +208,7 @@ struct StaggeredGSmearTestWrapper { //
     init(argc, argv);
   }
 
-  void init(int argc, char **argv)
+  void init(int, char **)
   {
     setVerbosity(verbosity);
     inv_param.split_grid[0] = grid_partition[0];
@@ -231,7 +231,7 @@ struct StaggeredGSmearTestWrapper { //
 
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-    constructHostGaugeInputField(qdp_inlink, gauge_param, argc, argv, staggered_default_gauge_input);
+    constructHostGaugeInputField(qdp_inlink, gauge_param, staggered_default_gauge_input);
     initExtendedField(qdp_inlink_ex, qdp_inlink);
     // Prepare two link field:
     if (verify_results or (gtest_type == gsmear_test_type::GaussianSmear and smear_compute_two_link == false))

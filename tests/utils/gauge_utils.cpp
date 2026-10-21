@@ -1,4 +1,3 @@
-#include <cmath>
 #include <quda.h>
 #include <gauge_field.h>
 #include <io/gauge_io.h>
@@ -456,7 +455,7 @@ void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision,
   instantiate_host<ConstructGaussianSU3GaugeField>(precision, gauge, width);
 }
 
-const char *getGaugeInputStr(GaugeInputMode mode)
+const char *get_gauge_input_str(GaugeInputMode mode)
 {
   switch (mode) {
   case GaugeInputMode::HAAR: return "haar";
@@ -468,43 +467,30 @@ const char *getGaugeInputStr(GaugeInputMode mode)
   return "invalid";
 }
 
-HostGaugeInput::HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv, GaugeInputMode default_mode)
+void printGaugeInput(GaugeInputMode mode)
 {
-  quda::GaugeFieldParam field_param(gauge_param);
-  field_param.location = QUDA_CPU_FIELD_LOCATION;
-  field_param.order = QUDA_QDP_GAUGE_ORDER;
-  field_param.create = QUDA_NULL_FIELD_CREATE;
-  input = quda::GaugeField(field_param);
-  constructHostGaugeInputField(input, gauge_param, argc, argv, default_mode);
+  if (mode == GaugeInputMode::GAUSSIAN_SU3)
+    printfQuda("Gauge input: %s, width %g\n", get_gauge_input_str(mode), gauge_input_width);
+  else
+    printfQuda("Gauge input: %s\n", get_gauge_input_str(mode));
 }
 
 GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
 {
-  const bool explicit_input = !gauge_input.empty();
   const bool has_load = !latfile.empty();
 
-  if (explicit_input) {
-    GaugeInputMode mode = GaugeInputMode::HAAR;
-    if (gauge_input == "unit")
-      mode = GaugeInputMode::UNIT;
-    else if (gauge_input == "gaussian-su3")
-      mode = GaugeInputMode::GAUSSIAN_SU3;
-    else if (gauge_input == "load")
-      mode = GaugeInputMode::LOAD;
-
+  if (gauge_input_explicit) {
+    const GaugeInputMode mode = gauge_input;
     if (mode != GaugeInputMode::GAUSSIAN_SU3 && gauge_input_width_explicit) {
       errorQuda("--gauge-input-width requires --gauge-input gaussian-su3");
     }
     if (mode != GaugeInputMode::LOAD && has_load) {
-      errorQuda("--load-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
+      errorQuda("--load-gauge conflicts with explicit --gauge-input %s", get_gauge_input_str(mode));
     }
     if (mode != GaugeInputMode::UNIT && unit_gauge) {
-      errorQuda("--unit-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
+      errorQuda("--unit-gauge conflicts with explicit --gauge-input %s", get_gauge_input_str(mode));
     }
     if (mode == GaugeInputMode::LOAD && !has_load) { errorQuda("--gauge-input load requires --load-gauge"); }
-    if (mode == GaugeInputMode::GAUSSIAN_SU3 && (!std::isfinite(gauge_input_width) || gauge_input_width < 0)) {
-      errorQuda("--gauge-input-width must be finite and nonnegative");
-    }
     return mode;
   }
 
@@ -513,8 +499,7 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
   return default_mode;
 }
 
-void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int, char **,
-                                  GaugeInputMode default_mode)
+void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, GaugeInputMode default_mode)
 {
   switch (resolveGaugeInputMode(default_mode)) {
   case GaugeInputMode::HAAR:
@@ -534,21 +519,6 @@ void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gaug
     quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param)).load(gauge, gauge_param.cpu_prec, gauge_param.X);
     applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
     break;
-  }
-}
-
-void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
-                                  GaugeInputMode default_mode)
-{
-  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
-    constructHostGaugeInputField(static_cast<void *const *>(gauge.raw_pointer()), gauge_param, argc, argv, default_mode);
-  } else {
-    GaugeFieldParam param(gauge);
-    param.order = QUDA_QDP_GAUGE_ORDER;
-    param.create = QUDA_NULL_FIELD_CREATE;
-    GaugeField u(param);
-    constructHostGaugeInputField(static_cast<void *const *>(u.raw_pointer()), gauge_param, argc, argv, default_mode);
-    gauge = u;
   }
 }
 

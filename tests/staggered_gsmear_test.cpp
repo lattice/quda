@@ -17,11 +17,7 @@ protected:
     printfQuda("prec     recon    test_type     S_dim         T_dimension\n");
     printfQuda("%s   %s       %s       %d/%d/%d      %d \n", get_prec_str(prec), get_recon_str(link_recon),
                get_string(gtest_type_map, gtest_type).c_str(), xdim, ydim, zdim, tdim);
-    const auto input_mode = resolveGaugeInputMode(staggered_default_gauge_input);
-    if (input_mode == GaugeInputMode::GAUSSIAN_SU3)
-      printfQuda("Gauge input: %s, width %g\n", getGaugeInputStr(input_mode), gauge_input_width);
-    else
-      printfQuda("Gauge input: %s\n", getGaugeInputStr(input_mode));
+    printGaugeInput(resolveGaugeInputMode(staggered_default_gauge_input));
     printfQuda("Grid partition info:     X  Y  Z  T\n");
     printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
                dimPartitioned(3));

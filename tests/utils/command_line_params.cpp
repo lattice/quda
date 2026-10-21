@@ -49,7 +49,8 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 std::string latfile;
 bool unit_gauge = false;
-std::string gauge_input;
+GaugeInputMode gauge_input = GaugeInputMode::HAAR;
+bool gauge_input_explicit = false;
 double gauge_input_width = 0.25;
 bool gauge_input_width_explicit = false;
 double gaussian_sigma = 0.2;
@@ -505,6 +506,11 @@ namespace
   CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {{"parallel", QUDA_FILE_IO_PARALLEL},
                                                         {"serial", QUDA_FILE_IO_SERIAL}};
 
+  CLI::TransformPairs<GaugeInputMode> gauge_input_map {{"haar", GaugeInputMode::HAAR},
+                                                       {"unit", GaugeInputMode::UNIT},
+                                                       {"gaussian-su3", GaugeInputMode::GAUSSIAN_SU3},
+                                                       {"load", GaugeInputMode::LOAD}};
+
   CLI::TransformPairs<KSSourceType> ks_source_type_map {{"random", KSSourceType::RANDOM},
                                                         {"load", KSSourceType::LOAD},
                                                         {"point", KSSourceType::POINT},
@@ -635,22 +641,23 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       "--gauge-input", gauge_input,
       "Gauge field input mode: haar, unit, gaussian-su3, or load (default: load with --load-gauge, unit with "
       "--unit-gauge, otherwise gaussian-su3; used by the staggered dslash, invert, eigensolve and gsmear tests)")
-    ->check(CLI::IsMember({"haar", "unit", "gaussian-su3", "load"}));
+    ->transform(CLI::QUDACheckedTransformer(gauge_input_map))
+    ->each([](const std::string &) { gauge_input_explicit = true; })
+    ->default_str("");
+  CLI::Validator finite_number(
+    [](std::string &input) {
+      double value;
+      if (!CLI::detail::lexical_cast(input, value) || !std::isfinite(value)) return "Value " + input + " is not finite";
+      return std::string();
+    },
+    "");
   quda_app
-    ->add_option(
-      "--gauge-input-width",
-      [&](CLI::results_t res) {
-        gauge_input_width_explicit = true;
-        double width = 0;
-        if (!CLI::detail::lexical_cast(res[0], width)) return false;
-        if (!std::isfinite(width) || width < 0) {
-          throw CLI::ValidationError("--gauge-input-width", "expected a finite nonnegative value");
-        }
-        gauge_input_width = width;
-        return true;
-      },
-      "Gaussian width sigma for --gauge-input gaussian-su3 (default 0.25)")
-    ->type_name("FLOAT");
+    ->add_option("--gauge-input-width", gauge_input_width,
+                 "Gaussian width sigma for --gauge-input gaussian-su3 (default 0.25)")
+    ->check(CLI::PositiveNumber)
+    ->check(finite_number)
+    ->each([](const std::string &) { gauge_input_width_explicit = true; })
+    ->default_str("");
   quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
   quda_app->add_option("--mass", mass, "Mass of Dirac operator (default 0.1)");
