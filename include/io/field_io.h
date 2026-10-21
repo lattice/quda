@@ -8,8 +8,8 @@
 namespace quda
 {
 
-  /** Defined in staggered_sign_convention.h */
-  enum class StaggeredSignConvention;
+  /** The sign convention of staggered fields saved by QUDA: QUDA's own, or MILC's */
+  enum class StaggeredSignConvention { QUDA, MILC };
 
   /**
      @brief Internal options for loading and saving fields.  This is
@@ -87,6 +87,11 @@ namespace quda
      @brief Return a string naming a reunitarization method, for messages
    */
   const char *get_gauge_reunitarize_str(QudaGaugeReunitarize reunitarize);
+
+  /**
+     @brief Return the name of a staggered sign convention ("QUDA" or "MILC"), as files record it
+   */
+  const char *get_staggered_sign_convention_str(StaggeredSignConvention convention);
 
   /**
      @brief Determine the format of an existing file from its

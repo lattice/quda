@@ -7,7 +7,6 @@
 #include <io/scidac_io.h>
 #include <io/vector_io.h>
 #include <blas_quda.h>
-#include <staggered_sign_convention.h>
 #include <timer.h>
 
 namespace quda

@@ -3,6 +3,7 @@
 #include <random>
 #include <string>
 
+#include <blas_quda.h>
 #include <comm_quda.h>
 #include <util_quda.h>
 
@@ -263,4 +264,34 @@ void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSo
   if (param.subset == KSSourceSubset::CORNER) where += ", corner subset";
   if (is_random_ks_source(param.type)) where += ", seed " + std::to_string(param.seed);
   logQuda(QUDA_SUMMARIZE, "Built %lu %s sources (MILC's definition) %s\n", sources.size(), type, where.c_str());
+}
+
+void convertStaggeredSignConvention(std::vector<quda::ColorSpinorField> &fields)
+{
+  using namespace quda;
+  for (auto i = 0u; i < fields.size(); i++) {
+    const auto &x = fields[i];
+    if (x.IsComposite())
+      errorQuda("Field %u of %lu is a composite field, so its staggered sign convention cannot be converted", i,
+                fields.size());
+    if (x.SiteSubset() != QUDA_FULL_SITE_SUBSET || x.Nspin() != 1 || x.Ndim() != 4)
+      errorQuda("Field %u of %lu is not a full 4-d staggered field (it is %s, with %d spins and %d dimensions), so its "
+                "staggered sign convention cannot be converted",
+                i, fields.size(), x.SiteSubset() == QUDA_FULL_SITE_SUBSET ? "full" : "single-parity", x.Nspin(),
+                x.Ndim());
+    // the host ax takes any precision other than double for single
+    if (x.Location() == QUDA_CPU_FIELD_LOCATION && x.Precision() != QUDA_DOUBLE_PRECISION
+        && x.Precision() != QUDA_SINGLE_PRECISION)
+      errorQuda("Field %u of %lu is a host field of precision %d, not double or single, so its staggered sign "
+                "convention cannot be converted",
+                i, fields.size(), x.Precision());
+  }
+
+  for (auto &x : fields) {
+    auto &odd = x.Odd();
+    if (odd.Location() == QUDA_CUDA_FIELD_LOCATION)
+      blas::ax(-1.0, odd);
+    else
+      ax(-1.0, odd.data(), static_cast<int>(odd.Length()), odd.Precision());
+  }
 }

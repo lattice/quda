@@ -11,7 +11,6 @@
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <color_spinor_field.h>
-#include <staggered_sign_convention.h>
 #include <io/ks_io.h>
 #include <io/lime.h>
 #include <io/scidac_io.h>
@@ -694,19 +693,6 @@ TEST(KSDetectionTest, kinds)
 
 namespace
 {
-  // the bytes of a field, copied to the host in its own precision
-  std::vector<char> field_bytes(const quda::ColorSpinorField &f)
-  {
-    quda::ColorSpinorParam p(f);
-    p.location = QUDA_CPU_FIELD_LOCATION;
-    p.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    p.create = QUDA_NULL_FIELD_CREATE;
-    quda::ColorSpinorField h(p);
-    h = f;
-    auto data = h.data<const char *>();
-    return std::vector<char>(data, data + h.Bytes());
-  }
-
   // the number of ranks on which b is true (collective)
   int ranks_where(bool b)
   {
@@ -714,42 +700,7 @@ namespace
     quda::comm_allreduce_int(n);
     return n;
   }
-
-  bool odd_site(const std::array<int, 4> &g) { return (g[0] + g[1] + g[2] + g[3]) % 2 == 1; }
 } // namespace
-
-using sign_test_t = ::testing::tuple<QudaFieldLocation, QudaPrecision>;
-
-class StaggeredSignConventionTest : public ::testing::TestWithParam<sign_test_t>
-{
-};
-
-// the conversion negates the odd sites exactly and leaves the even ones as they are, both directions do the same, and
-// converting twice restores the fields bit for bit
-TEST_P(StaggeredSignConventionTest, convert)
-{
-  using namespace quda;
-  const auto location = ::testing::get<0>(GetParam());
-  const auto prec = ::testing::get<1>(GetParam());
-  if (!is_enabled_spin(1) || !is_enabled(prec)) GTEST_SKIP();
-  const Target t = {QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, prec, location};
-  const int n = 3;
-  auto x = encoded_fields(n, t), y = encoded_fields(n, t);
-  std::vector<std::vector<char>> original;
-  for (auto &f : x) original.push_back(field_bytes(f));
-
-  auto converted
-    = [](int i, const std::array<int, 4> &g, int k) { return (odd_site(g) ? -1.0 : 1.0) * encoded(i, g, k, 6); };
-  staggeredMILCToQUDASignConvention(x);
-  EXPECT_EQ(mismatches(x, converted), 0);
-  staggeredQUDAToMILCSignConvention(y);
-  for (int i = 0; i < n; i++) EXPECT_EQ(ranks_where(field_bytes(y[i]) != field_bytes(x[i])), 0) << "field " << i;
-
-  staggeredQUDAToMILCSignConvention(x);
-  for (int i = 0; i < n; i++) EXPECT_EQ(ranks_where(field_bytes(x[i]) != original[i]), 0) << "field " << i;
-  staggeredMILCToQUDASignConvention(y);
-  for (int i = 0; i < n; i++) EXPECT_EQ(ranks_where(field_bytes(y[i]) != original[i]), 0) << "field " << i;
-}
 
 // QUDA's staggered vector files record the sign convention they were saved in, in each record's XML, identically in
 // both backends; without one they record none
@@ -1144,13 +1095,4 @@ INSTANTIATE_TEST_SUITE_P(KS, KSRandomSourceBuildTest,
                            std::string name = get_ks_source_type_str(param.param);
                            std::replace(name.begin(), name.end(), '-', '_');
                            return name;
-                         });
-
-INSTANTIATE_TEST_SUITE_P(KS, StaggeredSignConventionTest,
-                         Combine(Values(QUDA_CPU_FIELD_LOCATION, QUDA_CUDA_FIELD_LOCATION),
-                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)),
-                         [](testing::TestParamInfo<sign_test_t> param) {
-                           std::string name
-                             = ::testing::get<0>(param.param) == QUDA_CPU_FIELD_LOCATION ? "host" : "device";
-                           return name + "_" + get_prec_str(::testing::get<1>(param.param));
                          });

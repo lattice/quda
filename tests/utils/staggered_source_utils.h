@@ -69,3 +69,17 @@ bool is_random_ks_source(KSSourceType type);
    @param[in] param The source
  */
 void constructKSSources(std::vector<quda::ColorSpinorField> &sources, const KSSourceParam &param);
+
+/**
+   @brief Convert staggered fields between QUDA's and MILC's sign conventions, by negating their odd sites (odd global
+   x + y + z + t)
+
+   QUDA's staggered operator is eps M_MILC eps, with eps = (-1)^(x+y+z+t), so MILC's solution of M_MILC x = b is
+   eps M_QUDA^{-1} (eps b).  Apply it to b (and to an initial guess from MILC) before a QUDA solve, and to the
+   solution and to b after it; the operation is its own inverse.  eps is QUDA's staggered gamma5
+   (DiracMatrix::applyGamma5 for the unpreconditioned staggered and asqtad operators).
+
+   @param[in,out] fields Full 4-d fields of 1 spin, not composite, on the device or on the host in double or single
+   precision
+ */
+void convertStaggeredSignConvention(std::vector<quda::ColorSpinorField> &fields);

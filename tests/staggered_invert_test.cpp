@@ -8,7 +8,6 @@
 #include <quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
-#include <staggered_sign_convention.h>
 #include <io/ks_io.h>
 #include <io/vector_io.h>
 
@@ -403,8 +402,8 @@ void load_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector
         prop_load_sink.c_str());
   }
   if (prop_milc_sign_convention) {
-    quda::staggeredMILCToQUDASignConvention(in);
-    if (!prop_load_sink.empty()) quda::staggeredMILCToQUDASignConvention(out);
+    convertStaggeredSignConvention(in);
+    if (!prop_load_sink.empty()) convertStaggeredSignConvention(out);
   }
 }
 
@@ -413,8 +412,8 @@ void load_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector
 void save_propagator_fields(std::vector<quda::ColorSpinorField> &in, std::vector<quda::ColorSpinorField> &out)
 {
   if (prop_milc_sign_convention) {
-    quda::staggeredQUDAToMILCSignConvention(in);
-    quda::staggeredQUDAToMILCSignConvention(out);
+    convertStaggeredSignConvention(in);
+    convertStaggeredSignConvention(out);
   }
   if (prop_save_source.empty() && prop_save_sink.empty()) return;
 

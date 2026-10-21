@@ -62,6 +62,15 @@ namespace quda
     }
   }
 
+  const char *get_staggered_sign_convention_str(StaggeredSignConvention convention)
+  {
+    switch (convention) {
+    case StaggeredSignConvention::QUDA: return "QUDA";
+    case StaggeredSignConvention::MILC: return "MILC";
+    }
+    return "";
+  }
+
   namespace
   {
     constexpr uint32_t lime_magic = 0x456789ab;       // LIME headers are always big endian
