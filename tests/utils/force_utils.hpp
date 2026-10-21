@@ -248,15 +248,6 @@ public:
    * @return Matrix determinant.
    */
   T determinant() const;
-
-  /**
-   * @brief Compute the inverse of a 3x3 matrix.
-   *
-   * This operation is implemented only for matrices with N = 3 and requires a non-singular matrix.
-   *
-   * @return Inverse matrix.
-   */
-  Matrix inverse() const;
 };
 
 template <int N, class T> Matrix<N, T>::Matrix()
@@ -276,23 +267,6 @@ template <int N, class T> T Matrix<N, T>::determinant() const
   return (*this)(0, 0) * ((*this)(1, 1) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 1))
     - (*this)(0, 1) * ((*this)(1, 0) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 0))
     + (*this)(0, 2) * ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0));
-}
-
-template <int N, class T> Matrix<N, T> Matrix<N, T>::inverse() const
-{
-  static_assert(N == 3, "Matrix::inverse is implemented only for 3x3 matrices");
-  Matrix<N, T> out;
-  const auto det = determinant();
-  out(0, 0) = ((*this)(1, 1) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 1)) / det;
-  out(0, 1) = ((*this)(0, 2) * (*this)(2, 1) - (*this)(0, 1) * (*this)(2, 2)) / det;
-  out(0, 2) = ((*this)(0, 1) * (*this)(1, 2) - (*this)(0, 2) * (*this)(1, 1)) / det;
-  out(1, 0) = ((*this)(1, 2) * (*this)(2, 0) - (*this)(1, 0) * (*this)(2, 2)) / det;
-  out(1, 1) = ((*this)(0, 0) * (*this)(2, 2) - (*this)(0, 2) * (*this)(2, 0)) / det;
-  out(1, 2) = ((*this)(0, 2) * (*this)(1, 0) - (*this)(0, 0) * (*this)(1, 2)) / det;
-  out(2, 0) = ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0)) / det;
-  out(2, 1) = ((*this)(0, 1) * (*this)(2, 0) - (*this)(0, 0) * (*this)(2, 1)) / det;
-  out(2, 2) = ((*this)(0, 0) * (*this)(1, 1) - (*this)(0, 1) * (*this)(1, 0)) / det;
-  return out;
 }
 
 template <int N, class T> Matrix<N, T> &Matrix<N, T>::operator+=(const Matrix<N, T> &mat)
@@ -368,14 +342,16 @@ template <typename real_t> void make_herm(Matrix<3, std::complex<real_t>> &m)
  */
 template <typename real_t> Matrix<3, std::complex<real_t>> exponentiate_iQ(const Matrix<3, std::complex<real_t>> &q)
 {
+  // Cayley-Hamilton for SU(3), arXiv hep-lat/0311018; [n] is the paper's equation n
   using complex = std::complex<real_t>;
   constexpr real_t inv3 = static_cast<real_t>(1.0 / 3.0);
-  constexpr real_t inv_pi = static_cast<real_t>(1.0 / M_PI);
-  constexpr real_t inv_3pi = static_cast<real_t>(1.0 / (3.0 * M_PI));
 
   const auto q2 = q * q;
+  // [14] c0 = det(Q)
   real_t c0 = q.determinant().real();
+  // [15] c1 = Tr(Q^2) / 2
   const real_t c1 = static_cast<real_t>(0.5) * trace(q2).real();
+  // [17]
   const real_t sqrt_c1_inv3 = std::sqrt(c1 * inv3);
   const real_t c0_max = 2 * c1 * inv3 * sqrt_c1_inv3;
   Matrix<3, complex> identity;
@@ -383,50 +359,62 @@ template <typename real_t> Matrix<3, std::complex<real_t>> exponentiate_iQ(const
 
   if (c1 == 0) return identity;
 
+  // [34] the fj are computed for c0 > 0 and converted at the end
   int parity = 0;
   if (c0 < 0) {
     c0 = -c0;
     parity = 1;
   }
 
+  // [25]
   const real_t theta = std::acos(c0 / c0_max);
-  const real_t u = std::cos(theta * inv_3pi * static_cast<real_t>(M_PI)) * sqrt_c1_inv3;
-  const real_t w = std::sin(theta * inv_3pi * static_cast<real_t>(M_PI)) * std::sqrt(c1);
+  // [23]
+  const real_t u = std::cos(theta / 3) * sqrt_c1_inv3;
+  // [24]
+  const real_t w = std::sin(theta / 3) * std::sqrt(c1);
+
+  // [29] fj = hj / (9 u^2 - w^2)
   const real_t u_sq = u * u;
   const real_t w_sq = w * w;
   const real_t denom_inv = static_cast<real_t>(1.0) / (9 * u_sq - w_sq);
-  const real_t exp_iu_re = std::cos(u * inv_pi * static_cast<real_t>(M_PI));
-  const real_t exp_iu_im = std::sin(u * inv_pi * static_cast<real_t>(M_PI));
+  const real_t exp_iu_re = std::cos(u);
+  const real_t exp_iu_im = std::sin(u);
   const real_t exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
   const real_t exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
-  const real_t cos_w = std::cos(w * inv_pi * static_cast<real_t>(M_PI));
-  const real_t sinc_w = std::abs(w) < static_cast<real_t>(0.05) ? static_cast<real_t>(1.0)
-      - w_sq / 6
-        * (static_cast<real_t>(1.0)
-           - w_sq * static_cast<real_t>(0.05)
-             * (static_cast<real_t>(1.0) - w_sq / 42 * (static_cast<real_t>(1.0) - w_sq / 72))) :
-                                                                  std::sin(w * inv_pi * static_cast<real_t>(M_PI)) / w;
+  const real_t cos_w = std::cos(w);
 
+  // [33] with one more term of the series than the paper
+  real_t sinc_w;
+  if (std::abs(w) < static_cast<real_t>(0.05))
+    sinc_w = 1 - w_sq / 6 * (1 - w_sq * static_cast<real_t>(0.05) * (1 - w_sq / 42 * (1 - w_sq / 72)));
+  else
+    sinc_w = std::sin(w) / w;
+
+  // [30] f0
   real_t h_re
     = (u_sq - w_sq) * exp_2iu_re + 8 * u_sq * cos_w * exp_iu_re + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_im;
   real_t h_im
     = (u_sq - w_sq) * exp_2iu_im - 8 * u_sq * cos_w * exp_iu_im + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_re;
   complex f0(h_re * denom_inv, h_im * denom_inv);
 
+  // [31] f1
   h_re = 2 * u * exp_2iu_re - 2 * u * cos_w * exp_iu_re + (3 * u_sq - w_sq) * sinc_w * exp_iu_im;
   h_im = 2 * u * exp_2iu_im + 2 * u * cos_w * exp_iu_im + (3 * u_sq - w_sq) * sinc_w * exp_iu_re;
   complex f1(h_re * denom_inv, h_im * denom_inv);
 
+  // [32] f2
   h_re = exp_2iu_re - cos_w * exp_iu_re - 3 * u * sinc_w * exp_iu_im;
   h_im = exp_2iu_im + cos_w * exp_iu_im - 3 * u * sinc_w * exp_iu_re;
   complex f2(h_re * denom_inv, h_im * denom_inv);
 
+  // [34] fj(-c0, c1) = (-1)^j fj(c0, c1)^*
   if (parity) {
     f0.imag(-f0.imag());
     f1.real(-f1.real());
     f2.imag(-f2.imag());
   }
 
+  // [19] exp(iQ) = f0 I + f1 Q + f2 Q^2
   return f0 * identity + f1 * q + f2 * q2;
 }
 
@@ -463,54 +451,6 @@ template <int N, class T, class U>
 Matrix<N, typename Promote<T, U>::Type> operator*(const U &scalar, const Matrix<N, T> &mat)
 {
   return mat * scalar;
-}
-
-/**
- * @brief Check whether a complex 3x3 matrix and its inverse satisfy an SU(3) tolerance.
- *
- * @param[in] inv Inverse of the matrix.
- * @param[in] u Matrix to check.
- * @param[in] tol Unitarity tolerance.
- */
-template <typename real_t>
-bool is_unitary(const Matrix<3, std::complex<real_t>> &inv, const Matrix<3, std::complex<real_t>> &u, real_t tol)
-{
-  const auto identity = conj(u) * u;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      if (std::abs(u(i, j).real() - inv(j, i).real()) > tol || std::abs(u(i, j).imag() + inv(j, i).imag()) > tol)
-        return false;
-    }
-    if (std::abs(identity(i, i).real() - static_cast<real_t>(1.0)) > tol || std::abs(identity(i, i).imag()) > tol)
-      return false;
-    for (int j = 0; j < i; j++) {
-      if (std::abs(identity(i, j).real()) > tol || std::abs(identity(i, j).imag()) > tol
-          || std::abs(identity(j, i).real()) > tol || std::abs(identity(j, i).imag()) > tol)
-        return false;
-    }
-  }
-  return true;
-}
-
-/**
- * @brief Project a complex 3x3 matrix onto SU(3) using polar decomposition.
- *
- * @param[in,out] u Matrix to project.
- * @param[in] tol Unitarity tolerance.
- */
-template <typename real_t> void polar_su3(Matrix<3, std::complex<real_t>> &u, real_t tol)
-{
-  auto out = u;
-  auto inv = u.inverse();
-  int i = 0;
-  do {
-    out = static_cast<real_t>(0.5) * (out + conj(inv));
-    inv = out.inverse();
-  } while (!is_unitary(inv, out, tol) && ++i < 100);
-
-  const auto det = out.determinant();
-  const auto mod = std::pow(std::norm(det), static_cast<real_t>(-1.0 / 6.0));
-  u = std::polar(mod, -std::arg(det) / static_cast<real_t>(3.0)) * out;
 }
 
 template <int N, class T> struct Identity {
