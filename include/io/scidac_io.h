@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 #include <io/field_io.h>
+#include <io/gauge_io.h>
 #include <io/host_field.h>
 #include <io/lime.h>
 #include <io/site_io.h>
@@ -97,9 +98,12 @@ namespace quda
       int datacount = 0;    /** Items per site */
       std::string user_xml; /** The user record XML */
       bool ildg = false;    /** Whether the file has (or should have) the ILDG records */
-      std::string ildg_lfn; /** ILDG logical file name to write; empty means none (save only) */
+      /** The ILDG logical file name: on save, the ildg-data-lfn record to write with the ILDG records, if any; on
+          load, the one found in the record's message (or anywhere, in ILDG files from other codes) */
+      std::optional<std::string> ildg_lfn;
       /** The box of the file's lattice that a hypercube record (record type 2) holds; none for a lattice field */
       std::optional<io::Hypercube> hypercube;
+      std::optional<std::string> date; /** The <date> of the private record XML, verbatim (load only) */
     };
 
     /**
@@ -258,7 +262,17 @@ namespace quda
       bool checksum_matches = false; /** Whether it matches the data (load only) */
       io::Checksum sum;              /** The checksums suma and sumb computed from the data (load only) */
       bool legacy_strings = false;   /** Save with the strings of FileIOParam::legacy_strings (save only) */
+      GaugeMetadata metadata;        /** The file's SciDAC and ILDG metadata (load only) */
     };
+
+    /**
+       @brief Set the user record XML of a gauge field's metadata, with
+       whether it is a usqcdInfo record and the content of its <info>
+       element, for both backends
+       @param[out] metadata The metadata
+       @param[in] user_xml The user record XML as found in the file
+     */
+    void set_gauge_record_xml(GaugeMetadata &metadata, const std::string &user_xml);
 
     /**
        @brief The metadata records of a gauge field: the user file XML and the record's metadata

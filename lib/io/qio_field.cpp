@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <unistd.h>
 #include <qmp.h>
 #include <qio.h>
@@ -105,7 +106,8 @@ static void get_site(char *buf, size_t index, int, void *arg)
   (*static_cast<const quda::io::SitePack *>(arg))(0, index, buf);
 }
 
-QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar, QIO_Filesystem *fs = nullptr)
+QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar, QIO_Filesystem *fs = nullptr,
+                            std::string *user_file_xml = nullptr)
 {
   QIO_Iflag iflag;
 
@@ -127,6 +129,7 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar, QIO_Fi
   printfQuda("%s: QIO_open_read done.\n", __func__);
   printfQuda("%s: User file info is \"%s\"\n", __func__, QIO_string_ptr(xml_file_in));
 
+  if (user_file_xml && QIO_string_ptr(xml_file_in)) *user_file_xml = QIO_string_ptr(xml_file_in);
   QIO_string_destroy(xml_file_in);
   return infile;
 }
@@ -181,7 +184,8 @@ static std::string hypercube_str(QIO_RecordInfo *rec_info)
 // reads the next record into a host field; a hypercube record is an error unless allowed, when it fills only its box
 int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, int nColor, int len,
                QudaPrecision *file_prec_out = nullptr, std::string *record_xml_out = nullptr,
-               const char *filename = nullptr, int record = 0, bool allow_hypercube = false)
+               const char *filename = nullptr, int record = 0, bool allow_hypercube = false,
+               std::optional<std::string> *date_out = nullptr)
 {
   const int count = field.items();
   // Get the QIO record and string
@@ -240,6 +244,10 @@ int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, 
 
   if (file_prec_out) *file_prec_out = file_prec;
   if (record_xml_out && QIO_string_ptr(xml_record_in)) *record_xml_out = QIO_string_ptr(xml_record_in);
+  // QIO makes the record info of a file without SciDAC records itself, dated now; QIO_defined_record_date is
+  // declared but not defined
+  if (date_out && QIO_get_reader_format(infile) == QIO_SCIDAC_NATIVE && rec_info->date.occur)
+    *date_out = QIO_get_record_date(rec_info);
 
   QIO_string_destroy(xml_record_in);
   QIO_destroy_record_info(rec_info);
@@ -251,9 +259,9 @@ int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, 
 }
 
 int read_su3_field(QIO_Reader *infile, const quda::io::HostField &field, QudaPrecision *file_prec,
-                   std::string *record_xml, const char *filename)
+                   std::string *record_xml, const char *filename, std::optional<std::string> *date)
 {
-  return read_field(infile, field, 1, 9, 18, file_prec, record_xml, filename);
+  return read_field(infile, field, 1, 9, 18, file_prec, record_xml, filename, 0, false, date);
 }
 
 // The USQCD gauge field record XML: <usqcdInfo> with the average plaquette and link trace.  This uses QIO's own
@@ -351,15 +359,17 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   PartitionFilesystem fs(io_mode, io_partition_grid, partfile_name(filename));
 
   /* Open the test file for reading */
-  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, qio_serpar(io_mode), fs.get());
+  std::string file_xml;
+  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, qio_serpar(io_mode), fs.get(), &file_xml);
   if (infile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Read the su3 field record */
   printfQuda("%s: reading su3 field\n", __func__);
   fflush(stdout);
   std::string record_xml;
-  int status
-    = read_su3_field(infile, quda::io::HostField(gauge, 4, precision, 18), &info.file_prec, &record_xml, filename);
+  std::optional<std::string> date;
+  int status = read_su3_field(infile, quda::io::HostField(gauge, 4, precision, 18), &info.file_prec, &record_xml,
+                              filename, &date);
   // on a checksum mismatch QIO has read the whole record, including the checksum, so the field is complete
   if (status != QIO_SUCCESS && status != QIO_CHECKSUM_MISMATCH) { errorQuda("read_su3_field failed %d\n", status); }
   info.sum = {QIO_get_reader_last_checksuma(infile), QIO_get_reader_last_checksumb(infile)};
@@ -382,6 +392,19 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   info.has_usqcd_info = usqcd_info[0] != 0.0;
   info.plaq = usqcd_info[1];
   info.linktr = usqcd_info[2];
+
+  // QIO gives placeholders for the XML of files without SciDAC records, and finds no LFN in them; the strings are
+  // taken from node 0, as the ILDG style
+  const char *lfn = QIO_get_ILDG_LFN(infile);
+  std::array<int, 2> found = {lfn != nullptr, date.has_value()};
+  std::array<std::string, 4> strings
+    = {native ? file_xml : "", native ? record_xml : "", lfn ? lfn : "", date.value_or("")};
+  QMP_broadcast(found.data(), sizeof(found));
+  for (auto &s : strings) quda::io::broadcast(s);
+  info.metadata.user_file_xml = strings[0];
+  quda::scidac::set_gauge_record_xml(info.metadata, strings[1]);
+  if (found[0]) info.metadata.ildg_lfn = strings[2];
+  if (found[1]) info.metadata.record_date = strings[3];
 
   /* Close the file */
   QIO_close_read(infile);

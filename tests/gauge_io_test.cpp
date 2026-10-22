@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <map>
+#include <optional>
 #include <vector>
 #include <unistd.h>
 
@@ -1376,6 +1378,576 @@ TEST(GaugeMPIIOPartfileTest, volumes)
   }
   SCOPED_TRACE("volumes " + grid_str(p.partfile_grid));
   check(p);
+}
+
+namespace
+{
+  const std::string xml_declaration = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+
+  // MILC's user file XML of gauge fields (generic/io_scidac.c)
+  const std::string milc_file_xml = xml_declaration + "<title>MILC ILDG archival gauge configuration</title>";
+
+  // the lines of a MILC .info file as create_MILC_info (ks_imp_dyn/gauge_info.c) puts them in usqcdInfo's <info>,
+  // from configs/24x24x24x24.chklat.info
+  const std::string milc_info_lines
+    = "action.description = \"Gauge plus fermion\"\n"
+      "gauge.description = \"Symanzik 1x1 + 1x2 + 1x1x1 action with HISQ quark loops\"\n"
+      "gauge.nloops = 3\n"
+      "gauge.nreps = 1\n"
+      "gauge.beta11 = 6.300000\n"
+      "gauge.tadpole.u0 = 0.890000\n"
+      "gauge.ssplaq = 1.623083\n"
+      "gauge.stplaq = 1.624976\n"
+      "gauge.nersc_linktr = -2.204722e-04\n"
+      "gauge.nersc_checksum = 2510161697\n"
+      "quark.description = \"HISQ action version 1\"\n"
+      "quark.dyn_flavors =[3] 2 1 1\n"
+      "quark.dyn_mass =[3] 0.001000 0.050000 0.500000\n";
+
+  // a usqcdInfo record as QIO's encoder writes it, which MILC uses (create_QCDML), with the plaquette and link
+  // trace in a format and the content of <info> (none: no <info> element)
+  std::string usqcd_record(const char *fmt, double plaq, double linktr, const std::optional<std::string> &info)
+  {
+    char p[32], l[32];
+    snprintf(p, sizeof(p), fmt, plaq);
+    snprintf(l, sizeof(l), fmt, linktr);
+    return xml_declaration + "<usqcdInfo><version>1.0</version><plaq>" + p + "</plaq><linktr>" + l + "</linktr>"
+      + (info ? "<info>" + *info + "</info>" : "") + "</usqcdInfo>";
+  }
+
+  // the <date> of the private record XML and the ILDG LFN of a file's field, read from the file on the calling rank
+  struct FieldStrings {
+    std::optional<std::string> date;
+    std::optional<std::string> lfn;
+  };
+
+  FieldStrings field_strings(const std::string &file)
+  {
+    using namespace quda::scidac;
+    const auto contents = read_file(file);
+    FieldStrings s;
+    for (auto &m : group_messages(local_records(file))) {
+      if (!find_record(m, binary_data) && !find_record(m, ildg_binary_data)) continue;
+      if (auto r = find_record(m, private_record_xml)) {
+        const auto xml = record_string(contents, r);
+        const auto start = xml.find("<date>"), end = xml.find("</date>");
+        if (start != std::string::npos && end != std::string::npos) s.date = xml.substr(start + 6, end - start - 6);
+      }
+      if (auto r = find_record(m, ildg_data_lfn)) s.lfn = record_string(contents, r);
+      break;
+    }
+    return s;
+  }
+
+  void expect_same_metadata(const quda::GaugeMetadata &a, const quda::GaugeMetadata &b)
+  {
+    EXPECT_EQ(a.user_file_xml, b.user_file_xml);
+    EXPECT_EQ(a.user_record_xml, b.user_record_xml);
+    EXPECT_EQ(a.has_usqcd_info, b.has_usqcd_info);
+    EXPECT_EQ(a.usqcd_info, b.usqcd_info);
+    EXPECT_EQ(a.ildg_lfn, b.ildg_lfn);
+    EXPECT_EQ(a.record_date, b.record_date);
+    EXPECT_EQ(a.milc_time_stamp, b.milc_time_stamp);
+    EXPECT_EQ(a.milc_info.size(), b.milc_info.size());
+    for (auto i = 0u; i < std::min(a.milc_info.size(), b.milc_info.size()); i++) {
+      EXPECT_EQ(a.milc_info[i].key, b.milc_info[i].key);
+      EXPECT_EQ(a.milc_info[i].line, b.milc_info[i].line);
+    }
+  }
+
+  // load a gauge field with each backend that reads LIME files, expecting the links given; returns each load's info
+  std::vector<quda::GaugeFileInfo> load_lime_backends(const std::string &file, const HostGauge &expected,
+                                                      bool external = true)
+  {
+    using namespace quda;
+    std::vector<GaugeFileInfo> infos;
+    HostGauge loaded(expected.prec);
+    for (auto backend : lime_backends(QUDA_FILE_FORMAT_QIO)) {
+      if (backend != QUDA_FILE_FORMAT_QIO && !external) continue;
+      SCOPED_TRACE(std::string("loaded with ") + get_file_format_str(backend));
+      loaded.clear();
+      infos.push_back(GaugeIO(file, file_io_param(backend, QUDA_FILE_IO_PARALLEL))
+                        .load(loaded.data, expected.prec, gauge_param_for(expected.prec).X));
+      EXPECT_TRUE(loaded == expected);
+    }
+    if (infos.size() == 2) {
+      SCOPED_TRACE("native and external loads");
+      expect_same_metadata(infos[0].metadata, infos[1].metadata);
+    }
+    return infos;
+  }
+
+  // a double-precision gauge field's links rounded to float, as a single-precision file holds them
+  void round_to_float(const HostGauge &gauge, HostGauge &rounded)
+  {
+    for (int dir = 0; dir < 4; dir++)
+      for (size_t i = 0; i < V * gauge_site_size; i++)
+        static_cast<double *>(rounded.data[dir])[i] = static_cast<float>(static_cast<double *>(gauge.data[dir])[i]);
+  }
+
+  // write a gauge field file with the given strings through the native backend's writer, in single precision
+  void write_gauge_with_strings(const std::string &file, const HostGauge &gauge, const std::string &user_file_xml,
+                                const std::string &user_record_xml, bool ildg = false,
+                                const std::optional<std::string> &lfn = {}, const quda::FileIOParam &param = {})
+  {
+    using namespace quda;
+    scidac::GaugeInfo info;
+    info.ildg = ildg;
+    auto g = scidac::gauge_records(QUDA_SINGLE_PRECISION, info);
+    g.record.user_xml = user_record_xml;
+    g.record.ildg_lfn = lfn;
+    const void *const *data = gauge.data;
+    scidac::write_fields(file, user_file_xml, {g.record}, {io::HostField(data, 4, gauge.prec, 18)},
+                         gauge_param_for(gauge.prec).X, QUDA_INVALID_PARITY, param);
+    comm_barrier();
+  }
+
+  // keep only the ILDG records of a LIME file, in one message, as in ILDG files from other codes (rank 0)
+  void keep_ildg_records(const std::string &in, const std::string &out)
+  {
+    using namespace quda;
+    const auto contents = read_file(in);
+    std::vector<lime::Record> kept;
+    for (auto &r : local_records(in))
+      if (r.type == scidac::ildg_format || r.type == scidac::ildg_data_lfn || r.type == scidac::ildg_binary_data)
+        kept.push_back(r);
+    EXPECT_EQ(kept.size(), 3u);
+    std::vector<char> result;
+    for (auto i = 0u; i < kept.size(); i++) {
+      const auto &r = kept[i];
+      const auto start = contents.begin() + (r.data_offset - lime::header_bytes);
+      const auto end = contents.begin() + (r.data_offset + r.data_bytes + lime::padding(r.data_bytes));
+      const auto header = result.size();
+      result.insert(result.end(), start, end);
+      result[header + 6] = static_cast<char>((i == 0 ? 0x80 : 0) | (i + 1 == kept.size() ? 0x40 : 0));
+    }
+    EXPECT_TRUE(write_file(out, result));
+  }
+} // namespace
+
+// the metadata of QUDA's own SciDAC and ILDG files, saved by either backend and loaded by both
+TEST(GaugeMetadataTest, quda_files)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+
+  const std::string file = "metadata.lat";
+  struct Case {
+    QudaFileFormat format;
+    bool usqcd_info;
+    std::string lfn;
+  };
+  const Case cases[] = {{QUDA_FILE_FORMAT_QIO, false, ""},
+                        {QUDA_FILE_FORMAT_QIO, true, ""},
+                        {QUDA_FILE_FORMAT_ILDG, false, ""},
+                        {QUDA_FILE_FORMAT_ILDG, false, "lfn://quda/metadata_test"},
+                        {QUDA_FILE_FORMAT_ILDG, true, "lfn://quda/metadata_test"}};
+  for (auto &c : cases) {
+    for (auto saver : lime_backends(c.format)) {
+      SCOPED_TRACE(std::string("saved as ") + get_file_format_str(saver) + (c.usqcd_info ? " with usqcdInfo" : "")
+                   + (c.lfn.empty() ? "" : " with an LFN"));
+      auto p = file_io_param(saver, QUDA_FILE_IO_PARALLEL);
+      p.write_usqcd_info = c.usqcd_info;
+      p.ildg_lfn = c.lfn;
+      GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
+      const auto strings = field_strings(file);
+      const bool ildg = c.format == QUDA_FILE_FORMAT_ILDG;
+
+      for (auto &info : load_lime_backends(file, gauge)) {
+        const auto &m = info.metadata;
+        EXPECT_EQ(m.user_file_xml, expected_file_xml("gauge field"));
+        EXPECT_EQ(m.has_usqcd_info, c.usqcd_info);
+        if (c.usqcd_info) {
+          // the plaquette and link trace of usqcdInfo are those of gauge_observables
+          EXPECT_EQ(m.user_record_xml, usqcd_record("%.16e", obs.plaq, obs.linktr, "QUDA"));
+          EXPECT_EQ(m.usqcd_info, std::optional<std::string>("QUDA"));
+          EXPECT_EQ(info.plaq, obs.plaq);
+          EXPECT_EQ(info.linktr, obs.linktr);
+        } else {
+          EXPECT_EQ(m.user_record_xml, expected_gauge_record_xml("<version>1.0</version>"));
+          EXPECT_FALSE(m.usqcd_info);
+        }
+        if (ildg)
+          EXPECT_EQ(m.ildg_lfn, std::optional<std::string>(c.lfn.empty() ? file : c.lfn));
+        else
+          EXPECT_FALSE(m.ildg_lfn);
+        EXPECT_EQ(m.ildg_lfn, strings.lfn);
+        // asctime() in UTC, with its newline replaced by " UTC", as QIO dates records
+        EXPECT_TRUE(strings.date);
+        EXPECT_EQ(m.record_date, strings.date);
+        const auto date = strings.date.value_or("");
+        EXPECT_EQ(date.size(), 28u) << date;
+        EXPECT_EQ(date.substr(date.size() - std::min<size_t>(date.size(), 4)), " UTC") << date;
+        EXPECT_TRUE(m.milc_time_stamp.empty());
+        EXPECT_TRUE(m.milc_info.empty());
+      }
+      remove_saved_file(file);
+    }
+  }
+}
+
+// files with MILC's strings, and with strings of other codes, written through the native writer: every string is
+// read back exactly by both backends
+TEST(GaugeMetadataTest, foreign_strings)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec), rounded(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  // the files are single precision, as MILC writes them
+  round_to_float(gauge, rounded);
+  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  const std::string milc_record = usqcd_record("%.6e", obs.plaq, obs.linktr, milc_info_lines);
+
+  // a Chroma-like file and record XML, with white space and nested elements of the same name
+  const std::string other_file_xml = "<?xml version=\"1.0\"?>\n<HMC>\n  <ProgramInfo>\n    <code>chroma</code>\n"
+                                     "  </ProgramInfo>\n</HMC>\n";
+  const std::string other_record_xml = "<?xml version=\"1.0\"?>\n<Params>\n  <Params><info>beta 6.3</info></Params>\n"
+                                       "  <MesPlq>0.54</MesPlq>\n</Params>\n";
+
+  struct Case {
+    std::string name;
+    std::string file_xml;
+    std::string record_xml;
+    bool ildg;
+    std::optional<std::string> lfn;
+    bool usqcd_info;
+    std::optional<std::string> info;
+  };
+  const Case cases[] = {
+    {"MILC SciDAC", milc_file_xml, milc_record, false, {}, true, milc_info_lines},
+    {"MILC ILDG", milc_file_xml, milc_record, true, "lfn://USQCD/MILC/test/metadata", true, milc_info_lines},
+    {"empty <info>", milc_file_xml, usqcd_record("%.6e", obs.plaq, obs.linktr, ""), false, {}, true, ""},
+    {"no <info>", milc_file_xml, usqcd_record("%.6e", obs.plaq, obs.linktr, {}), false, {}, true, {}},
+    {"other code", other_file_xml, other_record_xml, true, "lfn://other/metadata", false, {}},
+  };
+  const std::string file = "metadata_foreign.lat";
+  for (auto &c : cases) {
+    SCOPED_TRACE(c.name);
+    write_gauge_with_strings(file, gauge, c.file_xml, c.record_xml, c.ildg, c.lfn);
+    const auto strings = field_strings(file);
+    const auto infos = load_lime_backends(file, rounded);
+    for (auto &info : infos) {
+      const auto &m = info.metadata;
+      EXPECT_EQ(m.user_file_xml, c.file_xml);
+      EXPECT_EQ(m.user_record_xml, c.record_xml);
+      EXPECT_EQ(m.has_usqcd_info, c.usqcd_info);
+      EXPECT_EQ(m.usqcd_info, c.info);
+      EXPECT_EQ(m.ildg_lfn, c.lfn);
+      EXPECT_TRUE(strings.date);
+      EXPECT_EQ(m.record_date, strings.date);
+      EXPECT_EQ(info.ildg, c.ildg);
+      EXPECT_EQ(info.has_plaq_linktr, c.usqcd_info);
+      if (info.has_plaq_linktr) { EXPECT_TRUE(info.plaq_linktr_matches); }
+    }
+    if (mpi_io_enabled()) {
+      SCOPED_TRACE("MPI-IO load");
+      HostGauge loaded(prec);
+      loaded.clear();
+      auto info
+        = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_MPI_IO)).load(loaded.data, prec, gauge_param.X);
+      EXPECT_TRUE(loaded == rounded);
+      expect_same_metadata(info.metadata, infos[0].metadata);
+    }
+    remove_saved_file(file);
+  }
+}
+
+// the metadata of a partfile comes from its first volume
+TEST(GaugeMetadataTest, partfile)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec), rounded(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  round_to_float(gauge, rounded);
+  const std::string file = "metadata_part.lat";
+
+  // QUDA's partfile, one volume per rank (a single file on one rank), saved and loaded by either backend
+  for (auto saver : lime_backends(QUDA_FILE_FORMAT_QIO)) {
+    SCOPED_TRACE(std::string("saved as ") + get_file_format_str(saver));
+    auto p = partfile_param(saver, QUDA_FILE_IO_PARALLEL);
+    p.write_usqcd_info = true;
+    GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
+    const auto strings = field_strings(comm_size() > 1 ? volume_file(file, 0) : file);
+    for (auto &info : load_lime_backends(file, gauge)) {
+      EXPECT_EQ(info.metadata.user_file_xml, expected_file_xml("gauge field"));
+      EXPECT_TRUE(info.metadata.has_usqcd_info);
+      EXPECT_EQ(info.metadata.usqcd_info, std::optional<std::string>("QUDA"));
+      EXPECT_TRUE(strings.date);
+      EXPECT_EQ(info.metadata.record_date, strings.date);
+    }
+    remove_saved_file(file);
+  }
+
+  // MILC's strings in a partfile of two volumes in t, as if saved by another rank layout (which only the native
+  // backend reads)
+  auto p = partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  p.partfile_grid = {1, 1, 1, 2};
+  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  const auto record = usqcd_record("%.6e", obs.plaq, obs.linktr, milc_info_lines);
+  write_gauge_with_strings(file, gauge, milc_file_xml, record, false, {}, p);
+  EXPECT_EQ(saved_volumes(file).size(), 2u);
+  const auto strings = field_strings(volume_file(file, 0));
+  for (auto &info : load_lime_backends(file, rounded, false)) {
+    EXPECT_EQ(info.metadata.user_file_xml, milc_file_xml);
+    EXPECT_EQ(info.metadata.user_record_xml, record);
+    EXPECT_EQ(info.metadata.usqcd_info, std::optional<std::string>(milc_info_lines));
+    EXPECT_TRUE(strings.date);
+    EXPECT_EQ(info.metadata.record_date, strings.date);
+  }
+  remove_saved_file(file);
+}
+
+// an ILDG file from another code, with only the ILDG records: an LFN, but no SciDAC strings or date; QIO reads no
+// LFN from such files
+TEST(GaugeMetadataTest, ildg_only)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  const std::string saved = "metadata_ildg.lat", file = "metadata_ildg_only.lat";
+  auto p = file_io_param(QUDA_FILE_FORMAT_ILDG, QUDA_FILE_IO_PARALLEL);
+  p.ildg_lfn = "lfn://other/ildg_only";
+  GaugeIO(saved, p).save(gauge.data, prec, gauge_param.X);
+  if (comm_rank() == 0) keep_ildg_records(saved, file);
+  comm_barrier();
+
+  const auto infos = load_lime_backends(file, gauge, false);
+#ifdef HAVE_QIO
+  HostGauge loaded(prec);
+  loaded.clear();
+  auto external = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL))
+                    .load(loaded.data, prec, gauge_param.X);
+  EXPECT_TRUE(loaded == gauge);
+  EXPECT_FALSE(external.metadata.ildg_lfn);
+  auto expected = infos[0].metadata;
+  expected.ildg_lfn.reset();
+  expect_same_metadata(external.metadata, expected);
+#endif
+  for (auto &info : infos) {
+    const auto &m = info.metadata;
+    EXPECT_TRUE(m.user_file_xml.empty());
+    EXPECT_TRUE(m.user_record_xml.empty());
+    EXPECT_FALSE(m.has_usqcd_info);
+    EXPECT_EQ(m.ildg_lfn, std::optional<std::string>("lfn://other/ildg_only"));
+    EXPECT_FALSE(m.record_date);
+    EXPECT_TRUE(info.ildg);
+    EXPECT_FALSE(info.has_checksum);
+  }
+  remove_saved_file(saved);
+  remove_saved_file(file);
+}
+
+// a MILC file's header time stamp, and its .info lines in file order as they are written, whatever their order
+// and form
+TEST(GaugeMetadataTest, milc_info)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec), loaded(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  const std::string file = "metadata.milc";
+  GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL)).save(gauge.data, prec, gauge_param.X);
+
+  // the header's time stamp, and the .info file's lines by key
+  auto contents = read_file(file);
+  EXPECT_GE(contents.size(), 96u);
+  contents.resize(std::max<size_t>(contents.size(), 96));
+  const std::string stamp(contents.data() + 20, strnlen(contents.data() + 20, 64));
+  EXPECT_FALSE(stamp.empty());
+  std::map<std::string, std::string> saved;
+  {
+    std::ifstream in(file + ".info");
+    for (std::string line; std::getline(in, line);) saved[line.substr(0, line.find(' '))] = line;
+  }
+  EXPECT_EQ(saved.size(), 7u);
+
+  // MILC's array lines, a "key value" line, an indented one, one without a key, blank lines and a CR
+  const std::vector<std::pair<std::string, std::string>> items = {
+    {"quark.dyn_flavors", "quark.dyn_flavors =[3] 2 1 1"},
+    {"nt", saved["nt"]},
+    {"gauge.beta11", "  gauge.beta11 6.300000"},
+    {"checksums", saved["checksums"]},
+    {"", "= 1"},
+    {"magic_number", saved["magic_number"]},
+    {"time_stamp", saved["time_stamp"]},
+    {"quark.dyn_mass", "quark.dyn_mass =[3] 0.001000 0.050000 0.500000\r"},
+    {"nz", saved["nz"]},
+    {"ny", saved["ny"]},
+    {"nx", saved["nx"]},
+    {"action.description", "action.description = \"Gauge plus fermion\""},
+  };
+  // every rank has read the saved .info file before it is replaced
+  comm_barrier();
+  if (comm_rank() == 0) {
+    std::ofstream out(file + ".info", std::ios::trunc);
+    for (auto i = 0u; i < items.size(); i++) out << items[i].second << (i % 4 == 1 ? "\n\n  \n" : "\n");
+  }
+  comm_barrier();
+
+  loaded.clear();
+  auto info
+    = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL)).load(loaded.data, prec, gauge_param.X);
+  EXPECT_TRUE(info.has_info_file);
+  EXPECT_TRUE(info.checksum_matches);
+  const auto &m = info.metadata;
+  EXPECT_EQ(m.milc_time_stamp, stamp);
+  EXPECT_EQ(m.milc_info.size(), items.size());
+  for (auto i = 0u; i < std::min(items.size(), m.milc_info.size()); i++) {
+    EXPECT_EQ(m.milc_info[i].key, items[i].first);
+    EXPECT_EQ(m.milc_info[i].line, items[i].second);
+  }
+  EXPECT_TRUE(m.user_file_xml.empty());
+  EXPECT_TRUE(m.user_record_xml.empty());
+  EXPECT_FALSE(m.ildg_lfn);
+  EXPECT_FALSE(m.record_date);
+
+  remove_saved_file(file);
+  remove_saved_file(file + ".info");
+}
+
+namespace
+{
+  // MILC's NERSC checksum of a host gauge field, summed here independently of the library
+  uint32_t nersc_checksum(const HostGauge &gauge)
+  {
+    uint64_t sum = 0;
+    for (int dir = 0; dir < 4; dir++)
+      for (size_t s = 0; s < static_cast<size_t>(V); s++)
+        for (int i = 0; i < 12; i++) {
+          const float f = static_cast<float>(get_element(gauge.data[dir], gauge.prec, s * 18 + i));
+          uint32_t bits;
+          memcpy(&bits, &f, sizeof(bits));
+          sum += bits;
+        }
+    size_t total = sum;
+    quda::comm_allreduce_sum(total);
+    return static_cast<uint32_t>(total);
+  }
+
+  // a value of a link that depends only on its global site, its direction and the component
+  double global_value(size_t global, int dir, int k)
+  {
+    uint64_t h = global * 0x9e3779b97f4a7c15ull ^ (static_cast<uint64_t>(dir) << 48) ^ (static_cast<uint64_t>(k) << 56);
+    h ^= h >> 31;
+    h *= 0xbf58476d1ce4e5b9ull;
+    h ^= h >> 29;
+    return static_cast<double>(h >> 11) / static_cast<double>(1ull << 53) * 2.0 - 1.0;
+  }
+} // namespace
+
+// a unit field: plaquettes and link trace 1, and the checksum of the 1s of rows 0 and 1
+TEST(GaugeObservablesTest, unit)
+{
+  using namespace quda;
+  for (auto prec : {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION}) {
+    if (!is_enabled(prec)) continue;
+    SCOPED_TRACE(get_prec_str(prec));
+    QudaGaugeParam gauge_param = gauge_param_for(prec);
+    HostGauge gauge(prec);
+    gauge.clear();
+    for (int dir = 0; dir < 4; dir++)
+      for (size_t s = 0; s < static_cast<size_t>(V); s++)
+        for (int k : {0, 8, 16}) {
+          if (prec == QUDA_DOUBLE_PRECISION)
+            static_cast<double *>(gauge.data[dir])[s * 18 + k] = 1.0;
+          else
+            static_cast<float *>(gauge.data[dir])[s * 18 + k] = 1.0f;
+        }
+    const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+    EXPECT_NEAR(obs.plaq, 1.0, 1e-14);
+    EXPECT_NEAR(obs.plaq_spatial, 1.0, 1e-14);
+    EXPECT_NEAR(obs.plaq_temporal, 1.0, 1e-14);
+    EXPECT_NEAR(obs.linktr, 1.0, 1e-14);
+    EXPECT_EQ(obs.nersc_checksum, nersc_checksum(gauge));
+    // rows 0 and 1 hold one 1.0f (0x3f800000) each
+    const uint64_t global_links = 4 * static_cast<uint64_t>(V) * comm_size();
+    EXPECT_EQ(obs.nersc_checksum, static_cast<uint32_t>(global_links * 2 * 0x3f800000ull));
+  }
+}
+
+// the checksum of a field whose values depend only on the global site is the same on every rank layout: it equals
+// the sum over the global lattice, computed here on every rank alone
+TEST(GaugeObservablesTest, checksum_layout)
+{
+  using namespace quda;
+  const QudaGaugeParam gauge_param = gauge_param_for(QUDA_DOUBLE_PRECISION);
+  const int *X = gauge_param.X;
+  std::array<int, 4> N;
+  for (int d = 0; d < 4; d++) N[d] = X[d] * comm_dim(d);
+  uint64_t expected = 0;
+  for (size_t g = 0; g < static_cast<size_t>(N[0]) * N[1] * N[2] * N[3]; g++)
+    for (int dir = 0; dir < 4; dir++)
+      for (int k = 0; k < 12; k++) {
+        const float f = static_cast<float>(global_value(g, dir, k));
+        uint32_t bits;
+        memcpy(&bits, &f, sizeof(bits));
+        expected += bits;
+      }
+
+  for (auto prec : {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION}) {
+    if (!is_enabled(prec)) continue;
+    SCOPED_TRACE(get_prec_str(prec));
+    HostGauge gauge(prec);
+    for (int t = 0; t < X[3]; t++)
+      for (int z = 0; z < X[2]; z++)
+        for (int y = 0; y < X[1]; y++)
+          for (int x = 0; x < X[0]; x++) {
+            const int c[4]
+              = {comm_coord(0) * X[0] + x, comm_coord(1) * X[1] + y, comm_coord(2) * X[2] + z, comm_coord(3) * X[3] + t};
+            const size_t g = c[0] + N[0] * (c[1] + static_cast<size_t>(N[1]) * (c[2] + static_cast<size_t>(N[2]) * c[3]));
+            const size_t lex = x + X[0] * (y + static_cast<size_t>(X[1]) * (z + static_cast<size_t>(X[2]) * t));
+            const size_t index = lex / 2 + ((c[0] + c[1] + c[2] + c[3]) % 2) * (V / 2);
+            for (int dir = 0; dir < 4; dir++)
+              for (int k = 0; k < 18; k++) {
+                const double v = global_value(g, dir, k);
+                if (prec == QUDA_DOUBLE_PRECISION)
+                  static_cast<double *>(gauge.data[dir])[index * 18 + k] = v;
+                else
+                  static_cast<float *>(gauge.data[dir])[index * 18 + k] = static_cast<float>(v);
+              }
+          }
+    const auto obs = gauge_observables(gauge.data, prec, X);
+    EXPECT_EQ(obs.nersc_checksum, static_cast<uint32_t>(expected));
+    EXPECT_EQ(obs.nersc_checksum, nersc_checksum(gauge));
+  }
+}
+
+// the spatial and temporal plaquettes average to the plaquette, which is QUDA's
+TEST(GaugeObservablesTest, plaquettes)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  EXPECT_NEAR(obs.plaq_spatial + obs.plaq_temporal, 2.0 * obs.plaq, 1e-14);
+  EXPECT_GT(std::abs(obs.plaq_spatial - obs.plaq_temporal), 0.0);
+
+  loadGaugeQuda(gauge.data, &gauge_param);
+  std::array<double, 3> plaq;
+  plaqQuda(plaq.data());
+  freeGaugeQuda();
+  EXPECT_NEAR(obs.plaq, plaq[0], 1e-12);
+  EXPECT_NEAR(obs.plaq_spatial, plaq[1], 1e-12);
+  EXPECT_NEAR(obs.plaq_temporal, plaq[2], 1e-12);
 }
 
 #ifdef HAVE_QIO

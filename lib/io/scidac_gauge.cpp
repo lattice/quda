@@ -27,6 +27,14 @@ namespace quda
       }
     } // namespace
 
+    void set_gauge_record_xml(GaugeMetadata &metadata, const std::string &user_xml)
+    {
+      metadata.user_record_xml = user_xml;
+      auto usqcd = xml_value(user_xml, "usqcdInfo");
+      metadata.has_usqcd_info = usqcd.has_value();
+      metadata.usqcd_info = usqcd ? xml_value(*usqcd, "info") : std::nullopt;
+    }
+
     GaugeInfo load_gauge(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
                          const FileIOParam &param)
     {
@@ -42,6 +50,10 @@ namespace quda
       info.ildg = m.ildg;
       info.file_prec = m.prec;
       if (records.native) read_usqcd_info(m.user_xml, info);
+      info.metadata.user_file_xml = records.user_file_xml;
+      set_gauge_record_xml(info.metadata, m.user_xml);
+      info.metadata.ildg_lfn = m.ildg_lfn;
+      info.metadata.record_date = m.date;
 
       // the four links of a site are row-major 3x3 complex matrices
       auto sum = read_field(records, field, X, QUDA_INVALID_PARITY, param);
@@ -70,7 +82,7 @@ namespace quda
       else
         m.user_xml = quda_record_xml(matrix_reals, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 3, 0);
       m.ildg = info.ildg;
-      m.ildg_lfn = info.ildg_lfn;
+      if (!info.ildg_lfn.empty()) m.ildg_lfn = info.ildg_lfn;
       return g;
     }
 

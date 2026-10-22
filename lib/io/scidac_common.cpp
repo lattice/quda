@@ -446,7 +446,7 @@ namespace quda
       const int file_info_index = f.native ? want(&records[0]) : -1;
       const int user_file_index = f.native ? want(find_record(records, file_xml)) : -1;
       struct Strings {
-        int private_record, user_record, checksum, ildg_format;
+        int private_record, user_record, checksum, ildg_format, ildg_lfn;
       };
       std::vector<Strings> indices;
       std::vector<bool> has_ildg_format;
@@ -457,13 +457,15 @@ namespace quda
           if (message[i].type == checksum) sum = &message[i];
         const lime::Record *format_record = find_record(message, ildg_format);
         if (!f.native && !format_record) format_record = find_record(records, ildg_format);
+        const lime::Record *lfn_record = find_record(message, ildg_data_lfn);
+        if (!f.native && !lfn_record) lfn_record = find_record(records, ildg_data_lfn);
         has_ildg_format.push_back(format_record != nullptr);
         // SciDAC files give the metadata in their private records; ILDG files from other codes only in ildg-format
         if (f.native)
-          indices.push_back(
-            {want(find_record(message, private_record_xml)), want(find_record(message, record_xml)), want(sum), -1});
+          indices.push_back({want(find_record(message, private_record_xml)), want(find_record(message, record_xml)),
+                             want(sum), -1, want(lfn_record)});
         else
-          indices.push_back({-1, -1, -1, want(format_record)});
+          indices.push_back({-1, -1, -1, want(format_record), want(lfn_record)});
       }
       const auto strings = lime::read_strings(file, wanted);
       auto text = [&](int index) { return index < 0 ? std::string() : strings[index]; };
@@ -500,6 +502,7 @@ namespace quda
         auto &m = r.metadata;
         m.ildg = has_ildg_format[k];
         const auto &index = indices[k];
+        if (index.ildg_lfn >= 0) m.ildg_lfn = text(index.ildg_lfn);
         const std::string what = found.size() > 1 ? "binary record " + std::to_string(k) + " of " + file : file;
 
         if (f.native) {
@@ -515,6 +518,7 @@ namespace quda
             m.hypercube = parse_hypercube(record_info, f.dims, what);
           else if (type != field_recordtype)
             errorQuda("The binary data of %s is not a lattice field (record type %s)", what.c_str(), recordtype->c_str());
+          m.date = xml_value(record_info, "date");
           m.datatype = xml_value(record_info, "datatype").value_or("");
           m.prec
             = xml_value(record_info, "precision").value_or("") == "F" ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
@@ -1061,7 +1065,7 @@ namespace quda
           writer->write(record_xml, m.user_xml, false, false);
           if (m.ildg) {
             writer->write(ildg_format, ildg_format_xml(m.prec, N), false, false);
-            if (!m.ildg_lfn.empty()) writer->write(ildg_data_lfn, m.ildg_lfn, false, false);
+            if (m.ildg_lfn) writer->write(ildg_data_lfn, *m.ildg_lfn, false, false);
           }
           data_offset = writer->reserve(m.ildg ? ildg_binary_data : binary_data, bytes, false, false);
         }

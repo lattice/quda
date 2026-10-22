@@ -31,7 +31,30 @@ namespace quda
       if (!out) warningQuda("Could not write %s", info_filename.c_str());
     }
 
-    std::optional<std::map<std::string, std::string>> read_info(const std::string &filename)
+    namespace
+    {
+      std::string trim(const std::string &s)
+      {
+        auto first = s.find_first_not_of(" \t\r");
+        if (first == std::string::npos) return std::string();
+        return s.substr(first, s.find_last_not_of(" \t\r") - first + 1);
+      }
+
+      // the key of a line of a .info file and its value, unquoted; no key if the line starts with a separator
+      std::pair<std::string, std::string> parse_info_line(const std::string &raw)
+      {
+        const auto line = trim(raw);
+        auto end = line.find_first_of(" \t=");
+        if (line.empty() || end == 0) return {};
+        auto key = line.substr(0, end);
+        auto value = end == std::string::npos ? std::string() : trim(line.substr(end));
+        if (!value.empty() && value[0] == '=') value = trim(value.substr(1));
+        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') value = value.substr(1, value.size() - 2);
+        return {key, value};
+      }
+    } // namespace
+
+    std::optional<std::vector<MILCInfoItem>> read_info(const std::string &filename)
     {
       int found = 0;
       std::string contents;
@@ -48,26 +71,24 @@ namespace quda
       if (!found) return std::nullopt;
       io::broadcast(contents);
 
-      auto trim = [](const std::string &s) {
-        auto first = s.find_first_not_of(" \t\r");
-        if (first == std::string::npos) return std::string();
-        return s.substr(first, s.find_last_not_of(" \t\r") - first + 1);
-      };
-
-      std::map<std::string, std::string> items;
+      std::vector<MILCInfoItem> items;
       std::istringstream lines(contents);
       std::string line;
       while (std::getline(lines, line)) {
-        line = trim(line);
-        auto end = line.find_first_of(" \t=");
-        if (line.empty() || end == 0) continue;
-        auto key = line.substr(0, end);
-        auto value = end == std::string::npos ? std::string() : trim(line.substr(end));
-        if (!value.empty() && value[0] == '=') value = trim(value.substr(1));
-        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') value = value.substr(1, value.size() - 2);
-        items[key] = value;
+        if (trim(line).empty()) continue;
+        items.push_back({parse_info_line(line).first, line});
       }
       return items;
+    }
+
+    std::map<std::string, std::string> info_values(const std::vector<MILCInfoItem> &items)
+    {
+      std::map<std::string, std::string> values;
+      for (auto &item : items) {
+        auto [key, value] = parse_info_line(item.line);
+        if (!key.empty()) values[key] = value;
+      }
+      return values;
     }
 
   } // namespace milc

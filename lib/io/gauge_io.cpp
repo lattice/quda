@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <util_quda.h>
 #include <timer.h>
@@ -53,9 +54,9 @@ namespace quda
     }
 
     /**
-       @brief Compute the average plaquette and link trace, both normalized as Re Tr / 3
+       @brief Compute the average plaquettes (all, spatial and temporal) and the link trace, normalized as Re Tr / 3
      */
-    void compute_plaq_linktr(const void *const gauge[], QudaPrecision prec, const int *X, double &plaq, double &linktr)
+    void compute_plaquettes_linktr(const void *const gauge[], QudaPrecision prec, const int *X, GaugeObservables &obs)
     {
       auto field_param = host_field_param(gauge, prec, X);
       GaugeField host(field_param);
@@ -63,12 +64,55 @@ namespace quda
       device.copy(host);
 
       // getLinkTrace averages Tr U over the links of a field without a halo
-      linktr = getLinkTrace(device).real() / 3.0;
+      obs.linktr = getLinkTrace(device).real() / 3.0;
 
       lat_dim_t R;
       for (int d = 0; d < 4; d++) R[d] = comm_dim_partitioned(d) ? 1 : 0;
       std::unique_ptr<GaugeField> extended(createExtendedGauge(device, R));
-      plaq = static_cast<double>(plaquette(*extended)[0]);
+      const auto plaq = plaquette(*extended);
+      obs.plaq = static_cast<double>(plaq[0]);
+      obs.plaq_spatial = static_cast<double>(plaq[1]);
+      obs.plaq_temporal = static_cast<double>(plaq[2]);
+    }
+
+    void compute_plaq_linktr(const void *const gauge[], QudaPrecision prec, const int *X, double &plaq, double &linktr)
+    {
+      GaugeObservables obs;
+      compute_plaquettes_linktr(gauge, prec, X, obs);
+      plaq = obs.plaq;
+      linktr = obs.linktr;
+    }
+
+    /**
+       @brief MILC's NERSC checksum of a host gauge field (generic/nersc_cksum.c): the 32-bit patterns of the real
+       and imaginary parts of rows 0 and 1 of every link, each converted to float, summed modulo 2^32
+     */
+    uint32_t nersc_checksum(const void *const gauge[], QudaPrecision prec, const int *X)
+    {
+      if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
+        errorQuda("The NERSC checksum needs a double or single precision host gauge field, not precision %d", prec);
+      const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
+      // rows 0 and 1 of a row-major 3x3 complex matrix are its first 12 reals
+      constexpr int row_reals = 12;
+
+      // integer sums don't depend on the order, so the result doesn't depend on the threads or the ranks
+      uint64_t sum = 0;
+      for (int dir = 0; dir < 4; dir++) {
+        const auto d = static_cast<const double *>(gauge[dir]);
+        const auto f = static_cast<const float *>(gauge[dir]);
+#pragma omp parallel for reduction(+ : sum)
+        for (size_t s = 0; s < volume; s++) {
+          for (int i = 0; i < row_reals; i++) {
+            const float value = prec == QUDA_DOUBLE_PRECISION ? static_cast<float>(d[s * 18 + i]) : f[s * 18 + i];
+            uint32_t bits;
+            memcpy(&bits, &value, sizeof(bits));
+            sum += bits;
+          }
+        }
+      }
+      size_t total = sum;
+      comm_allreduce_sum(total);
+      return static_cast<uint32_t>(total);
     }
 
 #ifdef HAVE_QIO
@@ -143,7 +187,24 @@ namespace quda
       file_info.checksum_matches = info.checksum_matches;
       file_info.sum29 = info.sum.sum29;
       file_info.sum31 = info.sum.sum31;
+      file_info.metadata = info.metadata;
       return file_info;
+    }
+
+    /**
+       @brief Log the metadata a load found, beyond what log_loaded gives
+     */
+    void log_metadata(const std::string &filename, const GaugeMetadata &m)
+    {
+      if (getVerbosity() < QUDA_VERBOSE) return;
+      if (m.record_date) logQuda(QUDA_VERBOSE, "Record date of %s: \"%s\"\n", filename.c_str(), m.record_date->c_str());
+      if (m.ildg_lfn) logQuda(QUDA_VERBOSE, "ILDG LFN of %s: \"%s\"\n", filename.c_str(), m.ildg_lfn->c_str());
+      if (m.has_usqcd_info) {
+        const std::string info
+          = m.usqcd_info ? "with " + std::to_string(m.usqcd_info->size()) + " bytes of <info>" : "without <info>";
+        logQuda(QUDA_VERBOSE, "%s has a usqcdInfo record %s\n", filename.c_str(), info.c_str());
+      }
+      if (!m.milc_info.empty()) logQuda(QUDA_VERBOSE, "%s.info has %lu lines\n", filename.c_str(), m.milc_info.size());
     }
 
     /**
@@ -279,6 +340,14 @@ namespace quda
     }
   } // namespace
 
+  GaugeObservables gauge_observables(const void *const gauge[], QudaPrecision prec, const int *X)
+  {
+    GaugeObservables obs;
+    compute_plaquettes_linktr(gauge, prec, X, obs);
+    obs.nersc_checksum = nersc_checksum(gauge, prec, X);
+    return obs;
+  }
+
   GaugeIO::GaugeIO(const std::string &filename, const FileIOParam &param) : filename(filename), param(param)
   {
     if (filename.empty()) errorQuda("No gauge field file defined");
@@ -302,6 +371,7 @@ namespace quda
 
     host_timer.stop();
     log_loaded(filename, info, param.external_qio && format != QUDA_FILE_FORMAT_MILC);
+    log_metadata(filename, info.metadata);
     logQuda(QUDA_SUMMARIZE, "Time spent loading gauge field from %s = %g secs\n", filename.c_str(), host_timer.last());
 
     if (info.has_plaq_linktr) check_plaq_linktr(filename, gauge, prec, X, info);

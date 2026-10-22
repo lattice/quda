@@ -39,13 +39,15 @@ namespace quda
       void check_info(const std::string &filename, const GaugeHeader &header, const FileIOParam &param,
                       GaugeFileInfo &info)
       {
-        auto items = read_info(filename);
-        if (!items) return;
+        auto lines = read_info(filename);
+        if (!lines) return;
         info.has_info_file = true;
+        info.metadata.milc_info = *lines;
+        const auto items = info_values(*lines);
 
         auto get = [&](const char *key) -> const std::string * {
-          auto it = items->find(key);
-          return it == items->end() ? nullptr : &it->second;
+          auto it = items.find(key);
+          return it == items.end() ? nullptr : &it->second;
         };
 
         if (auto s = get("checksums")) {
@@ -149,8 +151,9 @@ namespace quda
         = io::check_checksum(filename, sum, {header.sum29, header.sum31}, param.allow_checksum_mismatch);
       check_info(filename, header, param, info);
 
-      std::string stamp(header.time_stamp, strnlen(header.time_stamp, sizeof(header.time_stamp)));
-      logQuda(QUDA_VERBOSE, "MILC v5 time stamp \"%s\"\n", stamp.c_str());
+      info.metadata.milc_time_stamp
+        = std::string(header.time_stamp, strnlen(header.time_stamp, sizeof(header.time_stamp)));
+      logQuda(QUDA_VERBOSE, "MILC v5 time stamp \"%s\"\n", info.metadata.milc_time_stamp.c_str());
       return info;
     }
 

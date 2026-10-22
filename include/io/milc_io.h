@@ -27,10 +27,17 @@ namespace quda
     /**
        @brief Read <filename>.info if it exists.  Rank 0 reads it and
        broadcasts its contents.  Lines may have the form "key = value"
-       or "key value"; surrounding quotes are removed from the values.
-       @return The keys and values, or nothing if there is no file
+       or "key value".
+       @return The lines that aren't blank in file order, each with its key, or nothing if there is no file
      */
-    std::optional<std::map<std::string, std::string>> read_info(const std::string &filename);
+    std::optional<std::vector<MILCInfoItem>> read_info(const std::string &filename);
+
+    /**
+       @brief The values of the lines of a .info file by key, with
+       surrounding quotes removed; a key given more than once takes the
+       value of its last line
+     */
+    std::map<std::string, std::string> info_values(const std::vector<MILCInfoItem> &items);
 
     /**
        @brief Load a MILC v5 gauge field
