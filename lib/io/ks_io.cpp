@@ -123,6 +123,7 @@ namespace quda
       return io::HostField(odd ? &none : &data, odd ? &data : &none, 1, h.Precision(), reals, h.Volume(), stride);
     }
 
+#ifdef HAVE_QIO
     /**
        @brief A host field that holds no sites, for a record that is read but not loaded
      */
@@ -132,7 +133,6 @@ namespace quda
       return io::HostField(&none, 1, QUDA_DOUBLE_PRECISION, m.typesize / m.prec);
     }
 
-#ifdef HAVE_QIO
     std::vector<scidac::FieldChecksum> load_qio(const std::string &filename, const scidac::KSFile &file,
                                                 const std::vector<int> &records, const std::vector<io::HostField> &fields,
                                                 const int *X, const FileIOParam &param)

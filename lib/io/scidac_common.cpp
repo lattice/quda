@@ -427,6 +427,7 @@ namespace quda
       };
       std::vector<Message> found;
       for (auto &m : messages) {
+        if (!f.native && !found.empty()) break;
         for (auto i = 0u; i < m.size(); i++) {
           if (m[i].type != binary_data && m[i].type != ildg_binary_data) continue;
           found.push_back({&m, i});
@@ -434,7 +435,6 @@ namespace quda
         }
       }
       if (found.empty()) errorQuda("%s has no %s or %s record", file.c_str(), binary_data, ildg_binary_data);
-      if (!f.native) found.resize(1);
 
       // rank 0 reads every metadata record at once
       std::vector<lime::Record> wanted;

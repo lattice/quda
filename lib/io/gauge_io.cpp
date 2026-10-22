@@ -184,10 +184,10 @@ namespace quda
       int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
       *num_failures_h = 0;
       projectSU3(device, device.toleranceSU3(), num_failures_d);
-      int failures = *num_failures_h;
+      size_t failures = *num_failures_h;
       pool_host_pinned_free(num_failures_h);
-      comm_allreduce_int(failures);
-      if (failures > 0) errorQuda("The polar projection onto SU(3) failed for %d links", failures);
+      comm_allreduce_sum(failures);
+      if (failures > 0) errorQuda("The polar projection onto SU(3) failed for %lu links", failures);
 
       host.copy(device);
     }
