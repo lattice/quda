@@ -959,11 +959,13 @@ template <typename Float> void set_to_zero(void *oprod_)
 
 void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
                              std::array<void *, 4> &gauge, std::vector<char> &clover, std::vector<char> &clover_inv,
-                             QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
+                             QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio, bool trlog,
+                             int rhmc_flavors)
 {
   if (inv_param->matpc_type != QUDA_MATPC_ODD_ODD_ASYMMETRIC)
     errorQuda("Preconditioned operator type %d not supported by test code", inv_param->matpc_type);
   if (inv_param->dagger != QUDA_DAG_YES) errorQuda("Test code presently requires dagger option");
+  bool rhmc = rhmc_flavors > 0;
 
   quda::ColorSpinorParam qParam;
   inv_param->solution_type = QUDA_MATDAG_MAT_SOLUTION; // set to full solution for field creation
@@ -1028,18 +1030,20 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
         errorQuda("TMCloverForce_reference: dslash_type not supported\n");
       }
 
-      if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-        axpbyz_host(1.0 / inv_param->evmax, p[i].Odd().data<double *>(), 0, p[i].Odd().data<double *>(),
-                    p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
-        tau1_host(x[i].Even().data<double *>(), x[i].Even().data<double *>(), x[i].Even().VolumeCB());
-        tau1_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
+      if (rhmc) {
+        if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+          axpbyz_host(1.0 / inv_param->evmax, p[i].Odd().data<double *>(), 0, p[i].Odd().data<double *>(),
+                      p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
+          tau1_host(x[i].Even().data<double *>(), x[i].Even().data<double *>(), x[i].Even().VolumeCB());
+          tau1_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
+        }
         caxpy_host(0.0, -inv_param->offset[i], x[i].Odd().data<double *>(), p[i].Odd().data<double *>(),
                    p[i].Odd().VolumeCB());
       }
 
       Gamma5_host(x[i].Even().data<double *>(), x[i].Even().data<double *>(), x[i].Even().VolumeCB());
 
-      if (detratio && inv_param->twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) {
+      if (detratio) {
         qParam.v = h_x0[i];
         quda::ColorSpinorField load_half(qParam);
         x0[i].Odd() = load_half;
@@ -1047,30 +1051,31 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
                     p[i].Odd().VolumeCB());
       }
 
-      if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-        Gamma5_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
-      }
+      if (rhmc) Gamma5_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
 
+      // the RHMC force uses the daggered dslash for the even part of Y
+      QudaDagType dag = rhmc ? QUDA_DAG_YES : QUDA_DAG_NO;
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param->twist_flavor == QUDA_TWIST_SINGLET)
           tmc_dslash(p[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), p[i].Odd().data(),
-                     inv_param->kappa, inv_param->mu, inv_param->twist_flavor, myMatPCType, parity, QUDA_DAG_NO,
+                     inv_param->kappa, inv_param->mu, inv_param->twist_flavor, myMatPCType, parity, dag,
                      inv_param->cpu_prec, *gauge_param);
         else if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)
           tmc_ndeg_dslash(p[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), p[i].Odd().data(),
                           inv_param->kappa, inv_param->mu, inv_param->epsilon, myMatPCType, parity, QUDA_DAG_YES,
                           inv_param->cpu_prec, *gauge_param);
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-        clover_dslash(p[i].Even().data(), gauge.data(), clover_inv.data(), p[i].Odd().data(), parity, QUDA_DAG_NO,
+        clover_dslash(p[i].Even().data(), gauge.data(), clover_inv.data(), p[i].Odd().data(), parity, dag,
                       inv_param->cpu_prec, *gauge_param);
       } else {
         errorQuda("TMCloverForce_reference: dslash_type not supported\n");
       }
 
-      if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      if (rhmc) {
         Gamma5_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
         Gamma5_host(p[i].Even().data<double *>(), p[i].Even().data<double *>(), p[i].Even().VolumeCB());
-        tau1_host(p[i].Even().data<double *>(), p[i].Even().data<double *>(), p[i].Even().VolumeCB());
+        if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)
+          tau1_host(p[i].Even().data<double *>(), p[i].Even().data<double *>(), p[i].Even().VolumeCB());
       }
 
     } else {
@@ -1116,9 +1121,10 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
     0.0;
 
   // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
-  // the non-twisted trace is larger by a factor 4 than the twisted one for mu -> 0, see computeTMCloverForceQuda
-  double sigma_coeff = k_csw_ov_8 * (twist_flavor != QUDA_TWIST_NO ? 32.0 : 8.0);
-  if (!detratio) computeCloverSigmaTrace_reference(oprod, clover.data(), sigma_coeff, 0, mu2, eps2, twist_flavor);
+  // the non-twisted trace is larger by a factor 4 than the twisted one for mu -> 0, and a single flavor requires
+  // an additional factor 1/2, see computeTMCloverForceQuda
+  double sigma_coeff = k_csw_ov_8 * (twist_flavor != QUDA_TWIST_NO ? 32.0 : 8.0) * (rhmc_flavors == 1 ? 0.5 : 1.0);
+  if (trlog) computeCloverSigmaTrace_reference(oprod, clover.data(), sigma_coeff, 0, mu2, eps2, twist_flavor);
 
   std::vector<std::vector<double>> ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {
