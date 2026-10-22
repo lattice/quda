@@ -563,6 +563,7 @@
 #define QudaFileIOMode integer(4)
 #define QUDA_FILE_IO_PARALLEL 0
 #define QUDA_FILE_IO_SERIAL 1
+#define QUDA_FILE_IO_MPI_IO 2
 #define QUDA_FILE_IO_INVALID QUDA_INVALID_ENUM
 
 #define QudaGaugeReunitarize integer(4)

@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <string>
+#include <tuple>
 #include <vector>
 #include <unistd.h>
 
@@ -1273,6 +1275,175 @@ TEST(MILCEigenvectorPrecisionTest, single)
   for (auto &file : files) remove_saved_file(file);
 }
 
+namespace
+{
+  /**
+     @brief Save vectors with the options p in parallel and in MPI-IO mode, expect the same file (or partfile
+     volumes), and expect the MPI-IO file to load exactly in both modes and the parallel one in MPI-IO mode
+   */
+  void expect_mpi_io_round_trip(const std::vector<quda::ColorSpinorField> &v, QudaPrecision prec,
+                                const quda::FileIOParam &p, const std::string &name,
+                                const std::vector<quda::complex_t> *evals = nullptr,
+                                const std::vector<quda::real_t> *resids = nullptr)
+  {
+    using namespace quda;
+    const int n = v.size();
+    auto parallel = p, mpi_io = p;
+    parallel.io_mode = QUDA_FILE_IO_PARALLEL;
+    mpi_io.io_mode = QUDA_FILE_IO_MPI_IO;
+    const std::string ref_file = name + "_parallel.cs", file = name + "_mpi_io.cs";
+    VectorIO(ref_file, parallel).save({v.begin(), v.end()}, prec, n, evals, resids);
+    VectorIO(file, mpi_io).save({v.begin(), v.end()}, prec, n, evals, resids);
+    const bool volumes = p.partfile && (comm_size() > 1 || p.partfile_grid != std::array<int, 4> {});
+    if (comm_rank() == 0) {
+      if (volumes)
+        expect_same_partfile(ref_file, file);
+      else
+        expect_same_saved_file(ref_file, file, false);
+    }
+
+    const std::vector<std::tuple<std::string, FileIOParam, const char *>> loads
+      = {{file, mpi_io, "in MPI-IO mode"}, {file, parallel, "in parallel mode"}, {ref_file, mpi_io, "in MPI-IO mode"}};
+    for (auto &[f, q, how] : loads) {
+      SCOPED_TRACE("loading " + f + " " + how);
+      auto u = zero_vectors(n, ColorSpinorParam(v[0]));
+      std::vector<complex_t> loaded;
+      VectorIO(f, q).load(u, evals ? &loaded : nullptr);
+      expect_same_vectors(u, v);
+      if (evals) expect_loaded_evals(loaded, *evals, n, !p.milc_eigenvectors);
+    }
+    remove_saved_file(ref_file);
+    remove_saved_file(file);
+  }
+} // namespace
+
+// tuple types: precision, number of spins, subset
+using vector_mpi_io_test_t = ::testing::tuple<QudaPrecision, int, VectorSubset>;
+
+class VectorMPIIOTest : public ::testing::TestWithParam<vector_mpi_io_test_t>
+{
+};
+
+// an MPI-IO save of several vectors is the file a parallel save writes, and loads exactly in both modes
+TEST_P(VectorMPIIOTest, round_trip)
+{
+  using namespace quda;
+  auto prec = ::testing::get<0>(GetParam());
+  auto nSpin = ::testing::get<1>(GetParam());
+  auto subset = ::testing::get<2>(GetParam());
+  if (!mpi_io_enabled() || !is_enabled(prec) || !is_enabled_spin(nSpin)) GTEST_SKIP();
+
+  const auto site_subset = subset == VectorSubset::FULL ? QUDA_FULL_SITE_SUBSET : QUDA_PARITY_SITE_SUBSET;
+  const auto parity = subset == VectorSubset::ODD ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+  auto v = random_vectors(3, vector_param(site_subset, parity, nSpin, prec, QUDA_CPU_FIELD_LOCATION));
+  auto p = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  p.parity_inflate = subset == VectorSubset::INFLATED;
+  expect_mpi_io_round_trip(v, prec, p, "mpi_io");
+}
+
+// 5-d vectors: Ls items per site
+TEST(VectorMPIIOCasesTest, five_d)
+{
+  using namespace quda;
+  if (!mpi_io_enabled() || !is_enabled_spin(4)) GTEST_SKIP();
+  const int n = 2, Ls = 4;
+  for (bool inflated : {false, true}) {
+    SCOPED_TRACE(inflated ? "odd parity, inflated" : "full");
+    auto param = vector_param(inflated ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET, QUDA_ODD_PARITY, 4,
+                              QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION, Ls);
+    param.pc_type = QUDA_4D_PC;
+    std::vector<ColorSpinorField> v(n, param);
+    for (int i = 0; i < n; i++) {
+      if (inflated) {
+        fill_parity(v[i], 1, i, param.pc_type);
+      } else {
+        fill_parity(v[i].Even(), 0, i, param.pc_type);
+        fill_parity(v[i].Odd(), 1, i, param.pc_type);
+      }
+    }
+    auto p = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+    p.parity_inflate = inflated;
+    expect_mpi_io_round_trip(v, QUDA_DOUBLE_PRECISION, p, "mpi_io_five_d");
+  }
+}
+
+// eigenvalues and residuals in the records' metadata
+TEST(VectorMPIIOCasesTest, eigenvalues)
+{
+  using namespace quda;
+  if (!mpi_io_enabled() || !is_enabled_spin(4)) GTEST_SKIP();
+  const int n = 3;
+  auto v = random_vectors(
+    n, vector_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 4, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION));
+  const auto evals = test_evals(n);
+  const auto resids = test_resids(n);
+  expect_mpi_io_round_trip(v, QUDA_DOUBLE_PRECISION, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL),
+                           "mpi_io_evals", &evals, &resids);
+}
+
+// MILC's eigenvector format
+TEST(VectorMPIIOCasesTest, milc_format)
+{
+  using namespace quda;
+  if (!mpi_io_enabled() || !is_enabled_spin(1)) GTEST_SKIP();
+  const int n = 3;
+  auto v = random_vectors(
+    n, vector_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION));
+  const auto evals = test_evals(n);
+  const auto resids = test_resids(n);
+  auto p = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  p.milc_eigenvectors = true;
+  expect_mpi_io_round_trip(v, QUDA_DOUBLE_PRECISION, p, "mpi_io_milc", &evals, &resids);
+}
+
+// partfiles go through POSIX I/O as in parallel mode, so an MPI-IO partfile save writes the parallel volumes; on one
+// rank, without volumes of another layout, a partfile is a single file, saved through MPI-IO
+TEST(VectorMPIIOCasesTest, partfile)
+{
+  using namespace quda;
+  if (!mpi_io_enabled() || !is_enabled_spin(1)) GTEST_SKIP();
+  const int n = 3;
+  {
+    SCOPED_TRACE("full, one volume per rank");
+    auto v = random_vectors(
+      n, vector_param(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION));
+    expect_mpi_io_round_trip(v, QUDA_DOUBLE_PRECISION, partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL),
+                             "mpi_io_partfile");
+  }
+  {
+    SCOPED_TRACE("even parity, volumes 2 3 2 2");
+    auto v = random_vectors(
+      n, vector_param(QUDA_PARITY_SITE_SUBSET, QUDA_EVEN_PARITY, 1, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION));
+    auto p = partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+    p.partfile_grid = {2, 3, 2, 2};
+    expect_mpi_io_round_trip(v, QUDA_DOUBLE_PRECISION, p, "mpi_io_partfile_layout");
+  }
+}
+
+#ifdef HAVE_QIO
+// the external backend saves the same file in parallel mode and loads an MPI-IO file exactly
+TEST(VectorMPIIOCasesTest, external)
+{
+  using namespace quda;
+  if (!mpi_io_enabled() || !is_enabled_spin(4)) GTEST_SKIP();
+  const int n = 3;
+  const auto param
+    = vector_param(QUDA_PARITY_SITE_SUBSET, QUDA_ODD_PARITY, 4, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION);
+  auto v = random_vectors(n, param);
+  const std::string file = "mpi_io_native.cs", external_file = "mpi_io_external.cs";
+  VectorIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_MPI_IO))
+    .save({v.begin(), v.end()}, QUDA_DOUBLE_PRECISION, n);
+  auto external = file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL);
+  VectorIO(external_file, external).save({v.begin(), v.end()}, QUDA_DOUBLE_PRECISION, n);
+  if (comm_rank() == 0) expect_same_saved_file(file, external_file, false);
+  auto u = zero_vectors(n, param);
+  VectorIO(file, external).load(u);
+  expect_same_vectors(u, v);
+  remove_saved_file(file);
+  remove_saved_file(external_file);
+}
+#endif
+
 // partfiles across runs with different rank layouts (run_partfile_cross.sh): --partfile-save saves full and
 // single-parity vectors to <prefix>_full and <prefix>_parity, and --partfile-load loads them; --partfile-layout
 // chooses QUDA's files, MILC's eigenvector format or QUDA's old interleaved layout
@@ -1462,6 +1633,18 @@ INSTANTIATE_TEST_SUITE_P(Vector, VectorIOBackendTest,
                            return name;
                          });
 #endif
+
+// MPI-IO against parallel mode
+INSTANTIATE_TEST_SUITE_P(Vector, VectorMPIIOTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 4),
+                                 Values(VectorSubset::FULL, VectorSubset::EVEN, VectorSubset::ODD,
+                                        VectorSubset::INFLATED)),
+                         [](testing::TestParamInfo<vector_mpi_io_test_t> param) {
+                           std::string name;
+                           name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += std::string("spin") + std::to_string(::testing::get<1>(param.param)) + "_";
+                           return name + get_vector_subset_str(::testing::get<2>(param.param));
+                         });
 
 // what the files of 5-d vectors hold
 INSTANTIATE_TEST_SUITE_P(Vector, FiveDLayoutTest,

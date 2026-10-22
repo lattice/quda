@@ -72,7 +72,8 @@ void printQudaFileIOParam(QudaFileIOParam *param)
       && param->format != QUDA_FILE_FORMAT_MILC && param->format != QUDA_FILE_FORMAT_ILDG
       && param->format != QUDA_FILE_FORMAT_QIO_EXTERNAL && param->format != QUDA_FILE_FORMAT_ILDG_EXTERNAL)
     errorQuda("Invalid file format %d", param->format);
-  if (param->io_mode != QUDA_FILE_IO_PARALLEL && param->io_mode != QUDA_FILE_IO_SERIAL)
+  if (param->io_mode != QUDA_FILE_IO_PARALLEL && param->io_mode != QUDA_FILE_IO_SERIAL
+      && param->io_mode != QUDA_FILE_IO_MPI_IO)
     errorQuda("Invalid file IO mode %d", param->io_mode);
   if (strnlen(param->ildg_lfn, sizeof(param->ildg_lfn)) == sizeof(param->ildg_lfn))
     errorQuda("ILDG logical file name is not null terminated");

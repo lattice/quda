@@ -8,6 +8,7 @@ target_sources(
           lime.cpp
           milc_common.cpp
           milc_gauge.cpp
+          mpi_file.cpp
           reunitarize.cpp
           scidac_common.cpp
           scidac_gauge.cpp

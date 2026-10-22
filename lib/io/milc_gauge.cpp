@@ -127,8 +127,16 @@ namespace quda
         errorQuda("%s is %lu bytes, but a MILC v5 gauge file of this size should be %lu bytes", filename.c_str(),
                   file_size, expected_size);
 
-      auto sum = io::read_data(filename, layout, X, io::Partitions(param.io_mode, param.io_partition_grid),
-                               field.unpacker(QUDA_SINGLE_PRECISION));
+      // checks the grid, also in MPI-IO mode, whose reads don't use the partitions
+      const io::Partitions partitions(param.io_mode, param.io_partition_grid);
+      io::Checksum sum;
+      if (param.io_mode == QUDA_FILE_IO_MPI_IO) {
+        io::File file(filename, io::File::Mode::READ, true);
+        sum = io::read_data(file, layout, X, field.unpacker(QUDA_SINGLE_PRECISION));
+        file.close();
+      } else {
+        sum = io::read_data(filename, layout, X, partitions, field.unpacker(QUDA_SINGLE_PRECISION));
+      }
 
       GaugeFileInfo info;
       info.format = QUDA_FILE_FORMAT_MILC;
@@ -149,7 +157,7 @@ namespace quda
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
                             const FileIOParam &param)
     {
-      // checks the grid before rank 0 truncates the file
+      // checks the grid before the file is truncated
       const io::Partitions partitions(param.io_mode, param.io_partition_grid);
       io::HostField field(gauge, n_dim, prec, matrix_reals);
       if (prec == QUDA_DOUBLE_PRECISION)
@@ -166,19 +174,35 @@ namespace quda
       if (comm_rank() == 0) {
         stamp = time_stamp();
         memcpy(header.time_stamp, stamp.c_str(), std::min(stamp.size(), sizeof(header.time_stamp) - 1));
-        io::File file(filename, io::File::Mode::CREATE);
-        file.write(&header, sizeof(header), 0);
-        file.close();
       }
 
+      // rank 0 writes the header, and the checksums into it after the data
       auto layout = field.layout(QUDA_SINGLE_PRECISION, sizeof(GaugeHeader), false, io::ChecksumType::MILC);
-      auto sum = io::write_data(filename, layout, X, partitions, field.packer(QUDA_SINGLE_PRECISION));
-
-      if (comm_rank() == 0) {
+      io::Checksum sum;
+      auto write_checksums = [&](const io::File &file) {
         uint32_t sums[2] = {sum.sum29, sum.sum31};
-        io::File file(filename, io::File::Mode::WRITE);
         file.write(sums, sizeof(sums), offsetof(GaugeHeader, sum29));
+      };
+      if (param.io_mode == QUDA_FILE_IO_MPI_IO) {
+        io::File file(filename, io::File::Mode::CREATE, true);
+        if (comm_rank() == 0) file.write(&header, sizeof(header), 0);
+        sum = io::write_data(file, layout, X, field.packer(QUDA_SINGLE_PRECISION));
+        if (comm_rank() == 0) write_checksums(file);
         file.close();
+        // every rank's data is in the file before anyone reads it
+        comm_barrier();
+      } else {
+        if (comm_rank() == 0) {
+          io::File file(filename, io::File::Mode::CREATE);
+          file.write(&header, sizeof(header), 0);
+          file.close();
+        }
+        sum = io::write_data(filename, layout, X, partitions, field.packer(QUDA_SINGLE_PRECISION));
+        if (comm_rank() == 0) {
+          io::File file(filename, io::File::Mode::WRITE);
+          write_checksums(file);
+          file.close();
+        }
       }
 
       write_info(filename,

@@ -28,6 +28,14 @@ namespace quda
       errorQuda("The %s file format needs the external QIO library, which requires building QUDA with QUDA_QIO=ON",
                 get_file_format_str(checked.format));
 #endif
+    if (checked.io_mode == QUDA_FILE_IO_MPI_IO) {
+#if !defined(MPI_COMMS) && !defined(QMP_COMMS)
+      errorQuda("The MPI-IO file I/O mode needs QUDA built with QUDA_MPI or QUDA_QMP");
+#endif
+      if (external_qio)
+        errorQuda("The %s file format uses the external QIO backend, which has no MPI-IO mode",
+                  get_file_format_str(checked.format));
+    }
     io_mode = checked.io_mode;
     ildg_lfn = checked.ildg_lfn;
     write_usqcd_info = checked.write_usqcd_info == QUDA_BOOLEAN_TRUE;

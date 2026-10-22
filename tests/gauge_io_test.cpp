@@ -264,6 +264,16 @@ TEST(FileIOParamTest, conversion)
     expect_equal(FileIOParam(&param), expected);
 #endif
   }
+
+  // the MPI-IO mode needs an MPI or QMP build and the native backend
+  if (mpi_io_enabled()) {
+    param.format = QUDA_FILE_FORMAT_QIO;
+    param.io_mode = QUDA_FILE_IO_MPI_IO;
+    expected.format = QUDA_FILE_FORMAT_QIO;
+    expected.external_qio = false;
+    expected.io_mode = QUDA_FILE_IO_MPI_IO;
+    expect_equal(FileIOParam(&param), expected);
+  }
 }
 
 // the CRC-32 used in SciDAC checksums is that of zlib
@@ -1150,6 +1160,224 @@ TEST_P(GaugeLegacyStringsTest, load)
   }
 }
 
+// tuple types: precision, file format, whether to write the usqcdInfo record
+using gauge_mpi_io_test_t = ::testing::tuple<QudaPrecision, QudaFileFormat, bool>;
+
+class GaugeMPIIOTest : public ::testing::TestWithParam<gauge_mpi_io_test_t>
+{
+};
+
+// an MPI-IO save is the file a parallel save writes, and MPI-IO loads of either give the parallel load exactly
+TEST_P(GaugeMPIIOTest, save_load)
+{
+  using namespace quda;
+  auto prec = ::testing::get<0>(GetParam());
+  auto format = ::testing::get<1>(GetParam());
+  auto usqcd_info = ::testing::get<2>(GetParam());
+  if (!mpi_io_enabled() || !is_enabled(prec)) GTEST_SKIP();
+  // the usqcdInfo record does not apply to MILC files
+  if (format == QUDA_FILE_FORMAT_MILC && usqcd_info) GTEST_SKIP();
+  const auto saved = saved_format(format);
+  const bool milc = saved == QUDA_FILE_FORMAT_MILC;
+
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge original(prec), reference(prec), loaded(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  auto param = [&](QudaFileFormat f, QudaFileIOMode io_mode) {
+    auto p = file_io_param(f, io_mode);
+    p.write_usqcd_info = usqcd_info;
+    p.ildg_lfn = "lfn://quda/mpi_io_test"; // the default, the file name, differs between files
+    return p;
+  };
+  auto load = [&](const std::string &file, const FileIOParam &p, HostGauge &gauge) {
+    gauge.clear();
+    return GaugeIO(file, p).load(gauge.data, prec, gauge_param.X);
+  };
+
+  const std::string ref_file = "mpi_io_ref.lat", file = "mpi_io.lat";
+  GaugeIO(ref_file, param(format, QUDA_FILE_IO_PARALLEL)).save(original.data, prec, gauge_param.X);
+  GaugeIO(file, param(format, QUDA_FILE_IO_MPI_IO)).save(original.data, prec, gauge_param.X);
+  if (comm_rank() == 0) expect_same_saved_file(ref_file, file, milc);
+
+  const auto ref_info = load(ref_file, param(format, QUDA_FILE_IO_PARALLEL), reference);
+  EXPECT_TRUE(ref_info.checksum_matches);
+  EXPECT_EQ(ref_info.has_plaq_linktr, usqcd_info);
+  if (!milc) { EXPECT_TRUE(reference == original); }
+
+  auto expect_reference = [&](const GaugeFileInfo &info) {
+    EXPECT_TRUE(loaded == reference);
+    EXPECT_EQ(info.format, ref_info.format);
+    EXPECT_EQ(info.file_prec, ref_info.file_prec);
+    EXPECT_EQ(info.ildg, ref_info.ildg);
+    EXPECT_EQ(info.has_info_file, ref_info.has_info_file);
+    EXPECT_TRUE(info.has_checksum);
+    EXPECT_TRUE(info.checksum_matches);
+    EXPECT_EQ(info.sum29, ref_info.sum29);
+    EXPECT_EQ(info.sum31, ref_info.sum31);
+    EXPECT_EQ(info.has_plaq_linktr, ref_info.has_plaq_linktr);
+    if (info.has_plaq_linktr) {
+      EXPECT_TRUE(info.plaq_linktr_matches);
+      EXPECT_EQ(info.plaq, ref_info.plaq);
+      EXPECT_EQ(info.linktr, ref_info.linktr);
+    }
+  };
+  {
+    SCOPED_TRACE("MPI-IO load of the MPI-IO file");
+    expect_reference(load(file, param(format, QUDA_FILE_IO_MPI_IO), loaded));
+  }
+  {
+    SCOPED_TRACE("MPI-IO load of the parallel file");
+    expect_reference(load(ref_file, param(format, QUDA_FILE_IO_MPI_IO), loaded));
+  }
+#ifdef HAVE_QIO
+  if (!milc) {
+    SCOPED_TRACE("external load of the MPI-IO file");
+    auto external = saved == QUDA_FILE_FORMAT_ILDG ? QUDA_FILE_FORMAT_ILDG_EXTERNAL : QUDA_FILE_FORMAT_QIO_EXTERNAL;
+    expect_reference(load(file, param(external, QUDA_FILE_IO_PARALLEL), loaded));
+  }
+#endif
+
+  // a wrong stored checksum is still found
+  corrupt_checksum(file, saved);
+  auto allow = param(format, QUDA_FILE_IO_MPI_IO);
+  allow.allow_checksum_mismatch = true;
+  auto corrupt_info = load(file, allow, loaded);
+  EXPECT_TRUE(loaded == reference);
+  EXPECT_FALSE(corrupt_info.checksum_matches);
+  EXPECT_EQ(corrupt_info.sum29, ref_info.sum29);
+  EXPECT_EQ(corrupt_info.sum31, ref_info.sum31);
+
+  for (auto &f : {ref_file, file}) {
+    remove_saved_file(f);
+    if (milc && comm_rank() == 0 && remove((f + ".info").c_str()) != 0) errorQuda("Error deleting %s.info", f.c_str());
+  }
+}
+
+// in MPI-IO mode a grid equal to the process grid groups no ranks, so it is accepted
+TEST(GaugeMPIIOGridTest, process_grid)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!mpi_io_enabled() || !is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge original(prec), reference(prec), loaded(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+  const std::array<int, 4> grid = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
+
+  for (auto format : {QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_MILC}) {
+    SCOPED_TRACE(get_file_format_str(format));
+    const bool milc = format == QUDA_FILE_FORMAT_MILC;
+    const std::string ref_file = "mpi_io_grid_ref.lat", file = "mpi_io_grid.lat";
+    GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).save(original.data, prec, gauge_param.X);
+    GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO, grid)).save(original.data, prec, gauge_param.X);
+    if (comm_rank() == 0) expect_same_saved_file(ref_file, file, milc);
+
+    reference.clear();
+    loaded.clear();
+    auto ref_info
+      = GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).load(reference.data, prec, gauge_param.X);
+    auto info = GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO, grid)).load(loaded.data, prec, gauge_param.X);
+    EXPECT_TRUE(loaded == reference);
+    EXPECT_TRUE(info.checksum_matches);
+    EXPECT_EQ(info.sum29, ref_info.sum29);
+    EXPECT_EQ(info.sum31, ref_info.sum31);
+
+    for (auto &f : {ref_file, file}) {
+      remove_saved_file(f);
+      if (milc && comm_rank() == 0 && remove((f + ".info").c_str()) != 0)
+        errorQuda("Error deleting %s.info", f.c_str());
+    }
+  }
+}
+
+// an MPI-IO save over a larger file truncates it: the file is the one a fresh parallel save writes
+TEST(GaugeMPIIOOverwriteTest, larger_file)
+{
+  using namespace quda;
+  if (!mpi_io_enabled() || !is_enabled(QUDA_DOUBLE_PRECISION) || !is_enabled(QUDA_SINGLE_PRECISION)) GTEST_SKIP();
+  QudaGaugeParam large_param = gauge_param_for(QUDA_DOUBLE_PRECISION),
+                 small_param = gauge_param_for(QUDA_SINGLE_PRECISION);
+  HostGauge large(QUDA_DOUBLE_PRECISION), small(QUDA_SINGLE_PRECISION);
+  constructHostGaugeField(large.data, large_param, 0, nullptr);
+  constructHostGaugeField(small.data, small_param, 0, nullptr);
+
+  for (auto format : {QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_MILC}) {
+    SCOPED_TRACE(get_file_format_str(format));
+    const bool milc = format == QUDA_FILE_FORMAT_MILC;
+    const std::string ref_file = "mpi_io_overwrite_ref.lat", file = "mpi_io_overwrite.lat";
+    // double-precision SciDAC, larger than either single-precision file
+    GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL))
+      .save(large.data, QUDA_DOUBLE_PRECISION, large_param.X);
+    const size_t old_size = comm_rank() == 0 ? std::filesystem::file_size(file) : 0;
+
+    GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO)).save(small.data, QUDA_SINGLE_PRECISION, small_param.X);
+    GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).save(small.data, QUDA_SINGLE_PRECISION, small_param.X);
+    if (comm_rank() == 0) {
+      EXPECT_GT(old_size, std::filesystem::file_size(ref_file));
+      expect_same_saved_file(ref_file, file, milc);
+    }
+    HostGauge loaded(QUDA_SINGLE_PRECISION);
+    loaded.clear();
+    auto info
+      = GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO)).load(loaded.data, QUDA_SINGLE_PRECISION, small_param.X);
+    EXPECT_TRUE(loaded == small);
+    EXPECT_TRUE(info.checksum_matches);
+
+    for (auto &f : {ref_file, file}) {
+      remove_saved_file(f);
+      if (milc && comm_rank() == 0 && remove((f + ".info").c_str()) != 0)
+        errorQuda("Error deleting %s.info", f.c_str());
+    }
+  }
+}
+
+// partfiles go through POSIX I/O as in parallel mode, so an MPI-IO partfile save writes the parallel volumes, and
+// MPI-IO loads them exactly; on one rank a partfile is a single file, saved through MPI-IO
+TEST(GaugeMPIIOPartfileTest, volumes)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!mpi_io_enabled() || !is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge original(prec), loaded(prec);
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+
+  auto check = [&](FileIOParam parallel) {
+    auto mpi_io = parallel;
+    mpi_io.io_mode = QUDA_FILE_IO_MPI_IO;
+    const std::string ref_file = "mpi_io_partfile_ref.lat", file = "mpi_io_partfile.lat";
+    GaugeIO(ref_file, parallel).save(original.data, prec, gauge_param.X);
+    GaugeIO(file, mpi_io).save(original.data, prec, gauge_param.X);
+    const bool volumes = comm_size() > 1 || parallel.partfile_grid != std::array<int, 4> {};
+    if (comm_rank() == 0) {
+      EXPECT_EQ(saved_volumes(file).empty(), !volumes);
+      if (volumes)
+        expect_same_partfile(ref_file, file);
+      else
+        expect_same_saved_file(ref_file, file, false);
+    }
+    loaded.clear();
+    auto info
+      = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_MPI_IO)).load(loaded.data, prec, gauge_param.X);
+    EXPECT_TRUE(loaded == original);
+    EXPECT_TRUE(info.checksum_matches);
+    remove_saved_file(ref_file);
+    remove_saved_file(file);
+  };
+
+  check(partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL));
+
+  // volumes as if saved by another rank layout
+  auto p = partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  for (int d = 0; d < 4; d++) {
+    const int N = gauge_param.X[d] * comm_dim(d);
+    p.partfile_grid[d] = N % 3 == 0 ? 3 : N % 2 == 0 ? 2 : 1;
+  }
+  SCOPED_TRACE("volumes " + grid_str(p.partfile_grid));
+  check(p);
+}
+
 #ifdef HAVE_QIO
 class GaugeIOBackendTest : public ::testing::TestWithParam<gauge_test_t>
 {
@@ -1292,6 +1520,20 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugePartitionTest,
 INSTANTIATE_TEST_SUITE_P(Gauge, GaugePartfileTest, Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
                          [](testing::TestParamInfo<QudaPrecision> param) {
                            return std::string(get_prec_str(param.param));
+                         });
+
+// MPI-IO, with the native formats
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeMPIIOTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(QUDA_FILE_FORMAT_AUTO, QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG,
+                                        QUDA_FILE_FORMAT_MILC),
+                                 Values(true, false)),
+                         [](testing::TestParamInfo<gauge_mpi_io_test_t> param) {
+                           std::string name;
+                           name += get_prec_str(::testing::get<0>(param.param)) + std::string("_");
+                           name += quda::get_file_format_str(::testing::get<1>(param.param));
+                           name += ::testing::get<2>(param.param) ? "_usqcd_info" : "_no_usqcd_info";
+                           return name;
                          });
 
 // readGaugeQuda

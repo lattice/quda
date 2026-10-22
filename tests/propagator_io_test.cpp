@@ -51,6 +51,12 @@ namespace
 #endif
   }
 
+  // the external QIO backend has no MPI-IO mode, so with MPI-IO it saves and loads the same files in parallel mode
+  QudaFileIOMode io_mode_for(QudaFileFormat format, QudaFileIOMode io_mode)
+  {
+    return format == QUDA_FILE_FORMAT_QIO_EXTERNAL && io_mode == QUDA_FILE_IO_MPI_IO ? QUDA_FILE_IO_PARALLEL : io_mode;
+  }
+
   // parameters of staggered fields on the test lattice: full or single parity, on the host or the device
   quda::ColorSpinorParam ks_param(QudaSiteSubset subset, QudaParity parity, QudaPrecision prec, QudaFieldLocation location)
   {
@@ -220,8 +226,8 @@ namespace
     const auto X = local_dims();
     if (external) {
 #ifdef HAVE_QIO
-      write_spinor_field(file.c_str(), {file_xml, metadata}, fields, X.data(), QUDA_FULL_SITE_SUBSET, false, io_mode,
-                         grid);
+      write_spinor_field(file.c_str(), {file_xml, metadata}, fields, X.data(), QUDA_FULL_SITE_SUBSET, false,
+                         io_mode_for(QUDA_FILE_FORMAT_QIO_EXTERNAL, io_mode), grid);
 #endif
     } else {
       scidac::write_fields(file, file_xml, metadata, fields, X.data(), QUDA_INVALID_PARITY,
@@ -380,7 +386,7 @@ TEST_P(HypercubeTest, boxes)
 {
   using namespace quda;
   const auto io_mode = GetParam();
-  if (!is_enabled_spin(1)) GTEST_SKIP();
+  if (!is_enabled_spin(1) || (io_mode == QUDA_FILE_IO_MPI_IO && !mpi_io_enabled())) GTEST_SKIP();
   const auto boxes = test_boxes();
   const int n = boxes.size();
   std::vector<TestRecord> records;
@@ -428,7 +434,7 @@ TEST_P(HypercubeTest, boxes)
       for (auto format : ks_formats()) {
         SCOPED_TRACE("loading " + file + " with " + get_file_format_str(format));
         auto u = zero_fields(n, full);
-        auto info = KSSourceIO(file, file_io_param(format, io_mode, grid)).load(u);
+        auto info = KSSourceIO(file, file_io_param(format, io_mode_for(format, io_mode), grid)).load(u);
         EXPECT_EQ(mismatches(u, expected), 0);
         EXPECT_EQ(info.type, KSFileType::VectorSource);
         EXPECT_EQ(info.file_info, milc_info);
@@ -447,74 +453,91 @@ class KSPropagatorLoadTest : public ::testing::TestWithParam<prop_test_t>
 {
 };
 
-// VV-pair files as MILC writes them load into full and single-parity fields with both backends, with and without
-// their sources, and fewer pairs than they hold
-TEST_P(KSPropagatorLoadTest, load)
+namespace
 {
-  using namespace quda;
-  const auto prec = ::testing::get<0>(GetParam());
-  const int nc = ::testing::get<1>(GetParam());
-  const bool slice = ::testing::get<2>(GetParam());
-  if (!is_enabled_spin(1)) GTEST_SKIP();
-  const auto X = local_dims();
-  const auto N = global_dims();
-  // the first slice of the second rank in t, or the middle of the lattice
-  const box_t source_box = slice ? box_t(time_slice(X[3] < N[3] ? X[3] : N[3] / 2)) : std::nullopt;
-  const std::string source_info = slice ? "point" : "even_wall";
+  /**
+     @brief Write a VV-pair file of nc pairs as MILC writes them, with sources on the whole lattice or a time slice,
+     and expect it to load into full and single-parity fields with both backends (natively in the I/O mode given),
+     with and without its sources, and fewer pairs than it holds
+   */
+  void propagator_load(QudaPrecision prec, int nc, bool slice, QudaFileIOMode io_mode)
+  {
+    using namespace quda;
+    const auto X = local_dims();
+    const auto N = global_dims();
+    // the first slice of the second rank in t, or the middle of the lattice
+    const box_t source_box = slice ? box_t(time_slice(X[3] < N[3] ? X[3] : N[3] / 2)) : std::nullopt;
+    const std::string source_info = slice ? "point" : "even_wall";
 
-  std::vector<TestRecord> records;
-  for (int c = 0; c < nc; c++) {
-    records.push_back(color_vector_record(2 * c, prec, source_box, pair_source_xml(source_info)));
-    records.push_back(color_vector_record(2 * c + 1, prec, std::nullopt, solution_xml(c)));
-  }
-  auto solution = [&](int i, const std::array<int, 4> &g, int k) { return encoded(2 * i + 1, g, k, 6); };
-  auto source
-    = [&](int i, const std::array<int, 4> &g, int k) { return in_box(g, source_box) ? encoded(2 * i, g, k, 6) : 0.0; };
+    std::vector<TestRecord> records;
+    for (int c = 0; c < nc; c++) {
+      records.push_back(color_vector_record(2 * c, prec, source_box, pair_source_xml(source_info)));
+      records.push_back(color_vector_record(2 * c + 1, prec, std::nullopt, solution_xml(c)));
+    }
+    auto solution = [&](int i, const std::array<int, 4> &g, int k) { return encoded(2 * i + 1, g, k, 6); };
+    auto source
+      = [&](int i, const std::array<int, 4> &g, int k) { return in_box(g, source_box) ? encoded(2 * i, g, k, 6) : 0.0; };
 
-  std::vector<std::string> files;
-  for (bool external : writers()) {
-    files.push_back("vv_" + writer_str(external) + ".prop");
-    write_test_file(files.back(), vv_file_xml(), records, external);
-  }
-  if (comm_rank() == 0 && files.size() > 1) expect_same_saved_file(files[0], files[1], false);
+    std::vector<std::string> files;
+    for (bool external : writers()) {
+      files.push_back("vv_" + writer_str(external) + ".prop");
+      write_test_file(files.back(), vv_file_xml(), records, external);
+    }
+    if (comm_rank() == 0 && files.size() > 1) expect_same_saved_file(files[0], files[1], false);
 
-  const Target full = {QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION};
-  for (auto &file : files) {
-    for (auto format : ks_formats()) {
-      const auto p = file_io_param(format, QUDA_FILE_IO_PARALLEL);
-      for (auto &t : targets(prec)) {
-        SCOPED_TRACE("loading " + file + " with " + get_file_format_str(format) + " into " + target_str(t) + " fields");
-        auto x = zero_fields(nc, t), b = zero_fields(nc, t);
-        auto info = KSPropagatorIO(file, p).load(x, b);
-        EXPECT_EQ(mismatches(x, solution), 0);
-        EXPECT_EQ(mismatches(b, source), 0);
-        EXPECT_EQ(info.type, KSFileType::Propagator);
-        EXPECT_EQ(info.file_prec, prec);
-        EXPECT_EQ(info.file_info, milc_info);
-        EXPECT_EQ(info.boxes, std::vector<box_t>(nc, source_box));
-        EXPECT_EQ(info.source_info, std::vector<std::string>(nc, source_info));
-        EXPECT_EQ(info.solution_info, std::vector<std::string>(nc, ""));
-      }
-      {
-        SCOPED_TRACE("loading " + file + " with " + get_file_format_str(format) + " without the sources");
-        auto x = zero_fields(nc, full);
-        auto info = KSPropagatorIO(file, p).load(x, {});
-        EXPECT_EQ(mismatches(x, solution), 0);
-        EXPECT_TRUE(info.boxes.empty());
-        EXPECT_TRUE(info.source_info.empty());
-        EXPECT_EQ(info.solution_info.size(), static_cast<size_t>(nc));
-      }
-      if (nc > 1) {
-        SCOPED_TRACE("loading " + std::to_string(nc - 1) + " pairs of " + file + " with " + get_file_format_str(format));
-        auto x = zero_fields(nc - 1, full), b = zero_fields(nc - 1, full);
-        auto info = KSPropagatorIO(file, p).load(x, b);
-        EXPECT_EQ(mismatches(x, solution), 0);
-        EXPECT_EQ(mismatches(b, source), 0);
-        EXPECT_EQ(info.boxes.size(), static_cast<size_t>(nc - 1));
+    const Target full = {QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, QUDA_DOUBLE_PRECISION, QUDA_CPU_FIELD_LOCATION};
+    for (auto &file : files) {
+      for (auto format : ks_formats()) {
+        const auto p = file_io_param(format, io_mode_for(format, io_mode));
+        for (auto &t : targets(prec)) {
+          SCOPED_TRACE("loading " + file + " with " + get_file_format_str(format) + " into " + target_str(t) + " fields");
+          auto x = zero_fields(nc, t), b = zero_fields(nc, t);
+          auto info = KSPropagatorIO(file, p).load(x, b);
+          EXPECT_EQ(mismatches(x, solution), 0);
+          EXPECT_EQ(mismatches(b, source), 0);
+          EXPECT_EQ(info.type, KSFileType::Propagator);
+          EXPECT_EQ(info.file_prec, prec);
+          EXPECT_EQ(info.file_info, milc_info);
+          EXPECT_EQ(info.boxes, std::vector<box_t>(nc, source_box));
+          EXPECT_EQ(info.source_info, std::vector<std::string>(nc, source_info));
+          EXPECT_EQ(info.solution_info, std::vector<std::string>(nc, ""));
+        }
+        {
+          SCOPED_TRACE("loading " + file + " with " + get_file_format_str(format) + " without the sources");
+          auto x = zero_fields(nc, full);
+          auto info = KSPropagatorIO(file, p).load(x, {});
+          EXPECT_EQ(mismatches(x, solution), 0);
+          EXPECT_TRUE(info.boxes.empty());
+          EXPECT_TRUE(info.source_info.empty());
+          EXPECT_EQ(info.solution_info.size(), static_cast<size_t>(nc));
+        }
+        if (nc > 1) {
+          SCOPED_TRACE("loading " + std::to_string(nc - 1) + " pairs of " + file + " with " + get_file_format_str(format));
+          auto x = zero_fields(nc - 1, full), b = zero_fields(nc - 1, full);
+          auto info = KSPropagatorIO(file, p).load(x, b);
+          EXPECT_EQ(mismatches(x, solution), 0);
+          EXPECT_EQ(mismatches(b, source), 0);
+          EXPECT_EQ(info.boxes.size(), static_cast<size_t>(nc - 1));
+        }
       }
     }
+    remove_files(files);
   }
-  remove_files(files);
+} // namespace
+
+// VV-pair files as MILC writes them load in parallel mode
+TEST_P(KSPropagatorLoadTest, load)
+{
+  if (!quda::is_enabled_spin(1)) GTEST_SKIP();
+  propagator_load(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()), ::testing::get<2>(GetParam()),
+                  QUDA_FILE_IO_PARALLEL);
+}
+
+// and in MPI-IO mode, with time-slice sources, of whose sites most ranks hold none
+TEST(KSPropagatorMPIIOLoadTest, timeslice)
+{
+  if (!quda::is_enabled_spin(1) || !mpi_io_enabled()) GTEST_SKIP();
+  propagator_load(QUDA_DOUBLE_PRECISION, 3, true, QUDA_FILE_IO_MPI_IO);
 }
 
 enum class SourceKind { COLOR, NO_COLOR, OLD_STYLE, PAIRS, COMPLEX, COMPLEX_SLICE };
@@ -1063,7 +1086,7 @@ int main(int argc, char **argv)
 using ::testing::Combine;
 using ::testing::Values;
 
-INSTANTIATE_TEST_SUITE_P(KS, HypercubeTest, Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL),
+INSTANTIATE_TEST_SUITE_P(KS, HypercubeTest, Values(QUDA_FILE_IO_PARALLEL, QUDA_FILE_IO_SERIAL, QUDA_FILE_IO_MPI_IO),
                          [](testing::TestParamInfo<QudaFileIOMode> param) {
                            return std::string(get_io_mode_str(param.param));
                          });

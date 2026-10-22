@@ -33,9 +33,15 @@ extern "C" {
  */
 typedef struct QudaFileIOParam_s {
   size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
-  QudaFileFormat format;        /**< File format; AUTO detects the format on load and uses QIO on save */
-  QudaFileIOMode io_mode;       /**< Whether all ranks access the file, or only rank 0 */
-  char ildg_lfn[256];           /**< ILDG logical file name; empty means use the file name */
+  QudaFileFormat format;  /**< File format; AUTO detects the format on load and uses QIO on save */
+  QudaFileIOMode io_mode; /**< Whether all ranks access the file, only rank 0, or all ranks through collective MPI-IO.
+                             MPI-IO is meant for single files on parallel file systems (Lustre, GPFS), and needs
+                             QUDA built with QUDA_MPI or QUDA_QMP and the native backend (not the _EXTERNAL
+                             formats).  Partfiles are loaded and saved as in parallel mode, with a warning.  The MPI
+                             library's own settings (ROMIO hints, e.g. through ROMIO_HINTS, or Open MPI's MCA
+                             parameters) choose the ranks that access the file and the striping of new files; an
+                             existing file is overwritten in place and keeps its striping */
+  char ildg_lfn[256];     /**< ILDG logical file name; empty means use the file name */
   QudaBoolean write_usqcd_info; /**< Whether to write the USQCD plaquette / link-trace record on QIO and ILDG gauge saves */
   QudaBoolean allow_checksum_mismatch; /**< Whether a MILC, QIO or ILDG file whose checksums do not match its data is
                                           loaded with a warning instead of an error (default false).  This is necessary
@@ -47,9 +53,11 @@ typedef struct QudaFileIOParam_s {
                                handling the data of every rank in its block.  Each value must divide the number of
                                ranks in that dimension; all zeros (the default) means one partition per rank.
                                Applies to gauge fields and vectors: for single files in parallel mode only (serial
-                               mode goes through rank 0 alone); a partfile is saved as one file per partition,
-                               whatever the mode.  The native backend loads partfiles saved with any rank layout and
-                               grid; the external QIO backend only those saved with its own layout and grid */
+                               mode goes through rank 0 alone, and in MPI-IO mode a grid that groups ranks is an
+                               error, since the MPI library chooses which ranks access the file); a partfile is saved
+                               as one file per partition, whatever the mode.  The native backend loads partfiles saved
+                               with any rank layout and grid; the external QIO backend only those saved with its own
+                               layout and grid */
   QudaBoolean milc_eigenvectors; /**< Whether to save eigenvectors in MILC's SciDAC format (default false), on the full
                                     lattice with both parities filled and the eigenvalues in MILC's convention.  Only
                                     for eigensolver saves of the preconditioned staggered or asqtad operator M; any

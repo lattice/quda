@@ -25,7 +25,19 @@ extern const char *gitversion;
 
 inline const char *get_io_mode_str(QudaFileIOMode io_mode)
 {
-  return io_mode == QUDA_FILE_IO_SERIAL ? "serial" : "parallel";
+  return io_mode == QUDA_FILE_IO_SERIAL ? "serial" : io_mode == QUDA_FILE_IO_MPI_IO ? "mpi_io" : "parallel";
+}
+
+/**
+   @brief Whether this build has the MPI-IO file I/O mode (QUDA_MPI or QUDA_QMP)
+ */
+constexpr bool mpi_io_enabled()
+{
+#if defined(MPI_COMMS) || defined(QMP_COMMS)
+  return true;
+#else
+  return false;
+#endif
 }
 
 /**

@@ -7,10 +7,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
 #include <enum_quda.h>
+#include <io/mpi_file.h>
 
 namespace quda
 {
@@ -115,17 +117,27 @@ namespace quda
     using SitePack = std::function<void(int block, size_t index, char *site)>;
 
     /**
-       @brief Simple wrapper around a POSIX file descriptor, raising errorQuda on failure
+       @brief Simple wrapper around a POSIX file descriptor, or a file
+       opened through MPI-IO by every rank, raising errorQuda on
+       failure.  On an MPI-IO file, read and write are independent
+       accesses of the calling rank, and closing it, or destroying it
+       while it is open, is collective.
      */
     class File
     {
       int fd = -1;
+      std::unique_ptr<MpiHandle, void (*)(MpiHandle *)> mpi {nullptr, mpi_free};
       std::string filename;
 
     public:
       enum class Mode { READ, WRITE, CREATE };
 
-      File(const std::string &filename, Mode mode);
+      /**
+         @param[in] filename The file
+         @param[in] mode READ, WRITE (without truncating), or CREATE (truncating an existing file)
+         @param[in] mpi_io Whether to open it through MPI-IO, collectively (READ or CREATE only)
+       */
+      File(const std::string &filename, Mode mode, bool mpi_io = false);
       ~File();
       File(const File &) = delete;
       File &operator=(const File &) = delete;
@@ -135,8 +147,16 @@ namespace quda
       size_t size() const;
 
       /**
+         @brief The MPI-IO file, or null for a POSIX file
+       */
+      const MpiHandle *mpi_handle() const { return mpi.get(); }
+
+      const std::string &name() const { return filename; }
+
+      /**
          @brief Close the file, raising an error if that fails (which can
-         report failed writes on network file systems)
+         report failed writes on network file systems); collective for
+         an MPI-IO file
        */
       void close();
     };
@@ -217,12 +237,14 @@ namespace quda
     /**
        @brief Check an I/O partition grid against the process grid and
        log how it applies.  A grid that does not divide the process
-       grid is an error in either mode; a valid grid is ignored in
-       serial mode.
-       @param[in] io_mode Serial or parallel
+       grid is an error in every mode; a valid grid is ignored in
+       serial mode.  In MPI-IO mode a grid that groups ranks is an
+       error, since the MPI library chooses which ranks access the
+       file; a grid equal to the process grid is accepted.
+       @param[in] io_mode Serial, parallel or MPI-IO
        @param[in] grid Number of partitions in each dimension, or all zeros for one per rank
        @param[in] dims The process grid
-       @return Whether the grid groups the ranks: false for a zero grid and in serial mode
+       @return Whether the grid groups the ranks: false for a zero grid, in serial mode and in MPI-IO mode
      */
     bool check_partition_grid(QudaFileIOMode io_mode, const std::array<int, 4> &grid, const std::array<int, 4> &dims);
 
@@ -247,7 +269,7 @@ namespace quda
 
     public:
       /**
-         @param[in] io_mode Serial or parallel
+         @param[in] io_mode Serial, parallel or MPI-IO (one partition per rank, as parallel mode with a zero grid)
          @param[in] grid Number of partitions in each dimension, or all zeros for one per rank
          @param[in] partfile Whether the partitions are those of a partfile, which apply in serial mode too
        */
@@ -324,6 +346,26 @@ namespace quda
      */
     Checksum write_data(const std::vector<FilePart> &parts, const DataLayout &layout, const int *X,
                         const Partitions &partitions, const SitePack &pack, const Hypercube *region = nullptr);
+
+    /**
+       @brief Read the data section of a file opened through MPI-IO,
+       with one collective read per block, in which every rank reads
+       its box of the region.  Collective; the region and checksum
+       are as for the other read_data.
+       @param[in] file The file, opened through MPI-IO by every rank
+     */
+    Checksum read_data(const File &file, const DataLayout &layout, const int *X, const SiteUnpack &unpack,
+                       const Hypercube *region = nullptr);
+
+    /**
+       @brief Write the data section of a file opened through MPI-IO,
+       with one collective write per block, in which every rank writes
+       its box of the region.  Collective.  The data is complete in
+       the file once the file is closed.
+       @param[in] file The file, opened through MPI-IO by every rank
+     */
+    Checksum write_data(const File &file, const DataLayout &layout, const int *X, const SitePack &pack,
+                        const Hypercube *region = nullptr);
 
     /**
        @brief Report a checksum mismatch: a warning if allowed, otherwise an error

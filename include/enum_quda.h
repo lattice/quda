@@ -674,10 +674,11 @@ typedef enum QudaFileFormat_s {
   QUDA_FILE_FORMAT_INVALID = QUDA_INVALID_ENUM
 } QudaFileFormat;
 
-// Whether all ranks access a file, or only rank 0
+// Whether all ranks access a file, only rank 0, or all ranks through collective MPI-IO
 typedef enum QudaFileIOMode_s {
   QUDA_FILE_IO_PARALLEL,
   QUDA_FILE_IO_SERIAL,
+  QUDA_FILE_IO_MPI_IO, // single files through collective MPI-IO (requires QUDA_MPI or QUDA_QMP)
   QUDA_FILE_IO_INVALID = QUDA_INVALID_ENUM
 } QudaFileIOMode;
 

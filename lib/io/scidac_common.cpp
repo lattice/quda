@@ -862,6 +862,21 @@ namespace quda
         if (first_file) first_file->close();
         return sums;
       }
+
+      /**
+         @brief The options with which a partfile is loaded or saved:
+         partfiles go through POSIX I/O, so MPI-IO mode becomes parallel
+         mode, with a warning
+       */
+      FileIOParam partfile_io_param(const FileIOParam &param, const std::string &filename, const char *action)
+      {
+        if (param.io_mode != QUDA_FILE_IO_MPI_IO) return param;
+        warningQuda("%s is a partfile, which is %s with POSIX I/O as in parallel mode, not through MPI-IO",
+                    filename.c_str(), action);
+        auto p = param;
+        p.io_mode = QUDA_FILE_IO_PARALLEL;
+        return p;
+      }
     } // namespace
 
     std::vector<std::vector<io::FilePart>> find_volumes(const FieldRecords &records, size_t site_bytes)
@@ -944,8 +959,10 @@ namespace quda
         layouts.push_back(field_layout(fields[k], m.prec, r.data.data_offset, parity));
       }
 
-      const io::Partitions partitions(param.io_mode, param.io_partition_grid);
       const bool partfile = records.volfmt == partfile_volfmt;
+      const auto io_param = partfile ? partfile_io_param(param, records.filename, "loaded") : param;
+      // checks the grid, also in MPI-IO mode, whose reads don't use the partitions
+      const io::Partitions partitions(io_param.io_mode, io_param.io_partition_grid);
       for (auto k = 0u; partfile && k < fields.size(); k++)
         if (records.fields[k].metadata.hypercube)
           errorQuda("%s is a hypercube record in a partfile, which is not supported", what(k).c_str());
@@ -957,6 +974,11 @@ namespace quda
                       layouts[k].site_bytes, layouts[0].site_bytes);
         volumes = find_volumes(records, layouts[0].site_bytes);
       }
+
+      // one MPI file for all the records
+      std::optional<io::File> mpi_file;
+      if (io_param.io_mode == QUDA_FILE_IO_MPI_IO && !fields.empty())
+        mpi_file.emplace(file, io::File::Mode::READ, true);
 
       std::vector<FieldChecksum> sums;
       for (auto k = 0u; k < fields.size(); k++) {
@@ -971,7 +993,8 @@ namespace quda
           if (r.data.data_bytes != bytes)
             errorQuda("The binary data of %s is %lu bytes, but should be %lu bytes%s", what(k).c_str(),
                       r.data.data_bytes, bytes, box ? (" for the sites " + hypercube_str(*box)).c_str() : "");
-          c.sum = io::read_data(file, layouts[k], X, partitions, unpack, box ? &*box : nullptr);
+          c.sum = mpi_file ? io::read_data(*mpi_file, layouts[k], X, unpack, box ? &*box : nullptr) :
+                             io::read_data(file, layouts[k], X, partitions, unpack, box ? &*box : nullptr);
         }
 
         // as in QIO, a SciDAC file must have a checksum, while ILDG files from other codes have none
@@ -982,6 +1005,7 @@ namespace quda
         }
         sums.push_back(c);
       }
+      if (mpi_file) mpi_file->close();
       return sums;
     }
 
@@ -1003,18 +1027,21 @@ namespace quda
       if (param.partfile && (comm_size() > 1 || param.partfile_grid != std::array<int, 4> {})) {
         for (auto &m : metadata)
           if (m.hypercube) errorQuda("%s: hypercube records cannot be saved in partfiles", filename.c_str());
-        return write_partfile(filename, user_file_xml, metadata, fields, X, parity, param);
+        return write_partfile(filename, user_file_xml, metadata, fields, X, parity,
+                              partfile_io_param(param, filename, "saved"));
       }
 
-      // checks the grid before rank 0 truncates the file
+      // checks the grid before the file is truncated
       const io::Partitions partitions(param.io_mode, param.io_partition_grid);
+      const bool mpi_io = param.io_mode == QUDA_FILE_IO_MPI_IO;
       const auto N = file_dims(X, parity);
 
-      // rank 0 writes everything but the binary data, appending each record's checksum after its data
+      // rank 0 writes everything but the binary data, appending each record's checksum after its data; in MPI-IO
+      // mode every rank opens the file, and rank 0 writes through the same MPI file
       std::optional<io::File> file;
       std::optional<lime::Writer> writer;
+      if (mpi_io || comm_rank() == 0) file.emplace(filename, io::File::Mode::CREATE, mpi_io);
       if (comm_rank() == 0) {
-        file.emplace(filename, io::File::Mode::CREATE);
         writer.emplace(*file);
         writer->write(private_file_xml, file_info_xml(N, 0), true, false);
         writer->write(file_xml, user_file_xml, false, true);
@@ -1041,11 +1068,14 @@ namespace quda
         comm_broadcast(&data_offset, sizeof(data_offset));
         layout.offset = data_offset;
 
-        auto sum = io::write_data(filename, layout, X, partitions, fields[k].packer(m.prec), box);
+        auto sum = mpi_io ? io::write_data(*file, layout, X, fields[k].packer(m.prec), box) :
+                            io::write_data(filename, layout, X, partitions, fields[k].packer(m.prec), box);
         if (comm_rank() == 0) writer->write(checksum, checksum_xml(sum.sum29, sum.sum31), false, true);
         sums.push_back(sum);
       }
       if (file) file->close();
+      // every rank's data is in the file before anyone reads it
+      if (mpi_io) comm_barrier();
       return sums;
     }
 

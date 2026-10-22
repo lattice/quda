@@ -503,8 +503,8 @@ namespace
   CLI::TransformPairs<QudaFileFormat> prop_file_format_map {
     {"auto", QUDA_FILE_FORMAT_AUTO}, {"qio", QUDA_FILE_FORMAT_QIO}, {"qio-external", QUDA_FILE_FORMAT_QIO_EXTERNAL}};
 
-  CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {{"parallel", QUDA_FILE_IO_PARALLEL},
-                                                        {"serial", QUDA_FILE_IO_SERIAL}};
+  CLI::TransformPairs<QudaFileIOMode> file_io_mode_map {
+    {"parallel", QUDA_FILE_IO_PARALLEL}, {"serial", QUDA_FILE_IO_SERIAL}, {"mpi-io", QUDA_FILE_IO_MPI_IO}};
 
   CLI::TransformPairs<GaugeInputMode> gauge_input_map {{"haar", GaugeInputMode::HAAR},
                                                        {"unit", GaugeInputMode::UNIT},
@@ -771,7 +771,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(file_format_map));
   quda_app
     ->add_option("--gauge-file-io-mode", gauge_file_io_mode,
-                 "Whether all ranks (parallel, default) or only rank 0 (serial) access gauge field files")
+                 "Whether all ranks (parallel, default), only rank 0 (serial) or all ranks through collective MPI-IO "
+                 "(mpi-io) access gauge field files")
     ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
   quda_app
     ->add_option("--gauge-file-io-partitions", gauge_file_io_partitions,
@@ -955,7 +956,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(file_format_map));
   opgroup
     ->add_option("--eig-file-io-mode", eig_file_io_mode,
-                 "Whether all ranks (parallel, default) or only rank 0 (serial) access eigenvector files")
+                 "Whether all ranks (parallel, default), only rank 0 (serial) or all ranks through collective MPI-IO "
+                 "(mpi-io) access eigenvector files")
     ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
   opgroup
     ->add_option(
@@ -1148,7 +1150,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     "Whether to save near-null vectors as partfile instead of singlefile (default false; singlefile)");
   opgroup
     ->add_option("--mg-file-io-mode", mg_file_io_mode,
-                 "Whether all ranks (parallel, default) or only rank 0 (serial) access near-null vector files")
+                 "Whether all ranks (parallel, default), only rank 0 (serial) or all ranks through collective MPI-IO "
+                 "(mpi-io) access near-null vector files")
     ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
   opgroup
     ->add_option("--mg-file-io-partitions", mg_file_io_partitions,
@@ -1464,7 +1467,8 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(prop_file_format_map));
   opgroup
     ->add_option("--prop-file-io-mode", prop_file_io_mode,
-                 "Whether all ranks (parallel, default) or only rank 0 (serial) access source and propagator files")
+                 "Whether all ranks (parallel, default), only rank 0 (serial) or all ranks through collective MPI-IO "
+                 "(mpi-io) access source and propagator files")
     ->transform(CLI::QUDACheckedTransformer(file_io_mode_map));
   opgroup
     ->add_option("--prop-file-io-partitions", prop_file_io_partitions,

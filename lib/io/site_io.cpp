@@ -18,8 +18,14 @@ namespace quda
   namespace io
   {
 
-    File::File(const std::string &filename, Mode mode) : filename(filename)
+    File::File(const std::string &filename, Mode mode, bool mpi_io) : filename(filename)
     {
+      if (mpi_io) {
+        if (mode == Mode::WRITE)
+          errorQuda("%s: MPI-IO files are opened to be read or created, not to be written in place", filename.c_str());
+        mpi.reset(mpi_open(filename, mode == Mode::CREATE));
+        return;
+      }
       int flags = mode == Mode::READ ? O_RDONLY : mode == Mode::WRITE ? O_WRONLY : O_WRONLY | O_CREAT | O_TRUNC;
       fd = open(filename.c_str(), flags, 0644);
       if (fd < 0) errorQuda("Cannot open %s: %s", filename.c_str(), strerror(errno));
@@ -32,12 +38,21 @@ namespace quda
 
     void File::close()
     {
+      if (mpi) {
+        mpi_close(*mpi);
+        mpi.reset();
+        return;
+      }
       if (fd >= 0 && ::close(fd) != 0) errorQuda("Error closing %s: %s", filename.c_str(), strerror(errno));
       fd = -1;
     }
 
     void File::read(void *data, size_t bytes, size_t offset) const
     {
+      if (mpi) {
+        mpi_read_at(*mpi, data, bytes, offset);
+        return;
+      }
       auto p = static_cast<char *>(data);
       while (bytes > 0) {
         ssize_t n = pread(fd, p, bytes, static_cast<off_t>(offset));
@@ -52,6 +67,10 @@ namespace quda
 
     void File::write(const void *data, size_t bytes, size_t offset) const
     {
+      if (mpi) {
+        mpi_write_at(*mpi, data, bytes, offset);
+        return;
+      }
       auto p = static_cast<const char *>(data);
       while (bytes > 0) {
         ssize_t n = pwrite(fd, p, bytes, static_cast<off_t>(offset));
@@ -65,6 +84,7 @@ namespace quda
 
     size_t File::size() const
     {
+      if (mpi) return mpi_size(*mpi);
       struct stat s;
       if (fstat(fd, &s) != 0) errorQuda("Cannot stat %s: %s", filename.c_str(), strerror(errno));
       return s.st_size;
@@ -548,6 +568,15 @@ namespace quda
                 grid[0], grid[1], grid[2], grid[3]);
         return false;
       }
+      if (io_mode == QUDA_FILE_IO_MPI_IO) {
+        if (grid != dims)
+          errorQuda("The I/O partition grid %d %d %d %d groups the ranks of the process grid %d %d %d %d, but in "
+                    "MPI-IO mode the MPI library chooses which ranks access the file: use a zero grid, and set the "
+                    "aggregators through the MPI library (ROMIO's cb_nodes and cb_config_list hints, or Open MPI's "
+                    "io_ompio_num_aggregators)",
+                    grid[0], grid[1], grid[2], grid[3], dims[0], dims[1], dims[2], dims[3]);
+        return false;
+      }
       logQuda(QUDA_VERBOSE, "I/O partition grid %d %d %d %d: each partition has %d x %d x %d x %d ranks\n", grid[0],
               grid[1], grid[2], grid[3], dims[0] / grid[0], dims[1] / grid[1], dims[2] / grid[2], dims[3] / grid[3]);
       return true;
@@ -599,6 +628,53 @@ namespace quda
           if (rank != comm_rank()) bytes = std::max(bytes, g.local_bytes(partitions.coords(rank)));
         return bytes;
       }
+
+      /**
+         @brief Checksum, byte swap and unpack one block of the rank at c, read into its buffer in file order
+       */
+      void unpack_block(Checksum &sum, const Geometry &g, const coords_t &c, int block, std::vector<char> &buffer,
+                        const SiteUnpack &unpack)
+      {
+        const auto &layout = g.layout;
+        if (layout.checksum == ChecksumType::SCIDAC) checksum_rows(sum, g, c, block, buffer.data());
+        if (layout.swap) byte_swap(buffer.data(), buffer.size() / layout.word_bytes, layout.word_bytes);
+        if (layout.checksum == ChecksumType::MILC) checksum_rows(sum, g, c, block, buffer.data());
+        g.for_each_site(
+          c, [&](size_t index, size_t pos) { unpack(block, index, buffer.data() + pos * layout.site_bytes); });
+      }
+
+      /**
+         @brief Pack, checksum and byte swap one block of the rank at c into its buffer, in file order
+       */
+      void pack_block(Checksum &sum, const Geometry &g, const coords_t &c, int block, std::vector<char> &buffer,
+                      const SitePack &pack)
+      {
+        const auto &layout = g.layout;
+        g.for_each_site(c,
+                        [&](size_t index, size_t pos) { pack(block, index, buffer.data() + pos * layout.site_bytes); });
+        if (layout.checksum == ChecksumType::MILC) checksum_rows(sum, g, c, block, buffer.data());
+        if (layout.swap) byte_swap(buffer.data(), buffer.size() / layout.word_bytes, layout.word_bytes);
+        if (layout.checksum == ChecksumType::SCIDAC) checksum_rows(sum, g, c, block, buffer.data());
+      }
+
+      /**
+         @brief Read or write one block of every rank's box of the region, collectively through MPI-IO
+       */
+      void access_box(const File &file, const Geometry &g, const coords_t &c, int block, char *buffer, bool write)
+      {
+        if (!file.mpi_handle()) errorQuda("%s was not opened through MPI-IO", file.name().c_str());
+        const auto b = g.local_box(c);
+        coords_t region, lo, extent;
+        for (int d = 0; d < 4; d++) {
+          region[d] = static_cast<int>(g.region.extent(d));
+          lo[d] = b.lo[d] - g.region.lo[d];
+          extent[d] = static_cast<int>(b.extent(d));
+        }
+        const size_t offset = g.layout.offset + block * g.region.volume() * g.layout.site_bytes;
+        mpi_access(*file.mpi_handle(), write, buffer, offset, region, lo, extent, g.layout.site_bytes);
+      }
+
+      coords_t my_coords() { return {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)}; }
     } // namespace
 
     Checksum read_data(const std::string &filename, const DataLayout &layout, const int *X,
@@ -616,14 +692,6 @@ namespace quda
       std::vector<char> buffer(g.local_bytes(me));
       Checksum sum;
 
-      auto process = [&](int block) {
-        if (layout.checksum == ChecksumType::SCIDAC) checksum_rows(sum, g, me, block, buffer.data());
-        if (layout.swap) byte_swap(buffer.data(), buffer.size() / layout.word_bytes, layout.word_bytes);
-        if (layout.checksum == ChecksumType::MILC) checksum_rows(sum, g, me, block, buffer.data());
-        g.for_each_site(
-          me, [&](size_t index, size_t pos) { unpack(block, index, buffer.data() + pos * layout.site_bytes); });
-      };
-
       const auto &ranks = partitions.ranks();
       FileCache files(parts, File::Mode::READ);
       std::vector<char> staging(staging_bytes(g, partitions));
@@ -637,9 +705,23 @@ namespace quda
           }
         }
         if (!partitions.is_leader()) recv(buffer.data(), buffer.size(), partitions.leader());
-        process(block);
+        unpack_block(sum, g, me, block, buffer, unpack);
       }
 
+      return combine(sum);
+    }
+
+    Checksum read_data(const File &file, const DataLayout &layout, const int *X, const SiteUnpack &unpack,
+                       const Hypercube *region)
+    {
+      Geometry g(layout, X, region);
+      const auto me = my_coords();
+      std::vector<char> buffer(g.local_bytes(me));
+      Checksum sum;
+      for (int block = 0; block < layout.n_block; block++) {
+        access_box(file, g, me, block, buffer.data(), false);
+        unpack_block(sum, g, me, block, buffer, unpack);
+      }
       return combine(sum);
     }
 
@@ -658,14 +740,6 @@ namespace quda
       std::vector<char> buffer(g.local_bytes(me));
       Checksum sum;
 
-      auto process = [&](int block) {
-        g.for_each_site(me,
-                        [&](size_t index, size_t pos) { pack(block, index, buffer.data() + pos * layout.site_bytes); });
-        if (layout.checksum == ChecksumType::MILC) checksum_rows(sum, g, me, block, buffer.data());
-        if (layout.swap) byte_swap(buffer.data(), buffer.size() / layout.word_bytes, layout.word_bytes);
-        if (layout.checksum == ChecksumType::SCIDAC) checksum_rows(sum, g, me, block, buffer.data());
-      };
-
       // the files have been created, with everything but the data
       comm_barrier();
 
@@ -673,7 +747,7 @@ namespace quda
       FileCache files(parts, File::Mode::WRITE);
       std::vector<char> staging(staging_bytes(g, partitions));
       for (int block = 0; block < layout.n_block; block++) {
-        process(block);
+        pack_block(sum, g, me, block, buffer, pack);
         if (!partitions.is_leader()) send(buffer.data(), buffer.size(), partitions.leader());
         for (int rank : ranks) {
           if (rank == my_rank) {
@@ -689,6 +763,20 @@ namespace quda
       // every rank's data is in the files before anyone reads them
       comm_barrier();
 
+      return combine(sum);
+    }
+
+    Checksum write_data(const File &file, const DataLayout &layout, const int *X, const SitePack &pack,
+                        const Hypercube *region)
+    {
+      Geometry g(layout, X, region);
+      const auto me = my_coords();
+      std::vector<char> buffer(g.local_bytes(me));
+      Checksum sum;
+      for (int block = 0; block < layout.n_block; block++) {
+        pack_block(sum, g, me, block, buffer, pack);
+        access_box(file, g, me, block, buffer.data(), true);
+      }
       return combine(sum);
     }
 
