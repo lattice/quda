@@ -20,9 +20,17 @@ namespace quda
     std::string time_stamp();
 
     /**
-       @brief Write <filename>.info on rank 0, one "key = value" line per item
+       @brief Write <filename>.info on rank 0: one "key = value" line per
+       item, then the other lines verbatim, in their order.  Another line
+       with an item's key is replaced by the item's line in its place,
+       and one with a key in dropped is left out; only the first line of
+       such a key is kept.
+       @param[in] items QUDA's keys and values
+       @param[in] lines The other lines, without newlines
+       @param[in] dropped The keys of other lines to leave out
      */
-    void write_info(const std::string &filename, const std::vector<std::pair<std::string, std::string>> &items);
+    void write_info(const std::string &filename, const std::vector<std::pair<std::string, std::string>> &items,
+                    const std::vector<MILCInfoItem> &lines = {}, const std::vector<std::string> &dropped = {});
 
     /**
        @brief Read <filename>.info if it exists.  Rank 0 reads it and
@@ -52,16 +60,21 @@ namespace quda
                              const FileIOParam &param);
 
     /**
-       @brief Save a MILC v5 gauge field, and its .info file
+       @brief Save a MILC v5 gauge field, and its .info file.  With
+       param.write_usqcd_info, the .info file also holds MILC's
+       gauge.ssplaq, gauge.stplaq, gauge.nersc_linktr and
+       gauge.nersc_checksum of the links as saved, in single precision,
+       which needs initQuda.
        @param[in] filename The file
        @param[in] gauge The host gauge field in QDP order, one array per direction
        @param[in] prec The precision of the host gauge field
        @param[in] X The local lattice dimensions
        @param[in] param File I/O options
+       @param[in] metadata The time stamp and the other .info lines to write (see GaugeMetadata)
        @return The checksums written
      */
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                            const FileIOParam &param);
+                            const FileIOParam &param, const GaugeMetadata &metadata = {});
 
   } // namespace milc
 

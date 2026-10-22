@@ -6,6 +6,8 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <regex>
+#include <sstream>
 #include <vector>
 #include <unistd.h>
 
@@ -129,6 +131,49 @@ namespace
   double get_element(const void *data, QudaPrecision prec, size_t i)
   {
     return prec == QUDA_DOUBLE_PRECISION ? static_cast<const double *>(data)[i] : static_cast<const float *>(data)[i];
+  }
+
+  // MILC's NERSC checksum of a host gauge field, summed here independently of the library
+  uint32_t nersc_checksum(const HostGauge &gauge)
+  {
+    uint64_t sum = 0;
+    for (int dir = 0; dir < 4; dir++)
+      for (size_t s = 0; s < static_cast<size_t>(V); s++)
+        for (int i = 0; i < 12; i++) {
+          const float f = static_cast<float>(get_element(gauge.data[dir], gauge.prec, s * 18 + i));
+          uint32_t bits;
+          memcpy(&bits, &f, sizeof(bits));
+          sum += bits;
+        }
+    size_t total = sum;
+    quda::comm_allreduce_sum(total);
+    return static_cast<uint32_t>(total);
+  }
+
+  // the lines of MILC's .info keys that QUDA computes, for the links of a gauge field rounded to float as a MILC
+  // file holds them: in MILC's formats (write_gauge_info_item in generic/io_lat_utils.c), each value as a float
+  std::vector<std::string> computed_info_lines(const void *const gauge[], QudaPrecision prec, const int *X)
+  {
+    HostGauge rounded(QUDA_DOUBLE_PRECISION);
+    for (int dir = 0; dir < 4; dir++)
+      for (size_t i = 0; i < V * gauge_site_size; i++)
+        static_cast<double *>(rounded.data[dir])[i] = static_cast<float>(get_element(gauge[dir], prec, i));
+    const auto obs = quda::gauge_observables(rounded.data, QUDA_DOUBLE_PRECISION, X);
+    char lines[4][96];
+    snprintf(lines[0], sizeof(lines[0]), "gauge.ssplaq = %f", static_cast<float>(3.0 * obs.plaq_spatial));
+    snprintf(lines[1], sizeof(lines[1]), "gauge.stplaq = %f", static_cast<float>(3.0 * obs.plaq_temporal));
+    snprintf(lines[2], sizeof(lines[2]), "gauge.nersc_linktr = %e", static_cast<float>(obs.linktr));
+    snprintf(lines[3], sizeof(lines[3]), "gauge.nersc_checksum = %u", nersc_checksum(rounded));
+    return {lines[0], lines[1], lines[2], lines[3]};
+  }
+
+  // the lines of a .info file, read on the calling rank
+  std::vector<std::string> info_lines(const std::string &file)
+  {
+    std::ifstream in(file + ".info");
+    std::vector<std::string> lines;
+    for (std::string line; std::getline(in, line);) lines.push_back(line);
+    return lines;
   }
 
   // check a saved MILC v5 gauge file independently of the library's reader: its header, where
@@ -334,9 +379,6 @@ TEST_P(GaugeIOTest, verify)
   QudaGaugeParam gauge_param = gauge_param_for(::testing::get<0>(param));
   if (!quda::is_enabled(gauge_param.cpu_prec)) GTEST_SKIP();
 
-  // the usqcdInfo record does not apply to MILC files
-  if (::testing::get<1>(param) == QUDA_FILE_FORMAT_MILC && ::testing::get<3>(param)) GTEST_SKIP();
-
   // the file options go through the public interface struct
   QudaFileIOParam io_param = newQudaFileIOParam();
   io_param.struct_size = sizeof(io_param);
@@ -406,10 +448,12 @@ TEST_P(GaugeIOTest, verify)
   EXPECT_EQ(info.format, format);
   EXPECT_EQ(info.file_prec, file_prec);
   EXPECT_EQ(info.ildg, format == QUDA_FILE_FORMAT_ILDG);
+  // usqcdInfo, or for MILC files the plaquettes and link trace in the .info file
   EXPECT_EQ(info.has_plaq_linktr, ::testing::get<3>(param));
   if (info.has_plaq_linktr) {
     EXPECT_TRUE(info.plaq_linktr_matches);
-    auto tol = gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION ? 1e-12 : 1e-6;
+    // MILC's .info files print the plaquettes to six decimal places
+    auto tol = format == QUDA_FILE_FORMAT_MILC ? 1e-5 : gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION ? 1e-12 : 1e-6;
     EXPECT_NEAR(info.plaq, plaq_new[0], tol);
   }
   EXPECT_EQ(info.has_info_file, format == QUDA_FILE_FORMAT_MILC);
@@ -461,6 +505,37 @@ TEST_P(MILCGaugeFileTest, layout)
   const std::string file = "milc.lat";
   GaugeIO(file, param).save(gauge, prec, gauge_param.X);
   check_milc_gauge_file(file, gauge, prec, gauge_param.X);
+
+  // the .info file: QUDA's lines, then MILC's four keys that QUDA computes, of the links as saved and in MILC's
+  // formats; a load verifies the plaquettes and link trace
+  const auto computed = computed_info_lines(gauge, prec, gauge_param.X);
+  const char *keys[] = {"magic_number", "time_stamp", "checksums", "nx", "ny", "nz", "nt"};
+  const std::regex formats[]
+    = {std::regex("gauge\\.ssplaq = -?[0-9]+\\.[0-9]{6}"), std::regex("gauge\\.stplaq = -?[0-9]+\\.[0-9]{6}"),
+       std::regex("gauge\\.nersc_linktr = -?[0-9]\\.[0-9]{6}e[-+][0-9]{2}"),
+       std::regex("gauge\\.nersc_checksum = [0-9]+")};
+  if (comm_rank() == 0) {
+    const auto lines = info_lines(file);
+    EXPECT_EQ(lines.size(), 11u);
+    for (auto i = 0u; i < std::min<size_t>(lines.size(), 7); i++)
+      EXPECT_EQ(lines[i].substr(0, lines[i].find(' ')), keys[i]) << lines[i];
+    for (auto i = 7u; i < std::min<size_t>(lines.size(), 11); i++) {
+      EXPECT_EQ(lines[i], computed[i - 7]);
+      EXPECT_TRUE(std::regex_match(lines[i], formats[i - 7])) << lines[i];
+    }
+  }
+  HostGauge loaded(prec);
+  auto info = GaugeIO(file, param).load(loaded.data, prec, gauge_param.X);
+  EXPECT_TRUE(info.has_plaq_linktr);
+  EXPECT_TRUE(info.plaq_linktr_matches);
+
+  // without write_usqcd_info, only QUDA's lines
+  auto plain = param;
+  plain.write_usqcd_info = false;
+  GaugeIO(file, plain).save(gauge, prec, gauge_param.X);
+  if (comm_rank() == 0) { EXPECT_EQ(info_lines(file).size(), 7u); }
+  info = GaugeIO(file, plain).load(loaded.data, prec, gauge_param.X);
+  EXPECT_FALSE(info.has_plaq_linktr);
 
   // every rank reads the file on its own
   comm_barrier();
@@ -1177,8 +1252,6 @@ TEST_P(GaugeMPIIOTest, save_load)
   auto format = ::testing::get<1>(GetParam());
   auto usqcd_info = ::testing::get<2>(GetParam());
   if (!mpi_io_enabled() || !is_enabled(prec)) GTEST_SKIP();
-  // the usqcdInfo record does not apply to MILC files
-  if (format == QUDA_FILE_FORMAT_MILC && usqcd_info) GTEST_SKIP();
   const auto saved = saved_format(format);
   const bool milc = saved == QUDA_FILE_FORMAT_MILC;
 
@@ -1762,7 +1835,9 @@ TEST(GaugeMetadataTest, milc_info)
   HostGauge gauge(prec), loaded(prec);
   constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
   const std::string file = "metadata.milc";
-  GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL)).save(gauge.data, prec, gauge_param.X);
+  auto p = file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
+  p.write_usqcd_info = true;
+  GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
 
   // the header's time stamp, and the .info file's lines by key
   auto contents = read_file(file);
@@ -1775,7 +1850,8 @@ TEST(GaugeMetadataTest, milc_info)
     std::ifstream in(file + ".info");
     for (std::string line; std::getline(in, line);) saved[line.substr(0, line.find(' '))] = line;
   }
-  EXPECT_EQ(saved.size(), 7u);
+  // QUDA's lines and the four computed keys
+  EXPECT_EQ(saved.size(), 11u);
 
   // MILC's array lines, a "key value" line, an indented one, one without a key, blank lines and a CR
   const std::vector<std::pair<std::string, std::string>> items = {
@@ -1823,23 +1899,321 @@ TEST(GaugeMetadataTest, milc_info)
 
 namespace
 {
-  // MILC's NERSC checksum of a host gauge field, summed here independently of the library
-  uint32_t nersc_checksum(const HostGauge &gauge)
+  // a string of XML longer than QIO's own XML strings (QIO_STRINGALLOC, 1024 bytes)
+  std::string long_xml(const std::string &element)
   {
-    uint64_t sum = 0;
-    for (int dir = 0; dir < 4; dir++)
-      for (size_t s = 0; s < static_cast<size_t>(V); s++)
-        for (int i = 0; i < 12; i++) {
-          const float f = static_cast<float>(get_element(gauge.data[dir], gauge.prec, s * 18 + i));
-          uint32_t bits;
-          memcpy(&bits, &f, sizeof(bits));
-          sum += bits;
-        }
-    size_t total = sum;
-    quda::comm_allreduce_sum(total);
-    return static_cast<uint32_t>(total);
+    std::string xml = xml_declaration + "<" + element + ">\n";
+    for (int i = 0; i < 40; i++) xml += "  <line>" + std::string(40, static_cast<char>('a' + i % 26)) + "</line>\n";
+    return xml + "</" + element + ">\n";
   }
 
+  // the metadata of a save, and what a load of the file must find
+  struct SaveCase {
+    std::string name;
+    QudaFileFormat format; // QIO or ILDG
+    bool write_usqcd_info;
+    quda::GaugeMetadata given;
+    quda::GaugeMetadata expected; // the record date is that of the file when none is given
+    bool partfile = false;
+  };
+
+  // save a gauge field with each backend, given the metadata, and expect the same files from both, byte for byte
+  // when the date is given; returns the files saved
+  std::vector<std::string> save_lime_backends(const SaveCase &c, const HostGauge &gauge)
+  {
+    using namespace quda;
+    std::vector<std::string> files;
+    for (auto saver : lime_backends(c.format)) {
+      const std::string file = std::string("save_metadata_") + get_file_format_str(saver) + ".lat";
+      auto p = file_io_param(saver, QUDA_FILE_IO_PARALLEL, {}, c.partfile);
+      p.write_usqcd_info = c.write_usqcd_info;
+      p.ildg_lfn = "lfn://quda/param"; // the default, the file name, differs between the files
+      GaugeIO(file, p).save(gauge.data, gauge.prec, gauge_param_for(gauge.prec).X, c.given);
+      files.push_back(file);
+    }
+    if (files.size() == 2 && comm_rank() == 0) {
+      SCOPED_TRACE("native and external saves");
+      const bool volumes = c.partfile && comm_size() > 1;
+      auto a = volumes ? saved_volumes(files[0]) : std::vector<std::string> {files[0]};
+      auto b = volumes ? saved_volumes(files[1]) : std::vector<std::string> {files[1]};
+      EXPECT_EQ(a.size(), b.size());
+      for (auto i = 0u; i < std::min(a.size(), b.size()); i++) {
+        if (c.given.record_date || i > 0)
+          expect_same_file(a[i], b[i]);
+        else
+          expect_same_saved_file(a[i], b[i], false);
+      }
+    }
+    return files;
+  }
+} // namespace
+
+// metadata given to a SciDAC or ILDG save is written by either backend, the same bytes from both when the date is
+// given, and comes back exactly when the file is loaded by either backend
+TEST(GaugeSaveMetadataTest, lime)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  auto usqcd = [&](const std::string &info) { return usqcd_record("%.16e", obs.plaq, obs.linktr, info); };
+
+  const std::string other_file_xml = "<?xml version=\"1.0\"?>\n<HMC>\n  <ProgramInfo>\n    <code>chroma</code>\n"
+                                     "  </ProgramInfo>\n</HMC>\n";
+  const std::string other_record_xml = "<?xml version=\"1.0\"?>\n<Params>\n  <Params><info>beta 6.3</info></Params>\n"
+                                       "  <MesPlq>0.54</MesPlq>\n</Params>\n";
+  // MILC-style lines with an element of usqcdInfo's own name in them, which QIO's XML parser can't nest
+  const std::string nested_info = "gauge.description = \"<info>nested</info>\"\n<info>gauge.nloops = 3</info>\n";
+  const std::string date = "Sun Dec  4 20:49:06 2005 UTC";
+
+  // QUDA's strings, with a usqcdInfo record with the given <info>, and the other fields as given
+  auto quda_strings = [&](const std::optional<std::string> &info) {
+    GaugeMetadata m;
+    m.user_file_xml = expected_file_xml("gauge field");
+    m.user_record_xml = info ? usqcd(*info) : expected_gauge_record_xml("<version>1.0</version>");
+    m.has_usqcd_info = info.has_value();
+    m.usqcd_info = info;
+    return m;
+  };
+
+  std::vector<SaveCase> cases;
+  {
+    SaveCase c {"file XML", QUDA_FILE_FORMAT_QIO, true, {}, quda_strings("QUDA")};
+    c.given.user_file_xml = other_file_xml;
+    c.expected.user_file_xml = other_file_xml;
+    cases.push_back(c);
+  }
+  {
+    SaveCase c {"long file and record XML", QUDA_FILE_FORMAT_QIO, true, {}, {}};
+    c.given.user_file_xml = long_xml("file");
+    c.given.user_record_xml = long_xml("record");
+    c.expected = c.given;
+    cases.push_back(c);
+  }
+  {
+    SaveCase c {"record XML, LFN and date", QUDA_FILE_FORMAT_ILDG, true, {}, {}};
+    c.given.user_record_xml = other_record_xml;
+    c.given.ildg_lfn = "lfn://other/given";
+    c.given.record_date = date;
+    c.expected = c.given;
+    c.expected.user_file_xml = expected_file_xml("gauge field");
+    cases.push_back(c);
+  }
+  for (auto format : {QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG}) {
+    // as MILC writes them, with usqcdInfo's old plaquette and link trace, which are computed afresh
+    SaveCase c {"MILC's strings", format, true, {}, {}};
+    c.given.user_file_xml = milc_file_xml;
+    c.given.user_record_xml = usqcd_record("%.6e", 0.5, 0.1, milc_info_lines);
+    c.given.has_usqcd_info = true;
+    c.given.usqcd_info = milc_info_lines;
+    c.given.record_date = date;
+    if (format == QUDA_FILE_FORMAT_ILDG) c.given.ildg_lfn = "lfn://USQCD/MILC/test/save_metadata";
+    c.expected = c.given;
+    c.expected.user_record_xml = usqcd(milc_info_lines);
+    cases.push_back(c);
+  }
+  {
+    SaveCase c {"nested <info>", QUDA_FILE_FORMAT_QIO, true, {}, quda_strings(nested_info)};
+    c.given.has_usqcd_info = true;
+    c.given.usqcd_info = nested_info;
+    cases.push_back(c);
+  }
+  {
+    SaveCase c {"usqcdInfo with an empty <info>", QUDA_FILE_FORMAT_QIO, true, {}, quda_strings("")};
+    c.given.has_usqcd_info = true;
+    c.given.usqcd_info = "";
+    cases.push_back(c);
+  }
+  {
+    // no <info> means QUDA's
+    SaveCase c {"usqcdInfo without <info>", QUDA_FILE_FORMAT_QIO, true, {}, quda_strings("QUDA")};
+    c.given.has_usqcd_info = true;
+    cases.push_back(c);
+  }
+  {
+    SaveCase c {"usqcdInfo without write_usqcd_info", QUDA_FILE_FORMAT_QIO, false, {}, quda_strings({})};
+    c.given.has_usqcd_info = true;
+    c.given.usqcd_info = milc_info_lines;
+    cases.push_back(c);
+  }
+  {
+    SaveCase c {"LFN", QUDA_FILE_FORMAT_ILDG, false, {}, quda_strings({})};
+    c.given.ildg_lfn = "lfn://other/given";
+    c.expected.ildg_lfn = c.given.ildg_lfn;
+    cases.push_back(c);
+  }
+  {
+    // an empty LFN counts as none
+    SaveCase c {"empty LFN", QUDA_FILE_FORMAT_ILDG, false, {}, quda_strings({})};
+    c.given.ildg_lfn = "";
+    c.expected.ildg_lfn = "lfn://quda/param";
+    cases.push_back(c);
+  }
+  {
+    // the metadata of the first volume, which differs between the backends only by the date
+    SaveCase c {"partfile", QUDA_FILE_FORMAT_QIO, true, {}, {}, true};
+    c.given.user_file_xml = milc_file_xml;
+    c.given.has_usqcd_info = true;
+    c.given.usqcd_info = milc_info_lines;
+    c.given.record_date = date;
+    c.expected = c.given;
+    c.expected.user_record_xml = usqcd(milc_info_lines);
+    cases.push_back(c);
+  }
+
+  for (auto &c : cases) {
+    SCOPED_TRACE(c.name + " (" + get_file_format_str(c.format) + ")");
+    for (auto &file : save_lime_backends(c, gauge)) {
+      SCOPED_TRACE("saved as " + file);
+      const auto strings = field_strings(c.partfile && comm_size() > 1 ? volume_file(file, 0) : file);
+      auto expected = c.expected;
+      if (!expected.record_date) expected.record_date = strings.date;
+      EXPECT_TRUE(strings.date);
+      for (auto &info : load_lime_backends(file, gauge)) {
+        expect_same_metadata(info.metadata, expected);
+        EXPECT_EQ(info.ildg, c.format == QUDA_FILE_FORMAT_ILDG);
+        EXPECT_EQ(info.has_plaq_linktr, c.expected.has_usqcd_info);
+        if (info.has_plaq_linktr) {
+          EXPECT_TRUE(info.plaq_linktr_matches);
+          EXPECT_EQ(info.plaq, obs.plaq);
+          EXPECT_EQ(info.linktr, obs.linktr);
+        }
+      }
+      remove_saved_file(file);
+    }
+  }
+}
+
+// a MILC save given a time stamp and .info lines: the time stamp in the header and the .info file, the lines after
+// QUDA's, and QUDA's lines in place of given lines of the same keys, so that MILC's own order is kept
+TEST(GaugeSaveMetadataTest, milc)
+{
+  using namespace quda;
+  const auto prec = QUDA_DOUBLE_PRECISION;
+  if (!is_enabled(prec)) GTEST_SKIP();
+  QudaGaugeParam gauge_param = gauge_param_for(prec);
+  HostGauge gauge(prec), loaded(prec);
+  constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
+  const auto computed = computed_info_lines(gauge.data, prec, gauge_param.X);
+  const std::string file = "save_metadata.milc";
+
+  // QUDA's lines by key, for a time stamp and the checksums of the file
+  auto quda_line = [&](const std::string &key, const std::string &stamp, const GaugeFileInfo &info) {
+    const char *dims[] = {"nx", "ny", "nz", "nt"};
+    for (int d = 0; d < 4; d++)
+      if (key == dims[d]) return key + " = " + std::to_string(gauge_param.X[d] * comm_dim(d));
+    const char *computed_keys[] = {"gauge.ssplaq", "gauge.stplaq", "gauge.nersc_linktr", "gauge.nersc_checksum"};
+    for (int k = 0; k < 4; k++)
+      if (key == computed_keys[k]) return computed[k];
+    if (key == "magic_number") return std::string("magic_number = 20103");
+    if (key == "time_stamp") return "time_stamp = \"" + stamp + "\"";
+    char sums[64];
+    snprintf(sums, sizeof(sums), "checksums = \"%x %x\"", info.sum29, info.sum31);
+    return std::string(sums);
+  };
+  const std::vector<std::string> quda_keys = {"magic_number", "time_stamp", "checksums", "nx", "ny", "nz", "nt"};
+  const std::vector<std::string> computed_keys
+    = {"gauge.ssplaq", "gauge.stplaq", "gauge.nersc_linktr", "gauge.nersc_checksum"};
+
+  // configs/24x24x24x24.chklat.info, as MILC wrote it
+  std::vector<MILCInfoItem> milc_lines = {{"magic_number", "magic_number = 20103"},
+                                          {"time_stamp", "time_stamp = \"Sat Nov 18 17:30:04 2017\""},
+                                          {"checksums", "checksums = \"fc4e1f56 74b0fe7c\""},
+                                          {"nx", "nx = 24"},
+                                          {"ny", "ny = 24"},
+                                          {"nz", "nz = 24"},
+                                          {"nt", "nt = 24"}};
+  {
+    std::istringstream in(milc_info_lines);
+    for (std::string line; std::getline(in, line);) milc_lines.push_back({line.substr(0, line.find(' ')), line});
+  }
+  EXPECT_EQ(milc_lines.size(), 20u);
+
+  // lines out of MILC's order: QUDA's keys given once or twice, array lines, a "key value" line, one without a
+  // key, a line ending in a CR, and a key of MILC's given twice
+  const std::vector<MILCInfoItem> other_lines = {{"quark.dyn_flavors", "quark.dyn_flavors =[3] 2 1 1"},
+                                                 {"nx", "nx = 99"},
+                                                 {"", "= 1"},
+                                                 {"gauge.ssplaq", "gauge.ssplaq = 9.999999"},
+                                                 {"nx", "nx = 98"},
+                                                 {"quark.dyn_mass", "quark.dyn_mass =[3] 0.001000 0.050000 0.500000\r"},
+                                                 {"gauge.beta11", "  gauge.beta11 6.300000"},
+                                                 {"action.description", "action.description = \"Gauge plus fermion\""},
+                                                 {"action.description", "action.description = \"twice\""}};
+
+  struct Case {
+    std::string name;
+    bool write_usqcd_info;
+    std::string stamp;
+    std::vector<MILCInfoItem> lines;
+  };
+  const Case cases[] = {{"MILC's .info", true, "Sat Nov 18 17:30:04 2017", milc_lines},
+                        {"other lines", true, "Thu Oct 22 18:00:00 2026", other_lines},
+                        {"other lines without write_usqcd_info", false, std::string(64, 'x'), other_lines}};
+  for (auto &c : cases) {
+    SCOPED_TRACE(c.name);
+    GaugeMetadata given;
+    given.milc_time_stamp = c.stamp;
+    given.milc_info = c.lines;
+    auto p = file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
+    p.write_usqcd_info = c.write_usqcd_info;
+    GaugeIO(file, p).save(gauge.data, prec, gauge_param.X, given);
+    loaded.clear();
+    const auto info = GaugeIO(file, p).load(loaded.data, prec, gauge_param.X);
+    EXPECT_TRUE(info.checksum_matches);
+    EXPECT_EQ(info.has_plaq_linktr, c.write_usqcd_info);
+    if (info.has_plaq_linktr) { EXPECT_TRUE(info.plaq_linktr_matches); }
+
+    // QUDA's lines whose keys aren't given, then the given ones, with QUDA's line for the first of each of its keys
+    auto keys = quda_keys;
+    if (c.write_usqcd_info) keys.insert(keys.end(), computed_keys.begin(), computed_keys.end());
+    auto given_key = [&](const std::string &key) {
+      return std::any_of(c.lines.begin(), c.lines.end(), [&](const MILCInfoItem &i) { return i.key == key; });
+    };
+    std::vector<MILCInfoItem> expected;
+    for (auto &key : keys)
+      if (!given_key(key)) expected.push_back({key, quda_line(key, c.stamp, info)});
+    std::vector<std::string> placed;
+    for (auto &line : c.lines) {
+      const bool quda = std::find(keys.begin(), keys.end(), line.key) != keys.end();
+      const bool dropped = std::find(computed_keys.begin(), computed_keys.end(), line.key) != computed_keys.end();
+      if (quda && std::find(placed.begin(), placed.end(), line.key) == placed.end()) {
+        expected.push_back({line.key, quda_line(line.key, c.stamp, info)});
+        placed.push_back(line.key);
+      } else if (!quda && !dropped) {
+        expected.push_back(line);
+      }
+    }
+    if (c.name == "MILC's .info") {
+      // MILC's order, with this field's values
+      EXPECT_EQ(expected.size(), milc_lines.size());
+      for (auto i = 0u; i < std::min(expected.size(), milc_lines.size()); i++)
+        EXPECT_EQ(expected[i].key, milc_lines[i].key);
+    }
+
+    const auto &m = info.metadata;
+    EXPECT_EQ(m.milc_time_stamp, c.stamp);
+    EXPECT_EQ(m.milc_info.size(), expected.size());
+    for (auto i = 0u; i < std::min(expected.size(), m.milc_info.size()); i++) {
+      EXPECT_EQ(m.milc_info[i].key, expected[i].key);
+      EXPECT_EQ(m.milc_info[i].line, expected[i].line);
+    }
+    if (comm_rank() == 0) {
+      auto contents = read_file(file);
+      contents.resize(std::max<size_t>(contents.size(), 96));
+      std::string header_stamp(contents.data() + 20, 64);
+      EXPECT_EQ(header_stamp, c.stamp + std::string(64 - c.stamp.size(), '\0'));
+    }
+    remove_saved_file(file);
+    remove_saved_file(file + ".info");
+  }
+}
+
+namespace
+{
   // a value of a link that depends only on its global site, its direction and the component
   double global_value(size_t global, int dir, int k)
   {

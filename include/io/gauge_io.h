@@ -21,6 +21,28 @@ namespace quda
      @brief The metadata of a gauge field file beyond the links, their
      checksums and the plaquette: what a conversion to another file
      can carry over.  Fields that a format doesn't have are left empty.
+
+     A load fills it.  A save can be given one, and writes the fields of
+     the format it saves, in either backend; empty fields mean what a
+     save without it writes:
+     - user_file_xml: written verbatim; empty means QUDA's <qudaFile>.
+     - has_usqcd_info: a usqcdInfo record with freshly computed
+       plaquette and link trace and usqcd_info as its <info> (none means
+       "QUDA"), if FileIOParam::write_usqcd_info is set; otherwise QUDA's
+       own record XML.  Without it, a non-empty user_record_xml is written
+       verbatim, and no usqcdInfo record.
+     - ildg_lfn: the LFN of ILDG saves, ahead of FileIOParam::ildg_lfn
+       (an empty one counts as none).
+     - record_date: written verbatim as the private record XML's <date>;
+       none means the time of saving.
+     - milc_time_stamp: the MILC header's time stamp and the .info
+       file's time_stamp, at most 64 bytes; empty means the time of saving.
+     - milc_info: written to the .info file verbatim, in order, after the
+       lines QUDA writes.  A line whose key QUDA writes (magic_number,
+       time_stamp, checksums, nx to nt, and the four keys of
+       FileIOParam::write_usqcd_info) is replaced by QUDA's line in its
+       place, or left out if QUDA doesn't write it; only the first line
+       of a key is kept.
    */
   struct GaugeMetadata {
     std::string user_file_xml;   /** SciDAC: the user file XML (none in ILDG files from other codes) */
@@ -118,8 +140,9 @@ namespace quda
        @param[in] gauge The host gauge field, one array per direction
        @param[in] prec The precision of the host gauge field
        @param[in] X The local lattice dimensions
+       @param[in] metadata Metadata to write, as a load reports it; see GaugeMetadata
     */
-    void save(const void *const gauge[], QudaPrecision prec, const int *X);
+    void save(const void *const gauge[], QudaPrecision prec, const int *X, const GaugeMetadata &metadata = {});
   };
 
 } // namespace quda

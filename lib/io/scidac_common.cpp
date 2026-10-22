@@ -151,9 +151,10 @@ namespace quda
     } // namespace
 
     std::string record_info_xml(const std::string &datatype, QudaPrecision prec, int colors, int spins, int typesize,
-                                int datacount, const std::optional<io::Hypercube> &hypercube)
+                                int datacount, const std::optional<io::Hypercube> &hypercube,
+                                const std::optional<std::string> &date)
     {
-      std::string tags = element("version", "1.1") + element("date", record_date())
+      std::string tags = element("version", "1.1") + element("date", date ? *date : record_date())
         + element("recordtype", hypercube ? hypercube_recordtype : field_recordtype);
       if (hypercube)
         tags += element("spacetime", 4) + element("hyperlower", int_list(hypercube->lower))
@@ -273,7 +274,7 @@ namespace quda
         + element("info", element("eigVal", format("%.18e", eval)) + element("resid", format("%e", resid)));
     }
 
-    std::string usqcd_info_xml(double plaq, double linktr)
+    std::string usqcd_info_xml(double plaq, double linktr, const std::string &info)
     {
       char plaq_str[32], linktr_str[32];
       snprintf(plaq_str, sizeof(plaq_str), "%.16e", plaq);
@@ -283,7 +284,7 @@ namespace quda
       return xml_declaration
         + element("usqcdInfo",
                   element("version", "1.0") + element("plaq", plaq_str) + element("linktr", linktr_str)
-                    + element("info", "QUDA"));
+                    + element("info", info));
     }
 
     std::optional<std::string> xml_value(const std::string &xml, const std::string &tag)
@@ -848,9 +849,9 @@ namespace quda
           const auto &m = metadata[k];
           uint64_t first_offset = 0;
           if (comm_rank() == 0) {
-            first_writer->write(private_record_xml,
-                                record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount), true,
-                                false);
+            first_writer->write(
+              private_record_xml,
+              record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount, {}, m.date), true, false);
             first_writer->write(record_xml, m.user_xml, false, false);
             first_offset = first_writer->reserve(binary_data, data_bytes(parts[0], k), false, false);
           }
@@ -1059,9 +1060,10 @@ namespace quda
         const size_t bytes = box ? box->volume() * layout.site_bytes : io::data_bytes(layout, io::global_dims(X));
         uint64_t data_offset = 0;
         if (comm_rank() == 0) {
-          writer->write(private_record_xml,
-                        record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount, m.hypercube),
-                        true, false);
+          writer->write(
+            private_record_xml,
+            record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount, m.hypercube, m.date), true,
+            false);
           writer->write(record_xml, m.user_xml, false, false);
           if (m.ildg) {
             writer->write(ildg_format, ildg_format_xml(m.prec, N), false, false);

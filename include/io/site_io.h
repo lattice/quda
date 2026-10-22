@@ -62,6 +62,13 @@ namespace quda
     std::string checksum_str(const Checksum &sum);
 
     /**
+       @brief A string from a file or a caller for a message: its first
+       200 characters, and its size if it is longer.  QUDA's messages
+       are formatted in a buffer of 1000 bytes.
+     */
+    std::string excerpt(const std::string &s);
+
+    /**
        @brief A file holding a box of the lattice: the stored sites
        (half the x extent when a single parity is stored) whose
        coordinates lie in [corner, corner + extent), in lexicographic

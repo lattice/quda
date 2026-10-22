@@ -66,7 +66,10 @@ namespace quda
     GaugeRecords gauge_records(QudaPrecision file_prec, const GaugeInfo &info)
     {
       GaugeRecords g;
-      g.user_file_xml = info.legacy_strings ? legacy_file_xml : quda_file_xml("gauge field");
+      if (!info.user_file_xml.empty())
+        g.user_file_xml = info.user_file_xml;
+      else
+        g.user_file_xml = info.legacy_strings ? legacy_file_xml : quda_file_xml("gauge field");
       auto &m = g.record;
       const std::string p = file_prec == QUDA_DOUBLE_PRECISION ? "D" : "F";
       // QIO only writes the ILDG records for the USQCD (or QDP) color matrix datatypes
@@ -75,8 +78,11 @@ namespace quda
       m.colors = 3;
       m.typesize = matrix_reals * file_prec;
       m.datacount = n_dim;
-      if (info.has_usqcd_info)
-        m.user_xml = usqcd_info_xml(info.plaq, info.linktr);
+      m.date = info.date;
+      if (info.user_record_xml)
+        m.user_xml = *info.user_record_xml;
+      else if (info.has_usqcd_info)
+        m.user_xml = usqcd_info_xml(info.plaq, info.linktr, info.usqcd_info);
       else if (info.legacy_strings)
         m.user_xml = legacy_quda_record_xml(matrix_reals, m.datatype, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 3, 0);
       else

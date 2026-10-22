@@ -24,6 +24,8 @@ namespace quda
     bool partfile = false;       /** QIO only, ignored on load */
     bool parity_inflate = false; /** Inflate single-parity vectors to full fields for I/O */
     std::string ildg_lfn;        /** Empty means use the file name */
+    /** QIO and ILDG saves: write a usqcdInfo record; MILC saves: write gauge.ssplaq, gauge.stplaq,
+        gauge.nersc_linktr and gauge.nersc_checksum in the .info file */
     bool write_usqcd_info = true;
     bool allow_checksum_mismatch = false; /** Warn instead of error on a checksum mismatch */
 

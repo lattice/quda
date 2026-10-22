@@ -207,6 +207,13 @@ namespace quda
       return buf;
     }
 
+    std::string excerpt(const std::string &s)
+    {
+      constexpr size_t n = 200;
+      if (s.size() <= n) return s;
+      return s.substr(0, n) + "... (" + std::to_string(s.size()) + " bytes)";
+    }
+
     void report_checksum_mismatch(const std::string &message, bool allow)
     {
       if (allow)

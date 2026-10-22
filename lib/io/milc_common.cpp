@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <ctime>
 #include <fstream>
 #include <sstream>
@@ -21,12 +22,30 @@ namespace quda
       return stamp;
     }
 
-    void write_info(const std::string &filename, const std::vector<std::pair<std::string, std::string>> &items)
+    void write_info(const std::string &filename, const std::vector<std::pair<std::string, std::string>> &items,
+                    const std::vector<MILCInfoItem> &lines, const std::vector<std::string> &dropped)
     {
       if (comm_rank() != 0) return;
+      auto has_key = [](const auto &keys, const std::string &key) {
+        return std::find(keys.begin(), keys.end(), key) != keys.end();
+      };
+      std::vector<std::string> keys;
+      for (auto &line : lines) keys.push_back(line.key);
+
       auto info_filename = filename + ".info";
       std::ofstream out(info_filename);
-      for (auto &item : items) out << item.first << " = " << item.second << "\n";
+      for (auto &item : items)
+        if (!has_key(keys, item.first)) out << item.first << " = " << item.second << "\n";
+      std::vector<std::string> placed;
+      for (auto &line : lines) {
+        auto item = std::find_if(items.begin(), items.end(), [&](const auto &i) { return i.first == line.key; });
+        if (item == items.end() && !has_key(dropped, line.key)) {
+          out << line.line << "\n";
+        } else if (item != items.end() && !has_key(placed, line.key)) {
+          out << item->first << " = " << item->second << "\n";
+          placed.push_back(line.key);
+        }
+      }
       out.close();
       if (!out) warningQuda("Could not write %s", info_filename.c_str());
     }

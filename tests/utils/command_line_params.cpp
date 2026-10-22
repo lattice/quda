@@ -784,7 +784,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "ILDG logical file name used when saving in ILDG format (default: the file name)");
   quda_app->add_option("--gauge-write-usqcd-info", gauge_write_usqcd_info,
                        "Whether to write the USQCD plaquette and link-trace record when saving QIO or ILDG gauge "
-                       "fields (default true)");
+                       "fields, and MILC's plaquettes, link trace and NERSC checksum in the .info file when saving "
+                       "MILC gauge fields (default true)");
   quda_app->add_option("--gauge-allow-checksum-mismatch", gauge_allow_checksum_mismatch,
                        "Whether to load a gauge field whose checksums do not match its data, with a warning "
                        "(default false)");

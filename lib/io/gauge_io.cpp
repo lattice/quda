@@ -197,8 +197,10 @@ namespace quda
     void log_metadata(const std::string &filename, const GaugeMetadata &m)
     {
       if (getVerbosity() < QUDA_VERBOSE) return;
-      if (m.record_date) logQuda(QUDA_VERBOSE, "Record date of %s: \"%s\"\n", filename.c_str(), m.record_date->c_str());
-      if (m.ildg_lfn) logQuda(QUDA_VERBOSE, "ILDG LFN of %s: \"%s\"\n", filename.c_str(), m.ildg_lfn->c_str());
+      if (m.record_date)
+        logQuda(QUDA_VERBOSE, "Record date of %s: \"%s\"\n", filename.c_str(), io::excerpt(*m.record_date).c_str());
+      if (m.ildg_lfn)
+        logQuda(QUDA_VERBOSE, "ILDG LFN of %s: \"%s\"\n", filename.c_str(), io::excerpt(*m.ildg_lfn).c_str());
       if (m.has_usqcd_info) {
         const std::string info
           = m.usqcd_info ? "with " + std::to_string(m.usqcd_info->size()) + " bytes of <info>" : "without <info>";
@@ -321,19 +323,35 @@ namespace quda
     }
 
     /**
-       @brief Save a QIO or ILDG gauge field, with a usqcdInfo record if requested
+       @brief Save a QIO or ILDG gauge field, with a usqcdInfo record if requested, and the metadata given
      */
     io::Checksum save_lime(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                           const FileIOParam &param, bool ildg)
+                           const FileIOParam &param, bool ildg, const GaugeMetadata &metadata)
     {
       scidac::GaugeInfo info;
       info.legacy_strings = param.legacy_strings;
       info.ildg = ildg;
-      if (ildg) info.ildg_lfn = param.ildg_lfn.empty() ? filename : param.ildg_lfn;
-      if (param.write_usqcd_info) {
+      if (ildg) {
+        if (metadata.ildg_lfn && !metadata.ildg_lfn->empty())
+          info.ildg_lfn = *metadata.ildg_lfn;
+        else
+          info.ildg_lfn = param.ildg_lfn.empty() ? filename : param.ildg_lfn;
+      }
+      info.user_file_xml = metadata.user_file_xml;
+      info.date = metadata.record_date;
+      if (!metadata.has_usqcd_info && !metadata.user_record_xml.empty()) {
+        info.user_record_xml = metadata.user_record_xml;
+        if (param.write_usqcd_info)
+          logQuda(QUDA_VERBOSE, "The record XML given for %s is written as it is, so no usqcdInfo record is\n",
+                  filename.c_str());
+      } else if (param.write_usqcd_info) {
         compute_plaq_linktr(gauge, prec, X, info.plaq, info.linktr);
         info.has_usqcd_info = true;
+        if (metadata.usqcd_info) info.usqcd_info = *metadata.usqcd_info;
         logQuda(QUDA_SUMMARIZE, "usqcdInfo plaquette %.16e, link trace %.16e\n", info.plaq, info.linktr);
+      } else if (metadata.has_usqcd_info) {
+        logQuda(QUDA_VERBOSE, "write_usqcd_info is not set, so the usqcdInfo record given for %s is not written\n",
+                filename.c_str());
       }
       return param.external_qio ? save_qio(filename, gauge, prec, X, param, info) :
                                   scidac::save_gauge(filename, gauge, prec, X, param, info);
@@ -379,7 +397,7 @@ namespace quda
     return info;
   }
 
-  void GaugeIO::save(const void *const gauge[], QudaPrecision prec, const int *X)
+  void GaugeIO::save(const void *const gauge[], QudaPrecision prec, const int *X, const GaugeMetadata &metadata)
   {
     auto format = resolve_save_format(param.format);
     if (param.partfile && format == QUDA_FILE_FORMAT_ILDG)
@@ -394,9 +412,9 @@ namespace quda
 
     io::Checksum sum;
     switch (format) {
-    case QUDA_FILE_FORMAT_QIO: sum = save_lime(filename, gauge, prec, X, param, false); break;
-    case QUDA_FILE_FORMAT_ILDG: sum = save_lime(filename, gauge, prec, X, param, true); break;
-    case QUDA_FILE_FORMAT_MILC: sum = milc::save_gauge(filename, gauge, prec, X, param); break;
+    case QUDA_FILE_FORMAT_QIO: sum = save_lime(filename, gauge, prec, X, param, false, metadata); break;
+    case QUDA_FILE_FORMAT_ILDG: sum = save_lime(filename, gauge, prec, X, param, true, metadata); break;
+    case QUDA_FILE_FORMAT_MILC: sum = milc::save_gauge(filename, gauge, prec, X, param, metadata); break;
     default: errorQuda("Unexpected file format %d", format);
     }
     // rank 0 finishes the file (checksum record or header, .info file) after the other ranks are done

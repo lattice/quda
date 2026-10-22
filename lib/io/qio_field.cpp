@@ -127,7 +127,8 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar, QIO_Fi
   }
 
   printfQuda("%s: QIO_open_read done.\n", __func__);
-  printfQuda("%s: User file info is \"%s\"\n", __func__, QIO_string_ptr(xml_file_in));
+  if (QIO_string_ptr(xml_file_in))
+    printfQuda("%s: User file info is \"%s\"\n", __func__, quda::io::excerpt(QIO_string_ptr(xml_file_in)).c_str());
 
   if (user_file_xml && QIO_string_ptr(xml_file_in)) *user_file_xml = QIO_string_ptr(xml_file_in);
   QIO_string_destroy(xml_file_in);
@@ -164,7 +165,7 @@ QIO_Writer *open_test_output(const char *filename, const char *xml_write_file, i
   }
 
   printfQuda("%s: QIO_open_write done.\n", __func__);
-  printfQuda("%s: User file info is \"%s\"\n", __func__, QIO_string_ptr(xml_file_out));
+  printfQuda("%s: User file info is \"%s\"\n", __func__, quda::io::excerpt(xml_write_file).c_str());
 
   QIO_string_destroy(xml_file_out);
   return outfile;
@@ -233,7 +234,7 @@ int read_field(QIO_Reader *infile, const quda::io::HostField &field, int nSpin, 
   // The len != 18 is a WAR for this line segfaulting on some Chroma configs.
   // Tracked on github via #936
   if (len != 18 && QIO_string_length(xml_record_in) > 0)
-    logQuda(QUDA_VERBOSE, "QIO string: %s\n", QIO_string_ptr(xml_record_in));
+    logQuda(QUDA_VERBOSE, "QIO string: %s\n", quda::io::excerpt(QIO_string_ptr(xml_record_in)).c_str());
 
   // Get total size. Could probably check the filesize better, but tbd.
   size_t rec_size = file_prec * count * len;
@@ -266,16 +267,13 @@ int read_su3_field(QIO_Reader *infile, const quda::io::HostField &field, QudaPre
 
 // The USQCD gauge field record XML: <usqcdInfo> with the average plaquette and link trace.  This uses QIO's own
 // encoder rather than quda::scidac::usqcd_info_xml, so comparing the output of the two backends checks the latter.
-static std::string encode_usqcd_info(double plaq, double linktr)
+static std::string encode_usqcd_info(double plaq, double linktr, const std::string &info_text)
 {
   char plaq_str[32], linktr_str[32];
   snprintf(plaq_str, sizeof(plaq_str), "%.16e", plaq);
   snprintf(linktr_str, sizeof(linktr_str), "%.16e", linktr);
-  // QIO's XML parser does not handle nested tags of the same name, so QUDA's own record XML (which has an <info>
-  // tag) cannot be embedded in the <info> field
-  char info_str[] = "QUDA";
 
-  QIO_USQCDLatticeInfo *info = QIO_create_usqcd_lattice_info(plaq_str, linktr_str, info_str);
+  QIO_USQCDLatticeInfo *info = QIO_create_usqcd_lattice_info(plaq_str, linktr_str, const_cast<char *>(info_text.c_str()));
   QIO_String *xml = QIO_string_create();
   QIO_encode_usqcd_lattice_info(xml, info);
   std::string result = QIO_string_ptr(xml);
@@ -468,6 +466,17 @@ static int write_record(QIO_Writer *outfile, const quda::io::HostField &field, c
                                                     const_cast<char *>(m.datatype.c_str()), precision, m.colors,
                                                     m.spins, m.typesize, m.datacount);
 
+  if (m.date) {
+    // QIO encodes the private record XML into a string of QIO_STRINGALLOC bytes, cutting off the rest
+    const auto xml = quda::scidac::record_info_xml(m.datatype, m.prec, m.colors, m.spins, m.typesize, m.datacount,
+                                                   m.hypercube, m.date);
+    if (xml.size() >= QIO_STRINGALLOC)
+      errorQuda("The external QIO library cannot write a private record XML of %lu bytes, as the date \"%s\" makes "
+                "it; it writes at most %d",
+                xml.size(), quda::io::excerpt(*m.date).c_str(), QIO_STRINGALLOC - 1);
+    QIO_set_record_date(rec_info, const_cast<char *>(m.date->c_str()));
+  }
+
   QIO_String *xml_record_out = QIO_string_create();
   QIO_string_set(xml_record_out, m.user_xml.c_str());
 
@@ -492,7 +501,15 @@ quda::io::Checksum write_gauge_field(const char *filename, void *gauge[], QudaPr
   if (precision != QUDA_DOUBLE_PRECISION && precision != QUDA_SINGLE_PRECISION)
     errorQuda("Error, file_prec=%d not supported", precision);
   auto records = quda::scidac::gauge_records(precision, info);
-  if (info.has_usqcd_info) records.record.user_xml = encode_usqcd_info(info.plaq, info.linktr);
+  if (info.has_usqcd_info && !info.user_record_xml) {
+    records.record.user_xml = encode_usqcd_info(info.plaq, info.linktr, info.usqcd_info);
+    // QIO encodes it into a string of QIO_STRINGALLOC bytes too, cutting off the rest
+    const auto expected = quda::scidac::usqcd_info_xml(info.plaq, info.linktr, info.usqcd_info);
+    if (records.record.user_xml != expected)
+      errorQuda("The external QIO library encoded the usqcdInfo record of %s in %lu bytes rather than %lu (it writes "
+                "at most %d)",
+                filename, records.record.user_xml.size(), expected.size(), QIO_STRINGALLOC - 1);
+  }
 
   /* Open the test file for writing */
   const char *lfn = info.ildg && !info.ildg_lfn.empty() ? info.ildg_lfn.c_str() : nullptr;

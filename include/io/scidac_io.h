@@ -55,14 +55,16 @@ namespace quda
     std::string volume_name(const std::string &filename, int n);
 
     /**
-       @brief The private record XML of a lattice field, dated now.
-       Colors, spins, typesize and datacount are omitted when zero.
+       @brief The private record XML of a lattice field.  Colors, spins,
+       typesize and datacount are omitted when zero.
        @param[in] typesize Bytes per item and site
        @param[in] datacount Items per site
        @param[in] hypercube The box of a hypercube record (record type 2), or none for a lattice field
+       @param[in] date The <date>, verbatim, or none for now
      */
     std::string record_info_xml(const std::string &datatype, QudaPrecision prec, int colors, int spins, int typesize,
-                                int datacount, const std::optional<io::Hypercube> &hypercube = {});
+                                int datacount, const std::optional<io::Hypercube> &hypercube = {},
+                                const std::optional<std::string> &date = {});
 
     /**
        @brief The checksum record XML
@@ -103,7 +105,8 @@ namespace quda
       std::optional<std::string> ildg_lfn;
       /** The box of the file's lattice that a hypercube record (record type 2) holds; none for a lattice field */
       std::optional<io::Hypercube> hypercube;
-      std::optional<std::string> date; /** The <date> of the private record XML, verbatim (load only) */
+      /** The <date> of the private record XML, verbatim: on save, none means now; on load, the one found */
+      std::optional<std::string> date;
     };
 
     /**
@@ -262,7 +265,12 @@ namespace quda
       bool checksum_matches = false; /** Whether it matches the data (load only) */
       io::Checksum sum;              /** The checksums suma and sumb computed from the data (load only) */
       bool legacy_strings = false;   /** Save with the strings of FileIOParam::legacy_strings (save only) */
-      GaugeMetadata metadata;        /** The file's SciDAC and ILDG metadata (load only) */
+      std::string user_file_xml;     /** The user file XML to write; empty means QUDA's (save only) */
+      /** A user record XML to write verbatim instead of QUDA's or a usqcdInfo record (save only) */
+      std::optional<std::string> user_record_xml;
+      std::string usqcd_info = "QUDA"; /** The <info> of the usqcdInfo record (save only) */
+      std::optional<std::string> date; /** The record's <date>; none means now (save only) */
+      GaugeMetadata metadata;          /** The file's SciDAC and ILDG metadata (load only) */
     };
 
     /**
@@ -285,7 +293,8 @@ namespace quda
     /**
        @brief The metadata records to save a gauge field with, for both backends
        @param[in] file_prec Precision of the file
-       @param[in] info Whether to write the ILDG records, a usqcdInfo record and the legacy strings
+       @param[in] info Whether to write the ILDG records, a usqcdInfo record and the legacy strings, and the
+       strings and date to write
      */
     GaugeRecords gauge_records(QudaPrecision file_prec, const GaugeInfo &info);
 
@@ -344,8 +353,9 @@ namespace quda
 
     /**
        @brief The USQCD gauge field record XML, usqcdInfo, with the average plaquette and link trace
+       @param[in] info The content of its <info> element, verbatim
      */
-    std::string usqcd_info_xml(double plaq, double linktr);
+    std::string usqcd_info_xml(double plaq, double linktr, const std::string &info = "QUDA");
 
     /**
        @brief Find the content of the first element <tag>...</tag> of an

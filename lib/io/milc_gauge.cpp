@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -53,7 +54,7 @@ namespace quda
         if (auto s = get("checksums")) {
           unsigned int sum29, sum31;
           if (sscanf(s->c_str(), "%x %x", &sum29, &sum31) != 2)
-            errorQuda("Cannot read the checksums \"%s\" in %s.info", s->c_str(), filename.c_str());
+            errorQuda("Cannot read the checksums \"%s\" in %s.info", io::excerpt(*s).c_str(), filename.c_str());
           io::Checksum listed = {sum29, sum31}, stored = {header.sum29, header.sum31};
           if (listed != stored) {
             info.checksum_matches = false;
@@ -67,15 +68,15 @@ namespace quda
         for (int d = 0; d < n_dim; d++) {
           if (auto s = get(dim_keys[d])) {
             if (std::strtol(s->c_str(), nullptr, 10) != static_cast<long>(header.dims[d]))
-              errorQuda("%s = %s in %s.info does not match the file's dimension %u", dim_keys[d], s->c_str(),
-                        filename.c_str(), header.dims[d]);
+              errorQuda("%s = %s in %s.info does not match the file's dimension %u", dim_keys[d],
+                        io::excerpt(*s).c_str(), filename.c_str(), header.dims[d]);
           }
         }
 
         if (auto s = get("time_stamp")) {
           std::string stamp(header.time_stamp, strnlen(header.time_stamp, sizeof(header.time_stamp)));
           if (*s != stamp)
-            warningQuda("The time stamp \"%s\" in %s.info does not match the file's \"%s\"", s->c_str(),
+            warningQuda("The time stamp \"%s\" in %s.info does not match the file's \"%s\"", io::excerpt(*s).c_str(),
                         filename.c_str(), stamp.c_str());
         }
 
@@ -88,6 +89,39 @@ namespace quda
           info.plaq = (std::strtod(ssplaq->c_str(), nullptr) + std::strtod(stplaq->c_str(), nullptr)) / 6.0;
           info.linktr = std::strtod(linktr->c_str(), nullptr);
         }
+      }
+
+      /**
+         @brief The values of gauge.ssplaq, gauge.stplaq, gauge.nersc_linktr and gauge.nersc_checksum for the
+         links as a MILC v5 file holds them, in single precision, formatted as MILC's write_gauge_info_item
+         writes them (generic/io_lat_utils.c): each value as a float, with %f, %f, %e and %u.  Collective.
+       */
+      std::array<std::string, 4> computed_info(const void *const gauge[], QudaPrecision prec, const int *X)
+      {
+        // computed in double precision on the values rounded to float, which single-precision links are already
+        const size_t reals = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3] * matrix_reals;
+        std::vector<std::vector<double>> rounded(n_dim, std::vector<double>(reals));
+        for (int dir = 0; dir < n_dim; dir++) {
+          auto u = rounded[dir].data();
+          const auto d = static_cast<const double *>(gauge[dir]);
+          const auto f = static_cast<const float *>(gauge[dir]);
+#pragma omp parallel for
+          for (size_t i = 0; i < reals; i++) u[i] = prec == QUDA_DOUBLE_PRECISION ? static_cast<float>(d[i]) : f[i];
+        }
+        const void *links[n_dim] = {rounded[0].data(), rounded[1].data(), rounded[2].data(), rounded[3].data()};
+        const auto obs = gauge_observables(links, QUDA_DOUBLE_PRECISION, X);
+
+        std::array<std::string, 4> values;
+        auto print = [](const char *fmt, auto value) {
+          char buf[64];
+          snprintf(buf, sizeof(buf), fmt, value);
+          return std::string(buf);
+        };
+        values[0] = print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_spatial)));
+        values[1] = print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_temporal)));
+        values[2] = print("%e", static_cast<double>(static_cast<float>(obs.linktr)));
+        values[3] = print("%u", static_cast<unsigned int>(obs.nersc_checksum));
+        return values;
       }
     } // namespace
 
@@ -158,10 +192,18 @@ namespace quda
     }
 
     io::Checksum save_gauge(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                            const FileIOParam &param)
+                            const FileIOParam &param, const GaugeMetadata &metadata)
     {
-      // checks the grid before the file is truncated
+      // checks the grid and the metadata before the file is truncated
       const io::Partitions partitions(param.io_mode, param.io_partition_grid);
+      if (metadata.milc_time_stamp.size() > sizeof(GaugeHeader::time_stamp))
+        errorQuda("The time stamp \"%s\" given for %s is longer than the %lu bytes of a MILC v5 header",
+                  io::excerpt(metadata.milc_time_stamp).c_str(), filename.c_str(), sizeof(GaugeHeader::time_stamp));
+      for (auto &item : metadata.milc_info)
+        if (item.line.find('\n') != std::string::npos)
+          errorQuda("The .info line \"%s\" given for %s holds a newline", io::excerpt(item.line).c_str(),
+                    filename.c_str());
+
       io::HostField field(gauge, n_dim, prec, matrix_reals);
       if (prec == QUDA_DOUBLE_PRECISION)
         logQuda(QUDA_SUMMARIZE,
@@ -173,10 +215,10 @@ namespace quda
       header.magic = gauge_magic;
       for (int d = 0; d < n_dim; d++) header.dims[d] = N[d];
 
-      std::string stamp;
+      std::string stamp = metadata.milc_time_stamp;
       if (comm_rank() == 0) {
-        stamp = time_stamp();
-        memcpy(header.time_stamp, stamp.c_str(), std::min(stamp.size(), sizeof(header.time_stamp) - 1));
+        if (stamp.empty()) stamp = time_stamp();
+        memcpy(header.time_stamp, stamp.c_str(), std::min(stamp.size(), sizeof(header.time_stamp)));
       }
 
       // rank 0 writes the header, and the checksums into it after the data
@@ -208,14 +250,23 @@ namespace quda
         }
       }
 
-      write_info(filename,
-                 {{"magic_number", std::to_string(gauge_magic)},
-                  {"time_stamp", "\"" + stamp + "\""},
-                  {"checksums", "\"" + io::checksum_str(sum) + "\""},
-                  {"nx", std::to_string(N[0])},
-                  {"ny", std::to_string(N[1])},
-                  {"nz", std::to_string(N[2])},
-                  {"nt", std::to_string(N[3])}});
+      std::vector<std::pair<std::string, std::string>> items = {{"magic_number", std::to_string(gauge_magic)},
+                                                                {"time_stamp", "\"" + stamp + "\""},
+                                                                {"checksums", "\"" + io::checksum_str(sum) + "\""},
+                                                                {"nx", std::to_string(N[0])},
+                                                                {"ny", std::to_string(N[1])},
+                                                                {"nz", std::to_string(N[2])},
+                                                                {"nt", std::to_string(N[3])}};
+      const std::vector<std::string> computed_keys
+        = {"gauge.ssplaq", "gauge.stplaq", "gauge.nersc_linktr", "gauge.nersc_checksum"};
+      if (param.write_usqcd_info) {
+        const auto values = computed_info(gauge, prec, X);
+        for (int k = 0; k < 4; k++) items.push_back({computed_keys[k], values[k]});
+        logQuda(QUDA_SUMMARIZE, "MILC .info plaquettes %s %s, link trace %s, NERSC checksum %s\n", values[0].c_str(),
+                values[1].c_str(), values[2].c_str(), values[3].c_str());
+      }
+      write_info(filename, items, metadata.milc_info,
+                 param.write_usqcd_info ? std::vector<std::string>() : computed_keys);
 
       return sum;
     }
