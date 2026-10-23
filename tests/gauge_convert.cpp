@@ -566,7 +566,7 @@ namespace
         if (!contains(milc_generic_keys, item.key)) lines.push_back(item);
       lines = replace_items(lines, computed_items(saved), false);
       out.has_usqcd_info = true;
-      out.usqcd_info = join_lines(lines) + join_lines(provenance);
+      out.usqcd_info = join_lines(replace_items(lines, provenance, true));
       map.provenance_bytes = join_lines(provenance).size();
       if (!in.milc_info.empty()) map.notes.push_back("the .info lines are carried in the usqcdInfo record's <info>");
       if (!gauge_write_usqcd_info)
