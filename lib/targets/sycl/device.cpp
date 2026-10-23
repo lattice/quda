@@ -77,8 +77,8 @@ namespace quda
                  str(myDevice.get_info<sycl::info::device::max_work_item_sizes<3>>()).c_str());
       printfQuda("  Max work group size: %lu\n", myDevice.get_info<sycl::info::device::max_work_group_size>());
       printfQuda("  Max num sub groups: %u\n", myDevice.get_info<sycl::info::device::max_num_sub_groups>());
-      printfQuda("  Sub group independent forward progress: %s\n",
-                 myDevice.get_info<sycl::info::device::sub_group_independent_forward_progress>() ? "true" : "false");
+      //printfQuda("  Sub group independent forward progress: %s\n",
+      //myDevice.get_info<sycl::info::device::sub_group_independent_forward_progress>() ? "true" : "false");
       printfQuda("  Sub group sizes: %s\n", str(myDevice.get_info<sycl::info::device::sub_group_sizes>()).c_str());
       printfQuda("  Preferred vector width float: %u\n",
                  myDevice.get_info<sycl::info::device::preferred_vector_width_float>());
