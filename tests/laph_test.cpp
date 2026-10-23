@@ -78,11 +78,12 @@ auto laph_test(test_t param)
   auto Lt = tdim * comm_dim(3);
   std::vector<host_complex> hostRes(nSink * nEv * Lt * nSpin, host_complex(0., 0.));
 
+  auto tdim0 = tdim; // avoids icpx compiler crash on Aurora, can remove once fixed
 #pragma omp parallel for collapse(4)
   for (int iEv = 0; iEv < nEv; ++iEv) {
     for (int iSink = 0; iSink < nSink; ++iSink) {
       for (int iSpin = 0; iSpin < nSpin; ++iSpin) {
-        for (int iT = 0; iT < tdim; ++iT) {
+        for (int iT = 0; iT < tdim0; ++iT) {
           int globT = comm_coord(3) * tdim + iT;
           for (int iZ = 0; iZ < zdim; ++iZ) {
             for (int iY = 0; iY < ydim; ++iY) {
