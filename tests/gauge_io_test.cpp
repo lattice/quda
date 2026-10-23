@@ -14,6 +14,7 @@
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <io/gauge_io.h>
+#include <io/milc_io.h>
 #include <io/reunitarize.h>
 #include <io/site_io.h>
 #include <quda.h>
@@ -1895,6 +1896,32 @@ TEST(GaugeMetadataTest, milc_info)
 
   remove_saved_file(file);
   remove_saved_file(file + ".info");
+}
+
+// the lines of .info text, as usqcdInfo's <info> holds them, split and keyed as read_info splits and keys a file
+TEST(GaugeMetadataTest, info_items)
+{
+  using namespace quda;
+  const std::vector<MILCInfoItem> items = {
+    {"gauge.description", "gauge.description = \"Symanzik 1x1 + 1x2 + 1x1x1 action\""},
+    {"quark.dyn_flavors", "quark.dyn_flavors =[3] 2 1 1"},
+    {"gauge.beta11", "  gauge.beta11 6.300000"},
+    {"", "= 1"},
+    {"quark.mass2", "quark.mass2 = 0.100000\r"},
+    {"nt", "nt=24"},
+  };
+  std::string text = "\n";
+  for (auto &item : items) text += item.line + "\n \t\n";
+  text.pop_back();
+
+  const auto parsed = milc::info_items(text);
+  EXPECT_EQ(parsed.size(), items.size());
+  for (auto i = 0u; i < std::min(items.size(), parsed.size()); i++) {
+    EXPECT_EQ(parsed[i].key, items[i].key);
+    EXPECT_EQ(parsed[i].line, items[i].line);
+  }
+  EXPECT_TRUE(milc::info_items("").empty());
+  EXPECT_TRUE(milc::info_items(" \n\t\r\n").empty());
 }
 
 namespace

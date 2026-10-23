@@ -73,6 +73,18 @@ namespace quda
       }
     } // namespace
 
+    std::vector<MILCInfoItem> info_items(const std::string &text)
+    {
+      std::vector<MILCInfoItem> items;
+      std::istringstream lines(text);
+      std::string line;
+      while (std::getline(lines, line)) {
+        if (trim(line).empty()) continue;
+        items.push_back({parse_info_line(line).first, line});
+      }
+      return items;
+    }
+
     std::optional<std::vector<MILCInfoItem>> read_info(const std::string &filename)
     {
       int found = 0;
@@ -89,15 +101,7 @@ namespace quda
       comm_broadcast(&found, sizeof(found));
       if (!found) return std::nullopt;
       io::broadcast(contents);
-
-      std::vector<MILCInfoItem> items;
-      std::istringstream lines(contents);
-      std::string line;
-      while (std::getline(lines, line)) {
-        if (trim(line).empty()) continue;
-        items.push_back({parse_info_line(line).first, line});
-      }
-      return items;
+      return info_items(contents);
     }
 
     std::map<std::string, std::string> info_values(const std::vector<MILCInfoItem> &items)

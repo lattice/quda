@@ -63,6 +63,25 @@ bool gauge_write_usqcd_info = true;
 bool gauge_allow_checksum_mismatch = false;
 bool gauge_save_partfile = false;
 QudaGaugeReunitarize gauge_reunitarize = QUDA_GAUGE_REUNITARIZE_NONE;
+
+// gauge_convert options
+QudaFileFormat gauge_load_format = QUDA_FILE_FORMAT_AUTO;
+bool gauge_load_format_given = false;
+QudaFileIOMode gauge_load_io_mode = QUDA_FILE_IO_PARALLEL;
+bool gauge_load_io_mode_given = false;
+std::array<int, 4> gauge_load_io_partitions = {0, 0, 0, 0};
+bool gauge_load_io_partitions_given = false;
+QudaFileFormat gauge_save_format = QUDA_FILE_FORMAT_INVALID;
+QudaPrecision gauge_save_prec = QUDA_INVALID_PRECISION;
+QudaFileIOMode gauge_save_io_mode = QUDA_FILE_IO_PARALLEL;
+bool gauge_save_io_mode_given = false;
+std::array<int, 4> gauge_save_io_partitions = {0, 0, 0, 0};
+bool gauge_save_io_partitions_given = false;
+std::array<int, 4> gauge_save_partfile_grid = {0, 0, 0, 0};
+bool gauge_convert_overwrite = false;
+bool gauge_convert_verify = true;
+uint64_t gauge_input_seed = 0;
+bool gauge_input_seed_given = false;
 int Nsrc = 1;
 int Msrc = 1;
 int Nsrc_tile = 1;
@@ -499,6 +518,15 @@ namespace
                                                        {"ildg", QUDA_FILE_FORMAT_ILDG},
                                                        {"qio-external", QUDA_FILE_FORMAT_QIO_EXTERNAL},
                                                        {"ildg-external", QUDA_FILE_FORMAT_ILDG_EXTERNAL}};
+
+  CLI::TransformPairs<QudaFileFormat> gauge_save_format_map {{"qio", QUDA_FILE_FORMAT_QIO},
+                                                             {"milc", QUDA_FILE_FORMAT_MILC},
+                                                             {"ildg", QUDA_FILE_FORMAT_ILDG},
+                                                             {"qio-external", QUDA_FILE_FORMAT_QIO_EXTERNAL},
+                                                             {"ildg-external", QUDA_FILE_FORMAT_ILDG_EXTERNAL}};
+
+  CLI::TransformPairs<QudaPrecision> gauge_save_prec_map {{"double", QUDA_DOUBLE_PRECISION},
+                                                          {"single", QUDA_SINGLE_PRECISION}};
 
   CLI::TransformPairs<QudaFileFormat> prop_file_format_map {
     {"auto", QUDA_FILE_FORMAT_AUTO}, {"qio", QUDA_FILE_FORMAT_QIO}, {"qio-external", QUDA_FILE_FORMAT_QIO_EXTERNAL}};
@@ -1476,6 +1504,88 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "Number of I/O partitions in each dimension for source and propagator files, as MILC's "
                  "ionode_geometry (default 0 0 0 0, one partition per rank)")
     ->expected(4);
+}
+
+void add_gauge_convert_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group(
+    "Gauge conversion",
+    "Options of gauge_convert, which loads the gauge field of --load-gauge (or generates one with --gauge-input) and "
+    "saves it to --save-gauge. --gauge-allow-checksum-mismatch and --gauge-reunitarize apply to the load; "
+    "--gauge-save-partfile, --gauge-ildg-lfn and --gauge-write-usqcd-info to the save. Unless the conversion "
+    "changes nothing, the output records its source in MILC's gauge.previous.filename (the path as given), "
+    "gauge.previous.time_stamp and gauge.previous.checksums (the source's checksums as its format defines them: "
+    "suma and sumb for SciDAC and ILDG, sum29 and sum31 for MILC)");
+
+  opgroup
+    ->add_option("--gauge-load-format", gauge_load_format,
+                 "File format of --load-gauge (auto, qio, milc, ildg; qio-external and ildg-external use the external "
+                 "QIO library; default: --gauge-file-format)")
+    ->transform(CLI::QUDACheckedTransformer(file_format_map))
+    ->each([](const std::string &) { gauge_load_format_given = true; })
+    ->default_str("");
+  opgroup
+    ->add_option("--gauge-load-io-mode", gauge_load_io_mode,
+                 "How --load-gauge is read: parallel, serial or mpi-io (default: --gauge-file-io-mode)")
+    ->transform(CLI::QUDACheckedTransformer(file_io_mode_map))
+    ->each([](const std::string &) { gauge_load_io_mode_given = true; })
+    ->default_str("");
+  opgroup
+    ->add_option("--gauge-load-io-partitions", gauge_load_io_partitions,
+                 "Number of I/O partitions in each dimension for reading --load-gauge (default: "
+                 "--gauge-file-io-partitions)")
+    ->expected(4)
+    ->each([](const std::string &) { gauge_load_io_partitions_given = true; })
+    ->default_str("");
+
+  opgroup
+    ->add_option("--gauge-save-format", gauge_save_format,
+                 "File format of --save-gauge, required with it: qio, ildg, milc; qio-external and ildg-external use "
+                 "the external QIO library")
+    ->transform(CLI::QUDACheckedTransformer(gauge_save_format_map))
+    ->default_str("");
+  opgroup
+    ->add_option("--gauge-save-prec", gauge_save_prec,
+                 "Precision of --save-gauge: single or double (default: single for --gauge-save-format milc, whose "
+                 "files are always single precision, so double is an error with it; otherwise the precision of "
+                 "--load-gauge's file, or double for a generated field)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_save_prec_map))
+    ->default_str("");
+  opgroup
+    ->add_option("--gauge-save-io-mode", gauge_save_io_mode,
+                 "How --save-gauge is written: parallel, serial or mpi-io (default: --gauge-file-io-mode)")
+    ->transform(CLI::QUDACheckedTransformer(file_io_mode_map))
+    ->each([](const std::string &) { gauge_save_io_mode_given = true; })
+    ->default_str("");
+  opgroup
+    ->add_option("--gauge-save-io-partitions", gauge_save_io_partitions,
+                 "Number of I/O partitions in each dimension for writing --save-gauge (default: "
+                 "--gauge-file-io-partitions)")
+    ->expected(4)
+    ->each([](const std::string &) { gauge_save_io_partitions_given = true; })
+    ->default_str("");
+  opgroup
+    ->add_option("--gauge-save-partfile-grid", gauge_save_partfile_grid,
+                 "Save --save-gauge as a SciDAC partfile laid out as if by a process grid a b c d, one volume per "
+                 "virtual rank, whatever the rank count of this run (implies --gauge-save-partfile; "
+                 "--gauge-save-format qio only; default 0 0 0 0, one volume per I/O partition)")
+    ->expected(4);
+
+  opgroup->add_option("--gauge-convert-overwrite", gauge_convert_overwrite,
+                      "Replace an existing --save-gauge: remove it, its .info file for MILC output, and every "
+                      "<file>.vol followed by 4 to 9 digits before saving; without it an existing output is an error "
+                      "(default false)");
+  opgroup->add_option("--gauge-convert-verify", gauge_convert_verify,
+                      "Reload --save-gauge after saving it and compare every value bit for bit with what was saved, "
+                      "and its metadata with what was given (default true)");
+
+  opgroup
+    ->add_option("--gauge-input-seed", gauge_input_seed,
+                 "Seed of the generator of a field generated with --gauge-input: each site's generator is seeded from "
+                 "the seed and the site's global index, so the field is the same on any rank layout (default: the "
+                 "other tests' seeding, which is also independent of the rank layout)")
+    ->each([](const std::string &) { gauge_input_seed_given = true; })
+    ->default_str("");
 }
 
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)

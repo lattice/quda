@@ -455,33 +455,51 @@ namespace
         rng[parity * volume_h + i] = host_rng_t(seed(global_idx));
       }
   }
+
+  // SplitMix64's mixing function
+  uint64_t splitmix64(uint64_t z)
+  {
+    z += 0x9e3779b97f4a7c15ull;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+    return z ^ (z >> 31);
+  }
+
+  // mixed into the seed of initRand(seed), so that its streams differ from the built sources' of the same seed
+  constexpr uint64_t gauge_stream = 0x6761756765ull; // "gauge"
+
+  void initRankRand()
+  {
+    int rank = 0;
+
+#if defined(QMP_COMMS)
+    rank = QMP_get_node_number();
+#elif defined(MPI_COMMS)
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+
+    srand(17 * rank + 137);
+  }
 } // namespace
 
 void initRand()
 {
-  int rank = 0;
-
-#if defined(QMP_COMMS)
-  rank = QMP_get_node_number();
-#elif defined(MPI_COMMS)
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-#endif
-
-  srand(17 * rank + 137);
+  initRankRand();
 
   // initialize the hypercubic RNG
   initHypercubicRNG(host_rand, {xdim, ydim, zdim, tdim}, [](uint64_t global_idx) { return 17ul * global_idx + 137; });
 }
 
+void initRand(uint64_t seed)
+{
+  initRankRand();
+  initHypercubicRNG(host_rand, {xdim, ydim, zdim, tdim},
+                    [seed](uint64_t global_idx) { return splitmix64(splitmix64(seed ^ gauge_stream) ^ global_idx); });
+}
+
 uint64_t host_source_rand_seed(uint64_t seed, uint64_t global_index)
 {
-  auto mix = [](uint64_t z) {
-    z += 0x9e3779b97f4a7c15ull;
-    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
-    z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
-    return z ^ (z >> 31);
-  };
-  return mix(mix(seed) ^ global_index);
+  return splitmix64(splitmix64(seed) ^ global_index);
 }
 
 void initSourceRand(std::vector<host_rng_t> &rng, uint64_t seed, const std::array<int, 4> &X)

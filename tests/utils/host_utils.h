@@ -177,6 +177,15 @@ void finalizeComms();
 void initRand();
 
 /**
+ * @brief Initialize the RNG as initRand does, but with each site's generator of host_rand seeded from the seed and
+ * the site's global lexicographic index (SplitMix64's mixing, as host_source_rand_seed, but with streams distinct from
+ * the built sources' of the same seed), so that the fields drawn from it depend on the seed and not on the rank
+ * layout. Needs to be called after comms are initialized
+ * @param[in] seed The seed
+ */
+void initRand(uint64_t seed);
+
+/**
  * @brief The seed of the generator of the site with the given global lexicographic index in the generators of the
  * built staggered sources (initSourceRand; SplitMix64's mixing of the seed, then of its combination with the index, so
  * that the streams are distinct from host_rand's)

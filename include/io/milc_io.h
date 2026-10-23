@@ -33,6 +33,13 @@ namespace quda
                     const std::vector<MILCInfoItem> &lines = {}, const std::vector<std::string> &dropped = {});
 
     /**
+       @brief The lines of the text of a .info file, as read_info gives
+       them: those that aren't blank, in order, each with its key.  Lines
+       may have the form "key = value" or "key value".
+     */
+    std::vector<MILCInfoItem> info_items(const std::string &text);
+
+    /**
        @brief Read <filename>.info if it exists.  Rank 0 reads it and
        broadcasts its contents.  Lines may have the form "key = value"
        or "key value".

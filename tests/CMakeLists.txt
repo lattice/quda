@@ -178,6 +178,11 @@ target_link_libraries(gauge_io_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_io_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(gauge_convert gauge_convert.cpp)
+target_link_libraries(gauge_convert ${TEST_LIBS})
+quda_checkbuildtest(gauge_convert QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_convert ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(vector_io_test vector_io_test.cpp)
 target_link_libraries(vector_io_test ${TEST_LIBS})
 quda_checkbuildtest(vector_io_test QUDA_BUILD_ALL_TESTS)
