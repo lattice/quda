@@ -35,15 +35,17 @@
  */
 template <typename real_t> struct StaggeredDslashReference {
   void operator()(ColorSpinorField &res_, const GaugeField &fatlink_, const GaugeField &longlink_,
-                  const ColorSpinorField &spinorField_,
-                  int oddBit, int daggerBit,
-                  QudaDslashType dslash_type, int laplace3D)
+                  const ColorSpinorField &spinorField_, int oddBit, int daggerBit, QudaDslashType dslash_type,
+                  int laplace3D)
   {
     if (laplace3D < 4 && dslash_type != QUDA_LAPLACE_DSLASH)
       errorQuda("laplace3D = %d only supported for Laplace dslash (%d requested)", laplace3D, dslash_type);
 
-#define E(x,i,y) static_cast<const real_t *>(x[i]y)
-#define INIT(x,y) {E(x,0,y), E(x,1,y), E(x,2,y), E(x,3,y)}
+#define E(x, i, y) static_cast<const real_t *>(x[i] y)
+#define INIT(x, y)                                                                                                     \
+  {                                                                                                                    \
+    E(x, 0, y), E(x, 1, y), E(x, 2, y), E(x, 3, y)                                                                     \
+  }
     const auto res = res_.data<real_t *>();
     const auto fatlinkArray = fatlink_.data_array<const real_t *>();
     const auto fatlink = fatlinkArray.data;
@@ -154,10 +156,8 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
-  instantiate_host<StaggeredDslashReference>(in.Precision(), out, fat_link,
-                                             long_link,
-                                             in, oddBit,
-                                             daggerBit, dslash_type, laplace3D);
+  instantiate_host<StaggeredDslashReference>(in.Precision(), out, fat_link, long_link, in, oddBit, daggerBit,
+                                             dslash_type, laplace3D);
 }
 
 void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,

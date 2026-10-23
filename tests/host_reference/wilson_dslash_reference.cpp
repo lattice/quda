@@ -47,7 +47,10 @@ template <typename real_t> struct DslashReference {
                   const void *const *fwdSpinor_, const void *const *backSpinor_, int parity, int dagger)
   {
 #define E(x) static_cast<const real_t *const>(x)
-#define INIT(x) {E(x[0]),E(x[1]),E(x[2]),E(x[3])}
+#define INIT(x)                                                                                                        \
+  {                                                                                                                    \
+    E(x[0]), E(x[1]), E(x[2]), E(x[3])                                                                                 \
+  }
     const auto res = static_cast<real_t *const>(res_);
     const real_t *const gaugeFull[] = INIT(gaugeFull_);
     const real_t *const ghostGauge[] = INIT(ghostGauge_);

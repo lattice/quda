@@ -431,9 +431,10 @@ template <typename real_t> struct HisqStaplesForce {
   }
 
   template <int oddBit>
-  void computeMiddleLinkSite(int half_lattice_index, const int dim[4], const matrix *const oprod, const matrix *const Qprev,
-                             const matrix *const *const link, int sig, int mu, real_t coeff, const LoadStore<real_t> &ls,
-                             matrix *const Pmu, matrix *const P3, matrix *const Qmu, matrix *const *const newOprod)
+  void computeMiddleLinkSite(int half_lattice_index, const int dim[4], const matrix *const oprod,
+                             const matrix *const Qprev, const matrix *const *const link, int sig, int mu, real_t coeff,
+                             const LoadStore<real_t> &ls, matrix *const Pmu, matrix *const P3, matrix *const Qmu,
+                             matrix *const *const newOprod)
   {
     const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
     const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
@@ -729,7 +730,7 @@ template <typename real_t> struct HisqStaplesForce {
   }
 
   void operator()(const int dim[4], PathCoefficients<double> staple_coeff, quda::GaugeField &oprod_,
-		  quda::GaugeField &link_, quda::GaugeField *newOprod_)
+                  quda::GaugeField &link_, quda::GaugeField *newOprod_)
   {
     const auto oprodArray = oprod_.data_array<const matrix *>();
     const auto oprod = oprodArray.data;
@@ -763,8 +764,8 @@ template <typename real_t> struct HisqStaplesForce {
         if (mu == sig || mu == OPP_DIR(sig)) continue;
 
         // no, that first cast isn't a typo.
-        computeMiddleLinkField(dim, reinterpret_cast<const matrix *const>(oprod), static_cast<matrix *>(NULL), link, sig, mu,
-                               -ThreeSt, Pmu, P3, Qmu, newOprod);
+        computeMiddleLinkField(dim, reinterpret_cast<const matrix *const>(oprod), static_cast<matrix *>(NULL), link,
+                               sig, mu, -ThreeSt, Pmu, P3, Qmu, newOprod);
 
         for (int nu = 0; nu < 8; ++nu) {
           if (nu == mu || nu == OPP_DIR(mu) || nu == sig || nu == OPP_DIR(sig)) continue;
@@ -882,8 +883,8 @@ template <class real_t> struct ComputeLongLinkField {
     }
   }
 
-  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig,
-                  real_t coeff, quda::GaugeField *output_)
+  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig, real_t coeff,
+                  quda::GaugeField *output_)
   {
     const auto oprodArray = oprod_.data_array<const matrix *>();
     const auto oprod = oprodArray.data;
@@ -941,8 +942,7 @@ template <class real_t> struct CompleteForceField {
     ls.storeMatrixToMomentumField(colorMatY, oddBit, sig, half_lattice_index, coeff, mom);
   }
 
-  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig,
-                  quda::GaugeField *mom_)
+  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig, quda::GaugeField *mom_)
   {
     const auto oprodArray = oprod_.data_array<const matrix *>();
     const auto oprod = oprodArray.data;
