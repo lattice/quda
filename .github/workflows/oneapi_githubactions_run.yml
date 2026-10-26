@@ -13,7 +13,7 @@ env:
 
 jobs:
   buildrun:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - name: Install software
       run: |
@@ -37,7 +37,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Ccache for gh actions
-      uses: hendrikmuhs/ccache-action@v1.2.16
+      uses: hendrikmuhs/ccache-action@v1.2.17
       with:
         key: ${{ github.job }}
         max-size: 2000M
