@@ -622,13 +622,17 @@ typedef enum QudaGaugeSmearType_s {
 } QudaGaugeSmearType;
 
 // Selects the generator K_t of the fermion gradient flow in performGFlowQuda.
+// Only the LAPLACE options are Luescher's Laplacian flow (arXiv:1302.5246). The
+// Wilson, staggered and HISQ -DdagD generators include the mu != nu cross terms of
+// D = sum_mu D_mu; they match the Laplacian only in the free field, and their
+// continuum limit is Dslash^2 = Laplacian + 1/2 sigma.F (see fermion_flow_op.h).
 typedef enum QudaFermionFlowType_s {
   QUDA_FERMION_FLOW_LAPLACE_4D = 0, /**< 4D gauge-covariant Laplacian (default, legacy behavior) */
   QUDA_FERMION_FLOW_LAPLACE_3D,     /**< 3D (spatial) gauge-covariant Laplacian */
-  QUDA_FERMION_FLOW_WILSON,         /**< Wilson -DdagD */
-  QUDA_FERMION_FLOW_STAGGERED,      /**< naive staggered -DdagD */
-  QUDA_FERMION_FLOW_HISQ,           /**< full HISQ -DdagD */
-  QUDA_FERMION_FLOW_HISQ_TRUNCATED, /**< HISQ -DdagD with the Naik (long) term dropped */
+  QUDA_FERMION_FLOW_WILSON,         /**< Wilson -DdagD (Dslash^2 flow, not the Laplacian) */
+  QUDA_FERMION_FLOW_STAGGERED,      /**< naive staggered -DdagD (Dslash^2 flow, not the Laplacian) */
+  QUDA_FERMION_FLOW_HISQ,           /**< full HISQ -DdagD (Dslash^2 flow, not the Laplacian) */
+  QUDA_FERMION_FLOW_HISQ_TRUNCATED, /**< HISQ -DdagD with the Naik (long) term dropped (Dslash^2 flow) */
   QUDA_FERMION_FLOW_INVALID = QUDA_INVALID_ENUM
 } QudaFermionFlowType;
 

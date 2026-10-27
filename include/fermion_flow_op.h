@@ -138,6 +138,16 @@ namespace quda
      LaplaceFlowOp (and QEX's staggered -DdagD flow); the bare -MdagM would be 4x too
      strong (~ -4p^2), giving the wrong smearing radius. With mass 0 this reduces to
      1/4 Dhop^2, whose free-field limit is the gauge Laplacian on each parity.
+
+     NOT THE LAPLACIAN FLOW: the match to the Laplacian above is a free-field
+     statement. With Dhop = sum_mu D_mu, Dhop^2 = sum_mu D_mu^2 + sum_{mu<nu} {D_mu, D_nu};
+     the staggered phases cancel the anticommutators only in the free field. In a gauge
+     background they survive as a field-strength term, and the continuum limit of
+     this generator is Dslash^2 = Delta + 1/2 sigma_{mu nu} F_{mu nu}, not Delta. This is
+     therefore the Dslash^2 flow, not Luescher's Laplacian flow (arXiv:1302.5246,
+     eqs. 2.4-2.5). The two agree at tree level but have different continuum limits at
+     fixed flow time, and small-flow-time matching coefficients computed for the
+     Laplacian flow do not apply to this one. The same holds for HisqFlowOp.
   */
   class StaggeredFlowOp : public FermionFlowOp
   {
@@ -195,6 +205,11 @@ namespace quda
      Wilson operator (four-component spinors) uses kappa (inv_param.kappa). The
      generator is K_t = -DdagD = -MdagM (negative semi-definite for any kappa).
 
+     NOT THE LAPLACIAN FLOW: D_W = Dslash + O(a) Wilson term, so the continuum limit
+     of -DdagD is Dslash^2 = Delta + 1/2 sigma_{mu nu} F_{mu nu}, not Delta. As for
+     StaggeredFlowOp, this is the Dslash^2 flow rather than Luescher's Laplacian flow
+     (arXiv:1302.5246, eqs. 2.4-2.5); see the note there.
+
      TEMPORAL BOUNDARY CONDITION: not applied by this operator. The BC is whatever
      is present in the caller's link data: anti-periodic if the caller bakes the
      sign in (harmless to the gauge flow: it cancels in every closed loop).
@@ -250,7 +265,10 @@ namespace quda
      and (for full HISQ) the Naik three-link field L = longKSLink(W). KS phases +
      anti-periodic T are baked into the thin links before fattening (using the
      caller-supplied smear_param.staggered_phase_type), so they propagate into X
-     and L. K_t = -1/4 MdagM (see StaggeredFlowOp for why the 1/4 is required):
+     and L. K_t = -1/4 MdagM (see StaggeredFlowOp for why the 1/4 is required, and
+     for why this is the Dslash^2 flow rather than the Laplacian flow; with HISQ each
+     D_mu is the fat one-link plus Naik three-link hop, and the cross terms include
+     fat-Naik products):
        - with_long = true  : full HISQ -- DiracImprovedStaggered(fat = X, long = L).
        - with_long = false : truncated HISQ (Option A) -- the Naik term dropped,
                              applied with the cheap one-link DiracStaggered(gauge = X).
