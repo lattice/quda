@@ -164,28 +164,6 @@ static void hisq_force_startup()
 
   setVerbosity(verbosity);
 
-  quda::RNG *rng;
-
-  // initialize RNG
-  {
-    // Create a dummy field with which to initialize the RNG
-    quda::ColorSpinorParam param;
-    param.v = nullptr;
-    param.nColor = 3;
-    param.nSpin = 1;
-    param.setPrecision(force_prec);
-    param.create = QUDA_REFERENCE_FIELD_CREATE;
-    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    param.nDim = 4;
-    param.pc_type = QUDA_4D_PC;
-    param.siteSubset = QUDA_FULL_SITE_SUBSET;
-    param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    param.location = QUDA_CPU_FIELD_LOCATION;
-    for (int d = 0; d < 4; d++) param.x[d] = X[d];
-    quda::ColorSpinorField spinor_in(param);
-    rng = new quda::RNG(spinor_in, 1234);
-  }
-
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
   QudaGaugeParam qudaGaugeParam_ex;
 
@@ -303,10 +281,22 @@ static void hisq_force_startup()
    * Create the outer product fields *
    **********************************/
 
-  // Create four full-volume random spinor fields
-  void *stag_for_oprod = safe_malloc(4 * cpuGauge->Volume() * stag_spinor_site_size * force_prec);
+  // Create a full-volume random spinor field
+  quda::ColorSpinorParam qParam;
+  qParam.nColor = 3;
+  qParam.nSpin = 1;
+  qParam.setPrecision(force_prec);
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  qParam.nDim = 4;
+  qParam.pc_type = QUDA_4D_PC;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
+  for (int d = 0; d < 4; d++) qParam.x[d] = X[d];
+  quda::ColorSpinorField stag_for_oprod(qParam);
 
-  // Allocate the outer product fields and populate them with the random spinor fields
+  // Allocate the outer product fields and populate them with the random spinor field
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.order = gauge_order;
@@ -326,15 +316,18 @@ static void hisq_force_startup()
   cpuLongLinkOprod_ex = new GaugeField(gParam_ex);
 
   // initialize the CPU outer product fields and exchange once
-  createStagForOprodCPU(stag_for_oprod, force_prec, qudaGaugeParam.X, *rng);
-  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuOprod, force_prec, 1);
-  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuLongLinkOprod, force_prec, 3);
+  {
+    quda::RNG rng(stag_for_oprod, 1234);
+    createStagForOprodCPU(stag_for_oprod, rng);
+  }
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuOprod, 1);
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuLongLinkOprod, 3);
 
   copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
 
   // free the initial spinor field
-  host_free(stag_for_oprod);
+  stag_for_oprod = {};
 
   /**************************
    * Create remaining fields *
@@ -380,11 +373,6 @@ static void hisq_force_startup()
   cpuLongLinkOprod_ex->exchangeExtendedGhost(R, true);
   cudaLongLinkOprod_ex->copy(*cpuLongLinkOprod);
   cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
-
-  /**********************
-   * Do a little cleanup *
-   **********************/
-  delete rng;
 }
 
 // one-time teardown at end of tests

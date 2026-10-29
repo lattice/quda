@@ -1100,13 +1100,20 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
 static int compare_link(const GaugeField &a, const GaugeField &b)
 {
   if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
+
+  // raw_pointer() uses a static buffer for pointer-array orders, so we must
+  // capture each field's per-direction pointers separately to avoid aliasing.
+  void *a_ptrs[4], *b_ptrs[4];
+  for (int d = 0; d < 4; d++) {
+    a_ptrs[d] = a.data<void *>(d);
+    b_ptrs[d] = b.data<void *>(d);
+  }
+
   int ret;
   if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink(reinterpret_cast<double **>(a.raw_pointer()), reinterpret_cast<double **>(b.raw_pointer()),
-                      a.Volume());
+    ret = compareLink(reinterpret_cast<double **>(a_ptrs), reinterpret_cast<double **>(b_ptrs), a.Volume());
   } else {
-    ret = compareLink(reinterpret_cast<float **>(a.raw_pointer()), reinterpret_cast<float **>(b.raw_pointer()),
-                      a.Volume());
+    ret = compareLink(reinterpret_cast<float **>(a_ptrs), reinterpret_cast<float **>(b_ptrs), a.Volume());
   }
 
   return ret;
@@ -1170,19 +1177,11 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   return compare_link(linkA, linkB);
 }
 
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng)
+void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng)
 {
-  unsigned long shift = x[0] * x[1] * x[2] * x[3] * stag_spinor_site_size;
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    double *dstag = (double *)stag_for_oprod;
-    // matpc: compute a full-volume spinor
-    for (int d = 0; d < 4; d++)
-      constructRandomSpinorSource(dstag + d * shift, 1, 3, QUDA_DOUBLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
-  } else {
-    float *fstag = (float *)stag_for_oprod;
-    for (int d = 0; d < 4; d++)
-      constructRandomSpinorSource(fstag + d * shift, 1, 3, QUDA_SINGLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
-  }
+  if (stag_for_oprod.Location() != QUDA_CPU_FIELD_LOCATION || stag_for_oprod.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+    errorQuda("Expected a full-parity host spinor field");
+  quda::spinorNoise(stag_for_oprod, rng, QUDA_NOISE_UNIFORM);
 }
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)
