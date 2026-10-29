@@ -360,6 +360,7 @@ bool   smear_delete_two_link  = true;
 bool enable_testing = false;
 
 bool detratio = false;
+int rhmc_flavors = 0;
 
 namespace
 {
@@ -1362,6 +1363,8 @@ void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
   opgroup->add_option("--determinant-ratio", detratio, "Test a ratio of determinants. Default is false");
+  opgroup->add_option("--rhmc-flavors", rhmc_flavors,
+                      "Number of RHMC flavors (0: no RHMC, 1: single flavor, 2: non-degenerate doublet). Default is 0");
 }
 
 void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app)
