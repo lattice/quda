@@ -134,11 +134,15 @@ namespace quda
         {
           int v_ = thread_idx % arg.block_y;
           int x_ = thread_idx / arg.block_y;
-          if (x_ + x_offset < arg.volume_cb && v_ + v_offset < arg.actual_nvec) {
-            color_spinor_t color_spinor = cache.load(x_, v_);
-            if constexpr (Arg::nSpin == 4 && Arg::from_to_non_rel) {
-              color_spinor.toRel();
-              color_spinor *= rsqrt(static_cast<typename Arg::real>(2.0));
+          if (x_ + x_offset < arg.volume_cb && v_ + v_offset < Arg::nVec) {
+            // ColorSpinor initializes to zero; only valid columns have data in the cache.
+            color_spinor_t color_spinor;
+            if (v_ + v_offset < arg.actual_nvec) {
+              color_spinor = cache.load(x_, v_);
+              if constexpr (Arg::nSpin == 4 && Arg::from_to_non_rel) {
+                color_spinor.toRel();
+                color_spinor *= rsqrt(static_cast<typename Arg::real>(2.0));
+              }
             }
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
