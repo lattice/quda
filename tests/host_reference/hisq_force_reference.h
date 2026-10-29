@@ -4,15 +4,15 @@
 #include <quda.h>
 #include <enum_quda.h>
 #include <gauge_field.h>
+#include <color_spinor_field.h>
 
 /**
    @brief Compute a staggered spinor outer product for some offset, CPU version
-   @param[in] src Pointer to an appropriately sized host staggered spinor field
+   @param[in] src Full-parity host staggered spinor field; its ghost zones are exchanged here
    @param[out] dest Reference to a gauge field for the outer product
-   @param[in] precision Precision of data (single or double)
-   @param[in] separation Offset for outer product (1 for fat links, 3 for long links)
+   @param[in] separation Odd offset for outer product (1 for fat links, 3 for long links)
 */
-void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dest, QudaPrecision precision, size_t separation);
+void computeLinkOrderedOuterProduct(const quda::ColorSpinorField &src, quda::GaugeField &dest, int separation);
 
 /**
    @brief Compute the force contribution from the fat links, CPU version

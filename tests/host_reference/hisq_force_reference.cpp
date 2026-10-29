@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "host_utils.h"
+#include "dslash_reference.h"
 #include "force_utils.hpp"
 #include "index_utils.hpp"
 #include "instantiate_host.hpp"
@@ -16,28 +17,38 @@ extern int V;
 extern int Vh;
 
 template <typename real_t> struct ComputeLinkOrderedOuterProduct {
-  void operator()(const void *const src_, quda::GaugeField &dest, size_t nhops)
+  void operator()(const quda::ColorSpinorField &src, quda::GaugeField &dest, int nhops)
   {
-    auto src = reinterpret_cast<const su3_vector<real_t> *>(src_);
+    for (int parity = 0; parity < 2; ++parity) {
+      // nhops is odd, so the forward neighbor of a site lives on the opposite parity
+      const int nbr_parity = 1 - parity;
+      const auto &site_field = parity == 0 ? src.Even() : src.Odd();
+      const auto &nbr_field = nbr_parity == 0 ? src.Even() : src.Odd();
+      nbr_field.exchangeGhost(static_cast<QudaParity>(nbr_parity), nhops, 0);
+
+      const auto site = site_field.data<const su3_vector<real_t> *>();
+      const auto nbr = nbr_field.data<const real_t *>();
+      const auto fwd_ghost = typed_ptr_array<const real_t *>(nbr_field.fwdGhostFaceBuffer);
+      const auto back_ghost = typed_ptr_array<const real_t *>(nbr_field.backGhostFaceBuffer);
 
 #pragma omp parallel for
-    for (int i = 0; i < V; ++i) {
-      int dx[4];
-      for (int dir = 0; dir < 4; ++dir) {
-        dx[3] = dx[2] = dx[1] = dx[0] = 0;
-        dx[dir] = nhops;
-        int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-        auto hw = src + nbr_idx;
-        auto p = get_su3_matrix<real_t>(dest, i, dir);
-        su3_projector(hw, &src[i], p);
-      } // dir
-    }   // i
+      for (int i = 0; i < Vh; ++i) {
+        for (int dir = 0; dir < 4; ++dir) {
+          auto hw = reinterpret_cast<const su3_vector<real_t> *>(spinorNeighbor(
+            i, 2 * dir, parity, nbr, fwd_ghost.data(), back_ghost.data(), nhops, nhops, stag_spinor_site_size));
+          auto p = get_su3_matrix<real_t>(dest, parity * Vh + i, dir);
+          su3_projector(hw, &site[i], p);
+        } // dir
+      } // i
+    } // parity
   }
 };
 
-void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
+void computeLinkOrderedOuterProduct(const quda::ColorSpinorField &src, quda::GaugeField &dst, int nhops)
 {
-  instantiate_host<ComputeLinkOrderedOuterProduct>(precision, src, dst, nhops);
+  if (src.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Expected a full-parity spinor field");
+  if (nhops % 2 == 0) errorQuda("Outer product separation %d must be odd", nhops);
+  instantiate_host<ComputeLinkOrderedOuterProduct>(src.Precision(), src, dst, nhops);
 }
 
 #define RETURN_IF_ERR                                                                                                  \
@@ -431,9 +442,10 @@ template <typename real_t> struct HisqStaplesForce {
   }
 
   template <int oddBit>
-  void computeMiddleLinkSite(int half_lattice_index, const int dim[4], matrix *const oprod, const matrix *const Qprev,
-                             const matrix *const *const link, int sig, int mu, real_t coeff, const LoadStore<real_t> &ls,
-                             matrix *const Pmu, matrix *const P3, matrix *const Qmu, matrix *const *const newOprod)
+  void computeMiddleLinkSite(int half_lattice_index, const int dim[4], const matrix *const oprod,
+                             const matrix *const Qprev, const matrix *const *const link, int sig, int mu, real_t coeff,
+                             const LoadStore<real_t> &ls, matrix *const Pmu, matrix *const P3, matrix *const Qmu,
+                             matrix *const *const newOprod)
   {
     const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
     const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
@@ -514,7 +526,7 @@ template <typename real_t> struct HisqStaplesForce {
     if (sig_positive) ls.addMatrixToField(colorMatY, oddBit, sig, half_lattice_index, coeff, newOprod);
   } // computeMiddleLinkSite
 
-  void computeMiddleLinkField(const int dim[4], matrix *const oprod, const matrix *const Qprev,
+  void computeMiddleLinkField(const int dim[4], const matrix *const oprod, const matrix *const Qprev,
                               const matrix *const *const link, int sig, int mu, real_t coeff, matrix *const Pmu,
                               matrix *const P3, matrix *const Qmu, matrix *const *const newOprod)
   {
@@ -720,37 +732,40 @@ template <typename real_t> struct HisqStaplesForce {
     LoadStore<real_t> ls(volume);
 #pragma omp parallel for
     for (int site = 0; site < loop_count; ++site) {
-
       computeAllLinkSite<0>(site, dim, oprod, Qprev, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
     }
-
+#pragma omp parallel for
     for (int site = 0; site < loop_count; ++site) {
       computeAllLinkSite<1>(site, dim, oprod, Qprev, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
     }
   }
 
-  void operator()(const int dim[4], PathCoefficients<double> staple_coeff, void **oprod_, void **link_, void **tempmat_,
-                  void **newOprod_)
+  void operator()(const int dim[4], PathCoefficients<double> staple_coeff, quda::GaugeField &oprod_,
+                  quda::GaugeField &link_, quda::GaugeField *newOprod_)
   {
-    auto oprod = reinterpret_cast<matrix **>(oprod_);
-    auto link = reinterpret_cast<matrix **>(link_);
-    auto tempmat = reinterpret_cast<matrix **>(tempmat_);
-    auto newOprod = reinterpret_cast<matrix **>(newOprod_);
+    const auto oprodArray = oprod_.data_array<const matrix *>();
+    const auto oprod = oprodArray.data;
+    const auto linkArray = link_.data_array<const matrix *>();
+    const auto link = linkArray.data;
+    const auto newOprodArray = newOprod_->data_array<matrix *>();
+    const auto newOprod = newOprodArray.data;
 
     real_t OneLink, ThreeSt, FiveSt, SevenSt, Lepage, coeff;
-
     OneLink = staple_coeff.one;
     ThreeSt = staple_coeff.three;
     FiveSt = staple_coeff.five;
     SevenSt = staple_coeff.seven;
     Lepage = staple_coeff.lepage;
 
-    auto Pmu = tempmat[0];
-    auto P3 = tempmat[1];
-    auto P5 = tempmat[2];
-    auto Pnumu = tempmat[3];
-    auto Qmu = tempmat[4];
-    auto Qnumu = tempmat[5];
+    matrix *tempmat[6];
+    uint64_t len = is_multi_gpu() ? (2 * Vh_ex) : (dim[0] * dim[1] * dim[2] * dim[3]);
+    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<matrix *>(safe_malloc(len * sizeof(matrix))); }
+    const auto Pmu = tempmat[0];
+    const auto P3 = tempmat[1];
+    const auto P5 = tempmat[2];
+    const auto Pnumu = tempmat[3];
+    const auto Qmu = tempmat[4];
+    const auto Qnumu = tempmat[5];
 
     for (int sig = 0; sig < 4; ++sig) { computeOneLinkField(dim, oprod, sig, OneLink, newOprod); }
 
@@ -760,8 +775,8 @@ template <typename real_t> struct HisqStaplesForce {
         if (mu == sig || mu == OPP_DIR(sig)) continue;
 
         // no, that first cast isn't a typo.
-        computeMiddleLinkField(dim, reinterpret_cast<matrix *>(oprod), static_cast<matrix *>(NULL), link, sig, mu,
-                               -ThreeSt, Pmu, P3, Qmu, newOprod);
+        computeMiddleLinkField(dim, reinterpret_cast<const matrix *const>(oprod), static_cast<matrix *>(NULL), link,
+                               sig, mu, -ThreeSt, Pmu, P3, Qmu, newOprod);
 
         for (int nu = 0; nu < 8; ++nu) {
           if (nu == mu || nu == OPP_DIR(mu) || nu == sig || nu == OPP_DIR(sig)) continue;
@@ -806,6 +821,7 @@ template <typename real_t> struct HisqStaplesForce {
                              static_cast<matrix *>(NULL), newOprod);
       } // mu
     }   // sig
+    for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
 
     // Need also to compute the one-link contribution
   }
@@ -818,8 +834,6 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
 
-  uint64_t len = is_multi_gpu() ? (2 * Vh_ex) : (X_[0] * X_[1] * X_[2] * X_[3]);
-
   PathCoefficients<double> act_path_coeff;
   act_path_coeff.one = path_coeff[0];
   act_path_coeff.naik = path_coeff[1];
@@ -828,14 +842,7 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   act_path_coeff.seven = path_coeff[4];
   act_path_coeff.lepage = path_coeff[5];
 
-  // temporary LatticeColorMatrix
-  void *tempmat[6];
-  for (int i = 0; i < 6; i++) { tempmat[i] = safe_malloc(len * 18 * precision); }
-
-  instantiate_host<HisqStaplesForce>(precision, X_, act_path_coeff, oprod.data_array().data, link.data_array().data,
-                                     tempmat, newOprod->data_array().data);
-
-  for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
+  instantiate_host<HisqStaplesForce>(precision, X_, act_path_coeff, oprod, link, newOprod);
 }
 
 template <class real_t> struct ComputeLongLinkField {
@@ -887,12 +894,15 @@ template <class real_t> struct ComputeLongLinkField {
     }
   }
 
-  void operator()(const int dim[4], const void *const *const oprod_, const void *const *const link_, int sig,
-                  real_t coeff, void *const *const output_)
+  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig, real_t coeff,
+                  quda::GaugeField *output_)
   {
-    auto oprod = reinterpret_cast<const matrix *const *>(oprod_);
-    auto link = reinterpret_cast<const matrix *const *>(link_);
-    auto output = reinterpret_cast<matrix *const *>(output_);
+    const auto oprodArray = oprod_.data_array<const matrix *>();
+    const auto oprod = oprodArray.data;
+    const auto linkArray = link_.data_array<const matrix *>();
+    const auto link = linkArray.data;
+    const auto outputArray = output_->data_array<matrix *>();
+    const auto output = outputArray.data;
 
     int volume = 1;
     for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
@@ -918,8 +928,7 @@ void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeFiel
   QudaPrecision precision = oprod.Precision();
 
   for (int sig = 0; sig < 4; ++sig) {
-    instantiate_host<ComputeLongLinkField>(precision, X_, oprod.data_array().data, link.data_array().data, sig, coeff,
-                                           newOprod->data_array().data);
+    instantiate_host<ComputeLongLinkField>(precision, X_, oprod, link, sig, coeff, newOprod);
   } // sig
 }
 
@@ -944,12 +953,13 @@ template <class real_t> struct CompleteForceField {
     ls.storeMatrixToMomentumField(colorMatY, oddBit, sig, half_lattice_index, coeff, mom);
   }
 
-  void operator()(const int dim[4], const void *const *const oprod_, const void *const *const link_, int sig,
-                  void *const mom_)
+  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig, quda::GaugeField *mom_)
   {
-    auto oprod = reinterpret_cast<const matrix *const *>(oprod_);
-    auto link = reinterpret_cast<const matrix *const *>(link_);
-    auto mom = reinterpret_cast<real_t *>(mom_);
+    const auto oprodArray = oprod_.data_array<const matrix *>();
+    const auto oprod = oprodArray.data;
+    const auto linkArray = link_.data_array<const matrix *>();
+    const auto link = linkArray.data;
+    const auto mom = mom_->data<real_t *>();
 
     int volume = dim[0] * dim[1] * dim[2] * dim[3];
     const int half_volume = volume / 2;
@@ -969,7 +979,6 @@ void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda:
   QudaPrecision precision = oprod.Precision();
 
   for (int sig = 0; sig < 4; ++sig) {
-    instantiate_host<CompleteForceField>(precision, X_, oprod.data_array().data, link.data_array().data, sig,
-                                         mom->data());
+    instantiate_host<CompleteForceField>(precision, X_, oprod, link, sig, mom);
   } // loop over sig
 }

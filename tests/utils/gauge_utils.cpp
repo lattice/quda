@@ -477,14 +477,15 @@ const char *getGaugeInputStr(GaugeInputMode mode)
   return "invalid";
 }
 
-HostGaugeInput::HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv, GaugeInputMode default_mode)
+HostGaugeInput::HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv, GaugeInputMode default_mode,
+                               QudaStaggeredPhase phase)
 {
   quda::GaugeFieldParam field_param(gauge_param);
   field_param.location = QUDA_CPU_FIELD_LOCATION;
   field_param.order = QUDA_QDP_GAUGE_ORDER;
   field_param.create = QUDA_NULL_FIELD_CREATE;
   input = quda::GaugeField(field_param);
-  constructHostGaugeInputField(input, gauge_param, argc, argv, default_mode);
+  constructHostGaugeInputField(input, gauge_param, argc, argv, default_mode, phase);
 }
 
 GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
@@ -523,40 +524,42 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
 }
 
 void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
-                                  GaugeInputMode default_mode)
+                                  GaugeInputMode default_mode, QudaStaggeredPhase phase)
 {
+  // applyGaugeStaggeredPhase only sets the spatial phases, which is the complete MILC convention
+  if (phase != QUDA_STAGGERED_PHASE_NO && phase != QUDA_STAGGERED_PHASE_MILC)
+    errorQuda("Unsupported staggered phase type %d for gauge input", phase);
+
   switch (resolveGaugeInputMode(default_mode)) {
-  case GaugeInputMode::HAAR:
-    constructRandomSU3GaugeField(gauge, gauge_param.cpu_prec);
-    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
-    break;
-  case GaugeInputMode::UNIT:
-    constructIdentityGaugeField(gauge, gauge_param.cpu_prec);
-    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
-    break;
+  case GaugeInputMode::HAAR: constructRandomSU3GaugeField(gauge, gauge_param.cpu_prec); break;
+  case GaugeInputMode::UNIT: constructIdentityGaugeField(gauge, gauge_param.cpu_prec); break;
   case GaugeInputMode::GAUSSIAN_SU3:
     constructGaussianSU3GaugeField(gauge, gauge_param.cpu_prec, gauge_input_width);
-    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
     break;
   case GaugeInputMode::LOAD:
     logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
     read_gauge_field(latfile.c_str(), (void **)gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
     break;
   }
+
+  applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
+  if (phase != QUDA_STAGGERED_PHASE_NO)
+    applyGaugeStaggeredPhase(gauge, Vh, gauge_param.X, gauge_param.cpu_prec, QUDA_PERIODIC_T, phase);
 }
 
 void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
-                                  GaugeInputMode default_mode)
+                                  GaugeInputMode default_mode, QudaStaggeredPhase phase)
 {
   if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
-    constructHostGaugeInputField(static_cast<void *const *>(gauge.raw_pointer()), gauge_param, argc, argv, default_mode);
+    constructHostGaugeInputField(static_cast<void *const *>(gauge.raw_pointer()), gauge_param, argc, argv, default_mode,
+                                 phase);
   } else {
     GaugeFieldParam param(gauge);
     param.order = QUDA_QDP_GAUGE_ORDER;
     param.create = QUDA_NULL_FIELD_CREATE;
     GaugeField u(param);
-    constructHostGaugeInputField(static_cast<void *const *>(u.raw_pointer()), gauge_param, argc, argv, default_mode);
+    constructHostGaugeInputField(static_cast<void *const *>(u.raw_pointer()), gauge_param, argc, argv, default_mode,
+                                 phase);
     gauge = u;
   }
 }

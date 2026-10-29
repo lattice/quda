@@ -245,6 +245,11 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(hisq_endtoend_test hisq_endtoend_test.cpp)
+  target_link_libraries(hisq_endtoend_test ${TEST_LIBS})
+  quda_checkbuildtest(hisq_endtoend_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_endtoend_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
   add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
   target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
@@ -1605,6 +1610,11 @@ if(QUDA_DIRAC_STAGGERED)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
                    --dim 8 8 8 8
                    --gtest_output=xml:hisq_stencil_test.xml)
+
+  add_test(NAME hisq_endtoend
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_endtoend_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_endtoend_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)

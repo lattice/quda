@@ -85,8 +85,9 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
                                             int argc, char **argv);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
-void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
+void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **vlink,
+                         void **wlink, void **sitelink, void *qudaGaugeParamPtr,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
 void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_param);
 void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
                                    quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param,
@@ -279,13 +280,11 @@ StrongCheckResult strong_check_scalar(const void *a, const std::string &label_a,
                                       const std::string &label_b, size_t length, QudaPrecision precision);
 
 /**
-   @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations
-   @param[out] stag_for_oprod Set of four contiguous host spinor fields
-   @param[in] precision Precision of field
-   @param[in] x Full lattice volume
+   @brief Fill a staggered spinor field, whose outer product is used for momentum calculations
+   @param[out] stag_for_oprod Full-parity host staggered spinor field
    @param[in] rng RNG
 */
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng);
+void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng);
 
 // additions for dw (quickly hacked on)
 int fullLatticeIndex_4d(int i, int oddBit);

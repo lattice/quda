@@ -247,6 +247,7 @@ namespace quda {
      @brief Transpose the B vectors into a composite V field:
        - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
        - V: spatial -> spin/color -> nVec
+     Columns of V beyond B.size() are zero padded.
      @param[out] The output V Matrix field
      @param[in] B input vectors
      @param[in] from_non_rel whether or not transform B from non-relativistic basis

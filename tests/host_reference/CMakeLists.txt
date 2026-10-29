@@ -12,6 +12,7 @@ target_sources(
   gauge_smear_reference.cpp
   clover_force_reference.cpp
   hisq_force_reference.cpp
+  momentum_force_reference.cpp
   staggered_dslash_reference.cpp
   wilson_dslash_reference.cpp)
 

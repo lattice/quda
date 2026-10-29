@@ -29,9 +29,10 @@ public:
    * @param[in] argc Command-line argument count used to resolve the input mode.
    * @param[in] argv Command-line arguments used to resolve or load the input field.
    * @param[in] default_mode Input mode used when no explicit mode is requested.
+   * @param[in] phase Staggered phase convention to apply (NO or MILC).
    */
   HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv,
-                 GaugeInputMode default_mode = GaugeInputMode::HAAR);
+                 GaugeInputMode default_mode = GaugeInputMode::HAAR, QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO);
 
   const quda::GaugeField &field() const { return input; }
 };
@@ -183,9 +184,12 @@ void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision,
  * @param[in] gauge_param Information about the desired gauge field.
  * @param[in] argc Input command-line argument count.
  * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] default_mode Input mode used when no explicit mode is requested.
+ * @param[in] phase Staggered phase convention to apply (NO or MILC).
  */
 void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
-                                  GaugeInputMode default_mode = GaugeInputMode::HAAR);
+                                  GaugeInputMode default_mode = GaugeInputMode::HAAR,
+                                  QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO);
 
 /**
  * @brief Construct a host gauge field from the resolved gauge-input mode.
@@ -194,6 +198,9 @@ void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gaug
  * @param[in] gauge_param Information about the desired gauge field.
  * @param[in] argc Input command-line argument count.
  * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] default_mode Input mode used when no explicit mode is requested.
+ * @param[in] phase Staggered phase convention to apply (NO or MILC).
  */
 void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
-                                  GaugeInputMode default_mode = GaugeInputMode::HAAR);
+                                  GaugeInputMode default_mode = GaugeInputMode::HAAR,
+                                  QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO);

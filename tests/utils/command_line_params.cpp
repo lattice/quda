@@ -49,7 +49,7 @@ int laplace3D = 4;
 std::string latfile;
 bool unit_gauge = false;
 std::string gauge_input;
-double gauge_input_width = 0.2;
+double gauge_input_width = 0.25;
 bool gauge_input_width_explicit = false;
 double gaussian_sigma = 0.2;
 std::string gauge_outfile;
@@ -362,6 +362,7 @@ bool   smear_delete_two_link  = true;
 bool enable_testing = false;
 
 bool detratio = false;
+int rhmc_flavors = 0;
 
 namespace
 {
@@ -587,7 +588,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
         gauge_input_width = width;
         return true;
       },
-      "Gaussian width sigma for --gauge-input gaussian-su3 (default 0.2)")
+      "Gaussian width sigma for --gauge-input gaussian-su3 (default 0.25)")
     ->type_name("FLOAT");
   quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
@@ -1371,6 +1372,8 @@ void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
   opgroup->add_option("--determinant-ratio", detratio, "Test a ratio of determinants. Default is false");
+  opgroup->add_option("--rhmc-flavors", rhmc_flavors,
+                      "Number of RHMC flavors (0: no RHMC, 1: single flavor, 2: non-degenerate doublet). Default is 0");
 }
 
 void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app)

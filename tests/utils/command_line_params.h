@@ -610,5 +610,6 @@ extern QudaPrecision prop_save_prec;
 extern bool enable_testing;
 
 extern bool detratio;
+extern int rhmc_flavors;
 
 extern int covdev_mu;
