@@ -112,6 +112,7 @@ namespace quda {
   void ReorderStaggeredKahlerDiracInverse(GaugeField &fineXinv, const GaugeField &coarseXinv,
                                           const bool dagger_approximation, const real_t mass)
   {
+    if (fineXinv.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU KD-inverse reordering is not supported");
     // Instantiate based on precision, number of colors
     instantiate<calculateStaggeredGeometryReorder>(fineXinv, coarseXinv, dagger_approximation, mass);
   }

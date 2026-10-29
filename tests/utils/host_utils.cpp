@@ -1100,13 +1100,20 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
 static int compare_link(const GaugeField &a, const GaugeField &b)
 {
   if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
+
+  // raw_pointer() uses a static buffer for pointer-array orders, so we must
+  // capture each field's per-direction pointers separately to avoid aliasing.
+  void *a_ptrs[4], *b_ptrs[4];
+  for (int d = 0; d < 4; d++) {
+    a_ptrs[d] = a.data<void *>(d);
+    b_ptrs[d] = b.data<void *>(d);
+  }
+
   int ret;
   if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink(reinterpret_cast<double **>(a.raw_pointer()), reinterpret_cast<double **>(b.raw_pointer()),
-                      a.Volume());
+    ret = compareLink(reinterpret_cast<double **>(a_ptrs), reinterpret_cast<double **>(b_ptrs), a.Volume());
   } else {
-    ret = compareLink(reinterpret_cast<float **>(a.raw_pointer()), reinterpret_cast<float **>(b.raw_pointer()),
-                      a.Volume());
+    ret = compareLink(reinterpret_cast<float **>(a_ptrs), reinterpret_cast<float **>(b_ptrs), a.Volume());
   }
 
   return ret;
@@ -1170,19 +1177,98 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   return compare_link(linkA, linkB);
 }
 
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng)
+template <typename Float>
+static StrongCheckResult strong_check_histogram(const std::vector<const Float *> &a, const std::string &label_a,
+                                                const std::vector<const Float *> &b, const std::string &label_b,
+                                                size_t length)
 {
-  unsigned long shift = x[0] * x[1] * x[2] * x[3] * stag_spinor_site_size;
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    double *dstag = (double *)stag_for_oprod;
-    // matpc: compute a full-volume spinor
-    for (int d = 0; d < 4; d++)
-      constructRandomSpinorSource(dstag + d * shift, 1, 3, QUDA_DOUBLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
-  } else {
-    float *fstag = (float *)stag_for_oprod;
-    for (int d = 0; d < 4; d++)
-      constructRandomSpinorSource(fstag + d * shift, 1, 3, QUDA_SINGLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
+  constexpr int levels = 16;
+  const int geometry = a.size();
+  std::vector<std::array<size_t, levels>> failures(geometry);
+  double max_deviation = 0.0;
+
+  for (int component = 0; component < geometry; component++) {
+    for (size_t i = 0; i < length; i++) {
+      const double deviation = std::abs(static_cast<double>(a[component][i]) - static_cast<double>(b[component][i]));
+      max_deviation
+        = std::isnan(deviation) ? std::numeric_limits<double>::infinity() : std::max(max_deviation, deviation);
+      for (int level = 0; level < levels; level++) {
+        if (deviation > std::pow(10.0, -(level + 1)) || std::isnan(deviation)) failures[component][level]++;
+      }
+    }
   }
+
+  printfQuda("Deviation histogram: %s vs %s (max %.6e)\n", label_a.c_str(), label_b.c_str(), max_deviation);
+  printfQuda(" threshold");
+  for (int component = 0; component < geometry; component++) printfQuda("     component %d", component);
+  printfQuda("          total/fraction\n");
+
+  int accuracy_level = 0;
+  const size_t total_values = geometry * length;
+  for (int level = 0; level < levels; level++) {
+    const double threshold = std::pow(10.0, -(level + 1));
+    size_t total_failures = 0;
+    printfQuda(" %9.1e", threshold);
+    for (int component = 0; component < geometry; component++) {
+      printfQuda(" %15zu", failures[component][level]);
+      total_failures += failures[component][level];
+    }
+    printfQuda(" %15zu/%zu %.6e\n", total_failures, total_values,
+               total_values ? static_cast<double>(total_failures) / total_values : 0.0);
+    if (total_failures == 0) accuracy_level = level + 1;
+  }
+
+  return {max_deviation, accuracy_level};
+}
+
+StrongCheckResult strong_check_field(const GaugeField &a, const std::string &label_a, const GaugeField &b,
+                                     const std::string &label_b)
+{
+  checkPrecision(a, b);
+  if (a.Location() != QUDA_CPU_FIELD_LOCATION || b.Location() != QUDA_CPU_FIELD_LOCATION)
+    errorQuda("strong_check_field requires CPU fields");
+  if (a.Order() != QUDA_QDP_GAUGE_ORDER || b.Order() != QUDA_QDP_GAUGE_ORDER)
+    errorQuda("strong_check_field requires QDP-ordered fields");
+  if (a.Geometry() != b.Geometry() || a.Volume() != b.Volume()) errorQuda("Field geometry or volume mismatch");
+
+  const int geometry = a.Geometry();
+  const size_t length = a.Volume() * gauge_site_size;
+  if (a.Precision() == QUDA_DOUBLE_PRECISION) {
+    std::vector<const double *> a_ptr(geometry);
+    std::vector<const double *> b_ptr(geometry);
+    for (int component = 0; component < geometry; component++) {
+      a_ptr[component] = static_cast<const double *>(a.data(component));
+      b_ptr[component] = static_cast<const double *>(b.data(component));
+    }
+    return strong_check_histogram(a_ptr, label_a, b_ptr, label_b, length);
+  } else {
+    std::vector<const float *> a_ptr(geometry);
+    std::vector<const float *> b_ptr(geometry);
+    for (int component = 0; component < geometry; component++) {
+      a_ptr[component] = static_cast<const float *>(a.data(component));
+      b_ptr[component] = static_cast<const float *>(b.data(component));
+    }
+    return strong_check_histogram(a_ptr, label_a, b_ptr, label_b, length);
+  }
+}
+
+StrongCheckResult strong_check_scalar(const void *a, const std::string &label_a, const void *b,
+                                      const std::string &label_b, size_t length, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    return strong_check_histogram(std::vector<const double *> {static_cast<const double *>(a)}, label_a,
+                                  std::vector<const double *> {static_cast<const double *>(b)}, label_b, length);
+  } else {
+    return strong_check_histogram(std::vector<const float *> {static_cast<const float *>(a)}, label_a,
+                                  std::vector<const float *> {static_cast<const float *>(b)}, label_b, length);
+  }
+}
+
+void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng)
+{
+  if (stag_for_oprod.Location() != QUDA_CPU_FIELD_LOCATION || stag_for_oprod.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+    errorQuda("Expected a full-parity host spinor field");
+  quda::spinorNoise(stag_for_oprod, rng, QUDA_NOISE_UNIFORM);
 }
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)

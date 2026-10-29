@@ -245,6 +245,11 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(hisq_endtoend_test hisq_endtoend_test.cpp)
+  target_link_libraries(hisq_endtoend_test ${TEST_LIBS})
+  quda_checkbuildtest(hisq_endtoend_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_endtoend_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
   add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
   target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
@@ -255,6 +260,11 @@ add_executable(gauge_path_test gauge_path_test.cpp)
 target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(gauge_smear_test gauge_smear_test.cpp)
+target_link_libraries(gauge_smear_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_smear_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_smear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_executable(clover_force_test clover_force_test.cpp)
@@ -1600,6 +1610,11 @@ if(QUDA_DIRAC_STAGGERED)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
                    --dim 8 8 8 8
                    --gtest_output=xml:hisq_stencil_test.xml)
+
+  add_test(NAME hisq_endtoend
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_endtoend_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_endtoend_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
@@ -1617,6 +1632,16 @@ add_test(NAME gauge_path
   COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
   --dim 2 4 6 8 --enable-testing true --niter 1
   --gtest_output=xml:gauge_path_test.xml)
+
+add_test(NAME gauge_smear
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_smear_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true
+  --gtest_output=xml:gauge_smear_test.xml)
+
+add_test(NAME su3
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:su3_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true --niter 1
+  --gtest_output=xml:su3_test.xml)
 
 foreach(prec IN LISTS TEST_PRECS)
 
