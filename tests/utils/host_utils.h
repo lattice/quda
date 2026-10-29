@@ -246,13 +246,11 @@ int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, co
                       const std::string &msgB);
 
 /**
-   @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations
-   @param[out] stag_for_oprod Set of four contiguous host spinor fields
-   @param[in] precision Precision of field
-   @param[in] x Full lattice volume
+   @brief Fill a staggered spinor field, whose outer product is used for momentum calculations
+   @param[out] stag_for_oprod Full-parity host staggered spinor field
    @param[in] rng RNG
 */
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng);
+void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng);
 
 // additions for dw (quickly hacked on)
 int fullLatticeIndex_4d(int i, int oddBit);

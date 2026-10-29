@@ -50,6 +50,10 @@ static std::array<std::array<double, 6>, 3> act_paths;
 // Input sitelinks (QDP order, host precision)
 static void *qdp_sitelink[4] = {};
 
+// Host spinors for outer products: the force chain checks and the computeHISQForceQuda check
+static ColorSpinorField cpuQuark;
+static ColorSpinorField interfaceQuark;
+
 // CPU reference links (QDP order, host precision)
 static void *v_reflink[4] = {};
 static void *w_reflink[4] = {};
@@ -84,6 +88,23 @@ static bool links_valid = false;
 static int cur_n_naiks = 1;
 static int cur_partition = -1;
 
+static ColorSpinorField createHostQuark()
+{
+  ColorSpinorParam qParam;
+  qParam.nColor = 3;
+  qParam.nSpin = 1;
+  qParam.setPrecision(gauge_param.cpu_prec);
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  qParam.nDim = 4;
+  qParam.pc_type = QUDA_4D_PC;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
+  for (int d = 0; d < 4; d++) qParam.x[d] = gauge_param.X[d];
+  return ColorSpinorField(qParam);
+}
+
 static void init_host()
 {
   if (host_initialized) return;
@@ -111,6 +132,14 @@ static void init_host()
 
   for (int i = 0; i < 4; i++) qdp_sitelink[i] = host_pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
   createTestLinks(qdp_sitelink, gauge_param.cpu_prec);
+
+  cpuQuark = createHostQuark();
+  interfaceQuark = createHostQuark();
+  {
+    RNG rng(cpuQuark, 1234);
+    createStagForOprodCPU(cpuQuark, rng);
+    createStagForOprodCPU(interfaceQuark, rng);
+  }
 
   for (int i = 0; i < 4; i++) {
     v_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -262,6 +291,9 @@ static void destroy_host()
     if (long_reflink_eps[i]) { host_free(long_reflink_eps[i]); long_reflink_eps[i] = nullptr; }
   }
 
+  cpuQuark = {};
+  interfaceQuark = {};
+
   host_initialized = false;
 }
 
@@ -299,10 +331,6 @@ static GaugeField *cudaLongLinkOprod_ex = nullptr;
 static GaugeField *cudaForce = nullptr;
 static GaugeField *cudaMom = nullptr;
 
-// Raw spinor for outer product and the host field that references it
-static void *stag_for_oprod = nullptr;
-static ColorSpinorField *cpuQuark = nullptr;
-
 static bool force_valid = false;
 static QudaPrecision force_cur_prec = QUDA_INVALID_PRECISION;
 static bool force_cur_has_naik = false;
@@ -329,10 +357,6 @@ static void teardown_force()
   delete cudaLongLinkOprod_ex; cudaLongLinkOprod_ex = nullptr;
   delete cudaForce; cudaForce = nullptr;
   delete cudaMom; cudaMom = nullptr;
-
-  delete cpuQuark;
-  cpuQuark = nullptr;
-  if (stag_for_oprod) { host_free(stag_for_oprod); stag_for_oprod = nullptr; }
 
   force_valid = false;
 }
@@ -402,34 +426,9 @@ static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool
   cpuOprod_ex = new GaugeField(gParam_ex);
   cpuLongLinkOprod_ex = new GaugeField(gParam_ex);
 
-  // RNG and random spinors
-  {
-    ColorSpinorParam qParam;
-    qParam.v = nullptr;
-    qParam.nColor = 3;
-    qParam.nSpin = 1;
-    qParam.setPrecision(forceGaugeParam.cpu_prec);
-    qParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    qParam.nDim = 4;
-    qParam.pc_type = QUDA_4D_PC;
-    qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    qParam.location = QUDA_CPU_FIELD_LOCATION;
-    for (int d = 0; d < 4; d++) qParam.x[d] = forceGaugeParam.X[d];
-    ColorSpinorField spinor_in(qParam);
-    RNG rng(spinor_in, 1234);
-
-    stag_for_oprod = safe_malloc(4 * V * stag_spinor_site_size * forceGaugeParam.cpu_prec);
-    createStagForOprodCPU(stag_for_oprod, forceGaugeParam.cpu_prec, forceGaugeParam.X, rng);
-
-    qParam.v = stag_for_oprod;
-    cpuQuark = new ColorSpinorField(qParam);
-  }
-
   // CPU outer products from spinors
-  computeLinkOrderedOuterProduct(*cpuQuark, *cpuOprod, 1);
-  computeLinkOrderedOuterProduct(*cpuQuark, *cpuLongLinkOprod, 3);
+  computeLinkOrderedOuterProduct(cpuQuark, *cpuOprod, 1);
+  computeLinkOrderedOuterProduct(cpuQuark, *cpuLongLinkOprod, 3);
 
   copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
@@ -666,11 +665,11 @@ void HisqEndToEndTest::verify_force_oprod()
   GaugeField gpuNaikOprod(oParam);
   GaugeField *oprod[2] = {&gpuStapleOprod, &gpuNaikOprod};
 
-  ColorSpinorParam qParam(*cpuQuark);
+  ColorSpinorParam qParam(cpuQuark);
   qParam.location = QUDA_CUDA_FIELD_LOCATION;
   qParam.setPrecision(host_prec, host_prec, true);
   ColorSpinorField cudaQuark(qParam);
-  cudaQuark = *cpuQuark;
+  cudaQuark = cpuQuark;
 
   double coeff[2] = {0.625, -0.058479};
   computeStaggeredOprod(oprod, cudaQuark, coeff, 3);
@@ -729,11 +728,11 @@ void HisqEndToEndTest::verify_force_naik_oprod()
   GaugeField oneLinkOprod(oParam);
   GaugeField naikOprod(oParam);
 
-  ColorSpinorParam qParam(*cpuQuark);
+  ColorSpinorParam qParam(cpuQuark);
   qParam.location = QUDA_CUDA_FIELD_LOCATION;
   qParam.setPrecision(host_prec, host_prec, true);
   ColorSpinorField cudaQuark(qParam);
-  cudaQuark = *cpuQuark;
+  cudaQuark = cpuQuark;
 
   double coeff_reg[2] = {0.625, -0.058479};
   double coeff_naik[2] = {0.3125, -0.029240};
@@ -841,27 +840,12 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   exchange_llfat_cleanup();
 #endif
 
-  // ---- 3. Fresh spinor and outer products ----
-  void *local_stag = nullptr;
-  {
-    ColorSpinorParam qParam;
-    qParam.v = nullptr;
-    qParam.nColor = 3;
-    qParam.nSpin = 1;
-    qParam.setPrecision(host_prec);
-    qParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    qParam.nDim = 4;
-    qParam.pc_type = QUDA_4D_PC;
-    qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    qParam.location = QUDA_CPU_FIELD_LOCATION;
-    for (int d = 0; d < 4; d++) qParam.x[d] = gauge_param.X[d];
-    ColorSpinorField spinor_in(qParam);
-    RNG rng(spinor_in, 5678);
-    local_stag = safe_malloc(4 * V * stag_spinor_site_size * host_prec);
-    createStagForOprodCPU(local_stag, host_prec, gauge_param.X, rng);
-  }
+  // ---- 3. Spinor and outer products ----
+  ColorSpinorParam qParam(interfaceQuark);
+  qParam.location = QUDA_CUDA_FIELD_LOCATION;
+  qParam.setPrecision(host_prec, host_prec, true);
+  ColorSpinorField cudaQuark(qParam);
+  cudaQuark = interfaceQuark;
 
   QudaGaugeParam fgp = newQudaGaugeParam();
   for (int d = 0; d < 4; d++) fgp.X[d] = gauge_param.X[d];
@@ -906,29 +890,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   GaugeField gpuStapleOprod(oParam);
   GaugeField gpuNaikOprod(oParam);
   GaugeField *oprod_arr[2] = {&gpuStapleOprod, &gpuNaikOprod};
-
-  {
-    ColorSpinorParam qcParam;
-    qcParam.nColor = 3;
-    qcParam.nSpin = 1;
-    qcParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    qcParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    qcParam.nDim = 4;
-    qcParam.pc_type = QUDA_4D_PC;
-    qcParam.setPrecision(host_prec, host_prec, true);
-    qcParam.pad = 0;
-    for (int d = 0; d < 4; d++) qcParam.x[d] = gauge_param.X[d];
-    qcParam.create = QUDA_NULL_FIELD_CREATE;
-    qcParam.location = QUDA_CUDA_FIELD_LOCATION;
-    ColorSpinorField cudaQuark(qcParam);
-    qcParam.location = QUDA_CPU_FIELD_LOCATION;
-    qcParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    qcParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
-    qcParam.v = local_stag;
-    ColorSpinorField cpuQuark(qcParam);
-    cudaQuark = cpuQuark;
-    computeStaggeredOprod(oprod_arr, cudaQuark, coeff_reg, 3);
-  }
+  computeStaggeredOprod(oprod_arr, cudaQuark, coeff_reg, 3);
 
   // Build oneLinkOprod on GPU matching computeHISQForceQuda: copy stapleOprod scaled by level2_coeff[0]
   GaugeField gpuOneLinkOprod(oParam);
@@ -936,26 +898,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
 
   if (has_naik) {
     GaugeField *oprod_naik[2] = {&gpuOneLinkOprod, &gpuNaikOprod};
-    ColorSpinorParam qcParam2;
-    qcParam2.nColor = 3;
-    qcParam2.nSpin = 1;
-    qcParam2.siteSubset = QUDA_FULL_SITE_SUBSET;
-    qcParam2.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    qcParam2.nDim = 4;
-    qcParam2.pc_type = QUDA_4D_PC;
-    qcParam2.setPrecision(host_prec, host_prec, true);
-    qcParam2.pad = 0;
-    for (int d = 0; d < 4; d++) qcParam2.x[d] = gauge_param.X[d];
-    qcParam2.create = QUDA_NULL_FIELD_CREATE;
-    qcParam2.location = QUDA_CUDA_FIELD_LOCATION;
-    ColorSpinorField cudaQuark2(qcParam2);
-    qcParam2.location = QUDA_CPU_FIELD_LOCATION;
-    qcParam2.create = QUDA_REFERENCE_FIELD_CREATE;
-    qcParam2.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
-    qcParam2.v = local_stag;
-    ColorSpinorField cpuQuark2(qcParam2);
-    cudaQuark2 = cpuQuark2;
-    computeStaggeredOprod(oprod_naik, cudaQuark2, coeff_naik_term, 3);
+    computeStaggeredOprod(oprod_naik, cudaQuark, coeff_naik_term, 3);
   }
 
   // Copy GPU outer products to CPU QDP-order fields (already scaled by coefficients)
@@ -978,7 +921,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   reorderQDPtoMILC(milc_w_hp, qdp_w, V, gauge_site_size, host_prec, host_prec);
 
   // ---- 5. Call computeHISQForceQuda ----
-  void *fermion_ptrs[1] = {local_stag};
+  void *fermion_ptrs[1] = {interfaceQuark.data()};
 
   size_t mom_bytes = 4 * V * mom_site_size * host_prec;
   void *milc_mom_out = safe_malloc(mom_bytes);
@@ -1105,7 +1048,6 @@ void HisqEndToEndTest::verify_hisq_force_interface()
     host_free(qdp_v[i]);
     host_free(qdp_w[i]);
   }
-  host_free(local_stag);
   host_free(milc_u_hp);
   host_free(milc_v_hp);
   host_free(milc_w_hp);
