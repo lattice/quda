@@ -1771,23 +1771,31 @@ namespace quda
 
       static constexpr int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
       Float *field;
-      size_t offset;
-      Float *ghost[8];
       index_t volumeCB;
       index_t faceVolumeCB[4];
       int nParity;
       const int dim[4]; // xyzt convention
       const int L[4];   // txyz convention
+      const int parityCB; // suggested parity of single parity field
 
       OpenQCDDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
         field(field_ ? field_ : a.data<Float *>()),
-        offset(a.Bytes() / (2 * sizeof(Float))), // TODO: What's this for??
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        dim {a.X(0), a.X(1), a.X(2), a.X(3)}, // *local* lattice dimensions, xyzt
-        L {a.X(3), a.X(0), a.X(1), a.X(2)}    // *local* lattice dimensions, txyz
+        /* getCoords and openqcd::ipt use the full local lattice, undo halving
+          of x[0] for a parity field (introduced in ColorSpinorParam) */
+        dim {a.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 2 * a.X(0) : a.X(0),
+             a.X(1), a.X(2), a.X(3)},         // *full local* lattice dimensions, xyzt
+        L {dim[3], dim[0], dim[1], dim[2]},   // *full local* lattice dimensions, txyz
+        parityCB(a.SuggestedParity())
       {
         if constexpr (length != 24) { errorQuda("Spinor field length %d not supported", length); }
+
+        /* check for valid suggested parity */
+        if (a.SiteSubset() == QUDA_PARITY_SITE_SUBSET && a.SuggestedParity() == QUDA_INVALID_PARITY) {
+          errorQuda("openQCD parity spinor field has no suggested parity; expected matpc_type"
+                    "QUDA_MATPC_EVEN_EVEN/ODD_ODD(_ASYMMETRIC)");
+        }
       }
 
       /**
@@ -1802,7 +1810,8 @@ namespace quda
       __device__ __host__ inline index_t getSpinorOffset(int x_cb, int parity) const
       {
         int x_quda[4], x[4];
-        getCoords(x_quda, x_cb, dim, parity); // x_quda contains xyzt local Carthesian corrdinates
+        /* Parity field uses only parity = 0, use cb_parity. */
+        getCoords(x_quda, x_cb, dim, nParity == QUDA_FULL_SITE_SUBSET ? parity : parityCB); // x_quda contains xyzt local Carthesian corrdinates
         openqcd::rotate_coords(x_quda, x);    // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
         return static_cast<index_t>(openqcd::ipt(x, L)) * length;
       }
