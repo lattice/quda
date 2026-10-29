@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "host_utils.h"
+#include "dslash_reference.h"
 #include "force_utils.hpp"
 #include "index_utils.hpp"
 #include "instantiate_host.hpp"
@@ -16,28 +17,38 @@ extern int V;
 extern int Vh;
 
 template <typename real_t> struct ComputeLinkOrderedOuterProduct {
-  void operator()(const void *const src_, quda::GaugeField &dest, size_t nhops)
+  void operator()(const quda::ColorSpinorField &src, quda::GaugeField &dest, int nhops)
   {
-    auto src = reinterpret_cast<const su3_vector<real_t> *>(src_);
+    for (int parity = 0; parity < 2; ++parity) {
+      // nhops is odd, so the forward neighbor of a site lives on the opposite parity
+      const int nbr_parity = 1 - parity;
+      const auto &site_field = parity == 0 ? src.Even() : src.Odd();
+      const auto &nbr_field = nbr_parity == 0 ? src.Even() : src.Odd();
+      nbr_field.exchangeGhost(static_cast<QudaParity>(nbr_parity), nhops, 0);
+
+      const auto site = site_field.data<const su3_vector<real_t> *>();
+      const auto nbr = nbr_field.data<const real_t *>();
+      const auto fwd_ghost = typed_ptr_array<const real_t *>(nbr_field.fwdGhostFaceBuffer);
+      const auto back_ghost = typed_ptr_array<const real_t *>(nbr_field.backGhostFaceBuffer);
 
 #pragma omp parallel for
-    for (int i = 0; i < V; ++i) {
-      int dx[4];
-      for (int dir = 0; dir < 4; ++dir) {
-        dx[3] = dx[2] = dx[1] = dx[0] = 0;
-        dx[dir] = nhops;
-        int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-        auto hw = src + nbr_idx;
-        auto p = get_su3_matrix<real_t>(dest, i, dir);
-        su3_projector(hw, &src[i], p);
-      } // dir
-    }   // i
+      for (int i = 0; i < Vh; ++i) {
+        for (int dir = 0; dir < 4; ++dir) {
+          auto hw = reinterpret_cast<const su3_vector<real_t> *>(spinorNeighbor(
+            i, 2 * dir, parity, nbr, fwd_ghost.data(), back_ghost.data(), nhops, nhops, stag_spinor_site_size));
+          auto p = get_su3_matrix<real_t>(dest, parity * Vh + i, dir);
+          su3_projector(hw, &site[i], p);
+        } // dir
+      } // i
+    } // parity
   }
 };
 
-void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
+void computeLinkOrderedOuterProduct(const quda::ColorSpinorField &src, quda::GaugeField &dst, int nhops)
 {
-  instantiate_host<ComputeLinkOrderedOuterProduct>(precision, src, dst, nhops);
+  if (src.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Expected a full-parity spinor field");
+  if (nhops % 2 == 0) errorQuda("Outer product separation %d must be odd", nhops);
+  instantiate_host<ComputeLinkOrderedOuterProduct>(src.Precision(), src, dst, nhops);
 }
 
 #define RETURN_IF_ERR                                                                                                  \

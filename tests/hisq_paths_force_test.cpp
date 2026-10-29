@@ -327,8 +327,24 @@ static void hisq_force_startup()
 
   // initialize the CPU outer product fields and exchange once
   createStagForOprodCPU(stag_for_oprod, force_prec, qudaGaugeParam.X, *rng);
-  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuOprod, force_prec, 1);
-  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuLongLinkOprod, force_prec, 3);
+  {
+    quda::ColorSpinorParam param;
+    param.v = stag_for_oprod;
+    param.nColor = 3;
+    param.nSpin = 1;
+    param.setPrecision(force_prec);
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.nDim = 4;
+    param.pc_type = QUDA_4D_PC;
+    param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    param.location = QUDA_CPU_FIELD_LOCATION;
+    for (int d = 0; d < 4; d++) param.x[d] = qudaGaugeParam.X[d];
+    quda::ColorSpinorField stag_oprod_field(param);
+    computeLinkOrderedOuterProduct(stag_oprod_field, *cpuOprod, 1);
+    computeLinkOrderedOuterProduct(stag_oprod_field, *cpuLongLinkOprod, 3);
+  }
 
   copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
