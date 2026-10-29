@@ -24,26 +24,10 @@
 
 using namespace quda;
 
+// With Haar-random links the per-stage full_chain checks pass, but hisq_force_interface does not: such rough links
+// occasionally make the fattened V nearly singular, and the force reunitarization then amplifies GPU/CPU rounding
+// differences beyond the check's tolerance. A moderately rough Gaussian field avoids this.
 static constexpr GaugeInputMode default_gauge_input = GaugeInputMode::GAUSSIAN_SU3;
-
-// Links carry no staggered phases or boundary signs, matching createSiteLinkCPU(SITELINK_PHASE_NO)
-static void createTestLinks(void *const *links, QudaPrecision precision)
-{
-  switch (resolveGaugeInputMode(default_gauge_input)) {
-  case GaugeInputMode::HAAR: createSiteLinkCPU(links, precision, SiteLinkType::SITELINK_PHASE_NO); break;
-  case GaugeInputMode::UNIT: constructIdentityGaugeField(links, precision); break;
-  case GaugeInputMode::GAUSSIAN_SU3: constructGaussianSU3GaugeField(links, precision, gauge_input_width); break;
-  case GaugeInputMode::LOAD: errorQuda("--gauge-input load is not supported by this test"); break;
-  }
-}
-
-static void createTestLinks(GaugeField &links, QudaPrecision precision)
-{
-  if (links.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", links.Order());
-  void *ptrs[4];
-  for (int d = 0; d < 4; d++) ptrs[d] = links.data<void *>(d);
-  createTestLinks(ptrs, precision);
-}
 
 static std::array<std::array<double, 6>, 3> act_paths;
 
@@ -88,6 +72,21 @@ static bool links_valid = false;
 static int cur_n_naiks = 1;
 static int cur_partition = -1;
 
+// Command line, needed to load a gauge field
+static int test_argc = 0;
+static char **test_argv = nullptr;
+
+// Links carry MILC staggered phases and the temporal boundary sign, as HISQ inputs from MILC do
+static void createTestLinks(void *const *links)
+{
+  constructHostGaugeInputField(links, gauge_param, test_argc, test_argv, default_gauge_input, QUDA_STAGGERED_PHASE_MILC);
+}
+
+static void createTestLinks(GaugeField &links)
+{
+  constructHostGaugeInputField(links, gauge_param, test_argc, test_argv, default_gauge_input, QUDA_STAGGERED_PHASE_MILC);
+}
+
 static ColorSpinorField createHostQuark()
 {
   ColorSpinorParam qParam;
@@ -131,7 +130,7 @@ static void init_host()
   act_paths[2] = {(1.0 / 8.0), (-1.0 / 24.0), 0.0, 0.0, 0.0, 0.0};
 
   for (int i = 0; i < 4; i++) qdp_sitelink[i] = host_pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  createTestLinks(qdp_sitelink, gauge_param.cpu_prec);
+  createTestLinks(qdp_sitelink);
 
   cpuQuark = createHostQuark();
   interfaceQuark = createHostQuark();
@@ -414,7 +413,7 @@ static void setup_force(QudaPrecision test_prec, QudaReconstructType recon, bool
   GaugeFieldParam cpuGaugeParam(gParam);
   cpuGaugeParam.create = QUDA_NULL_FIELD_CREATE;
   cpuGauge = new GaugeField(cpuGaugeParam);
-  createTestLinks(*cpuGauge, forceGaugeParam.cpu_prec);
+  createTestLinks(*cpuGauge);
 
   cpuGauge_ex = new GaugeField(gParam_ex);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
@@ -804,7 +803,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   // ---- 1. Fresh U links (QDP order, host precision) ----
   void *qdp_u[4];
   for (int i = 0; i < 4; i++) qdp_u[i] = safe_malloc(gsize);
-  createTestLinks(qdp_u, host_prec);
+  createTestLinks(qdp_u);
 
   // ---- 2. Build V, W on GPU via computeKSLinkQuda ----
   QudaGaugeParam linkParam = newQudaGaugeParam();
@@ -1251,6 +1250,8 @@ int main(int argc, char **argv)
   setVerbosity(verbosity);
   initComms(argc, argv, gridsize_from_cmdline);
   initQuda(device_ordinal);
+  test_argc = argc;
+  test_argv = argv;
 
   const auto input_mode = resolveGaugeInputMode(default_gauge_input);
   if (input_mode == GaugeInputMode::GAUSSIAN_SU3)
