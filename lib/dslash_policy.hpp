@@ -306,6 +306,9 @@ namespace quda
   */
   template <typename T> inline void completeDslash(const ColorSpinorField &halo, const T &dslashParam)
   {
+#ifdef MNNVL_COMMS
+    (void)halo;
+#endif
     // this ensures that the p2p sending is completed before any
     // subsequent work is done on the compute stream
     for (int dim=3; dim>=0; dim--) {
