@@ -7,6 +7,19 @@
 
 namespace quda {
 
+  static bool use_mnnvl_vmm_comms()
+  {
+#ifdef MNNVL_COMMS
+#ifdef NVSHMEM_COMMS
+    return !comm_nvshmem_enabled();
+#else
+    return true;
+#endif
+#else
+    return false;
+#endif
+  }
+
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field) :
     location(field.Location()),
     precision(field.Precision()),
@@ -269,7 +282,7 @@ namespace quda {
           // hipErrorInvalidValue.
           destroyIPCComms();
           for (int b=0; b<2; b++) {
-            device_comms_pinned_free(ghost_recv_buffer_d[b]);
+            if (!use_mnnvl_vmm_comms()) device_comms_pinned_free(ghost_recv_buffer_d[b]);
             device_comms_pinned_free(ghost_send_buffer_d[b]);
             host_free(ghost_pinned_send_buffer_h[b]);
             host_free(ghost_pinned_recv_buffer_h[b]);
@@ -279,10 +292,12 @@ namespace quda {
 
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
-          // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
-          // silence any false cuda-memcheck initcheck errors
-          qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
+          if (!use_mnnvl_vmm_comms()) {
+            // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+            ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+            // silence any false cuda-memcheck initcheck errors
+            qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
+          }
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
           ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
@@ -303,7 +318,7 @@ namespace quda {
         }
 
         initGhostFaceBuffer = true;
-	ghostFaceBytes = ghost_bytes;
+        ghostFaceBytes = ghost_bytes;
       }
 
       LatticeField::ghost_field_reset = true; // this signals that we must reset the IPC comms
@@ -318,9 +333,11 @@ namespace quda {
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
-      // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
-      ghost_recv_buffer_d[b] = nullptr;
+      if (!use_mnnvl_vmm_comms()) {
+        // free receive buffer
+        if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
+        ghost_recv_buffer_d[b] = nullptr;
+      }
 
       // free send buffer
       if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
@@ -374,7 +391,8 @@ namespace quda {
           from_face_dim_dir_hd[b][i][dir] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][dir];
 
           my_face_dim_dir_d[b][i][dir] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][dir];
-          from_face_dim_dir_d[b][i][dir] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir];
+          from_face_dim_dir_d[b][i][dir]
+            = from_face_d[b] ? static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir] : nullptr;
         } // loop over b
       }   // loop over direction
     } // loop over dimension
@@ -392,8 +410,9 @@ namespace quda {
           mh_recv[b][i][dir] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][dir], i, hop, ghost_face_bytes[i]);
           mh_send_rdma[b][i][dir]
             = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
-          mh_recv_rdma[b][i][dir]
-            = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) : nullptr;
+          mh_recv_rdma[b][i][dir] = gdr && from_face_dim_dir_d[b][i][dir] ?
+            comm_declare_receive_relative(from_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]) :
+            nullptr;
         }
       } // loop over b
 
@@ -454,7 +473,7 @@ namespace quda {
 
   void LatticeField::createIPCComms() const
   {
-    if ( initIPCComms && !ghost_field_reset ) return;
+    if (initIPCComms && !ghost_field_reset) return;
 
     // If we already have IPC state and the ghost field has been reset,
     // tear it down before recreating; otherwise the IPC mem/event handle
@@ -464,15 +483,66 @@ namespace quda {
     if (initIPCComms && ghost_field_reset) destroyIPCComms();
 
     if (!initComms) errorQuda("Can only be called after create comms");
+#ifndef MNNVL_COMMS
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
       errorQuda("ghost_field appears not to be allocated");
 
     for (int b=0; b<2; b++) {
       // set remote send buffer to ghost receive buffers on neighboring processes
       comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
+    }
+    if (comm_nvshmem_enabled()) {
+      comm_peer2peer_finalize_validation();
+      comm_peer2peer_report_validated();
+    }
+    for (int b = 0; b < 2; b++) {
       // get remote events
       comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
     }
+#else
+    if (comm_nvshmem_enabled()) {
+      for (int b = 0; b < 2; b++) {
+        comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
+      }
+      comm_peer2peer_finalize_validation();
+      comm_peer2peer_report_validated();
+      for (int b = 0; b < 2; b++) { comm_create_local_event(ipcCopyEvent[b]); }
+    } else {
+      for (int b = 0; b < 2; b++) {
+        // set remote send buffer to ghost receive buffers on neighboring processes
+        ghost_recv_buffer_d[b] = comm_create_local_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_bytes);
+        from_face_d[b] = ghost_recv_buffer_d[b];
+      }
+      comm_peer2peer_finalize_validation();
+      comm_peer2peer_report_validated();
+      for (int b = 0; b < 2; b++) { comm_create_local_event(ipcCopyEvent[b]); }
+    }
+
+    // Update the receive buffers
+    for (int i = 0; i < nDimComms; i++) {
+      if (!commDimPartitioned(i)) continue;
+
+      for (int dir = 0; dir < 2; dir++) {
+        for (int b = 0; b < 2; ++b) {
+          from_face_dim_dir_d[b][i][dir] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir];
+        } // loop over b
+      }   // loop over direction
+    }     // loop over dimension
+
+    if (!comm_nvshmem_enabled() && comm_gdr_enabled()) {
+      for (int i = 0; i < nDimComms; i++) {
+        if (!commDimPartitioned(i)) continue;
+        for (int dir = 0; dir < 2; dir++) {
+          int hop = dir == 0 ? -1 : +1;
+          for (int b = 0; b < 2; ++b) {
+            if (mh_recv_rdma[b][i][dir]) comm_free(mh_recv_rdma[b][i][dir]);
+            mh_recv_rdma[b][i][dir]
+              = comm_declare_receive_relative(from_face_dim_dir_d[b][i][dir], i, hop, ghost_face_bytes[i]);
+          }
+        }
+      }
+    }
+#endif
 
     // zero the host-side signaling buffers
     buffer_send_p2p = {};
@@ -510,8 +580,18 @@ namespace quda {
     comm_barrier();
 
     for (int b = 0; b < 2; b++) {
+#ifndef MNNVL_COMMS
       comm_destroy_neighbor_memory(ghost_remote_send_buffer_d[b]);
       comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
+#else
+      if (comm_nvshmem_enabled()) {
+        comm_destroy_neighbor_memory(ghost_remote_send_buffer_d[b]);
+        comm_destroy_local_event(ipcCopyEvent[b]);
+      } else {
+        comm_destroy_local_neighbor_memory(ghost_recv_buffer_d[b], ghost_remote_send_buffer_d[b]);
+        comm_destroy_local_event(ipcCopyEvent[b]);
+      }
+#endif
     }
 
     for (int dim=0; dim<4; ++dim) {
