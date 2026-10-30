@@ -36,7 +36,7 @@ namespace quda
                name ? name : "unknown", str ? str : "unknown");
   }
 
-  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, VMM, N_ALLOC_TYPE };
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, HOST_PINNED, MANAGED, SHMEM, VMM_DEVICE_PINNED, N_ALLOC_TYPE };
 
   class MemAlloc
   {
@@ -113,7 +113,8 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host", "Host Pinned", "Managed", "Shmem", "VMM"};
+    const char *type_str[]
+      = {"Device", "Device Pinned", "Host", "Host Pinned", "Managed", "Shmem", "VMM Device Pinned"};
 
     for (auto entry : alloc[type]) {
       void *ptr = entry.first;
@@ -133,7 +134,7 @@ namespace quda
   {
     total_bytes[type] += a.base_size;
     if (total_bytes[type] > max_total_bytes[type]) { max_total_bytes[type] = total_bytes[type]; }
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != VMM) {
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != VMM_DEVICE_PINNED) {
       total_host_bytes += a.base_size;
       if (total_host_bytes > max_total_host_bytes) { max_total_host_bytes = total_host_bytes; }
     }
@@ -148,7 +149,9 @@ namespace quda
   {
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
-    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != VMM) { total_host_bytes -= size; }
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM && type != VMM_DEVICE_PINNED) {
+      total_host_bytes -= size;
+    }
     if (type == HOST_PINNED) { total_pinned_bytes -= size; }
     alloc[type].erase(ptr);
   }
@@ -359,7 +362,7 @@ namespace quda
       errorQuda("Failed to release VMM allocation handle (%s:%d in %s())", file, line, func);
     }
     void *mapped_ptr = reinterpret_cast<void *>(ptr);
-    track_malloc(VMM, a, mapped_ptr);
+    track_malloc(VMM_DEVICE_PINNED, a, mapped_ptr);
     return mapped_ptr;
   }
 #endif
@@ -537,7 +540,9 @@ namespace quda
   void device_vmm_free_(const char *func, const char *file, int line, void *ptr)
   {
     if (!ptr) { errorQuda("Attempt to free NULL VMM pointer (%s:%d in %s())", file, line, func); }
-    if (!alloc[VMM].count(ptr)) { errorQuda("Attempt to free invalid VMM pointer (%s:%d in %s())", file, line, func); }
+    if (!alloc[VMM_DEVICE_PINNED].count(ptr)) {
+      errorQuda("Attempt to free invalid VMM pointer (%s:%d in %s())", file, line, func);
+    }
     CUdeviceptr base = 0;
     size_t size = 0;
     CUresult err = cuMemGetAddressRange(&base, &size, reinterpret_cast<CUdeviceptr>(ptr));
@@ -547,7 +552,7 @@ namespace quda
       report_cu_error("CUDA VMM free", err);
       errorQuda("Failed to free VMM device memory (%s:%d in %s())", file, line, func);
     }
-    track_free(VMM, ptr);
+    track_free(VMM_DEVICE_PINNED, ptr);
   }
 #endif
 
@@ -627,7 +632,7 @@ namespace quda
     }
 #endif
 #ifdef MNNVL_COMMS
-    if (alloc[VMM].count(ptr)) return device_vmm_free_(func, file, line, ptr);
+    if (alloc[VMM_DEVICE_PINNED].count(ptr)) return device_vmm_free_(func, file, line, ptr);
 #endif
     device_pinned_free_(func, file, line, ptr);
   }
@@ -636,6 +641,7 @@ namespace quda
   {
     printfQuda("Device memory used = %.1f MiB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
     printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
+    printfQuda("VMM pinned device memory used = %.1f MiB\n", max_total_bytes[VMM_DEVICE_PINNED] / (double)(1 << 20));
     printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
     printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
@@ -644,13 +650,14 @@ namespace quda
 
   void assertAllMemFree()
   {
-    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty()
-        || !alloc[HOST_PINNED].empty()) {
+    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty() || !alloc[HOST_PINNED].empty()
+        || !alloc[VMM_DEVICE_PINNED].empty()) {
       warningQuda("The following internal memory allocations were not freed.");
       printfQuda("\n");
       print_alloc_header();
       print_alloc(DEVICE);
       print_alloc(DEVICE_PINNED);
+      print_alloc(VMM_DEVICE_PINNED);
       print_alloc(SHMEM);
       print_alloc(HOST);
       print_alloc(HOST_PINNED);
