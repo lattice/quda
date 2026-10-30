@@ -192,6 +192,9 @@ namespace quda
 
     void comm_peer2peer_init(const char *hostname_recv_buf)
     {
+#ifdef MNNVL_COMMS
+      (void)hostname_recv_buf;
+#endif
       if (peer2peer_init) return;
 
       // set gdr enablement
@@ -208,9 +211,11 @@ namespace quda
 
       char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
 
+#ifndef MNNVL_COMMS
       // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
       // and comm_dim(dim) == 2 (used for perf benchmarking)
       bool disable_peer_to_peer_bidir = false;
+#endif
 
       if (enable_peer_to_peer_env) {
         enable_peer_to_peer = atoi(enable_peer_to_peer_env);
@@ -248,7 +253,9 @@ namespace quda
 
         if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
           if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
+#ifndef MNNVL_COMMS
           disable_peer_to_peer_bidir = true;
+#endif
         }
 
         enable_peer_to_peer = std::abs(enable_peer_to_peer);
@@ -272,11 +279,12 @@ namespace quda
                        enable_p2p_max_access_rank);
         }
 
-        const int gpuid = comm_gpuid();
-
         comm_set_neighbor_ranks();
 
+#ifndef MNNVL_COMMS
+        const int gpuid = comm_gpuid();
         char *hostname = comm_hostname();
+#endif
         int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
 
         comm_gather_gpuid(gpuid_recv_buf);
