@@ -83,7 +83,7 @@ void destroy()
   mom_ref = {};
 }
 
-using test_t = ::testing::tuple<QudaPrecision, QudaDslashType, bool, int, QudaTwistFlavorType>;
+using test_t = ::testing::tuple<QudaPrecision, QudaDslashType, bool, int, QudaTwistFlavorType, int>;
 
 std::tuple<int, double> clover_force_test(test_t param)
 {
@@ -98,6 +98,7 @@ std::tuple<int, double> clover_force_test(test_t param)
   }
   for (int i = 0; i < nvector; i++) inv_param.offset[i] = 0.06 + i * i * 0.1;
   bool detratio = ::testing::get<2>(param);
+  int n_rhmc = ::testing::get<5>(param);
 
   std::vector<quda::ColorSpinorField> out_nvector(nvector);
   std::vector<void *> in(nvector);
@@ -130,16 +131,20 @@ std::tuple<int, double> clover_force_test(test_t param)
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gauge_param.overwrite_mom = 1;
 
+  // there is no determinant ratio with RHMC, where the detratio test parameter only removes the trlog term
+  bool trlog = !detratio;
+  int quda_detratio = detratio && n_rhmc == 0;
+
   if (getTuning())
     computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
-                             detratio);
+                             quda_detratio, trlog, n_rhmc);
 
   // Multiple execution to exclude warmup time in the first run
   double time_sec = 0.0;
   double gflops = 0.0;
   for (int i = 0; i < niter; i++) {
     computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
-                             detratio);
+                             quda_detratio, trlog, n_rhmc);
     time_sec += inv_param.secs;
     gflops += inv_param.gflops;
   }
@@ -150,7 +155,7 @@ std::tuple<int, double> clover_force_test(test_t param)
     gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
     mom_ref.zero();
     TMCloverForce_reference(mom_ref.data(), in.data(), in0.data(), coeff.data(), nvector, u, clover, clover_inv,
-                            &gauge_param, &inv_param, detratio);
+                            &gauge_param, &inv_param, quda_detratio, trlog, n_rhmc);
     *check_out = compare_floats(mom.data(), mom_ref.data(), 4 * V * mom_site_size, getTolerance(gauge_param.cuda_prec),
                                 gauge_param.cpu_prec);
     strong_check_mom(mom.data(), mom_ref.data(), 4 * V, gauge_param.cpu_prec);
@@ -251,7 +256,9 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
   name += std::string(get_prec_str(::testing::get<0>(param.param))) + "_";
   name += std::string(get_dslash_str(::testing::get<1>(param.param))) + "_";
   name += std::string(get_TwistFlavor_str(::testing::get<4>(param.param)));
-  if (::testing::get<2>(param.param)) name += std::string("ratio_");
+  int n_rhmc = ::testing::get<5>(param.param);
+  if (n_rhmc > 0) name += std::string("rhmc") + std::to_string(n_rhmc) + "_";
+  if (::testing::get<2>(param.param)) name += std::string(n_rhmc > 0 ? "notrlog_" : "ratio_");
   name += std::string("nvector_") + std::to_string(::testing::get<3>(param.param));
   return name;
 }
@@ -289,7 +296,7 @@ int main(int argc, char **argv)
 
     test_rc = RUN_ALL_TESTS();
   } else {
-    clover_force_test({prec, dslash_type, detratio, Nsrc, twist_flavor});
+    clover_force_test({prec, dslash_type, detratio, Nsrc, twist_flavor, rhmc_flavors});
   }
 
   destroy();
@@ -304,7 +311,13 @@ using ::testing::Values;
 #ifdef GPU_CLOVER_DIRAC
 INSTANTIATE_TEST_SUITE_P(CloverForceTest, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_CLOVER_WILSON_DSLASH),
-                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_NO)),
+                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_NO), Values(0)),
+                         gettestname);
+
+// clover single flavor RHMC
+INSTANTIATE_TEST_SUITE_P(CloverForceTest_RHMC, CloverForceTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_CLOVER_WILSON_DSLASH),
+                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_NO), Values(1)),
                          gettestname);
 #endif
 
@@ -312,12 +325,12 @@ INSTANTIATE_TEST_SUITE_P(CloverForceTest, CloverForceTest,
 // twisted clover singlet
 INSTANTIATE_TEST_SUITE_P(CloverForceTest_TwistedClover, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_TWISTED_CLOVER_DSLASH),
-                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_SINGLET)),
+                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_SINGLET), Values(0)),
                          gettestname);
 
 // twisted clover non degenerate doublet
 INSTANTIATE_TEST_SUITE_P(CloverForceTest_ndeg_TwistedClover, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_TWISTED_CLOVER_DSLASH),
-                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_NONDEG_DOUBLET)),
+                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_NONDEG_DOUBLET), Values(2)),
                          gettestname);
 #endif
