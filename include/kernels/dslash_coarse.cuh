@@ -30,6 +30,7 @@ namespace quda {
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, bool native>
   struct DslashCoarseArg : kernel_param<> {
+
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
     static constexpr bool dagger = dagger_;
@@ -379,11 +380,13 @@ namespace quda {
           applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
       }
 
+      // Full-team collectives must precede the direction-dependent branch.
+      if constexpr (allthreads) out = warp_combine<Arg::color_stride>(out);
+
       if (dir==0 && dim==0) {
         const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 
-        // reduce down to the first group of column-split threads
-        out = warp_combine<Arg::color_stride>(out);
+        if constexpr (!allthreads) out = warp_combine<Arg::color_stride>(out);
 
         if (!allthreads || alive) {
 #pragma unroll

@@ -160,6 +160,7 @@ namespace quda
         }
       }
 
+      if constexpr (allthreads) cache.sync(); // finish reading before reuse
       swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
 
       if (!allthreads || alive) {
