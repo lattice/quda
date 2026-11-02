@@ -1537,6 +1537,11 @@ static void *openQCD_qudaSolverReadIn(int id)
       invert_param_mg->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
       invert_param_mg->dirac_order = QUDA_DIRAC_ORDER;
 
+      /* Set up of QUDA's MG on the full solve and solution (newMultigridQuda
+       * rejects anything but QUDA_DIRECT_SOLVE).*/
+      invert_param_mg->solve_type = QUDA_DIRECT_SOLVE;
+      invert_param_mg->solution_type = QUDA_MAT_SOLUTION;
+
       multigrid_param->n_level = kv.get<int>(mg_section, "n_level", multigrid_param->n_level, true);
       multigrid_param->setup_type = kv.get<QudaSetupType>(mg_section, "setup_type", multigrid_param->setup_type);
       multigrid_param->pre_orthonormalize
