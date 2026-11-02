@@ -550,7 +550,7 @@ void openQCD_qudaGaugeFree(void);
  * 
  * @param[in]  mu      The twisted-mass parameter
  */
-void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu);
+void openQCD_qudaCloverLoad(void *clover, QudaInvertParam *inv_param);
 
 /**
  * @brief      Free the clover field allocated in quda.

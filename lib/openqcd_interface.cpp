@@ -600,6 +600,59 @@ static int in_comm(void)
    return qudaState.layout.quda_comm != MPI_COMM_NULL;
 }
 
+/**
+ * @brief      Whether the solve acts on the even-odd preconditioned operator.
+ *
+ * @param[in]  param  The parameter struct
+ *
+ * @return     true for DIRECT_PC, NORMOP_PC and NORMERR_PC solve types
+ */
+static bool is_pc_solve(const QudaInvertParam *param)
+{
+  return param->solve_type == QUDA_DIRECT_PC_SOLVE || param->solve_type == QUDA_NORMOP_PC_SOLVE
+    || param->solve_type == QUDA_NORMERR_PC_SOLVE;
+}
+
+
+/**
+ * @brief      Set mass to replicate openQxD's twisted-mass functionality.
+ *  Take parameters directly from qudaState layout dirac params.
+ *
+ * Decide how to set the twisted mass depending on param's solve_type and eoflg
+ * to replicate openQxD's logic. On openQxd, when eoflg=1, only the Dirac
+ * operator is:
+ *      Dhat = (A_ee + i*mu*g5) - D_eo * A_oo^-1 * D_oe
+ *
+ * To replicate this, when requesting and EO + PC solve, the twisted
+ * mass is set on the tm_rho variable ("applied like twisted mass to diagonal
+ * (but not inverse)") and mu=0.0  Override matpc_type to use the asymmetric
+ * preconditioned operator, to enable tm_rho in the diagonal
+ * (DiracTwistedCloverPC::M). 
+ *
+ * @param      param  The parameter struct
+ */
+static void set_openqcd_twist(QudaInvertParam *param)
+{
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
+  bool eo_pc = is_pc_solve(param) && dp.eoflg;
+  param->mu = eo_pc ? 0.0 : dp.mu;
+  param->tm_rho = eo_pc ? dp.mu : 0.0;
+
+  if (std::fabs(dp.mu) > 0.0) {
+    param->twist_flavor = QUDA_TWIST_SINGLET;
+    param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+    if (eo_pc) { /* Ensure assymetric types */
+      if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
+        param->matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+      } else if (param->matpc_type == QUDA_MATPC_ODD_ODD) {
+        param->matpc_type = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
+      }
+    }
+  }
+  WITH_COMM(logQuda(QUDA_SUMMARIZE, "Properites openqxd: mu=%.6e, eoflg=%d, QUDA: mu=%.6e tm_rho=%.6e solve_type=%d)\n",
+      dp.mu, dp.eoflg, param->mu, param->tm_rho, param->solve_type));
+}
+
 void openQCD_qudaFinalize(void)
 {
   if (!in_comm()) return;
@@ -672,12 +725,7 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu)
 
   void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, clover);
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_CLOVER, clover, buf)) {
-    param.mu = mu;
-    
-    if (std::fabs(mu) > 0.0) {
-          param.twist_flavor = QUDA_TWIST_SINGLET;
-          param.dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
-    }
+    set_openqcd_twist(&param);
 
     loadCloverQuda(buf, NULL, &param);
   }
@@ -723,37 +771,6 @@ inline void set_su3csw(QudaInvertParam *param, double su3csw)
   }
 }
 
-/**
- * @brief      Apply openQxD's twisted-mass convention to a parameter struct.
- *
- * openQxD runs the force/action routines with eoflg=1, which twists the even
- * diagonal only and leaves the odd block untwisted inside the Schur
- * complement:
- *
- *   Dhat = (A_ee + i*mu*g5) - D_eo * A_oo^-1 * D_oe
- *
- * QUDA's twisted-clover operator uses a single twist factor for both, so the
- * twist travels in tm_rho ("applied like twisted mass to diagonal (but not
- * inverse)") with mu left at zero. Only the asymmetric preconditioned operator
- * honours tm_rho, hence the matpc_type override.
- *
- * With eoflg != 1 openQxD twists every site, which is QUDA's own convention,
- * so mu is passed through unchanged and tm_rho stays zero.
- *
- * @param      param  The parameter struct
- * @param[in]  dp     The openQxD Dirac parameters
- */
-static void set_openqxd_twist(QudaInvertParam *param, openQCD_dirac_parms_t dp)
-{
-  param->mu = (dp.eoflg == 1) ? 0.0 : dp.mu;
-  param->tm_rho = (dp.eoflg == 1) ? dp.mu : 0.0;
-
-  if (std::fabs(dp.mu) > 0.0) {
-    param->twist_flavor = QUDA_TWIST_SINGLET;
-    param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
-    if (dp.eoflg == 1) { param->matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC; }
-  }
-}
 
 /**
  * @brief      Creates a new quda Dirac parameter struct
@@ -1078,12 +1095,10 @@ static int openQCD_qudaInvertParamCheck(void *param_)
     ret = false;
   }
 
-  /* the twist lives in tm_rho when openQxD twists the even sites only */
-  if (param->mu != ((dp.eoflg == 1) ? 0.0 : dp.mu)
-      || param->tm_rho != ((dp.eoflg == 1) ? dp.mu : 0.0)) {
+  if ((param->mu != dp.mu) && (param->tm_rho != dp.mu) ) {
     WITH_COMM(logQuda(
-      QUDA_VERBOSE, "Property mu does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: mu=%.6e eoflg=%d, QUDA: mu=%.6e tm_rho=%.6e)\n",
-      dp.mu, dp.eoflg, param->mu, param->tm_rho));
+      QUDA_VERBOSE, "Property mu does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: mu=%.6e eoflg=%d, QUDA: mu=%.6e tm_rho=%.6e solve_type=%d)\n",
+      dp.mu, dp.eoflg, param->mu, param->tm_rho, param->solve_type));
     WITH_COMM(logQuda(QUDA_VERBOSE, "  => need params update\n"));
     ret = false;
   }
@@ -1217,12 +1232,12 @@ static void openQCD_qudaSolverUpdate(void *param_)
     additional_prop->u1csw = dp.u1csw;
     additional_prop->qhat = dp.qhat;
     set_su3csw(param, dp.su3csw);
-    set_openqxd_twist(param, dp);
+    set_openqcd_twist(param);
 
     QudaInvertParam *mg_inv_param = additional_prop->mg_param->invert_param;
     mg_inv_param->kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
     set_su3csw(mg_inv_param, dp.su3csw);
-    set_openqxd_twist(mg_inv_param, dp);
+    set_openqcd_twist(mg_inv_param);
   }
 
   if (do_clover_update) {
@@ -1348,8 +1363,6 @@ static void *openQCD_qudaSolverReadIn(int id)
   param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
   set_su3csw(param, dp.su3csw);
-
-  set_openqxd_twist(param, dp);
 
   if (my_rank == 0 && id != -1) {
 
