@@ -76,6 +76,7 @@ typedef struct {
   int qhat;
   double m0, su3csw, u1csw, cF[2], theta[3];
   double mu;     /* mu: twisted mass */
+  int eoflg;
 } openQCD_dirac_parms_t;
 
 typedef struct {

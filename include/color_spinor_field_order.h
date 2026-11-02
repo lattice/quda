@@ -1822,8 +1822,14 @@ namespace quda
         block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
       }
 
+      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int parity = 0) const
+      {
+        auto out = &field[getSpinorOffset(x_cb, parity)];
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      }
 
       /**
+         @brief This accessor routine returns a colorspinor_wrapper to this object,
          allowing us to overload various operators for manipulating at
          the site level interms of matrix operations.
          @param[in] x_cb Checkerboarded space-time index we are requesting

@@ -864,7 +864,7 @@ void openQCD_qudaGaugeFree(void)
   qudaState.swd_ad_rev = -1;
 }
 
-void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu)
+void openQCD_qudaCloverLoad(void *clover, QudaInvertParam *inv_param)
 {
   QudaInvertParam param = newOpenQCDParam();
   param.clover_order = QUDA_OPENQCD_CLOVER_ORDER;
@@ -873,14 +873,15 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu)
   param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
   param.clover_cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION;
 
-  param.kappa = kappa;
-  param.clover_csw = csw;
+  param.kappa = inv_param->kappa;
+  param.clover_csw = inv_param->clover_csw;
+  param.mu = inv_param->mu;
+  param.solve_type = inv_param->solve_type;
   param.clover_coeff = 0.0;
 
   void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, clover);
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_CLOVER, clover, buf)) {
     set_openqcd_twist(&param);
-
     loadCloverQuda(buf, NULL, &param);
   }
 }
@@ -1429,7 +1430,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
         WITH_COMM(logQuda(QUDA_VERBOSE, "Loading Clover field from openQCD ...\n"));
         void *h_sw = qudaState.layout.h_sw();
         PUSH_RANGE("openQCD_qudaCloverLoad", 3);
-        openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw, param->mu);
+        openQCD_qudaCloverLoad(h_sw, param);
         POP_RANGE;
         clover_field_set_revision();
 
@@ -1831,8 +1832,6 @@ static void *openQCD_qudaSolverReadIn(int id)
   MPI_Bcast((void *)invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, qudaState.layout.world_comm);
   MPI_Bcast((void *)multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, qudaState.layout.world_comm);
   multigrid_param->invert_param = invert_param_mg;
-
-  set_openqxd_twist(param, dp);
 
   /**
    * We need a void* to store the multigrid_param (QudaMultigridParam) struct,
