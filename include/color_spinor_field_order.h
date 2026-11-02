@@ -1776,27 +1776,25 @@ namespace quda
       int nParity;
       const int dim[4]; // xyzt convention
       const int L[4];   // txyz convention
-      const int cb_parity; // parity of a single-parity field, unused for a full field
+      const int parityCB; // suggested parity of single parity field
 
       OpenQCDDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
         field(field_ ? field_ : a.data<Float *>()),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        /* getCoords() and openqcd::ipt() both expect the full local lattice,
-           but a parity field carries a halved x[0] (ColorSpinorParam
-           constructor). Undo halving, so it aligns with openQCD's geometry. */
+        /* getCoords and openqcd::ipt use the full local lattice, undo halving
+          of x[0] for a parity field (introduced in ColorSpinorParam) */
         dim {a.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 2 * a.X(0) : a.X(0),
              a.X(1), a.X(2), a.X(3)},         // *full local* lattice dimensions, xyzt
         L {dim[3], dim[0], dim[1], dim[2]},   // *full local* lattice dimensions, txyz
-        cb_parity(a.SuggestedParity() == QUDA_ODD_PARITY ? 1 : 0)
+        parityCB(a.SuggestedParity())
       {
         if constexpr (length != 24) { errorQuda("Spinor field length %d not supported", length); }
 
-        /* For a parity field QUDA hands the accessor parity = 0 throughout and
-           keeps the actual parity in the field itself, so we must know it. */
+        /* check for valid suggested parity */
         if (a.SiteSubset() == QUDA_PARITY_SITE_SUBSET && a.SuggestedParity() == QUDA_INVALID_PARITY) {
-          errorQuda("openQCD parity spinor field has no suggested parity; set matpc_type to one of "
-                    "QUDA_MATPC_EVEN_EVEN(_ASYMMETRIC) or QUDA_MATPC_ODD_ODD(_ASYMMETRIC)");
+          errorQuda("openQCD parity spinor field has no suggested parity; expected matpc_type"
+                    "QUDA_MATPC_EVEN_EVEN/ODD_ODD(_ASYMMETRIC)");
         }
       }
 
@@ -1812,9 +1810,8 @@ namespace quda
       __device__ __host__ inline index_t getSpinorOffset(int x_cb, int parity) const
       {
         int x_quda[4], x[4];
-        /* A full field is traversed with parity = 0,1; a parity field is
-           traversed with parity = 0 only and carries its parity in cb_parity. */
-        getCoords(x_quda, x_cb, dim, nParity == QUDA_FULL_SITE_SUBSET ? parity : cb_parity);
+        /* Parity field uses only parity = 0, use cb_parity. */
+        getCoords(x_quda, x_cb, dim, nParity == QUDA_FULL_SITE_SUBSET ? parity : parityCB); // x_quda contains xyzt local Carthesian corrdinates
         openqcd::rotate_coords(x_quda, x);    // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
         return static_cast<index_t>(openqcd::ipt(x, L)) * length;
       }
@@ -1825,14 +1822,8 @@ namespace quda
         block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int parity = 0) const
-      {
-        auto out = &field[getSpinorOffset(x_cb, parity)];
-        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
-      }
 
       /**
-         @brief This accessor routine returns a colorspinor_wrapper to this object,
          allowing us to overload various operators for manipulating at
          the site level interms of matrix operations.
          @param[in] x_cb Checkerboarded space-time index we are requesting
