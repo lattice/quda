@@ -45,7 +45,7 @@ namespace quda
 
         // first set up receive
         if (comm_peer2peer_enabled(1 - dir, dim)) {
-          receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp, sizeof(remote_handle));
+          receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp, sizeof(remote_handle[dim][1 - dir]));
         }
 
         // now send

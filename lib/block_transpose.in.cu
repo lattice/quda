@@ -39,7 +39,9 @@ namespace quda
         if constexpr (std::is_const_v<v_t>) {
           strcat(aux, ",v2b");
         } else {
-          strcat(aux, ",b2v");
+          // Forward transpose must also write the padded columns of V.
+          resizeVector(nVec);
+          strcat(aux, ",b2v,pad_zero");
         }
         setRHSstring(aux, B.size());
         if (from_to_non_rel) { strcat(aux, ",from_to_non_rel"); }

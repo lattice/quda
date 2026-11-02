@@ -40,12 +40,7 @@ namespace quda
       return period;
     }
 
-    /**
-       @brief Return if monitoring is enabled.  Default is disabled,
-       and can be enabled setting the environment variable
-       QUDA_ENABLE_MONITOR=1
-     */
-    auto is_enabled()
+    bool is_enabled()
     {
       static bool init = false;
       static bool enable = false;
