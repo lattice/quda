@@ -1250,7 +1250,8 @@ static int openQCD_qudaInvertParamCheck(void *param_)
     ret = false;
   }
 
-  if ((param->mu != dp.mu) && (param->tm_rho != dp.mu) ) {
+  if (param->mu != ((dp.eoflg == 1 && is_pc_solve(param)) ? 0.0 : dp.mu)
+      || param->tm_rho != ((dp.eoflg == 1 && is_pc_solve(param)) ? dp.mu : 0.0)) {
     WITH_COMM(logQuda(
       QUDA_VERBOSE, "Property mu does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: mu=%.6e eoflg=%d, QUDA: mu=%.6e tm_rho=%.6e solve_type=%d)\n",
       dp.mu, dp.eoflg, param->mu, param->tm_rho, param->solve_type));
