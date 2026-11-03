@@ -1,5 +1,11 @@
 # P2P island performance investigation
 
+This is a historical measurement record from checkpoint `5f087c784`.
+Its recorded P2P flags 5/6 are no longer accepted by current code. Their
+current equivalents are `QUDA_ENABLE_P2P=1/2` together with
+`QUDA_ENABLE_P2P_FORCE=1`; the raw cache, logs, and timings below are
+preserved unchanged. Current keys also contain `p2p_force=0|1`.
+
 The island filter works, and the examined tuning entries do not alias. There is
 no monotonic relationship between island size and dslash performance on this
 single-L4 MPS emulation. Larger-volume differences are small even when P2P is
@@ -168,7 +174,8 @@ shared autotuning cache confirmed H for `8^4`/col/island-8 and R for
   valid, but numerical runs allowed P2P flag 3 with tuning disabled. That can
   choose the no-P2P default and did not establish forced-P2P numerical
   coverage. The 36 checks above supply that coverage for this process grid.
-  The matrix runner now defaults to flag 5 and accepts `--p2p 6` explicitly.
+  The matrix runner now defaults to `--p2p 1 --p2p-force 1` and accepts
+  `--p2p 2` for forced remote-write coverage.
 
 ## Why P2P does not produce a large monotonic speedup here
 

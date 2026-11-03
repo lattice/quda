@@ -61,10 +61,14 @@ int main(int argc, char **argv)
   std::string token;
   while (std::getline(input, token, ',')) islands.push_back(std::stoi(token));
   int failures = 0;
+  const char *p2p_env = getenv("QUDA_ENABLE_P2P");
+  const bool p2p_enabled = !p2p_env || std::atoi(p2p_env) != 0;
   const std::string global_config = quda::comm_config_string();
   auto check = [&]() {
     std::string config = quda::comm_config_string();
     if (config.find(",p2p_islands=") == std::string::npos) failures++;
+    if (config.find(quda::comm_peer2peer_force() ? ",p2p_force=1" : ",p2p_force=0") == std::string::npos)
+      failures++;
     int length = config.size();
     quda::comm_broadcast(&length, sizeof(length));
     std::string reference(length, '\0');
@@ -80,7 +84,8 @@ int main(int argc, char **argv)
     for (int dim = 0; dim < 4; dim++) {
       for (int dir = 0; dir < 2; dir++) {
         int neighbor = quda::comm_neighbor_rank(dir, dim);
-        bool expected = neighbor != quda::comm_rank() && islands[global_rank] == islands[original_ranks[neighbor]];
+        bool expected = p2p_enabled && neighbor != quda::comm_rank()
+          && islands[global_rank] == islands[original_ranks[neighbor]];
         if (quda::comm_peer2peer_enabled(dir, dim) != expected) failures++;
       }
     }

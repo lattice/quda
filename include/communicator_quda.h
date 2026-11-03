@@ -189,6 +189,7 @@ namespace quda
 
     /** by default enable both copy engines and load/store access */
     int enable_peer_to_peer = 3;
+    bool force_peer_to_peer = false;
 
     /** sets whether we cap which peers can use peer-to-peer */
     int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
@@ -252,65 +253,41 @@ namespace quda
       if (comm_gdr_enabled()) {
         if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Enabling GPU-Direct RDMA access\n");
         comm_gdr_blacklist(); // set GDR blacklist
-        // by default, if GDR is enabled we disable non-p2p policies to
-        // prevent possible conflict between MPI and QUDA opening the same
-        // IPC memory handles when using CUDA-aware MPI
-        enable_peer_to_peer += 4;
       } else {
         if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling GPU-Direct RDMA access\n");
       }
 
-      char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+      auto read_setting = [](const char *name, int default_value, int maximum) {
+        const char *value = getenv(name);
+        if (!value) return default_value;
+        if (value[0] < '0' || value[0] > '0' + maximum || value[1] != '\0')
+          errorQuda("Invalid %s='%s': expected an integer in 0..%d", name, value, maximum);
+        return value[0] - '0';
+      };
+      enable_peer_to_peer = read_setting("QUDA_ENABLE_P2P", 3, 3);
+      force_peer_to_peer = read_setting("QUDA_ENABLE_P2P_FORCE", 0, 1);
+      if (force_peer_to_peer && !enable_peer_to_peer)
+        errorQuda("QUDA_ENABLE_P2P_FORCE=1 requires QUDA_ENABLE_P2P to be nonzero");
 
-      // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
-      // and comm_dim(dim) == 2 (used for perf benchmarking)
-      bool disable_peer_to_peer_bidir = false;
-
-      if (enable_peer_to_peer_env) {
-        enable_peer_to_peer = atoi(enable_peer_to_peer_env);
-
-        switch (std::abs(enable_peer_to_peer)) {
-        case 0:
-          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
-          break;
-        case 1:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
-          break;
-        case 2:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
-          break;
-        case 3:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access\n");
-          break;
-        case 5:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n");
-          break;
-        case 6:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n");
-          break;
-        case 7:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n");
-          break;
-        default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
-        }
-
-        if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
-          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
-          disable_peer_to_peer_bidir = true;
-        }
-
-        enable_peer_to_peer = std::abs(enable_peer_to_peer);
-
-      } else { // !enable_peer_to_peer_env
+      switch (enable_peer_to_peer) {
+      case 0:
+        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
+        break;
+      case 1:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
+        break;
+      case 2:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
+        break;
+      case 3:
         if (getVerbosity() > QUDA_SILENT && rank == 0)
           printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+        break;
       }
+      if (getVerbosity() > QUDA_SILENT && rank == 0 && force_peer_to_peer)
+        printf("Forcing peer-to-peer policies where eligible links exist\n");
 
       if (!peer2peer_init && enable_peer_to_peer) {
 
@@ -339,11 +316,6 @@ namespace quda
           for (int dim = 0; dim < 4; ++dim) {
             int neighbor_rank = comm_neighbor_rank(dir, dim);
             if (neighbor_rank == comm_rank()) continue;
-
-            // disable peer-to-peer comms in one direction
-            if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
-                && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
-              continue;
 
             // if the neighbors are on the same
             if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
@@ -680,6 +652,8 @@ namespace quda
     if (!config_init) {
       strcpy(config_string, ",p2p=");
       strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
+      strcat(config_string, ",p2p_force=");
+      strcat(config_string, force_peer_to_peer ? "1" : "0");
       if (enable_p2p_max_access_rank != std::numeric_limits<int>::max()) {
         strcat(config_string, ",p2p_max_access_rank=");
         strcat(config_string, std::to_string(enable_p2p_max_access_rank).c_str());

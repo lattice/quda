@@ -1778,19 +1778,19 @@ namespace quda
         first_active_policy = static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
-        if (comm_peer2peer_enabled_global() & 2) { // enable/disable p2p copy engine policy tuning
+        if (comm_peer2peer_enabled_global() & 2) { // enable/disable remote-write policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)]
               = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);
         }
 
-        if (comm_peer2peer_enabled_global() & 1) { // enable/disable p2p direct store policy tuning
+        if (comm_peer2peer_enabled_global() & 1) { // enable/disable copy-engine policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)]
               = QudaP2PPolicy::QUDA_P2P_COPY_ENGINE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE);
         }
 
-        if (!(comm_peer2peer_enabled_global() & 4)) { // enable/disable non-p2p policy tuning
+        if (!comm_peer2peer_force() || !comm_peer2peer_enabled_global()) {
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT);
         }

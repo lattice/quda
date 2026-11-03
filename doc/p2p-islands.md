@@ -20,11 +20,20 @@ this string only once; returning to a cached communicator restores its key.
 
 For a single-GPU emulation, enable `QUDA_ENABLE_MPS=1`, use an MPS server,
 and set `QUDA_ENABLE_GDR=0` for host-buffer MPI across islands. MPS alone
-does not define island membership. `QUDA_ENABLE_P2P=3` allows the tuner
-to choose no-P2P, copy-engine, or remote-write policies. For controlled
-experiments, `5` forces copy-engine P2P and `6` forces remote-write P2P
-on eligible links; island boundaries still use ordinary MPI. `7` permits
-both P2P methods but excludes the no-P2P policy when P2P links exist.
+does not define island membership. `QUDA_ENABLE_P2P` accepts only `0`
+(off), `1` (copy engine), `2` (remote write), or `3` (both). These permit
+features; the tuner may still choose the non-P2P policy.
+`QUDA_ENABLE_P2P_FORCE=1` excludes that candidate when eligible links exist;
+it defaults to `0` and accepts only `0` or `1`. All other values, including
+negative and legacy 5/6/7 settings, are errors. `QUDA_ENABLE_P2P=0` with
+force enabled is also an error.
+
+For controlled copy-engine testing use `QUDA_ENABLE_P2P=1` with
+`QUDA_ENABLE_P2P_FORCE=1`; for remote writes use `2` with force `1`.
+Islands and hardware eligibility still restrict which links use P2P. With
+no eligible peers, ordinary MPI remains available even with force set.
+GDR no longer implicitly forces P2P. The cached configuration includes
+`,p2p_force=0|1`, separating tuning entries for the two policy sets.
 
 Build `p2p_islands_test` in an MPI build. On one GPU:
 
@@ -55,9 +64,10 @@ sizes 1, 2, 4, and 8. It covers both rank orderings, pure X/Y/Z/T process
 grids, and six mixed grids, including splitting multiple dimensions at
 once and splitting into single-rank subgrids. Each case saves its full log.
 Two independent MPI worlds run at a time (16 total MPS clients).
-The runner defaults to `--p2p 5` to force copy-engine P2P on eligible
-faces; use `--p2p 6` to force remote writes. `--p2p 3` permits the
-no-P2P policy and is not a forced-P2P numerical test with tuning disabled.
+The runner defaults to `--p2p 1 --p2p-force 1` to force copy-engine P2P
+on eligible faces; use `--p2p 2` to force remote writes. Use
+`--p2p-force 0` to permit the non-P2P policy. With tuning disabled this
+can choose the non-P2P default even when P2P methods are permitted.
 
 ## Checkpoint validation
 

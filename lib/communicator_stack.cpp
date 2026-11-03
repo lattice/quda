@@ -177,6 +177,8 @@ namespace quda
 
   int comm_peer2peer_enabled_global() { return get_current_communicator().comm_peer2peer_enabled_global(); }
 
+  bool comm_peer2peer_force() { return get_current_communicator().force_peer_to_peer; }
+
   bool comm_peer2peer_enabled(int dir, int dim) { return get_current_communicator().comm_peer2peer_enabled(dir, dim); }
 
   void comm_enable_peer2peer(bool enable) { get_current_communicator().comm_enable_peer2peer(enable); }
