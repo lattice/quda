@@ -181,15 +181,11 @@ void hisqCompleteForceToForceCPU(quda::GaugeField &force_out, const quda::GaugeF
   bool multi = is_multi_gpu();
 
   if (oprod.Precision() == QUDA_DOUBLE_PRECISION) {
-    completeForceToForceT<double>(
-      reinterpret_cast<double *const *>(force_out.data_array().data),
-      reinterpret_cast<const double *const *>(oprod.data_array().data),
-      reinterpret_cast<const double *const *>(link.data_array().data), dim, multi);
+    completeForceToForceT<double>(force_out.data_array<double *>().data, oprod.data_array<const double *>().data,
+                                  link.data_array<const double *>().data, dim, multi);
   } else {
-    completeForceToForceT<float>(
-      reinterpret_cast<float *const *>(force_out.data_array().data),
-      reinterpret_cast<const float *const *>(oprod.data_array().data),
-      reinterpret_cast<const float *const *>(link.data_array().data), dim, multi);
+    completeForceToForceT<float>(force_out.data_array<float *>().data, oprod.data_array<const float *>().data,
+                                 link.data_array<const float *>().data, dim, multi);
   }
 }
 
@@ -200,9 +196,9 @@ void updateMomentumFromForceCPU(quda::GaugeField &mom, double coeff, const quda:
 
   if (force.Precision() == QUDA_DOUBLE_PRECISION) {
     updateMomentumFromForceT<double>(reinterpret_cast<double *>(mom.data()), coeff,
-                                     reinterpret_cast<const double *const *>(force.data_array().data), dim);
+                                     force.data_array<const double *>().data, dim);
   } else {
     updateMomentumFromForceT<float>(reinterpret_cast<float *>(mom.data()), coeff,
-                                    reinterpret_cast<const float *const *>(force.data_array().data), dim);
+                                    force.data_array<const float *>().data, dim);
   }
 }

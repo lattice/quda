@@ -1101,19 +1101,16 @@ static int compare_link(const GaugeField &a, const GaugeField &b)
 {
   if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
 
-  // raw_pointer() uses a static buffer for pointer-array orders, so we must
-  // capture each field's per-direction pointers separately to avoid aliasing.
-  void *a_ptrs[4], *b_ptrs[4];
-  for (int d = 0; d < 4; d++) {
-    a_ptrs[d] = a.data<void *>(d);
-    b_ptrs[d] = b.data<void *>(d);
-  }
-
+  // not raw_pointer(): it returns a shared static buffer, so a and b would alias
   int ret;
   if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink(reinterpret_cast<double **>(a_ptrs), reinterpret_cast<double **>(b_ptrs), a.Volume());
+    auto a_ptrs = a.data_array<double *>();
+    auto b_ptrs = b.data_array<double *>();
+    ret = compareLink(a_ptrs.data, b_ptrs.data, a.Volume());
   } else {
-    ret = compareLink(reinterpret_cast<float **>(a_ptrs), reinterpret_cast<float **>(b_ptrs), a.Volume());
+    auto a_ptrs = a.data_array<float *>();
+    auto b_ptrs = b.data_array<float *>();
+    ret = compareLink(a_ptrs.data, b_ptrs.data, a.Volume());
   }
 
   return ret;

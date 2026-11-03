@@ -631,9 +631,7 @@ void HisqEndToEndTest::verify_force_result(const char *label)
                            getTolerance(test_prec), gauge_param.cpu_prec);
   }
 
-  void *hPtrs[4], *cPtrs[4];
-  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
-  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
+  int level = strong_check_link(hostVerify, "GPU result:", *cpuForce, "CPU reference:");
   int tolerance = getNegLog10Tolerance(test_prec);
   EXPECT_EQ(res, 1) << label << " compare_floats mismatch";
   ASSERT_GE(level, tolerance) << label << " strong_check mismatch";
@@ -1136,9 +1134,7 @@ TEST_P(HisqEndToEndTest, full_chain)
                              getTolerance(test_prec), gauge_param.cpu_prec);
     }
 
-    void *hPtrs[4], *cPtrs[4];
-    for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuUnitResult.data<void *>(d); }
-    int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
+    int level = strong_check_link(hostVerify, "GPU result:", cpuUnitResult, "CPU reference:");
     int tolerance = getNegLog10Tolerance(test_prec);
     EXPECT_EQ(res, 1) << "Unitarize force compare_floats mismatch";
     ASSERT_GE(level, tolerance) << "Unitarize force strong_check mismatch";

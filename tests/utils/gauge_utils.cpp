@@ -434,7 +434,7 @@ template <typename real_t> struct ConstructGaussianSU3GaugeField {
   void operator()(void *const *gauge_, double width)
   {
     using complex = std::complex<real_t>;
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     for (int dir = 0; dir < 4; dir++) {
 #pragma omp parallel for
