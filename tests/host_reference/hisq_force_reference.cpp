@@ -51,6 +51,44 @@ void computeLinkOrderedOuterProduct(const quda::ColorSpinorField &src, quda::Gau
   instantiate_host<ComputeLinkOrderedOuterProduct>(src.Precision(), src, dst, nhops);
 }
 
+template <typename real_t> struct AccumulateByParity {
+  void operator()(quda::GaugeField &y, const quda::GaugeField &x, double a_even, double a_odd)
+  {
+    const size_t half = x.VolumeCB() * gauge_site_size;
+    for (int d = 0; d < 4; d++) {
+      auto yd = y.data<real_t *>(d);
+      auto xd = x.data<const real_t *>(d);
+      for (size_t i = 0; i < half; i++) {
+        yd[i] += a_even * xd[i];
+        yd[half + i] += a_odd * xd[half + i];
+      }
+    }
+  }
+};
+
+void computeStaggeredOprodCPU(std::array<quda::GaugeField, 2> &out, const quda::ColorSpinorField &in,
+                              const double coeff[], int nFace)
+{
+  if (nFace != 1 && nFace != 3) errorQuda("Invalid nFace=%d", nFace);
+  for (int i = 0; i < (nFace == 3 ? 2 : 1); i++) {
+    if (out[i].Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", out[i].Order());
+    if (out[i].Precision() != in.Precision())
+      errorQuda("Outer product precision %d does not match quark precision %d", out[i].Precision(), in.Precision());
+  }
+
+  quda::GaugeFieldParam param(out[0]);
+  param.create = QUDA_NULL_FIELD_CREATE;
+  quda::GaugeField oprod(param);
+
+  computeLinkOrderedOuterProduct(in, oprod, 1);
+  instantiate_host<AccumulateByParity>(in.Precision(), out[0], oprod, coeff[0], nFace == 1 ? -coeff[0] : coeff[0]);
+
+  if (nFace == 3) {
+    computeLinkOrderedOuterProduct(in, oprod, 3);
+    instantiate_host<AccumulateByParity>(in.Precision(), out[1], oprod, coeff[1], coeff[1]);
+  }
+}
+
 #define RETURN_IF_ERR                                                                                                  \
   if (err) return;
 

@@ -4,7 +4,9 @@
 #include <array>
 #include <cstddef>
 #include <random>
+#include <string>
 #include <type_traits>
+#include <utility>
 
 #include <quda.h>
 #include <random_quda.h>
@@ -269,6 +271,18 @@ void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec);
 int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, const quda::GaugeField &linkB,
                       const std::string &msgB);
+
+/**
+   @brief Compare two non-extended QDP-ordered host gauge fields element-wise and by accuracy level
+   @param[in] result Field under test
+   @param[in] msg_result Label printed for result in verbose output
+   @param[in] expected Reference field
+   @param[in] msg_expected Label printed for expected in verbose output
+   @param[in] tol Element-wise tolerance passed to compare_floats
+   @return Whether every element agrees within tol, and the accuracy level from strong_check_link
+*/
+std::pair<bool, int> compare_link_fields(const quda::GaugeField &result, const std::string &msg_result,
+                                         const quda::GaugeField &expected, const std::string &msg_expected, double tol);
 
 /**
    @brief Fill a staggered spinor field, whose outer product is used for momentum calculations

@@ -1183,6 +1183,22 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   return compare_link(linkA, linkB);
 }
 
+std::pair<bool, int> compare_link_fields(const GaugeField &result, const std::string &msg_result,
+                                         const GaugeField &expected, const std::string &msg_expected, double tol)
+{
+  if (result.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", result.Order());
+  if (expected.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", expected.Order());
+
+  bool res = true;
+  for (int d = 0; d < 4; d++) {
+    res &= compare_floats(expected.data<void *>(d), result.data<void *>(d), expected.Volume() * gauge_site_size, tol,
+                          checkPrecision(result, expected))
+      == 1;
+  }
+  int level = strong_check_link(result, msg_result, expected, msg_expected);
+  return {res, level};
+}
+
 void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng)
 {
   if (stag_for_oprod.Location() != QUDA_CPU_FIELD_LOCATION || stag_for_oprod.SiteSubset() != QUDA_FULL_SITE_SUBSET)
