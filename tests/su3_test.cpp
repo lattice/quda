@@ -478,11 +478,8 @@ GaugeSmearObservableComparison run_gauge_smear_observable_test(QudaPrecision pre
   GaugeSmearObservableComparison comparison {};
   comparison.projection_failures = projection_failures;
   comparison.field_tolerance = getTolerance(precision);
-  for (int dir = 0; dir < 4; dir++) {
-    comparison.field_deviation = std::max(comparison.field_deviation,
-                                          compare_floats_v2(device_result.data(dir), host_current->data(dir),
-                                                            V * gauge_site_size, comparison.field_tolerance, precision));
-  }
+  comparison.field_deviation
+    = strong_check_field(device_result, "QUDA five-step field", *host_current, "host five-step reference").max_deviation;
   for (int i = 0; i < 3; i++) {
     const double plaquette_scale = std::max(std::abs(observable[1].plaquette[i]), std::abs(host_plaquette[i]));
     comparison.plaquette_deviation[i]

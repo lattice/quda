@@ -1,6 +1,4 @@
-#include <algorithm>
 #include <array>
-#include <limits>
 #include <string>
 #include <tuple>
 
@@ -133,25 +131,13 @@ int verify_one_step(QudaPrecision precision, QudaGaugeSmearParam smear_param,
   gauge_smear_reference(reference, fields.input, smear_param);
 
   const auto tolerance = getTolerance(precision);
-  int check = 1;
-  auto max_deviation = 0.0;
-  for (int dir = 0; dir < 4; dir++) {
-    max_deviation = std::max(max_deviation,
-                             compare_floats_v2(result.data(dir), reference.data(dir), V * gauge_site_size,
-                                               std::numeric_limits<double>::infinity(), fields.gauge_param.cpu_prec));
-    check &= compare_floats(result.data(dir), reference.data(dir), V * gauge_site_size, tolerance,
-                            fields.gauge_param.cpu_prec);
-  }
+  const auto [check, level] = compare_link_fields(result, "QUDA result:", reference, "CPU reference:", tolerance);
   logQuda(QUDA_SUMMARIZE,
-          "%s one-step %s reconstruct=%s rk_order=%u dir_ignore=%d smear_anisotropy=%.1f: max deviation %.3e, "
+          "%s one-step %s reconstruct=%s rk_order=%u dir_ignore=%d smear_anisotropy=%.1f: accuracy level %d, "
           "tolerance %.3e\n",
           get_gauge_smear_str(smear_param.smear_type), get_prec_str(precision),
           get_recon_str(fields.gauge_param.reconstruct), smear_param.rk_order, smear_param.dir_ignore,
-          smear_param.smear_anisotropy, max_deviation, tolerance);
-  auto result_ptrs = result.data_array<void *>();
-  auto reference_ptrs = reference.data_array<void *>();
-  strong_check_link(result_ptrs.data, "QUDA result:", reference_ptrs.data, "CPU reference:", V,
-                    fields.gauge_param.cpu_prec);
+          smear_param.smear_anisotropy, level, tolerance);
   return check;
 }
 
