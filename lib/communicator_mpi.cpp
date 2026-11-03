@@ -60,6 +60,8 @@ namespace quda
 
   Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
   {
+    test_p2p_island = other.test_p2p_island;
+    test_p2p_island_initialized = other.test_p2p_island_initialized;
     user_set_comm_handle = false;
 
     constexpr int nDim = 4;

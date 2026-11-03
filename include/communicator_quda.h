@@ -7,6 +7,9 @@
 #include <stack>
 #include <algorithm>
 #include <numeric>
+#include <cerrno>
+#include <climits>
+#include <string>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -190,6 +193,54 @@ namespace quda
     /** sets whether we cap which peers can use peer-to-peer */
     int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
 
+    // Assigned in the original QUDA communicator, inherited by split communicators.
+    int test_p2p_island = -1;
+    bool test_p2p_island_initialized = false;
+    std::vector<int> test_p2p_neighbor_islands;
+
+    void init_test_p2p_islands()
+    {
+#if defined(MPI_COMMS) || defined(QMP_COMMS)
+      if (!test_p2p_island_initialized) {
+        const char *env = getenv("QUDA_TEST_P2P_ISLANDS");
+        std::string value = env ? env : "";
+        int length = value.size();
+        comm_broadcast(&length, sizeof(length));
+        std::string reference(length, '\0');
+        if (comm_rank() == 0) reference = value;
+        comm_broadcast(reference.data(), reference.size());
+        int mismatch = value != reference;
+        comm_allreduce_int(mismatch);
+        if (mismatch) errorQuda("QUDA_TEST_P2P_ISLANDS must be identical on all ranks");
+        if (env) {
+          std::vector<int> islands;
+          const char *p = value.c_str();
+          while (*p) {
+            if (*p < '0' || *p > '9') errorQuda("Invalid QUDA_TEST_P2P_ISLANDS: expected comma-separated nonnegative IDs");
+            errno = 0;
+            char *end = nullptr;
+            long id = strtol(p, &end, 10);
+            if (errno || id > INT_MAX || (*end && *end != ',')) errorQuda("Invalid QUDA_TEST_P2P_ISLANDS ID");
+            islands.push_back(static_cast<int>(id));
+            p = end;
+            if (*p == ',') {
+              p++;
+              if (!*p) errorQuda("Trailing comma in QUDA_TEST_P2P_ISLANDS");
+            }
+          }
+          if (islands.size() != comm_size()) errorQuda("QUDA_TEST_P2P_ISLANDS requires one ID per original QUDA rank");
+          test_p2p_island = islands[comm_rank()];
+        }
+        test_p2p_island_initialized = true;
+      }
+      test_p2p_neighbor_islands.resize(comm_size());
+      if (MPI_Allgather(&test_p2p_island, 1, MPI_INT, test_p2p_neighbor_islands.data(), 1, MPI_INT, MPI_COMM_HANDLE)
+          != MPI_SUCCESS) errorQuda("Failed to gather P2P island IDs");
+#else
+      if (getenv("QUDA_TEST_P2P_ISLANDS")) errorQuda("QUDA_TEST_P2P_ISLANDS requires MPI or QMP communications");
+#endif
+    }
+
     void comm_peer2peer_init(const char *hostname_recv_buf)
     {
       if (peer2peer_init) return;
@@ -300,7 +351,8 @@ namespace quda
 
               // enable P2P if we can access the peer or if peer is self
               // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
-              if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+              bool same_island = test_p2p_island < 0 || test_p2p_neighbor_islands[neighbor_rank] == test_p2p_island;
+              if (same_island && ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid)) {
                 peer2peer_enabled[dir][dim] = true;
                 if (getVerbosity() > QUDA_SILENT) {
                   printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
@@ -309,6 +361,9 @@ namespace quda
                 }
               } else {
                 intranode_enabled[dir][dim] = true;
+                if (!same_island && getVerbosity() > QUDA_SILENT)
+                  printf("P2P island boundary: rank %d (island=%d), neighbor %d (island=%d), dir=%d, dim=%d\n",
+                         comm_rank(), test_p2p_island, neighbor_rank, test_p2p_neighbor_islands[neighbor_rank], dir, dim);
                 if (getVerbosity() > QUDA_SILENT) {
                   printf(
                     "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
@@ -588,6 +643,7 @@ namespace quda
       }
     } // -ve gpuid
 
+    init_test_p2p_islands();
     comm_peer2peer_init(hostname_recv_buf);
 
     host_free(hostname_recv_buf);

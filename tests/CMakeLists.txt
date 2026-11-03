@@ -32,6 +32,12 @@ endif()
 
 set(TEST_LIBS quda_test)
 
+if(QUDA_MPI)
+  add_executable(p2p_islands_test EXCLUDE_FROM_ALL p2p_islands_test.cpp)
+  target_link_libraries(p2p_islands_test PRIVATE QUDA::quda MPI::MPI_CXX)
+  target_include_directories(p2p_islands_test PRIVATE $<TARGET_PROPERTY:quda_cpp,INCLUDE_DIRECTORIES>)
+endif()
+
 # custom target for building all tests (useful if QUDA_BUILD_ALL_TESTS is OFF)
 add_custom_target(all_tests)
 
