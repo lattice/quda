@@ -2,7 +2,9 @@
 
 #include <vector>
 #include <array>
+#include <cstddef>
 #include <random>
+#include <type_traits>
 
 #include <quda.h>
 #include <random_quda.h>
@@ -55,6 +57,29 @@ constexpr bool is_multi_gpu()
 #else
   return false;
 #endif
+}
+
+/**
+ * @brief Build a typed array of per-dimension pointers, e.g., from ghost buffers
+ *
+ * @tparam T The pointer type to cast each element to (e.g., const double *)
+ * @tparam N The number of elements to convert
+ * @tparam Src An indexable source whose elements are either pointers (e.g.,
+ * ColorSpinorField::fwdGhostFaceBuffer) or objects with a data() method (e.g.,
+ * GaugeField::Ghost())
+ * @param[in] src The source to convert
+ * @return Array of the first N elements of src cast to T
+ */
+template <typename T, std::size_t N = 4, typename Src> std::array<T, N> typed_ptr_array(const Src &src)
+{
+  std::array<T, N> out {};
+  for (std::size_t i = 0; i < N; i++) {
+    if constexpr (std::is_pointer_v<std::decay_t<decltype(src[i])>>)
+      out[i] = static_cast<T>(src[i]);
+    else
+      out[i] = static_cast<T>(src[i].data());
+  }
+  return out;
 }
 
 // Determine if the Laplace operator has been defined
