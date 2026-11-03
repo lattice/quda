@@ -871,14 +871,24 @@ void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconst
 
 template <typename Float> static int compareFloats(Float *a, Float *b, int len, double epsilon)
 {
-  for (int i = 0; i < len; i++) {
-    double diff = fabs(a[i] - b[i]);
-    if (diff > epsilon || std::isnan(diff)) {
-      printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
-      return 0;
-    }
+  if (len <= 0) return 1;
+  auto fails = [&](int i) {
+    const double diff = fabs(a[i] - b[i]);
+    return diff > epsilon || std::isnan(diff);
+  };
+
+  int first = len;
+  if (fails(0)) {
+    first = 0;
+  } else {
+#pragma omp parallel for reduction(min : first)
+    for (int i = 1; i < len; i++)
+      if (fails(i)) first = std::min(first, i);
   }
-  return 1;
+
+  if (first == len) return 1;
+  printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", first, first, a[first], first, b[first]);
+  return 0;
 }
 
 int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision precision)
@@ -891,16 +901,22 @@ int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision prec
 
 template <typename Float> static double compareFloats_v2(Float *a, Float *b, int len, double epsilon)
 {
-  double global_diff = 0.0;
-  for (int i = 0; i < len; i++) {
-    double diff = fabs(a[i] - b[i]);
-    if (diff > epsilon || std::isnan(diff)) {
-      //printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
-      return diff;
-    }
-    global_diff = std::max(global_diff, diff);
+  if (len <= 0) return 0.0;
+  auto diff = [&](int i) -> double { return fabs(a[i] - b[i]); };
+  auto fails = [&](double d) { return d > epsilon || std::isnan(d); };
+
+  if (fails(diff(0))) return diff(0);
+  int first = len;
+  double global_diff = diff(0);
+#pragma omp parallel for reduction(min : first) reduction(max : global_diff)
+  for (int i = 1; i < len; i++) {
+    const double d = diff(i);
+    if (fails(d))
+      first = std::min(first, i);
+    else
+      global_diff = std::max(global_diff, d);
   }
-  return global_diff;
+  return first < len ? diff(first) : global_diff;
 }
 
 // returns deviation instead of failure flag
@@ -1251,20 +1267,31 @@ static StrongCheckResult strong_check_histogram(const std::vector<const Float *>
                                                 size_t length)
 {
   constexpr int levels = 16;
+  std::array<double, levels> thresholds;
+  for (int level = 0; level < levels; level++) thresholds[level] = std::pow(10.0, -(level + 1));
   const int geometry = a.size();
   std::vector<std::array<size_t, levels>> failures(geometry);
   double max_deviation = 0.0;
+  bool any_nan = false;
 
   for (int component = 0; component < geometry; component++) {
+    const Float *a_c = a[component];
+    const Float *b_c = b[component];
+    size_t count[levels] = {};
+#pragma omp parallel for reduction(+ : count) reduction(max : max_deviation) reduction(|| : any_nan)
     for (size_t i = 0; i < length; i++) {
-      const double deviation = std::abs(static_cast<double>(a[component][i]) - static_cast<double>(b[component][i]));
-      max_deviation
-        = std::isnan(deviation) ? std::numeric_limits<double>::infinity() : std::max(max_deviation, deviation);
-      for (int level = 0; level < levels; level++) {
-        if (deviation > std::pow(10.0, -(level + 1)) || std::isnan(deviation)) failures[component][level]++;
+      const double deviation = std::abs(static_cast<double>(a_c[i]) - static_cast<double>(b_c[i]));
+      if (std::isnan(deviation)) {
+        any_nan = true;
+        for (int level = 0; level < levels; level++) count[level]++;
+      } else {
+        max_deviation = std::max(max_deviation, deviation);
+        for (int level = 0; level < levels; level++) count[level] += deviation > thresholds[level];
       }
     }
+    std::copy(count, count + levels, failures[component].begin());
   }
+  if (any_nan) max_deviation = std::numeric_limits<double>::infinity();
 
   printfQuda("Deviation histogram: %s vs %s (max %.6e)\n", label_a.c_str(), label_b.c_str(), max_deviation);
   printfQuda(" threshold");
@@ -1274,9 +1301,8 @@ static StrongCheckResult strong_check_histogram(const std::vector<const Float *>
   int accuracy_level = 0;
   const size_t total_values = geometry * length;
   for (int level = 0; level < levels; level++) {
-    const double threshold = std::pow(10.0, -(level + 1));
     size_t total_failures = 0;
-    printfQuda(" %9.1e", threshold);
+    printfQuda(" %9.1e", thresholds[level]);
     for (int component = 0; component < geometry; component++) {
       printfQuda(" %15zu", failures[component][level]);
       total_failures += failures[component][level];
