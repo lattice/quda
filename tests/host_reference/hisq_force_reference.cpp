@@ -106,69 +106,11 @@ public:
                                   real_t *const) const;
   real_t getData(const real_t *const *const field, int idx, int dir, int oddBit, int offset, int hfv) const;
   void addData(real_t *const *const field, int idx, int dir, int oddBit, int offset, real_t, int hfv) const;
-  int half_idx_conversion_ex2normal(int half_lattice_index, const int *dim, int oddBit) const;
-  int half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const;
 };
 
-template <typename real_t>
-int LoadStore<real_t>::half_idx_conversion_ex2normal(int half_lattice_index_ex, const int *dim, int oddBit) const
-{
-  int X1 = dim[0];
-  int X2 = dim[1];
-  int X3 = dim[2];
-  // int X4=dim[3];
-
-  int E1 = dim[0] + 4;
-  int E2 = dim[1] + 4;
-  int E3 = dim[2] + 4;
-  // int E4=dim[3]+4;
-  int E1h = E1 / 2;
-
-  int sid = half_lattice_index_ex;
-
-  int za = sid / E1h;
-  int x1h = sid - za * E1h;
-  int zb = za / E2;
-  int x2 = za - zb * E2;
-  int x4 = zb / E3;
-  int x3 = zb - x4 * E3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
-
-  int idx = ((x4 - 2) * X3 * X2 * X1 + (x3 - 2) * X2 * X1 + (x2 - 2) * X1 + (x1 - 2)) / 2;
-  return idx;
-}
-
-template <class real_t>
-int LoadStore<real_t>::half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const
-{
-  int X1 = dim[0];
-  int X2 = dim[1];
-  int X3 = dim[2];
-  // int X4=dim[3];
-  int X1h = X1 / 2;
-
-  int E1 = dim[0] + 4;
-  int E2 = dim[1] + 4;
-  int E3 = dim[2] + 4;
-  // int E4=dim[3]+4;
-  // int E1h=E1/2;
-
-  int sid = half_lattice_index;
-
-  int za = sid / X1h;
-  int x1h = sid - za * X1h;
-  int zb = za / X2;
-  int x2 = za - zb * X2;
-  int x4 = zb / X3;
-  int x3 = zb - x4 * X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
-
-  int idx = ((x4 + 2) * E3 * E2 * E1 + (x3 + 2) * E2 * E1 + (x2 + 2) * E1 + (x1 + 2)) / 2;
-
-  return idx;
-}
+// The rest of this reference (field sizes, Vh_ex) also assumes this radius, so it must stay in sync
+constexpr int force_ref_r = is_multi_gpu() ? 2 : 0;
+constexpr std::array<int, 4> force_ref_R = {force_ref_r, force_ref_r, force_ref_r, force_ref_r};
 
 template <class real_t>
 void LoadStore<real_t>::loadMatrixFromField(const typename LoadStore<real_t>::matrix *const field, int oddBit,
@@ -419,7 +361,7 @@ template <typename real_t> struct HisqStaplesForce {
     if (GOES_FORWARDS(sig)) {
       matrix colorMatW;
 
-      int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+      int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
       ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatW);
       ls.addMatrixToField(colorMatW, oddBit, sig, idx, coeff, output);
@@ -862,7 +804,7 @@ template <class real_t> struct ComputeLongLinkField {
       matrix colorMatU, colorMatV, colorMatW, colorMatX, colorMatY, colorMatZ;
 
       int point_a, point_b, point_c, point_d, point_e;
-      int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+      int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
       int X = locator.getFullFromHalfIndex(idx);
       point_c = idx;
@@ -942,7 +884,7 @@ template <class real_t> struct CompleteForceField {
   {
     matrix colorMatX, colorMatY, linkW;
 
-    int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+    int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
     ls.loadMatrixFromField(link, oddBit, sig, idx, &linkW);
     ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatX);

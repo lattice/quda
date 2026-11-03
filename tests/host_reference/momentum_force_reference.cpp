@@ -1,6 +1,7 @@
 #include <complex>
 #include <gauge_field.h>
 #include "host_utils.h"
+#include "index_utils.hpp"
 #include "momentum_force_reference.h"
 
 // CPU implementations matching the GPU's two-step complete force -> momentum pipeline.
@@ -97,38 +98,19 @@ void storeMomMILC(const Mat3x3<real> &m, real coeff, real *mom, int dir, int idx
   p[9] = 0.0;
 }
 
-int halfIdxNormal2Ex(int half_idx, const int dim[4], int oddBit)
-{
-  int X1 = dim[0], X2 = dim[1], X3 = dim[2];
-  int X1h = X1 / 2;
-  int E1 = X1 + 4, E2 = X2 + 4, E3 = X3 + 4;
-  int E1h = E1 / 2;
-
-  int za = half_idx / X1h;
-  int x1h = half_idx - za * X1h;
-  int zb = za / X2;
-  int x2 = za - zb * X2;
-  int x4 = zb / X3;
-  int x3 = zb - x4 * X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
-
-  return ((x4 + 2) * E3 + (x3 + 2)) * E2 * E1h + (x2 + 2) * E1h + (x1 + 2) / 2;
-}
-
 template <typename real>
-void completeForceToForceT(real *const *force_out, const real *const *oprod, const real *const *link,
-                           const int dim[4], bool is_multi_gpu)
+void completeForceToForceT(real *const *force_out, const real *const *oprod, const real *const *link, const int dim[4],
+                           const quda::lat_dim_t &R)
 {
   int vol = dim[0] * dim[1] * dim[2] * dim[3];
   int half_vol = vol / 2;
+  int e_half_vol = (dim[0] + 2 * R[0]) * (dim[1] + 2 * R[1]) * (dim[2] + 2 * R[2]) * (dim[3] + 2 * R[3]) / 2;
 
   for (int oddBit = 0; oddBit < 2; oddBit++) {
     real parity_coeff = (oddBit == 1) ? -1.0 : 1.0;
 #pragma omp parallel for
     for (int idx = 0; idx < half_vol; idx++) {
-      int e_idx = is_multi_gpu ? halfIdxNormal2Ex(idx, dim, oddBit) : idx;
-      int e_half_vol = is_multi_gpu ? ((dim[0] + 4) * (dim[1] + 4) * (dim[2] + 4) * (dim[3] + 4) / 2) : half_vol;
+      int e_idx = getIndexExtended(idx, dim, oddBit, R);
 
       for (int dir = 0; dir < 4; dir++) {
         Mat3x3<real> U, O;
@@ -176,16 +158,22 @@ void updateMomentumFromForceT(real *mom, double coeff, const real *const *force,
 void hisqCompleteForceToForceCPU(quda::GaugeField &force_out, const quda::GaugeField &oprod,
                                  const quda::GaugeField &link)
 {
+  const auto &R = oprod.R();
   int dim[4];
-  for (int d = 0; d < 4; d++) dim[d] = oprod.X()[d] - 2 * oprod.R()[d];
-  bool multi = is_multi_gpu();
+  for (int d = 0; d < 4; d++) {
+    dim[d] = oprod.X()[d] - 2 * R[d];
+    if (link.R()[d] != R[d] || link.X()[d] != oprod.X()[d])
+      errorQuda("link and oprod must share the same extended geometry (dim %d)", d);
+    if (force_out.R()[d] != 0 || force_out.X()[d] != dim[d])
+      errorQuda("force_out must be a non-extended field on the local lattice (dim %d)", d);
+  }
 
   if (oprod.Precision() == QUDA_DOUBLE_PRECISION) {
     completeForceToForceT<double>(force_out.data_array<double *>().data, oprod.data_array<const double *>().data,
-                                  link.data_array<const double *>().data, dim, multi);
+                                  link.data_array<const double *>().data, dim, R);
   } else {
     completeForceToForceT<float>(force_out.data_array<float *>().data, oprod.data_array<const float *>().data,
-                                 link.data_array<const float *>().data, dim, multi);
+                                 link.data_array<const float *>().data, dim, R);
   }
 }
 
