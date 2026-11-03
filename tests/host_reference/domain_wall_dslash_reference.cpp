@@ -36,11 +36,11 @@ template <typename real_t, QudaPCType type> struct DslashReference4D {
                   const void *const *fwdSpinor_, const void *const *backSpinor_, int parity, int dagger)
   {
     auto out = reinterpret_cast<real_t *>(out_);
-    auto gauge = reinterpret_cast<const real_t *const *>(gauge_);
-    auto ghostGauge = reinterpret_cast<const real_t *const *>(ghostGauge_);
+    const auto gauge = typed_ptr_array<const real_t *>(gauge_);
+    const auto ghostGauge = typed_ptr_array<const real_t *>(ghostGauge_);
     auto in = reinterpret_cast<const real_t *>(in_);
-    auto fwdSpinor = reinterpret_cast<const real_t *const *>(fwdSpinor_);
-    auto backSpinor = reinterpret_cast<const real_t *const *>(backSpinor_);
+    const auto fwdSpinor = typed_ptr_array<const real_t *>(fwdSpinor_);
+    const auto backSpinor = typed_ptr_array<const real_t *>(backSpinor_);
 
 #pragma omp parallel for
     for (auto i = 0lu; i < V5h * spinor_site_size; i++) out[i] = 0.0;
@@ -64,7 +64,8 @@ template <typename real_t, QudaPCType type> struct DslashReference4D {
           int gaugeOddBit = (xs % 2 == 0 || type == QUDA_4D_PC) ? parity : (parity + 1) % 2;
 
           const real_t *gauge = gaugeLink(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-          const real_t *spinor = spinorNeighbor_5d<type>(sp_idx, dir, parity, in, fwdSpinor, backSpinor, 1, 1);
+          const real_t *spinor
+            = spinorNeighbor_5d<type>(sp_idx, dir, parity, in, fwdSpinor.data(), backSpinor.data(), 1, 1);
 
           real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
           int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;

@@ -959,10 +959,15 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
 
 void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precision)
 {
-  if (precision == QUDA_DOUBLE_PRECISION)
-    checkGauge((double **)oldG, (double **)newG, epsilon);
-  else
-    checkGauge((float **)oldG, (float **)newG, epsilon);
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    auto old_ptrs = typed_ptr_array<double *>(oldG);
+    auto new_ptrs = typed_ptr_array<double *>(newG);
+    checkGauge(old_ptrs.data(), new_ptrs.data(), epsilon);
+  } else {
+    auto old_ptrs = typed_ptr_array<float *>(oldG);
+    auto new_ptrs = typed_ptr_array<float *>(newG);
+    checkGauge(old_ptrs.data(), new_ptrs.data(), epsilon);
+  }
 }
 
 std::complex<double> twoColorSpinorContract(std::complex<double> *spinor1, std::complex<double> *spinor2)
@@ -1089,9 +1094,13 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
   int ret;
 
   if (precision == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink((double **)linkA, (double **)linkB, len);
+    auto a_ptrs = typed_ptr_array<double *>(linkA);
+    auto b_ptrs = typed_ptr_array<double *>(linkB);
+    ret = compareLink(a_ptrs.data(), b_ptrs.data(), len);
   } else {
-    ret = compareLink((float **)linkA, (float **)linkB, len);
+    auto a_ptrs = typed_ptr_array<float *>(linkA);
+    auto b_ptrs = typed_ptr_array<float *>(linkB);
+    ret = compareLink(a_ptrs.data(), b_ptrs.data(), len);
   }
 
   return ret;

@@ -187,13 +187,16 @@ void llfat_cpu(void **fatlink, su3_matrix **sitelink, Float *act_path_coeff)
 void llfat_reference(void **fatlink, void **sitelink, QudaPrecision prec, void *act_path_coeff)
 {
   switch (prec) {
-  case QUDA_DOUBLE_PRECISION:
-    llfat_cpu((void **)fatlink, (su3_matrix<double> **)sitelink, (double *)act_path_coeff);
+  case QUDA_DOUBLE_PRECISION: {
+    auto link = typed_ptr_array<su3_matrix<double> *>(sitelink);
+    llfat_cpu(fatlink, link.data(), (double *)act_path_coeff);
     break;
-
-  case QUDA_SINGLE_PRECISION:
-    llfat_cpu((void **)fatlink, (su3_matrix<float> **)sitelink, (float *)act_path_coeff);
+  }
+  case QUDA_SINGLE_PRECISION: {
+    auto link = typed_ptr_array<su3_matrix<float> *>(sitelink);
+    llfat_cpu(fatlink, link.data(), (float *)act_path_coeff);
     break;
+  }
 
   default:
     fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
@@ -436,6 +439,8 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
     ghost_staple[i] = (su3_matrix *)safe_malloc(2 * Vs[i] * sizeof(su3_matrix));
     ghost_staple1[i] = (su3_matrix *)safe_malloc(2 * Vs[i] * sizeof(su3_matrix));
   }
+  auto ghost_staple_v = typed_ptr_array<void *>(ghost_staple);
+  auto ghost_staple1_v = typed_ptr_array<void *>(ghost_staple1);
 
   su3_matrix *tempmat1 = (su3_matrix *)safe_malloc(V * sizeof(su3_matrix));
 
@@ -462,7 +467,7 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
         // The Lepage term */
         // Note this also involves modifying c_1 (above)
 
-        exchange_cpu_staple(Z_, staple, (void **)ghost_staple, prec);
+        exchange_cpu_staple(Z_, staple, ghost_staple_v.data(), prec);
 
         llfat_compute_gen_staple_field_mg((su3_matrix *)NULL, dir, nu, staple, ghost_staple, sitelink, ghost_sitelink,
                                           ghost_sitelink_diag, fatlink, act_path_coeff[5], 1);
@@ -472,7 +477,7 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
             llfat_compute_gen_staple_field_mg(tempmat1, dir, rho, staple, ghost_staple, sitelink, ghost_sitelink,
                                               ghost_sitelink_diag, fatlink, act_path_coeff[3], 1);
 
-            exchange_cpu_staple(Z_, tempmat1, (void **)ghost_staple1, prec);
+            exchange_cpu_staple(Z_, tempmat1, ghost_staple1_v.data(), prec);
 
             for (int sig = XUP; sig <= TUP; sig++) {
               if ((sig != dir) && (sig != nu) && (sig != rho)) {
@@ -512,13 +517,17 @@ void llfat_reference_mg(void **fatlink, void **sitelink, void **ghost_sitelink, 
 
   switch (prec) {
   case QUDA_DOUBLE_PRECISION: {
-    llfat_cpu_mg((void **)fatlink, (su3_matrix<double> **)sitelink, (su3_matrix<double> **)ghost_sitelink,
-                 (su3_matrix<double> **)ghost_sitelink_diag, (double *)act_path_coeff);
+    auto link = typed_ptr_array<su3_matrix<double> *>(sitelink);
+    auto ghost = typed_ptr_array<su3_matrix<double> *>(ghost_sitelink);
+    auto diag = typed_ptr_array<su3_matrix<double> *, n_ghost_diag>(ghost_sitelink_diag);
+    llfat_cpu_mg(fatlink, link.data(), ghost.data(), diag.data(), (double *)act_path_coeff);
     break;
   }
   case QUDA_SINGLE_PRECISION: {
-    llfat_cpu_mg((void **)fatlink, (su3_matrix<float> **)sitelink, (su3_matrix<float> **)ghost_sitelink,
-                 (su3_matrix<float> **)ghost_sitelink_diag, (float *)act_path_coeff);
+    auto link = typed_ptr_array<su3_matrix<float> *>(sitelink);
+    auto ghost = typed_ptr_array<su3_matrix<float> *>(ghost_sitelink);
+    auto diag = typed_ptr_array<su3_matrix<float> *, n_ghost_diag>(ghost_sitelink_diag);
+    llfat_cpu_mg(fatlink, link.data(), ghost.data(), diag.data(), (float *)act_path_coeff);
     break;
   }
   default:

@@ -284,6 +284,9 @@ int fullLatticeIndex_5d_4dpc(int i, int oddBit);
 int process_command_line_option(int argc, char **argv, int *idx);
 int process_options(int argc, char **argv);
 
+// Number of diagonal ghost link buffers: one per (nu, mu) direction pair, indexed as nu * 4 + mu
+constexpr int n_ghost_diag = 16;
+
 // Implemented in face_gauge.cpp
 void exchange_cpu_sitelink(quda::lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
                            QudaPrecision gPrecision, QudaGaugeParam *param, int optflag);

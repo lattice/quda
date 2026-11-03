@@ -151,17 +151,8 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack, Float **cpuGhos
   }     // ite
 }
 
-void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void **cpuGhostStapleFwd, int nFace,
-                                QudaPrecision precision, lat_dim_t &X)
-{
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhostAllStaples((double *)staple, (double **)cpuGhostStapleBack, (double **)cpuGhostStapleFwd, nFace, X);
-  } else {
-    packGhostAllStaples((float *)staple, (float **)cpuGhostStapleBack, (float **)cpuGhostStapleFwd, nFace, X);
-  }
-}
-
-void pack_gauge_diag(void *buf, lat_dim_t &X, void **sitelink, int nu, int mu, int dir1, int dir2, QudaPrecision prec)
+void pack_gauge_diag(void *buf, lat_dim_t &X, void *const *sitelink, int nu, int mu, int dir1, int dir2,
+                     QudaPrecision prec)
 {
   /*
     nu |          |
@@ -327,16 +318,6 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack, Float **cpuGhostFw
   }   // ite
 }
 
-void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void **cpuGhostFwd, int dir, int nFace,
-                          QudaPrecision precision, lat_dim_t &X)
-{
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhostAllLinks((double **)cpuLink, (double **)cpuGhostBack, (double **)cpuGhostFwd, dir, nFace, X);
-  } else {
-    packGhostAllLinks((float **)cpuLink, (float **)cpuGhostBack, (float **)cpuGhostFwd, dir, nFace, X);
-  }
-}
-
 void exchange_llfat_init(QudaPrecision prec)
 {
   static bool initialized = false;
@@ -371,6 +352,7 @@ void exchange_sitelink_diag(lat_dim_t &X, Float **sitelink, Float **ghost_siteli
   * and we need to send our data to neighbor with dx[nu]=+1, dx[mu]=-1
   */
 
+  const auto sitelink_v = typed_ptr_array<void *>(sitelink);
   for (int nu = XUP; nu <= TUP; nu++) {
     for (int mu = XUP; mu <= TUP; mu++) {
       if (nu == mu) { continue; }
@@ -388,7 +370,7 @@ void exchange_sitelink_diag(lat_dim_t &X, Float **sitelink, Float **ghost_siteli
       int len = X[dir1] * X[dir2] * gauge_site_size * sizeof(Float);
       void *sendbuf = host_pinned_malloc(len);
 
-      pack_gauge_diag(sendbuf, X, (void **)sitelink, nu, mu, dir1, dir2, (QudaPrecision)sizeof(Float));
+      pack_gauge_diag(sendbuf, X, sitelink_v.data(), nu, mu, dir1, dir2, (QudaPrecision)sizeof(Float));
 
       int dx[4] = {0};
       dx[nu] = -1;
@@ -420,8 +402,7 @@ void exchange_sitelink(lat_dim_t &X, Float **sitelink, Float **ghost_sitelink, F
   int nFace = 1;
   for (int dir = 0; dir < 4; dir++) {
     if (optflag && !commDimPartitioned(dir)) continue;
-    pack_ghost_all_links((void **)sitelink, (void **)sitelink_back_sendbuf, (void **)sitelink_fwd_sendbuf, dir, nFace,
-                         (QudaPrecision)(sizeof(Float)), X);
+    packGhostAllLinks(sitelink, sitelink_back_sendbuf, sitelink_fwd_sendbuf, dir, nFace, X);
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -478,11 +459,19 @@ void exchange_cpu_sitelink(lat_dim_t &X, void **sitelink, void **ghost_sitelink,
   }
 
   if (gPrecision == QUDA_DOUBLE_PRECISION) {
-    exchange_sitelink(X, (double **)sitelink, (double **)(ghost_sitelink), (double **)ghost_sitelink_diag,
-                      (double **)sitelink_fwd_sendbuf, (double **)sitelink_back_sendbuf, optflag);
+    auto link = typed_ptr_array<double *>(sitelink);
+    auto ghost = typed_ptr_array<double *>(ghost_sitelink);
+    auto diag = typed_ptr_array<double *, n_ghost_diag>(ghost_sitelink_diag);
+    auto fwd = typed_ptr_array<double *>(sitelink_fwd_sendbuf);
+    auto back = typed_ptr_array<double *>(sitelink_back_sendbuf);
+    exchange_sitelink(X, link.data(), ghost.data(), diag.data(), fwd.data(), back.data(), optflag);
   } else { // single
-    exchange_sitelink(X, (float **)sitelink, (float **)(ghost_sitelink), (float **)ghost_sitelink_diag,
-                      (float **)sitelink_fwd_sendbuf, (float **)sitelink_back_sendbuf, optflag);
+    auto link = typed_ptr_array<float *>(sitelink);
+    auto ghost = typed_ptr_array<float *>(ghost_sitelink);
+    auto diag = typed_ptr_array<float *, n_ghost_diag>(ghost_sitelink_diag);
+    auto fwd = typed_ptr_array<float *>(sitelink_fwd_sendbuf);
+    auto back = typed_ptr_array<float *>(sitelink_back_sendbuf);
+    exchange_sitelink(X, link.data(), ghost.data(), diag.data(), fwd.data(), back.data(), optflag);
   }
 
   for (int i = 0; i < 4; i++) {
@@ -894,8 +883,7 @@ void do_exchange_cpu_staple(Float *staple, Float **ghost_staple, Float **staple_
                             Float **staple_back_sendbuf, lat_dim_t &X)
 {
   int nFace = 1;
-  pack_ghost_all_staples_cpu(staple, (void **)staple_back_sendbuf, (void **)staple_fwd_sendbuf, nFace,
-                             (QudaPrecision)(sizeof(Float)), X);
+  packGhostAllStaples(staple, staple_back_sendbuf, staple_fwd_sendbuf, nFace, X);
 
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
   size_t len[4] = {Vsh_x * gauge_site_size * sizeof(Float), Vsh_y * gauge_site_size * sizeof(Float),
@@ -943,11 +931,15 @@ void exchange_cpu_staple(lat_dim_t &X, void *staple, void **ghost_staple, QudaPr
   }
 
   if (gPrecision == QUDA_DOUBLE_PRECISION) {
-    do_exchange_cpu_staple((double *)staple, (double **)ghost_staple, (double **)staple_fwd_sendbuf,
-                           (double **)staple_back_sendbuf, X);
+    auto ghost = typed_ptr_array<double *>(ghost_staple);
+    auto fwd = typed_ptr_array<double *>(staple_fwd_sendbuf);
+    auto back = typed_ptr_array<double *>(staple_back_sendbuf);
+    do_exchange_cpu_staple(static_cast<double *>(staple), ghost.data(), fwd.data(), back.data(), X);
   } else { // single
-    do_exchange_cpu_staple((float *)staple, (float **)ghost_staple, (float **)staple_fwd_sendbuf,
-                           (float **)staple_back_sendbuf, X);
+    auto ghost = typed_ptr_array<float *>(ghost_staple);
+    auto fwd = typed_ptr_array<float *>(staple_fwd_sendbuf);
+    auto back = typed_ptr_array<float *>(staple_back_sendbuf);
+    do_exchange_cpu_staple(static_cast<float *>(staple), ghost.data(), fwd.data(), back.data(), X);
   }
 
   for (int i = 0; i < 4; i++) {
