@@ -267,9 +267,7 @@ static void setup_links(QudaPrecision test_prec, QudaReconstructType /*recon*/, 
     reorderMILCtoQDP(qdp_longlink_eps, longlink_eps, V, gauge_site_size, gauge_param.cpu_prec, test_prec);
   }
 
-#ifdef MULTI_GPU
-  exchange_llfat_cleanup();
-#endif
+  if constexpr (is_multi_gpu()) exchange_llfat_cleanup();
 
   links_valid = true;
 }
@@ -300,11 +298,7 @@ static void destroy_host()
 // Force infrastructure
 // ============================================================
 
-#ifdef MULTI_GPU
-static lat_dim_t force_R = {2, 2, 2, 2};
-#else
-static lat_dim_t force_R = {0, 0, 0, 0};
-#endif
+constexpr lat_dim_t force_R = is_multi_gpu() ? lat_dim_t {2, 2, 2, 2} : lat_dim_t {0, 0, 0, 0};
 
 // CPU outer products (host precision)
 static GaugeField *cpuOprod = nullptr;
@@ -835,9 +829,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   host_free(milc_u_tp);
   host_free(vlink_milc);
   host_free(wlink_milc);
-#ifdef MULTI_GPU
-  exchange_llfat_cleanup();
-#endif
+  if constexpr (is_multi_gpu()) exchange_llfat_cleanup();
 
   // ---- 3. Spinor and outer products ----
   ColorSpinorParam qParam(interfaceQuark);
@@ -1209,29 +1201,18 @@ std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
   return ss.str();
 }
 
-#ifdef MULTI_GPU
+constexpr int n_partitions = is_multi_gpu() ? 16 : 1;
+
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
                          ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
                                             ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Range(0, 16)),
+                                            ::testing::Bool(), ::testing::Range(0, n_partitions)),
                          getHisqEndToEndTestName);
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqForceInterfaceTest,
                          ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION),
                                             ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Range(0, 16)),
+                                            ::testing::Bool(), ::testing::Range(0, n_partitions)),
                          getHisqEndToEndTestName);
-#else
-INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
-                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
-                                            ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Values(0)),
-                         getHisqEndToEndTestName);
-INSTANTIATE_TEST_SUITE_P(QUDA, HisqForceInterfaceTest,
-                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION),
-                                            ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Values(0)),
-                         getHisqEndToEndTestName);
-#endif
 
 int main(int argc, char **argv)
 {
