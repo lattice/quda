@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -92,11 +91,11 @@ namespace quda
       }
 
       /**
-         @brief The values of gauge.ssplaq, gauge.stplaq, gauge.nersc_linktr and gauge.nersc_checksum for the
-         links as a MILC v5 file holds them, in single precision, formatted as MILC's write_gauge_info_item
-         writes them (generic/io_lat_utils.c): each value as a float, with %f, %f, %e and %u.  Collective.
+         @brief The computed .info items (computed_info_items) of the links as a MILC v5 file holds them, in
+         single precision.  Collective.
        */
-      std::array<std::string, 4> computed_info(const void *const gauge[], QudaPrecision prec, const int *X)
+      std::vector<std::pair<std::string, std::string>> computed_info(const void *const gauge[], QudaPrecision prec,
+                                                                     const int *X)
       {
         // computed in double precision on the values rounded to float, which single-precision links are already
         const size_t reals = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3] * matrix_reals;
@@ -109,21 +108,39 @@ namespace quda
           for (size_t i = 0; i < reals; i++) u[i] = prec == QUDA_DOUBLE_PRECISION ? static_cast<float>(d[i]) : f[i];
         }
         const void *links[n_dim] = {rounded[0].data(), rounded[1].data(), rounded[2].data(), rounded[3].data()};
-        const auto obs = gauge_observables(links, QUDA_DOUBLE_PRECISION, X);
-
-        std::array<std::string, 4> values;
-        auto print = [](const char *fmt, auto value) {
-          char buf[64];
-          snprintf(buf, sizeof(buf), fmt, value);
-          return std::string(buf);
-        };
-        values[0] = print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_spatial)));
-        values[1] = print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_temporal)));
-        values[2] = print("%e", static_cast<double>(static_cast<float>(obs.linktr)));
-        values[3] = print("%u", static_cast<unsigned int>(obs.nersc_checksum));
-        return values;
+        return computed_info_items(gauge_observables(links, QUDA_DOUBLE_PRECISION, X));
       }
     } // namespace
+
+    const std::vector<std::string> &generic_info_keys()
+    {
+      static const std::vector<std::string> keys = {"magic_number", "time_stamp", "checksums", "nx", "ny", "nz", "nt"};
+      return keys;
+    }
+
+    const std::vector<std::string> &computed_info_keys()
+    {
+      static const std::vector<std::string> keys
+        = {"gauge.ssplaq", "gauge.stplaq", "gauge.nersc_linktr", "gauge.nersc_checksum"};
+      return keys;
+    }
+
+    std::vector<std::pair<std::string, std::string>> computed_info_items(const GaugeObservables &obs)
+    {
+      auto print = [](const char *fmt, auto value) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), fmt, value);
+        return std::string(buf);
+      };
+      const std::string values[] = {print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_spatial))),
+                                    print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_temporal))),
+                                    print("%e", static_cast<double>(static_cast<float>(obs.linktr))),
+                                    print("%u", static_cast<unsigned int>(obs.nersc_checksum))};
+      const auto &keys = computed_info_keys();
+      std::vector<std::pair<std::string, std::string>> items;
+      for (size_t k = 0; k < keys.size(); k++) items.push_back({keys[k], values[k]});
+      return items;
+    }
 
     GaugeFileInfo load_gauge(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
                              const FileIOParam &param)
@@ -250,23 +267,22 @@ namespace quda
         }
       }
 
-      std::vector<std::pair<std::string, std::string>> items = {{"magic_number", std::to_string(gauge_magic)},
-                                                                {"time_stamp", "\"" + stamp + "\""},
-                                                                {"checksums", "\"" + io::checksum_str(sum) + "\""},
-                                                                {"nx", std::to_string(N[0])},
-                                                                {"ny", std::to_string(N[1])},
-                                                                {"nz", std::to_string(N[2])},
-                                                                {"nt", std::to_string(N[3])}};
-      const std::vector<std::string> computed_keys
-        = {"gauge.ssplaq", "gauge.stplaq", "gauge.nersc_linktr", "gauge.nersc_checksum"};
+      const std::string generic_values[]
+        = {std::to_string(gauge_magic), "\"" + stamp + "\"",  "\"" + io::checksum_str(sum) + "\"",
+           std::to_string(N[0]),        std::to_string(N[1]), std::to_string(N[2]),
+           std::to_string(N[3])};
+      const auto &generic_keys = generic_info_keys();
+      std::vector<std::pair<std::string, std::string>> items;
+      for (size_t k = 0; k < generic_keys.size(); k++) items.push_back({generic_keys[k], generic_values[k]});
       if (param.write_usqcd_info) {
-        const auto values = computed_info(gauge, prec, X);
-        for (int k = 0; k < 4; k++) items.push_back({computed_keys[k], values[k]});
-        logQuda(QUDA_SUMMARIZE, "MILC .info plaquettes %s %s, link trace %s, NERSC checksum %s\n", values[0].c_str(),
-                values[1].c_str(), values[2].c_str(), values[3].c_str());
+        const auto computed = computed_info(gauge, prec, X);
+        items.insert(items.end(), computed.begin(), computed.end());
+        logQuda(QUDA_SUMMARIZE, "MILC .info plaquettes %s %s, link trace %s, NERSC checksum %s\n",
+                computed[0].second.c_str(), computed[1].second.c_str(), computed[2].second.c_str(),
+                computed[3].second.c_str());
       }
       write_info(filename, items, metadata.milc_info,
-                 param.write_usqcd_info ? std::vector<std::string>() : computed_keys);
+                 param.write_usqcd_info ? std::vector<std::string>() : computed_info_keys());
 
       return sum;
     }

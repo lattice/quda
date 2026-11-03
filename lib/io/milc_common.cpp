@@ -34,8 +34,11 @@ namespace quda
 
       auto info_filename = filename + ".info";
       std::ofstream out(info_filename);
-      for (auto &item : items)
-        if (!has_key(keys, item.first)) out << item.first << " = " << item.second << "\n";
+      auto write_missing = [&](auto item) {
+        for (; item != items.end() && !has_key(keys, item->first); item++)
+          out << item->first << " = " << item->second << "\n";
+      };
+      write_missing(items.begin());
       std::vector<std::string> placed;
       for (auto &line : lines) {
         auto item = std::find_if(items.begin(), items.end(), [&](const auto &i) { return i.first == line.key; });
@@ -44,6 +47,7 @@ namespace quda
         } else if (item != items.end() && !has_key(placed, line.key)) {
           out << item->first << " = " << item->second << "\n";
           placed.push_back(line.key);
+          write_missing(item + 1);
         }
       }
       out.close();

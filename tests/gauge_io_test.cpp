@@ -2114,8 +2114,9 @@ TEST(GaugeSaveMetadataTest, lime)
   }
 }
 
-// a MILC save given a time stamp and .info lines: the time stamp in the header and the .info file, the lines after
-// QUDA's, and QUDA's lines in place of given lines of the same keys, so that MILC's own order is kept
+// a MILC save given a time stamp and .info lines: the time stamp in the header and the .info file, the given lines
+// in their order with QUDA's lines in place of given lines of the same keys, and each of QUDA's other lines right
+// after QUDA's line before it, so that MILC's own order is kept
 TEST(GaugeSaveMetadataTest, milc)
 {
   using namespace quda;
@@ -2158,6 +2159,27 @@ TEST(GaugeSaveMetadataTest, milc)
     for (std::string line; std::getline(in, line);) milc_lines.push_back({line.substr(0, line.find(' ')), line});
   }
   EXPECT_EQ(milc_lines.size(), 20u);
+  std::vector<std::string> milc_keys;
+  for (auto &line : milc_lines) milc_keys.push_back(line.key);
+
+  // what a SciDAC file's <info> holds of MILC's .info: the lines without QUDA's seven
+  const std::vector<MILCInfoItem> scidac_lines(milc_lines.begin() + quda_keys.size(), milc_lines.end());
+
+  // milc_qcd/binary_samples/lat.sample.5p7.info (1999): QUDA's seven keys in the "key value" form, none computed
+  const std::vector<MILCInfoItem> milc_1999_lines
+    = {{"magic_number", "magic_number 20103"},
+       {"time_stamp", "time_stamp \"Wed Aug 25 08:30:50 1999\""},
+       {"checksums", "checksums \"2e218ab1 2d188e6b\""},
+       {"nx", "nx 4"},
+       {"ny", "ny 4"},
+       {"nz", "nz 4"},
+       {"nt", "nt 8"},
+       {"action.description", "action.description \"Pure gauge Schroedinger functional\""},
+       {"gauge.description", "gauge.description \"One plaqette action with bc_flag 2\""},
+       {"gauge.beta11", "gauge.beta11 5.700000"}};
+  std::vector<std::string> milc_1999_keys = quda_keys;
+  milc_1999_keys.insert(milc_1999_keys.end(), computed_keys.begin(), computed_keys.end());
+  milc_1999_keys.insert(milc_1999_keys.end(), {"action.description", "gauge.description", "gauge.beta11"});
 
   // lines out of MILC's order: QUDA's keys given once or twice, array lines, a "key value" line, one without a
   // key, a line ending in a CR, and a key of MILC's given twice
@@ -2176,10 +2198,13 @@ TEST(GaugeSaveMetadataTest, milc)
     bool write_usqcd_info;
     std::string stamp;
     std::vector<MILCInfoItem> lines;
+    std::vector<std::string> keys; // the saved lines' keys in order, if given
   };
-  const Case cases[] = {{"MILC's .info", true, "Sat Nov 18 17:30:04 2017", milc_lines},
-                        {"other lines", true, "Thu Oct 22 18:00:00 2026", other_lines},
-                        {"other lines without write_usqcd_info", false, std::string(64, 'x'), other_lines}};
+  const Case cases[] = {{"MILC's .info", true, "Sat Nov 18 17:30:04 2017", milc_lines, milc_keys},
+                        {"MILC 1999 .info", true, "Wed Aug 25 08:30:50 1999", milc_1999_lines, milc_1999_keys},
+                        {"SciDAC <info> lines", true, "Sat Nov 18 17:30:04 2017", scidac_lines, milc_keys},
+                        {"other lines", true, "Thu Oct 22 18:00:00 2026", other_lines, {}},
+                        {"other lines without write_usqcd_info", false, std::string(64, 'x'), other_lines, {}}};
   for (auto &c : cases) {
     SCOPED_TRACE(c.name);
     GaugeMetadata given;
@@ -2194,15 +2219,14 @@ TEST(GaugeSaveMetadataTest, milc)
     EXPECT_EQ(info.has_plaq_linktr, c.write_usqcd_info);
     if (info.has_plaq_linktr) { EXPECT_TRUE(info.plaq_linktr_matches); }
 
-    // QUDA's lines whose keys aren't given, then the given ones, with QUDA's line for the first of each of its keys
+    // the given lines with QUDA's line for the first of each of its keys, then each of QUDA's lines whose key isn't
+    // given inserted right after QUDA's line before it, or first
     auto keys = quda_keys;
     if (c.write_usqcd_info) keys.insert(keys.end(), computed_keys.begin(), computed_keys.end());
     auto given_key = [&](const std::string &key) {
       return std::any_of(c.lines.begin(), c.lines.end(), [&](const MILCInfoItem &i) { return i.key == key; });
     };
     std::vector<MILCInfoItem> expected;
-    for (auto &key : keys)
-      if (!given_key(key)) expected.push_back({key, quda_line(key, c.stamp, info)});
     std::vector<std::string> placed;
     for (auto &line : c.lines) {
       const bool quda = std::find(keys.begin(), keys.end(), line.key) != keys.end();
@@ -2214,14 +2238,29 @@ TEST(GaugeSaveMetadataTest, milc)
         expected.push_back(line);
       }
     }
-    if (c.name == "MILC's .info") {
-      // MILC's order, with this field's values
-      EXPECT_EQ(expected.size(), milc_lines.size());
-      for (auto i = 0u; i < std::min(expected.size(), milc_lines.size()); i++)
-        EXPECT_EQ(expected[i].key, milc_lines[i].key);
+    for (auto k = 0u; k < keys.size(); k++) {
+      if (given_key(keys[k])) continue;
+      auto at = expected.begin();
+      if (k > 0)
+        at = std::find_if(expected.begin(), expected.end(), [&](const MILCInfoItem &i) { return i.key == keys[k - 1]; })
+          + 1;
+      expected.insert(at, {keys[k], quda_line(keys[k], c.stamp, info)});
     }
 
     const auto &m = info.metadata;
+    if (!c.keys.empty()) {
+      // the order by key, independently of the expectation above
+      EXPECT_EQ(expected.size(), c.keys.size());
+      for (auto i = 0u; i < std::min(expected.size(), c.keys.size()); i++) EXPECT_EQ(expected[i].key, c.keys[i]);
+      EXPECT_EQ(m.milc_info.size(), c.keys.size());
+      for (auto i = 0u; i < std::min(m.milc_info.size(), c.keys.size()); i++) EXPECT_EQ(m.milc_info[i].key, c.keys[i]);
+    }
+    if (c.name == "MILC 1999 .info") {
+      // MILC's own lines verbatim after QUDA's eleven
+      for (auto i = quda_keys.size(); i < c.lines.size() && i + computed_keys.size() < m.milc_info.size(); i++)
+        EXPECT_EQ(m.milc_info[i + computed_keys.size()].line, c.lines[i].line);
+    }
+
     EXPECT_EQ(m.milc_time_stamp, c.stamp);
     EXPECT_EQ(m.milc_info.size(), expected.size());
     for (auto i = 0u; i < std::min(expected.size(), m.milc_info.size()); i++) {

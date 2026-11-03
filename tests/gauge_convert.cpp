@@ -331,12 +331,6 @@ namespace
     if (gauge_input_seed_given) printfQuda("Gauge input seed: %lu\n", static_cast<unsigned long>(gauge_input_seed));
   }
 
-  // MILC's .info keys that QUDA writes itself, and the four it computes
-  const std::vector<std::string> milc_generic_keys
-    = {"magic_number", "time_stamp", "checksums", "nx", "ny", "nz", "nt"};
-  const std::vector<std::string> milc_computed_keys
-    = {"gauge.ssplaq", "gauge.stplaq", "gauge.nersc_linktr", "gauge.nersc_checksum"};
-
   bool contains(const std::vector<std::string> &keys, const std::string &key)
   {
     return std::find(keys.begin(), keys.end(), key) != keys.end();
@@ -441,15 +435,9 @@ namespace
   // MILC's four computed keys of the links, as milc::save_gauge writes them
   std::vector<MILCInfoItem> computed_items(const GaugeObservables &obs)
   {
-    auto print = [](const char *fmt, auto value) {
-      char buf[64];
-      snprintf(buf, sizeof(buf), fmt, value);
-      return std::string(buf);
-    };
-    return {info_item("gauge.ssplaq", print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_spatial)))),
-            info_item("gauge.stplaq", print("%f", static_cast<double>(static_cast<float>(3.0 * obs.plaq_temporal)))),
-            info_item("gauge.nersc_linktr", print("%e", static_cast<double>(static_cast<float>(obs.linktr)))),
-            info_item("gauge.nersc_checksum", print("%u", static_cast<unsigned int>(obs.nersc_checksum)))};
+    std::vector<MILCInfoItem> items;
+    for (auto &[key, value] : milc::computed_info_items(obs)) items.push_back(info_item(key, value));
+    return items;
   }
 
   // MILC's provenance keys: the source file, its time stamp (MILC) or record date (SciDAC), and its checksums
@@ -563,7 +551,7 @@ namespace
     if (from_milc) {
       std::vector<MILCInfoItem> lines;
       for (auto &item : in.milc_info)
-        if (!contains(milc_generic_keys, item.key)) lines.push_back(item);
+        if (!contains(milc::generic_info_keys(), item.key)) lines.push_back(item);
       lines = replace_items(lines, computed_items(saved), false);
       out.has_usqcd_info = true;
       out.usqcd_info = join_lines(replace_items(lines, provenance, true));
@@ -626,7 +614,8 @@ namespace
   {
     std::vector<MILCInfoItem> out;
     for (auto &item : items)
-      if (!contains(milc_generic_keys, item.key) && !contains(milc_computed_keys, item.key)) out.push_back(item);
+      if (!contains(milc::generic_info_keys(), item.key) && !contains(milc::computed_info_keys(), item.key))
+        out.push_back(item);
     return out;
   }
 

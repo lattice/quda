@@ -20,12 +20,14 @@ namespace quda
     std::string time_stamp();
 
     /**
-       @brief Write <filename>.info on rank 0: one "key = value" line per
-       item, then the other lines verbatim, in their order.  Another line
-       with an item's key is replaced by the item's line in its place,
-       and one with a key in dropped is left out; only the first line of
-       such a key is kept.
-       @param[in] items QUDA's keys and values
+       @brief Write <filename>.info on rank 0: the other lines verbatim,
+       in their order, and one "key = value" line per item.  The first
+       other line with an item's key is replaced by the item's line, and
+       later lines of that key are left out, as are lines with a key in
+       dropped.  An item whose key no other line has goes right after
+       the line of the item before it, or first if it is the first item,
+       so runs of such items stay in the items' order.
+       @param[in] items QUDA's keys and values, in QUDA's order
        @param[in] lines The other lines, without newlines
        @param[in] dropped The keys of other lines to leave out
      */
@@ -53,6 +55,27 @@ namespace quda
        value of its last line
      */
     std::map<std::string, std::string> info_values(const std::vector<MILCInfoItem> &items);
+
+    /**
+       @brief The keys of the .info lines save_gauge always writes, in
+       its order: magic_number, time_stamp, checksums, nx, ny, nz, nt
+     */
+    const std::vector<std::string> &generic_info_keys();
+
+    /**
+       @brief The keys of the .info lines save_gauge computes from the
+       links with param.write_usqcd_info, in its order: gauge.ssplaq,
+       gauge.stplaq, gauge.nersc_linktr, gauge.nersc_checksum
+     */
+    const std::vector<std::string> &computed_info_keys();
+
+    /**
+       @brief The keys of computed_info_keys and their values for a
+       field's observables, formatted as MILC's write_gauge_info_item
+       writes them (generic/io_lat_utils.c): each value as a float, with
+       %f, %f, %e and %u
+     */
+    std::vector<std::pair<std::string, std::string>> computed_info_items(const GaugeObservables &obs);
 
     /**
        @brief Load a MILC v5 gauge field
