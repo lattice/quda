@@ -779,6 +779,14 @@ if(QUDA_FPMP_FLOATFLOAT AND NOT QUDA_TARGET_TYPE STREQUAL "CUDA")
   message(FATAL_ERROR "QUDA_FPMP_FLOATFLOAT requires QUDA_TARGET_TYPE=CUDA")
 endif()
 
+if(QUDA_FPMP_FLOATFLOAT AND QUDA_SCALAR_TYPE STREQUAL "float128")
+  message(FATAL_ERROR
+          "QUDA_FPMP_FLOATFLOAT cannot be combined with QUDA_SCALAR_TYPE=float128. "
+          "CCCL deletes conversions between binary128 and fp32mp2, so coefficient "
+          "casts and reduction_to_real() do not compile. Leave float-float off, "
+          "or use QUDA_SCALAR_TYPE=double.")
+endif()
+
 message(STATUS "QUDA_FPMP_DOUBLEDOUBLE: ${QUDA_FPMP_DOUBLEDOUBLE} (${QUDA_FPMP_DOUBLEDOUBLE_ACCURACY})")
 message(STATUS "QUDA_FPMP_FLOATFLOAT: ${QUDA_FPMP_FLOATFLOAT} (${QUDA_FPMP_FLOATFLOAT_ACCURACY})")
 

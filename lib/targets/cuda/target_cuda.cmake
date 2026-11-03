@@ -136,9 +136,11 @@ message(STATUS "QUDA_GPU_ARCH: ${QUDA_GPU_ARCH}")
 
 # Low FP64:FP32 parts (32:1 or 64:1). First-configure defaults: bulk float-float
 # low, reductions mid. High-FP64 parts (70/80/90/100/107) stay IEEE double.
+# QUDA_SCALAR_TYPE=float128 stays on IEEE double too: CCCL deletes the
+# binary128 <-> fp32mp2 conversions those defaults would require.
 set(_quda_low_fp64_caps 72 75 86 87 89 103 110 120 121)
 string(REGEX MATCH "^[0-9]+" _quda_fp64_cap "${QUDA_COMPUTE_CAPABILITY}")
-if(_quda_fp64_cap IN_LIST _quda_low_fp64_caps)
+if(_quda_fp64_cap IN_LIST _quda_low_fp64_caps AND NOT QUDA_SCALAR_TYPE STREQUAL "float128")
   set(QUDA_FPMP_FLOATFLOAT_DEFAULT ON)
   set(QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT low)
   # An explicit QUDA_FPMP_FLOATFLOAT=OFF has to leave the reductions on IEEE double
@@ -153,6 +155,10 @@ else()
   set(QUDA_FPMP_FLOATFLOAT_DEFAULT OFF)
   set(QUDA_FPMP_FLOATFLOAT_ACCURACY_DEFAULT high)
   set(QUDA_REDUCTION_TYPE_DEFAULT double)
+  if(_quda_fp64_cap IN_LIST _quda_low_fp64_caps)
+    message(STATUS "Low-FP64 arch ${QUDA_GPU_ARCH}: float-float defaults disabled "
+                   "for QUDA_SCALAR_TYPE=float128")
+  endif()
 endif()
 unset(_quda_low_fp64_caps)
 unset(_quda_fp64_cap)
