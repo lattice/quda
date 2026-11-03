@@ -278,8 +278,8 @@ int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, co
    @param[in] msg_result Label printed for result in verbose output
    @param[in] expected Reference field
    @param[in] msg_expected Label printed for expected in verbose output
-   @param[in] tol Element-wise tolerance passed to compare_floats
-   @return Whether every element agrees within tol, and the accuracy level from strong_check_link
+   @param[in] tol Element-wise absolute tolerance
+   @return Whether every element agrees within tol, and the accuracy level from strong_check_field
 */
 std::pair<bool, int> compare_link_fields(const quda::GaugeField &result, const std::string &msg_result,
                                          const quda::GaugeField &expected, const std::string &msg_expected, double tol);
@@ -289,7 +289,7 @@ std::pair<bool, int> compare_link_fields(const quda::GaugeField &result, const s
  */
 struct StrongCheckResult {
   double max_deviation; /**< Largest absolute component-wise difference. */
-  int accuracy_level;   /**< Finest base-10 threshold with no failures. */
+  int accuracy_level;   /**< Largest L with no deviation above 10^-(L+1), matching strong_check_link. */
 };
 
 /**

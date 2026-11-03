@@ -1183,20 +1183,66 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   return compare_link(linkA, linkB);
 }
 
+static void print_link_endpoints(const GaugeField &u, const std::string &msg)
+{
+  if (u.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", u.Order());
+  printfQuda("%s\n", msg.c_str());
+  printLinkElement(u.data(0), 0, u.Precision());
+  printfQuda("\n");
+  printLinkElement(u.data(0), 1, u.Precision());
+  printfQuda("...\n");
+  printLinkElement(u.data(3), u.Volume() - 1, u.Precision());
+  printfQuda("\n");
+}
+
+template <typename Float>
+static void print_first_failures(const GaugeField &result, const std::string &msg_result, const GaugeField &expected,
+                                 const std::string &msg_expected, double tol)
+{
+  const size_t length = result.Volume() * gauge_site_size;
+  for (int component = 0; component < result.Geometry(); component++) {
+    const auto r = static_cast<const Float *>(result.data(component));
+    const auto e = static_cast<const Float *>(expected.data(component));
+    auto diff = [&](size_t i) { return std::abs(static_cast<double>(r[i]) - static_cast<double>(e[i])); };
+    auto fails = [&](size_t i) {
+      const double d = diff(i);
+      return d > tol || std::isnan(d);
+    };
+
+    size_t first = length;
+    if (fails(0)) {
+      first = 0;
+    } else {
+#pragma omp parallel for reduction(min : first)
+      for (size_t i = 1; i < length; i++)
+        if (fails(i)) first = std::min(first, i);
+    }
+
+    if (first < length)
+      printfQuda("ERROR: component %d, i=%zu: %s %e, %s %e, |diff| %e > tol %e\n", component, first, msg_result.c_str(),
+                 static_cast<double>(r[first]), msg_expected.c_str(), static_cast<double>(e[first]), diff(first), tol);
+  }
+}
+
 std::pair<bool, int> compare_link_fields(const GaugeField &result, const std::string &msg_result,
                                          const GaugeField &expected, const std::string &msg_expected, double tol)
 {
   if (result.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", result.Order());
   if (expected.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", expected.Order());
 
-  bool res = true;
-  for (int d = 0; d < 4; d++) {
-    res &= compare_floats(expected.data<void *>(d), result.data<void *>(d), expected.Volume() * gauge_site_size, tol,
-                          checkPrecision(result, expected))
-      == 1;
+  if (verbosity >= QUDA_VERBOSE) {
+    print_link_endpoints(result, msg_result);
+    print_link_endpoints(expected, "\n" + msg_expected);
   }
-  int level = strong_check_link(result, msg_result, expected, msg_expected);
-  return {res, level};
+  const auto check = strong_check_field(result, msg_result, expected, msg_expected);
+  const bool pass = check.max_deviation <= tol;
+  if (!pass) {
+    if (result.Precision() == QUDA_DOUBLE_PRECISION)
+      print_first_failures<double>(result, msg_result, expected, msg_expected, tol);
+    else
+      print_first_failures<float>(result, msg_result, expected, msg_expected, tol);
+  }
+  return {pass, check.accuracy_level};
 }
 
 template <typename Float>
@@ -1237,7 +1283,7 @@ static StrongCheckResult strong_check_histogram(const std::vector<const Float *>
     }
     printfQuda(" %15zu/%zu %.6e\n", total_failures, total_values,
                total_values ? static_cast<double>(total_failures) / total_values : 0.0);
-    if (total_failures == 0) accuracy_level = level + 1;
+    if (total_failures == 0) accuracy_level = level;
   }
 
   return {max_deviation, accuracy_level};
