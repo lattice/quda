@@ -20,8 +20,11 @@ this string only once; returning to a cached communicator restores its key.
 
 For a single-GPU emulation, enable `QUDA_ENABLE_MPS=1`, use an MPS server,
 and set `QUDA_ENABLE_GDR=0` for host-buffer MPI across islands. MPS alone
-does not define island membership. Do not use P2P-only policy settings
-(`QUDA_ENABLE_P2P=5,6,7`) for this mixed-path experiment.
+does not define island membership. `QUDA_ENABLE_P2P=3` allows the tuner
+to choose no-P2P, copy-engine, or remote-write policies. For controlled
+experiments, `5` forces copy-engine P2P and `6` forces remote-write P2P
+on eligible links; island boundaries still use ordinary MPI. `7` permits
+both P2P methods but excludes the no-P2P policy when P2P links exist.
 
 Build `p2p_islands_test` in an MPI build. On one GPU:
 
@@ -52,6 +55,9 @@ sizes 1, 2, 4, and 8. It covers both rank orderings, pure X/Y/Z/T process
 grids, and six mixed grids, including splitting multiple dimensions at
 once and splitting into single-rank subgrids. Each case saves its full log.
 Two independent MPI worlds run at a time (16 total MPS clients).
+The runner defaults to `--p2p 5` to force copy-engine P2P on eligible
+faces; use `--p2p 6` to force remote writes. `--p2p 3` permits the
+no-P2P policy and is not a forced-P2P numerical test with tuning disabled.
 
 ## Checkpoint validation
 
@@ -67,6 +73,12 @@ Process grids were `8 1 1 1`, `1 8 1 1`, `1 1 8 1`, `1 1 1 8`,
 used factor 2 along each partitioned axis separately, plus a full split
 along all partitioned axes together. The pure-axis numerical checks used
 factor 2; all mixed-grid splits had numerical checks.
+
+Those original numerical runs used P2P flag 3 with tuning disabled, so they
+could select the no-P2P default. They validate results with the island setup
+but do not prove forced-P2P halo correctness. The subsequent
+[performance investigation](p2p-islands-performance.md) adds runtime path
+traces and 36 passing forced-copy/remote CPU-reference checks through `32^4`.
 
 Validated on one NVIDIA L4 with MPS, Open MPI 4.1.6, single precision,
 uncompressed gauge fields, and GPU-direct RDMA disabled:
@@ -88,6 +100,9 @@ These checks validate the island machinery; they do not reproduce the
 Laplace-to-MG failure, whose pipeline test is a separate next step.
 
 ## Dslash performance sample
+
+This initial one-volume sample is superseded by the
+[multi-volume cache audit and controlled-policy investigation](p2p-islands-performance.md).
 
 Eight sequentially benchmarked MPS ranks on the L4, local volume `16^4`,
 process grid `2 1 1 4`, Wilson dslash, single precision, reconstruction 18,

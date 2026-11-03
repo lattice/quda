@@ -10,10 +10,12 @@ import subprocess
 parser = argparse.ArgumentParser()
 parser.add_argument("build", type=Path)
 parser.add_argument("logs", type=Path)
+parser.add_argument("--p2p", choices=(3, 5, 6), type=int, default=5,
+                    help="5 forces copy-engine (default), 6 forces remote-write, 3 permits the no-P2P policy")
 args = parser.parse_args()
 args.logs.mkdir(parents=True, exist_ok=True)
 env = dict(os.environ, QUDA_ENABLE_MPS="1", QUDA_ENABLE_GDR="0",
-           QUDA_ENABLE_P2P="3", QUDA_ENABLE_TUNING="0")
+           QUDA_ENABLE_P2P=str(args.p2p), QUDA_ENABLE_TUNING="0")
 env.pop("DISPLAY", None)
 cases = []
 # Each physical lattice dimension is tested as the only partitioned axis.
@@ -50,7 +52,7 @@ for island_size, order, (grid, split) in itertools.product((1, 2, 4, 8), ("col",
             command += ["--dim", "4", "4", "4", "4", "--nsrc", str(math.prod(split)),
                         "--prec", "single", "--recon", "18", "--niter", "2",
                         "--gtest_filter=DslashTest.verify"]
-        name = f"{program}-island{island_size}-{order}-grid{''.join(map(str, grid))}-split{''.join(map(str, split))}"
+        name = f"{program}-p2p{args.p2p}-island{island_size}-{order}-grid{''.join(map(str, grid))}-split{''.join(map(str, split))}"
         marker = "PASS (0 mismatches)" if program == "p2p_islands_test" else "[  PASSED  ] 1 test."
         jobs.append((command, env.copy(), name, marker))
 
