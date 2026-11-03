@@ -64,8 +64,8 @@ double rectangle(const matrix<real_t> *const *links, size_t i, int mu, int nu, c
 template <typename real_t> struct PlaquetteReference {
   void operator()(std::array<double, 2> &result, const quda::GaugeField &u, const lattice_t &lat)
   {
-    const auto ptrs = u.data_array<void *>();
-    const auto links = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
+    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto links = ptrs.data;
     double spatial = 0.0;
     double temporal = 0.0;
 
@@ -84,8 +84,8 @@ template <typename real_t> struct PlaquetteReference {
 template <typename real_t> struct PlaquetteRectangleReferenceCompute {
   void operator()(std::array<double, 4> &result, const quda::GaugeField &u, const lattice_t &lat)
   {
-    const auto ptrs = u.data_array<void *>();
-    const auto links = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
+    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto links = ptrs.data;
     double spatial_plaquette = 0.0;
     double temporal_plaquette = 0.0;
     double spatial_rectangle = 0.0;
@@ -116,8 +116,8 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
     const int x3 = u.X()[3];
     const size_t volume = u.Volume();
     const size_t spatial_volume = volume / x3;
-    const auto ptrs = u.data_array<void *>();
-    const auto links = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
+    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto links = ptrs.data;
 
     std::vector<matrix<double>> local_product(spatial_volume);
 #pragma omp parallel for
@@ -197,8 +197,8 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
 template <typename real_t> struct LinkDeterminantTraceReferenceCompute {
   void operator()(std::array<double, 6> &result, const quda::GaugeField &u)
   {
-    const auto ptrs = u.data_array<void *>();
-    const auto links = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
+    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto links = ptrs.data;
     double determinant_real = 0.0;
     double determinant_imaginary = 0.0;
     double trace_real = 0.0;
@@ -253,10 +253,10 @@ matrix<real_t> clover_fmunu(const matrix<real_t> *const *links, size_t i, int mu
 template <typename real_t> struct FieldStrengthReferenceCompute {
   void operator()(quda::GaugeField &out, const quda::GaugeField &u, const lattice_t &lat)
   {
-    const auto input_ptrs = u.data_array<void *>();
-    auto links = reinterpret_cast<const matrix<real_t> *const *>(input_ptrs.data);
-    const auto output_ptrs = out.data_array<void *>();
-    auto fmunu = reinterpret_cast<matrix<real_t> *const *>(output_ptrs.data);
+    const auto input_ptrs = u.data_array<const matrix<real_t> *>();
+    const auto links = input_ptrs.data;
+    const auto output_ptrs = out.data_array<matrix<real_t> *>();
+    const auto fmunu = output_ptrs.data;
     constexpr std::array<std::array<int, 2>, 6> directions {{{1, 0}, {2, 0}, {2, 1}, {3, 0}, {3, 1}, {3, 2}}};
 
 #pragma omp parallel for
@@ -270,8 +270,8 @@ template <typename real_t> struct FieldStrengthReferenceCompute {
 template <typename real_t> struct FieldStrengthObservableReferenceCompute {
   FieldStrengthObservableReference operator()(const quda::GaugeField &fmunu)
   {
-    const auto ptrs = fmunu.data_array<void *>();
-    auto field = reinterpret_cast<const matrix<real_t> *const *>(ptrs.data);
+    const auto ptrs = fmunu.data_array<const matrix<real_t> *>();
+    const auto field = ptrs.data;
     const auto identity = Identity<3, std::complex<real_t>>()();
     constexpr double q_norm = -1.0 / (4.0 * M_PI * M_PI);
     double spatial_energy = 0.0;
@@ -315,8 +315,8 @@ template <typename real_t> struct FieldStrengthObservableReferenceCompute {
 template <typename real_t> struct ProjectSU3Reference {
   int operator()(quda::GaugeField &u)
   {
-    const auto ptrs = u.data_array<void *>();
-    auto links = reinterpret_cast<matrix<real_t> *const *>(ptrs.data);
+    const auto ptrs = u.data_array<matrix<real_t> *>();
+    const auto links = ptrs.data;
     const auto tolerance = static_cast<real_t>(u.toleranceSU3());
     int failures = 0;
 

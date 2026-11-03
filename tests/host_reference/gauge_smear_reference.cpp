@@ -86,10 +86,10 @@ template <typename real_t> struct APESmear {
                   const lattice_t &lat)
   {
     using link = matrix<real_t>;
-    const auto input_ptrs = in.data_array<void *>();
-    const auto output_ptrs = out.data_array<void *>();
-    auto input = reinterpret_cast<const link *const *>(input_ptrs.data);
-    auto output = reinterpret_cast<link *const *>(output_ptrs.data);
+    const auto input_ptrs = in.data_array<const link *>();
+    const auto output_ptrs = out.data_array<link *>();
+    const auto input = input_ptrs.data;
+    const auto output = output_ptrs.data;
     const int ape_dim = dir_ignore == 4 ? 4 : 3;
     const auto alpha_ = static_cast<real_t>(alpha);
     const auto anisotropy_ = static_cast<real_t>(anisotropy);
@@ -235,10 +235,10 @@ template <typename real_t> struct StoutSmear {
                   double anisotropy, bool over_improved, const lattice_t &lat)
   {
     using link = matrix<real_t>;
-    const auto input_ptrs = in.data_array<void *>();
-    const auto output_ptrs = out.data_array<void *>();
-    auto input = reinterpret_cast<const link *const *>(input_ptrs.data);
-    auto output = reinterpret_cast<link *const *>(output_ptrs.data);
+    const auto input_ptrs = in.data_array<const link *>();
+    const auto output_ptrs = out.data_array<link *>();
+    const auto input = input_ptrs.data;
+    const auto output = output_ptrs.data;
     const int smear_dim = dir_ignore == 4 ? 4 : 3;
     const auto rho_ = static_cast<real_t>(rho);
     const auto epsilon_ = static_cast<real_t>(epsilon);
@@ -276,12 +276,11 @@ template <typename real_t> struct HYPLevel1 {
                   const lattice_t &lat)
   {
     using link = matrix<real_t>;
-    const auto input_ptrs = in.data_array<void *>();
-    auto input = reinterpret_cast<const link *const *>(input_ptrs.data);
+    const auto input_ptrs = in.data_array<const link *>();
+    const auto input = input_ptrs.data;
     std::array<std::array<link *, 4>, 4> output;
     for (int slot = 0; slot < 4; slot++) {
-      const auto ptrs = out[slot]->data_array<void *>();
-      auto field = reinterpret_cast<link *const *>(ptrs.data);
+      const auto field = out[slot]->data_array<link *>();
       for (int dir = 0; dir < 4; dir++) output[slot][dir] = field[dir];
     }
     const auto alpha_ = static_cast<real_t>(alpha);
@@ -322,17 +321,15 @@ template <typename real_t> struct HYPLevel2 {
     std::array<std::array<const link *, 4>, 4> input;
     std::array<std::array<link *, 4>, 4> output;
     for (int slot = 0; slot < 4; slot++) {
-      const auto input_ptrs = in[slot]->data_array<void *>();
-      const auto output_ptrs = out[slot]->data_array<void *>();
-      auto input_field = reinterpret_cast<const link *const *>(input_ptrs.data);
-      auto output_field = reinterpret_cast<link *const *>(output_ptrs.data);
+      const auto input_field = in[slot]->data_array<const link *>();
+      const auto output_field = out[slot]->data_array<link *>();
       for (int dir = 0; dir < 4; dir++) {
         input[slot][dir] = input_field[dir];
         output[slot][dir] = output_field[dir];
       }
     }
-    const auto thin_ptrs = thin.data_array<void *>();
-    auto thin_links = reinterpret_cast<const link *const *>(thin_ptrs.data);
+    const auto thin_ptrs = thin.data_array<const link *>();
+    const auto thin_links = thin_ptrs.data;
     const auto alpha_ = static_cast<real_t>(alpha);
     const auto identity = Identity<3, std::complex<real_t>>()();
     const auto tolerance = static_cast<real_t>(thin.toleranceSU3());
@@ -377,14 +374,13 @@ template <typename real_t> struct HYPFinal {
     using link = matrix<real_t>;
     std::array<std::array<const link *, 4>, 4> input;
     for (int slot = 0; slot < 4; slot++) {
-      const auto ptrs = tensors[slot]->data_array<void *>();
-      auto field = reinterpret_cast<const link *const *>(ptrs.data);
+      const auto field = tensors[slot]->data_array<const link *>();
       for (int dir = 0; dir < 4; dir++) input[slot][dir] = field[dir];
     }
-    const auto thin_ptrs = thin.data_array<void *>();
-    const auto output_ptrs = out.data_array<void *>();
-    auto thin_links = reinterpret_cast<const link *const *>(thin_ptrs.data);
-    auto output = reinterpret_cast<link *const *>(output_ptrs.data);
+    const auto thin_ptrs = thin.data_array<const link *>();
+    const auto output_ptrs = out.data_array<link *>();
+    const auto thin_links = thin_ptrs.data;
+    const auto output = output_ptrs.data;
     const int hyp_dim = dir_ignore == 4 ? 4 : 3;
     const auto alpha_ = static_cast<real_t>(alpha);
     const auto scale = static_cast<real_t>(alpha_ / (hyp_dim == 4 ? 6 : 4));
@@ -495,10 +491,10 @@ template <typename real_t> struct WFlowW1 {
                   real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
   {
     using link = matrix<real_t>;
-    const auto input_ptrs = in.data_array<void *>();
-    const auto output_ptrs = out.data_array<void *>();
-    auto input = reinterpret_cast<const link *const *>(input_ptrs.data);
-    auto output = reinterpret_cast<link *const *>(output_ptrs.data);
+    const auto input_ptrs = in.data_array<const link *>();
+    const auto output_ptrs = out.data_array<link *>();
+    const auto input = input_ptrs.data;
+    const auto output = output_ptrs.data;
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
       for (int dir = 0; dir < 4; dir++) {
@@ -521,10 +517,10 @@ template <typename real_t> struct WFlowW2 {
                   real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
   {
     using link = matrix<real_t>;
-    const auto input_ptrs = in.data_array<void *>();
-    const auto output_ptrs = out.data_array<void *>();
-    auto input = reinterpret_cast<const link *const *>(input_ptrs.data);
-    auto output = reinterpret_cast<link *const *>(output_ptrs.data);
+    const auto input_ptrs = in.data_array<const link *>();
+    const auto output_ptrs = out.data_array<link *>();
+    const auto input = input_ptrs.data;
+    const auto output = output_ptrs.data;
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
       for (int dir = 0; dir < 4; dir++) {
@@ -548,10 +544,10 @@ template <typename real_t> struct WFlowVt {
                   real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
   {
     using link = matrix<real_t>;
-    const auto input_ptrs = in.data_array<void *>();
-    const auto output_ptrs = out.data_array<void *>();
-    auto input = reinterpret_cast<const link *const *>(input_ptrs.data);
-    auto output = reinterpret_cast<link *const *>(output_ptrs.data);
+    const auto input_ptrs = in.data_array<const link *>();
+    const auto output_ptrs = out.data_array<link *>();
+    const auto input = input_ptrs.data;
+    const auto output = output_ptrs.data;
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
       for (int dir = 0; dir < 4; dir++) {
@@ -585,10 +581,10 @@ template <typename real_t> struct WFlowRK4Step {
                   bool get_stored, bool do_store)
   {
     using link = matrix<real_t>;
-    const auto input_ptrs = in.data_array<void *>();
-    const auto output_ptrs = out.data_array<void *>();
-    auto input = reinterpret_cast<const link *const *>(input_ptrs.data);
-    auto output = reinterpret_cast<link *const *>(output_ptrs.data);
+    const auto input_ptrs = in.data_array<const link *>();
+    const auto output_ptrs = out.data_array<link *>();
+    const auto input = input_ptrs.data;
+    const auto output = output_ptrs.data;
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
       for (int dir = 0; dir < 4; dir++) {
