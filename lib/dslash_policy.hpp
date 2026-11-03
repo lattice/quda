@@ -1,4 +1,5 @@
 #include <memory>
+#include <algorithm>
 #include <tune_quda.h>
 #include <index_helper.cuh>
 #include <timer.h>
@@ -1647,6 +1648,8 @@ namespace quda
 
   // whether we have initialized the dslash policy tuner
   extern bool dslash_policy_init;
+  extern int dslash_policy_p2p_mask;
+  extern bool dslash_policy_p2p_force;
 
   // used to keep track of which policy to start the autotuning
   extern int first_active_policy;
@@ -1773,24 +1776,32 @@ namespace quda
                      const ColorSpinorField &halo, TimeProfile &profile) :
       dslash(dslash), dslashParam(dslash.dslashParam), out(out), in(in), halo(halo), profile(profile)
     {
-      if (!dslash_policy_init) {
+      const int p2p_mask = comm_peer2peer_enabled_global();
+      const bool p2p_force = comm_peer2peer_force();
+      if (!dslash_policy_init || dslash_policy_p2p_mask != p2p_mask || dslash_policy_p2p_force != p2p_force) {
+
+        // Communicator switches can add/remove eligible peers. Rebuild rather
+        // than retaining a no-P2P-only (or forced-P2P-only) set from a subgrid.
+        std::fill(policies.begin(), policies.end(), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+        std::fill(p2p_policies.begin(), p2p_policies.end(), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+        strcpy(policy_string, ",pol=");
 
         first_active_policy = static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
-        if (comm_peer2peer_enabled_global() & 2) { // enable/disable remote-write policy tuning
+        if (p2p_mask & 2) { // enable/disable remote-write policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)]
               = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);
         }
 
-        if (comm_peer2peer_enabled_global() & 1) { // enable/disable copy-engine policy tuning
+        if (p2p_mask & 1) { // enable/disable copy-engine policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)]
               = QudaP2PPolicy::QUDA_P2P_COPY_ENGINE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE);
         }
 
-        if (!comm_peer2peer_force() || !comm_peer2peer_enabled_global()) {
+        if (!p2p_force || !p2p_mask) {
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT);
         }
@@ -1904,6 +1915,8 @@ namespace quda
 	 if (getVerbosity() > QUDA_SILENT) warningQuda("Disabling Dslash communication");
 	 dslash_comms = false;
        }
+        dslash_policy_p2p_mask = p2p_mask;
+        dslash_policy_p2p_force = p2p_force;
       }
 
       // before we do policy tuning we must ensure the kernel

@@ -54,6 +54,8 @@ namespace quda {
 
     // whether the dslash policy tuner has been enabled
     bool dslash_policy_init;
+    int dslash_policy_p2p_mask = -1;
+    bool dslash_policy_p2p_force = false;
 
     // used to keep track of which policy to start the autotuning
     int first_active_policy;
@@ -183,6 +185,8 @@ namespace quda {
     dslash_copy = true;
 
     dslash_policy_init = false;
+    dslash_policy_p2p_mask = -1;
+    dslash_policy_p2p_force = false;
     first_active_policy = 0;
     first_active_p2p_policy = 0;
 
@@ -194,7 +198,7 @@ namespace quda {
     p2p_policies = std::vector<QudaP2PPolicy>(
         static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
-    strcat(policy_string, ",pol=");
+    strcpy(policy_string, ",pol=");
   }
 
   void destroyDslashEvents()

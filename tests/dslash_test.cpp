@@ -1,4 +1,5 @@
 #include "dslash_test_utils.h"
+#include <communicator_quda.h>
 
 using namespace quda;
 
@@ -82,6 +83,90 @@ TEST_F(DslashTest, verify)
   tol = checkReasonableHostDeviation(deviation, tol, dslash_test_wrapper.inv_param.cuda_prec,
                                      dslash_test_wrapper.gauge_param.reconstruct);
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
+
+TEST_F(DslashTest, communicator_halo_phase_restore)
+{
+  if (!verify_results || DslashTestWrapper::test_split_grid || DslashTestWrapper::test_domain_decomposition
+      || dslash_type != QUDA_WILSON_DSLASH || comm_size() < 2)
+    GTEST_SKIP() << "Requires a global Wilson test on multiple ranks";
+
+  dslash_test_wrapper.dslashRef();
+  // Populate the global tuning cache before switching. Check the very first
+  // post-switch call below: repeated identical inputs can hide a wrong-slot
+  // read once both buffers have eventually received the same halo data.
+  dslash_test_wrapper.run_test(2);
+  CommKey split = default_comm_key;
+  int dim = 3;
+  while (dim > 0 && comm_dim(dim) == 1) dim--;
+  split[dim] = comm_dim(dim);
+  push_communicator(split);
+  // Model an odd/even difference in the number of dslashes executed by
+  // independent subgrids, without swapping any resident gauge fields.
+  LatticeField::bufferIndex = comm_coord_global(dim) % 2;
+  push_communicator(default_comm_key);
+  int unaligned = LatticeField::bufferIndex != 0;
+  comm_allreduce_int(unaligned);
+
+  dslash_test_wrapper.dslashCUDA(1);
+  dslash_test_wrapper.spinorOut = dslash_test_wrapper.cudaSpinorOut;
+  double deviation = dslash_test_wrapper.verify();
+  comm_allreduce_max(deviation);
+  EXPECT_EQ(unaligned, 0) << "Halo buffers remained out of phase after communicator restoration";
+  ASSERT_TRUE(std::isfinite(deviation));
+  ASSERT_LE(deviation, getTolerance(dslash_test_wrapper.inv_param.cuda_prec));
+}
+
+TEST_F(DslashTest, split_grid_policy_restore)
+{
+  if (!verify_results || !DslashTestWrapper::test_split_grid || DslashTestWrapper::test_domain_decomposition
+      || dslash_type != QUDA_WILSON_DSLASH || !getTuning())
+    GTEST_SKIP() << "Requires Wilson, a split grid and tuning";
+
+  dslash_test_wrapper.dslashRef();
+  // Do not retain an operator alias while the split-grid API switches the
+  // resident gauge fields. Rebuild global fields/operator for each check.
+  dslash_test_wrapper.end();
+  double deviation = 0.0;
+  bool finite_results = true;
+  for (int cycle = 0; cycle < 2; cycle++) {
+    printfQuda("Split/global cycle %d: split-grid dslash\n", cycle);
+    dslash_test_wrapper.run_test(2);
+    double measured = dslash_test_wrapper.verify();
+    finite_results &= std::isfinite(measured);
+    deviation = std::max(deviation, measured);
+    dslash_test_wrapper.cudaSpinor.clear();
+    dslash_test_wrapper.cudaSpinorOut.clear();
+    dslash_test_wrapper.cudaSpinorTmp.clear();
+    dslash_test_wrapper.init();
+    DslashTestWrapper::test_split_grid = false;
+    printfQuda("Split/global cycle %d: restored global-grid dslash\n", cycle);
+    dslash_test_wrapper.run_test(2);
+    measured = dslash_test_wrapper.verify();
+    finite_results &= std::isfinite(measured);
+    deviation = std::max(deviation, measured);
+    DslashTestWrapper::test_split_grid = true;
+    dslash_test_wrapper.end();
+  }
+
+  bool found_global_policy = false;
+  bool valid_policies = true;
+  const int mask = comm_peer2peer_enabled_global();
+  const bool force = comm_peer2peer_force();
+  for (const auto &entry : getTuneCache()) {
+    if (strncmp(entry.first.aux, "policy,", 7) != 0) continue;
+    if (strstr(entry.first.aux, comm_config_string())) {
+      found_global_policy = true;
+      valid_policies &= ((!force || !mask) && entry.second.aux.y == 0)
+        || (entry.second.aux.y == 1 && (mask & 1)) || (entry.second.aux.y == 2 && (mask & 2));
+    }
+    if (strstr(entry.first.aux, ",p2p=0,")) valid_policies &= entry.second.aux.y == 0;
+  }
+  EXPECT_TRUE(found_global_policy);
+  EXPECT_TRUE(valid_policies) << "Policy set was not refreshed across split/global communicators";
+  comm_allreduce_max(deviation);
+  ASSERT_TRUE(finite_results);
+  ASSERT_LE(deviation, getTolerance(dslash_test_wrapper.inv_param.cuda_prec));
 }
 
 int main(int argc, char **argv)

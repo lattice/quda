@@ -65,6 +65,13 @@ namespace quda
     ColorSpinorField::freeGhostBuffer();
     FieldTmp<ColorSpinorField>::destroy();
 
+    // Independent subgrids can execute different numbers of dslashes (also
+    // during autotuning), leaving the double-buffer indices out of phase.
+    // IPC sends address the same buffer index on the peer, so all ranks in
+    // the new communicator must start on the same buffer. The old buffers
+    // and their outstanding work have been torn down above.
+    LatticeField::bufferIndex = 0;
+
     auto search = communicator_stack.find(split_key);
     if (search == communicator_stack.end()) {
       communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(split_key),

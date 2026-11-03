@@ -148,8 +148,10 @@ per run, with four or eight MPS ranks, and 16 distinct policy cache keys.
 GDR-enabled checks cover startup configuration, not device-buffer MPI traffic.
 These are processes sharing one physical L4, not eight physical GPUs.
 
-The fine-dslash policy candidates still initialize once per process.
-Refreshing them when split/global communicator capabilities change is an
-unvalidated candidate on branch `investigate/p2p-policy-refresh`, not part
-of the cleanup. Split/global numerical failures remain under investigation;
-neither transition correctness nor a fix for Colin's failure is claimed.
+The original cleanup checkpoint did not fix communicator-transition state.
+The subsequent split/global correction resets halo-buffer phase on switching
+communicators and refreshes fine-dslash candidates when effective P2P
+capabilities change. See [the investigation and regression tests](p2p-split-grid.md).
+The earlier unvalidated candidate remains preserved on branch
+`investigate/p2p-policy-refresh`. Colin's Laplace/MG sequence has not yet
+been tested; these dslash regressions do not establish MG correctness.

@@ -1,5 +1,6 @@
 #include <quda.h>
 #include <communicator_quda.h>
+#include <lattice_field.h>
 #include <mpi.h>
 #include <cstdio>
 #include <cstdlib>
@@ -92,9 +93,15 @@ int main(int argc, char **argv)
   };
   check();
   for (int repeat = 0; repeat < 3; repeat++) {
+    // Simulate ranks finishing different amounts of independent work.
+    // Even with no allocated ghost buffers, switching must align the phase.
+    quda::LatticeField::bufferIndex = (global_rank + repeat) % 2;
     quda::push_communicator({split[0], split[1], split[2], split[3]});
+    if (quda::LatticeField::bufferIndex != 0) failures++;
     check();
+    quda::LatticeField::bufferIndex = (global_rank + repeat) % 2;
     quda::push_communicator(quda::default_comm_key);
+    if (quda::LatticeField::bufferIndex != 0) failures++;
     if (global_config != quda::comm_config_string()) failures++;
     check();
   }
