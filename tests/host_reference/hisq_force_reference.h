@@ -1,6 +1,8 @@
 #ifndef _HISQ_FORCE_REFERENCE_H
 #define _HISQ_FORCE_REFERENCE_H
 
+#include <array>
+
 #include <quda.h>
 #include <enum_quda.h>
 #include <gauge_field.h>
@@ -13,6 +15,17 @@
    @param[in] separation Odd offset for outer product (1 for fat links, 3 for long links)
 */
 void computeLinkOrderedOuterProduct(const quda::ColorSpinorField &src, quda::GaugeField &dest, int separation);
+
+/**
+   @brief Accumulate the staggered outer product(s) of a quark field, CPU version of computeStaggeredOprod
+   @param[in,out] out Host QDP-ordered fields to accumulate into: out[0] one-hop, out[1] three-hop (nFace = 3 only;
+   otherwise unused)
+   @param[in] in Full-parity host staggered quark field, of the same precision as out
+   @param[in] coeff Coefficients for the one- and three-hop terms
+   @param[in] nFace 1 (naive staggered, odd sites take -coeff[0]) or 3 (HISQ/asqtad)
+*/
+void computeStaggeredOprodCPU(std::array<quda::GaugeField, 2> &out, const quda::ColorSpinorField &in,
+                              const double coeff[], int nFace);
 
 /**
    @brief Compute the force contribution from the fat links, CPU version

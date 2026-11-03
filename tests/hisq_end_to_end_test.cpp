@@ -267,9 +267,7 @@ static void setup_links(QudaPrecision test_prec, QudaReconstructType /*recon*/, 
     reorderMILCtoQDP(qdp_longlink_eps, longlink_eps, V, gauge_site_size, gauge_param.cpu_prec, test_prec);
   }
 
-#ifdef MULTI_GPU
-  exchange_llfat_cleanup();
-#endif
+  if constexpr (is_multi_gpu()) exchange_llfat_cleanup();
 
   links_valid = true;
 }
@@ -300,11 +298,7 @@ static void destroy_host()
 // Force infrastructure
 // ============================================================
 
-#ifdef MULTI_GPU
-static lat_dim_t force_R = {2, 2, 2, 2};
-#else
-static lat_dim_t force_R = {0, 0, 0, 0};
-#endif
+constexpr lat_dim_t force_R = is_multi_gpu() ? lat_dim_t {2, 2, 2, 2} : lat_dim_t {0, 0, 0, 0};
 
 // CPU outer products (host precision)
 static GaugeField *cpuOprod = nullptr;
@@ -631,18 +625,10 @@ void HisqEndToEndTest::verify_force_result(const char *label)
   GaugeField hostVerify(hfParam);
   hostVerify.copy(*cudaForce);
 
-  int res = 1;
-  for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(cpuForce->data<void *>(dir), hostVerify.data<void *>(dir), V * gauge_site_size,
-                           getTolerance(test_prec), gauge_param.cpu_prec);
-  }
-
-  void *hPtrs[4], *cPtrs[4];
-  for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuForce->data<void *>(d); }
-  int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
-  int tolerance = getNegLog10Tolerance(test_prec);
-  EXPECT_EQ(res, 1) << label << " compare_floats mismatch";
-  ASSERT_GE(level, tolerance) << label << " strong_check mismatch";
+  auto [res, level]
+    = compare_link_fields(hostVerify, "GPU result:", *cpuForce, "CPU reference:", getTolerance(test_prec));
+  EXPECT_TRUE(res) << label << " compare_floats mismatch";
+  ASSERT_GE(level, getNegLog10Tolerance(test_prec)) << label << " strong_check mismatch";
 }
 
 void HisqEndToEndTest::verify_force_oprod()
@@ -689,22 +675,18 @@ void HisqEndToEndTest::verify_force_oprod()
             V * gauge_site_size);
   }
 
-  double tol = getTolerance(host_prec);
-  int res = 1;
-  for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(expectedStaple.data<void *>(dir), hostStapleOprod.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
+  const double tol = getTolerance(host_prec);
+  const int tol_level = getNegLog10Tolerance(host_prec);
+  {
+    auto [res, level] = compare_link_fields(hostStapleOprod, "GPU staple oprod:", expectedStaple, "CPU expected:", tol);
+    EXPECT_TRUE(res) << "Staple outer product (1-hop) mismatch";
+    EXPECT_GE(level, tol_level) << "Staple outer product (1-hop) strong_check mismatch";
   }
-  EXPECT_EQ(res, 1) << "Staple outer product (1-hop) mismatch";
-  strong_check_link(hostStapleOprod, "GPU staple oprod:", expectedStaple, "CPU expected:");
-
-  res = 1;
-  for (int dir = 0; dir < 4; dir++) {
-    res &= compare_floats(expectedNaik.data<void *>(dir), hostNaikOprod.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
+  {
+    auto [res, level] = compare_link_fields(hostNaikOprod, "GPU Naik oprod:", expectedNaik, "CPU expected:", tol);
+    EXPECT_TRUE(res) << "Naik outer product (3-hop) mismatch";
+    EXPECT_GE(level, tol_level) << "Naik outer product (3-hop) strong_check mismatch";
   }
-  EXPECT_EQ(res, 1) << "Naik outer product (3-hop) mismatch";
-  strong_check_link(hostNaikOprod, "GPU Naik oprod:", expectedNaik, "CPU expected:");
 }
 
 void HisqEndToEndTest::verify_force_naik_oprod()
@@ -769,27 +751,23 @@ void HisqEndToEndTest::verify_force_naik_oprod()
             expectedNaik.data<void *>(dir), V * gauge_site_size);
   }
 
-  double tol = getTolerance(host_prec);
-
-  int res = 1;
-  for (int dir = 0; dir < 4; dir++)
-    res &= compare_floats(expectedStaple.data<void *>(dir), hostStaple.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
-  EXPECT_EQ(res, 1) << "stapleOprod mismatch";
-
-  res = 1;
-  for (int dir = 0; dir < 4; dir++)
-    res &= compare_floats(expectedOneLink.data<void *>(dir), hostOneLink.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
-  EXPECT_EQ(res, 1) << "oneLinkOprod mismatch after copy+ax+Naik accumulation";
-  strong_check_link(hostOneLink, "GPU oneLinkOprod:", expectedOneLink, "CPU expected:");
-
-  res = 1;
-  for (int dir = 0; dir < 4; dir++)
-    res &= compare_floats(expectedNaik.data<void *>(dir), hostNaik.data<void *>(dir), V * gauge_site_size, tol,
-                           host_prec);
-  EXPECT_EQ(res, 1) << "naikOprod mismatch after Naik accumulation";
-  strong_check_link(hostNaik, "GPU naikOprod:", expectedNaik, "CPU expected:");
+  const double tol = getTolerance(host_prec);
+  const int tol_level = getNegLog10Tolerance(host_prec);
+  {
+    auto [res, level] = compare_link_fields(hostStaple, "GPU stapleOprod:", expectedStaple, "CPU expected:", tol);
+    EXPECT_TRUE(res) << "stapleOprod mismatch";
+    EXPECT_GE(level, tol_level) << "stapleOprod strong_check mismatch";
+  }
+  {
+    auto [res, level] = compare_link_fields(hostOneLink, "GPU oneLinkOprod:", expectedOneLink, "CPU expected:", tol);
+    EXPECT_TRUE(res) << "oneLinkOprod mismatch after copy+ax+Naik accumulation";
+    EXPECT_GE(level, tol_level) << "oneLinkOprod strong_check mismatch after copy+ax+Naik accumulation";
+  }
+  {
+    auto [res, level] = compare_link_fields(hostNaik, "GPU naikOprod:", expectedNaik, "CPU expected:", tol);
+    EXPECT_TRUE(res) << "naikOprod mismatch after Naik accumulation";
+    EXPECT_GE(level, tol_level) << "naikOprod strong_check mismatch after Naik accumulation";
+  }
 }
 
 void HisqEndToEndTest::verify_hisq_force_interface()
@@ -835,9 +813,7 @@ void HisqEndToEndTest::verify_hisq_force_interface()
   host_free(milc_u_tp);
   host_free(vlink_milc);
   host_free(wlink_milc);
-#ifdef MULTI_GPU
-  exchange_llfat_cleanup();
-#endif
+  if constexpr (is_multi_gpu()) exchange_llfat_cleanup();
 
   // ---- 3. Spinor and outer products ----
   ColorSpinorParam qParam(interfaceQuark);
@@ -1138,18 +1114,10 @@ TEST_P(HisqEndToEndTest, full_chain)
     GaugeField hostVerify(hfParam);
     hostVerify.copy(*cudaForce);
 
-    int res = 1;
-    for (int dir = 0; dir < 4; dir++) {
-      res &= compare_floats(cpuUnitResult.data<void *>(dir), hostVerify.data<void *>(dir), V * gauge_site_size,
-                             getTolerance(test_prec), gauge_param.cpu_prec);
-    }
-
-    void *hPtrs[4], *cPtrs[4];
-    for (int d = 0; d < 4; d++) { hPtrs[d] = hostVerify.data<void *>(d); cPtrs[d] = cpuUnitResult.data<void *>(d); }
-    int level = strong_check_link(hPtrs, "GPU result:", cPtrs, "CPU reference:", V, gauge_param.cpu_prec);
-    int tolerance = getNegLog10Tolerance(test_prec);
-    EXPECT_EQ(res, 1) << "Unitarize force compare_floats mismatch";
-    ASSERT_GE(level, tolerance) << "Unitarize force strong_check mismatch";
+    auto [res, level]
+      = compare_link_fields(hostVerify, "GPU result:", cpuUnitResult, "CPU reference:", getTolerance(test_prec));
+    EXPECT_TRUE(res) << "Unitarize force compare_floats mismatch";
+    ASSERT_GE(level, getNegLog10Tolerance(test_prec)) << "Unitarize force strong_check mismatch";
   }
 
   // Step 4: Fat7 staples (chained from unitarize output)
@@ -1209,29 +1177,18 @@ std::string getHisqEndToEndTestName(testing::TestParamInfo<test_t> param)
   return ss.str();
 }
 
-#ifdef MULTI_GPU
+constexpr int n_partitions = is_multi_gpu() ? 16 : 1;
+
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
                          ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
                                             ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Range(0, 16)),
+                                            ::testing::Bool(), ::testing::Range(0, n_partitions)),
                          getHisqEndToEndTestName);
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqForceInterfaceTest,
                          ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION),
                                             ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Range(0, 16)),
+                                            ::testing::Bool(), ::testing::Range(0, n_partitions)),
                          getHisqEndToEndTestName);
-#else
-INSTANTIATE_TEST_SUITE_P(QUDA, HisqEndToEndTest,
-                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
-                                            ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Values(0)),
-                         getHisqEndToEndTestName);
-INSTANTIATE_TEST_SUITE_P(QUDA, HisqForceInterfaceTest,
-                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION),
-                                            ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13),
-                                            ::testing::Bool(), ::testing::Values(0)),
-                         getHisqEndToEndTestName);
-#endif
 
 int main(int argc, char **argv)
 {

@@ -959,10 +959,15 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
 
 void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precision)
 {
-  if (precision == QUDA_DOUBLE_PRECISION)
-    checkGauge((double **)oldG, (double **)newG, epsilon);
-  else
-    checkGauge((float **)oldG, (float **)newG, epsilon);
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    auto old_ptrs = typed_ptr_array<double *>(oldG);
+    auto new_ptrs = typed_ptr_array<double *>(newG);
+    checkGauge(old_ptrs.data(), new_ptrs.data(), epsilon);
+  } else {
+    auto old_ptrs = typed_ptr_array<float *>(oldG);
+    auto new_ptrs = typed_ptr_array<float *>(newG);
+    checkGauge(old_ptrs.data(), new_ptrs.data(), epsilon);
+  }
 }
 
 std::complex<double> twoColorSpinorContract(std::complex<double> *spinor1, std::complex<double> *spinor2)
@@ -1089,9 +1094,13 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
   int ret;
 
   if (precision == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink((double **)linkA, (double **)linkB, len);
+    auto a_ptrs = typed_ptr_array<double *>(linkA);
+    auto b_ptrs = typed_ptr_array<double *>(linkB);
+    ret = compareLink(a_ptrs.data(), b_ptrs.data(), len);
   } else {
-    ret = compareLink((float **)linkA, (float **)linkB, len);
+    auto a_ptrs = typed_ptr_array<float *>(linkA);
+    auto b_ptrs = typed_ptr_array<float *>(linkB);
+    ret = compareLink(a_ptrs.data(), b_ptrs.data(), len);
   }
 
   return ret;
@@ -1101,19 +1110,16 @@ static int compare_link(const GaugeField &a, const GaugeField &b)
 {
   if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
 
-  // raw_pointer() uses a static buffer for pointer-array orders, so we must
-  // capture each field's per-direction pointers separately to avoid aliasing.
-  void *a_ptrs[4], *b_ptrs[4];
-  for (int d = 0; d < 4; d++) {
-    a_ptrs[d] = a.data<void *>(d);
-    b_ptrs[d] = b.data<void *>(d);
-  }
-
+  // not raw_pointer(): it returns a shared static buffer, so a and b would alias
   int ret;
   if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink(reinterpret_cast<double **>(a_ptrs), reinterpret_cast<double **>(b_ptrs), a.Volume());
+    auto a_ptrs = a.data_array<double *>();
+    auto b_ptrs = b.data_array<double *>();
+    ret = compareLink(a_ptrs.data, b_ptrs.data, a.Volume());
   } else {
-    ret = compareLink(reinterpret_cast<float **>(a_ptrs), reinterpret_cast<float **>(b_ptrs), a.Volume());
+    auto a_ptrs = a.data_array<float *>();
+    auto b_ptrs = b.data_array<float *>();
+    ret = compareLink(a_ptrs.data, b_ptrs.data, a.Volume());
   }
 
   return ret;
@@ -1175,6 +1181,22 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   }
 
   return compare_link(linkA, linkB);
+}
+
+std::pair<bool, int> compare_link_fields(const GaugeField &result, const std::string &msg_result,
+                                         const GaugeField &expected, const std::string &msg_expected, double tol)
+{
+  if (result.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", result.Order());
+  if (expected.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", expected.Order());
+
+  bool res = true;
+  for (int d = 0; d < 4; d++) {
+    res &= compare_floats(expected.data<void *>(d), result.data<void *>(d), expected.Volume() * gauge_site_size, tol,
+                          checkPrecision(result, expected))
+      == 1;
+  }
+  int level = strong_check_link(result, msg_result, expected, msg_expected);
+  return {res, level};
 }
 
 template <typename Float>
