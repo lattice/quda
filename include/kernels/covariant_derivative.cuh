@@ -14,7 +14,7 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariant derivative operator
   */
-  template <typename Float, int nSpin_, int nColor_, typename DDArg, QudaReconstructType reconstruct_, int nDim>
+  template <typename Float, int nSpin_, int nColor_, typename DDArg, QudaReconstructType reconstruct_, int nDim, bool shift_>
   struct CovDevArg : DslashArg<Float, nDim, DDArg> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
@@ -27,6 +27,8 @@ namespace quda
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, ghost, false,
                                   QUDA_NATIVE_GAUGE_ORDER, false, QUDA_VECTOR_GEOMETRY>::type G;
+
+    static constexpr bool shift = shift_;
 
     typedef typename mapper<Float>::type real;
 
@@ -81,25 +83,33 @@ namespace quda
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
       const bool ghost = (coord[d] + 1 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-      const Link U = arg.U(d, coord.x_cb, parity);
-
       if (doHalo<kernel_type>(d) && ghost) {
 
         const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
         const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-        out += U * in;
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const Link U = arg.U(d, coord.x_cb, parity);
+          out += U * in;
+        }
       } else if (doBulk<kernel_type>() && !ghost) {
 
         const Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
-        out += U * in;
+
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const Link U = arg.U(d, coord.x_cb, parity);
+          out += U * in;
+        }
       }
 
     } else if (mu >= 4 && arg.dd_in.doHopping(coord, d, -1)) {
       // Backward gather - compute back offset for spinor and gauge fetch
 
       const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
-      const int gauge_idx = back_idx;
 
       const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
@@ -109,13 +119,23 @@ namespace quda
         const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
         const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-        out += conj(U) * in;
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
+          out += conj(U) * in;
+        }
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        const Link U = arg.U(d, gauge_idx, 1 - parity);
         const Vector in = arg.in[src_idx](back_idx, their_spinor_parity);
 
-        out += conj(U) * in;
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const int gauge_idx = back_idx;
+          const Link U = Arg::shift ? Link() : arg.U(d, gauge_idx, 1 - parity);
+          out += conj(U) * in;
+        }
       }
     } // Forward/backward derivative
   }

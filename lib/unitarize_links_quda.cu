@@ -108,11 +108,8 @@ namespace quda {
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    UnitarizeLinks(GaugeField &out, const GaugeField &in, int* fails) :
-      TunableKernel3D(in, 2, 4),
-      out(out),
-      in(in),
-      fails(fails)
+    UnitarizeLinks(GaugeField &out, const GaugeField &in, int *fails) :
+      TunableKernel3D(in, 2, in.Geometry()), out(out), in(in), fails(fails)
     {
       apply(device::get_default_stream());
       qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed

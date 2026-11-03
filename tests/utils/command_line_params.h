@@ -608,3 +608,4 @@ extern bool detratio;
 extern int rhmc_flavors;
 
 extern int covdev_mu;
+extern bool covdev_shift;

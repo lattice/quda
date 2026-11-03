@@ -41,7 +41,7 @@ namespace quda
     mutable G<true> Uback; /** the backwards gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     /** parameters for distance preconditioning */
-    const real alpha0;
+    const double alpha0;
     const int t0;
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_WILSON;
 
@@ -126,10 +126,10 @@ namespace quda
 
     const int t = coord.gx[3];
     const int nt = arg.globalDim3;
-    real fwd_coeff_3
-      = Arg::distance_pc ? distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
-    real bwd_coeff_3
-      = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
+    real fwd_coeff_3 = Arg::distance_pc ? static_cast<real>(distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt)) :
+                                          static_cast<real>(1.0);
+    real bwd_coeff_3 = Arg::distance_pc ? static_cast<real>(distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt)) :
+                                          static_cast<real>(1.0);
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well

@@ -118,6 +118,14 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   param->ga_pad = 0;
 #endif
 
+#ifdef INIT_PARAM
+  P(gauge_fix_compute_theta, QUDA_BOOLEAN_TRUE);
+  P(gauge_fix_use_theta, QUDA_BOOLEAN_FALSE);
+#else
+  P(gauge_fix_compute_theta, QUDA_BOOLEAN_INVALID);
+  P(gauge_fix_use_theta, QUDA_BOOLEAN_INVALID);
+#endif
+
 #if defined INIT_PARAM
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_NO);
   P(staggered_phase_applied, 0);
@@ -387,7 +395,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
+  P(laplace_nspin, 1);
   P(covdev_mu, INVALID_INT);
+  P(covdev_shift, false);
+  P(covdev_nspin, 4);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
@@ -1212,6 +1223,50 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha2, INVALID_DOUBLE);
   P(alpha3, INVALID_DOUBLE);
   P(dir_ignore, INVALID_INT);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+#if defined INIT_PARAM
+QudaGaugeFixParam newQudaGaugeFixParam(void)
+{
+  QudaGaugeFixParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeFixParam(QudaGaugeFixParam *param)
+{
+#else
+void printQudaGaugeFixParam(QudaGaugeFixParam *param)
+{
+  printfQuda("QUDA Gauge Fix Parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeFixParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+  // P(fix_type, QUDA_GAUGE_FIX_INVALID);
+  P(tol, INVALID_DOUBLE);
+  P(maxiter, INVALID_INT);
+  P(dir_ignore, INVALID_INT);
+
+#ifdef INIT_PARAM
+  P(omega, 1.0);
+  P(alpha, 0.0);
+  P(reunit_interval, 10);
+  P(verbose_interval, 100);
+  P(compute_theta, true);
+  P(use_theta, false);
+#else
+  P(omega, INVALID_DOUBLE);
+  P(alpha, INVALID_DOUBLE);
+  P(reunit_interval, INVALID_INT);
+  P(verbose_interval, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
