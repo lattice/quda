@@ -91,15 +91,12 @@ quda::GaugeFieldParam make_host_gauge_param(const Su3Fields &fields, QudaPrecisi
 struct FieldStrengthFields {
   std::unique_ptr<quda::GaugeField> device_gauge;
   quda::GaugeField device_fmunu;
-  quda::GaugeField device_qdp_fmunu;
   quda::GaugeField device_result;
   quda::GaugeField host_reference;
 
   FieldStrengthFields(const Su3Fields &fields, bool copy_result = false) :
     device_fmunu(
       make_tensor_param(fields, QUDA_CUDA_FIELD_LOCATION, fields.gauge_param.cuda_prec, QUDA_NATIVE_GAUGE_ORDER)),
-    device_qdp_fmunu(
-      make_tensor_param(fields, QUDA_CUDA_FIELD_LOCATION, fields.gauge_param.cpu_prec, QUDA_QDP_GAUGE_ORDER)),
     device_result(make_tensor_param(fields, QUDA_CPU_FIELD_LOCATION, fields.gauge_param.cpu_prec, QUDA_QDP_GAUGE_ORDER)),
     host_reference(make_tensor_param(fields, QUDA_CPU_FIELD_LOCATION, fields.gauge_param.cpu_prec, QUDA_QDP_GAUGE_ORDER))
   {
@@ -117,13 +114,7 @@ struct FieldStrengthFields {
     device_gauge.reset(quda::createExtendedGauge(device, R, profile));
 
     quda::computeFmunu(device_fmunu, *device_gauge);
-    if (copy_result) {
-      device_qdp_fmunu.copy(device_fmunu);
-      const size_t component_bytes = fields.input.Volume() * gauge_site_size * fields.gauge_param.cpu_prec;
-      for (int component = 0; component < 6; component++)
-        qudaMemcpy(device_result.data(component), device_qdp_fmunu.data(component), component_bytes,
-                   qudaMemcpyDeviceToHost);
-    }
+    if (copy_result) device_result.copy(device_fmunu);
     compute_fmunu_reference(host_reference, fields.input);
   }
 };
