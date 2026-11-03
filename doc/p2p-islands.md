@@ -140,3 +140,16 @@ inter-node bandwidth.
 After adding the tuning fingerprint, all eight size/ordering topology
 regressions passed, including rank agreement on the config string and
 restoration of the original string after each split/restore cycle.
+
+## P2P cleanup validation boundary
+
+The mask/force cleanup is covered by `tests/p2p_force_test.py`: 65 checks
+per run, with four or eight MPS ranks, and 16 distinct policy cache keys.
+GDR-enabled checks cover startup configuration, not device-buffer MPI traffic.
+These are processes sharing one physical L4, not eight physical GPUs.
+
+The fine-dslash policy candidates still initialize once per process.
+Refreshing them when split/global communicator capabilities change is an
+unvalidated candidate on branch `investigate/p2p-policy-refresh`, not part
+of the cleanup. Split/global numerical failures remain under investigation;
+neither transition correctness nor a fix for Colin's failure is claimed.
