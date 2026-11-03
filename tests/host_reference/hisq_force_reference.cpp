@@ -150,6 +150,15 @@ public:
 constexpr int force_ref_r = is_multi_gpu() ? 2 : 0;
 constexpr std::array<int, 4> force_ref_R = {force_ref_r, force_ref_r, force_ref_r, force_ref_r};
 
+static void checkForceRefRadius(const quda::GaugeField &field, const char *name)
+{
+  for (int d = 0; d < 4; d++) {
+    if (field.R()[d] != force_ref_R[d])
+      errorQuda("%s has extension radius %d in dimension %d, but this reference requires %d", name, field.R()[d], d,
+                force_ref_R[d]);
+  }
+}
+
 template <class real_t>
 void LoadStore<real_t>::loadMatrixFromField(const typename LoadStore<real_t>::matrix *const field, int oddBit,
                                             int half_lattice_index, typename LoadStore<real_t>::matrix *const mat) const
@@ -810,6 +819,10 @@ template <typename real_t> struct HisqStaplesForce {
 void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda::GaugeField &link,
                          quda::GaugeField *newOprod)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+  checkForceRefRadius(*newOprod, "newOprod");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
@@ -903,6 +916,10 @@ template <class real_t> struct ComputeLongLinkField {
 
 void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *newOprod)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+  checkForceRefRadius(*newOprod, "newOprod");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
@@ -954,6 +971,9 @@ template <class real_t> struct CompleteForceField {
 
 void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *mom)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
