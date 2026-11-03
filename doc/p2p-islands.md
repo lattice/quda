@@ -20,16 +20,45 @@ Build `p2p_islands_test` in an MPI build. On one GPU:
 ```sh
 export QUDA_ENABLE_MPS=1 QUDA_ENABLE_GDR=0 QUDA_ENABLE_P2P=3
 export QUDA_TEST_P2P_ISLANDS=0,0,1,1
-mpirun -np 4 ./tests/p2p_islands_test
-mpirun -np 4 ./tests/p2p_islands_test t-fast
+mpirun -np 4 ./tests/p2p_islands_test --rank-order col
+mpirun -np 4 ./tests/p2p_islands_test --rank-order row
 ```
 
 This test checks every neighbor's P2P eligibility on the original grid and
-after three T-split/restore cycles, with two coordinate-to-rank orderings.
+after three split/restore cycles. It accepts `--gridsize X Y Z T`,
+`--grid-partition X Y Z T`, and the existing QUDA ordering convention:
+`--rank-order col` means T-fastest; `--rank-order row` means X-fastest.
+The default grid is `2 1 1 N/2`, split `1 1 1 2`, ordering `col`.
 It assumes all processes share one GPU and P2P is enabled. Use the existing
 dslash and inversion tests to validate actual halo exchanges and residuals.
 
+For the eight-rank regression matrix, build `p2p_islands_test` and
+`dslash_test`, start MPS, and run:
+
+```sh
+python3 tests/p2p_islands_matrix.py /path/to/build /path/to/results
+```
+
+The runner emulates eight ranks on one GPU, with contiguous islands of
+sizes 1, 2, 4, and 8. It covers both rank orderings, pure X/Y/Z/T process
+grids, and six mixed grids, including splitting multiple dimensions at
+once and splitting into single-rank subgrids. Each case saves its full log.
+Two independent MPI worlds run at a time (16 total MPS clients).
+
 ## Checkpoint validation
+
+The eight-rank matrix passed all 448 cases on the L4 under MPS:
+256 topology checks (each with three split/restore cycles) and 192
+CPU-reference Wilson dslash checks. Each island size (1, 2, 4, 8) passed
+112 cases, covering both orderings. The largest dslash relative L2 deviation
+was `3.540053e-8`.
+
+Process grids were `8 1 1 1`, `1 8 1 1`, `1 1 8 1`, `1 1 1 8`,
+`4 1 1 2`, `2 1 1 4`, `1 4 2 1`, `1 2 1 4`, `2 2 2 1`, and
+`2 1 2 2`. Pure-axis grids used split factors 2, 4, and 8. Mixed grids
+used factor 2 along each partitioned axis separately, plus a full split
+along all partitioned axes together. The pure-axis numerical checks used
+factor 2; all mixed-grid splits had numerical checks.
 
 Validated on one NVIDIA L4 with MPS, Open MPI 4.1.6, single precision,
 uncompressed gauge fields, and GPU-direct RDMA disabled:

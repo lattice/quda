@@ -31,8 +31,29 @@ int main(int argc, char **argv)
   int global_rank, size;
   MPI_Comm_rank(MPI_COMM_WORLD, &global_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
-  if (size < 4 || size % 4 || !getenv("QUDA_TEST_P2P_ISLANDS")) MPI_Abort(MPI_COMM_WORLD, 2);
-  Mapping map {{2, 1, 1, size / 2}, argc > 1 && std::string(argv[1]) == "t-fast"};
+  if (!getenv("QUDA_TEST_P2P_ISLANDS")) MPI_Abort(MPI_COMM_WORLD, 2);
+  Mapping map {{2, 1, 1, size / 2}, true};
+  int split[4] = {1, 1, 1, 2};
+  for (int i = 1; i < argc; i++) {
+    std::string option(argv[i]);
+    if (option == "--rank-order" && i + 1 < argc) {
+      std::string order(argv[++i]);
+      if (order != "col" && order != "row") MPI_Abort(MPI_COMM_WORLD, 2);
+      map.t_fast = order == "col";
+    } else if ((option == "--gridsize" || option == "--grid-partition") && i + 4 < argc) {
+      int *values = option == "--gridsize" ? map.dims : split;
+      for (int d = 0; d < 4; d++) values[d] = std::atoi(argv[++i]);
+    } else {
+      if (!global_rank) fprintf(stderr, "Usage: --rank-order col|row --gridsize X Y Z T --grid-partition X Y Z T\n");
+      MPI_Abort(MPI_COMM_WORLD, 2);
+    }
+  }
+  int volume = 1;
+  for (int d = 0; d < 4; d++) {
+    if (map.dims[d] < 1 || split[d] < 1 || map.dims[d] % split[d]) MPI_Abort(MPI_COMM_WORLD, 2);
+    volume *= map.dims[d];
+  }
+  if (volume != size) MPI_Abort(MPI_COMM_WORLD, 2);
   initCommsGridQuda(4, map.dims, rank_from_coords, &map);
   initQuda(-1);
   std::vector<int> islands;
@@ -56,7 +77,7 @@ int main(int argc, char **argv)
   };
   check();
   for (int repeat = 0; repeat < 3; repeat++) {
-    quda::push_communicator({1, 1, 1, 2});
+    quda::push_communicator({split[0], split[1], split[2], split[3]});
     check();
     quda::push_communicator(quda::default_comm_key);
     check();
