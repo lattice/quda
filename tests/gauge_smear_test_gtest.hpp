@@ -14,11 +14,16 @@ using anisotropic_flow_smear_test_t
 
 constexpr double kAnisotropicSmearValue = 1.3;
 
-#ifdef MULTI_GPU
-constexpr std::array smear_partitions {0, 1, 2, 4, 8, 12, 14, 15};
-#else
-constexpr std::array smear_partitions {0};
-#endif
+inline bool ctest_all_partitions = false;
+
+constexpr int n_partitions = is_multi_gpu() ? 16 : 1;
+
+inline bool skip_partition(int partition)
+{
+  constexpr std::array<bool, 16> partition_enabled {true, true,  true,  false, true, false, false, false,
+                                                    true, false, false, false, true, false, true,  true};
+  return !ctest_all_partitions && !partition_enabled[partition];
+}
 
 inline void set_test_partition(int partition)
 {
@@ -83,7 +88,12 @@ inline std::string anisotropic_flow_test_name(testing::TestParamInfo<anisotropic
 class GaugeSmearTest : public ::testing::TestWithParam<smear_test_t>
 {
 protected:
-  void SetUp() override { set_test_partition(testing::get<4>(GetParam())); }
+  void SetUp() override
+  {
+    const int partition = testing::get<4>(GetParam());
+    if (skip_partition(partition)) GTEST_SKIP();
+    set_test_partition(partition);
+  }
   void TearDown() override
   {
     freeGaugeQuda();
@@ -106,31 +116,36 @@ INSTANTIATE_TEST_SUITE_P(APE, GaugeSmearTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_APE), testing::Values(-1, 3, 4),
-                                          testing::ValuesIn(smear_partitions)),
+                                          testing::Range(0, n_partitions)),
                          test_name);
 INSTANTIATE_TEST_SUITE_P(Stout, GaugeSmearTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_STOUT), testing::Values(-1, 3, 4),
-                                          testing::ValuesIn(smear_partitions)),
+                                          testing::Range(0, n_partitions)),
                          test_name);
 INSTANTIATE_TEST_SUITE_P(OvrImpStout, GaugeSmearTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(-1, 3, 4),
-                                          testing::ValuesIn(smear_partitions)),
+                                          testing::Range(0, n_partitions)),
                          test_name);
 INSTANTIATE_TEST_SUITE_P(HYP, GaugeSmearTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_HYP), testing::Values(-1, 3, 4),
-                                          testing::ValuesIn(smear_partitions)),
+                                          testing::Range(0, n_partitions)),
                          test_name);
 
 class GaugeFlowSmearTest : public ::testing::TestWithParam<flow_smear_test_t>
 {
 protected:
-  void SetUp() override { set_test_partition(testing::get<5>(GetParam())); }
+  void SetUp() override
+  {
+    const int partition = testing::get<5>(GetParam());
+    if (skip_partition(partition)) GTEST_SKIP();
+    set_test_partition(partition);
+  }
   void TearDown() override
   {
     freeGaugeQuda();
@@ -153,19 +168,24 @@ INSTANTIATE_TEST_SUITE_P(WilsonFlow, GaugeFlowSmearTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1),
-                                          testing::Values(3u, 4u), testing::ValuesIn(smear_partitions)),
+                                          testing::Values(3u, 4u), testing::Range(0, n_partitions)),
                          flow_test_name);
 INSTANTIATE_TEST_SUITE_P(SymanzikFlow, GaugeFlowSmearTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1),
-                                          testing::Values(3u, 4u), testing::ValuesIn(smear_partitions)),
+                                          testing::Values(3u, 4u), testing::Range(0, n_partitions)),
                          flow_test_name);
 
 class GaugeSmearAnisotropicTest : public ::testing::TestWithParam<anisotropic_smear_test_t>
 {
 protected:
-  void SetUp() override { set_test_partition(testing::get<5>(GetParam())); }
+  void SetUp() override
+  {
+    const int partition = testing::get<5>(GetParam());
+    if (skip_partition(partition)) GTEST_SKIP();
+    set_test_partition(partition);
+  }
   void TearDown() override
   {
     freeGaugeQuda();
@@ -188,25 +208,30 @@ INSTANTIATE_TEST_SUITE_P(APE_Anisotropic, GaugeSmearAnisotropicTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_APE), testing::Values(4),
-                                          testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
+                                          testing::Values(kAnisotropicSmearValue), testing::Range(0, n_partitions)),
                          anisotropic_test_name);
 INSTANTIATE_TEST_SUITE_P(Stout_Anisotropic, GaugeSmearAnisotropicTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_STOUT), testing::Values(4),
-                                          testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
+                                          testing::Values(kAnisotropicSmearValue), testing::Range(0, n_partitions)),
                          anisotropic_test_name);
 INSTANTIATE_TEST_SUITE_P(OvrImpStout_Anisotropic, GaugeSmearAnisotropicTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_OVRIMP_STOUT), testing::Values(4),
-                                          testing::Values(kAnisotropicSmearValue), testing::ValuesIn(smear_partitions)),
+                                          testing::Values(kAnisotropicSmearValue), testing::Range(0, n_partitions)),
                          anisotropic_test_name);
 
 class GaugeFlowSmearAnisotropicTest : public ::testing::TestWithParam<anisotropic_flow_smear_test_t>
 {
 protected:
-  void SetUp() override { set_test_partition(testing::get<6>(GetParam())); }
+  void SetUp() override
+  {
+    const int partition = testing::get<6>(GetParam());
+    if (skip_partition(partition)) GTEST_SKIP();
+    set_test_partition(partition);
+  }
   void TearDown() override
   {
     freeGaugeQuda();
@@ -230,12 +255,12 @@ INSTANTIATE_TEST_SUITE_P(WilsonFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW), testing::Values(-1),
                                           testing::Values(3u, 4u), testing::Values(kAnisotropicSmearValue),
-                                          testing::ValuesIn(smear_partitions)),
+                                          testing::Range(0, n_partitions)),
                          anisotropic_flow_test_name);
 INSTANTIATE_TEST_SUITE_P(SymanzikFlow_Anisotropic, GaugeFlowSmearAnisotropicTest,
                          testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                           testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12),
                                           testing::Values(QUDA_GAUGE_SMEAR_SYMANZIK_FLOW), testing::Values(-1),
                                           testing::Values(3u, 4u), testing::Values(kAnisotropicSmearValue),
-                                          testing::ValuesIn(smear_partitions)),
+                                          testing::Range(0, n_partitions)),
                          anisotropic_flow_test_name);

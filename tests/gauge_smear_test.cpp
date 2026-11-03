@@ -265,6 +265,7 @@ struct gauge_smear_test : quda_test {
   {
     quda_test::add_command_line_group(app);
     add_su3_option_group(app);
+    app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
   }
 
   gauge_smear_test(int argc, char **argv) : quda_test("Gauge Smear Test", argc, argv) { }

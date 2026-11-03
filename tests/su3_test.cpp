@@ -612,6 +612,7 @@ struct su3_test : quda_test {
   {
     quda_test::add_command_line_group(app);
     add_su3_option_group(app);
+    app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
   }
 
   su3_test(int argc, char **argv) : quda_test("SU(3) Test", argc, argv) { }
