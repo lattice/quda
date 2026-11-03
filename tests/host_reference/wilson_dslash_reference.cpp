@@ -46,12 +46,19 @@ template <typename real_t> struct DslashReference {
   void operator()(void *res_, const void *const *gaugeFull_, const void *const *ghostGauge_, const void *spinorField_,
                   const void *const *fwdSpinor_, const void *const *backSpinor_, int parity, int dagger)
   {
-    auto res = reinterpret_cast<real_t *>(res_);
-    auto gaugeFull = reinterpret_cast<const real_t *const *>(gaugeFull_);
-    auto ghostGauge = reinterpret_cast<const real_t *const *>(ghostGauge_);
-    auto spinorField = reinterpret_cast<const real_t *>(spinorField_);
-    auto fwdSpinor = reinterpret_cast<const real_t *const *>(fwdSpinor_);
-    auto backSpinor = reinterpret_cast<const real_t *const *>(backSpinor_);
+#define E(x) static_cast<const real_t *const>(x)
+#define INIT(x)                                                                                                        \
+  {                                                                                                                    \
+    E(x[0]), E(x[1]), E(x[2]), E(x[3])                                                                                 \
+  }
+    const auto res = static_cast<real_t *const>(res_);
+    const real_t *const gaugeFull[] = INIT(gaugeFull_);
+    const real_t *const ghostGauge[] = INIT(ghostGauge_);
+    const auto spinorField = static_cast<const real_t *const>(spinorField_);
+    const real_t *const fwdSpinor[] = INIT(fwdSpinor_);
+    const real_t *const backSpinor[] = INIT(backSpinor_);
+#undef INIT
+#undef E
 
 #pragma omp parallel for
     for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
