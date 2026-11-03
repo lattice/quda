@@ -422,6 +422,7 @@ namespace quda
 
   void IRAM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
+    clearMatNorm();
     // Override any user input for block size.
     block_size = 1;
 

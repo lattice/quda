@@ -67,6 +67,7 @@ namespace quda
 
   void TRLM3D::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
+    clearMatNorm();
     // Create 3-d split communicators
     CommKey split_key = {1, 1, 1, comm_dim(3)};
 

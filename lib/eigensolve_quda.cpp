@@ -192,6 +192,8 @@ namespace quda
     }
   }
 
+  void EigenSolver::clearMatNorm() { eig_param->mat_norm = 0; }
+
   void EigenSolver::reportMatNorm(real_t krylov_norm)
   {
     real_t norm = eig_param->use_poly_acc ? static_cast<real_t>(eig_param->a_max) : krylov_norm;

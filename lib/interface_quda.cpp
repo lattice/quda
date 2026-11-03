@@ -2859,7 +2859,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     errorQuda("Invalid use_norm_op, dagger, gamma_5 combination");
   }
 
-  // Perform the eigensolve
+  // Perform the eigensolve. Paths that return without reportMatNorm()
+  // (vec_infile, arpack_check) must not keep a previous estimate.
+  eig_param->mat_norm = 0;
   if (eig_param->arpack_check) {
     arpack_solve(host_evecs_, evals, *m, eig_param);
   } else {

@@ -118,6 +118,12 @@ namespace quda
     real_t setEpsilon(const QudaPrecision prec);
 
     /**
+       @brief Zero eig_param->mat_norm. A solve that returns without an estimate
+       must not keep a value written by a previous solve.
+    */
+    void clearMatNorm();
+
+    /**
        @brief Record an estimate of the operator norm in eig_param->mat_norm.
        The Krylov space samples the whole spectrum, so the largest magnitude
        Ritz value of the projected matrix estimates ||A|| even for an SR solve;
