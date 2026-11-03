@@ -195,6 +195,7 @@ namespace quda
 
     // Assigned in the original QUDA communicator, inherited by split communicators.
     int test_p2p_island = -1;
+    uint64_t test_p2p_config_hash = 14695981039346656037ull;
     bool test_p2p_island_initialized = false;
     std::vector<int> test_p2p_neighbor_islands;
 
@@ -213,6 +214,8 @@ namespace quda
         comm_allreduce_int(mismatch);
         if (mismatch) errorQuda("QUDA_TEST_P2P_ISLANDS must be identical on all ranks");
         if (env) {
+          // Stable FNV-1a fingerprint of the complete original-rank assignment.
+          for (unsigned char byte : value) test_p2p_config_hash = (test_p2p_config_hash ^ byte) * 1099511628211ull;
           std::vector<int> islands;
           const char *p = value.c_str();
           while (*p) {
@@ -669,7 +672,7 @@ namespace quda
     }
   }
 
-  char config_string[64];
+  char config_string[128];
   bool config_init = false;
 
   const char *comm_config_string()
@@ -685,6 +688,28 @@ namespace quda
       strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
       strcat(config_string, ",nvshmem=");
       strcat(config_string, std::to_string(comm_nvshmem_enabled()).c_str());
+      if (test_p2p_island >= 0) {
+        // Include the current communicator's membership AND coordinate mapping.
+        // All ranks derive the same key; row/column mappings and subgrids with
+        // different island connectivity must not reuse a policy tuning entry.
+        uint64_t hash = test_p2p_config_hash;
+        auto mix = [&](uint32_t value) {
+          for (int byte = 0; byte < 4; byte++) {
+            hash = (hash ^ (value & 0xff)) * 1099511628211ull;
+            value >>= 8;
+          }
+        };
+        for (int dim = 0; dim < 4; dim++) mix(comm_dim(dim));
+        auto *topo = comm_default_topology();
+        for (size_t rank = 0; rank < test_p2p_neighbor_islands.size(); rank++) {
+          mix(test_p2p_neighbor_islands[rank]);
+          const int *coords = comm_coords_from_rank(topo, rank);
+          for (int dim = 0; dim < 4; dim++) mix(coords[dim]);
+        }
+        char suffix[40];
+        snprintf(suffix, sizeof(suffix), ",p2p_islands=%016llx", static_cast<unsigned long long>(hash));
+        strcat(config_string, suffix);
+      }
       config_init = true;
     }
 

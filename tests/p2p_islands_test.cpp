@@ -61,7 +61,17 @@ int main(int argc, char **argv)
   std::string token;
   while (std::getline(input, token, ',')) islands.push_back(std::stoi(token));
   int failures = 0;
+  const std::string global_config = quda::comm_config_string();
   auto check = [&]() {
+    std::string config = quda::comm_config_string();
+    if (config.find(",p2p_islands=") == std::string::npos) failures++;
+    int length = config.size();
+    quda::comm_broadcast(&length, sizeof(length));
+    std::string reference(length, '\0');
+    if (quda::comm_rank() == 0) reference = config;
+    quda::comm_broadcast(reference.data(), reference.size());
+    if (reference != config) failures++;
+    if (quda::comm_rank() == 0) printf("Island tuning config: %s\n", config.c_str());
     std::vector<int> original_ranks(quda::comm_size());
     for (int rank = 0; rank < static_cast<int>(original_ranks.size()); rank++) {
       original_ranks[rank] = global_rank;
@@ -80,6 +90,7 @@ int main(int argc, char **argv)
     quda::push_communicator({split[0], split[1], split[2], split[3]});
     check();
     quda::push_communicator(quda::default_comm_key);
+    if (global_config != quda::comm_config_string()) failures++;
     check();
   }
   MPI_Allreduce(MPI_IN_PLACE, &failures, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);

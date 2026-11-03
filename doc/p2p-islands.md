@@ -10,6 +10,14 @@ Membership is inherited across split-grid communicator changes, independent
 of the new local rank. Unset means normal P2P selection. The mask never enables
 hardware access that would otherwise be unavailable. MPI and QMP are supported.
 
+With islands enabled, the cached communication configuration string contains
+`,p2p_islands=<64-bit fingerprint>`. The fingerprint includes the complete
+original assignment, current communicator membership, dimensions, and
+coordinate-to-rank mapping. Dslash policy tuning already includes the
+communication configuration in its auxiliary key, so different island
+layouts/orderings do not share tuning entries. Each communicator computes
+this string only once; returning to a cached communicator restores its key.
+
 For a single-GPU emulation, enable `QUDA_ENABLE_MPS=1`, use an MPS server,
 and set `QUDA_ENABLE_GDR=0` for host-buffer MPI across islands. MPS alone
 does not define island membership. Do not use P2P-only policy settings
@@ -78,3 +86,32 @@ uncompressed gauge fields, and GPU-direct RDMA disabled:
 QMP support is implemented but was not built or exercised in this environment.
 These checks validate the island machinery; they do not reproduce the
 Laplace-to-MG failure, whose pipeline test is a separate next step.
+
+## Dslash performance sample
+
+Eight sequentially benchmarked MPS ranks on the L4, local volume `16^4`,
+process grid `2 1 1 4`, Wilson dslash, single precision, reconstruction 18,
+`QUDA_ENABLE_P2P=3`, and GDR disabled. Each configuration had one initial
+cache-population run and three measured runs of 1,000 calls, each with
+the test's own warm-up. Configuration order was shuffled per round.
+All configurations shared a tuning cache, with eight distinct island keys.
+
+Median reported microseconds per dslash call (min–max in parentheses):
+
+| Island size | Column / T-fastest | Row / X-fastest |
+| --- | --- | --- |
+| 1 | 984.208 (982.516–997.219) | 972.105 (971.443–987.397) |
+| 2 | 969.844 (968.790–976.857) | 971.333 (970.216–985.317) |
+| 4 | 993.195 (986.366–1017.496) | 983.684 (983.667–1008.643) |
+| 8 | 958.544 (957.795–965.449) | 972.109 (971.198–990.689) |
+
+The largest median improvement over size 1 was 2.7% (size 8, column
+ordering). There was no consistent monotonic trend across both orderings.
+Autotuning selected the non-P2P policy for some configurations, including
+size 4 in both orderings and size 8 in row ordering. These numbers describe
+automatically selected policies on a shared physical GPU, not inter-GPU or
+inter-node bandwidth.
+
+After adding the tuning fingerprint, all eight size/ordering topology
+regressions passed, including rank agreement on the config string and
+restoration of the original string after each split/restore cycle.
