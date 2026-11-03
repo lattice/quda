@@ -1,22 +1,22 @@
-@QUDA_COARSE_FILE_BEGIN @
+@QUDA_COARSE_FILE_BEGIN@
 #include <quda_arch.h>
 #include "dslash_coarse_decl.hpp"
 
 #if defined(QUDA_MMA_AVAILABLE)                                                                                        \
-  && ((@QUDA_MULTIGRID_NVEC @ == 24) || (@QUDA_MULTIGRID_NVEC @ == 32) || (@QUDA_MULTIGRID_NVEC @ == 64)               \
-      || (@QUDA_MULTIGRID_NVEC @ == 96))
+  && ((@QUDA_MULTIGRID_NVEC@ == 24) || (@QUDA_MULTIGRID_NVEC@ == 32) || (@QUDA_MULTIGRID_NVEC@ == 64)               \
+      || (@QUDA_MULTIGRID_NVEC@ == 96))
 #include "dslash_coarse_mma_inst.hpp"
 #endif
 
-  namespace quda
+namespace quda
 {
 
   constexpr bool dagger = @QUDA_MULTIGRID_DAGGER@;
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC@;
   constexpr int nVec = @QUDA_MULTIGRID_MRHS@;
-  using Float = @QUDA_COARSE_FLOAT @;
-  using yFloat = @QUDA_COARSE_YFLOAT @;
-  using ghostFloat = @QUDA_COARSE_GHOSTFLOAT @;
+  using Float = @QUDA_COARSE_FLOAT@;
+  using yFloat = @QUDA_COARSE_YFLOAT@;
+  using ghostFloat = @QUDA_COARSE_GHOSTFLOAT@;
 
 #if defined(QUDA_MMA_AVAILABLE)                                                                                        \
   && ((@QUDA_MULTIGRID_NVEC@ == 24) || (@QUDA_MULTIGRID_NVEC@ == 32) || (@QUDA_MULTIGRID_NVEC@ == 64)               \
@@ -38,4 +38,4 @@
 #endif
 
 } // namespace quda
-@QUDA_COARSE_FILE_END @
+@QUDA_COARSE_FILE_END@
