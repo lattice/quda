@@ -2,7 +2,8 @@
 #include "copy_gauge_helper.hpp"
 #include "multigrid.h"
 
-namespace quda {
+namespace quda
+{
 
   constexpr bool fine_grain() { return true; }
 
@@ -11,10 +12,9 @@ namespace quda {
                    double scale, sFloatOut *Out, sFloatOut **outGhost, int type)
   {
     typedef typename mapper<sFloatOut>::type FloatOut;
-    constexpr int length = 2*Nc*Nc;
+    constexpr int length = 2 * Nc * Nc;
 
-    if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
-      errorQuda("Reconstruct type %d not supported", out.Reconstruct());
+    if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Reconstruct type %d not supported", out.Reconstruct());
 
     if constexpr (fine_grain()) {
       if (out.Precision() == QUDA_HALF_PRECISION) {
@@ -72,7 +72,6 @@ namespace quda {
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
     }
-
   }
 
   template <int Nc, typename sFloatOut, typename sFloatIn>

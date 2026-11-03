@@ -2,10 +2,12 @@
 #include <instantiate.h>
 #include <kernels/copy_gauge_extended.cuh>
 
-namespace quda {
+namespace quda
+{
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-  class CopyGaugeEx : TunableKernel2D {
+  class CopyGaugeEx : TunableKernel2D
+  {
     template <bool expand> using Arg = CopyGaugeExArg<FloatOut, FloatIn, length, OutOrder, InOrder, expand>;
     GaugeField &out;
     const GaugeField &in;
@@ -15,7 +17,10 @@ namespace quda {
     double scale;
 
     bool tuneSharedBytes() const override { return false; }
-    unsigned int minThreads() const override { return in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(); }
+    unsigned int minThreads() const override
+    {
+      return in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB();
+    }
 
   public:
     CopyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale_, FloatOut *Out,
@@ -38,7 +43,7 @@ namespace quda {
 
     long long bytes() const override
     { // only count interior sites
-      return (out.LocalVolume() * out.Bytes()) / out.Volume() +  (in.LocalVolume() * in.Bytes()) / in.Volume();
+      return (out.LocalVolume() * out.Bytes()) / out.Volume() + (in.LocalVolume() * in.Bytes()) / in.Volume();
     }
   };
 
@@ -79,7 +84,7 @@ namespace quda {
           errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
         }
       } else {
-	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
+        errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
@@ -159,7 +164,7 @@ namespace quda {
           errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
         }
       } else {
-	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
+        errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 

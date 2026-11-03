@@ -38,8 +38,7 @@ namespace quda
 {
   template <typename T> struct is_doubledouble : std::false_type {
   };
-  template <cuda::fpmp2_accuracy Acc>
-  struct is_doubledouble<cuda::fpmp2<double, Acc>> : std::true_type {
+  template <cuda::fpmp2_accuracy Acc> struct is_doubledouble<cuda::fpmp2<double, Acc>> : std::true_type {
   };
   template <typename T> constexpr bool is_doubledouble_v = is_doubledouble<T>::value;
   template <typename T> using enable_if_doubledouble = std::enable_if_t<is_doubledouble_v<T>, int>;
@@ -52,8 +51,7 @@ template <typename T, quda::enable_if_doubledouble<T> = 0> __device__ __host__ i
 }
 namespace cuda::experimental
 {
-  template <typename T, quda::enable_if_doubledouble<T> = 0>
-  __device__ __host__ inline T abs(const T &a)
+  template <typename T, quda::enable_if_doubledouble<T> = 0> __device__ __host__ inline T abs(const T &a)
   {
     return fabs(a);
   }
@@ -112,18 +110,21 @@ namespace quda
     return output;
   }
 
-  template <typename T> __device__ __host__ inline doubledouble_pair<T> add2(doubledouble_pair<T> a, doubledouble_pair<T> b)
+  template <typename T>
+  __device__ __host__ inline doubledouble_pair<T> add2(doubledouble_pair<T> a, doubledouble_pair<T> b)
   {
     return {a.x + b.x, a.y + b.y};
   }
 
-  template <typename T> __device__ __host__ inline doubledouble_pair<T> mul2(doubledouble_pair<T> a, doubledouble_pair<T> b)
+  template <typename T>
+  __device__ __host__ inline doubledouble_pair<T> mul2(doubledouble_pair<T> a, doubledouble_pair<T> b)
   {
     return {a.x * b.x, a.y * b.y};
   }
 
   template <typename T>
-  __device__ __host__ inline doubledouble_pair<T> fma2(doubledouble_pair<T> a, doubledouble_pair<T> b, doubledouble_pair<T> c)
+  __device__ __host__ inline doubledouble_pair<T> fma2(doubledouble_pair<T> a, doubledouble_pair<T> b,
+                                                       doubledouble_pair<T> c)
   {
     return {a.x * b.x + c.x, a.y * b.y + c.y};
   }

@@ -340,8 +340,7 @@ namespace quda
       complex<Float> tmp[len];
       block_load<complex<Float>, len>(tmp, reinterpret_cast<const complex<Float> *>(in));
 #pragma unroll
-      for (int i = 0; i < len; i++)
-        v[i] = {static_cast<real>(tmp[i].real()), static_cast<real>(tmp[i].imag())};
+      for (int i = 0; i < len; i++) v[i] = {static_cast<real>(tmp[i].real()), static_cast<real>(tmp[i].imag())};
     }
   }
 
@@ -362,8 +361,7 @@ namespace quda
     } else {
       complex<Float> tmp[len];
 #pragma unroll
-      for (int i = 0; i < len; i++)
-        tmp[i] = {store_cast<Float>(v[i].real()), store_cast<Float>(v[i].imag())};
+      for (int i = 0; i < len; i++) tmp[i] = {store_cast<Float>(v[i].real()), store_cast<Float>(v[i].imag())};
       block_store<complex<Float>, len>(reinterpret_cast<complex<Float> *>(out), tmp);
     }
   }

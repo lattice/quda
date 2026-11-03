@@ -79,9 +79,8 @@ namespace quda
                                    cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                                    cvector_ref<const ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v)
     {
-      return dispatch_reduce_store(x, [&]<typename store_t>() {
-        return caxpbypzYmbwcDotProductUYNormY_t<store_t>(a, x, b, y, z, w, v);
-      });
+      return dispatch_reduce_store(
+        x, [&]<typename store_t>() { return caxpbypzYmbwcDotProductUYNormY_t<store_t>(a, x, b, y, z, w, v); });
     }
 
     cvector<array<real_t, 2>> axpyCGNorm(cvector<real_t> &a, cvector_ref<const ColorSpinorField> &x,

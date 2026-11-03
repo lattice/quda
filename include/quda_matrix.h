@@ -84,27 +84,26 @@ namespace quda {
 	template<class U>
 	  __device__ __host__ inline void operator=(const Matrix<U,N> & b) {
 #pragma unroll
-	  for (int i=0; i<N*N; i++)
+          for (int i = 0; i < N * N; i++)
             data[i] = T(static_cast<real>(b.data[i].real()), static_cast<real>(b.data[i].imag()));
-	}
+        }
 
         /**
            @brief Construct a Matrix from a wrapped gauge-field location.
            If the wrapper scalar type differs from the matrix register type, convert after loading.
            @param[in] s Wrapped gauge accessor at a field location
          */
-	template<typename Float, typename S>
-	  __device__ __host__ inline Matrix(const gauge_wrapper<Float, S> &s);
+        template <typename Float, typename S> __device__ __host__ inline Matrix(const gauge_wrapper<Float, S> &s);
 
         /**
            @brief Assign from a wrapped gauge-field location.
            If the wrapper scalar type differs from the matrix register type, convert after loading.
            @param[in] s Wrapped gauge accessor at a field location
          */
-	template<typename Float, typename S>
-	  __device__ __host__ inline void operator=(const gauge_wrapper<Float, S> &s);
+        template <typename Float, typename S>
+        __device__ __host__ inline void operator=(const gauge_wrapper<Float, S> &s);
 
-	template<typename S>
+        template<typename S>
 	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<real, S> &s);
 
 	template<typename S>
@@ -901,8 +900,8 @@ namespace quda {
       //[34] Test for c0 < 0.
       int parity = 0;
       if(c0 < 0) {
-	c0 *= real(-1);
-	parity = 1;
+        c0 *= real(-1);
+        parity = 1;
 	//calculate fj with c0 > 0 and then convert all fj.
       }
 

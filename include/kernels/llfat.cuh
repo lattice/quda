@@ -31,10 +31,7 @@ namespace quda {
     int odd_bit;
 
     LinkArg(GaugeField &link, const GaugeField &u, real_t coeff) :
-      kernel_param(dim3(link.VolumeCB(), 2, 4)),
-      link(link),
-      u(u),
-      coeff(static_cast<real>(coeff))
+      kernel_param(dim3(link.VolumeCB(), 2, 4)), link(link), u(u), coeff(static_cast<real>(coeff))
     {
       if (u.StaggeredPhase() != QUDA_STAGGERED_PHASE_MILC && u.Reconstruct() != QUDA_RECONSTRUCT_NO)
         errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
@@ -136,8 +133,8 @@ namespace quda {
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
 
-    StapleArg(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
-              real_t coeff, int nu, int mu_map[4]) :
+    StapleArg(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u, real_t coeff, int nu,
+              int mu_map[4]) :
       kernel_param(dim3(1, 2, 1)),
       fat(fat),
       staple(staple),
@@ -145,8 +142,7 @@ namespace quda {
       u(u),
       coeff(static_cast<real>(coeff)),
       nu(nu),
-      odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
-                commDimPartitioned(2)+commDimPartitioned(3))%2 )
+      odd_bit((commDimPartitioned(0) + commDimPartitioned(1) + commDimPartitioned(2) + commDimPartitioned(3)) % 2)
     {
       for (int d=0; d<4; d++) {
         X[d] = (fat.X()[d] + u.X()[d]) / 2;

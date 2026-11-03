@@ -361,7 +361,7 @@ namespace quda
   }
 #endif
 
-#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE)                                                                             \
+#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE)                                                                            \
   && (defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_IS_FLOATFLOAT))
   template <> void comm_allreduce_max<std::vector<device_reduce_t>>(std::vector<device_reduce_t> &a)
   {

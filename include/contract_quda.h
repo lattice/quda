@@ -20,8 +20,8 @@ namespace quda
    */
 
   void contractSummed(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result,
-                          QudaContractType cType, const int *const source_position, const int *const mom_mode,
-                          const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1);
+                      QudaContractType cType, const int *const source_position, const int *const mom_mode,
+                      const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1);
   /**
    * @param[in] x       input color spinor
    * @param[in] y       input color spinor

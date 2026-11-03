@@ -465,8 +465,7 @@ namespace quda
   __device__ __host__ inline float fdivide(float a, float b) { return target::dispatch<fdivide_impl>(a, b); }
   __device__ __host__ inline double fdivide(double a, double b) { return target::dispatch<fdivide_impl>(a, b); }
   template <typename T>
-  __device__ __host__ inline std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, T>
-  fdivide(T a, T b)
+  __device__ __host__ inline std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, T> fdivide(T a, T b)
   {
     return a / b;
   }

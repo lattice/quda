@@ -41,7 +41,10 @@ namespace quda
 
     // Multi-BLAS is GPU-only as well (same "Only implemented for GPU fields"
     // error in MultiBlas::compute), so reuse the multi-reduce gate.
-    template <typename store_t> constexpr bool multi_blas_prec_enabled() { return multi_reduce_prec_enabled<store_t>(); }
+    template <typename store_t> constexpr bool multi_blas_prec_enabled()
+    {
+      return multi_reduce_prec_enabled<store_t>();
+    }
 
     // Single-vector BLAS has a CPU-field path (see Blas::apply), so keep
     // double instantiable even when GPU double is disabled.

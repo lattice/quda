@@ -213,7 +213,8 @@ namespace quda {
     bool zero_refinement = param.precision_refinement_sloppy != param.precision;
 
     // this is the limit of precision possible
-    const double sloppy_tol = param.precision_sloppy == 8 ? compute_epsilon<double>() :
+    const double sloppy_tol = param.precision_sloppy == 8 ?
+      compute_epsilon<double>() :
       ((param.precision_sloppy == 4) ? compute_epsilon<float>() : pow(2., -17));
     const double fine_tol = pow(10.,(-2*(int)b.Precision()+1));
     std::vector<real_t> prec_tol(num_offset);

@@ -89,11 +89,11 @@ namespace quda {
     {
       for (int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       invpsq = (Float*)device_malloc(sizeof(Float) * volume);
-      delta = (complex<Store>*)device_malloc(sizeof(complex<Store>) * volume * 6);
+      delta = (complex<Store> *)device_malloc(sizeof(complex<Store>) * volume * 6);
 #ifdef GAUGEFIXING_DONT_USE_GX
-      gx = (complex<Store>*)device_malloc(sizeof(complex<Store>) * volume);
+      gx = (complex<Store> *)device_malloc(sizeof(complex<Store>) * volume);
 #else
-      gx = (complex<Store>*)device_malloc(sizeof(complex<Store>) * volume * elems);
+      gx = (complex<Store> *)device_malloc(sizeof(complex<Store>) * volume * elems);
 #endif
     }
 
@@ -167,7 +167,7 @@ namespace quda {
       ReduceArg<reduce_t>(dim3(data.VolumeCB(), 2, 1), 1, true), // reset = true
       data(data),
       delta(delta),
-      result{0, 0},
+      result {0, 0},
       volume(data.Volume())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];

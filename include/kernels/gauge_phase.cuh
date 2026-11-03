@@ -28,9 +28,8 @@ namespace quda {
       // else we are applying them
       real dir = u.StaggeredPhaseApplied() ? real(-1) : real(1);
 
-      i_mu_phase = complex<real>(
-        static_cast<real>(cos(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))),
-        dir * static_cast<real>(sin(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))));
+      i_mu_phase = complex<real>(static_cast<real>(cos(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))),
+                                 dir * static_cast<real>(sin(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))));
 
       for (int d=0; d<4; d++) X[d] = u.X()[d];
 
@@ -45,35 +44,34 @@ namespace quda {
     typename Arg::real phase = typename Arg::real(1);
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
       if (dim==0) {
-	phase = (1 - 2 * (t % 2) );
+        phase = (1 - 2 * (t % 2));
       } else if (dim == 1) {
-	phase = (1 - 2 * ((t + x) % 2) );
+        phase = (1 - 2 * ((t + x) % 2));
       } else if (dim == 2) {
-	phase = (1 - 2 * ((t + x + y) % 2) );
+        phase = (1 - 2 * ((t + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-	phase = (t == arg.X[3]-1) ? arg.tBoundary : typename Arg::real(1);
+        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim==0) {
-	phase = (1 - 2 * ((3 + t + z + y) % 2) );
+        phase = (1 - 2 * ((3 + t + z + y) % 2));
       } else if (dim == 1) {
-	phase = (1 - 2 * ((2 + t + z) % 2) );
+        phase = (1 - 2 * ((2 + t + z) % 2));
       } else if (dim == 2) {
-	phase = (1 - 2 * ((1 + t) % 2) );
+        phase = (1 - 2 * ((1 + t) % 2));
       } else if (dim == 3) { // also apply boundary condition
-	phase = (t == arg.X[3]-1) ? arg.tBoundary : typename Arg::real(1);
+        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {
       // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
       if (dim==0) {
 	phase = -1.0;
       } else if (dim == 1) {
-	phase = (1 - 2 * ((1 + x) % 2) );
+        phase = (1 - 2 * ((1 + x) % 2));
       } else if (dim == 2) {
-	phase = (1 - 2 * ((1 + x + y) % 2) );
+        phase = (1 - 2 * ((1 + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-	phase = ((t == arg.X[3]-1) ? arg.tBoundary : typename Arg::real(1)) *
-	  (1 - 2 * ((1 + x + y + z) % 2) );
+        phase = ((t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1)) * (1 - 2 * ((1 + x + y + z) % 2));
       }
     }
     return phase;
@@ -91,7 +89,7 @@ namespace quda {
     u *= phase;
 
     // apply imaginary chemical potential if needed
-    if (dim==3 && arg.i_mu != real(0)) u *= arg.i_mu_phase;
+    if (dim == 3 && arg.i_mu != real(0)) u *= arg.i_mu_phase;
 
     arg.u(dim, indexCB, parity) = u;
   }

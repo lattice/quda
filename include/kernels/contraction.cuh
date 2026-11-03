@@ -119,8 +119,7 @@ namespace quda
         Sum_dXi_dot_Pi
           += real((arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i]) / real(arg.NxNyNzNt[i]);
 
-      complex<real> phase
-        = {cospi(Sum_dXi_dot_Pi * real(2)), -sinpi(Sum_dXi_dot_Pi * real(2))};
+      complex<real> phase = {cospi(Sum_dXi_dot_Pi * real(2)), -sinpi(Sum_dXi_dot_Pi * real(2))};
 
       // Collect vector data
       int parity = 0;
@@ -256,10 +255,7 @@ namespace quda
     matrix_field<store_complex, nSpin> s;
 
     ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, store_complex *s) :
-      kernel_param(dim3(x.VolumeCB(), 2, 1)),
-      x(x),
-      y(y),
-      s(s, x.VolumeCB())
+      kernel_param(dim3(x.VolumeCB(), 2, 1)), x(x), y(y), s(s, x.VolumeCB())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }

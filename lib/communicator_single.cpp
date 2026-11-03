@@ -97,9 +97,9 @@ namespace quda
 // real_t follows QUDA_FPMP_DOUBLEDOUBLE_ACCURACY. reduction_t can pin a
 // different fp64mp2 accuracy (QUDA_REDUCTION_TYPE=doubledouble_low, for
 // example). Both symbols are required: vector<complex_t> reduces real_t.
-#if defined(QUDA_SCALAR_IS_DOUBLEDOUBLE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)                                             \
-  && !((defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_LOW))                      \
-       || (defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_MID))                   \
+#if defined(QUDA_SCALAR_IS_DOUBLEDOUBLE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)                                    \
+  && !((defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_LOW))             \
+       || (defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_MID))          \
        || (defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_HIGH) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_HIGH)))
 #define QUDA_COMM_DD_SCALAR_DISTINCT doubledouble
 #endif
@@ -117,11 +117,13 @@ namespace quda
 #endif
 
 #ifdef QUDA_COMM_DD_SCALAR_DISTINCT
-  template <> void Communicator::comm_allreduce_sum_array<QUDA_COMM_DD_SCALAR_DISTINCT>(QUDA_COMM_DD_SCALAR_DISTINCT *, size_t)
+  template <>
+  void Communicator::comm_allreduce_sum_array<QUDA_COMM_DD_SCALAR_DISTINCT>(QUDA_COMM_DD_SCALAR_DISTINCT *, size_t)
   {
   }
 
-  template <> void Communicator::comm_allreduce_max_array<QUDA_COMM_DD_SCALAR_DISTINCT>(QUDA_COMM_DD_SCALAR_DISTINCT *, size_t)
+  template <>
+  void Communicator::comm_allreduce_max_array<QUDA_COMM_DD_SCALAR_DISTINCT>(QUDA_COMM_DD_SCALAR_DISTINCT *, size_t)
   {
   }
 
@@ -138,8 +140,7 @@ namespace quda
 
   template <> void Communicator::comm_allreduce_max_array<reduction_t>(reduction_t *, size_t) { }
 
-  template <>
-  void Communicator::comm_allreduce_max_array<deviation_t<reduction_t>>(deviation_t<reduction_t> *, size_t)
+  template <> void Communicator::comm_allreduce_max_array<deviation_t<reduction_t>>(deviation_t<reduction_t> *, size_t)
   {
   }
 #endif

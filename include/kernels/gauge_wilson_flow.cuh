@@ -46,10 +46,10 @@ namespace quda
       coeff1x1(static_cast<real>(5.0 / 3.0)),
       coeff2x1(static_cast<real>(-1.0 / 12.0))
     {
-      constexpr double coeff_a_host[] = {0.0, 0.737101392796, 1.634740794341, 0.744739003780, 1.469897351522,
-                                         2.813971388035};
-      constexpr double coeff_b_host[] = {0.032918605146, 0.823256998200, 0.381530948900, 0.200092213184,
-                                         1.718581042715, 0.27};
+      constexpr double coeff_a_host[]
+        = {0.0, 0.737101392796, 1.634740794341, 0.744739003780, 1.469897351522, 2.813971388035};
+      constexpr double coeff_b_host[]
+        = {0.032918605146, 0.823256998200, 0.381530948900, 0.200092213184, 1.718581042715, 0.27};
       for (int i = 0; i < 6; i++) {
         coeff_a[i] = static_cast<real>(coeff_a_host[i]);
         coeff_b[i] = static_cast<real>(coeff_b_host[i]);
@@ -149,12 +149,12 @@ namespace quda
     Z2 *= arg.epsilon;
     return Z2;
   }
-  
+
   template <typename Link, typename Ftor>
   __host__ __device__ inline auto computeWStep(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                        const int x_cb, const int dir, const typename Ftor::Arg::real coeff_a,
-                                        const typename Ftor::Arg::real coeff_b,
-                                        const bool get_stored, const bool do_store)
+                                               const int x_cb, const int dir, const typename Ftor::Arg::real coeff_a,
+                                               const typename Ftor::Arg::real coeff_b, const bool get_stored,
+                                               const bool do_store)
   {
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;

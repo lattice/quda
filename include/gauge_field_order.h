@@ -54,8 +54,7 @@ namespace quda {
 	 @param[in] x_cb Checkerboarded space-time index we are accessing
 	 @param[in] parity Parity we are accessing
        */
-      __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity,
-                                                          Float phase = Float(1)) :
+      __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity, Float phase = Float(1)) :
         dim(dim), x_cb(x_cb), parity(parity), phase(phase), gauge(gauge)
       {
       }
@@ -77,44 +76,45 @@ namespace quda {
          @tparam N Matrix rank
          @param[in] a Matrix we want to store in this accessor
        */
-      template <typename U, int N>
-      __device__ __host__ inline void operator=(const Matrix<complex<U>, N> &a) const
+      template <typename U, int N> __device__ __host__ inline void operator=(const Matrix<complex<U>, N> &a) const
       {
         gauge.save(a.data, x_cb, dim, parity);
       }
     };
 
-  /**
-     @brief Assignment operator for the Matrix class with a gauge_wrapper input.
-     If the wrapper scalar type differs from the matrix register type, convert after loading.
-     @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
-   */
-  template <typename T, int N>
+    /**
+       @brief Assignment operator for the Matrix class with a gauge_wrapper input.
+       If the wrapper scalar type differs from the matrix register type, convert after loading.
+       @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
+     */
+    template <typename T, int N>
     template <typename Float, typename S>
-    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<Float,S> &a) {
-    if constexpr (std::is_same_v<real, Float>) {
-      a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
-    } else {
-      Matrix<complex<Float>, N> tmp(a);
-      *this = tmp;
+    __device__ __host__ inline void Matrix<T, N>::operator=(const gauge_wrapper<Float, S> &a)
+    {
+      if constexpr (std::is_same_v<real, Float>) {
+        a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+      } else {
+        Matrix<complex<Float>, N> tmp(a);
+        *this = tmp;
+      }
     }
-  }
 
-  /**
-     @brief Constructor for the Matrix class with a gauge_wrapper input.
-     If the wrapper scalar type differs from the matrix register type, convert after loading.
-     @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
-   */
-  template <typename T, int N>
+    /**
+       @brief Constructor for the Matrix class with a gauge_wrapper input.
+       If the wrapper scalar type differs from the matrix register type, convert after loading.
+       @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
+     */
+    template <typename T, int N>
     template <typename Float, typename S>
-    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<Float,S> &a) {
-    if constexpr (std::is_same_v<real, Float>) {
-      a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
-    } else {
-      Matrix<complex<Float>, N> tmp(a);
-      *this = tmp;
+    __device__ __host__ inline Matrix<T, N>::Matrix(const gauge_wrapper<Float, S> &a)
+    {
+      if constexpr (std::is_same_v<real, Float>) {
+        a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
+      } else {
+        Matrix<complex<Float>, N> tmp(a);
+        *this = tmp;
+      }
     }
-  }
 
   /**
      @brief gauge_ghost_wrapper is an internal class that is used to
@@ -1004,8 +1004,8 @@ namespace quda {
         __host__ real_t norm1(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          auto nrm1 = accessor.template transform_reduce<plus<device_reduce_t>>(
-            location, dim, abs_<double, mem_t>(accessor.scale_inv));
+          auto nrm1 = accessor.template transform_reduce<plus<device_reduce_t>>(location, dim,
+                                                                                abs_<double, mem_t>(accessor.scale_inv));
           commGlobalReductionPop();
           return reduction_to_real(nrm1);
         }
@@ -1675,15 +1675,13 @@ namespace quda {
         constexpr int geom() const { return static_geometry ? static_cast<int>(geometry_) : geometry; }
 
         /** Bit-preserving copy of native storage. Avoid memcpy: floatfloat is a non-trivial class. */
-        template <int n>
-        __device__ __host__ static inline void copy_raw(store_t *dst, const array<store_t, n> &src)
+        template <int n> __device__ __host__ static inline void copy_raw(store_t *dst, const array<store_t, n> &src)
         {
 #pragma unroll
           for (int j = 0; j < n; j++) dst[j] = src[j];
         }
 
-        template <int n>
-        __device__ __host__ static inline void copy_raw(array<store_t, n> &dst, const store_t *src)
+        template <int n> __device__ __host__ static inline void copy_raw(array<store_t, n> &dst, const store_t *src)
         {
 #pragma unroll
           for (int j = 0; j < n; j++) dst[j] = src[j];
@@ -1748,10 +1746,9 @@ namespace quda {
           }
         }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity,
-                                           real phase = real(1)) const
-      {
-        real tmp[reconLen];
+        __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = real(1)) const
+        {
+          real tmp[reconLen];
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
@@ -1763,8 +1760,7 @@ namespace quda {
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp
-            = vector_load<store_t, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
+          auto vecTmp = vector_load<store_t, Nrem>(gauge, parity * offset + (geom() * M * N + dir * Nrem) * stride, x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -1993,8 +1989,7 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<store_t, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N,
-                                         parity * faceVolumeCB[dir] + x);
+            = vector_load<store_t, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
@@ -2084,9 +2079,8 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory
-          auto vecTmp = vector_load<store_t, N>(
-            ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
-            ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
+          auto vecTmp = vector_load<store_t, N>(ghost[dim], dir * reconLen * 2 * geom() * R[dim] * faceVolumeCB[dim],
+                                                ((i * 2 + parity) * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale);
@@ -2095,9 +2089,8 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<store_t, Nrem>(
-              ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
-              (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
+            = vector_load<store_t, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geom() * R[dim] * faceVolumeCB[dim],
+                                         (parity * geom() + g) * R[dim] * faceVolumeCB[dim] + x);
 
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
@@ -2122,8 +2115,8 @@ namespace quda {
       }
 
       template <typename In>
-      __device__ __host__ inline void saveGhostEx(const quda::complex<In> in[length / 2], int x, int, int dir, int dim, int g,
-                                                  int parity, const int R[]) const
+      __device__ __host__ inline void saveGhostEx(const quda::complex<In> in[length / 2], int x, int, int dir, int dim,
+                                                  int g, int parity, const int R[]) const
       {
         complex v[length / 2];
         cast_in(v, in);

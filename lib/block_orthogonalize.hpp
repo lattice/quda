@@ -13,7 +13,8 @@
 #include <instantiate.h>
 #include <multigrid.h>
 
-namespace quda {
+namespace quda
+{
 
   struct OrthoAggregates {
     // List of block sizes we wish to instantiate.  The required block
@@ -28,7 +29,8 @@ namespace quda {
     */
     static unsigned int block_mapper(unsigned int raw_block)
     {
-      for (unsigned int b = 0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];
+      for (unsigned int b = 0; b < block.size(); b++)
+        if (raw_block <= block[b]) return block[b];
       errorQuda("Invalid raw block size %d\n", raw_block);
       return 0;
     }
@@ -39,13 +41,15 @@ namespace quda {
   using namespace quda::colorspinor;
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
-  class BlockOrtho : public TunableBlock2D {
+  class BlockOrtho : public TunableBlock2D
+  {
 
     using real = typename mapper<vFloat>::type;
     // we only support block-format on fine grid where Ncolor=3
     static constexpr int nColor = isFixed<bFloat>::value ? 3 : nColor_;
     static constexpr int chiral_blocks = nSpin == 1 ? 2 : nSpin / spinBlockSize;
-    template <bool is_device, typename Rotator, typename Vector> using Arg = BlockOrthoArg<is_device, vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
+    template <bool is_device, typename Rotator, typename Vector>
+    using Arg = BlockOrthoArg<is_device, vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
 
     ColorSpinorField &V;
     const std::vector<ColorSpinorField> &B;
@@ -76,7 +80,7 @@ namespace quda {
       if (nColor_ != nColor)
         errorQuda("Number of colors %d not supported with this precision %lu\n", nColor_, sizeof(bFloat));
 
-      strcat(aux,",block_size=");
+      strcat(aux, ",block_size=");
 
       aggregate_size = 1;
       for (int d = 0; d < V.Ndim(); d++) {
@@ -89,7 +93,7 @@ namespace quda {
       if (aggregate_size % 2 != 0) errorQuda("Invalid MG aggregate size %d, must be even", aggregate_size);
       if (aggregate_size > 1024) errorQuda("Invalid MG aggregate size %d, must be <= 1024", aggregate_size);
 
-      nBlock = (V.Volume()/aggregate_size) * chiral_blocks;
+      nBlock = (V.Volume() / aggregate_size) * chiral_blocks;
 
       strcat(aux, ",n_block_ortho=");
       i32toa(aux + strlen(aux), n_block_ortho);
@@ -100,29 +104,30 @@ namespace quda {
       V.Scale(max); // by definition this is true
       apply(device::get_default_stream());
 
-      auto margin = 1.05; // the 1.05 gives us some margin
-      if (two_pass && V.Precision() < QUDA_SINGLE_PRECISION && (margin * max < 1.0)) {  // recompute for more precision
+      auto margin = 1.05;                                                              // the 1.05 gives us some margin
+      if (two_pass && V.Precision() < QUDA_SINGLE_PRECISION && (margin * max < 1.0)) { // recompute for more precision
         iter++;
         V.Scale(margin * max);
         apply(device::get_default_stream());
       }
     }
 
-    template <typename Rotator, typename Vector>
-    void launch_host_(const TuneParam &tp, const qudaStream_t &stream)
+    template <typename Rotator, typename Vector> void launch_host_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<false, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
+      Arg<false, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho,
+                                      V);
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
-      if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
+      if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning())
+        max = Rotator(V).abs_max(V);
     }
 
-    template <typename Rotator, typename Vector>
-    void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
+    template <typename Rotator, typename Vector> void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
     {
       Arg<true, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
       arg.swizzle_factor = tp.aux.x;
       launch_device<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
-      if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
+      if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning())
+        max = Rotator(V).abs_max(V);
     }
 
     void apply(const qudaStream_t &stream)
@@ -157,10 +162,10 @@ namespace quda {
     {
       if (param.aux.x < 2 * device::processor_count()) {
         param.aux.x++;
-	return true;
+        return true;
       } else {
         param.aux.x = 1;
-	return false;
+        return false;
       }
     }
 #else
@@ -170,9 +175,9 @@ namespace quda {
     bool advanceTuneParam(TuneParam &param) const
     {
       if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	return advanceSharedBytes(param) || advanceAux(param);
+        return advanceSharedBytes(param) || advanceAux(param);
       } else {
-	return false;
+        return false;
       }
     }
 
@@ -215,17 +220,21 @@ namespace quda {
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
 
     int blocksize = geo_blocksize * V.Ncolor();
-    if (spinBlockSize == 0) { blocksize /= 2; } else { blocksize *= spinBlockSize; }
-    int chiralBlocks = (spinBlockSize == 0) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
-    int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
+    if (spinBlockSize == 0) {
+      blocksize /= 2;
+    } else {
+      blocksize *= spinBlockSize;
+    }
+    int chiralBlocks = (spinBlockSize == 0) ? 2 : V.Nspin() / spinBlockSize; // always 2 for staggered.
+    int numblocks = (V.Volume() / geo_blocksize) * chiralBlocks;
     constexpr int coarseSpin = (nSpin == 4 || nSpin == 2 || spinBlockSize == 0) ? 2 : 1;
 
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d repeating %d times, two_pass = %d\n",
                  numblocks, blocksize, nVec, n_block_ortho, two_pass);
 
-    BlockOrtho<vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec>
-      ortho(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
+    BlockOrtho<vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec> ortho(
+      V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
   }
 
   template <typename vFloat, typename bFloat, int fineColor, int coarseColor>
@@ -238,23 +247,24 @@ namespace quda {
       constexpr int nSpin = 2;
       if (spin_bs != 1) errorQuda("Unexpected spin block size = %d", spin_bs);
       constexpr int spinBlockSize = 1;
-      BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, fineColor, coarseColor>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
+      BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, fineColor, coarseColor>(
+        V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
     } else if constexpr (fineColor == 3) {
       if (V.Nspin() == 4) {
         constexpr int nSpin = 4;
         if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
         if constexpr (is_enabled_spin(nSpin)) {
           constexpr int spinBlockSize = 2;
-          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, fineColor, coarseColor>
-            (V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, fineColor, coarseColor>(
+            V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
         }
       } else if (V.Nspin() == 1) {
         constexpr int nSpin = 1;
         if (spin_bs != 0) errorQuda("Unexpected spin block size = %d", spin_bs);
         if constexpr (is_enabled_spin(nSpin)) {
           constexpr int spinBlockSize = 0;
-          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, fineColor, coarseColor>
-            (V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, fineColor, coarseColor>(
+            V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
         }
       } else {
         errorQuda("Unexpected nSpin = %d", V.Nspin());

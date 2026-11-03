@@ -287,8 +287,7 @@ namespace quda
       return static_cast<Index>(j) * stride * (N / 2) + static_cast<Index>(x_cb) * Nvec + i;
     };
 
-    template <typename T, int n>
-    __device__ __host__ inline void copy_storage(T *dst, const array<T, n> &src)
+    template <typename T, int n> __device__ __host__ inline void copy_storage(T *dst, const array<T, n> &src)
     {
 #pragma unroll
       for (int i = 0; i < n; i++) dst[i] = src[i];
@@ -758,8 +757,8 @@ namespace quda
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
         using reduce_t = std::conditional_t<is_floatfloat_v<Float>, double, Float>;
-        real_t absmax = real_t(transform_reduce<maximum<reduce_t>>(field.Location(), field.SiteSubset(),
-                                                                abs_max_<reduce_t, ghost_store_t>(static_cast<reduce_t>(scale_inv))));
+        real_t absmax = real_t(transform_reduce<maximum<reduce_t>>(
+          field.Location(), field.SiteSubset(), abs_max_<reduce_t, ghost_store_t>(static_cast<reduce_t>(scale_inv))));
         commGlobalReductionPop();
         return absmax;
       }
@@ -1007,8 +1006,8 @@ namespace quda
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
         using reduce_t = std::conditional_t<is_floatfloat_v<Float>, double, Float>;
-        auto absmax = real_t(transform_reduce<maximum<reduce_t>>(field.Location(), field.SiteSubset(),
-                                                              abs_max_<reduce_t, store_t>(static_cast<reduce_t>(scale_inv))));
+        auto absmax = real_t(transform_reduce<maximum<reduce_t>>(
+          field.Location(), field.SiteSubset(), abs_max_<reduce_t, store_t>(static_cast<reduce_t>(scale_inv))));
         commGlobalReductionPop();
         return absmax;
       }
@@ -1056,9 +1055,9 @@ namespace quda
           for (int dir = 0; dir < 2; dir++) {
             if (comm_dim_partitioned(dim) && ghost_[2 * dim + dir]) {
               ghost[2 * dim + dir] = static_cast<store_t *>(ghost_[2 * dim + dir]);
-              ghost_norm[2 * dim + dir] = reinterpret_cast<norm_type *>(
-                static_cast<char *>(ghost_[2 * dim + dir])
-                + faceVolumeCB[dim] * nParity * length_ghost * sizeof(store_t));
+              ghost_norm[2 * dim + dir]
+                = reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+                                                + faceVolumeCB[dim] * nParity * length_ghost * sizeof(store_t));
             } else {
               ghost[2 * dim + dir] = nullptr;
               ghost_norm[2 * dim + dir] = nullptr;
@@ -1082,8 +1081,7 @@ namespace quda
 
         if constexpr (Nrem > 0) { // now load any remainder
           auto vecTmp
-            = vector_load<store_t, Nrem>(
-              ghost[2 * dim + dir] + parity_off * length_ghost + faceVolumeCB[dim] * M * N, x);
+            = vector_load<store_t, Nrem>(ghost[2 * dim + dir] + parity_off * length_ghost + faceVolumeCB[dim] * M * N, x);
           copy_and_scale(v + M * N, vecTmp, nrm);
         }
 
@@ -1139,10 +1137,9 @@ namespace quda
         if constexpr (Nrem > 0) { // now load any remainder
           array<store_t, Nrem> vecTmp;
           copy_and_scale<store_t, real, Nrem>(vecTmp, v + M * N, scale_inv);
-          vector_store<store_t, Nrem>(
-            ghost[2 * dim + dir] + static_cast<index_t>(parity) * faceVolumeCB[dim] * length_ghost
-              + faceVolumeCB[dim] * M * N,
-            x, vecTmp);
+          vector_store<store_t, Nrem>(ghost[2 * dim + dir] + static_cast<index_t>(parity) * faceVolumeCB[dim] * length_ghost
+                                        + faceVolumeCB[dim] * M * N,
+                                      x, vecTmp);
         }
       }
 
@@ -1567,15 +1564,16 @@ namespace quda
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            v[s * Nc + c]
-              = complex(static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Nc + c) * Ns + s) * 2 + 0]),
-                        static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Nc + c) * Ns + s) * 2 + 1]));
+            v[s * Nc + c] = complex(
+              static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Nc + c) * Ns + s) * 2 + 0]),
+              static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Nc + c) * Ns + s) * 2 + 1]));
           }
         }
       }
 
       template <typename In>
-      __device__ __host__ inline void saveGhost(const quda::complex<In> v[length / 2], int x, int dim, int dir, int parity = 0) const
+      __device__ __host__ inline void saveGhost(const quda::complex<In> v[length / 2], int x, int dim, int dir,
+                                                int parity = 0) const
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
@@ -1645,15 +1643,16 @@ namespace quda
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            v[s * Nc + c]
-              = complex(static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0]),
-                        static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1]));
+            v[s * Nc + c] = complex(
+              static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0]),
+              static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1]));
           }
         }
       }
 
       template <typename In>
-      __device__ __host__ inline void saveGhost(const quda::complex<In> v[length / 2], int x, int dim, int dir, int parity = 0) const
+      __device__ __host__ inline void saveGhost(const quda::complex<In> v[length / 2], int x, int dim, int dir,
+                                                int parity = 0) const
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
@@ -1753,15 +1752,16 @@ namespace quda
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            v[s * Nc + c]
-              = complex(static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0]),
-                        static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1]));
+            v[s * Nc + c] = complex(
+              static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0]),
+              static_cast<real>(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1]));
           }
         }
       }
 
       template <typename In>
-      __device__ __host__ inline void saveGhost(const quda::complex<In> v[length / 2], int x, int dim, int dir, int parity = 0) const
+      __device__ __host__ inline void saveGhost(const quda::complex<In> v[length / 2], int x, int dim, int dir,
+                                                int parity = 0) const
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {

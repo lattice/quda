@@ -208,11 +208,9 @@ namespace quda
   transform_reduce<maximum<double>, complex<floatfloat>, unsigned long, abs_max_<double, floatfloat>, identity>(
     QudaFieldLocation, std::vector<double> &, std::vector<complex<floatfloat> *> const &, unsigned long,
     abs_max_<double, floatfloat>, identity);
-  template double
-  transform_reduce<maximum<double>, complex<floatfloat>, unsigned long, abs_max_<double, floatfloat>>(
+  template double transform_reduce<maximum<double>, complex<floatfloat>, unsigned long, abs_max_<double, floatfloat>>(
     QudaFieldLocation, complex<floatfloat> const *, unsigned long, abs_max_<double, floatfloat>);
-  template double
-  transform_reduce<maximum<double>, complex<floatfloat>, unsigned int, abs_max_<double, floatfloat>>(
+  template double transform_reduce<maximum<double>, complex<floatfloat>, unsigned int, abs_max_<double, floatfloat>>(
     QudaFieldLocation, complex<floatfloat> const *, unsigned int, abs_max_<double, floatfloat>);
   template void
   transform_reduce<minimum<double>, complex<floatfloat>, unsigned int, abs_min_<double, floatfloat>, identity>(
@@ -222,8 +220,7 @@ namespace quda
   transform_reduce<minimum<double>, complex<floatfloat>, unsigned long, abs_min_<double, floatfloat>, identity>(
     QudaFieldLocation, std::vector<double> &, std::vector<complex<floatfloat> *> const &, unsigned long,
     abs_min_<double, floatfloat>, identity);
-  template double
-  transform_reduce<minimum<double>, complex<floatfloat>, unsigned long, abs_min_<double, floatfloat>>(
+  template double transform_reduce<minimum<double>, complex<floatfloat>, unsigned long, abs_min_<double, floatfloat>>(
     QudaFieldLocation, complex<floatfloat> const *, unsigned long, abs_min_<double, floatfloat>);
 #endif
 

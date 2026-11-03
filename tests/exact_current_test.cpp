@@ -26,158 +26,156 @@ constexpr int n_current_ev = 2;
 
 #include "exact_current_test_gtest.hpp"
 
-namespace {
-
-void **alloc_links(size_t bytes)
+namespace
 {
-  void **links = new void *[4];
-  for (int dir = 0; dir < 4; dir++) links[dir] = safe_malloc(bytes);
-  return links;
-}
 
-void free_links(void **links)
-{
-  if (!links) return;
-  for (int dir = 0; dir < 4; dir++) host_free(links[dir]);
-  delete[] links;
-}
-
-// y.Odd() = scale * x.Odd(). axy, not axpy: the odd MCD result is replaced.
-template <typename real>
-void copy_odd(ColorSpinorField &y, const ColorSpinorField &x, real scale)
-{
-  const int n = (y.Volume() / 2) * nColor;
-  auto *dst = reinterpret_cast<std::complex<real> *>(y.Odd().data());
-  auto *src = reinterpret_cast<const std::complex<real> *>(x.Odd().data());
-  for (int i = 0; i < n; i++) dst[i] = scale * src[i];
-}
-
-// G5 is +1 on even sites and -1 on odd sites. G1 is the identity.
-template <typename real> void apply_g5(ColorSpinorField &x) { copy_odd<real>(x, x, static_cast<real>(-1)); }
-
-template <typename real>
-std::complex<real> site_dot(const ColorSpinorField &a, const ColorSpinorField &b, int site)
-{
-  auto *aa = reinterpret_cast<const std::complex<real> *>(a.data());
-  auto *bb = reinterpret_cast<const std::complex<real> *>(b.data());
-  std::complex<real> dot = 0;
-  for (int c = 0; c < nColor; c++) dot += std::conj(aa[nColor * site + c]) * bb[nColor * site + c];
-  return dot;
-}
-
-template <typename real>
-void accumulate_imag(real *jlow, const ColorSpinorField &left, const ColorSpinorField &right, int mu, size_t base,
-                     int vol_cb, double zscale)
-{
-  const real z = static_cast<real>(zscale);
-  for (int x = 0; x < vol_cb; x++) {
-    jlow[base + 4 * x + mu] += z * site_dot<real>(left, right, static_cast<int>(base == 0 ? x : vol_cb + x)).imag();
+  void **alloc_links(size_t bytes)
+  {
+    void **links = new void *[4];
+    for (int dir = 0; dir < 4; dir++) links[dir] = safe_malloc(bytes);
+    return links;
   }
-}
 
-void zscales(const double *eval, const double *mass, int nmasses, int i, double &zscale, double &zscale2)
-{
-  zscale = 0;
-  zscale2 = 0;
-  switch (nmasses) {
-  case 1: zscale = 1.0 / (eval[i] + 4.0 * mass[0] * mass[0]); break;
-  case 2: {
-    const double dl = eval[i] + 4.0 * mass[0] * mass[0];
-    const double ds = eval[i] + 4.0 * mass[1] * mass[1];
-    zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (dl * ds);
-    break;
+  void free_links(void **links)
+  {
+    if (!links) return;
+    for (int dir = 0; dir < 4; dir++) host_free(links[dir]);
+    delete[] links;
   }
-  case 3: {
-    const double du = eval[i] + 4.0 * mass[0] * mass[0];
-    const double dd = eval[i] + 4.0 * mass[1] * mass[1];
-    const double ds = eval[i] + 4.0 * mass[2] * mass[2];
-    zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (du * dd);
-    zscale2 = 4.0 * (mass[2] * mass[2] - mass[0] * mass[0]) / (du * ds);
-    break;
+
+  // y.Odd() = scale * x.Odd(). axy, not axpy: the odd MCD result is replaced.
+  template <typename real> void copy_odd(ColorSpinorField &y, const ColorSpinorField &x, real scale)
+  {
+    const int n = (y.Volume() / 2) * nColor;
+    auto *dst = reinterpret_cast<std::complex<real> *>(y.Odd().data());
+    auto *src = reinterpret_cast<const std::complex<real> *>(x.Odd().data());
+    for (int i = 0; i < n; i++) dst[i] = scale * src[i];
   }
-  default: errorQuda("Unexpected nmasses %d", nmasses);
+
+  // G5 is +1 on even sites and -1 on odd sites. G1 is the identity.
+  template <typename real> void apply_g5(ColorSpinorField &x) { copy_odd<real>(x, x, static_cast<real>(-1)); }
+
+  template <typename real> std::complex<real> site_dot(const ColorSpinorField &a, const ColorSpinorField &b, int site)
+  {
+    auto *aa = reinterpret_cast<const std::complex<real> *>(a.data());
+    auto *bb = reinterpret_cast<const std::complex<real> *>(b.data());
+    std::complex<real> dot = 0;
+    for (int c = 0; c < nColor; c++) dot += std::conj(aa[nColor * site + c]) * bb[nColor * site + c];
+    return dot;
   }
-}
 
-template <typename real>
-void host_current(real *jlow, real *jlow2, const GaugeField &fat, const GaugeField &lng, const GaugeField &shift,
-                  std::vector<ColorSpinorField> &evec_even, std::vector<ColorSpinorField> &evec_odd, const double *eval,
-                  const double *mass, int nmasses)
-{
-  ColorSpinorParam full(evec_even[0]);
-  full.siteSubset = QUDA_FULL_SITE_SUBSET;
-  full.x[0] *= 2;
-  full.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField gr0(full);
-  ColorSpinorField gr_mu(full);
-  ColorSpinorField evec(full);
-
-  ColorSpinorParam parity(evec_even[0]);
-  parity.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField dslash_out(parity);
-
-  const int vol_cb = gr0.Volume() / 2;
-  const size_t odd_base = 2 * gr0.Volume();
-
-  for (int i = 0; i < n_current_ev; i++) {
-    // D_oe. Even sites of gr0 stay zero.
-    memset(dslash_out.data(), 0, dslash_out.Bytes());
-    stag_dslash(dslash_out, fat, lng, evec_even[i], QUDA_ODD_PARITY, 0, QUDA_ASQTAD_DSLASH, 4);
-    memcpy(gr0.Odd().data(), dslash_out.data(), dslash_out.Bytes());
-
-    memcpy(evec.Even().data(), evec_even[i].data(), evec_even[i].Bytes());
-    memcpy(evec.Odd().data(), evec_odd[i].data(), evec_odd[i].Bytes());
-
-    double zscale = 0, zscale2 = 0;
-    zscales(eval, mass, nmasses, i, zscale, zscale2);
-
-    for (int mu = 0; mu < 4; mu++) {
-      mat(gr_mu, shift, gr0, 0, mu);
-      copy_odd<real>(gr_mu, gr0, static_cast<real>(-1));
-      apply_g5<real>(gr_mu);
-      accumulate_imag<real>(jlow, evec, gr_mu, mu, 0, vol_cb, -zscale);
-      if (nmasses == 3) accumulate_imag<real>(jlow2, evec, gr_mu, mu, 0, vol_cb, -zscale2);
-
-      mat(gr_mu, shift, evec, 0, mu);
-      apply_g5<real>(gr_mu); // ax(-1) on the odd sites
-      apply_g5<real>(gr_mu); // spin-taste G5
-      accumulate_imag<real>(jlow, gr0, gr_mu, mu, odd_base, vol_cb, +zscale);
-      if (nmasses == 3) accumulate_imag<real>(jlow2, gr0, gr_mu, mu, odd_base, vol_cb, +zscale2);
+  template <typename real>
+  void accumulate_imag(real *jlow, const ColorSpinorField &left, const ColorSpinorField &right, int mu, size_t base,
+                       int vol_cb, double zscale)
+  {
+    const real z = static_cast<real>(zscale);
+    for (int x = 0; x < vol_cb; x++) {
+      jlow[base + 4 * x + mu] += z * site_dot<real>(left, right, static_cast<int>(base == 0 ? x : vol_cb + x)).imag();
     }
   }
-}
 
-template <typename real>
-double max_abs_diff(const real *a, const real *b, size_t n)
-{
-  double deviation = 0;
-  for (size_t i = 0; i < n; i++) {
-    double diff = std::abs(static_cast<double>(a[i]) - static_cast<double>(b[i]));
-    if (std::isnan(diff)) return std::numeric_limits<double>::infinity();
-    deviation = std::max(deviation, diff);
+  void zscales(const double *eval, const double *mass, int nmasses, int i, double &zscale, double &zscale2)
+  {
+    zscale = 0;
+    zscale2 = 0;
+    switch (nmasses) {
+    case 1: zscale = 1.0 / (eval[i] + 4.0 * mass[0] * mass[0]); break;
+    case 2: {
+      const double dl = eval[i] + 4.0 * mass[0] * mass[0];
+      const double ds = eval[i] + 4.0 * mass[1] * mass[1];
+      zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (dl * ds);
+      break;
+    }
+    case 3: {
+      const double du = eval[i] + 4.0 * mass[0] * mass[0];
+      const double dd = eval[i] + 4.0 * mass[1] * mass[1];
+      const double ds = eval[i] + 4.0 * mass[2] * mass[2];
+      zscale = 4.0 * (mass[1] * mass[1] - mass[0] * mass[0]) / (du * dd);
+      zscale2 = 4.0 * (mass[2] * mass[2] - mass[0] * mass[0]) / (du * ds);
+      break;
+    }
+    default: errorQuda("Unexpected nmasses %d", nmasses);
+    }
   }
-  return deviation;
-}
 
-ColorSpinorParam parity_param(const QudaGaugeParam &gauge_param, QudaPrecision prec)
-{
-  ColorSpinorParam cs;
-  cs.nColor = nColor;
-  cs.nSpin = 1;
-  cs.nDim = 4;
-  for (int d = 0; d < 4; d++) cs.x[d] = gauge_param.X[d];
-  cs.x[0] /= 2;
-  cs.setPrecision(prec);
-  cs.pad = 0;
-  cs.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  cs.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  cs.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  cs.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  cs.pc_type = QUDA_4D_PC;
-  cs.create = QUDA_ZERO_FIELD_CREATE;
-  cs.location = QUDA_CPU_FIELD_LOCATION;
-  return cs;
-}
+  template <typename real>
+  void host_current(real *jlow, real *jlow2, const GaugeField &fat, const GaugeField &lng, const GaugeField &shift,
+                    std::vector<ColorSpinorField> &evec_even, std::vector<ColorSpinorField> &evec_odd,
+                    const double *eval, const double *mass, int nmasses)
+  {
+    ColorSpinorParam full(evec_even[0]);
+    full.siteSubset = QUDA_FULL_SITE_SUBSET;
+    full.x[0] *= 2;
+    full.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField gr0(full);
+    ColorSpinorField gr_mu(full);
+    ColorSpinorField evec(full);
+
+    ColorSpinorParam parity(evec_even[0]);
+    parity.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField dslash_out(parity);
+
+    const int vol_cb = gr0.Volume() / 2;
+    const size_t odd_base = 2 * gr0.Volume();
+
+    for (int i = 0; i < n_current_ev; i++) {
+      // D_oe. Even sites of gr0 stay zero.
+      memset(dslash_out.data(), 0, dslash_out.Bytes());
+      stag_dslash(dslash_out, fat, lng, evec_even[i], QUDA_ODD_PARITY, 0, QUDA_ASQTAD_DSLASH, 4);
+      memcpy(gr0.Odd().data(), dslash_out.data(), dslash_out.Bytes());
+
+      memcpy(evec.Even().data(), evec_even[i].data(), evec_even[i].Bytes());
+      memcpy(evec.Odd().data(), evec_odd[i].data(), evec_odd[i].Bytes());
+
+      double zscale = 0, zscale2 = 0;
+      zscales(eval, mass, nmasses, i, zscale, zscale2);
+
+      for (int mu = 0; mu < 4; mu++) {
+        mat(gr_mu, shift, gr0, 0, mu);
+        copy_odd<real>(gr_mu, gr0, static_cast<real>(-1));
+        apply_g5<real>(gr_mu);
+        accumulate_imag<real>(jlow, evec, gr_mu, mu, 0, vol_cb, -zscale);
+        if (nmasses == 3) accumulate_imag<real>(jlow2, evec, gr_mu, mu, 0, vol_cb, -zscale2);
+
+        mat(gr_mu, shift, evec, 0, mu);
+        apply_g5<real>(gr_mu); // ax(-1) on the odd sites
+        apply_g5<real>(gr_mu); // spin-taste G5
+        accumulate_imag<real>(jlow, gr0, gr_mu, mu, odd_base, vol_cb, +zscale);
+        if (nmasses == 3) accumulate_imag<real>(jlow2, gr0, gr_mu, mu, odd_base, vol_cb, +zscale2);
+      }
+    }
+  }
+
+  template <typename real> double max_abs_diff(const real *a, const real *b, size_t n)
+  {
+    double deviation = 0;
+    for (size_t i = 0; i < n; i++) {
+      double diff = std::abs(static_cast<double>(a[i]) - static_cast<double>(b[i]));
+      if (std::isnan(diff)) return std::numeric_limits<double>::infinity();
+      deviation = std::max(deviation, diff);
+    }
+    return deviation;
+  }
+
+  ColorSpinorParam parity_param(const QudaGaugeParam &gauge_param, QudaPrecision prec)
+  {
+    ColorSpinorParam cs;
+    cs.nColor = nColor;
+    cs.nSpin = 1;
+    cs.nDim = 4;
+    for (int d = 0; d < 4; d++) cs.x[d] = gauge_param.X[d];
+    cs.x[0] /= 2;
+    cs.setPrecision(prec);
+    cs.pad = 0;
+    cs.siteSubset = QUDA_PARITY_SITE_SUBSET;
+    cs.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    cs.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    cs.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+    cs.pc_type = QUDA_4D_PC;
+    cs.create = QUDA_ZERO_FIELD_CREATE;
+    cs.location = QUDA_CPU_FIELD_LOCATION;
+    return cs;
+  }
 
 } // namespace
 

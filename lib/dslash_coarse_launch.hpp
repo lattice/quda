@@ -48,8 +48,8 @@ namespace quda
         ApplyCoarseMma_t<dagger, coarseColor, nVec, Float, yFloat, ghostFloat>(
           out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, halo);
       } else {
-        ApplyCoarse_t<dagger, coarseColor, Float, yFloat, ghostFloat>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                                      type, halo_location, halo);
+        ApplyCoarse_t<dagger, coarseColor, Float, yFloat, ghostFloat>(out, inA, inB, Y, X, kappa, parity, dslash,
+                                                                      clover, type, halo_location, halo);
       }
     };
 
@@ -189,15 +189,15 @@ namespace quda
 
       auto launch_kernels = [&](DslashType type) {
         apply_coarse_store<dagger, coarseColor, use_mma, nVec>(precision, Y.Precision(), halo_precision, out, inA, inB,
-                                                               Y, X, kappa, parity, dslash, clover, type,
-                                                               halo_location, halo);
+                                                               Y, X, kappa, parity, dslash, clover, type, halo_location,
+                                                               halo);
       };
 
       if (policy != DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP) {
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
-          halo.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
-                             pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
+          halo.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
+                             dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
 
         if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
@@ -207,8 +207,8 @@ namespace quda
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
           shmem += 2;
-          halo.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
-                             pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
+          halo.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
+                             dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
         launch_kernels(DSLASH_INTERIOR);
         if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
@@ -226,13 +226,15 @@ namespace quda
     }
   };
 
-  template <typename Launch> class DslashCoarsePolicyTune : public Tunable {
+  template <typename Launch> class DslashCoarsePolicyTune : public Tunable
+  {
 
     static inline bool dslash_init = false;
     static inline int first_active_policy = static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
     static inline char policy_string[TuneKey::aux_n] = {};
     static inline std::vector<DslashCoarsePolicy> policies
-      = {static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED};
+      = {static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED),
+         DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED};
 
     static void enable_policy(DslashCoarsePolicy p) { policies[static_cast<std::size_t>(p)] = p; }
 
@@ -410,10 +412,9 @@ namespace quda
         ApplyCoarse<dagger, coarseColor>(
           {out.begin(), out.begin() + out.size() / 2}, {inA.begin(), inA.begin() + inA.size() / 2},
           {inB.begin(), inB.begin() + inB.size() / 2}, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
-        ApplyCoarse<dagger, coarseColor>({out.begin() + out.size() / 2, out.end()},
-                                         {inA.begin() + inA.size() / 2, inA.end()},
-                                         {inB.begin() + inB.size() / 2, inB.end()}, Y, X, kappa, parity, dslash, clover,
-                                         commDim, halo_precision);
+        ApplyCoarse<dagger, coarseColor>(
+          {out.begin() + out.size() / 2, out.end()}, {inA.begin() + inA.size() / 2, inA.end()},
+          {inB.begin() + inB.size() / 2, inB.end()}, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
         return;
       }
 

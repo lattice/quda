@@ -105,8 +105,8 @@ namespace quda {
   };
 
   void contractSummed(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<complex_t> &result_global,
-                          const QudaContractType cType, const int *const source_position, const int *const mom_mode,
-                          const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1)
+                      const QudaContractType cType, const int *const source_position, const int *const mom_mode,
+                      const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1)
   {
     checkPrecision(x, y);
     if (x.Nspin() != y.Nspin())
@@ -137,20 +137,16 @@ namespace quda {
     unsigned int minThreads() const { return x.VolumeCB(); }
 
 public:
-    Contraction(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType) :
-      TunableKernel2D(x, 2),
-      result(static_cast<store_complex *>(result)),
-      x(x),
-      y(y),
-      cType(cType)
-    {
-      switch (cType) {
-      case QUDA_CONTRACT_TYPE_OPEN: strcat(aux, "open,"); break;
-      case QUDA_CONTRACT_TYPE_DR: strcat(aux, "degrand-rossi,"); break;
-      case QUDA_CONTRACT_TYPE_STAGGERED: strcat(aux, "staggered,"); break;
-      default: errorQuda("Unexpected contraction type %d", cType);
-      }
-      apply(device::get_default_stream());
+  Contraction(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType) :
+    TunableKernel2D(x, 2), result(static_cast<store_complex *>(result)), x(x), y(y), cType(cType)
+  {
+    switch (cType) {
+    case QUDA_CONTRACT_TYPE_OPEN: strcat(aux, "open,"); break;
+    case QUDA_CONTRACT_TYPE_DR: strcat(aux, "degrand-rossi,"); break;
+    case QUDA_CONTRACT_TYPE_STAGGERED: strcat(aux, "staggered,"); break;
+    default: errorQuda("Unexpected contraction type %d", cType);
+    }
+    apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

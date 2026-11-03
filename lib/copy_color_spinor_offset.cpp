@@ -4,8 +4,10 @@
 namespace quda
 {
 
-  void copyColorSpinorOffset_double(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
-  void copyColorSpinorOffset_single(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
+  void copyColorSpinorOffset_double(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset,
+                                    QudaPCType pc_type);
+  void copyColorSpinorOffset_single(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset,
+                                    QudaPCType pc_type);
   void copyColorSpinorOffset_half(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
   void copyColorSpinorOffset_quarter(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset,
                                      QudaPCType pc_type);

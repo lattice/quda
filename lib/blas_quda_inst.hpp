@@ -185,44 +185,43 @@ namespace quda
     }
 
     // Repeat instantiations only; names and bodies are the templates above.
-#define INSTANTIATE_BLAS_STORE(store_t)                                                                                \
-  template void axpbyz_t<store_t>(cvector<real_t> &, cvector_ref<const ColorSpinorField> &, cvector<real_t> &,          \
-                                  cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);             \
-  template void axy_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                             \
-                               cvector_ref<ColorSpinorField> &);                                                       \
-  template void caxpyz_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                          \
-                                  cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);             \
-  template void caxpby_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &, cvector<complex_t> &,    \
-                                  cvector_ref<ColorSpinorField> &);                                                    \
-  template void axpbypczw_t<store_t>(cvector<real_t> &, cvector_ref<const ColorSpinorField> &, cvector<real_t> &,       \
-                                     cvector_ref<const ColorSpinorField> &, cvector<real_t> &,                         \
-                                     cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);          \
-  template void caxpbypzw_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                       \
-                                     cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                      \
-                                     cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);          \
-  template void axpyBzpcx_t<store_t>(cvector<real_t> &, cvector_ref<ColorSpinorField> &,                                \
-                                     cvector_ref<ColorSpinorField> &, cvector<real_t> &,                               \
-                                     cvector_ref<const ColorSpinorField> &, cvector<real_t> &);                        \
-  template void axpyZpbx_t<store_t>(cvector<real_t> &, cvector_ref<ColorSpinorField> &,                                 \
-                                    cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,            \
-                                    cvector<real_t> &);                                                                \
-  template void caxpyBzpx_t<store_t>(cvector<complex_t> &, cvector_ref<ColorSpinorField> &,                             \
-                                     cvector_ref<ColorSpinorField> &, cvector<complex_t> &,                            \
-                                     cvector_ref<const ColorSpinorField> &);                                           \
-  template void caxpyBxpz_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                       \
-                                     cvector_ref<ColorSpinorField> &, cvector<complex_t> &,                            \
-                                     cvector_ref<ColorSpinorField> &);                                                 \
-  template void caxpbypzYmbw_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                    \
-                                        cvector<complex_t> &, cvector_ref<ColorSpinorField> &,                         \
-                                        cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &);       \
-  template void cabxpyAx_t<store_t>(cvector<real_t> &, cvector<complex_t> &, cvector_ref<ColorSpinorField> &,           \
-                                    cvector_ref<ColorSpinorField> &);                                                  \
-  template void caxpyXmaz_t<store_t>(cvector<complex_t> &, cvector_ref<ColorSpinorField> &,                             \
-                                     cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &);          \
-  template void caxpyXmazMR_t<store_t>(cvector<real_t> &, cvector_ref<ColorSpinorField> &,                              \
-                                       cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &);        \
-  template void tripleCGUpdate_t<store_t>(cvector<real_t> &, cvector<real_t> &, cvector_ref<const ColorSpinorField> &,  \
-                                          cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &,            \
+#define INSTANTIATE_BLAS_STORE(store_t)                                                                                  \
+  template void axpbyz_t<store_t>(cvector<real_t> &, cvector_ref<const ColorSpinorField> &, cvector<real_t> &,           \
+                                  cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);               \
+  template void axy_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                              \
+                               cvector_ref<ColorSpinorField> &);                                                         \
+  template void caxpyz_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                           \
+                                  cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);               \
+  template void caxpby_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &, cvector<complex_t> &,     \
+                                  cvector_ref<ColorSpinorField> &);                                                      \
+  template void axpbypczw_t<store_t>(cvector<real_t> &, cvector_ref<const ColorSpinorField> &, cvector<real_t> &,        \
+                                     cvector_ref<const ColorSpinorField> &, cvector<real_t> &,                           \
+                                     cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);            \
+  template void caxpbypzw_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                        \
+                                     cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                        \
+                                     cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);            \
+  template void axpyBzpcx_t<store_t>(cvector<real_t> &, cvector_ref<ColorSpinorField> &,                                 \
+                                     cvector_ref<ColorSpinorField> &, cvector<real_t> &,                                 \
+                                     cvector_ref<const ColorSpinorField> &, cvector<real_t> &);                          \
+  template void axpyZpbx_t<store_t>(cvector<real_t> &, cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &, \
+                                    cvector_ref<const ColorSpinorField> &, cvector<real_t> &);                           \
+  template void caxpyBzpx_t<store_t>(cvector<complex_t> &, cvector_ref<ColorSpinorField> &,                              \
+                                     cvector_ref<ColorSpinorField> &, cvector<complex_t> &,                              \
+                                     cvector_ref<const ColorSpinorField> &);                                             \
+  template void caxpyBxpz_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                        \
+                                     cvector_ref<ColorSpinorField> &, cvector<complex_t> &,                              \
+                                     cvector_ref<ColorSpinorField> &);                                                   \
+  template void caxpbypzYmbw_t<store_t>(cvector<complex_t> &, cvector_ref<const ColorSpinorField> &,                     \
+                                        cvector<complex_t> &, cvector_ref<ColorSpinorField> &,                           \
+                                        cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &);         \
+  template void cabxpyAx_t<store_t>(cvector<real_t> &, cvector<complex_t> &, cvector_ref<ColorSpinorField> &,            \
+                                    cvector_ref<ColorSpinorField> &);                                                    \
+  template void caxpyXmaz_t<store_t>(cvector<complex_t> &, cvector_ref<ColorSpinorField> &,                              \
+                                     cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &);            \
+  template void caxpyXmazMR_t<store_t>(cvector<real_t> &, cvector_ref<ColorSpinorField> &,                               \
+                                       cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &);          \
+  template void tripleCGUpdate_t<store_t>(cvector<real_t> &, cvector<real_t> &, cvector_ref<const ColorSpinorField> &,   \
+                                          cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &,              \
                                           cvector_ref<ColorSpinorField> &);
 
   } // namespace blas

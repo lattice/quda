@@ -131,7 +131,8 @@ template <typename CccT> struct fp32mp2_normalized : CccT {
   template <typename U, std::enable_if_t<std::is_arithmetic_v<U>, int> = 0>
   friend __host__ __device__ bool operator==(fp32mp2_normalized a, U b)
   {
-    return static_cast<const CccT &>(a) == CccT(static_cast<std::conditional_t<std::is_same_v<U, double>, double, float>>(b));
+    return static_cast<const CccT &>(a)
+      == CccT(static_cast<std::conditional_t<std::is_same_v<U, double>, double, float>>(b));
   }
   template <typename U, std::enable_if_t<std::is_arithmetic_v<U>, int> = 0>
   friend __host__ __device__ bool operator==(U a, fp32mp2_normalized b)
@@ -215,8 +216,7 @@ namespace quda
   /** True for any fp32mp2 accuracy, not just the one aliased by floatfloat. */
   template <typename T> struct is_floatfloat : std::false_type {
   };
-  template <cuda::fpmp2_accuracy Acc>
-  struct is_floatfloat<cuda::fpmp2<float, Acc>> : std::true_type {
+  template <cuda::fpmp2_accuracy Acc> struct is_floatfloat<cuda::fpmp2<float, Acc>> : std::true_type {
   };
   template <typename CccT> struct is_floatfloat<fp32mp2_normalized<CccT>> : is_floatfloat<CccT> {
   };
@@ -241,7 +241,8 @@ namespace quda
     return T(cuda::div<cuda::fpmp2_accuracy::high>(static_cast<const ccc_t &>(num), static_cast<const ccc_t &>(den)));
   }
 
-  template <typename T, enable_if_floatfloat<T> = 0> __device__ __host__ constexpr T floatfloat_numeric_lowest(const T &)
+  template <typename T, enable_if_floatfloat<T> = 0>
+  __device__ __host__ constexpr T floatfloat_numeric_lowest(const T &)
   {
     return T(cuda::std::numeric_limits<floatfloat_cccl_t<T>>::lowest());
   }
@@ -311,8 +312,7 @@ namespace quda
     return {a.x * b.x, a.y * b.y};
   }
 
-  template <typename T>
-  __device__ __host__ inline fpmp2_pair<T> fma2(fpmp2_pair<T> a, fpmp2_pair<T> b, fpmp2_pair<T> c)
+  template <typename T> __device__ __host__ inline fpmp2_pair<T> fma2(fpmp2_pair<T> a, fpmp2_pair<T> b, fpmp2_pair<T> c)
   {
     return {a.x * b.x + c.x, a.y * b.y + c.y};
   }

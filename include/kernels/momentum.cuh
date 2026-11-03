@@ -47,7 +47,7 @@ namespace quda {
         local_sum += reduction_t(mom(1, 2).imag()) * reduction_t(mom(1, 2).imag());
         local_sum -= reduction_t(4);
 
-	action = operator()(action, local_sum);
+        action = operator()(action, local_sum);
       }
       return action;
     }
@@ -67,10 +67,7 @@ namespace quda {
     int border[4]; //
 
     UpdateMomArg(GaugeField &mom, real_t coeff, const GaugeField &force) :
-      ReduceArg<reduce_t>(dim3(mom.VolumeCB(), 2, 1)),
-      mom(mom),
-      force(force),
-      coeff(static_cast<real>(coeff))
+      ReduceArg<reduce_t>(dim3(mom.VolumeCB(), 2, 1)), mom(mom), force(force), coeff(static_cast<real>(coeff))
     {
       for (int dir=0; dir<4; ++dir) {
         X[dir] = mom.X()[dir];

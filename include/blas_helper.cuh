@@ -557,8 +557,8 @@ namespace quda
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-        // Native double-precision CUDA fields use floatfloat storage when enabled.
-        // Legacy and CPU field orders retain IEEE-double storage.
+            // Native double-precision CUDA fields use floatfloat storage when enabled.
+            // Legacy and CPU field orders retain IEEE-double storage.
 #ifdef QUDA_FPMP_FLOATFLOAT
         if (y.Location() == QUDA_CUDA_FIELD_LOCATION && y.isNative())
           instantiate<Functor, Blas, T, x_store_t, floatfloat>(a, b, c, x, y, args...);
@@ -599,8 +599,8 @@ namespace quda
         if constexpr (!is_enabled(QUDA_DOUBLE_PRECISION))
           if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
             errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-        // Native double-precision CUDA fields use floatfloat storage when enabled.
-        // Legacy and CPU field orders retain IEEE-double storage.
+            // Native double-precision CUDA fields use floatfloat storage when enabled.
+            // Legacy and CPU field orders retain IEEE-double storage.
 #ifdef QUDA_FPMP_FLOATFLOAT
         if (x.Location() == QUDA_CUDA_FIELD_LOCATION && x.isNative())
           instantiate<Functor, Blas, mixed, T, floatfloat>(a, b, c, x_, args...);

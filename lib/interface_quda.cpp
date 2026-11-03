@@ -6307,7 +6307,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
           std::fill(result_global.begin(), result_global.end(), 0.0);
           contractSummed(d_prop1[s1 * src_nColor + c1], d_prop2[b1 * src_nColor + c1], result_global, cType,
-                             source_position, &mom_modes[4 * mom_idx], &fft_type[4 * mom_idx], s1, b1);
+                         source_position, &mom_modes[4 * mom_idx], &fft_type[4 * mom_idx], s1, b1);
 
           comm_allreduce_sum(result_global);
           for (size_t t = 0; t < global_decay_dim_slices; t++) {
@@ -6373,7 +6373,8 @@ void exactCurrentQuda(void **evec_even, void **evec_odd, const double *evals, in
 {
   auto profile = pushProfile(profileExactCurrent);
 
-  if (!param || !X || !evec_even || !evec_odd || !evals || !masses) errorQuda("exactCurrentQuda called with a null argument");
+  if (!param || !X || !evec_even || !evec_odd || !evals || !masses)
+    errorQuda("exactCurrentQuda called with a null argument");
   if (n_ev < 1) errorQuda("exactCurrentQuda requires at least one eigenvector");
   if (nmasses != 1 && nmasses != 2 && nmasses != 3) errorQuda("Wrong number of masses %d!", nmasses);
 

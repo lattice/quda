@@ -201,7 +201,7 @@ namespace quda
                                    cvector_ref<const ColorSpinorField> &, cvector_ref<ColorSpinorField> &);            \
   template void axpyBzpcx_t<store_t>(const std::vector<real_t> &, cvector_ref<ColorSpinorField> &,                     \
                                      cvector_ref<ColorSpinorField> &, const std::vector<real_t> &, ColorSpinorField &, \
-                                     const std::vector<real_t> &);                                                    \
+                                     const std::vector<real_t> &);                                                     \
   template void caxpyBxpz_t<store_t>(const std::vector<complex_t> &, cvector_ref<const ColorSpinorField> &,            \
                                      ColorSpinorField &, const std::vector<complex_t> &, ColorSpinorField &);
 

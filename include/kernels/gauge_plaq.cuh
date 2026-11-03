@@ -34,10 +34,9 @@ namespace quda {
     }
   };
 
-  template<typename Arg>
-  __device__ inline reduction_t plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
+  template <typename Arg> __device__ inline reduction_t plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::real>,3>;
+    using Link = Matrix<complex<typename Arg::real>, 3>;
 
     int dx[4] = {0, 0, 0, 0};
     Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);

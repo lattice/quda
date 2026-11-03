@@ -309,8 +309,7 @@ namespace quda {
     using range = std::pair<size_t,size_t>;
 
     template <typename store_t, template <typename...> class Functor, typename T>
-    void axpy_recurse(const std::vector<T> &a, cvector_ref<const ColorSpinorField> &x,
-                      cvector_ref<ColorSpinorField> &y,
+    void axpy_recurse(const std::vector<T> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
                       const range &range_x, const range &range_y, int upper)
     {
       if (a.size() != x.size() * y.size())
@@ -326,8 +325,10 @@ namespace quda {
         auto a_ = bisect_col(a, x.size(), y.size() / 2, y.size() - y.size() / 2);
         auto y_ = bisect(y);
 
-        axpy_recurse<store_t, Functor>(a_.first, x, y_.first, range_x, range(range_y.first, range_y.first + y_.first.size()), upper);
-        axpy_recurse<store_t, Functor>(a_.second, x, y_.second, range_x, range(range_y.first + y_.first.size(), range_y.second), upper);
+        axpy_recurse<store_t, Functor>(a_.first, x, y_.first, range_x,
+                                       range(range_y.first, range_y.first + y_.first.size()), upper);
+        axpy_recurse<store_t, Functor>(a_.second, x, y_.second, range_x,
+                                       range(range_y.first + y_.first.size(), range_y.second), upper);
       } else {
         // if at the bottom of recursion,
         if (is_valid_NXZ(x.size(), false, y[0].Precision())) {
@@ -339,14 +340,17 @@ namespace quda {
 
           // mark true since we will copy the "a" matrix into constant memory
           constexpr bool mixed = true;
-          instantiate<Functor, MultiBlas, mixed, std::vector<T>, store_t>(a, std::vector<T>(), std::vector<T>(), x[0], y[0], x, y, x, x);
+          instantiate<Functor, MultiBlas, mixed, std::vector<T>, store_t>(a, std::vector<T>(), std::vector<T>(), x[0],
+                                                                          y[0], x, y, x, x);
         } else {
           // split the problem in half and recurse
           auto x_ = bisect(x);
           auto a_ = bisect(a, y.size() * (x.size() / 2));
 
-          axpy_recurse<store_t, Functor>(a_.first, x_.first, y, range(range_x.first, range_x.first + x_.first.size()), range_y, upper);
-          axpy_recurse<store_t, Functor>(a_.second, x_.second, y, range(range_x.first + x_.first.size(), range_x.second), range_y, upper);
+          axpy_recurse<store_t, Functor>(a_.first, x_.first, y, range(range_x.first, range_x.first + x_.first.size()),
+                                         range_y, upper);
+          axpy_recurse<store_t, Functor>(a_.second, x_.second, y,
+                                         range(range_x.first + x_.first.size(), range_x.second), range_y, upper);
         }
       } // end if (y.size() > max_YW_size())
     }
@@ -487,9 +491,8 @@ namespace quda {
 
             axpyz_recurse<store_t, Functor>(a_.first, x_.first, y, z,
                                             range(range_x.first, range_x.first + x_.first.size()), range_y, pass, upper);
-            axpyz_recurse<store_t, Functor>(a_.second, x_.second, y, z,
-                                            range(range_x.first + x_.first.size(), range_x.second), range_y, pass,
-                                            upper);
+            axpyz_recurse<store_t, Functor>(
+              a_.second, x_.second, y, z, range(range_x.first + x_.first.size(), range_x.second), range_y, pass, upper);
           }
         } // end if (y.size() > max_YW_size())
       }
@@ -609,8 +612,8 @@ namespace quda {
       }
 
       template <typename store_t>
-      void caxpyBxpz_impl(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x_, ColorSpinorField &y_,
-                          const std::vector<complex_t> &b, ColorSpinorField &z_)
+      void caxpyBxpz_impl(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x_,
+                          ColorSpinorField &y_, const std::vector<complex_t> &b, ColorSpinorField &z_)
       {
         // besides being a no-op, this keeps a non-recursive path that returns
         // for builds where the instantiation below is entirely disabled at

@@ -102,13 +102,13 @@ namespace quda {
       const real five;
       const real seven;
       const real lepage;
-      PathCoefficients(const double *path_coeff_array)
-        : one(static_cast<real>(path_coeff_array[0])),
-          naik(static_cast<real>(path_coeff_array[1])),
-          three(static_cast<real>(path_coeff_array[2])),
-          five(static_cast<real>(path_coeff_array[3])),
-          seven(static_cast<real>(path_coeff_array[4])),
-          lepage(static_cast<real>(path_coeff_array[5]))
+      PathCoefficients(const double *path_coeff_array) :
+        one(static_cast<real>(path_coeff_array[0])),
+        naik(static_cast<real>(path_coeff_array[1])),
+        three(static_cast<real>(path_coeff_array[2])),
+        five(static_cast<real>(path_coeff_array[3])),
+        seven(static_cast<real>(path_coeff_array[4])),
+        lepage(static_cast<real>(path_coeff_array[5]))
       {
       }
     };
@@ -164,11 +164,16 @@ namespace quda {
       BaseForceArg(const GaugeField &link, int overlap) :
         kernel_param(dim3(1, 2, 1)),
         link(link),
-        commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) },
+        commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
         tboundary(static_cast<real>(static_cast<int>(link.TBoundary()))),
         is_first_time_slice(comm_coord(3) == 0 ? true : false),
         is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
-        mu(-1), nu(-1), rho(-1), sig(-1), compute_lepage(-1), nu_next(-1)
+        mu(-1),
+        nu(-1),
+        rho(-1),
+        sig(-1),
+        compute_lepage(-1),
+        nu_next(-1)
       {
         for (int d=0; d<4; d++) {
           E[d] = link.X()[d];
@@ -1063,7 +1068,8 @@ namespace quda {
 
           makeAntiHerm(Ow);
 
-          typename Arg::real coeff = (parity==1) ? static_cast<typename Arg::real>(-1) : static_cast<typename Arg::real>(1);
+          typename Arg::real coeff
+            = (parity == 1) ? static_cast<typename Arg::real>(-1) : static_cast<typename Arg::real>(1);
           arg.force(sig, e_cb, parity) = coeff * Ow;
         }
       }
@@ -1082,8 +1088,8 @@ namespace quda {
 
       static constexpr int overlap = 0;
 
-      LongLinkArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod, real_t coeff)
-        : BaseForceArg(link, overlap), force(force), oProd(oprod), coeff(static_cast<real>(coeff))
+      LongLinkArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod, real_t coeff) :
+        BaseForceArg(link, overlap), force(force), oProd(oprod), coeff(static_cast<real>(coeff))
       { }
 
     };

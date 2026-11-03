@@ -61,7 +61,7 @@ namespace quda {
           b = -real(2.0 * kappa * mu);
           a = real(1) / (real(1) + b * b);
         }
-	c = real(0);
+        c = real(0);
         if (dagger) b *= real(-1);
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT) {

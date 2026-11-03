@@ -47,7 +47,7 @@ namespace quda
         *addr = *addr + val;
       } else
 #ifdef QUDA_FPMP_DOUBLEDOUBLE
-      if constexpr (is_doubledouble_v<T>) {
+        if constexpr (is_doubledouble_v<T>) {
 #pragma omp critical
         *addr = *addr + val;
       } else
@@ -69,7 +69,7 @@ namespace quda
         floatfloat_atomic_add(addr, val);
       } else
 #ifdef QUDA_FPMP_DOUBLEDOUBLE
-      if constexpr (is_doubledouble_v<T>) {
+        if constexpr (is_doubledouble_v<T>) {
         atomicAdd(addr, val);
       } else
 #endif

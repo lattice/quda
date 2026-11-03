@@ -14,8 +14,7 @@ namespace quda
      For floatfloat, asqtad long-link recon 13/9 and naive staggered
      recon 9 stay at 1; asqtad-18 and naive 18/13 use 4.
    */
-  template <typename real, QudaReconstructType recon, bool improved>
-  constexpr int staggered_dslash_hop_unroll()
+  template <typename real, QudaReconstructType recon, bool improved> constexpr int staggered_dslash_hop_unroll()
   {
     if constexpr (is_floatfloat_v<real>) {
       if constexpr (improved) {
@@ -71,8 +70,8 @@ namespace quda
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
-    static constexpr int hop_unroll
-      = staggered_dslash_hop_unroll<real, improved_ ? reconstruct_l_ : reconstruct_u_, improved_>();
+    static constexpr int hop_unroll = staggered_dslash_hop_unroll < real, improved_ ? reconstruct_l_ : reconstruct_u_,
+                         improved_ > ();
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED;
     static constexpr int prefetch_distance_l1 = 0;
 
