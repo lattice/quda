@@ -112,8 +112,7 @@ struct FieldStrengthFields {
     quda::GaugeField device(device_param);
     device.copy(fields.input);
 
-    quda::lat_dim_t R;
-    for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+    const auto R = gauge_extension_radius();
     static quda::TimeProfile profile("SU3FieldStrengthTest");
     device_gauge.reset(quda::createExtendedGauge(device, R, profile));
 

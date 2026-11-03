@@ -415,15 +415,15 @@ template <typename real_t> struct HYPFinal {
  * @brief Apply a one-step HYP smear using temporary tensor fields.
  *
  * @param[out] out Smeared gauge field.
- * @param[in] in Extended input gauge field.
+ * @param[in] in Extended input gauge field; temporary fields are extended by the same radius.
  * @param[in] gauge_param Gauge field parameters used for temporary fields.
- * @param[in] R Extended border radius.
  * @param[in] smear_param HYP parameters.
  * @param[in] lat Extended lattice metadata.
  */
-void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param, const quda::lat_dim_t &R,
+void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
                const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
 {
+  const auto &R = in.R();
   quda::GaugeFieldParam field_param(out);
   field_param.location = QUDA_CPU_FIELD_LOCATION;
   field_param.create = QUDA_NULL_FIELD_CREATE;
@@ -602,14 +602,15 @@ template <typename real_t> struct WFlowRK4Step {
  * @brief Host implementation of one third-order Wilson-flow integration cycle.
  *
  * The operator advances an extended input field through the W1, W2, and Vt stages using temporary
- * fields constructed from the supplied gauge parameters and border radius.
+ * fields constructed from the supplied gauge parameters and the input's extension radius.
  *
  * @tparam real_t Floating-point type used for the host gauge field.
  */
 template <typename real_t> struct WFlowRK3 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
-                  const quda::lat_dim_t &R, const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
+                  const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
   {
+    const auto &R = in.R();
     const auto epsilon = static_cast<real_t>(smear_param.epsilon);
     const auto anisotropy = static_cast<real_t>(smear_param.smear_anisotropy);
     const auto type = smear_param.smear_type;
@@ -634,14 +635,15 @@ template <typename real_t> struct WFlowRK3 {
  * @brief Host implementation of one fourth-order Wilson-flow integration cycle.
  *
  * The operator applies the fixed six-stage Runge--Kutta coefficients using temporary fields
- * constructed from the supplied gauge parameters and border radius.
+ * constructed from the supplied gauge parameters and the input's extension radius.
  *
  * @tparam real_t Floating-point type used for the host gauge field.
  */
 template <typename real_t> struct WFlowRK4 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
-                  const quda::lat_dim_t &R, const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
+                  const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
   {
+    const auto &R = in.R();
     struct rk4_stage {
       double coeff_a;
       double coeff_b;
@@ -699,14 +701,13 @@ template <typename real_t> struct WFlowRK4 {
  * @param[out] out Flowed gauge field.
  * @param[in] in Extended input gauge field.
  * @param[in] gauge_param Gauge field parameters used for temporary fields.
- * @param[in] R Extended border radius.
  * @param[in] smear_param Flow parameters.
  * @param[in] lat Extended lattice metadata.
  */
 void wflow_smear_rk3(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
-                     const quda::lat_dim_t &R, const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
+                     const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
 {
-  instantiate_host<WFlowRK3>(in.Precision(), out, in, gauge_param, R, smear_param, lat);
+  instantiate_host<WFlowRK3>(in.Precision(), out, in, gauge_param, smear_param, lat);
 }
 
 /**
@@ -715,14 +716,13 @@ void wflow_smear_rk3(quda::GaugeField &out, const quda::GaugeField &in, QudaGaug
  * @param[out] out Flowed gauge field.
  * @param[in] in Extended input gauge field.
  * @param[in] gauge_param Gauge field parameters used for temporary fields.
- * @param[in] R Extended border radius.
  * @param[in] smear_param Flow parameters.
  * @param[in] lat Extended lattice metadata.
  */
 void wflow_smear_rk4(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
-                     const quda::lat_dim_t &R, const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
+                     const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
 {
-  instantiate_host<WFlowRK4>(in.Precision(), out, in, gauge_param, R, smear_param, lat);
+  instantiate_host<WFlowRK4>(in.Precision(), out, in, gauge_param, smear_param, lat);
 }
 
 void gauge_smear_reference(quda::GaugeField &out, const quda::GaugeField &in, const QudaGaugeSmearParam &smear_param)
@@ -741,8 +741,7 @@ void gauge_smear_reference(quda::GaugeField &out, const quda::GaugeField &in, co
     if (reference_param.dir_ignore < 0 || reference_param.dir_ignore > 3) reference_param.dir_ignore = 4;
   }
 
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
   gauge_param.cpu_prec = in.Precision();
@@ -766,13 +765,13 @@ void gauge_smear_reference(quda::GaugeField &out, const quda::GaugeField &in, co
     instantiate_host<StoutSmear>(in.Precision(), out, *input_ex, reference_param.rho, reference_param.epsilon,
                                  reference_param.dir_ignore, reference_param.smear_anisotropy, true, lat);
     break;
-  case QUDA_GAUGE_SMEAR_HYP: hyp_smear(out, *input_ex, gauge_param, R, reference_param, lat); break;
+  case QUDA_GAUGE_SMEAR_HYP: hyp_smear(out, *input_ex, gauge_param, reference_param, lat); break;
   case QUDA_GAUGE_SMEAR_WILSON_FLOW:
   case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
     if (reference_param.rk_order == 4)
-      wflow_smear_rk4(out, *input_ex, gauge_param, R, reference_param, lat);
+      wflow_smear_rk4(out, *input_ex, gauge_param, reference_param, lat);
     else
-      wflow_smear_rk3(out, *input_ex, gauge_param, R, reference_param, lat);
+      wflow_smear_rk3(out, *input_ex, gauge_param, reference_param, lat);
     break;
   default: errorQuda("Unsupported host gauge smear type %d", reference_param.smear_type);
   }

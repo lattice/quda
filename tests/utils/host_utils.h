@@ -325,6 +325,12 @@ StrongCheckResult strong_check_scalar(const void *a, const std::string &label_a,
 */
 void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng);
 
+/**
+   @brief Extension radius used for extended gauge fields in tests and host references
+   @return 2 in each partitioned dimension and 0 otherwise
+*/
+quda::lat_dim_t gauge_extension_radius();
+
 // additions for dw (quickly hacked on)
 int fullLatticeIndex_4d(int i, int oddBit);
 int fullLatticeIndex_5d(int i, int oddBit);

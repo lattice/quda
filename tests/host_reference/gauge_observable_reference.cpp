@@ -340,8 +340,7 @@ int project_su3_reference(quda::GaugeField &u)
 
 std::array<double, 3> plaquette_reference(const quda::GaugeField &u)
 {
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
   gauge_param.cpu_prec = u.Precision();
@@ -365,8 +364,7 @@ std::array<double, 3> plaquette_reference(const quda::GaugeField &u)
 
 PlaquetteRectangleReference plaquette_rectangle_reference(const quda::GaugeField &u)
 {
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
   gauge_param.cpu_prec = u.Precision();
@@ -412,8 +410,7 @@ LinkDeterminantTraceReference link_determinant_trace_reference(const quda::Gauge
 
 void compute_fmunu_reference(quda::GaugeField &fmunu, const quda::GaugeField &u)
 {
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
   gauge_param.cpu_prec = u.Precision();

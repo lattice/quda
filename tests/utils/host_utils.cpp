@@ -1365,6 +1365,13 @@ void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rn
   quda::spinorNoise(stag_for_oprod, rng, QUDA_NOISE_UNIFORM);
 }
 
+quda::lat_dim_t gauge_extension_radius()
+{
+  quda::lat_dim_t R;
+  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  return R;
+}
+
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)
 {
   auto mean_time = 0.0;

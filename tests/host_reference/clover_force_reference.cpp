@@ -778,8 +778,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
 void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int parity, QudaGaugeParam &gauge_param)
 {
   // created extended field
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
 
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
