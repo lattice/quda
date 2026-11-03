@@ -521,12 +521,15 @@ double openQCD_qudaPlaquette(void);
  * @param[in]  c0                  Plaquette coefficient of the gauge action
  * @param[in]  c1                  Rectangle coefficient of the gauge action
  *                                 (skipps computation if c0 == 1.0)
- * @param[in]  compute_mom_action  If nonzero, return the momentum action
- *
- * @return     Momentum action in openQCD convention, i.e. momentum_action(1),
- *             if compute_mom_action, else 0
  */
-double openQCD_qudaGaugeForce(double c, double beta, double c0, double c1, int compute_mom_action);
+void openQCD_qudaGaugeForce(double c, double beta, double c0, double c1);
+
+/**
+ * @brief      Compute momentum action from resident gague field
+ * 
+ * @return     Momentum action in openQCD convention, i.e. momentum_action(1)
+ */
+double openQCD_qudaMomAction();
 
 /**
  * @brief      Compute the gauge action of the resident gauge field. QUDA
@@ -544,7 +547,7 @@ double openQCD_qudaGaugeAction(double beta, double c0, double c1);
 /**
  * @brief     Update the resident gauge field with the resident momentum field.
  *            Momentum field must be initialized first with
- *            openQCD_qudaMomCreate, and will updated accordingly with force calls
+ *            openQCD_qudaMomCreate, and will be updated accordingly with force calls
  *            such as openQCD_qudaGaugeForce.
  * 
  * @param[in]  eps          Step size of the gauge field update, exp{eps*mom}*ud

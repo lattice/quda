@@ -570,7 +570,7 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructTy
 
   param.reconstruct_sloppy = param.reconstruct = rec;
 
-  /* This makes quda to instantiate OpenQCDOrder */
+  /* This makes quda instantiate to OpenQCDOrder */
   param.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
 
   param.t_boundary = t_boundary;
@@ -600,8 +600,8 @@ static QudaGaugeParam newOpenQCDHMCParam(QudaPrecision prec, QudaReconstructType
   param.make_resident_gauge = true;   /* make the resulting field the resident gauge field */
   param.return_result_gauge = false;  /* don't return, gauge field stays on gpu */
   param.use_resident_mom = true;      /* similar as above for the momentum field */
-  param.make_resident_mom = true;
-  param.return_result_mom = false;
+  param.make_resident_mom = true;     /* make momentum field, the QUDA resident field*/
+  param.return_result_mom = false;    /* do not return mom */
   param.overwrite_mom = false;        /* accumulate to mom, don't overwrite */
   return param;
 }
@@ -707,9 +707,8 @@ double openQCD_qudaPlaquette(void)
   return 3.0 * plaq[0];
 }
 
-double openQCD_qudaGaugeForce(double c, double beta, double c0, double c1, int compute_mom_action)
+void openQCD_qudaGaugeForce(double c, double beta, double c0, double c1)
 {
-  double mom_action = 0.0;
   double dt=c*beta/6.0; /* openQCD convetion */
 
   /* Set up staples of the openQCD gauge action: 6 plaquettes (weight c0).
@@ -765,24 +764,29 @@ double openQCD_qudaGaugeForce(double c, double beta, double c0, double c1, int c
       memcpy(input_path_buf[dir][i], path_dir[dir][i], length[i] * sizeof(int));
     }
   }
-  /* End of setup of coefficients and paths */
 
   WITH_COMM(computeGaugeForceQuda(mom, gauge, input_path_buf, length, loop_coeff, num_paths, max_length, dt,
                                   &gauge_param));
-  if (compute_mom_action) {
-    WITH_COMM(mom_action = momActionQuda(mom, &gauge_param));
-    /* Revert MILC convention (see MomAction) of subtracting 4 per link, factor
-     * 2 to match norm_square_alg, in openQCD::momentum_action(1)*/
-    const auto &N = qudaState.layout.N;
-    const double vol = static_cast<double>(N[0]) * N[1] * N[2] * N[3];
-    mom_action = 2.0 * (mom_action + 4.0 * 4.0 * vol);
-  }
 
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
     host_free(input_path_buf[dir]);
   }
+}
 
+double openQCD_qudaMomAction()
+{
+  double mom_action = 0.0;
+
+  QudaGaugeParam gauge_param = newOpenQCDHMCParam(QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_PERIODIC_T);
+  void *mom = nullptr; /* use resident filed */
+
+  WITH_COMM(mom_action = momActionQuda(mom, &gauge_param));
+  /* Revert MILC convention (see MomAction) of subtracting 4 per link, factor
+    * 2 to match norm_square_alg, in openQCD::momentum_action(1)*/
+  const auto &N = qudaState.layout.N;
+  const double vol = static_cast<double>(N[0]) * N[1] * N[2] * N[3];
+  mom_action = 2.0 * (mom_action + 4.0 * 4.0 * vol);
   if (!qudaState.init.two_grids_equal) MPI_Bcast(&mom_action, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
 
   return mom_action;
