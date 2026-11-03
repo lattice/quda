@@ -567,16 +567,15 @@ endif()
 
 option(QUDA_DOWNLOAD_CCCL "Download CCCL via CPM; OFF = use the CUDA toolkit's CCCL" ON)
 if(QUDA_DOWNLOAD_CCCL)
-  # NVIDIA/cccl main. FPMP, including native fp32mp2 sinpi/cospi/sincospi,
-  # is not in a tagged CCCL release yet.
+  # v3.6.0-rc0 is the first tagged CCCL that ships FPMP, including native
+  # fp32mp2 sinpi/cospi/sincospi, in namespace cuda::.
   # The installed QUDA headers include <cuda/fpmp>, so the downloaded CCCL has
   # to be installed alongside them; CCCL disables its install rules when it is
   # a subproject.
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY NVIDIA/cccl
-      # main as of 2026-10-13. FPMP lives in namespace cuda::, not cuda::experimental::.
-      GIT_TAG 358f3baa887ff7c804a1901560d689e7b6c07004
+      GIT_TAG v3.6.0-rc0
       OPTIONS "CCCL_ENABLE_INSTALL_RULES ON"
               "libcudacxx_ENABLE_INSTALL_RULES ON"
               "CUB_ENABLE_INSTALL_RULES ON"
