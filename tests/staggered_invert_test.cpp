@@ -457,6 +457,14 @@ std::vector<std::array<quda::real_t, 2>> solve(test_t param)
 
   inv_param.residual_type = ::testing::get<7>(param);
 
+  // in the tests: CG3's residual can stay above the initial one for dozens of iterations before converging, and
+  // each one counts as an increase
+  bool cg3 = enable_testing
+    && (inv_param.inv_type == QUDA_CG3_INVERTER || inv_param.inv_type == QUDA_CG3NE_INVERTER
+        || inv_param.inv_type == QUDA_CG3NR_INVERTER);
+  inv_param.max_res_increase = cg3 ? std::max(max_res_increase, 100) : max_res_increase;
+  inv_param.max_res_increase_total = cg3 ? std::max(max_res_increase_total, 100) : max_res_increase_total;
+
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
 
