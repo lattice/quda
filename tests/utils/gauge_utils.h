@@ -26,8 +26,8 @@ public:
    * @brief Construct an immutable QDP-ordered host gauge field for test cases.
    *
    * @param[in] gauge_param Parameters that define the host field.
-   * @param[in] argc Command-line argument count used to resolve the input mode.
-   * @param[in] argv Command-line arguments used to resolve or load the input field.
+   * @param[in] argc Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param).
+   * @param[in] argv Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param).
    * @param[in] default_mode Input mode used when no explicit mode is requested.
    * @param[in] phase Staggered phase convention to apply (NO or MILC).
    */
@@ -39,6 +39,8 @@ public:
 
 /**
  * @brief Resolve the active gauge-input mode from command-line options.
+ *
+ * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
  */
 GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMode::HAAR);
 
@@ -61,8 +63,8 @@ void printGaugeInput(GaugeInputMode mode);
  *
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] gauge_param Information about the desired gauge field
- * @param[in] argc Input command-line argument count
- * @param[in] argv Input command-line arguments used in the case of loading a file
+ * @param[in] argc Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param)
+ * @param[in] argv Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param)
  */
 void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv);
 
@@ -71,8 +73,8 @@ void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_par
  *
  * @param[out] gauge Generated gauge field
  * @param[in] gauge_param Information about the desired gauge field
- * @param[in] argc Input command-line argument count
- * @param[in] argv Input command-line arguments used in the case of loading a file
+ * @param[in] argc Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param)
+ * @param[in] argv Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param)
  */
 void constructHostGaugeField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv);
 
@@ -201,8 +203,8 @@ void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision,
  *
  * @param[out] gauge Generated QDP-ordered gauge field.
  * @param[in] gauge_param Information about the desired gauge field.
- * @param[in] argc Input command-line argument count.
- * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] argc Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param).
+ * @param[in] argv Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param).
  * @param[in] default_mode Input mode used when no explicit mode is requested.
  * @param[in] phase Staggered phase convention to apply (NO or MILC).
  */
@@ -215,8 +217,8 @@ void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gaug
  *
  * @param[out] gauge Generated gauge field.
  * @param[in] gauge_param Information about the desired gauge field.
- * @param[in] argc Input command-line argument count.
- * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] argc Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param).
+ * @param[in] argv Unused; kept for the API (a loaded field goes through GaugeIO with gauge_param.file_io_param).
  * @param[in] default_mode Input mode used when no explicit mode is requested.
  * @param[in] phase Staggered phase convention to apply (NO or MILC).
  */
