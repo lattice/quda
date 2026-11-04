@@ -88,6 +88,10 @@ namespace quda
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
       loadFromFile(kSpace, evals);
+      // Loading also computes per-subgrid eigenvalues. Restore the full
+      // communicator and distribute them just as on the iterative path.
+      if (split_grid) push_communicator(default_comm_key);
+      comm_allreduce_sum(evals);
       return;
     }
 
