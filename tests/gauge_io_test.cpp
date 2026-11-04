@@ -427,13 +427,10 @@ TEST_P(GaugeIOTest, verify)
 
   // test the links are identical, or as close as the file precision allows
   double link_tol = file_prec == gauge_param.cpu_prec ? 0.0 : std::numeric_limits<float>::epsilon();
-  double max_dev = 0.0;
-  for (int dir = 0; dir < 4; dir++)
-    for (size_t i = 0; i < V * gauge_site_size; i++)
-      max_dev = std::max(max_dev,
-                         std::abs(get_element(gauge[dir], gauge_param.cpu_prec, i)
-                                  - get_element(original[dir].data(), gauge_param.cpu_prec, i)));
-  EXPECT_LE(max_dev, link_tol);
+  void *saved[4];
+  for (int dir = 0; dir < 4; dir++) saved[dir] = original[dir].data();
+  const GaugeField loaded_field(GaugeFieldParam(gauge_param, gauge)), saved_field(GaugeFieldParam(gauge_param, saved));
+  EXPECT_TRUE(compare_link_fields(loaded_field, "loaded", saved_field, "saved", link_tol).first);
 
   auto plaq_new = get_plaq();
 
