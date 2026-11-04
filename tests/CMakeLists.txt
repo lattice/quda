@@ -277,6 +277,11 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(staggered_gauge_input_test staggered_gauge_input_test.cpp)
+  target_link_libraries(staggered_gauge_input_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gauge_input_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gauge_input_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 add_executable(gauge_path_test gauge_path_test.cpp)
@@ -1643,6 +1648,11 @@ if(QUDA_DIRAC_STAGGERED)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_oprod_ctest> ${MPIEXEC_POSTFLAGS}
                    --dim 8 8 8 8
                    --gtest_output=xml:staggered_oprod_test.xml)
+
+  add_test(NAME staggered_gauge_input
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gauge_input_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 4 4 4 8
+                   --gtest_output=xml:staggered_gauge_input_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
