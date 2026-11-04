@@ -1,3 +1,4 @@
+#include <cmath>
 #include <quda.h>
 #include <gauge_field.h>
 #include <qio_field.h>
@@ -5,6 +6,7 @@
 #include "command_line_params.h"
 #include "host_utils.h"
 #include "rng_utils.hpp"
+#include "force_utils.hpp"
 #include "gauge_utils.h"
 #include "index_utils.hpp"
 #include "instantiate_host.hpp"
@@ -20,7 +22,7 @@
 template <typename real_t> struct ApplyGaugeSpatialAnisotropy {
   void operator()(void *const *gauge_, int Vh, double anisotropy)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
     auto inv_anisotropy = 1.0 / anisotropy;
     for (int d = 0; d < 3; d++) {
 #pragma omp parallel for
@@ -55,7 +57,7 @@ void applyGaugeSpatialAnisotropy(real_t *const *gauge, int Vh, double anisotropy
 template <typename real_t> struct ApplyGaugeTemporalBCs {
   void operator()(void *const *gauge_, int Vh, QudaTboundary t_boundary, bool three_link = false)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
     if (t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
       int lower_bound = (Z[0] / 2) * Z[1] * Z[2];
       lower_bound *= three_link ? (Z[3] - 3) : (Z[3] - 1);
@@ -98,7 +100,7 @@ void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary,
 template <typename real_t> struct EmulateGaugeTemporalGauge {
   void operator()(void *const *gauge_, int Vh)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
@@ -144,7 +146,7 @@ void emulateGaugeTemporalGauge(void *const *gauge, int Vh, QudaPrecision precisi
 template <typename real_t> struct ApplyGaugeLongLinkScaling {
   void operator()(void *const *gauge_, int Vh, double tadpole_coeff)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     real_t inv_scale = -1.0 / (24.0 * tadpole_coeff * tadpole_coeff);
     for (int d = 0; d < 4; d++) {
@@ -242,7 +244,7 @@ template <typename real_t> struct ApplyGaugeStaggeredPhase {
   void operator()(void *const *gauge_, int Vh, const int X[], QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
                   QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     int X1 = X[0];
     int X2 = X[1];
@@ -292,7 +294,7 @@ void applyGaugeFieldScaling(void *const *gauge, int Vh, const QudaGaugeParam &pa
 template <typename real_t> struct ConstructIdentityGaugeField {
   void operator()(void *const *gauge_)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     real_t *gaugeOdd[4], *gaugeEven[4];
     for (int dir = 0; dir < 4; dir++) {
@@ -332,7 +334,7 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
   {
     using complex = std::complex<real_t>;
 
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     real_t *gaugeOdd[4], *gaugeEven[4];
     for (int dir = 0; dir < 4; dir++) {
@@ -422,6 +424,147 @@ void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision)
 }
 
 /**
+ * @brief Construct independent Gaussian SU(3) links by algebra projection and exponentiation.
+ *
+ * @tparam real_t Floating point type of the gauge field.
+ * @param[out] gauge Generated QDP-ordered gauge field.
+ * @param[in] width Gaussian width sigma applied to each matrix component.
+ */
+template <typename real_t> struct ConstructGaussianSU3GaugeField {
+  void operator()(void *const *gauge_, double width)
+  {
+    using complex = std::complex<real_t>;
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+
+    for (int dir = 0; dir < 4; dir++) {
+#pragma omp parallel for
+      for (int i = 0; i < Vh; i++) {
+        for (int parity = 0; parity < 2; parity++) {
+          Matrix<3, complex> matrix;
+          for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+              matrix(row, col) = complex(random_gaussian_host<real_t>(i, parity, 0, width),
+                                         random_gaussian_host<real_t>(i, parity, 0, width));
+            }
+          }
+          make_herm(matrix);
+          const auto link = exponentiate_iQ(matrix);
+
+          auto out = reinterpret_cast<complex *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
+          for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) { out[row * 3 + col] = link(row, col); }
+          }
+        }
+      }
+    }
+  }
+};
+
+void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision, double width)
+{
+  instantiate_host<ConstructGaussianSU3GaugeField>(precision, gauge, width);
+}
+
+const char *getGaugeInputStr(GaugeInputMode mode)
+{
+  switch (mode) {
+  case GaugeInputMode::HAAR: return "haar";
+  case GaugeInputMode::UNIT: return "unit";
+  case GaugeInputMode::GAUSSIAN_SU3: return "gaussian-su3";
+  case GaugeInputMode::LOAD: return "load";
+  }
+  errorQuda("Invalid gauge input mode %d", static_cast<int>(mode));
+  return "invalid";
+}
+
+HostGaugeInput::HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv, GaugeInputMode default_mode,
+                               QudaStaggeredPhase phase)
+{
+  quda::GaugeFieldParam field_param(gauge_param);
+  field_param.location = QUDA_CPU_FIELD_LOCATION;
+  field_param.order = QUDA_QDP_GAUGE_ORDER;
+  field_param.create = QUDA_NULL_FIELD_CREATE;
+  input = quda::GaugeField(field_param);
+  constructHostGaugeInputField(input, gauge_param, argc, argv, default_mode, phase);
+}
+
+GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
+{
+  const bool explicit_input = !gauge_input.empty();
+  const bool has_load = !latfile.empty();
+
+  if (explicit_input) {
+    GaugeInputMode mode = GaugeInputMode::HAAR;
+    if (gauge_input == "unit")
+      mode = GaugeInputMode::UNIT;
+    else if (gauge_input == "gaussian-su3")
+      mode = GaugeInputMode::GAUSSIAN_SU3;
+    else if (gauge_input == "load")
+      mode = GaugeInputMode::LOAD;
+
+    if (mode != GaugeInputMode::GAUSSIAN_SU3 && gauge_input_width_explicit) {
+      errorQuda("--gauge-input-width requires --gauge-input gaussian-su3");
+    }
+    if (mode != GaugeInputMode::LOAD && has_load) {
+      errorQuda("--load-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
+    }
+    if (mode != GaugeInputMode::UNIT && unit_gauge) {
+      errorQuda("--unit-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
+    }
+    if (mode == GaugeInputMode::LOAD && !has_load) { errorQuda("--gauge-input load requires --load-gauge"); }
+    if (mode == GaugeInputMode::GAUSSIAN_SU3 && (!std::isfinite(gauge_input_width) || gauge_input_width < 0)) {
+      errorQuda("--gauge-input-width must be finite and nonnegative");
+    }
+    return mode;
+  }
+
+  if (has_load) return GaugeInputMode::LOAD;
+  if (unit_gauge) return GaugeInputMode::UNIT;
+  return default_mode;
+}
+
+void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode, QudaStaggeredPhase phase)
+{
+  // applyGaugeStaggeredPhase only sets the spatial phases, which is the complete MILC convention
+  if (phase != QUDA_STAGGERED_PHASE_NO && phase != QUDA_STAGGERED_PHASE_MILC)
+    errorQuda("Unsupported staggered phase type %d for gauge input", phase);
+
+  switch (resolveGaugeInputMode(default_mode)) {
+  case GaugeInputMode::HAAR: constructRandomSU3GaugeField(gauge, gauge_param.cpu_prec); break;
+  case GaugeInputMode::UNIT: constructIdentityGaugeField(gauge, gauge_param.cpu_prec); break;
+  case GaugeInputMode::GAUSSIAN_SU3:
+    constructGaussianSU3GaugeField(gauge, gauge_param.cpu_prec, gauge_input_width);
+    break;
+  case GaugeInputMode::LOAD:
+    logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
+    read_gauge_field(latfile.c_str(), (void **)gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    break;
+  }
+
+  applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
+  if (phase != QUDA_STAGGERED_PHASE_NO)
+    applyGaugeStaggeredPhase(gauge, Vh, gauge_param.X, gauge_param.cpu_prec, QUDA_PERIODIC_T, phase);
+}
+
+void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode, QudaStaggeredPhase phase)
+{
+  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+    constructHostGaugeInputField(static_cast<void *const *>(gauge.raw_pointer()), gauge_param, argc, argv, default_mode,
+                                 phase);
+  } else {
+    GaugeFieldParam param(gauge);
+    param.order = QUDA_QDP_GAUGE_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField u(param);
+    constructHostGaugeInputField(static_cast<void *const *>(u.raw_pointer()), gauge_param, argc, argv, default_mode,
+                                 phase);
+    gauge = u;
+  }
+}
+
+/**
  * @brief Rescales a gauge field with a per-site random phase
  *
  * @tparam real_t Floating point type of the gauge field
@@ -430,7 +573,7 @@ void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision)
 template <typename real_t> struct ApplyRandomU1Phase {
   void operator()(void *const *gauge_)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     for (int dir = 0; dir < 4; dir++) {
 #pragma omp parallel for
@@ -466,7 +609,7 @@ void applyRandomU1Phase(void *const *gauge, QudaPrecision precision)
 template <typename real_t> struct ConstructRandomMatrixGaugeField {
   void operator()(void *const *gauge_)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
 
     // Encapsulate creating a random matrix in a lambda to simplify making sure
     // the matrix is invertable
@@ -522,7 +665,7 @@ void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision
 template <typename real_t> struct AddNoiseToGaugeField {
   void operator()(void *const *gauge_, double noise_max)
   {
-    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
+    const auto gauge = typed_ptr_array<real_t *>(gauge_);
     // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
     for (int dir = 0; dir < 4; ++dir) {
 #pragma omp parallel for

@@ -41,23 +41,16 @@ template <typename real_t> struct StaggeredDslashReference {
     if (laplace3D < 4 && dslash_type != QUDA_LAPLACE_DSLASH)
       errorQuda("laplace3D = %d only supported for Laplace dslash (%d requested)", laplace3D, dslash_type);
 
-#define E(x, i, y) static_cast<const real_t *>(x[i] y)
-#define INIT(x, y)                                                                                                     \
-  {                                                                                                                    \
-    E(x, 0, y), E(x, 1, y), E(x, 2, y), E(x, 3, y)                                                                     \
-  }
     const auto res = res_.data<real_t *>();
     const auto fatlinkArray = fatlink_.data_array<const real_t *>();
     const auto fatlink = fatlinkArray.data;
     const auto longlinkArray = longlink_.data_array<const real_t *>();
     const auto longlink = longlinkArray.data;
-    const real_t *const ghostFatlink[] = INIT(fatlink_.Ghost(), .data());
-    const real_t *const ghostLonglink[] = INIT(longlink_.Ghost(), .data());
+    const auto ghostFatlink = typed_ptr_array<const real_t *>(fatlink_.Ghost());
+    const auto ghostLonglink = typed_ptr_array<const real_t *>(longlink_.Ghost());
     const auto spinorField = spinorField_.data<const real_t *>();
-    const real_t *const fwd_nbr_spinor[] = INIT(spinorField_.fwdGhostFaceBuffer, );
-    const real_t *const back_nbr_spinor[] = INIT(spinorField_.backGhostFaceBuffer, );
-#undef INIT
-#undef E
+    const auto fwd_nbr_spinor = typed_ptr_array<const real_t *>(spinorField_.fwdGhostFaceBuffer);
+    const auto back_nbr_spinor = typed_ptr_array<const real_t *>(spinorField_.backGhostFaceBuffer);
 
 #pragma omp parallel for
     for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
@@ -96,10 +89,11 @@ template <typename real_t> struct StaggeredDslashReference {
         const real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
           gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
           nullptr;
-        const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor,
-                                                             back_nbr_spinor, 1, nFace, stag_spinor_site_size);
+        const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor.data(),
+                                                             back_nbr_spinor.data(), 1, nFace, stag_spinor_site_size);
         const real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
-          spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace, stag_spinor_site_size) :
+          spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor.data(), back_nbr_spinor.data(), 3, nFace,
+                         stag_spinor_site_size) :
           nullptr;
 
         real_t gaugedSpinor[stag_spinor_site_size];

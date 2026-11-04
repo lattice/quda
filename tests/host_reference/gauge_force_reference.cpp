@@ -101,7 +101,7 @@ template <typename real_t> struct ComputePathProduct {
                   const void *const loop_coeff_, int coeff_index, int dir, const lattice_t &lat)
   {
     using matrix = Matrix<3, std::complex<real_t>>;
-    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
+    const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
 
     auto staple = reinterpret_cast<matrix *>(staple_);
     auto loop_coeff = reinterpret_cast<const real_t *>(loop_coeff_);
@@ -112,7 +112,7 @@ template <typename real_t> struct ComputePathProduct {
       int dx[4] = {};
       dx[dir] = 1;
 
-      auto curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
+      auto curr_matrix = compute_gauge_path(sitelink.data(), i, path, len, dx, lat);
 
       staple[i] = staple[i] + coeff * conj(curr_matrix);
     } // i
@@ -144,14 +144,14 @@ template <typename real_t> struct ComputeLoopTrace {
                                   const lattice_t &lat)
   {
     using matrix = Matrix<3, std::complex<real_t>>;
-    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
+    const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
 
     std::complex<double> accum = 0;
 
 #pragma omp parallel for reduction(+ : accum)
     for (size_t i = 0; i < lat.volume; i++) {
       int dx[4] = {};
-      auto tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
+      auto tmat = compute_gauge_path(sitelink.data(), i, path, len, dx, lat);
       auto tr = trace(tmat);
       accum += tr;
     }
@@ -186,7 +186,7 @@ template <typename real_t> struct UpdateMomentum {
     using matrix = Matrix<3, std::complex<real_t>>;
 
     auto momentum = reinterpret_cast<anti_hermitmat<real_t> *>(momentum_);
-    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
+    const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
     auto staple = reinterpret_cast<const matrix *>(staple_);
 
 #pragma omp parallel for
@@ -229,7 +229,7 @@ template <typename real_t> struct UpdateGauge {
     using matrix = Matrix<3, std::complex<real_t>>;
 
     auto gauge = reinterpret_cast<matrix *>(gauge_);
-    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
+    const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
     auto staple = reinterpret_cast<const matrix *>(staple_);
 
 #pragma omp parallel for
