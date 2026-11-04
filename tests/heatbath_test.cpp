@@ -142,7 +142,7 @@ void teardown_gauge()
     cpuGauge = gauge;
 
     quda::GaugeIO(gauge_outfile, quda::FileIOParam(gauge_param.file_io_param))
-      .save(reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param.cpu_prec, gauge_param.X);
+      .save(static_cast<void *const *>(cpuGauge.raw_pointer()), gauge_param.cpu_prec, gauge_param.X);
   } else {
     printfQuda("No output file specified.\n");
   }

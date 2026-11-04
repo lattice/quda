@@ -397,7 +397,7 @@ TEST_P(GaugeIOTest, verify)
 
   auto get_plaq = [&]() {
     // Load the gauge field to the device
-    loadGaugeQuda((void *)gauge, &gauge_param);
+    loadGaugeQuda(gauge, &gauge_param);
     std::array<double, 3> plaq;
     plaqQuda(plaq.data());
     freeGaugeQuda();
