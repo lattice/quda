@@ -16,6 +16,7 @@
 #include "staggered_gauge_utils.h"
 #include "rng_utils.hpp"
 #include "llfat_utils.h"
+#include "instantiate_host.hpp"
 
 extern double tadpole_factor;
 // Unitarization coefficients
@@ -27,27 +28,27 @@ static double svd_abs_error = 1e-4;
 static double max_allowed_error = 1e-11;
 
 // multiply each link by exp(i angle(i, parity)), one angle per link, drawn in the order dir, site, parity
-template <typename F> static void applyLinkU1Phase(void *const *links, QudaPrecision precision, F &&angle)
-{
-  for (int dir = 0; dir < 4; ++dir) {
+template <typename real_t> struct ApplyLinkU1Phase {
+  template <typename F> void operator()(void *const *links_, F &&angle)
+  {
+    const auto links = typed_ptr_array<real_t *>(links_);
+
+    for (int dir = 0; dir < 4; ++dir) {
 #pragma omp parallel for
-    for (int i = 0; i < Vh; ++i) {
-      for (int parity = 0; parity < 2; parity++) {
-        std::complex<double> z = std::polar(1.0, angle(i, parity));
-        for (auto j = 0lu; j < gauge_site_size; j += 2) {
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            std::complex<double> *l
-              = (std::complex<double> *)(&(((double *)links[dir])[(parity * Vh + i) * gauge_site_size + j]));
-            *l *= z;
-          } else {
-            std::complex<float> *l
-              = (std::complex<float> *)(&(((float *)links[dir])[(parity * Vh + i) * gauge_site_size + j]));
-            *l *= z;
-          }
+      for (int i = 0; i < Vh; ++i) {
+        for (int parity = 0; parity < 2; parity++) {
+          std::complex<double> z = std::polar(1.0, angle(i, parity));
+          auto link = reinterpret_cast<std::complex<real_t> *>(links[dir] + (parity * Vh + i) * gauge_site_size);
+          for (auto j = 0lu; j < gauge_site_size / 2; j++) link[j] *= z;
         }
       }
     }
   }
+};
+
+template <typename F> static void applyLinkU1Phase(void *const *links, QudaPrecision precision, F &&angle)
+{
+  instantiate_host<ApplyLinkU1Phase>(precision, links, angle);
 }
 
 void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, GaugeFieldConstructionType type,
