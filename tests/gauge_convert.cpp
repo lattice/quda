@@ -112,13 +112,13 @@ namespace
   {
     Conversion c;
     if (unit_gauge) errorQuda("gauge_convert takes --gauge-input unit rather than --unit-gauge");
-    c.generated = gauge_input_explicit && gauge_input != GaugeInputMode::LOAD;
+    c.generated = !gauge_input.empty() && gauge_input != "load";
     if (c.generated && !latfile.empty())
       errorQuda("Give either --load-gauge or a generated --gauge-input, not both (--gauge-input %s)",
-                get_gauge_input_str(gauge_input));
+                gauge_input.c_str());
     if (!c.generated && latfile.empty())
       errorQuda("Give the field to convert, with --load-gauge or a generated --gauge-input haar|unit|gaussian-su3");
-    if (gauge_input_width_explicit && !(c.generated && gauge_input == GaugeInputMode::GAUSSIAN_SU3))
+    if (gauge_input_width_explicit && !(c.generated && gauge_input == "gaussian-su3"))
       errorQuda("--gauge-input-width requires --gauge-input gaussian-su3");
     if (gauge_input_seed_given && !c.generated) errorQuda("--gauge-input-seed requires a generated --gauge-input");
     if (c.generated) {
@@ -321,13 +321,14 @@ namespace
   {
     if (gauge_input_seed_given) initRand(gauge_input_seed);
     // links without any boundary condition or anisotropy, as a file holds them
-    switch (gauge_input) {
+    const auto mode = resolveGaugeInputMode();
+    switch (mode) {
     case GaugeInputMode::HAAR: constructRandomSU3GaugeField(gauge.ptr, gauge.prec); break;
     case GaugeInputMode::UNIT: constructIdentityGaugeField(gauge.ptr, gauge.prec); break;
     case GaugeInputMode::GAUSSIAN_SU3: constructGaussianSU3GaugeField(gauge.ptr, gauge.prec, gauge_input_width); break;
-    default: errorQuda("Unexpected gauge input %s", get_gauge_input_str(gauge_input));
+    default: errorQuda("Unexpected gauge input %s", getGaugeInputStr(mode));
     }
-    printGaugeInput(gauge_input);
+    printGaugeInput(mode);
     if (gauge_input_seed_given) printfQuda("Gauge input seed: %lu\n", static_cast<unsigned long>(gauge_input_seed));
   }
 

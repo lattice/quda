@@ -22,8 +22,8 @@ namespace quda {
     Mom mom;
     const Gauge u;
 
-    int X[4]; // the regular volume parameters
-    int E[4]; // the extended volume parameters
+    int_fastdiv X[4]; // the regular volume parameters
+    int_fastdiv E[4]; // the extended volume parameters
     int border[4]; // radius of border
 
     real epsilon; // stepsize and any other overall scaling factor

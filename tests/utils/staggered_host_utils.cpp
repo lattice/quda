@@ -147,13 +147,16 @@ void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, vo
 {
   if (longlink) {
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION:
-      computeLongLinkCPU((void **)longlink, (su3_matrix<double> **)sitelink, (double *)act_path_coeff);
+    case QUDA_DOUBLE_PRECISION: {
+      auto link = typed_ptr_array<su3_matrix<double> *>(sitelink);
+      computeLongLinkCPU(longlink, link.data(), (double *)act_path_coeff);
       break;
-
-    case QUDA_SINGLE_PRECISION:
-      computeLongLinkCPU((void **)longlink, (su3_matrix<float> **)sitelink, (float *)act_path_coeff);
+    }
+    case QUDA_SINGLE_PRECISION: {
+      auto link = typed_ptr_array<su3_matrix<float> *>(sitelink);
+      computeLongLinkCPU(longlink, link.data(), (float *)act_path_coeff);
       break;
+    }
     default:
       fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
       exit(1);
@@ -202,13 +205,16 @@ void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *qudaGaug
   exchange_cpu_sitelink_ex(X, R, sitelink, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam->cpu_prec, 0, 4);
 
   switch (qudaGaugeParam->cpu_prec) {
-  case QUDA_DOUBLE_PRECISION:
-    computeTwoLinkCPU((void **)twolink, (su3_matrix<double> **)sitelink);
+  case QUDA_DOUBLE_PRECISION: {
+    auto link = typed_ptr_array<su3_matrix<double> *>(sitelink);
+    computeTwoLinkCPU(twolink, link.data());
     break;
-
-  case QUDA_SINGLE_PRECISION:
-    computeTwoLinkCPU((void **)twolink, (su3_matrix<float> **)sitelink);
+  }
+  case QUDA_SINGLE_PRECISION: {
+    auto link = typed_ptr_array<su3_matrix<float> *>(sitelink);
+    computeTwoLinkCPU(twolink, link.data());
     break;
+  }
   default:
     fprintf(stderr, "ERROR: unsupported precision(%d)\n", qudaGaugeParam->cpu_prec);
     exit(1);
@@ -279,9 +285,6 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
                                    QudaInvertParam * /*inv_param*/, const int oddBit, const double /*width*/,
                                    const int t0, QudaPrecision prec)
 {
-  void *ghost[4];
-  for (int i = 0; i < 4; i++) ghost[i] = twolnk.Ghost()[i].data();
-
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
     otherparity = QUDA_ODD_PARITY;
@@ -294,19 +297,20 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
 
   in.exchangeGhost(otherparity, nFace, 0/*daggerBit*/);
 
-  void **fwd_nbr_spinor = in.fwdGhostFaceBuffer;
-  void **back_nbr_spinor = in.backGhostFaceBuffer;
-
   if (prec == QUDA_DOUBLE_PRECISION) {
-    {
-      staggeredTwoLinkGaussianSmear((double *)out.data(), (double **)qdp_twolnk, (double **)ghost, (double *)in.data(),
-                                    (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, t0, oddBit);
-    } 
+    auto link = typed_ptr_array<double *>(qdp_twolnk);
+    auto ghost = typed_ptr_array<double *>(twolnk.Ghost());
+    auto fwd_nbr_spinor = typed_ptr_array<double *>(in.fwdGhostFaceBuffer);
+    auto back_nbr_spinor = typed_ptr_array<double *>(in.backGhostFaceBuffer);
+    staggeredTwoLinkGaussianSmear((double *)out.data(), link.data(), ghost.data(), (double *)in.data(),
+                                  fwd_nbr_spinor.data(), back_nbr_spinor.data(), t0, oddBit);
   } else {
-    {
-      staggeredTwoLinkGaussianSmear((float *)out.data(), (float **)qdp_twolnk, (float **)ghost, (float *)in.data(),
-                                    (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, t0, oddBit);
-    }
+    auto link = typed_ptr_array<float *>(qdp_twolnk);
+    auto ghost = typed_ptr_array<float *>(twolnk.Ghost());
+    auto fwd_nbr_spinor = typed_ptr_array<float *>(in.fwdGhostFaceBuffer);
+    auto back_nbr_spinor = typed_ptr_array<float *>(in.backGhostFaceBuffer);
+    staggeredTwoLinkGaussianSmear((float *)out.data(), link.data(), ghost.data(), (float *)in.data(),
+                                  fwd_nbr_spinor.data(), back_nbr_spinor.data(), t0, oddBit);
   }
   return;
 }
@@ -320,8 +324,9 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, const quda
 // Compute the full HISQ stencil on the CPU.
 // If "eps_naik" is 0, there's no naik correction,
 // and this routine skips building the paths in "act_path_coeffs[2]"
-void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik)
+void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **vlink,
+                         void **wlink, void **sitelink, void *qudaGaugeParamPtr,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik)
 {
   // Prepare various things
   QudaGaugeParam &qudaGaugeParam = *((QudaGaugeParam *)qudaGaugeParamPtr);
@@ -346,7 +351,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
 
 #ifdef MULTI_GPU
   void *ghost_sitelink[4];
-  void *ghost_sitelink_diag[16];
+  void *ghost_sitelink_diag[n_ghost_diag];
 #endif
 
   int X1 = Z[0];
@@ -407,7 +412,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
 
 #ifdef MULTI_GPU
   void *ghost_wlink[4];
-  void *ghost_wlink_diag[16];
+  void *ghost_wlink_diag[n_ghost_diag];
 #endif
 
   // Copy of V link needed for CPU unitarization routines
@@ -631,6 +636,17 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
     }
   }
 
+  //////////////////////////////////////////////////////////////
+  // Optionally copy out intermediate V and W links (QDP order)
+  //////////////////////////////////////////////////////////////
+
+  if (vlink) {
+    for (int i = 0; i < 4; i++) memcpy(vlink[i], v_reflink[i], V * gauge_site_size * gSize);
+  }
+  if (wlink) {
+    for (int i = 0; i < 4; i++) memcpy(wlink[i], w_reflink[i], V * gauge_site_size * gSize);
+  }
+
   //////////////
   // Clean up //
   //////////////
@@ -679,8 +695,9 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
 }
 
 // data reordering routines
-template <typename Out, typename In> void reorderQDPtoMILC(Out *milc_out, In **qdp_in, int V, int siteSize)
+template <typename Out, typename In> void reorderQDPtoMILC(Out *milc_out, void *const *qdp_in_, int V, int siteSize)
 {
+  const auto qdp_in = typed_ptr_array<const In *>(qdp_in_);
 #pragma omp parallel for
   for (int i = 0; i < V; i++) {
     for (int dir = 0; dir < 4; dir++) {
@@ -696,21 +713,22 @@ void reorderQDPtoMILC(void *milc_out, void **qdp_in, int V, int siteSize, QudaPr
 {
   if (out_precision == QUDA_SINGLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderQDPtoMILC<float, float>((float *)milc_out, (float **)qdp_in, V, siteSize);
+      reorderQDPtoMILC<float, float>((float *)milc_out, qdp_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderQDPtoMILC<float, double>((float *)milc_out, (double **)qdp_in, V, siteSize);
+      reorderQDPtoMILC<float, double>((float *)milc_out, qdp_in, V, siteSize);
     }
   } else if (out_precision == QUDA_DOUBLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderQDPtoMILC<double, float>((double *)milc_out, (float **)qdp_in, V, siteSize);
+      reorderQDPtoMILC<double, float>((double *)milc_out, qdp_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderQDPtoMILC<double, double>((double *)milc_out, (double **)qdp_in, V, siteSize);
+      reorderQDPtoMILC<double, double>((double *)milc_out, qdp_in, V, siteSize);
     }
   }
 }
 
-template <typename Out, typename In> void reorderMILCtoQDP(Out **qdp_out, In *milc_in, int V, int siteSize)
+template <typename Out, typename In> void reorderMILCtoQDP(void *const *qdp_out_, In *milc_in, int V, int siteSize)
 {
+  const auto qdp_out = typed_ptr_array<Out *>(qdp_out_);
 #pragma omp parallel for
   for (int i = 0; i < V; i++) {
     for (int dir = 0; dir < 4; dir++) {
@@ -726,15 +744,15 @@ void reorderMILCtoQDP(void **qdp_out, void *milc_in, int V, int siteSize, QudaPr
 {
   if (out_precision == QUDA_SINGLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderMILCtoQDP<float, float>((float **)qdp_out, (float *)milc_in, V, siteSize);
+      reorderMILCtoQDP<float, float>(qdp_out, (float *)milc_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderMILCtoQDP<float, double>((float **)qdp_out, (double *)milc_in, V, siteSize);
+      reorderMILCtoQDP<float, double>(qdp_out, (double *)milc_in, V, siteSize);
     }
   } else if (out_precision == QUDA_DOUBLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderMILCtoQDP<double, float>((double **)qdp_out, (float *)milc_in, V, siteSize);
+      reorderMILCtoQDP<double, float>(qdp_out, (float *)milc_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderMILCtoQDP<double, double>((double **)qdp_out, (double *)milc_in, V, siteSize);
+      reorderMILCtoQDP<double, double>(qdp_out, (double *)milc_in, V, siteSize);
     }
   }
 }

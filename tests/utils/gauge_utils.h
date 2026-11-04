@@ -5,7 +5,6 @@
 #include <gauge_field.h>
 
 #include "host_utils.h"
-#include "gauge_input.h"
 
 using quda::GaugeField;
 using quda::GaugeFieldParam;
@@ -13,10 +12,33 @@ using quda::GaugeFieldParam;
 // Local enums for gauge field construction types
 enum class GaugeFieldConstructionType { UNIT_GAUGE, RANDOM_GAUGE, LOAD_GAUGE };
 
+enum class GaugeInputMode { HAAR, UNIT, GAUSSIAN_SU3, LOAD };
+
+/**
+ * @brief Immutable host gauge input shared by independent test cases.
+ */
+class HostGaugeInput
+{
+  quda::GaugeField input;
+
+public:
+  /**
+   * @brief Construct an immutable QDP-ordered host gauge field for test cases.
+   *
+   * @param[in] gauge_param Parameters that define the host field.
+   * @param[in] argc Command-line argument count used to resolve the input mode.
+   * @param[in] argv Command-line arguments used to resolve or load the input field.
+   * @param[in] default_mode Input mode used when no explicit mode is requested.
+   * @param[in] phase Staggered phase convention to apply (NO or MILC).
+   */
+  HostGaugeInput(const QudaGaugeParam &gauge_param, int argc, char **argv,
+                 GaugeInputMode default_mode = GaugeInputMode::HAAR, QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO);
+
+  const quda::GaugeField &field() const { return input; }
+};
+
 /**
  * @brief Resolve the active gauge-input mode from command-line options.
- *
- * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
  */
 GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMode::HAAR);
 
@@ -25,7 +47,7 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMod
  *
  * @param[in] mode Gauge-input mode.
  */
-const char *get_gauge_input_str(GaugeInputMode mode);
+const char *getGaugeInputStr(GaugeInputMode mode);
 
 /**
  * @brief Print a gauge-input mode, and the Gaussian width for gaussian-su3.
@@ -179,7 +201,25 @@ void constructGaussianSU3GaugeField(void *const *gauge, QudaPrecision precision,
  *
  * @param[out] gauge Generated QDP-ordered gauge field.
  * @param[in] gauge_param Information about the desired gauge field.
- * @param[in] default_mode Input mode used without --gauge-input, --load-gauge or --unit-gauge.
+ * @param[in] argc Input command-line argument count.
+ * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] default_mode Input mode used when no explicit mode is requested.
+ * @param[in] phase Staggered phase convention to apply (NO or MILC).
  */
-void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param,
-                                  GaugeInputMode default_mode = GaugeInputMode::HAAR);
+void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode = GaugeInputMode::HAAR,
+                                  QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO);
+
+/**
+ * @brief Construct a host gauge field from the resolved gauge-input mode.
+ *
+ * @param[out] gauge Generated gauge field.
+ * @param[in] gauge_param Information about the desired gauge field.
+ * @param[in] argc Input command-line argument count.
+ * @param[in] argv Input command-line arguments used when loading a file.
+ * @param[in] default_mode Input mode used when no explicit mode is requested.
+ * @param[in] phase Staggered phase convention to apply (NO or MILC).
+ */
+void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
+                                  GaugeInputMode default_mode = GaugeInputMode::HAAR,
+                                  QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO);

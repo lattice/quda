@@ -915,14 +915,24 @@ void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconst
 
 template <typename Float> static int compareFloats(Float *a, Float *b, int len, double epsilon)
 {
-  for (int i = 0; i < len; i++) {
-    double diff = fabs(a[i] - b[i]);
-    if (diff > epsilon || std::isnan(diff)) {
-      printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
-      return 0;
-    }
+  if (len <= 0) return 1;
+  auto fails = [&](int i) {
+    const double diff = fabs(a[i] - b[i]);
+    return diff > epsilon || std::isnan(diff);
+  };
+
+  int first = len;
+  if (fails(0)) {
+    first = 0;
+  } else {
+#pragma omp parallel for reduction(min : first)
+    for (int i = 1; i < len; i++)
+      if (fails(i)) first = std::min(first, i);
   }
-  return 1;
+
+  if (first == len) return 1;
+  printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", first, first, a[first], first, b[first]);
+  return 0;
 }
 
 int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision precision)
@@ -935,16 +945,22 @@ int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision prec
 
 template <typename Float> static double compareFloats_v2(Float *a, Float *b, int len, double epsilon)
 {
-  double global_diff = 0.0;
-  for (int i = 0; i < len; i++) {
-    double diff = fabs(a[i] - b[i]);
-    if (diff > epsilon || std::isnan(diff)) {
-      //printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
-      return diff;
-    }
-    global_diff = std::max(global_diff, diff);
+  if (len <= 0) return 0.0;
+  auto diff = [&](int i) -> double { return fabs(a[i] - b[i]); };
+  auto fails = [&](double d) { return d > epsilon || std::isnan(d); };
+
+  if (fails(diff(0))) return diff(0);
+  int first = len;
+  double global_diff = diff(0);
+#pragma omp parallel for reduction(min : first) reduction(max : global_diff)
+  for (int i = 1; i < len; i++) {
+    const double d = diff(i);
+    if (fails(d))
+      first = std::min(first, i);
+    else
+      global_diff = std::max(global_diff, d);
   }
-  return global_diff;
+  return first < len ? diff(first) : global_diff;
 }
 
 // returns deviation instead of failure flag
@@ -1003,10 +1019,15 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
 
 void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precision)
 {
-  if (precision == QUDA_DOUBLE_PRECISION)
-    checkGauge((double **)oldG, (double **)newG, epsilon);
-  else
-    checkGauge((float **)oldG, (float **)newG, epsilon);
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    auto old_ptrs = typed_ptr_array<double *>(oldG);
+    auto new_ptrs = typed_ptr_array<double *>(newG);
+    checkGauge(old_ptrs.data(), new_ptrs.data(), epsilon);
+  } else {
+    auto old_ptrs = typed_ptr_array<float *>(oldG);
+    auto new_ptrs = typed_ptr_array<float *>(newG);
+    checkGauge(old_ptrs.data(), new_ptrs.data(), epsilon);
+  }
 }
 
 std::complex<double> twoColorSpinorContract(std::complex<double> *spinor1, std::complex<double> *spinor2)
@@ -1133,9 +1154,13 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
   int ret;
 
   if (precision == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink((double **)linkA, (double **)linkB, len);
+    auto a_ptrs = typed_ptr_array<double *>(linkA);
+    auto b_ptrs = typed_ptr_array<double *>(linkB);
+    ret = compareLink(a_ptrs.data(), b_ptrs.data(), len);
   } else {
-    ret = compareLink((float **)linkA, (float **)linkB, len);
+    auto a_ptrs = typed_ptr_array<float *>(linkA);
+    auto b_ptrs = typed_ptr_array<float *>(linkB);
+    ret = compareLink(a_ptrs.data(), b_ptrs.data(), len);
   }
 
   return ret;
@@ -1144,13 +1169,17 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
 static int compare_link(const GaugeField &a, const GaugeField &b)
 {
   if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
+
+  // not raw_pointer(): it returns a shared static buffer, so a and b would alias
   int ret;
   if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink(reinterpret_cast<double **>(a.raw_pointer()), reinterpret_cast<double **>(b.raw_pointer()),
-                      a.Volume());
+    auto a_ptrs = a.data_array<double *>();
+    auto b_ptrs = b.data_array<double *>();
+    ret = compareLink(a_ptrs.data, b_ptrs.data, a.Volume());
   } else {
-    ret = compareLink(reinterpret_cast<float **>(a.raw_pointer()), reinterpret_cast<float **>(b.raw_pointer()),
-                      a.Volume());
+    auto a_ptrs = a.data_array<float *>();
+    auto b_ptrs = b.data_array<float *>();
+    ret = compareLink(a_ptrs.data, b_ptrs.data, a.Volume());
   }
 
   return ret;
@@ -1214,19 +1243,177 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   return compare_link(linkA, linkB);
 }
 
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng)
+static void print_link_endpoints(const GaugeField &u, const std::string &msg)
 {
-  unsigned long shift = x[0] * x[1] * x[2] * x[3] * stag_spinor_site_size;
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    double *dstag = (double *)stag_for_oprod;
-    // matpc: compute a full-volume spinor
-    for (int d = 0; d < 4; d++)
-      constructRandomSpinorSource(dstag + d * shift, 1, 3, QUDA_DOUBLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
-  } else {
-    float *fstag = (float *)stag_for_oprod;
-    for (int d = 0; d < 4; d++)
-      constructRandomSpinorSource(fstag + d * shift, 1, 3, QUDA_SINGLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
+  if (u.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", u.Order());
+  printfQuda("%s\n", msg.c_str());
+  printLinkElement(u.data(0), 0, u.Precision());
+  printfQuda("\n");
+  printLinkElement(u.data(0), 1, u.Precision());
+  printfQuda("...\n");
+  printLinkElement(u.data(3), u.Volume() - 1, u.Precision());
+  printfQuda("\n");
+}
+
+template <typename Float>
+static void print_first_failures(const GaugeField &result, const std::string &msg_result, const GaugeField &expected,
+                                 const std::string &msg_expected, double tol)
+{
+  const size_t length = result.Volume() * gauge_site_size;
+  for (int component = 0; component < result.Geometry(); component++) {
+    const auto r = static_cast<const Float *>(result.data(component));
+    const auto e = static_cast<const Float *>(expected.data(component));
+    auto diff = [&](size_t i) { return std::abs(static_cast<double>(r[i]) - static_cast<double>(e[i])); };
+    auto fails = [&](size_t i) {
+      const double d = diff(i);
+      return d > tol || std::isnan(d);
+    };
+
+    size_t first = length;
+    if (fails(0)) {
+      first = 0;
+    } else {
+#pragma omp parallel for reduction(min : first)
+      for (size_t i = 1; i < length; i++)
+        if (fails(i)) first = std::min(first, i);
+    }
+
+    if (first < length)
+      printfQuda("ERROR: component %d, i=%zu: %s %e, %s %e, |diff| %e > tol %e\n", component, first, msg_result.c_str(),
+                 static_cast<double>(r[first]), msg_expected.c_str(), static_cast<double>(e[first]), diff(first), tol);
   }
+}
+
+std::pair<bool, int> compare_link_fields(const GaugeField &result, const std::string &msg_result,
+                                         const GaugeField &expected, const std::string &msg_expected, double tol)
+{
+  if (result.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", result.Order());
+  if (expected.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", expected.Order());
+
+  if (verbosity >= QUDA_VERBOSE) {
+    print_link_endpoints(result, msg_result);
+    print_link_endpoints(expected, "\n" + msg_expected);
+  }
+  const auto check = strong_check_field(result, msg_result, expected, msg_expected);
+  const bool pass = check.max_deviation <= tol;
+  if (!pass) {
+    if (result.Precision() == QUDA_DOUBLE_PRECISION)
+      print_first_failures<double>(result, msg_result, expected, msg_expected, tol);
+    else
+      print_first_failures<float>(result, msg_result, expected, msg_expected, tol);
+  }
+  return {pass, check.accuracy_level};
+}
+
+template <typename Float>
+static StrongCheckResult strong_check_histogram(const std::vector<const Float *> &a, const std::string &label_a,
+                                                const std::vector<const Float *> &b, const std::string &label_b,
+                                                size_t length)
+{
+  constexpr int levels = 16;
+  std::array<double, levels> thresholds;
+  for (int level = 0; level < levels; level++) thresholds[level] = std::pow(10.0, -(level + 1));
+  const int geometry = a.size();
+  std::vector<std::array<size_t, levels>> failures(geometry);
+  double max_deviation = 0.0;
+  bool any_nan = false;
+
+  for (int component = 0; component < geometry; component++) {
+    const Float *a_c = a[component];
+    const Float *b_c = b[component];
+    size_t count[levels] = {};
+#pragma omp parallel for reduction(+ : count) reduction(max : max_deviation) reduction(|| : any_nan)
+    for (size_t i = 0; i < length; i++) {
+      const double deviation = std::abs(static_cast<double>(a_c[i]) - static_cast<double>(b_c[i]));
+      if (std::isnan(deviation)) {
+        any_nan = true;
+        for (int level = 0; level < levels; level++) count[level]++;
+      } else {
+        max_deviation = std::max(max_deviation, deviation);
+        for (int level = 0; level < levels; level++) count[level] += deviation > thresholds[level];
+      }
+    }
+    std::copy(count, count + levels, failures[component].begin());
+  }
+  if (any_nan) max_deviation = std::numeric_limits<double>::infinity();
+
+  printfQuda("Deviation histogram: %s vs %s (max %.6e)\n", label_a.c_str(), label_b.c_str(), max_deviation);
+  printfQuda(" threshold");
+  for (int component = 0; component < geometry; component++) printfQuda("     component %d", component);
+  printfQuda("          total/fraction\n");
+
+  int accuracy_level = 0;
+  const size_t total_values = geometry * length;
+  for (int level = 0; level < levels; level++) {
+    size_t total_failures = 0;
+    printfQuda(" %9.1e", thresholds[level]);
+    for (int component = 0; component < geometry; component++) {
+      printfQuda(" %15zu", failures[component][level]);
+      total_failures += failures[component][level];
+    }
+    printfQuda(" %15zu/%zu %.6e\n", total_failures, total_values,
+               total_values ? static_cast<double>(total_failures) / total_values : 0.0);
+    if (total_failures == 0) accuracy_level = level;
+  }
+
+  return {max_deviation, accuracy_level};
+}
+
+StrongCheckResult strong_check_field(const GaugeField &a, const std::string &label_a, const GaugeField &b,
+                                     const std::string &label_b)
+{
+  checkPrecision(a, b);
+  if (a.Location() != QUDA_CPU_FIELD_LOCATION || b.Location() != QUDA_CPU_FIELD_LOCATION)
+    errorQuda("strong_check_field requires CPU fields");
+  if (a.Order() != QUDA_QDP_GAUGE_ORDER || b.Order() != QUDA_QDP_GAUGE_ORDER)
+    errorQuda("strong_check_field requires QDP-ordered fields");
+  if (a.Geometry() != b.Geometry() || a.Volume() != b.Volume()) errorQuda("Field geometry or volume mismatch");
+
+  const int geometry = a.Geometry();
+  const size_t length = a.Volume() * gauge_site_size;
+  if (a.Precision() == QUDA_DOUBLE_PRECISION) {
+    std::vector<const double *> a_ptr(geometry);
+    std::vector<const double *> b_ptr(geometry);
+    for (int component = 0; component < geometry; component++) {
+      a_ptr[component] = static_cast<const double *>(a.data(component));
+      b_ptr[component] = static_cast<const double *>(b.data(component));
+    }
+    return strong_check_histogram(a_ptr, label_a, b_ptr, label_b, length);
+  } else {
+    std::vector<const float *> a_ptr(geometry);
+    std::vector<const float *> b_ptr(geometry);
+    for (int component = 0; component < geometry; component++) {
+      a_ptr[component] = static_cast<const float *>(a.data(component));
+      b_ptr[component] = static_cast<const float *>(b.data(component));
+    }
+    return strong_check_histogram(a_ptr, label_a, b_ptr, label_b, length);
+  }
+}
+
+StrongCheckResult strong_check_scalar(const void *a, const std::string &label_a, const void *b,
+                                      const std::string &label_b, size_t length, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    return strong_check_histogram(std::vector<const double *> {static_cast<const double *>(a)}, label_a,
+                                  std::vector<const double *> {static_cast<const double *>(b)}, label_b, length);
+  } else {
+    return strong_check_histogram(std::vector<const float *> {static_cast<const float *>(a)}, label_a,
+                                  std::vector<const float *> {static_cast<const float *>(b)}, label_b, length);
+  }
+}
+
+void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng)
+{
+  if (stag_for_oprod.Location() != QUDA_CPU_FIELD_LOCATION || stag_for_oprod.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+    errorQuda("Expected a full-parity host spinor field");
+  quda::spinorNoise(stag_for_oprod, rng, QUDA_NOISE_UNIFORM);
+}
+
+quda::lat_dim_t gauge_extension_radius()
+{
+  quda::lat_dim_t R;
+  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  return R;
 }
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)

@@ -4,7 +4,6 @@
 #include <array>
 #include <quda.h>
 #include "misc.h"
-#include "gauge_input.h"
 
 // for compatibility while porting - remove later
 extern void usage(char **);
@@ -309,8 +308,7 @@ extern QudaDslashType dslash_type;
 extern int laplace3D;
 extern std::string latfile;
 extern bool unit_gauge;
-extern GaugeInputMode gauge_input;
-extern bool gauge_input_explicit;
+extern std::string gauge_input;
 extern double gauge_input_width;
 extern bool gauge_input_width_explicit;
 extern double gaussian_sigma;
@@ -605,6 +603,8 @@ extern double gauge_smear_alpha;
 extern double gauge_smear_alpha1;
 extern double gauge_smear_alpha2;
 extern double gauge_smear_alpha3;
+extern double gauge_smear_anisotropy;
+extern unsigned int gauge_smear_rk_order;
 extern int gauge_smear_steps;
 extern int gauge_n_save;
 extern int hier_threshold;
@@ -656,5 +656,6 @@ extern uint64_t prop_source_seed;
 extern bool enable_testing;
 
 extern bool detratio;
+extern int rhmc_flavors;
 
 extern int covdev_mu;

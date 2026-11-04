@@ -14,34 +14,31 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # ubuntu-latest is Ubuntu 26.04. CUDA 13.3 is published for ubuntu2404,
+    # which is also what the other 13.x workflows use.
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Install software
         run: |
-          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
-          sudo dpkg -i cuda-keyring_1.0-1_all.deb
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends ninja-build cmake libopenmpi-dev gfortran g++-12
-
-      - uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
-          execute_install_scripts: true
+          sudo apt-get install -y --no-install-recommends ninja-build cmake libopenmpi-dev g++-14 cuda-compiler-13-3 cuda-libraries-dev-13-3 cuda-nvml-dev-13-3
 
       - uses: actions/checkout@v4
 
       - name: Ccache for gh actions
-        uses: hendrikmuhs/ccache-action@v1.2.16
+        uses: hendrikmuhs/ccache-action@v1.2.17
         with:
-          key: ${{ github.job }}-g++-12-cuda-12.1
+          key: ${{ github.job }}-g++-14-cuda-13.3
           max-size: 2000M
 
       - name: Configure CMake
         run: >
           cmake
-          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc
-          -DCMAKE_CXX_COMPILER=g++-12
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.3/bin/nvcc
+          -DCMAKE_CXX_COMPILER=g++-14
           -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DQUDA_GPU_ARCH=sm_80 -DQUDA_GPU_ARCH_SUFFIX=virtual -DQUDA_JITIFY=ON
