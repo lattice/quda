@@ -49,6 +49,25 @@ template <typename Coord, typename I> inline int getCoords(Coord &x, int cb_inde
 }
 
 /**
+ * @brief Map a checkerboard index on a lattice to the checkerboard index of the same site on the
+ *        lattice extended by R in each direction
+ *
+ * @param[in] cb_index Checkerboard index on the non-extended lattice
+ * @param[in] X Non-extended lattice dimensions
+ * @param[in] parity Site parity
+ * @param[in] R Extension radius in each dimension
+ * @return Checkerboard index on the extended lattice
+ */
+template <typename I, typename J> inline int getIndexExtended(int cb_index, const I &X, int parity, const J &R)
+{
+  int x[4];
+  getCoords(x, cb_index, X, parity);
+  int ex[4];
+  for (int d = 0; d < 4; d++) ex[d] = X[d] + 2 * R[d];
+  return ((((x[3] + R[3]) * ex[2] + (x[2] + R[2])) * ex[1] + (x[1] + R[1])) * ex[0] + (x[0] + R[0])) >> 1;
+}
+
+/**
  * @brief Calculate the full index from the checkerboard index and a parity
  *
  * @param i The checkerboard index of the current site

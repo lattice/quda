@@ -46,19 +46,12 @@ template <typename real_t> struct DslashReference {
   void operator()(void *res_, const void *const *gaugeFull_, const void *const *ghostGauge_, const void *spinorField_,
                   const void *const *fwdSpinor_, const void *const *backSpinor_, int parity, int dagger)
   {
-#define E(x) static_cast<const real_t *const>(x)
-#define INIT(x)                                                                                                        \
-  {                                                                                                                    \
-    E(x[0]), E(x[1]), E(x[2]), E(x[3])                                                                                 \
-  }
     const auto res = static_cast<real_t *const>(res_);
-    const real_t *const gaugeFull[] = INIT(gaugeFull_);
-    const real_t *const ghostGauge[] = INIT(ghostGauge_);
+    const auto gaugeFull = typed_ptr_array<const real_t *>(gaugeFull_);
+    const auto ghostGauge = typed_ptr_array<const real_t *>(ghostGauge_);
     const auto spinorField = static_cast<const real_t *const>(spinorField_);
-    const real_t *const fwdSpinor[] = INIT(fwdSpinor_);
-    const real_t *const backSpinor[] = INIT(backSpinor_);
-#undef INIT
-#undef E
+    const auto fwdSpinor = typed_ptr_array<const real_t *>(fwdSpinor_);
+    const auto backSpinor = typed_ptr_array<const real_t *>(backSpinor_);
 
 #pragma omp parallel for
     for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
@@ -81,7 +74,7 @@ template <typename real_t> struct DslashReference {
 
       for (int dir = 0; dir < 8; dir++) {
         const real_t *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-        const real_t *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+        const real_t *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor.data(), backSpinor.data(), 1, 1);
 
         real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
         int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;

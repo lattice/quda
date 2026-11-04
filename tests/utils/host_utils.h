@@ -2,7 +2,11 @@
 
 #include <vector>
 #include <array>
+#include <cstddef>
 #include <random>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include <quda.h>
 #include <random_quda.h>
@@ -57,6 +61,29 @@ constexpr bool is_multi_gpu()
 #endif
 }
 
+/**
+ * @brief Build a typed array of per-dimension pointers, e.g., from ghost buffers
+ *
+ * @tparam T The pointer type to cast each element to (e.g., const double *)
+ * @tparam N The number of elements to convert
+ * @tparam Src An indexable source whose elements are either pointers (e.g.,
+ * ColorSpinorField::fwdGhostFaceBuffer) or objects with a data() method (e.g.,
+ * GaugeField::Ghost())
+ * @param[in] src The source to convert
+ * @return Array of the first N elements of src cast to T
+ */
+template <typename T, std::size_t N = 4, typename Src> std::array<T, N> typed_ptr_array(const Src &src)
+{
+  std::array<T, N> out {};
+  for (std::size_t i = 0; i < N; i++) {
+    if constexpr (std::is_pointer_v<std::decay_t<decltype(src[i])>>)
+      out[i] = static_cast<T>(src[i]);
+    else
+      out[i] = static_cast<T>(src[i].data());
+  }
+  return out;
+}
+
 // Determine if the Laplace operator has been defined
 constexpr bool is_enabled_laplace()
 {
@@ -85,8 +112,9 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
                                             int argc, char **argv);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
-void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
+void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **vlink,
+                         void **wlink, void **sitelink, void *qudaGaugeParamPtr,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
 void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_param);
 void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
                                    quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param,
@@ -245,13 +273,23 @@ int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, co
                       const std::string &msgB);
 
 /**
-   @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations
-   @param[out] stag_for_oprod Set of four contiguous host spinor fields
-   @param[in] precision Precision of field
-   @param[in] x Full lattice volume
+   @brief Compare two non-extended QDP-ordered host gauge fields element-wise and by accuracy level
+   @param[in] result Field under test
+   @param[in] msg_result Label printed for result in verbose output
+   @param[in] expected Reference field
+   @param[in] msg_expected Label printed for expected in verbose output
+   @param[in] tol Element-wise tolerance passed to compare_floats
+   @return Whether every element agrees within tol, and the accuracy level from strong_check_link
+*/
+std::pair<bool, int> compare_link_fields(const quda::GaugeField &result, const std::string &msg_result,
+                                         const quda::GaugeField &expected, const std::string &msg_expected, double tol);
+
+/**
+   @brief Fill a staggered spinor field, whose outer product is used for momentum calculations
+   @param[out] stag_for_oprod Full-parity host staggered spinor field
    @param[in] rng RNG
 */
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng);
+void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng);
 
 // additions for dw (quickly hacked on)
 int fullLatticeIndex_4d(int i, int oddBit);
@@ -259,6 +297,9 @@ int fullLatticeIndex_5d(int i, int oddBit);
 int fullLatticeIndex_5d_4dpc(int i, int oddBit);
 int process_command_line_option(int argc, char **argv, int *idx);
 int process_options(int argc, char **argv);
+
+// Number of diagonal ghost link buffers: one per (nu, mu) direction pair, indexed as nu * 4 + mu
+constexpr int n_ghost_diag = 16;
 
 // Implemented in face_gauge.cpp
 void exchange_cpu_sitelink(quda::lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,

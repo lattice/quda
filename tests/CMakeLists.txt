@@ -268,6 +268,21 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(hisq_end_to_end_test hisq_end_to_end_test.cpp)
+  target_link_libraries(hisq_end_to_end_test ${TEST_LIBS})
+  quda_checkbuildtest(hisq_end_to_end_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_end_to_end_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(staggered_oprod_test staggered_oprod_test.cpp)
+  target_link_libraries(staggered_oprod_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_oprod_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_oprod_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(staggered_oprod_ctest staggered_oprod_ctest.cpp)
+  target_link_libraries(staggered_oprod_ctest ${TEST_LIBS})
+  quda_checkbuildtest(staggered_oprod_ctest QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_oprod_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
   add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
   target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
@@ -1630,6 +1645,16 @@ if(QUDA_DIRAC_STAGGERED)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
                    --dim 8 8 8 8
                    --gtest_output=xml:hisq_stencil_test.xml)
+
+  add_test(NAME hisq_end_to_end
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_end_to_end_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_end_to_end_test.xml)
+
+  add_test(NAME staggered_oprod
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_oprod_ctest> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:staggered_oprod_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)

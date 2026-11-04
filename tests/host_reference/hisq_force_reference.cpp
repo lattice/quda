@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "host_utils.h"
+#include "dslash_reference.h"
 #include "force_utils.hpp"
 #include "index_utils.hpp"
 #include "instantiate_host.hpp"
@@ -16,28 +17,76 @@ extern int V;
 extern int Vh;
 
 template <typename real_t> struct ComputeLinkOrderedOuterProduct {
-  void operator()(const void *const src_, quda::GaugeField &dest, size_t nhops)
+  void operator()(const quda::ColorSpinorField &src, quda::GaugeField &dest, int nhops)
   {
-    auto src = static_cast<const su3_vector<real_t> *>(src_);
+    for (int parity = 0; parity < 2; ++parity) {
+      // nhops is odd, so the forward neighbor of a site lives on the opposite parity
+      const int nbr_parity = 1 - parity;
+      const auto &site_field = parity == 0 ? src.Even() : src.Odd();
+      const auto &nbr_field = nbr_parity == 0 ? src.Even() : src.Odd();
+      nbr_field.exchangeGhost(static_cast<QudaParity>(nbr_parity), nhops, 0);
+
+      const auto site = site_field.data<const su3_vector<real_t> *>();
+      const auto nbr = nbr_field.data<const real_t *>();
+      const auto fwd_ghost = typed_ptr_array<const real_t *>(nbr_field.fwdGhostFaceBuffer);
+      const auto back_ghost = typed_ptr_array<const real_t *>(nbr_field.backGhostFaceBuffer);
 
 #pragma omp parallel for
-    for (int i = 0; i < V; ++i) {
-      int dx[4];
-      for (int dir = 0; dir < 4; ++dir) {
-        dx[3] = dx[2] = dx[1] = dx[0] = 0;
-        dx[dir] = nhops;
-        int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-        auto hw = src + nbr_idx;
-        auto p = get_su3_matrix<real_t>(dest, i, dir);
-        su3_projector(hw, &src[i], p);
-      } // dir
-    }   // i
+      for (int i = 0; i < Vh; ++i) {
+        for (int dir = 0; dir < 4; ++dir) {
+          auto hw = reinterpret_cast<const su3_vector<real_t> *>(spinorNeighbor(
+            i, 2 * dir, parity, nbr, fwd_ghost.data(), back_ghost.data(), nhops, nhops, stag_spinor_site_size));
+          auto p = get_su3_matrix<real_t>(dest, parity * Vh + i, dir);
+          su3_projector(hw, &site[i], p);
+        } // dir
+      } // i
+    } // parity
   }
 };
 
-void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
+void computeLinkOrderedOuterProduct(const quda::ColorSpinorField &src, quda::GaugeField &dst, int nhops)
 {
-  instantiate_host<ComputeLinkOrderedOuterProduct>(precision, src, dst, nhops);
+  if (src.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Expected a full-parity spinor field");
+  if (nhops % 2 == 0) errorQuda("Outer product separation %d must be odd", nhops);
+  instantiate_host<ComputeLinkOrderedOuterProduct>(src.Precision(), src, dst, nhops);
+}
+
+template <typename real_t> struct AccumulateByParity {
+  void operator()(quda::GaugeField &y, const quda::GaugeField &x, double a_even, double a_odd)
+  {
+    const size_t half = x.VolumeCB() * gauge_site_size;
+    for (int d = 0; d < 4; d++) {
+      auto yd = y.data<real_t *>(d);
+      auto xd = x.data<const real_t *>(d);
+      for (size_t i = 0; i < half; i++) {
+        yd[i] += a_even * xd[i];
+        yd[half + i] += a_odd * xd[half + i];
+      }
+    }
+  }
+};
+
+void computeStaggeredOprodCPU(std::array<quda::GaugeField, 2> &out, const quda::ColorSpinorField &in,
+                              const double coeff[], int nFace)
+{
+  if (nFace != 1 && nFace != 3) errorQuda("Invalid nFace=%d", nFace);
+  for (int i = 0; i < (nFace == 3 ? 2 : 1); i++) {
+    if (out[i].Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", out[i].Order());
+    if (out[i].Precision() != in.Precision())
+      errorQuda("Outer product precision %d does not match quark precision %d", out[i].Precision(), in.Precision());
+  }
+
+  quda::GaugeFieldParam param(out[0]);
+  param.create = QUDA_NULL_FIELD_CREATE;
+  quda::GaugeField oprod(param);
+
+  computeLinkOrderedOuterProduct(in, oprod, 1);
+  instantiate_host<AccumulateByParity>(in.Precision(), out[0], oprod, coeff[0], nFace == 1 ? -coeff[0] : coeff[0]);
+
+  if (nFace == 3) {
+    computeLinkOrderedOuterProduct(in, oprod, 3);
+    instantiate_host<AccumulateByParity>(in.Precision(), out[1], oprod, coeff[1], coeff[1]);
+  }
 }
 
 #define RETURN_IF_ERR                                                                                                  \
@@ -95,68 +144,19 @@ public:
                                   real_t *const) const;
   real_t getData(const real_t *const *const field, int idx, int dir, int oddBit, int offset, int hfv) const;
   void addData(real_t *const *const field, int idx, int dir, int oddBit, int offset, real_t, int hfv) const;
-  int half_idx_conversion_ex2normal(int half_lattice_index, const int *dim, int oddBit) const;
-  int half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const;
 };
 
-template <typename real_t>
-int LoadStore<real_t>::half_idx_conversion_ex2normal(int half_lattice_index_ex, const int *dim, int oddBit) const
+// The rest of this reference (field sizes, Vh_ex) also assumes this radius, so it must stay in sync
+constexpr int force_ref_r = is_multi_gpu() ? 2 : 0;
+constexpr std::array<int, 4> force_ref_R = {force_ref_r, force_ref_r, force_ref_r, force_ref_r};
+
+static void checkForceRefRadius(const quda::GaugeField &field, const char *name)
 {
-  int X1 = dim[0];
-  int X2 = dim[1];
-  int X3 = dim[2];
-  // int X4=dim[3];
-
-  int E1 = dim[0] + 4;
-  int E2 = dim[1] + 4;
-  int E3 = dim[2] + 4;
-  // int E4=dim[3]+4;
-  int E1h = E1 / 2;
-
-  int sid = half_lattice_index_ex;
-
-  int za = sid / E1h;
-  int x1h = sid - za * E1h;
-  int zb = za / E2;
-  int x2 = za - zb * E2;
-  int x4 = zb / E3;
-  int x3 = zb - x4 * E3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
-
-  int idx = ((x4 - 2) * X3 * X2 * X1 + (x3 - 2) * X2 * X1 + (x2 - 2) * X1 + (x1 - 2)) / 2;
-  return idx;
-}
-
-template <class real_t>
-int LoadStore<real_t>::half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const
-{
-  int X1 = dim[0];
-  int X2 = dim[1];
-  int X3 = dim[2];
-  // int X4=dim[3];
-  int X1h = X1 / 2;
-
-  int E1 = dim[0] + 4;
-  int E2 = dim[1] + 4;
-  int E3 = dim[2] + 4;
-  // int E4=dim[3]+4;
-  // int E1h=E1/2;
-
-  int sid = half_lattice_index;
-
-  int za = sid / X1h;
-  int x1h = sid - za * X1h;
-  int zb = za / X2;
-  int x2 = za - zb * X2;
-  int x4 = zb / X3;
-  int x3 = zb - x4 * X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
-
-  int idx = ((x4 + 2) * E3 * E2 * E1 + (x3 + 2) * E2 * E1 + (x2 + 2) * E1 + (x1 + 2)) / 2;
-
-  return idx;
+  for (int d = 0; d < 4; d++) {
+    if (field.R()[d] != force_ref_R[d])
+      errorQuda("%s has extension radius %d in dimension %d, but this reference requires %d", name, field.R()[d], d,
+                force_ref_R[d]);
+  }
 }
 
 template <class real_t>
@@ -408,7 +408,7 @@ template <typename real_t> struct HisqStaplesForce {
     if (GOES_FORWARDS(sig)) {
       matrix colorMatW;
 
-      int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+      int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
       ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatW);
       ls.addMatrixToField(colorMatW, oddBit, sig, idx, coeff, output);
@@ -819,6 +819,10 @@ template <typename real_t> struct HisqStaplesForce {
 void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda::GaugeField &link,
                          quda::GaugeField *newOprod)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+  checkForceRefRadius(*newOprod, "newOprod");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
@@ -851,7 +855,7 @@ template <class real_t> struct ComputeLongLinkField {
       matrix colorMatU, colorMatV, colorMatW, colorMatX, colorMatY, colorMatZ;
 
       int point_a, point_b, point_c, point_d, point_e;
-      int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+      int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
       int X = locator.getFullFromHalfIndex(idx);
       point_c = idx;
@@ -912,6 +916,10 @@ template <class real_t> struct ComputeLongLinkField {
 
 void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *newOprod)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+  checkForceRefRadius(*newOprod, "newOprod");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
@@ -931,7 +939,7 @@ template <class real_t> struct CompleteForceField {
   {
     matrix colorMatX, colorMatY, linkW;
 
-    int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+    int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
     ls.loadMatrixFromField(link, oddBit, sig, idx, &linkW);
     ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatX);
@@ -963,6 +971,9 @@ template <class real_t> struct CompleteForceField {
 
 void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *mom)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
