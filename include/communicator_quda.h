@@ -863,6 +863,12 @@ namespace quda
 
 constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
+/**
+ * Switch between the full communicator and a nontrivial split of it.
+ * Exactly one endpoint must be default_comm_key; no-op and direct split-to-split
+ * transitions are errors. Split factors must be positive divisors of the full
+ * communicator extents. Return to full before selecting a different split.
+ */
 void push_communicator(const CommKey &split_key);
 
 /**

@@ -75,7 +75,8 @@ namespace quda
     }
     logQuda(QUDA_DEBUG_VERBOSE, "Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d)\n",
             comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
-    push_communicator(split_key);
+    const bool split_grid = !(split_key == default_comm_key);
+    if (split_grid) push_communicator(split_key);
 
     // Override any user input for block size.
     block_size = 1;
@@ -284,7 +285,7 @@ namespace quda
       computeEvals(kSpace, evals);
     }
 
-    push_communicator(default_comm_key);
+    if (split_grid) push_communicator(default_comm_key);
 
     // ensure all processes have all e-values
     comm_allreduce_sum(evals);
