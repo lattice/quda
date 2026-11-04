@@ -897,61 +897,65 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
 }
 
+// gauge field files hold plain links, which writeGaugeQuda and readGaugeQuda don't convert
+static void checkPlainLinkParam(const char *func, const QudaGaugeParam *param)
+{
+  if (param->t_boundary != QUDA_PERIODIC_T)
+    errorQuda("%s: gauge field files hold plain links (periodic t, no staggered phases), so param->t_boundary must "
+              "be QUDA_PERIODIC_T, not %d",
+              func, param->t_boundary);
+  if (param->staggered_phase_applied != 0)
+    errorQuda("%s: gauge field files hold plain links (periodic t, no staggered phases), so "
+              "param->staggered_phase_applied must be 0, not %d",
+              func, param->staggered_phase_applied);
+  if (param->i_mu != 0.0)
+    errorQuda("%s: gauge field files hold plain links (periodic t, no staggered phases), so param->i_mu must be 0, "
+              "not %g",
+              func, param->i_mu);
+}
+
 /** Write gauge field to disk **/
 void writeGaugeQuda(const char *file, QudaGaugeParam *param)
 {
-
+  checkPlainLinkParam(__func__, param);
   if (!initialized) errorQuda("QUDA not initialized");
 
-  // Create CPU field
-  GaugeFieldParam cpu_param(*param);
-  cpu_param.pad = 0;
-  cpu_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cpu_param.location = QUDA_CPU_FIELD_LOCATION;
-  cpu_param.order = QUDA_QDP_GAUGE_ORDER;
-  cpu_param.create = QUDA_NULL_FIELD_CREATE;
-  cpu_param.setPrecision(param->cpu_prec);
-  GaugeField cpuGauge(cpu_param);
-
-  // Select source and copy into cpuGauge
+  const GaugeField *u = nullptr;
   switch (param->type) {
   case QUDA_WILSON_LINKS:
     if (gaugePrecise == nullptr) errorQuda("gaugePrecise is not loaded");
-    cpuGauge.copy(*gaugePrecise);
+    u = gaugePrecise;
     break;
   case QUDA_ASQTAD_FAT_LINKS:
     if (gaugeFatPrecise == nullptr) errorQuda("gaugeFatPrecise is not loaded");
-    cpuGauge.copy(*gaugeFatPrecise);
+    u = gaugeFatPrecise;
     break;
   case QUDA_ASQTAD_LONG_LINKS:
     if (gaugeLongPrecise == nullptr) errorQuda("gaugeLongPrecise is not loaded");
-    cpuGauge.copy(*gaugeLongPrecise);
+    u = gaugeLongPrecise;
     break;
-  case QUDA_SMEARED_LINKS: {
+  case QUDA_SMEARED_LINKS:
     if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared is not loaded");
-    // Copy to intermediate non-extended field before copying to cpuGauge
-    GaugeFieldParam cuda_param(*param);
-    cuda_param.location = QUDA_CUDA_FIELD_LOCATION;
-    cuda_param.create = QUDA_NULL_FIELD_CREATE;
-    cuda_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    cuda_param.pad = 0;
-    cuda_param.setPrecision(param->cuda_prec);
-    GaugeField cudaGauge(cuda_param);
-    copyExtendedGauge(cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    cpuGauge.copy(cudaGauge);
-  } break;
+    u = gaugeSmeared;
+    break;
   default: errorQuda("Invalid gauge type");
   }
 
-  GaugeIO(file, FileIOParam(param->file_io_param))
-    .save(reinterpret_cast<void **>(cpuGauge.raw_pointer()), cpuGauge.Precision(), param->X);
+  // the resident field may have been loaded with other conventions than param describes
+  if (u->TBoundary() != QUDA_PERIODIC_T || u->StaggeredPhaseApplied() || u->iMu() != 0.0)
+    errorQuda("%s: gauge field files hold plain links (periodic t, no staggered phases), but the resident links of "
+              "type %d have t_boundary %d, staggered phases %s and i_mu %g",
+              __func__, param->type, u->TBoundary(), u->StaggeredPhaseApplied() ? "applied" : "not applied",
+              static_cast<double>(u->iMu()));
 
+  GaugeIO(file, FileIOParam(param->file_io_param)).save(*u, param->cpu_prec);
 } // writeGaugeQuda
 
 void readGaugeQuda(const char *file, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileGauge);
 
+  checkPlainLinkParam(__func__, param);
   if (!initialized) errorQuda("QUDA not initialized");
 
   QudaGaugeParam host_param = *param;
@@ -978,7 +982,7 @@ void readGaugeQuda(const char *file, QudaGaugeParam *param)
   for (int d = 0; d < 4; d++) gauge[d] = cpuGauge.data(d);
 
   getProfile().TPSTART(QUDA_PROFILE_IO);
-  GaugeIO(file, FileIOParam(param->file_io_param)).load(gauge, cpuGauge.Precision(), param->X);
+  GaugeIO(file, FileIOParam(param->file_io_param)).load(cpuGauge);
   getProfile().TPSTOP(QUDA_PROFILE_IO);
 
   loadGaugeQuda(gauge, &host_param);

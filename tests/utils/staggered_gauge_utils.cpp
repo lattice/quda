@@ -116,8 +116,7 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   if (input_mode == GaugeInputMode::LOAD || input_mode == GaugeInputMode::GAUSSIAN_SU3) {
     if (input_mode == GaugeInputMode::LOAD) {
       // load in the command line supplied gauge field
-      quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param))
-        .load(qdp_inlink, gauge_param.cpu_prec, gauge_param.X);
+      loadPlainHostGaugeField(latfile, qdp_inlink, gauge_param);
     } else {
       constructGaussianSU3GaugeField(qdp_inlink, gauge_param.cpu_prec, gauge_input_width);
       if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {

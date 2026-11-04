@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <comm_quda.h>
+#include <gauge_field.h>
 #include <util_quda.h>
 #include <io/host_field.h>
 #include <io/milc_io.h>
@@ -107,8 +108,18 @@ namespace quda
 #pragma omp parallel for
           for (size_t i = 0; i < reals; i++) u[i] = prec == QUDA_DOUBLE_PRECISION ? static_cast<float>(d[i]) : f[i];
         }
-        const void *links[n_dim] = {rounded[0].data(), rounded[1].data(), rounded[2].data(), rounded[3].data()};
-        return computed_info_items(gauge_observables(links, QUDA_DOUBLE_PRECISION, X));
+        void *links[n_dim] = {rounded[0].data(), rounded[1].data(), rounded[2].data(), rounded[3].data()};
+        QudaGaugeParam gauge_param = newQudaGaugeParam();
+        for (int d = 0; d < n_dim; d++) gauge_param.X[d] = X[d];
+        gauge_param.type = QUDA_GENERAL_LINKS;
+        gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+        gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+        gauge_param.t_boundary = QUDA_PERIODIC_T;
+        gauge_param.anisotropy = 1.0;
+        gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+        GaugeFieldParam field_param(gauge_param, links);
+        field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+        return computed_info_items(gauge_observables(GaugeField(field_param)));
       }
     } // namespace
 

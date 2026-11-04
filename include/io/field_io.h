@@ -70,6 +70,15 @@ namespace quda
     */
     bool legacy_strings = false;
 
+    /**
+       Gauge field loads and saves: convert between the plain links a
+       file holds (no staggered phases, periodic t) and the staggered
+       phases and t boundary the GaugeField records (see GaugeIO).
+       Off, the links are moved to and from the file as they are,
+       whatever the field records.  Not in QudaFileIOParam.
+    */
+    bool convert_link_conventions = false;
+
     FileIOParam() = default;
 
     /**

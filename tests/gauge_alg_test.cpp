@@ -285,7 +285,8 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
     saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
 
     // Write to disk
-    GaugeIO(gauge_outfile, FileIOParam(gauge_param.file_io_param)).save(cpu_gauge, gauge_param.cpu_prec, gauge_param.X);
+    GaugeIO(gauge_outfile, FileIOParam(gauge_param.file_io_param))
+      .save(plainHostGaugeFieldReference(cpu_gauge, gauge_param.cpu_prec, gauge_param.X));
 
     for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
     delete gauge;

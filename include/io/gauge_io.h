@@ -97,21 +97,56 @@ namespace quda
                                      real and imaginary parts, as floats, of rows 0 and 1 of every link */
   };
 
-  /**
-     @brief Compute the observables of a host gauge field in QDP order,
-     on the device for the plaquettes and the link trace, so after
-     initQuda.  The links are taken with periodic boundaries, as they
-     are in a file.  The checksum is exact, so it is the same on any
-     rank layout and thread count.  Collective.
-     @param[in] gauge The host gauge field, one array per direction
-     @param[in] prec The precision of the host gauge field
-     @param[in] X The local lattice dimensions
-   */
-  GaugeObservables gauge_observables(const void *const gauge[], QudaPrecision prec, const int *X);
+  class GaugeField;
 
   /**
-     @brief GaugeIO is a simple wrapper class for loading and saving
-     host gauge fields in QDP order (one array per direction).
+     @brief Compute the observables of a gauge field as a file would
+     hold it: on its links in double or single precision (single for a
+     half or quarter field), on the device for the plaquettes and the
+     link trace, so after initQuda.  The links are taken with periodic
+     boundaries, as they are in a file.  The checksum is exact, so it
+     is the same on any rank layout and thread count.  Collective.
+     @param[in] u The gauge field; any field GaugeIO::save accepts
+     @param[in] convert_link_conventions As FileIOParam's: compute on
+     the plain links of a field that records staggered phases or an
+     antiperiodic t boundary (see GaugeIO), rather than on its links
+     as they are
+   */
+  GaugeObservables gauge_observables(const GaugeField &u, bool convert_link_conventions = false);
+
+  /**
+     @brief GaugeIO loads and saves gauge fields.
+
+     It takes any GaugeField of 3 colors and vector geometry holding
+     links (QUDA_SU3_LINKS, QUDA_GENERAL_LINKS, QUDA_THREE_LINKS or
+     QUDA_SMEARED_LINKS), in any location, order, precision and
+     reconstruct GaugeField::copy supports.  The formats take a host
+     copy in QDP order without reconstruct; a host QDP field of the
+     file's precision (double or single, no reconstruct, not
+     extended, and for loads without a ghost zone) is read or written
+     in place, any other field through a temporary.
+
+     Files hold plain links: no staggered phases, periodic t.  By
+     default the links are moved to and from the file as they are,
+     whatever the field records.  With
+     FileIOParam::convert_link_conventions the links are converted on
+     the host copy (never on the caller's field), and each conversion
+     is announced:
+     - the staggered phases (StaggeredPhase(): MILC, TIFR or CHROMA,
+       as applyStaggeredPhase defines them) are in the links when
+       StaggeredPhaseApplied() is set; long links (QUDA_THREE_LINKS)
+       take MILC's, the phase of each of their three links;
+     - the antiperiodic t boundary sign is in the links when
+       TBoundary() is QUDA_ANTI_PERIODIC_T and either the field has
+       no staggered phase type or its phases are applied (as
+       applyStaggeredPhase applies the sign with the phases): on the
+       t links of the last global time slice, or of the last three
+       for long links.
+     It is an error to convert phases with a nonzero iMu(), on long
+     links with phases other than MILC's, with another phase type, or
+     with an odd local extent in a dimension the phases depend on.
+     Anisotropy, the tadpole factor and gauge fixing are never
+     converted.
    */
   class GaugeIO
   {
@@ -127,22 +162,31 @@ namespace quda
     GaugeIO(const std::string &filename, const FileIOParam &param = {});
 
     /**
-       @brief Load a gauge field from filename
-       @param[out] gauge The host gauge field, one array per direction
-       @param[in] prec The precision of the host gauge field
-       @param[in] X The local lattice dimensions
+       @brief Load a gauge field from filename.  The links are read
+       into a host copy of the field's precision (single for a half or
+       quarter field), checked against the file's plaquette and link
+       trace and reunitarized there, then converted (if requested) and
+       copied into the field, whose ghost zone is then exchanged.  A
+       reconstruct-12/8 field keeps the compressed links.  Extended
+       fields are not supported.
+       @param[out] u The gauge field; its lattice is the file's
        @return Metadata found in the file
     */
-    GaugeFileInfo load(void *const gauge[], QudaPrecision prec, const int *X);
+    GaugeFileInfo load(GaugeField &u);
 
     /**
-       @brief Save a gauge field to filename
-       @param[in] gauge The host gauge field, one array per direction
-       @param[in] prec The precision of the host gauge field
-       @param[in] X The local lattice dimensions
+       @brief Save a gauge field to filename.  An extended field saves
+       its interior.
+       @param[in] u The gauge field; its lattice is the file's
+       @param[in] prec The precision of the host copy the links are
+       saved from, double or single; the default is the field's, single
+       for a half or quarter field.  SciDAC and ILDG files hold the
+       links in this precision.  MILC files always hold the links
+       rounded to single precision, so for them it doesn't change the
+       file.
        @param[in] metadata Metadata to write, as a load reports it; see GaugeMetadata
     */
-    void save(const void *const gauge[], QudaPrecision prec, const int *X, const GaugeMetadata &metadata = {});
+    void save(const GaugeField &u, QudaPrecision prec = QUDA_INVALID_PRECISION, const GaugeMetadata &metadata = {});
   };
 
 } // namespace quda

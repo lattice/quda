@@ -522,6 +522,27 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
   return default_mode;
 }
 
+quda::GaugeField plainHostGaugeFieldReference(void *const *gauge, QudaPrecision precision, const int *X)
+{
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  for (int d = 0; d < 4; d++) gauge_param.X[d] = X[d];
+  gauge_param.type = QUDA_GENERAL_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.cpu_prec = precision;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  gauge_param.anisotropy = 1.0;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  GaugeFieldParam param(gauge_param, const_cast<void **>(gauge));
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  return GaugeField(param);
+}
+
+void loadPlainHostGaugeField(const std::string &file, void *const *gauge, const QudaGaugeParam &gauge_param)
+{
+  auto u = plainHostGaugeFieldReference(gauge, gauge_param.cpu_prec, gauge_param.X);
+  quda::GaugeIO(file, quda::FileIOParam(gauge_param.file_io_param)).load(u);
+}
+
 void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int, char **,
                                   GaugeInputMode default_mode, QudaStaggeredPhase phase)
 {
@@ -537,7 +558,7 @@ void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gaug
     break;
   case GaugeInputMode::LOAD:
     logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
-    quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param)).load(gauge, gauge_param.cpu_prec, gauge_param.X);
+    loadPlainHostGaugeField(latfile, gauge, gauge_param);
     break;
   }
 
@@ -731,7 +752,7 @@ void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_par
   if (latfile.size() > 0) {
     // load in the command line supplied gauge field
     logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
-    quda::GaugeIO(latfile, quda::FileIOParam(gauge_param.file_io_param)).load(gauge, gauge_param.cpu_prec, gauge_param.X);
+    loadPlainHostGaugeField(latfile, gauge, gauge_param);
     construct_type = GaugeFieldConstructionType::LOAD_GAUGE;
   } else {
     if (unit_gauge)

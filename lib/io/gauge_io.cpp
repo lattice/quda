@@ -2,6 +2,8 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <optional>
+#include <vector>
 #include <util_quda.h>
 #include <timer.h>
 #include <comm_quda.h>
@@ -20,23 +22,249 @@ namespace quda
 
   namespace
   {
+    // the QDP arrays of a host field, one per direction
+    struct HostArrays {
+      void *data[4];
+      explicit HostArrays(const GaugeField &u)
+      {
+        for (int d = 0; d < 4; d++) data[d] = u.data(d);
+      }
+    };
+
     /**
-       @brief Parameters for a reference field wrapping host arrays in QDP order
+       @brief Parameters for a reference field of general links with periodic boundaries on the QDP arrays of a
+       host field
      */
-    GaugeFieldParam host_field_param(const void *const gauge[], QudaPrecision prec, const int *X)
+    GaugeFieldParam host_field_param(const GaugeField &host)
     {
       QudaGaugeParam gauge_param = newQudaGaugeParam();
-      for (int d = 0; d < 4; d++) gauge_param.X[d] = X[d];
+      for (int d = 0; d < 4; d++) gauge_param.X[d] = host.X()[d];
       gauge_param.type = QUDA_GENERAL_LINKS;
       gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-      gauge_param.cpu_prec = prec;
+      gauge_param.cpu_prec = host.Precision();
       gauge_param.t_boundary = QUDA_PERIODIC_T;
       gauge_param.anisotropy = 1.0;
       gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-      GaugeFieldParam field_param(gauge_param, const_cast<void **>(gauge));
+      GaugeFieldParam field_param(gauge_param, host.raw_pointer());
       field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       return field_param;
+    }
+
+    void check_field(const GaugeField &u)
+    {
+      if (u.Ncolor() != 3) errorQuda("Gauge field files hold 3 colors, not %d", u.Ncolor());
+      if (u.Geometry() != QUDA_VECTOR_GEOMETRY)
+        errorQuda("Gauge field files hold one link per direction, not geometry %d", u.Geometry());
+      switch (u.LinkType()) {
+      case QUDA_SU3_LINKS:
+      case QUDA_GENERAL_LINKS:
+      case QUDA_THREE_LINKS:
+      case QUDA_SMEARED_LINKS: break;
+      default: errorQuda("Gauge field files hold links, not fields of link type %d", u.LinkType());
+      }
+    }
+
+    // the precision of the host copy of a field the formats take: at least single
+    QudaPrecision host_precision(QudaPrecision prec)
+    {
+      return prec < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : prec;
+    }
+
+    lat_dim_t interior_dims(const GaugeField &u)
+    {
+      lat_dim_t X = u.X();
+      if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED)
+        for (int d = 0; d < 4; d++) X[d] -= 2 * u.R()[d];
+      return X;
+    }
+
+    /**
+       @brief The staggered phases and t boundary sign that the links of a field hold, which a conversion removes
+       on save and applies on load (see GaugeIO)
+     */
+    struct LinkConventions {
+      bool phases = false; /** Whether the links hold staggered phases */
+      QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_NO;
+      bool sign = false;       /** Whether the links hold the antiperiodic t boundary sign */
+      bool long_links = false; /** Long links: the sign on the last three time slices */
+
+      bool any() const { return phases || sign; }
+
+      std::string str() const
+      {
+        std::string s;
+        if (phases) s = std::string("the ") + get_staggered_phase_str(phase_type) + " staggered phases";
+        if (phases && sign) s += " and ";
+        if (sign)
+          s += long_links ? "the antiperiodic t boundary sign of the last three time slices" :
+                            "the antiperiodic t boundary sign of the last time slice";
+        return s;
+      }
+
+      static const char *get_staggered_phase_str(QudaStaggeredPhase type)
+      {
+        switch (type) {
+        case QUDA_STAGGERED_PHASE_MILC: return "MILC";
+        case QUDA_STAGGERED_PHASE_TIFR: return "TIFR";
+        case QUDA_STAGGERED_PHASE_CHROMA: return "CHROMA";
+        default: return "unknown";
+        }
+      }
+    };
+
+    LinkConventions link_conventions(const GaugeField &u, bool convert)
+    {
+      LinkConventions c;
+      if (!convert) return c;
+      const auto type = u.StaggeredPhase();
+      const bool has_type
+        = type == QUDA_STAGGERED_PHASE_MILC || type == QUDA_STAGGERED_PHASE_TIFR || type == QUDA_STAGGERED_PHASE_CHROMA;
+      c.phases = u.StaggeredPhaseApplied();
+      c.phase_type = type;
+      c.long_links = u.LinkType() == QUDA_THREE_LINKS;
+      // applyStaggeredPhase applies the boundary sign with the phases
+      c.sign = u.TBoundary() == QUDA_ANTI_PERIODIC_T && (!has_type || c.phases);
+
+      if (c.phases) {
+        if (!has_type)
+          errorQuda("Only MILC, TIFR and CHROMA staggered phases can be converted, not phase type %d", type);
+        if (u.iMu() != 0.0)
+          errorQuda("The staggered phases of a field with an imaginary chemical potential (i_mu = %g) cannot be "
+                    "converted",
+                    static_cast<double>(u.iMu()));
+        if (c.long_links && type != QUDA_STAGGERED_PHASE_MILC)
+          errorQuda("Only MILC staggered phases can be converted on long links, not %s", c.get_staggered_phase_str(type));
+        // applyStaggeredPhase takes the phases from local coordinates, which give the global phases only for even
+        // local extents
+        const std::vector<int> depends = type == QUDA_STAGGERED_PHASE_MILC ? std::vector<int> {0, 1, 3} :
+          type == QUDA_STAGGERED_PHASE_TIFR                                ? std::vector<int> {1, 2, 3} :
+                                                                             std::vector<int> {0, 1, 2};
+        const auto X = interior_dims(u);
+        for (int d : depends)
+          if (X[d] % 2 != 0)
+            errorQuda("The %s staggered phases cannot be converted with the odd local extent %d in dimension %d",
+                      c.get_staggered_phase_str(type), X[d], d);
+      }
+      return c;
+    }
+
+    // the sign of a link in direction dir at global coordinates g from the staggered phases (as getPhase in
+    // kernels/gauge_phase.cuh defines them, without the boundary)
+    int staggered_phase(QudaStaggeredPhase type, int dir, const int g[4])
+    {
+      int n = 0;
+      switch (type) {
+      case QUDA_STAGGERED_PHASE_MILC: {
+        const int exponents[4] = {g[3], g[3] + g[0], g[3] + g[0] + g[1], 0};
+        n = exponents[dir];
+      } break;
+      case QUDA_STAGGERED_PHASE_TIFR: {
+        const int exponents[4] = {3 + g[3] + g[2] + g[1], 2 + g[3] + g[2], 1 + g[3], 0};
+        n = exponents[dir];
+      } break;
+      case QUDA_STAGGERED_PHASE_CHROMA: {
+        const int exponents[4] = {1, 1 + g[0], 1 + g[0] + g[1], 1 + g[0] + g[1] + g[2]};
+        n = exponents[dir];
+      } break;
+      default: errorQuda("Unexpected staggered phase type %d", type);
+      }
+      return n % 2 == 0 ? 1 : -1;
+    }
+
+    /**
+       @brief Multiply the links of a host QDP field by the signs of a set of conventions, which applies them to
+       plain links and removes them from links that hold them.  None of the three conventions' phase of a link in
+       direction mu depends on x_mu, so a long link's phase, the product of the phases of its three links, is that
+       of one link.
+     */
+    template <typename Float> void apply_conventions(GaugeField &view, const LinkConventions &c)
+    {
+      const auto &X = view.X();
+      const size_t volume = view.Volume();
+      const size_t half = view.VolumeCB();
+      const int T = X[3] * comm_dim(3);
+      const int sign_slices = c.long_links ? 3 : 1;
+      int offset[4];
+      for (int d = 0; d < 4; d++) offset[d] = comm_coord(d) * X[d];
+
+      for (int dir = 0; dir < 4; dir++) {
+        auto u = view.data<Float *>(dir);
+#pragma omp parallel for
+        for (size_t r = 0; r < volume; r++) {
+          int x[4], g[4];
+          size_t rest = r;
+          for (int d = 0; d < 4; d++) {
+            x[d] = rest % X[d];
+            rest /= X[d];
+            g[d] = x[d] + offset[d];
+          }
+          int s = c.phases ? staggered_phase(c.phase_type, dir, g) : 1;
+          if (c.sign && dir == 3 && g[3] >= T - sign_slices) s = -s;
+          if (s > 0) continue;
+          const size_t parity = (x[0] + x[1] + x[2] + x[3]) % 2;
+          Float *link = u + (parity * half + r / 2) * 18;
+          for (int i = 0; i < 18; i++) link[i] = -link[i];
+        }
+      }
+    }
+
+    void apply_conventions(GaugeField &view, const LinkConventions &c)
+    {
+      if (view.Precision() == QUDA_DOUBLE_PRECISION)
+        apply_conventions<double>(view, c);
+      else
+        apply_conventions<float>(view, c);
+    }
+
+    /**
+       @brief The parameters of the host field the formats take for a field: QDP order, no reconstruct, no ghost
+       zone, the interior of an extended field
+     */
+    GaugeFieldParam file_view_param(const GaugeField &u, QudaPrecision prec)
+    {
+      GaugeFieldParam param(u);
+      param.location = QUDA_CPU_FIELD_LOCATION;
+      param.create = QUDA_NULL_FIELD_CREATE;
+      param.reconstruct = QUDA_RECONSTRUCT_NO;
+      param.setPrecision(prec);
+      param.order = QUDA_QDP_GAUGE_ORDER;
+      param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      param.pad = 0;
+      param.x = interior_dims(u);
+      param.r = {};
+      return param;
+    }
+
+    // whether a field is the host field the formats take in the given precision
+    bool is_file_view(const GaugeField &u, QudaPrecision prec)
+    {
+      return u.Location() == QUDA_CPU_FIELD_LOCATION && u.Order() == QUDA_QDP_GAUGE_ORDER && u.Precision() == prec
+        && u.Reconstruct() == QUDA_RECONSTRUCT_NO && u.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED;
+    }
+
+    /**
+       @brief Copy a field's links into a host file view, the interior of an extended field
+     */
+    void copy_to_file_view(GaugeField &view, const GaugeField &u)
+    {
+      if (u.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+        view.copy(u);
+      } else if (u.Location() == QUDA_CPU_FIELD_LOCATION) {
+        copyExtendedGauge(view, u, QUDA_CPU_FIELD_LOCATION);
+      } else {
+        GaugeFieldParam param(u);
+        param.create = QUDA_NULL_FIELD_CREATE;
+        param.reconstruct = QUDA_RECONSTRUCT_NO;
+        param.setPrecision(u.Precision(), true);
+        param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+        param.pad = 0;
+        param.x = interior_dims(u);
+        param.r = {};
+        GaugeField interior(param);
+        copyExtendedGauge(interior, u, QUDA_CUDA_FIELD_LOCATION);
+        view.copy(interior);
+      }
     }
 
     /**
@@ -56,9 +284,9 @@ namespace quda
     /**
        @brief Compute the average plaquettes (all, spatial and temporal) and the link trace, normalized as Re Tr / 3
      */
-    void compute_plaquettes_linktr(const void *const gauge[], QudaPrecision prec, const int *X, GaugeObservables &obs)
+    void compute_plaquettes_linktr(const GaugeField &view, GaugeObservables &obs)
     {
-      auto field_param = host_field_param(gauge, prec, X);
+      auto field_param = host_field_param(view);
       GaugeField host(field_param);
       GaugeField device(device_field_param(field_param));
       device.copy(host);
@@ -75,10 +303,10 @@ namespace quda
       obs.plaq_temporal = static_cast<double>(plaq[2]);
     }
 
-    void compute_plaq_linktr(const void *const gauge[], QudaPrecision prec, const int *X, double &plaq, double &linktr)
+    void compute_plaq_linktr(const GaugeField &view, double &plaq, double &linktr)
     {
       GaugeObservables obs;
-      compute_plaquettes_linktr(gauge, prec, X, obs);
+      compute_plaquettes_linktr(view, obs);
       plaq = obs.plaq;
       linktr = obs.linktr;
     }
@@ -87,19 +315,21 @@ namespace quda
        @brief MILC's NERSC checksum of a host gauge field (generic/nersc_cksum.c): the 32-bit patterns of the real
        and imaginary parts of rows 0 and 1 of every link, each converted to float, summed modulo 2^32
      */
-    uint32_t nersc_checksum(const void *const gauge[], QudaPrecision prec, const int *X)
+    uint32_t nersc_checksum(const GaugeField &view)
     {
+      const QudaPrecision prec = view.Precision();
       if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
         errorQuda("The NERSC checksum needs a double or single precision host gauge field, not precision %d", prec);
-      const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
+      const size_t volume = view.Volume();
+      const HostArrays gauge(view);
       // rows 0 and 1 of a row-major 3x3 complex matrix are its first 12 reals
       constexpr int row_reals = 12;
 
       // integer sums don't depend on the order, so the result doesn't depend on the threads or the ranks
       uint64_t sum = 0;
       for (int dir = 0; dir < 4; dir++) {
-        const auto d = static_cast<const double *>(gauge[dir]);
-        const auto f = static_cast<const float *>(gauge[dir]);
+        const auto d = static_cast<const double *>(gauge.data[dir]);
+        const auto f = static_cast<const float *>(gauge.data[dir]);
 #pragma omp parallel for reduction(+ : sum)
         for (size_t s = 0; s < volume; s++) {
           for (int i = 0; i < row_reals; i++) {
@@ -212,11 +442,11 @@ namespace quda
     /**
        @brief Compare the plaquette and link trace recorded in a file's metadata with those of the loaded field
      */
-    void check_plaq_linktr(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                           GaugeFileInfo &info)
+    void check_plaq_linktr(const std::string &filename, const GaugeField &view, GaugeFileInfo &info)
     {
+      const QudaPrecision prec = view.Precision();
       double plaq, linktr;
-      compute_plaq_linktr(gauge, prec, X, plaq, linktr);
+      compute_plaq_linktr(view, plaq, linktr);
 
       // MILC .info files print these values to six decimal places, and values computed from data
       // that has passed through single precision only agree to single precision
@@ -236,9 +466,9 @@ namespace quda
     /**
        @brief Project the links of a host gauge field onto SU(3) with QUDA's polar projection, on the device
      */
-    void project_polar(void *const gauge[], QudaPrecision prec, const int *X)
+    void project_polar(GaugeField &view)
     {
-      auto field_param = host_field_param(gauge, prec, X);
+      auto field_param = host_field_param(view);
       GaugeField host(field_param);
       GaugeField device(device_field_param(field_param));
       device.copy(host);
@@ -258,9 +488,10 @@ namespace quda
     /**
        @brief Measure the deviation from unitarity of a loaded gauge field, and reunitarize it if requested
      */
-    void reunitarize(const std::string &filename, void *const gauge[], QudaPrecision prec, const int *X,
-                     QudaGaugeReunitarize method, GaugeFileInfo &info)
+    void reunitarize(const std::string &filename, GaugeField &view, QudaGaugeReunitarize method, GaugeFileInfo &info)
     {
+      const QudaPrecision prec = view.Precision();
+      const HostArrays gauge(view);
       const bool requested = method != QUDA_GAUGE_REUNITARIZE_NONE;
       const bool less_precise = info.file_prec < prec;
       if (!requested && !less_precise && getVerbosity() < QUDA_VERBOSE) return;
@@ -268,20 +499,20 @@ namespace quda
       if (method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2 && prec != QUDA_DOUBLE_PRECISION)
         errorQuda("Reunitarizing as MILC's double-precision builds do needs a double-precision host gauge field");
 
-      const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
+      const size_t volume = view.Volume();
 
       // MILC's single-precision builds hold the links in single precision, and check them after rounding
       const bool round = method == QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1 && prec == QUDA_DOUBLE_PRECISION;
       if (round) {
         for (int dir = 0; dir < 4; dir++) {
-          auto u = static_cast<double *>(gauge[dir]);
+          auto u = static_cast<double *>(gauge.data[dir]);
 #pragma omp parallel for
           for (size_t i = 0; i < volume * 18; i++) u[i] = static_cast<float>(u[i]);
         }
       }
 
       auto deviation = [&]() {
-        double d = io::unitarity_deviation(gauge, prec, volume);
+        double d = io::unitarity_deviation(gauge.data, prec, volume);
         comm_allreduce_max(d);
         return d;
       };
@@ -310,9 +541,9 @@ namespace quda
 
       switch (method) {
       case QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2:
-        io::reunitarize_gram_schmidt(gauge, prec, volume);
+        io::reunitarize_gram_schmidt(gauge.data, prec, volume);
         break;
-      case QUDA_GAUGE_REUNITARIZE_POLAR: project_polar(gauge, prec, X); break;
+      case QUDA_GAUGE_REUNITARIZE_POLAR: project_polar(view); break;
       default: errorQuda("Unexpected reunitarization method %d", method);
       }
 
@@ -325,9 +556,12 @@ namespace quda
     /**
        @brief Save a QIO or ILDG gauge field, with a usqcdInfo record if requested, and the metadata given
      */
-    io::Checksum save_lime(const std::string &filename, const void *const gauge[], QudaPrecision prec, const int *X,
-                           const FileIOParam &param, bool ildg, const GaugeMetadata &metadata)
+    io::Checksum save_lime(const std::string &filename, const GaugeField &view, const FileIOParam &param, bool ildg,
+                           const GaugeMetadata &metadata)
     {
+      const HostArrays gauge(view);
+      const QudaPrecision prec = view.Precision();
+      const int *X = view.X().data;
       scidac::GaugeInfo info;
       info.legacy_strings = param.legacy_strings;
       info.ildg = ildg;
@@ -345,7 +579,7 @@ namespace quda
           logQuda(QUDA_VERBOSE, "The record XML given for %s is written as it is, so no usqcdInfo record is\n",
                   filename.c_str());
       } else if (param.write_usqcd_info) {
-        compute_plaq_linktr(gauge, prec, X, info.plaq, info.linktr);
+        compute_plaq_linktr(view, info.plaq, info.linktr);
         info.has_usqcd_info = true;
         if (metadata.usqcd_info) info.usqcd_info = *metadata.usqcd_info;
         logQuda(QUDA_SUMMARIZE, "usqcdInfo plaquette %.16e, link trace %.16e\n", info.plaq, info.linktr);
@@ -353,16 +587,42 @@ namespace quda
         logQuda(QUDA_VERBOSE, "write_usqcd_info is not set, so the usqcdInfo record given for %s is not written\n",
                 filename.c_str());
       }
-      return param.external_qio ? save_qio(filename, gauge, prec, X, param, info) :
-                                  scidac::save_gauge(filename, gauge, prec, X, param, info);
+      return param.external_qio ? save_qio(filename, gauge.data, prec, X, param, info) :
+                                  scidac::save_gauge(filename, gauge.data, prec, X, param, info);
     }
+
+    /**
+       @brief The host field the formats save from for a field: the field itself when it already is one and needs
+       no conversion, otherwise a copy with the conversion's signs removed
+     */
+    class SaveView
+    {
+      std::optional<GaugeField> copy;
+      const GaugeField *view;
+
+    public:
+      SaveView(const GaugeField &u, QudaPrecision prec, const LinkConventions &c) : view(&u)
+      {
+        if (is_file_view(u, prec) && !c.any()) return;
+        copy.emplace(file_view_param(u, prec));
+        copy_to_file_view(*copy, u);
+        if (c.any()) apply_conventions(*copy, c);
+        view = &*copy;
+      }
+      const GaugeField &operator*() const { return *view; }
+    };
   } // namespace
 
-  GaugeObservables gauge_observables(const void *const gauge[], QudaPrecision prec, const int *X)
+  GaugeObservables gauge_observables(const GaugeField &u, bool convert_link_conventions)
   {
+    check_field(u);
+    const auto c = link_conventions(u, convert_link_conventions);
+    if (c.any()) printfQuda("Computing the observables of the plain links: removed %s\n", c.str().c_str());
+    const SaveView view(u, host_precision(u.Precision()), c);
+
     GaugeObservables obs;
-    compute_plaquettes_linktr(gauge, prec, X, obs);
-    obs.nersc_checksum = nersc_checksum(gauge, prec, X);
+    compute_plaquettes_linktr(*view, obs);
+    obs.nersc_checksum = nersc_checksum(*view);
     return obs;
   }
 
@@ -371,19 +631,33 @@ namespace quda
     if (filename.empty()) errorQuda("No gauge field file defined");
   }
 
-  GaugeFileInfo GaugeIO::load(void *const gauge[], QudaPrecision prec, const int *X)
+  GaugeFileInfo GaugeIO::load(GaugeField &u)
   {
+    check_field(u);
+    if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED)
+      errorQuda("Loading %s into an extended gauge field is not supported", filename.c_str());
+    const auto c = link_conventions(u, param.convert_link_conventions);
+    const QudaPrecision prec = host_precision(u.Precision());
+
     auto format = resolve_load_format(filename, param.format);
     logQuda(QUDA_SUMMARIZE, "Start loading %s gauge field from %s\n", get_file_format_str(format), filename.c_str());
+
+    // a host field with a ghost zone is loaded through a copy, which exchanges it
+    std::optional<GaugeField> copy;
+    const bool in_place = is_file_view(u, prec) && u.GhostExchange() == QUDA_GHOST_EXCHANGE_NO;
+    if (!in_place) copy.emplace(file_view_param(u, prec));
+    GaugeField &view = in_place ? u : *copy;
+    const HostArrays gauge(view);
+    const int *X = view.X().data;
 
     host_timer_t host_timer;
     host_timer.start();
 
     GaugeFileInfo info;
     switch (format) {
-    case QUDA_FILE_FORMAT_QIO: info = load_lime(filename, gauge, prec, X, param, false); break;
-    case QUDA_FILE_FORMAT_ILDG: info = load_lime(filename, gauge, prec, X, param, true); break;
-    case QUDA_FILE_FORMAT_MILC: info = milc::load_gauge(filename, gauge, prec, X, param); break;
+    case QUDA_FILE_FORMAT_QIO: info = load_lime(filename, gauge.data, prec, X, param, false); break;
+    case QUDA_FILE_FORMAT_ILDG: info = load_lime(filename, gauge.data, prec, X, param, true); break;
+    case QUDA_FILE_FORMAT_MILC: info = milc::load_gauge(filename, gauge.data, prec, X, param); break;
     default: errorQuda("Unexpected file format %d", format);
     }
 
@@ -392,29 +666,47 @@ namespace quda
     log_metadata(filename, info.metadata);
     logQuda(QUDA_SUMMARIZE, "Time spent loading gauge field from %s = %g secs\n", filename.c_str(), host_timer.last());
 
-    if (info.has_plaq_linktr) check_plaq_linktr(filename, gauge, prec, X, info);
-    reunitarize(filename, gauge, prec, X, param.reunitarize, info);
+    if (info.has_plaq_linktr) check_plaq_linktr(filename, view, info);
+    reunitarize(filename, view, param.reunitarize, info);
+
+    if (c.any()) {
+      apply_conventions(view, c);
+      printfQuda("Applied %s to the links loaded from %s\n", c.str().c_str(), filename.c_str());
+    }
+    if (!in_place) u.copy(view);
     return info;
   }
 
-  void GaugeIO::save(const void *const gauge[], QudaPrecision prec, const int *X, const GaugeMetadata &metadata)
+  void GaugeIO::save(const GaugeField &u, QudaPrecision prec, const GaugeMetadata &metadata)
   {
+    check_field(u);
+    if (prec != QUDA_INVALID_PRECISION && prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
+      errorQuda("%s: gauge fields are saved from double or single precision, not precision %d", filename.c_str(), prec);
+    const QudaPrecision save_prec = prec != QUDA_INVALID_PRECISION ? prec : host_precision(u.Precision());
+
     auto format = resolve_save_format(param.format);
     if (param.partfile && format == QUDA_FILE_FORMAT_ILDG)
       errorQuda("%s: ILDG files cannot be saved as partfiles", filename.c_str());
     if (param.partfile && format == QUDA_FILE_FORMAT_MILC)
       errorQuda("%s: MILC's gauge format has no partfiles", filename.c_str());
+    const auto c = link_conventions(u, param.convert_link_conventions);
     logQuda(QUDA_SUMMARIZE, "Start saving %s gauge field to %s%s\n", get_file_format_str(format), filename.c_str(),
             param.partfile ? " as a partfile" : "");
+
+    const SaveView view(u, save_prec, c);
+    if (c.any()) printfQuda("Removed %s from the links saved to %s\n", c.str().c_str(), filename.c_str());
 
     host_timer_t host_timer;
     host_timer.start();
 
     io::Checksum sum;
     switch (format) {
-    case QUDA_FILE_FORMAT_QIO: sum = save_lime(filename, gauge, prec, X, param, false, metadata); break;
-    case QUDA_FILE_FORMAT_ILDG: sum = save_lime(filename, gauge, prec, X, param, true, metadata); break;
-    case QUDA_FILE_FORMAT_MILC: sum = milc::save_gauge(filename, gauge, prec, X, param, metadata); break;
+    case QUDA_FILE_FORMAT_QIO: sum = save_lime(filename, *view, param, false, metadata); break;
+    case QUDA_FILE_FORMAT_ILDG: sum = save_lime(filename, *view, param, true, metadata); break;
+    case QUDA_FILE_FORMAT_MILC: {
+      const HostArrays gauge(*view);
+      sum = milc::save_gauge(filename, gauge.data, save_prec, (*view).X().data, param, metadata);
+    } break;
     default: errorQuda("Unexpected file format %d", format);
     }
     // rank 0 finishes the file (checksum record or header, .info file) after the other ranks are done

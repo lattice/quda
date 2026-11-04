@@ -79,6 +79,27 @@ void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_par
 void constructHostGaugeField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv);
 
 /**
+ * @brief A host gauge field referencing QDP-ordered arrays of plain links: general links, periodic t, no
+ * staggered phases, no ghost zone.  For GaugeIO, which then never converts the links.
+ *
+ * @param[in] gauge The arrays, one per direction
+ * @param[in] precision Floating-point precision of the arrays
+ * @param[in] X The local lattice dimensions
+ * @return The reference field
+ */
+quda::GaugeField plainHostGaugeFieldReference(void *const *gauge, QudaPrecision precision, const int *X);
+
+/**
+ * @brief Load a gauge field file into QDP-ordered host arrays as the plain links it holds, with the format and
+ * options of gauge_param.file_io_param; the caller applies any boundary conditions and phases
+ *
+ * @param[in] file The file
+ * @param[out] gauge The arrays, one per direction
+ * @param[in] gauge_param The precision (cpu_prec), local lattice (X) and file options of the arrays
+ */
+void loadPlainHostGaugeField(const std::string &file, void *const *gauge, const QudaGaugeParam &gauge_param);
+
+/**
  * @brief Constructs a gauge field based on a construction type
  *
  * @param[in,out] gauge Generated QDP-ordered gauge field

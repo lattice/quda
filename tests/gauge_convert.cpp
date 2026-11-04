@@ -82,6 +82,7 @@ namespace
     }
     HostGauge(const HostGauge &) = delete;
     HostGauge &operator=(const HostGauge &) = delete;
+    quda::GaugeField field(const int *X) const { return plainHostGaugeFieldReference(ptr, prec, X); }
   };
 
   // the input and output and their parameters, all checked before any file is touched
@@ -311,7 +312,7 @@ namespace
 
   void report_field(const char *what, const HostGauge &gauge, const int *X)
   {
-    const auto obs = gauge_observables(gauge.ptr, gauge.prec, X);
+    const auto obs = gauge_observables(gauge.field(X));
     printfQuda("%s: plaquette %.12f (spatial %.12f, temporal %.12f), link trace %.12e, largest deviation from "
                "unitarity %.2e\n",
                what, obs.plaq, obs.plaq_spatial, obs.plaq_temporal, obs.linktr, unitarity_deviation(gauge));
@@ -628,9 +629,10 @@ namespace
   {
     std::vector<std::string> failures;
     HostGauge loaded(saved.prec, volume());
+    auto loaded_field = loaded.field(X);
     host_timer_t timer;
     timer.start();
-    const auto info = GaugeIO(c.output, c.verify_param).load(loaded.ptr, loaded.prec, X);
+    const auto info = GaugeIO(c.output, c.verify_param).load(loaded_field);
     timer.stop();
 
     size_t differ = 0;
@@ -693,9 +695,10 @@ namespace
       generate(gauge);
       report_field("Generated field", gauge, X);
     } else {
+      auto field = gauge.field(X);
       host_timer_t timer;
       timer.start();
-      info = GaugeIO(c.input, c.load_param).load(gauge.ptr, gauge.prec, X);
+      info = GaugeIO(c.input, c.load_param).load(field);
       timer.stop();
       printfQuda("Loaded %s: %s%s, %s precision, checksums %s (%s), in %g s (%.3f GB/s)\n", c.input.c_str(),
                  family_str(load_family(info)), c.load_param.external_qio ? " (external QIO)" : "",
@@ -738,7 +741,7 @@ namespace
       }
     }
     const HostGauge &saved = save_prec == QUDA_SINGLE_PRECISION ? rounded : gauge;
-    const auto observables = gauge_observables(gauge.ptr, gauge.prec, X);
+    const auto observables = gauge_observables(gauge.field(X));
 
     const auto reasons = change_reasons(c, info, save_prec);
     const bool noop = reasons.empty();
@@ -756,7 +759,7 @@ namespace
     remove_existing(existing);
     host_timer_t timer;
     timer.start();
-    GaugeIO(c.output, c.save_param).save(saved.ptr, saved.prec, X, map.metadata);
+    GaugeIO(c.output, c.save_param).save(saved.field(X), saved.prec, map.metadata);
     timer.stop();
     printfQuda("Saved %s: %s%s%s, %s precision, in %g s (%.3f GB/s)\n", c.output.c_str(), family_str(family),
                c.save_param.external_qio ? " (external QIO)" : "", c.save_param.partfile ? " partfile" : "",

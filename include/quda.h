@@ -1262,7 +1262,16 @@ typedef struct QudaFileIOParam_s {
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
   /**
-   * Write the gauge field to disk
+   * Write QUDA's resident gauge field of type param->type to disk,
+   * from a host copy in precision param->cpu_prec.  The format and
+   * options come from param->file_io_param (null for defaults).
+   *
+   * Gauge field files hold plain links: no staggered phases, periodic
+   * t.  The links are saved as they are, so they must be plain:
+   * param->t_boundary must be QUDA_PERIODIC_T,
+   * param->staggered_phase_applied 0 and param->i_mu 0, or this is an
+   * error.  Remove any phases and boundary sign first (e.g., with
+   * staggeredPhaseQuda).
    * @param file Filename to write to
    * @param param   Contains all metadata regarding host and device storage
    */
@@ -1274,11 +1283,11 @@ typedef struct QudaFileIOParam_s {
    * The format and options come from param->file_io_param (null for
    * defaults; the format is detected on load).
    *
-   * The file's links are loaded as they are: no phases, boundary
-   * conditions or anisotropy are applied, so param->t_boundary,
-   * param->staggered_phase_applied and the other fields that describe
-   * the links must describe the file's (for files that writeGaugeQuda
-   * saved, as they were saved).  To apply them on the host, copy the
+   * Gauge field files hold plain links: no staggered phases, periodic
+   * t.  The links are loaded as they are, with no phases, boundary
+   * conditions or anisotropy applied, so param->t_boundary must be
+   * QUDA_PERIODIC_T, param->staggered_phase_applied 0 and param->i_mu
+   * 0, or this is an error.  To apply them on the host, copy the
    * field back with saveGaugeQuda, apply them (e.g., with
    * staggeredPhaseQuda for staggered phases) and call loadGaugeQuda.
    *

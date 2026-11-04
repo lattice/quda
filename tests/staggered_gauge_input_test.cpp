@@ -1,9 +1,11 @@
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <string>
 #include <vector>
 
 #include <comm_quda.h>
+#include <io/gauge_io.h>
 
 #include "test.h"
 #include "gauge_utils.h"
@@ -13,14 +15,16 @@
 // expected values computed from the global coordinates: c times the identity, with c the field's scale times MILC's
 // phases as the test utilities apply them (eta_x = (-1)^t, eta_y = (-1)^(t+x), eta_z = (-1)^(t+x+y)), times the
 // antiperiodic sign on the t links of the last global t slice, or of the last three for asqtad long links, each
-// applied once.
+// applied once.  The loading paths load plain unit links (periodic, no phases) saved by GaugeIO, and must give
+// exactly what the generating paths give; the Wilson-type path (constructHostGaugeField) applies only the sign on
+// the last slice.
 
 namespace
 {
-  enum class Path { STAGGERED, ASQTAD, ASQTAD_FAT_LONG, LAPLACE, INPUT_NO_PHASE, INPUT_MILC_PHASE };
+  enum class Path { STAGGERED, ASQTAD, ASQTAD_FAT_LONG, LAPLACE, INPUT_NO_PHASE, INPUT_MILC_PHASE, WILSON };
 
-  // how the unit field is asked for
-  enum class UnitInput { UNIT_GAUGE, GAUGE_INPUT_UNIT };
+  // how the unit field is asked for: generated, or loaded from a file of plain unit links
+  enum class UnitInput { UNIT_GAUGE, GAUGE_INPUT_UNIT, LOAD_GAUGE, GAUGE_INPUT_LOAD };
 
   const char *get_path_str(Path path)
   {
@@ -31,9 +35,25 @@ namespace
     case Path::LAPLACE: return "laplace";
     case Path::INPUT_NO_PHASE: return "input_no_phase";
     case Path::INPUT_MILC_PHASE: return "input_milc_phase";
+    case Path::WILSON: return "wilson";
     }
     return "invalid";
   }
+
+  const char *get_input_str(UnitInput input)
+  {
+    switch (input) {
+    case UnitInput::UNIT_GAUGE: return "unit_gauge";
+    case UnitInput::GAUGE_INPUT_UNIT: return "gauge_input_unit";
+    case UnitInput::LOAD_GAUGE: return "load_gauge";
+    case UnitInput::GAUGE_INPUT_LOAD: return "gauge_input_load";
+    }
+    return "invalid";
+  }
+
+  // plain unit links, saved once per run for the loading paths and removed at the end
+  const char *unit_file = "staggered_gauge_input_unit.lat";
+  bool unit_file_saved = false;
 
   struct Expected {
     double scale;
@@ -103,6 +123,26 @@ namespace
     quda::comm_allreduce_sum(wrong);
     EXPECT_EQ(wrong, 0u) << name << " links differ from the expected ones";
   }
+
+  void save_unit_file(const QudaGaugeParam &gauge_param)
+  {
+    if (unit_file_saved) return;
+    HostLinks u;
+    constructIdentityGaugeField(u.ptr.data(), QUDA_DOUBLE_PRECISION);
+    quda::GaugeIO(unit_file).save(plainHostGaugeFieldReference(u.ptr.data(), QUDA_DOUBLE_PRECISION, gauge_param.X));
+    unit_file_saved = true;
+  }
+
+  class UnitFileEnvironment : public ::testing::Environment
+  {
+  public:
+    void TearDown() override
+    {
+      if (!unit_file_saved) return;
+      quda::comm_barrier();
+      if (quda::comm_rank() == 0) std::remove(unit_file);
+    }
+  };
 } // namespace
 
 using test_t = ::testing::tuple<Path, UnitInput, QudaTboundary>;
@@ -115,11 +155,15 @@ TEST_P(StaggeredGaugeInputTest, signs)
 {
   const auto [path, input, t_boundary] = GetParam();
   if (path == Path::LAPLACE && !is_enabled_laplace()) GTEST_SKIP();
+  // constructHostGaugeField ignores --gauge-input
+  if (path == Path::WILSON && (input == UnitInput::GAUGE_INPUT_UNIT || input == UnitInput::GAUGE_INPUT_LOAD))
+    GTEST_SKIP();
+  const bool load = input == UnitInput::LOAD_GAUGE || input == UnitInput::GAUGE_INPUT_LOAD;
 
   // the options the construction paths read
   latfile.clear();
   unit_gauge = input == UnitInput::UNIT_GAUGE;
-  gauge_input = input == UnitInput::GAUGE_INPUT_UNIT ? "unit" : "";
+  gauge_input = input == UnitInput::GAUGE_INPUT_UNIT ? "unit" : input == UnitInput::GAUGE_INPUT_LOAD ? "load" : "";
   gauge_input_width_explicit = false;
   fermion_t_boundary = t_boundary;
   dslash_type = path == Path::ASQTAD || path == Path::ASQTAD_FAT_LONG ? QUDA_ASQTAD_DSLASH :
@@ -133,10 +177,21 @@ TEST_P(StaggeredGaugeInputTest, signs)
   cpu_prec = QUDA_DOUBLE_PRECISION;
   host_gauge_data_type_size = sizeof(double);
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setStaggeredGaugeParam(gauge_param);
+  if (path == Path::WILSON)
+    setWilsonGaugeParam(gauge_param);
+  else
+    setStaggeredGaugeParam(gauge_param);
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  if (load) {
+    save_unit_file(gauge_param);
+    latfile = unit_file;
+  }
 
-  if (path == Path::INPUT_NO_PHASE || path == Path::INPUT_MILC_PHASE) {
+  if (path == Path::WILSON) {
+    HostLinks u;
+    constructHostGaugeField(u.ptr.data(), gauge_param, 0, nullptr);
+    expect_links("wilson", u, {1.0, false, 1}, t_boundary);
+  } else if (path == Path::INPUT_NO_PHASE || path == Path::INPUT_MILC_PHASE) {
     const bool milc = path == Path::INPUT_MILC_PHASE;
     HostLinks u;
     constructHostGaugeInputField(u.ptr.data(), gauge_param, 0, nullptr, GaugeInputMode::HAAR,
@@ -149,7 +204,8 @@ TEST_P(StaggeredGaugeInputTest, signs)
     // HISQ's fat link of unit links with MILC's phases, around whose plaquettes the phases multiply to -1:
     // 1 + 3/8 + 3/8 + 1/8 - 3/4 from the one-link, 3-, 5- and 7-link staples and the Lepage term
     const double fat_scale = path == Path::ASQTAD_FAT_LONG ? 1.125 : 1.0;
-    const double long_scale = path == Path::ASQTAD || path == Path::ASQTAD_FAT_LONG ? -1.0 / 24.0 : 0.0;
+    // a loaded field's long links aren't built without --compute-fat-long, so they keep their zeros
+    const double long_scale = path == Path::ASQTAD_FAT_LONG || (path == Path::ASQTAD && !load) ? -1.0 / 24.0 : 0.0;
     expect_links("thin", thin, {1.0, phases, 1}, t_boundary);
     expect_links("fat", fat, {fat_scale, phases, 1}, t_boundary);
     expect_links("long", lng, {long_scale, phases, 3}, t_boundary);
@@ -160,18 +216,20 @@ int main(int argc, char **argv)
 {
   quda_test test("Staggered Gauge Input Test", argc, argv);
   test.init();
+  ::testing::AddGlobalTestEnvironment(new UnitFileEnvironment);
   return test.execute();
 }
 
 INSTANTIATE_TEST_SUITE_P(StaggeredGaugeInput, StaggeredGaugeInputTest,
                          ::testing::Combine(::testing::Values(Path::STAGGERED, Path::ASQTAD, Path::ASQTAD_FAT_LONG,
-                                                              Path::LAPLACE, Path::INPUT_NO_PHASE, Path::INPUT_MILC_PHASE),
-                                            ::testing::Values(UnitInput::UNIT_GAUGE, UnitInput::GAUGE_INPUT_UNIT),
+                                                              Path::LAPLACE, Path::INPUT_NO_PHASE,
+                                                              Path::INPUT_MILC_PHASE, Path::WILSON),
+                                            ::testing::Values(UnitInput::UNIT_GAUGE, UnitInput::GAUGE_INPUT_UNIT,
+                                                              UnitInput::LOAD_GAUGE, UnitInput::GAUGE_INPUT_LOAD),
                                             ::testing::Values(QUDA_PERIODIC_T, QUDA_ANTI_PERIODIC_T)),
                          [](testing::TestParamInfo<test_t> param) {
                            std::string name = get_path_str(::testing::get<0>(param.param));
-                           name += ::testing::get<1>(param.param) == UnitInput::UNIT_GAUGE ? "_unit_gauge" :
-                                                                                             "_gauge_input_unit";
+                           name += std::string("_") + get_input_str(::testing::get<1>(param.param));
                            name += ::testing::get<2>(param.param) == QUDA_PERIODIC_T ? "_periodic" : "_antiperiodic";
                            return name;
                          });

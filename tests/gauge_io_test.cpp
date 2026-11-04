@@ -88,6 +88,17 @@ namespace
     }
   };
 
+  // a reference field on QDP host arrays of plain links, which converts to the field, so that GaugeIO can load
+  // into a temporary one
+  struct PlainLinks {
+    GaugeField field;
+    PlainLinks(const void *const *gauge, QudaPrecision prec, const int *X) :
+      field(plainHostGaugeFieldReference(const_cast<void *const *>(gauge), prec, X))
+    {
+    }
+    operator GaugeField &() { return field; }
+  };
+
   // change the stored checksum of a gauge file, keeping its size, so that it no longer matches the data
   void corrupt_checksum(const std::string &file, QudaFileFormat format)
   {
@@ -159,7 +170,7 @@ namespace
     for (int dir = 0; dir < 4; dir++)
       for (size_t i = 0; i < V * gauge_site_size; i++)
         static_cast<double *>(rounded.data[dir])[i] = static_cast<float>(get_element(gauge[dir], prec, i));
-    const auto obs = quda::gauge_observables(rounded.data, QUDA_DOUBLE_PRECISION, X);
+    const auto obs = quda::gauge_observables(PlainLinks(rounded.data, QUDA_DOUBLE_PRECISION, X));
     char lines[4][96];
     snprintf(lines[0], sizeof(lines[0]), "gauge.ssplaq = %f", static_cast<float>(3.0 * obs.plaq_spatial));
     snprintf(lines[1], sizeof(lines[1]), "gauge.stplaq = %f", static_cast<float>(3.0 * obs.plaq_temporal));
@@ -420,10 +431,10 @@ TEST_P(GaugeIOTest, verify)
   GaugeIO io(file, FileIOParam(gauge_param.file_io_param));
 
   // write out the gauge field
-  io.save(gauge, gauge_param.cpu_prec, gauge_param.X);
+  io.save(PlainLinks(gauge, gauge_param.cpu_prec, gauge_param.X));
 
   // read it back
-  auto info = io.load(gauge, gauge_param.cpu_prec, gauge_param.X);
+  auto info = io.load(PlainLinks(gauge, gauge_param.cpu_prec, gauge_param.X));
 
   // test the links are identical, or as close as the file precision allows
   double link_tol = file_prec == gauge_param.cpu_prec ? 0.0 : std::numeric_limits<float>::epsilon();
@@ -463,7 +474,7 @@ TEST_P(GaugeIOTest, verify)
   corrupt_checksum(file, format);
   FileIOParam allow(gauge_param.file_io_param);
   allow.allow_checksum_mismatch = true;
-  auto corrupt_info = GaugeIO(file, allow).load(gauge, gauge_param.cpu_prec, gauge_param.X);
+  auto corrupt_info = GaugeIO(file, allow).load(PlainLinks(gauge, gauge_param.cpu_prec, gauge_param.X));
   EXPECT_FALSE(corrupt_info.checksum_matches);
   EXPECT_EQ(corrupt_info.sum29, info.sum29);
   EXPECT_EQ(corrupt_info.sum31, info.sum31);
@@ -501,7 +512,7 @@ TEST_P(MILCGaugeFileTest, layout)
   param.io_mode = ::testing::get<1>(GetParam());
 
   const std::string file = "milc.lat";
-  GaugeIO(file, param).save(gauge, prec, gauge_param.X);
+  GaugeIO(file, param).save(PlainLinks(gauge, prec, gauge_param.X));
   check_milc_gauge_file(file, gauge, prec, gauge_param.X);
 
   // the .info file: QUDA's lines, then MILC's four keys that QUDA computes, of the links as saved and in MILC's
@@ -523,16 +534,16 @@ TEST_P(MILCGaugeFileTest, layout)
     }
   }
   HostGauge loaded(prec);
-  auto info = GaugeIO(file, param).load(loaded.data, prec, gauge_param.X);
+  auto info = GaugeIO(file, param).load(PlainLinks(loaded.data, prec, gauge_param.X));
   EXPECT_TRUE(info.has_plaq_linktr);
   EXPECT_TRUE(info.plaq_linktr_matches);
 
   // without write_usqcd_info, only QUDA's lines
   auto plain = param;
   plain.write_usqcd_info = false;
-  GaugeIO(file, plain).save(gauge, prec, gauge_param.X);
+  GaugeIO(file, plain).save(PlainLinks(gauge, prec, gauge_param.X));
   if (comm_rank() == 0) { EXPECT_EQ(info_lines(file).size(), 7u); }
-  info = GaugeIO(file, plain).load(loaded.data, prec, gauge_param.X);
+  info = GaugeIO(file, plain).load(PlainLinks(loaded.data, prec, gauge_param.X));
   EXPECT_FALSE(info.has_plaq_linktr);
 
   // every rank reads the file on its own
@@ -564,12 +575,12 @@ public:
 
   quda::GaugeFileInfo load(const std::string &file, const quda::FileIOParam &param, HostGauge &gauge)
   {
-    return quda::GaugeIO(file, param).load(gauge.data, prec, gauge_param.X);
+    return quda::GaugeIO(file, param).load(PlainLinks(gauge.data, prec, gauge_param.X));
   }
 
   void save(const std::string &file, const quda::FileIOParam &param, const HostGauge &gauge)
   {
-    quda::GaugeIO(file, param).save(gauge.data, prec, gauge_param.X);
+    quda::GaugeIO(file, param).save(PlainLinks(gauge.data, prec, gauge_param.X));
   }
 
   void remove_files(const std::vector<std::string> &files)
@@ -688,10 +699,10 @@ TEST_P(GaugeReunitarizeTest, milc_file)
 
   const std::string file = "reunitarize.milc";
   auto param = file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
-  GaugeIO(file, param).save(original.data, prec, gauge_param.X);
-  auto raw_info = GaugeIO(file, param).load(raw.data, prec, gauge_param.X);
+  GaugeIO(file, param).save(PlainLinks(original.data, prec, gauge_param.X));
+  auto raw_info = GaugeIO(file, param).load(PlainLinks(raw.data, prec, gauge_param.X));
   param.reunitarize = method;
-  auto info = GaugeIO(file, param).load(loaded.data, prec, gauge_param.X);
+  auto info = GaugeIO(file, param).load(PlainLinks(loaded.data, prec, gauge_param.X));
 
   // the deviation is measured when reunitarizing, when the file is less precise than the host field, or at
   // verbose verbosity
@@ -753,9 +764,9 @@ TEST(GaugeMILCPrecisionTest, precision_1_rounds)
 
   const std::string file = "reunitarize.lat";
   auto param = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
-  GaugeIO(file, param).save(original.data, QUDA_DOUBLE_PRECISION, gauge_param.X);
+  GaugeIO(file, param).save(PlainLinks(original.data, QUDA_DOUBLE_PRECISION, gauge_param.X));
   param.reunitarize = QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_1;
-  auto info = GaugeIO(file, param).load(loaded.data, QUDA_DOUBLE_PRECISION, gauge_param.X);
+  auto info = GaugeIO(file, param).load(PlainLinks(loaded.data, QUDA_DOUBLE_PRECISION, gauge_param.X));
 
   EXPECT_EQ(info.file_prec, QUDA_DOUBLE_PRECISION);
   EXPECT_GT(info.unitarity_deviation, 0.0);
@@ -799,11 +810,12 @@ TEST_P(GaugePartitionTest, grids)
     p.ildg_lfn = "lfn://quda/partition_test"; // the default, the file name, differs between files
     return p;
   };
-  auto save
-    = [&](const std::string &file, const FileIOParam &p) { GaugeIO(file, p).save(original.data, prec, gauge_param.X); };
+  auto save = [&](const std::string &file, const FileIOParam &p) {
+    GaugeIO(file, p).save(PlainLinks(original.data, prec, gauge_param.X));
+  };
   auto load = [&](const std::string &file, const FileIOParam &p, HostGauge &gauge) {
     gauge.clear();
-    return GaugeIO(file, p).load(gauge.data, prec, gauge_param.X);
+    return GaugeIO(file, p).load(PlainLinks(gauge.data, prec, gauge_param.X));
   };
 
   const std::string ref_file = "partition_ref.lat", serial_ref_file = "partition_serial_ref.lat";
@@ -867,11 +879,12 @@ TEST_P(GaugePartfileTest, grids)
   QudaGaugeParam gauge_param = gauge_param_for(prec);
   HostGauge original(prec), loaded(prec);
   constructHostGaugeField(original.data, gauge_param, 0, nullptr);
-  auto save
-    = [&](const std::string &file, const FileIOParam &p) { GaugeIO(file, p).save(original.data, prec, gauge_param.X); };
+  auto save = [&](const std::string &file, const FileIOParam &p) {
+    GaugeIO(file, p).save(PlainLinks(original.data, prec, gauge_param.X));
+  };
   auto expect_load = [&](const std::string &file, const FileIOParam &p, bool usqcd_info = false) {
     loaded.clear();
-    auto info = GaugeIO(file, p).load(loaded.data, prec, gauge_param.X);
+    auto info = GaugeIO(file, p).load(PlainLinks(loaded.data, prec, gauge_param.X));
     EXPECT_TRUE(loaded == original);
     EXPECT_TRUE(info.checksum_matches);
     EXPECT_EQ(info.has_plaq_linktr, usqcd_info);
@@ -974,7 +987,7 @@ namespace
     using namespace quda;
     const auto prec = gauge_param.cpu_prec;
     HostGauge expected(prec), read(prec);
-    GaugeIO(file, FileIOParam(&io_param)).load(expected.data, prec, gauge_param.X);
+    GaugeIO(file, FileIOParam(&io_param)).load(PlainLinks(expected.data, prec, gauge_param.X));
 
     gauge_param.file_io_param = &io_param;
     readGaugeQuda(file.c_str(), &gauge_param);
@@ -1006,7 +1019,7 @@ TEST_P(ReadGaugeQudaTest, load)
   HostGauge original(prec);
   constructHostGaugeField(original.data, gauge_param, 0, nullptr);
   auto save = [&](const std::string &file, QudaFileIOParam io_param) {
-    GaugeIO(file, FileIOParam(&io_param)).save(original.data, prec, gauge_param.X);
+    GaugeIO(file, FileIOParam(&io_param)).save(PlainLinks(original.data, prec, gauge_param.X));
   };
 
   const std::string file = "read_gauge.lat";
@@ -1027,7 +1040,7 @@ TEST_P(ReadGaugeQudaTest, load)
 }
 
 // writeGaugeQuda then readGaugeQuda gives back the resident links exactly, for each type of links, in single files and
-// partfiles; writeGaugeQuda saves the same partfile as GaugeIO
+// partfiles; writeGaugeQuda saves the same file or partfile as GaugeIO saves from the host links
 TEST(ReadGaugeQudaWriteTest, round_trip)
 {
   using namespace quda;
@@ -1054,10 +1067,10 @@ TEST(ReadGaugeQudaWriteTest, round_trip)
       freeGaugeQuda();
       EXPECT_TRUE(read == original);
 
-      if (partfile && type == QUDA_WILSON_LINKS) {
-        GaugeIO(internal_file, FileIOParam(&io_param)).save(original.data, prec, gauge_param.X);
+      {
+        GaugeIO(internal_file, FileIOParam(&io_param)).save(PlainLinks(original.data, prec, gauge_param.X));
         if (comm_rank() == 0) {
-          if (comm_size() == 1)
+          if (!partfile || comm_size() == 1)
             expect_same_saved_file(file, internal_file, false);
           else
             expect_same_partfile(file, internal_file);
@@ -1083,13 +1096,13 @@ TEST(ReadGaugeQudaWriteTest, reunitarize)
   // a MILC file is single precision, so reunitarizing in double precision changes its links
   const std::string file = "read_gauge_reunitarize.milc";
   auto io_param = quda_file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
-  GaugeIO(file, FileIOParam(&io_param)).save(original.data, prec, gauge_param.X);
-  GaugeIO(file, FileIOParam(&io_param)).load(raw.data, prec, gauge_param.X);
+  GaugeIO(file, FileIOParam(&io_param)).save(PlainLinks(original.data, prec, gauge_param.X));
+  GaugeIO(file, FileIOParam(&io_param)).load(PlainLinks(raw.data, prec, gauge_param.X));
   io_param.reunitarize = QUDA_GAUGE_REUNITARIZE_MILC_GRAM_SCHMIDT_PRECISION_2;
   expect_read_as_loaded(file, gauge_param, io_param);
 
   HostGauge reunitarized(prec);
-  GaugeIO(file, FileIOParam(&io_param)).load(reunitarized.data, prec, gauge_param.X);
+  GaugeIO(file, FileIOParam(&io_param)).load(PlainLinks(reunitarized.data, prec, gauge_param.X));
   EXPECT_FALSE(reunitarized == raw);
 
   remove_saved_file(file);
@@ -1152,7 +1165,7 @@ TEST_P(GaugeStringsTest, saved)
         SCOPED_TRACE(std::string(get_file_format_str(backend)) + ", " + get_prec_str(prec) + ", " + kinds[k]);
         auto p = file_io_param(backend, QUDA_FILE_IO_PARALLEL, {}, partfile);
         p.write_usqcd_info = usqcd_info;
-        GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
+        GaugeIO(file, p).save(PlainLinks(gauge.data, prec, gauge_param.X));
         if (comm_rank() == 0) {
           const auto s = saved_strings(partfile && comm_size() > 1 ? volume_file(file, 0) : file);
           EXPECT_EQ(s.user_file, expected_file_xml("gauge field"));
@@ -1201,7 +1214,7 @@ TEST_P(GaugeLegacyStringsTest, load)
       auto p = file_io_param(backend, QUDA_FILE_IO_PARALLEL, {}, partfile);
       p.legacy_strings = true;
       p.ildg_lfn = "lfn://quda/io_test"; // the default, the file name, differs between the files
-      GaugeIO(file, p).save(original.data, prec, gauge_param.X);
+      GaugeIO(file, p).save(PlainLinks(original.data, prec, gauge_param.X));
       if (comm_rank() == 0) {
         SCOPED_TRACE(file);
         const auto s = saved_strings(volumes ? volume_file(file, 0) : file);
@@ -1225,7 +1238,8 @@ TEST_P(GaugeLegacyStringsTest, load)
       for (auto backend : lime_backends(format)) {
         SCOPED_TRACE("loading " + file + " with " + get_file_format_str(backend));
         loaded.clear();
-        auto info = GaugeIO(file, file_io_param(backend, QUDA_FILE_IO_PARALLEL)).load(loaded.data, prec, gauge_param.X);
+        auto info
+          = GaugeIO(file, file_io_param(backend, QUDA_FILE_IO_PARALLEL)).load(PlainLinks(loaded.data, prec, gauge_param.X));
         EXPECT_TRUE(loaded == original);
         EXPECT_TRUE(info.checksum_matches);
         EXPECT_EQ(info.ildg, format == QUDA_FILE_FORMAT_ILDG);
@@ -1265,12 +1279,12 @@ TEST_P(GaugeMPIIOTest, save_load)
   };
   auto load = [&](const std::string &file, const FileIOParam &p, HostGauge &gauge) {
     gauge.clear();
-    return GaugeIO(file, p).load(gauge.data, prec, gauge_param.X);
+    return GaugeIO(file, p).load(PlainLinks(gauge.data, prec, gauge_param.X));
   };
 
   const std::string ref_file = "mpi_io_ref.lat", file = "mpi_io.lat";
-  GaugeIO(ref_file, param(format, QUDA_FILE_IO_PARALLEL)).save(original.data, prec, gauge_param.X);
-  GaugeIO(file, param(format, QUDA_FILE_IO_MPI_IO)).save(original.data, prec, gauge_param.X);
+  GaugeIO(ref_file, param(format, QUDA_FILE_IO_PARALLEL)).save(PlainLinks(original.data, prec, gauge_param.X));
+  GaugeIO(file, param(format, QUDA_FILE_IO_MPI_IO)).save(PlainLinks(original.data, prec, gauge_param.X));
   if (comm_rank() == 0) expect_same_saved_file(ref_file, file, milc);
 
   const auto ref_info = load(ref_file, param(format, QUDA_FILE_IO_PARALLEL), reference);
@@ -1342,15 +1356,16 @@ TEST(GaugeMPIIOGridTest, process_grid)
     SCOPED_TRACE(get_file_format_str(format));
     const bool milc = format == QUDA_FILE_FORMAT_MILC;
     const std::string ref_file = "mpi_io_grid_ref.lat", file = "mpi_io_grid.lat";
-    GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).save(original.data, prec, gauge_param.X);
-    GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO, grid)).save(original.data, prec, gauge_param.X);
+    GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).save(PlainLinks(original.data, prec, gauge_param.X));
+    GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO, grid)).save(PlainLinks(original.data, prec, gauge_param.X));
     if (comm_rank() == 0) expect_same_saved_file(ref_file, file, milc);
 
     reference.clear();
     loaded.clear();
-    auto ref_info
-      = GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).load(reference.data, prec, gauge_param.X);
-    auto info = GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO, grid)).load(loaded.data, prec, gauge_param.X);
+    auto ref_info = GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL))
+                      .load(PlainLinks(reference.data, prec, gauge_param.X));
+    auto info
+      = GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO, grid)).load(PlainLinks(loaded.data, prec, gauge_param.X));
     EXPECT_TRUE(loaded == reference);
     EXPECT_TRUE(info.checksum_matches);
     EXPECT_EQ(info.sum29, ref_info.sum29);
@@ -1381,19 +1396,21 @@ TEST(GaugeMPIIOOverwriteTest, larger_file)
     const std::string ref_file = "mpi_io_overwrite_ref.lat", file = "mpi_io_overwrite.lat";
     // double-precision SciDAC, larger than either single-precision file
     GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL))
-      .save(large.data, QUDA_DOUBLE_PRECISION, large_param.X);
+      .save(PlainLinks(large.data, QUDA_DOUBLE_PRECISION, large_param.X));
     const size_t old_size = comm_rank() == 0 ? std::filesystem::file_size(file) : 0;
 
-    GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO)).save(small.data, QUDA_SINGLE_PRECISION, small_param.X);
-    GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL)).save(small.data, QUDA_SINGLE_PRECISION, small_param.X);
+    GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO))
+      .save(PlainLinks(small.data, QUDA_SINGLE_PRECISION, small_param.X));
+    GaugeIO(ref_file, file_io_param(format, QUDA_FILE_IO_PARALLEL))
+      .save(PlainLinks(small.data, QUDA_SINGLE_PRECISION, small_param.X));
     if (comm_rank() == 0) {
       EXPECT_GT(old_size, std::filesystem::file_size(ref_file));
       expect_same_saved_file(ref_file, file, milc);
     }
     HostGauge loaded(QUDA_SINGLE_PRECISION);
     loaded.clear();
-    auto info
-      = GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO)).load(loaded.data, QUDA_SINGLE_PRECISION, small_param.X);
+    auto info = GaugeIO(file, file_io_param(format, QUDA_FILE_IO_MPI_IO))
+                  .load(PlainLinks(loaded.data, QUDA_SINGLE_PRECISION, small_param.X));
     EXPECT_TRUE(loaded == small);
     EXPECT_TRUE(info.checksum_matches);
 
@@ -1420,8 +1437,8 @@ TEST(GaugeMPIIOPartfileTest, volumes)
     auto mpi_io = parallel;
     mpi_io.io_mode = QUDA_FILE_IO_MPI_IO;
     const std::string ref_file = "mpi_io_partfile_ref.lat", file = "mpi_io_partfile.lat";
-    GaugeIO(ref_file, parallel).save(original.data, prec, gauge_param.X);
-    GaugeIO(file, mpi_io).save(original.data, prec, gauge_param.X);
+    GaugeIO(ref_file, parallel).save(PlainLinks(original.data, prec, gauge_param.X));
+    GaugeIO(file, mpi_io).save(PlainLinks(original.data, prec, gauge_param.X));
     const bool volumes = comm_size() > 1 || parallel.partfile_grid != std::array<int, 4> {};
     if (comm_rank() == 0) {
       EXPECT_EQ(saved_volumes(file).empty(), !volumes);
@@ -1431,8 +1448,8 @@ TEST(GaugeMPIIOPartfileTest, volumes)
         expect_same_saved_file(ref_file, file, false);
     }
     loaded.clear();
-    auto info
-      = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_MPI_IO)).load(loaded.data, prec, gauge_param.X);
+    auto info = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_MPI_IO))
+                  .load(PlainLinks(loaded.data, prec, gauge_param.X));
     EXPECT_TRUE(loaded == original);
     EXPECT_TRUE(info.checksum_matches);
     remove_saved_file(ref_file);
@@ -1538,7 +1555,7 @@ namespace
       SCOPED_TRACE(std::string("loaded with ") + get_file_format_str(backend));
       loaded.clear();
       infos.push_back(GaugeIO(file, file_io_param(backend, QUDA_FILE_IO_PARALLEL))
-                        .load(loaded.data, expected.prec, gauge_param_for(expected.prec).X));
+                        .load(PlainLinks(loaded.data, expected.prec, gauge_param_for(expected.prec).X)));
       EXPECT_TRUE(loaded == expected);
     }
     if (infos.size() == 2) {
@@ -1605,7 +1622,7 @@ TEST(GaugeMetadataTest, quda_files)
   QudaGaugeParam gauge_param = gauge_param_for(prec);
   HostGauge gauge(prec);
   constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
-  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  const auto obs = gauge_observables(PlainLinks(gauge.data, prec, gauge_param.X));
 
   const std::string file = "metadata.lat";
   struct Case {
@@ -1625,7 +1642,7 @@ TEST(GaugeMetadataTest, quda_files)
       auto p = file_io_param(saver, QUDA_FILE_IO_PARALLEL);
       p.write_usqcd_info = c.usqcd_info;
       p.ildg_lfn = c.lfn;
-      GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
+      GaugeIO(file, p).save(PlainLinks(gauge.data, prec, gauge_param.X));
       const auto strings = field_strings(file);
       const bool ildg = c.format == QUDA_FILE_FORMAT_ILDG;
 
@@ -1674,7 +1691,7 @@ TEST(GaugeMetadataTest, foreign_strings)
   constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
   // the files are single precision, as MILC writes them
   round_to_float(gauge, rounded);
-  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  const auto obs = gauge_observables(PlainLinks(gauge.data, prec, gauge_param.X));
   const std::string milc_record = usqcd_record("%.6e", obs.plaq, obs.linktr, milc_info_lines);
 
   // a Chroma-like file and record XML, with white space and nested elements of the same name
@@ -1722,8 +1739,8 @@ TEST(GaugeMetadataTest, foreign_strings)
       SCOPED_TRACE("MPI-IO load");
       HostGauge loaded(prec);
       loaded.clear();
-      auto info
-        = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_MPI_IO)).load(loaded.data, prec, gauge_param.X);
+      auto info = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_MPI_IO))
+                    .load(PlainLinks(loaded.data, prec, gauge_param.X));
       EXPECT_TRUE(loaded == rounded);
       expect_same_metadata(info.metadata, infos[0].metadata);
     }
@@ -1748,7 +1765,7 @@ TEST(GaugeMetadataTest, partfile)
     SCOPED_TRACE(std::string("saved as ") + get_file_format_str(saver));
     auto p = partfile_param(saver, QUDA_FILE_IO_PARALLEL);
     p.write_usqcd_info = true;
-    GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
+    GaugeIO(file, p).save(PlainLinks(gauge.data, prec, gauge_param.X));
     const auto strings = field_strings(comm_size() > 1 ? volume_file(file, 0) : file);
     for (auto &info : load_lime_backends(file, gauge)) {
       EXPECT_EQ(info.metadata.user_file_xml, expected_file_xml("gauge field"));
@@ -1764,7 +1781,7 @@ TEST(GaugeMetadataTest, partfile)
   // backend reads)
   auto p = partfile_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
   p.partfile_grid = {1, 1, 1, 2};
-  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  const auto obs = gauge_observables(PlainLinks(gauge.data, prec, gauge_param.X));
   const auto record = usqcd_record("%.6e", obs.plaq, obs.linktr, milc_info_lines);
   write_gauge_with_strings(file, gauge, milc_file_xml, record, false, {}, p);
   EXPECT_EQ(saved_volumes(file).size(), 2u);
@@ -1792,7 +1809,7 @@ TEST(GaugeMetadataTest, ildg_only)
   const std::string saved = "metadata_ildg.lat", file = "metadata_ildg_only.lat";
   auto p = file_io_param(QUDA_FILE_FORMAT_ILDG, QUDA_FILE_IO_PARALLEL);
   p.ildg_lfn = "lfn://other/ildg_only";
-  GaugeIO(saved, p).save(gauge.data, prec, gauge_param.X);
+  GaugeIO(saved, p).save(PlainLinks(gauge.data, prec, gauge_param.X));
   if (comm_rank() == 0) keep_ildg_records(saved, file);
   comm_barrier();
 
@@ -1801,7 +1818,7 @@ TEST(GaugeMetadataTest, ildg_only)
   HostGauge loaded(prec);
   loaded.clear();
   auto external = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_QIO_EXTERNAL, QUDA_FILE_IO_PARALLEL))
-                    .load(loaded.data, prec, gauge_param.X);
+                    .load(PlainLinks(loaded.data, prec, gauge_param.X));
   EXPECT_TRUE(loaded == gauge);
   EXPECT_FALSE(external.metadata.ildg_lfn);
   auto expected = infos[0].metadata;
@@ -1835,7 +1852,7 @@ TEST(GaugeMetadataTest, milc_info)
   const std::string file = "metadata.milc";
   auto p = file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
   p.write_usqcd_info = true;
-  GaugeIO(file, p).save(gauge.data, prec, gauge_param.X);
+  GaugeIO(file, p).save(PlainLinks(gauge.data, prec, gauge_param.X));
 
   // the header's time stamp, and the .info file's lines by key
   auto contents = read_file(file);
@@ -1875,8 +1892,8 @@ TEST(GaugeMetadataTest, milc_info)
   comm_barrier();
 
   loaded.clear();
-  auto info
-    = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL)).load(loaded.data, prec, gauge_param.X);
+  auto info = GaugeIO(file, file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL))
+                .load(PlainLinks(loaded.data, prec, gauge_param.X));
   EXPECT_TRUE(info.has_info_file);
   EXPECT_TRUE(info.checksum_matches);
   const auto &m = info.metadata;
@@ -1952,7 +1969,7 @@ namespace
       auto p = file_io_param(saver, QUDA_FILE_IO_PARALLEL, {}, c.partfile);
       p.write_usqcd_info = c.write_usqcd_info;
       p.ildg_lfn = "lfn://quda/param"; // the default, the file name, differs between the files
-      GaugeIO(file, p).save(gauge.data, gauge.prec, gauge_param_for(gauge.prec).X, c.given);
+      GaugeIO(file, p).save(PlainLinks(gauge.data, gauge.prec, gauge_param_for(gauge.prec).X), gauge.prec, c.given);
       files.push_back(file);
     }
     if (files.size() == 2 && comm_rank() == 0) {
@@ -1982,7 +1999,7 @@ TEST(GaugeSaveMetadataTest, lime)
   QudaGaugeParam gauge_param = gauge_param_for(prec);
   HostGauge gauge(prec);
   constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
-  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  const auto obs = gauge_observables(PlainLinks(gauge.data, prec, gauge_param.X));
   auto usqcd = [&](const std::string &info) { return usqcd_record("%.16e", obs.plaq, obs.linktr, info); };
 
   const std::string other_file_xml = "<?xml version=\"1.0\"?>\n<HMC>\n  <ProgramInfo>\n    <code>chroma</code>\n"
@@ -2209,9 +2226,9 @@ TEST(GaugeSaveMetadataTest, milc)
     given.milc_info = c.lines;
     auto p = file_io_param(QUDA_FILE_FORMAT_MILC, QUDA_FILE_IO_PARALLEL);
     p.write_usqcd_info = c.write_usqcd_info;
-    GaugeIO(file, p).save(gauge.data, prec, gauge_param.X, given);
+    GaugeIO(file, p).save(PlainLinks(gauge.data, prec, gauge_param.X), prec, given);
     loaded.clear();
-    const auto info = GaugeIO(file, p).load(loaded.data, prec, gauge_param.X);
+    const auto info = GaugeIO(file, p).load(PlainLinks(loaded.data, prec, gauge_param.X));
     EXPECT_TRUE(info.checksum_matches);
     EXPECT_EQ(info.has_plaq_linktr, c.write_usqcd_info);
     if (info.has_plaq_linktr) { EXPECT_TRUE(info.plaq_linktr_matches); }
@@ -2306,7 +2323,7 @@ TEST(GaugeObservablesTest, unit)
           else
             static_cast<float *>(gauge.data[dir])[s * 18 + k] = 1.0f;
         }
-    const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+    const auto obs = gauge_observables(PlainLinks(gauge.data, prec, gauge_param.X));
     EXPECT_NEAR(obs.plaq, 1.0, 1e-14);
     EXPECT_NEAR(obs.plaq_spatial, 1.0, 1e-14);
     EXPECT_NEAR(obs.plaq_temporal, 1.0, 1e-14);
@@ -2359,7 +2376,7 @@ TEST(GaugeObservablesTest, checksum_layout)
                   static_cast<float *>(gauge.data[dir])[index * 18 + k] = static_cast<float>(v);
               }
           }
-    const auto obs = gauge_observables(gauge.data, prec, X);
+    const auto obs = gauge_observables(PlainLinks(gauge.data, prec, X));
     EXPECT_EQ(obs.nersc_checksum, static_cast<uint32_t>(expected));
     EXPECT_EQ(obs.nersc_checksum, nersc_checksum(gauge));
   }
@@ -2374,7 +2391,7 @@ TEST(GaugeObservablesTest, plaquettes)
   QudaGaugeParam gauge_param = gauge_param_for(prec);
   HostGauge gauge(prec);
   constructHostGaugeField(gauge.data, gauge_param, 0, nullptr);
-  const auto obs = gauge_observables(gauge.data, prec, gauge_param.X);
+  const auto obs = gauge_observables(PlainLinks(gauge.data, prec, gauge_param.X));
   EXPECT_NEAR(obs.plaq_spatial + obs.plaq_temporal, 2.0 * obs.plaq, 1e-14);
   EXPECT_GT(std::abs(obs.plaq_spatial - obs.plaq_temporal), 0.0);
 
@@ -2419,15 +2436,15 @@ TEST_P(GaugeIOBackendTest, compare)
   external.external_qio = true;
 
   const std::string native_file = "native.lat", external_file = "external.lat";
-  GaugeIO(native_file, native).save(gauge, prec, gauge_param.X);
-  GaugeIO(external_file, external).save(gauge, prec, gauge_param.X);
+  GaugeIO(native_file, native).save(PlainLinks(gauge, prec, gauge_param.X));
+  GaugeIO(external_file, external).save(PlainLinks(gauge, prec, gauge_param.X));
 
   if (comm_rank() == 0) expect_same_saved_file(native_file, external_file, false);
 
   std::vector<GaugeFileInfo> infos;
   for (auto [file, param] : {std::make_pair(native_file, external), std::make_pair(external_file, native)}) {
     for (int dir = 0; dir < 4; dir++) memset(loaded[dir], 0, bytes);
-    infos.push_back(GaugeIO(file, param).load(loaded, prec, gauge_param.X));
+    infos.push_back(GaugeIO(file, param).load(PlainLinks(loaded, prec, gauge_param.X)));
     for (int dir = 0; dir < 4; dir++)
       EXPECT_EQ(memcmp(loaded[dir], gauge[dir], bytes), 0) << file << " direction " << dir;
     EXPECT_TRUE(infos.back().has_checksum);
@@ -2446,6 +2463,518 @@ TEST_P(GaugeIOBackendTest, compare)
   }
 }
 #endif
+
+namespace
+{
+  // a host reference field in QDP order on the arrays of a host gauge field, with the given link type and the
+  // staggered phases and t boundary it records
+  GaugeFieldParam host_param(const HostGauge &h, QudaLinkType type = QUDA_SU3_LINKS,
+                             QudaTboundary t_boundary = QUDA_PERIODIC_T,
+                             QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO, bool applied = false)
+  {
+    QudaGaugeParam gauge_param = gauge_param_for(h.prec);
+    gauge_param.type = type;
+    gauge_param.t_boundary = t_boundary;
+    gauge_param.staggered_phase_type = phase;
+    gauge_param.staggered_phase_applied = applied;
+    GaugeFieldParam param(gauge_param, const_cast<void **>(h.data));
+    param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    return param;
+  }
+
+  // a field like another in a location, precision, reconstruct and (on the host) order; device fields are native
+  GaugeFieldParam field_param_like(const GaugeField &u, QudaFieldLocation location, QudaPrecision prec,
+                                   QudaReconstructType recon, QudaGaugeFieldOrder order = QUDA_QDP_GAUGE_ORDER)
+  {
+    GaugeFieldParam param(u);
+    param.location = location;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    param.reconstruct = recon;
+    param.setPrecision(prec, location == QUDA_CUDA_FIELD_LOCATION);
+    if (location == QUDA_CPU_FIELD_LOCATION) param.order = order;
+    param.ghostExchange = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_GHOST_EXCHANGE_PAD : QUDA_GHOST_EXCHANGE_NO;
+    return param;
+  }
+
+  // copy the links of a field into a host gauge field
+  void copy_links(HostGauge &h, const GaugeField &u)
+  {
+    auto param = host_param(h, u.LinkType(), u.TBoundary(), u.StaggeredPhase(), u.StaggeredPhaseApplied());
+    param.anisotropy = u.Anisotropy();
+    param.tadpole = u.Tadpole();
+    param.fixed = u.GaugeFixed();
+    GaugeField host(param);
+    host.copy(u);
+  }
+
+  // whether two fields hold the same links, bit for bit as double-precision host copies, on every rank
+  bool same_links(const GaugeField &a, const GaugeField &b)
+  {
+    HostGauge ha(QUDA_DOUBLE_PRECISION), hb(QUDA_DOUBLE_PRECISION);
+    copy_links(ha, a);
+    copy_links(hb, b);
+    int differ = ha == hb ? 0 : 1;
+    quda::comm_allreduce_int(differ);
+    return differ == 0;
+  }
+
+  // the messages QUDA prints (on rank 0) while a function runs, on every rank
+  template <typename F> std::string quda_output(F &&f)
+  {
+    FILE *saved = getOutputFile();
+    FILE *capture = tmpfile();
+    setOutputFile(capture);
+    f();
+    setOutputFile(saved);
+    std::string text;
+    if (quda::comm_rank() == 0) {
+      rewind(capture);
+      for (int c; (c = fgetc(capture)) != EOF;) text += static_cast<char>(c);
+    }
+    fclose(capture);
+    quda::io::broadcast(text);
+    return text;
+  }
+
+  bool announced(const std::string &output)
+  {
+    return output.find("Removed the ") != std::string::npos || output.find("Applied the ") != std::string::npos;
+  }
+
+  void remove_gauge_file(const std::string &file, QudaFileFormat format)
+  {
+    remove_saved_file(file);
+    if (saved_format(format) == QUDA_FILE_FORMAT_MILC) remove_saved_file(file + ".info");
+  }
+
+  // the formats of GaugeFieldIOTest: native SciDAC, ILDG and MILC, and the external backend with QIO
+  std::vector<QudaFileFormat> field_io_formats()
+  {
+    std::vector<QudaFileFormat> formats = {QUDA_FILE_FORMAT_QIO, QUDA_FILE_FORMAT_ILDG, QUDA_FILE_FORMAT_MILC};
+#ifdef HAVE_QIO
+    formats.push_back(QUDA_FILE_FORMAT_QIO_EXTERNAL);
+#endif
+    return formats;
+  }
+} // namespace
+
+class GaugeFieldIOTest : public ::testing::TestWithParam<QudaFileFormat>
+{
+};
+
+// a field in any location, precision, reconstruct and order saves the file its host QDP copy saves, and loads the
+// links that loading into that host copy gives
+TEST_P(GaugeFieldIOTest, layouts)
+{
+  using namespace quda;
+  const auto format = GetParam();
+  const bool milc = saved_format(format) == QUDA_FILE_FORMAT_MILC;
+  if (!is_enabled(QUDA_DOUBLE_PRECISION) || !is_enabled(QUDA_SINGLE_PRECISION)) GTEST_SKIP();
+
+  HostGauge original(QUDA_DOUBLE_PRECISION);
+  constructHostGaugeField(original.data, gauge_param_for(QUDA_DOUBLE_PRECISION), 0, nullptr);
+  const GaugeField ref(host_param(original));
+  auto param = file_io_param(format, QUDA_FILE_IO_PARALLEL);
+  param.ildg_lfn = "lfn://quda/io_test"; // the default, the file name, differs between the files compared
+
+  struct Layout {
+    std::string name;
+    QudaFieldLocation location;
+    QudaPrecision prec;
+    QudaReconstructType recon;
+    QudaGaugeFieldOrder order;
+  };
+  std::vector<Layout> layouts
+    = {{"device double", QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER},
+       {"device single", QUDA_CUDA_FIELD_LOCATION, QUDA_SINGLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER},
+       {"host MILC order", QUDA_CPU_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER},
+       {"host QDP single", QUDA_CPU_FIELD_LOCATION, QUDA_SINGLE_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER}};
+  if (is_enabled(QUDA_HALF_PRECISION))
+    layouts.push_back(
+      {"device half", QUDA_CUDA_FIELD_LOCATION, QUDA_HALF_PRECISION, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER});
+  if constexpr (is_enabled<QUDA_RECONSTRUCT_12>())
+    layouts.push_back(
+      {"device double 12", QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_12, QUDA_QDP_GAUGE_ORDER});
+  if constexpr (is_enabled<QUDA_RECONSTRUCT_8>())
+    layouts.push_back(
+      {"device double 8", QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_8, QUDA_QDP_GAUGE_ORDER});
+
+  const std::string file = "field_io.lat", host_file = "field_io_host.lat";
+  for (auto &l : layouts) {
+    SCOPED_TRACE(l.name);
+    GaugeField u(field_param_like(ref, l.location, l.prec, l.recon, l.order));
+    u.copy(ref);
+    const QudaPrecision host_prec = l.prec < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : l.prec;
+    HostGauge h(host_prec);
+    GaugeField host(host_param(h));
+    host.copy(u);
+
+    GaugeIO(file, param).save(u);
+    GaugeIO(host_file, param).save(host);
+    if (comm_rank() == 0) expect_same_saved_file(file, host_file, milc);
+
+    GaugeField loaded(field_param_like(ref, l.location, l.prec, l.recon, l.order));
+    GaugeIO(host_file, param).load(loaded);
+    HostGauge h2(host_prec);
+    GaugeField host_loaded(host_param(h2));
+    GaugeIO(host_file, param).load(host_loaded);
+    GaugeField expected(field_param_like(ref, l.location, l.prec, l.recon, l.order));
+    expected.copy(host_loaded);
+    EXPECT_TRUE(same_links(loaded, expected));
+
+    remove_gauge_file(file, format);
+    remove_gauge_file(host_file, format);
+  }
+
+  // an extended field saves its interior
+  if (saved_format(format) == QUDA_FILE_FORMAT_QIO) {
+    SCOPED_TRACE("extended");
+    GaugeField u(field_param_like(ref, QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO));
+    u.copy(ref);
+    lat_dim_t R = {1, 1, 1, 1};
+    std::unique_ptr<GaugeField> extended(createExtendedGauge(u, R));
+    GaugeIO(file, param).save(*extended);
+    GaugeIO(host_file, param).save(ref);
+    if (comm_rank() == 0) expect_same_saved_file(file, host_file, milc);
+    remove_gauge_file(file, format);
+    remove_gauge_file(host_file, format);
+  }
+}
+
+// a double field saved in single precision saves the file of its single-precision copy (MILC files hold single
+// precision anyway, so for them the default precision gives the same file too)
+TEST_P(GaugeFieldIOTest, save_precision)
+{
+  using namespace quda;
+  const auto format = GetParam();
+  const bool milc = saved_format(format) == QUDA_FILE_FORMAT_MILC;
+  if (!is_enabled(QUDA_DOUBLE_PRECISION) || !is_enabled(QUDA_SINGLE_PRECISION)) GTEST_SKIP();
+
+  HostGauge original(QUDA_DOUBLE_PRECISION), single(QUDA_SINGLE_PRECISION);
+  constructHostGaugeField(original.data, gauge_param_for(QUDA_DOUBLE_PRECISION), 0, nullptr);
+  const GaugeField ref(host_param(original));
+  GaugeField single_copy(host_param(single));
+  single_copy.copy(ref);
+  GaugeField device(field_param_like(ref, QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO));
+  device.copy(ref);
+  auto param = file_io_param(format, QUDA_FILE_IO_PARALLEL);
+  param.ildg_lfn = "lfn://quda/io_test"; // the default, the file name, differs between the files compared
+
+  const std::string file = "save_prec.lat", single_file = "save_prec_single.lat", device_file = "save_prec_dev.lat";
+  GaugeIO(file, param).save(ref, QUDA_SINGLE_PRECISION);
+  GaugeIO(device_file, param).save(device, QUDA_SINGLE_PRECISION);
+  GaugeIO(single_file, param).save(single_copy);
+  if (comm_rank() == 0) {
+    expect_same_saved_file(file, single_file, milc);
+    expect_same_saved_file(device_file, single_file, milc);
+  }
+  if (milc) {
+    GaugeIO(file, param).save(ref);
+    if (comm_rank() == 0) expect_same_saved_file(file, single_file, milc);
+  }
+  for (auto &f : {file, single_file, device_file}) remove_gauge_file(f, format);
+}
+
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeFieldIOTest, ::testing::ValuesIn(field_io_formats()),
+                         [](testing::TestParamInfo<QudaFileFormat> param) {
+                           return std::string(quda::get_file_format_str(param.param));
+                         });
+
+namespace
+{
+  // MILC's phase of a link and the antiperiodic sign on the last slices, from global coordinates
+  int milc_link_sign(int dir, const int g[4], int T, bool phases, int sign_slices)
+  {
+    const int exponents[4] = {g[3], g[3] + g[0], g[3] + g[0] + g[1], 0};
+    int s = phases && exponents[dir] % 2 != 0 ? -1 : 1;
+    if (dir == 3 && g[3] >= T - sign_slices) s = -s;
+    return s;
+  }
+
+  // the links of a double host field times the sign of each link from its global coordinates
+  template <typename Sign> void signed_links(HostGauge &out, const HostGauge &in, Sign &&sign)
+  {
+    using namespace quda;
+    const int X[4] = {xdim, ydim, zdim, tdim};
+    for (int dir = 0; dir < 4; dir++) {
+      auto u = static_cast<double *>(out.data[dir]);
+      auto v = static_cast<const double *>(in.data[dir]);
+      for (int r = 0; r < V; r++) {
+        int x[4], g[4], rest = r;
+        for (int d = 0; d < 4; d++) {
+          x[d] = rest % X[d];
+          rest /= X[d];
+          g[d] = x[d] + comm_coord(d) * X[d];
+        }
+        const size_t i = ((x[0] + x[1] + x[2] + x[3]) % 2) * Vh + r / 2;
+        const int s = sign(dir, g);
+        for (int k = 0; k < 18; k++) u[i * 18 + k] = s * v[i * 18 + k];
+      }
+    }
+  }
+
+  // the number of links of a host field that differ from a reference, over all ranks
+  int differing_links(const HostGauge &a, const HostGauge &b)
+  {
+    int n = 0;
+    for (int dir = 0; dir < 4; dir++)
+      for (int i = 0; i < V; i++)
+        if (memcmp(static_cast<const char *>(a.data[dir]) + i * 18 * a.prec,
+                   static_cast<const char *>(b.data[dir]) + i * 18 * b.prec, 18 * a.prec)
+            != 0)
+          n++;
+    quda::comm_allreduce_int(n);
+    return n;
+  }
+
+  quda::FileIOParam converting(quda::FileIOParam param)
+  {
+    param.convert_link_conventions = true;
+    return param;
+  }
+} // namespace
+
+// tuple types: staggered phase type, t boundary
+using convention_test_t = ::testing::tuple<QudaStaggeredPhase, QudaTboundary>;
+
+class GaugeConventionTest : public ::testing::TestWithParam<convention_test_t>
+{
+};
+
+// with the conversion on, a field with staggered phases applied (by applyStaggeredPhase on the device) saves the file
+// of its plain links, a field marked phased loads the plain links with the phases applied as applyStaggeredPhase
+// applies them, and the observables are those of the plain links; each conversion is announced
+TEST_P(GaugeConventionTest, thin_links)
+{
+  using namespace quda;
+  const auto phase = ::testing::get<0>(GetParam());
+  const auto t_boundary = ::testing::get<1>(GetParam());
+  if (!is_enabled(QUDA_DOUBLE_PRECISION)) GTEST_SKIP();
+
+  HostGauge original(QUDA_DOUBLE_PRECISION);
+  constructHostGaugeField(original.data, gauge_param_for(QUDA_DOUBLE_PRECISION), 0, nullptr);
+  const GaugeField plain(host_param(original));
+  const GaugeField ref(host_param(original, QUDA_SU3_LINKS, t_boundary, phase));
+  GaugeField phased(field_param_like(ref, QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO));
+  phased.copy(ref);
+  phased.applyStaggeredPhase(phase);
+
+  const auto param = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  const std::string file = "convention.lat", plain_file = "convention_plain.lat";
+  auto output = quda_output([&] { GaugeIO(file, converting(param)).save(phased); });
+  EXPECT_TRUE(announced(output)) << output;
+  GaugeIO(plain_file, param).save(plain);
+  if (comm_rank() == 0) expect_same_saved_file(file, plain_file, false);
+
+  auto loaded_param = field_param_like(ref, QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO);
+  loaded_param.staggeredPhaseApplied = true;
+  GaugeField loaded(loaded_param);
+  output = quda_output([&] { GaugeIO(plain_file, converting(param)).load(loaded); });
+  EXPECT_TRUE(announced(output)) << output;
+  EXPECT_TRUE(loaded.StaggeredPhaseApplied());
+  EXPECT_TRUE(same_links(loaded, phased));
+
+  const auto obs = gauge_observables(phased, true);
+  const auto plain_obs = gauge_observables(plain);
+  EXPECT_DOUBLE_EQ(obs.plaq, plain_obs.plaq);
+  EXPECT_DOUBLE_EQ(obs.linktr, plain_obs.linktr);
+  EXPECT_EQ(obs.nersc_checksum, plain_obs.nersc_checksum);
+
+  // a field with a staggered phase type whose phases aren't applied holds no boundary sign either
+  // (applyStaggeredPhase applies it with the phases), so nothing is converted
+  const GaugeField unapplied(host_param(original, QUDA_SU3_LINKS, t_boundary, phase, false));
+  output = quda_output([&] { GaugeIO(file, converting(param)).save(unapplied); });
+  EXPECT_FALSE(announced(output)) << output;
+  if (comm_rank() == 0) expect_same_saved_file(file, plain_file, false);
+
+  remove_saved_file(file);
+  remove_saved_file(plain_file);
+}
+
+INSTANTIATE_TEST_SUITE_P(Gauge, GaugeConventionTest,
+                         ::testing::Combine(::testing::Values(QUDA_STAGGERED_PHASE_MILC, QUDA_STAGGERED_PHASE_TIFR,
+                                                              QUDA_STAGGERED_PHASE_CHROMA),
+                                            ::testing::Values(QUDA_PERIODIC_T, QUDA_ANTI_PERIODIC_T)),
+                         [](testing::TestParamInfo<convention_test_t> param) {
+                           std::string name;
+                           switch (::testing::get<0>(param.param)) {
+                           case QUDA_STAGGERED_PHASE_MILC: name = "milc"; break;
+                           case QUDA_STAGGERED_PHASE_TIFR: name = "tifr"; break;
+                           default: name = "chroma"; break;
+                           }
+                           return name
+                             + (::testing::get<1>(param.param) == QUDA_PERIODIC_T ? "_periodic" : "_antiperiodic");
+                         });
+
+// without the conversion (the default), a field marked phased and antiperiodic saves and loads its links as they are,
+// as their plain arrays do, and nothing is announced
+TEST(GaugeConventionOffTest, as_they_are)
+{
+  using namespace quda;
+  if (!is_enabled(QUDA_DOUBLE_PRECISION)) GTEST_SKIP();
+  HostGauge original(QUDA_DOUBLE_PRECISION), loaded(QUDA_DOUBLE_PRECISION), plain_loaded(QUDA_DOUBLE_PRECISION);
+  constructHostGaugeField(original.data, gauge_param_for(QUDA_DOUBLE_PRECISION), 0, nullptr);
+  const GaugeField marked(host_param(original, QUDA_SU3_LINKS, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC, true));
+
+  const auto param = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  const std::string file = "convention_off.lat", plain_file = "convention_off_plain.lat";
+  auto output = quda_output([&] { GaugeIO(file, param).save(marked); });
+  EXPECT_FALSE(announced(output)) << output;
+  GaugeIO(plain_file, param)
+    .save(PlainLinks(original.data, QUDA_DOUBLE_PRECISION, gauge_param_for(QUDA_DOUBLE_PRECISION).X));
+  if (comm_rank() == 0) expect_same_saved_file(file, plain_file, false);
+
+  GaugeField marked_loaded(host_param(loaded, QUDA_SU3_LINKS, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC, true));
+  output = quda_output([&] { GaugeIO(file, param).load(marked_loaded); });
+  EXPECT_FALSE(announced(output)) << output;
+  EXPECT_EQ(differing_links(loaded, original), 0);
+
+  remove_saved_file(file);
+  remove_saved_file(plain_file);
+}
+
+// with the conversion on, long links take MILC's phases and the antiperiodic sign on the last three time slices (the
+// test utilities' applyGaugeFieldScaling_long), and Wilson-type links (no staggered phase type) the sign on the t
+// links of the last time slice only; checked link by link from the global coordinates
+TEST(GaugeConventionLinksTest, long_and_wilson)
+{
+  using namespace quda;
+  if (!is_enabled(QUDA_DOUBLE_PRECISION)) GTEST_SKIP();
+  const int T = tdim * comm_dim(3);
+  HostGauge original(QUDA_DOUBLE_PRECISION), expected(QUDA_DOUBLE_PRECISION), loaded(QUDA_DOUBLE_PRECISION);
+  constructHostGaugeField(original.data, gauge_param_for(QUDA_DOUBLE_PRECISION), 0, nullptr);
+  const auto param = file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL);
+  const std::string file = "convention_links.lat", plain_file = "convention_links_plain.lat";
+  GaugeIO(plain_file, param)
+    .save(PlainLinks(original.data, QUDA_DOUBLE_PRECISION, gauge_param_for(QUDA_DOUBLE_PRECISION).X));
+
+  struct Case {
+    std::string name;
+    QudaLinkType type;
+    QudaStaggeredPhase phase;
+    bool applied;
+    bool phases;
+    int sign_slices;
+  };
+  for (auto &c : {Case {"long links", QUDA_THREE_LINKS, QUDA_STAGGERED_PHASE_MILC, true, true, 3},
+                  Case {"Wilson links", QUDA_SU3_LINKS, QUDA_STAGGERED_PHASE_NO, false, false, 1}}) {
+    SCOPED_TRACE(c.name);
+    signed_links(expected, original,
+                 [&](int dir, const int g[4]) { return milc_link_sign(dir, g, T, c.phases, c.sign_slices); });
+
+    loaded.clear();
+    GaugeField u(host_param(loaded, c.type, QUDA_ANTI_PERIODIC_T, c.phase, c.applied));
+    auto output = quda_output([&] { GaugeIO(plain_file, converting(param)).load(u); });
+    EXPECT_TRUE(announced(output)) << output;
+    EXPECT_EQ(differing_links(loaded, expected), 0);
+
+    const GaugeField v(host_param(expected, c.type, QUDA_ANTI_PERIODIC_T, c.phase, c.applied));
+    GaugeIO(file, converting(param)).save(v);
+    if (comm_rank() == 0) expect_same_saved_file(file, plain_file, false);
+    remove_saved_file(file);
+  }
+  remove_saved_file(plain_file);
+}
+
+// the error paths, each of which aborts: run one at a time with --gtest_also_run_disabled_tests (validate/phase13_errors.sh)
+namespace
+{
+  QudaGaugeParam plain_write_param()
+  {
+    auto gauge_param = read_gauge_param(QUDA_DOUBLE_PRECISION);
+    return gauge_param;
+  }
+
+  void write_with(void (*change)(QudaGaugeParam &), bool read)
+  {
+    HostGauge original(QUDA_DOUBLE_PRECISION);
+    auto gauge_param = plain_write_param();
+    constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+    const std::string file = "error.lat";
+    if (read) {
+      quda::GaugeIO(file, quda::FileIOParam()).save(PlainLinks(original.data, QUDA_DOUBLE_PRECISION, gauge_param.X));
+      change(gauge_param);
+      readGaugeQuda(file.c_str(), &gauge_param);
+    } else {
+      loadGaugeQuda(original.data, &gauge_param);
+      change(gauge_param);
+      writeGaugeQuda(file.c_str(), &gauge_param);
+    }
+  }
+
+  void convert_with(QudaLinkType type, QudaStaggeredPhase phase, double i_mu, int t = 0)
+  {
+    HostGauge original(QUDA_DOUBLE_PRECISION);
+    constructHostGaugeField(original.data, gauge_param_for(QUDA_DOUBLE_PRECISION), 0, nullptr);
+    auto param = host_param(original, type, QUDA_ANTI_PERIODIC_T, phase, true);
+    param.i_mu = i_mu;
+    if (t > 0) param.x[3] = t;
+    const GaugeField u(param);
+    quda::GaugeIO("error.lat", converting(file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL))).save(u);
+  }
+} // namespace
+
+TEST(GaugeErrorTest, DISABLED_write_antiperiodic)
+{
+  write_with([](QudaGaugeParam &p) { p.t_boundary = QUDA_ANTI_PERIODIC_T; }, false);
+}
+TEST(GaugeErrorTest, DISABLED_write_phases)
+{
+  write_with([](QudaGaugeParam &p) { p.staggered_phase_applied = 1; }, false);
+}
+TEST(GaugeErrorTest, DISABLED_write_i_mu)
+{
+  write_with([](QudaGaugeParam &p) { p.i_mu = 0.1; }, false);
+}
+TEST(GaugeErrorTest, DISABLED_write_resident_antiperiodic)
+{
+  HostGauge original(QUDA_DOUBLE_PRECISION);
+  auto gauge_param = plain_write_param();
+  constructHostGaugeField(original.data, gauge_param, 0, nullptr);
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  loadGaugeQuda(original.data, &gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  writeGaugeQuda("error.lat", &gauge_param);
+}
+TEST(GaugeErrorTest, DISABLED_read_antiperiodic)
+{
+  write_with([](QudaGaugeParam &p) { p.t_boundary = QUDA_ANTI_PERIODIC_T; }, true);
+}
+TEST(GaugeErrorTest, DISABLED_read_phases)
+{
+  write_with([](QudaGaugeParam &p) { p.staggered_phase_applied = 1; }, true);
+}
+TEST(GaugeErrorTest, DISABLED_read_i_mu)
+{
+  write_with([](QudaGaugeParam &p) { p.i_mu = 0.1; }, true);
+}
+TEST(GaugeErrorTest, DISABLED_convert_i_mu) { convert_with(QUDA_SU3_LINKS, QUDA_STAGGERED_PHASE_MILC, 0.1); }
+TEST(GaugeErrorTest, DISABLED_convert_phase_type) { convert_with(QUDA_SU3_LINKS, QUDA_STAGGERED_PHASE_NO, 0.0); }
+TEST(GaugeErrorTest, DISABLED_convert_long_tifr) { convert_with(QUDA_THREE_LINKS, QUDA_STAGGERED_PHASE_TIFR, 0.0); }
+TEST(GaugeErrorTest, DISABLED_convert_odd_extent)
+{
+  convert_with(QUDA_SU3_LINKS, QUDA_STAGGERED_PHASE_MILC, 0.0, tdim - 1);
+}
+TEST(GaugeErrorTest, DISABLED_momentum)
+{
+  HostGauge original(QUDA_DOUBLE_PRECISION);
+  auto param = host_param(original, QUDA_SU3_LINKS);
+  param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  const GaugeField u(param);
+  quda::GaugeIO("error.lat", file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL)).save(u);
+}
+TEST(GaugeErrorTest, DISABLED_load_extended)
+{
+  using namespace quda;
+  HostGauge original(QUDA_DOUBLE_PRECISION);
+  constructHostGaugeField(original.data, gauge_param_for(QUDA_DOUBLE_PRECISION), 0, nullptr);
+  const GaugeField ref(host_param(original));
+  GaugeField u(field_param_like(ref, QUDA_CUDA_FIELD_LOCATION, QUDA_DOUBLE_PRECISION, QUDA_RECONSTRUCT_NO));
+  u.copy(ref);
+  std::unique_ptr<GaugeField> extended(createExtendedGauge(u, lat_dim_t {1, 1, 1, 1}));
+  quda::GaugeIO("error.lat", file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL)).save(ref);
+  quda::GaugeIO("error.lat", file_io_param(QUDA_FILE_FORMAT_QIO, QUDA_FILE_IO_PARALLEL)).load(*extended);
+}
 
 int main(int argc, char **argv)
 {
