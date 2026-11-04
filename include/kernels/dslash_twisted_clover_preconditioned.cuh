@@ -89,7 +89,7 @@ namespace quda
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
 
-          const complex<real> b(0.0, chirality == 0 ? arg.b : -arg.b);
+          const complex<real> b(real(0), chirality == 0 ? arg.b : -arg.b);
           Mat A = arg.A(coord.x_cb, parity, chirality);
           HalfVector chi = out.chiral_project(chirality);
           chi = A * chi + b * chi;

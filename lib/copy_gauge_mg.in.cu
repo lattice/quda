@@ -1,197 +1,44 @@
-#include "gauge_field_order.h"
-#include "copy_gauge_helper.hpp"
-#include "multigrid.h"
+#include <copy_gauge_mg.hpp>
+#include <instantiate.h>
 
-namespace quda {
+namespace quda
+{
 
-  constexpr bool fine_grain() { return true; }
+  // clang-format off
+  constexpr QudaPrecision prec_in = QUDA_@QUDA_COPY_GAUGE_PREC_IN@_PRECISION;
+  constexpr QudaPrecision prec_out = QUDA_@QUDA_COPY_GAUGE_PREC_OUT@_PRECISION;
+  // clang-format on
+  using store_in_t = typename precision_type_mapper<prec_in>::type;
+  using store_out_t = typename precision_type_mapper<prec_out>::type;
 
-  template <typename sFloatOut, typename FloatIn, int Nc, typename InOrder>
-  void copyGaugeMG(const InOrder &inOrder, GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-                   double scale, sFloatOut *Out, sFloatOut **outGhost, int type)
-  {
-    typedef typename mapper<sFloatOut>::type FloatOut;
-    constexpr int length = 2*Nc*Nc;
-
-    if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
-      errorQuda("Reconstruct type %d not supported", out.Reconstruct());
-
-    if constexpr (fine_grain()) {
-      if (out.Precision() == QUDA_HALF_PRECISION) {
-        if (in.Precision() == QUDA_HALF_PRECISION) {
-          out.Scale(in.Scale());
-        } else {
-          InOrder in_(const_cast<GaugeField &>(in));
-          out.Scale(in.abs_max());
-        }
-      }
-    }
-
-    if (out.isNative()) {
-
-      if constexpr (fine_grain()) {
-        if (outGhost) {
-          typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, false, sFloatOut> G;
-          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                             type);
-        } else {
-          typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, true, sFloatOut> G;
-          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                             type);
-        }
-      } else {
-        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO, length>::type G;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-      }
-
-    } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
-
-      if constexpr (fine_grain()) {
-        typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_QDP_GAUGE_ORDER, true, sFloatOut> G;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-      } else {
-        typedef typename gauge::QDPOrder<FloatOut, length> G;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-      }
-
-    } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
-
-      if constexpr (fine_grain()) {
-        typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_MILC_GAUGE_ORDER, true, sFloatOut> G;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-      } else {
-        using G = typename gauge::MILCOrder<FloatOut, length>;
-        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, scale,
-                                                           type);
-      }
-
-    } else {
-      errorQuda("Gauge field %d order not supported", out.Order());
-    }
-
-  }
-
-  template <int Nc, typename sFloatOut, typename sFloatIn>
-  void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale, sFloatOut *Out,
-                   sFloatIn *In, sFloatOut **outGhost, sFloatIn **inGhost, int type)
-  {
-    using FloatIn = typename mapper<sFloatIn>::type;
-
-    if (in.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Reconstruct type %d not supported", in.Reconstruct());
-
-    if (in.isNative()) {
-      if constexpr (fine_grain()) {
-        if (inGhost) {
-          typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, false, sFloatIn> G;
-          copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, scale,
-                                              Out, outGhost, type);
-        } else {
-          typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, true, sFloatIn> G;
-          copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, scale,
-                                              Out, outGhost, type);
-        }
-      } else {
-        typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO, 2 * Nc * Nc>::type G;
-        copyGaugeMG<sFloatOut, FloatIn, Nc>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
-      }
-    } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
-
-      if constexpr (fine_grain()) {
-        typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_QDP_GAUGE_ORDER, true, sFloatIn> G;
-        copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, scale, Out,
-                                            outGhost, type);
-      } else {
-        using G = typename gauge::QDPOrder<FloatIn, 2 * Nc * Nc>;
-        copyGaugeMG<sFloatOut, FloatIn, Nc>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
-      }
-
-    } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-
-      if constexpr (fine_grain()) {
-        typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_MILC_GAUGE_ORDER, true, sFloatIn> G;
-        copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, scale, Out,
-                                            outGhost, type);
-      } else {
-        using G = typename gauge::MILCOrder<FloatIn, 2 * Nc * Nc>;
-        copyGaugeMG<sFloatOut, FloatIn, Nc>(G(in, In, inGhost), out, in, location, scale, Out, outGhost, type);
-      }
-
-    } else {
-      errorQuda("Gauge field %d order not supported", in.Order());
-    }
-  }
-
+  // clang-format off
   template <int nColor>
-  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale, void *Out,
-                          void *In, void **ghostOut, void **ghostIn, int type);
+  void copyGenericGaugeMG_@QUDA_COPY_GAUGE_PREC_IN_LOWER@_@QUDA_COPY_GAUGE_PREC_OUT_LOWER@(
+    GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale, void *Out, void *In,
+    void **ghostOut, void **ghostIn, int type);
+  // clang-format on
 
+  // clang-format off
   constexpr int nColor = @QUDA_MULTIGRID_NVEC@;
+  // clang-format on
 
+  // clang-format off
   template <>
-  void copyGenericGaugeMG<nColor>(GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale,
-                                  void *Out, void *In, void **ghostOut, void **ghostIn, int type)
+  void copyGenericGaugeMG_@QUDA_COPY_GAUGE_PREC_IN_LOWER@_@QUDA_COPY_GAUGE_PREC_OUT_LOWER@<nColor>(
+    GaugeField &out, const GaugeField &in, QudaFieldLocation location, double scale, void *Out, void *In,
+    void **ghostOut, void **ghostIn, int type)
+  // clang-format on
   {
     if (!fine_grain() && (out.Precision() < QUDA_SINGLE_PRECISION || in.Precision() < QUDA_SINGLE_PRECISION))
       errorQuda("Precision format not supported");
 
-    if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      if constexpr (is_enabled_multigrid_double()) {
-        if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGaugeMG<2 * nColor>(out, in, location, scale, (double *)Out, (double *)In, (double **)ghostOut,
-                                  (double **)ghostIn, type);
-        } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGaugeMG<2 * nColor>(out, in, location, scale, (double *)Out, (float *)In, (double **)ghostOut,
-                                  (float **)ghostIn, type);
-        } else if (in.Precision() == QUDA_HALF_PRECISION) {
-          copyGaugeMG<2 * nColor>(out, in, location, scale, (double *)Out, (short *)In, (double **)ghostOut,
-                                  (short **)ghostIn, type);
-        } else {
-          errorQuda("Precision %d not supported", in.Precision());
-        }
-      } else {
-        errorQuda("Double precision multigrid has not been enabled");
-      }
-    } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-        if constexpr (is_enabled_multigrid_double()) {
-          copyGaugeMG<2 * nColor>(out, in, location, scale, (float *)Out, (double *)In, (float **)ghostOut,
-                                  (double **)ghostIn, type);
-        } else {
-          errorQuda("Double precision multigrid has not been enabled");
-        }
-      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGaugeMG<2 * nColor>(out, in, location, scale, (float *)Out, (float *)In, (float **)ghostOut,
-                                (float **)ghostIn, type);
-      } else if (in.Precision() == QUDA_HALF_PRECISION) {
-        copyGaugeMG<2 * nColor>(out, in, location, scale, (float *)Out, (short *)In, (float **)ghostOut,
-                                (short **)ghostIn, type);
-      } else {
-	errorQuda("Precision %d not supported", in.Precision());
-      }
-    } else if (out.Precision() == QUDA_HALF_PRECISION) {
-      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-        if constexpr (is_enabled_multigrid_double()) {
-          copyGaugeMG<2 * nColor>(out, in, location, scale, (short *)Out, (double *)In, (short **)ghostOut,
-                                  (double **)ghostIn, type);
-        } else {
-          errorQuda("Double precision multigrid has not been enabled");
-        }
-      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-        copyGaugeMG<2 * nColor>(out, in, location, scale, (short *)Out, (float *)In, (short **)ghostOut,
-                                (float **)ghostIn, type);
-      } else if (in.Precision() == QUDA_HALF_PRECISION) {
-        copyGaugeMG<2 * nColor>(out, in, location, scale, (short *)Out, (short *)In, (short **)ghostOut,
-                                (short **)ghostIn, type);
-      } else {
-	errorQuda("Precision %d not supported", in.Precision());
-      }
+    constexpr bool uses_double = (prec_in == QUDA_DOUBLE_PRECISION || prec_out == QUDA_DOUBLE_PRECISION);
+    if constexpr (uses_double && !is_enabled_multigrid_double()) {
+      errorQuda("Double precision multigrid has not been enabled");
     } else {
-      errorQuda("Precision %d not supported", out.Precision());
-    } 
-  } 
+      copyGaugeMG<2 * nColor>(out, in, location, scale, (store_out_t *)Out, (store_in_t *)In, (store_out_t **)ghostOut,
+                              (store_in_t **)ghostIn, type);
+    }
+  }
 
 } // namespace quda

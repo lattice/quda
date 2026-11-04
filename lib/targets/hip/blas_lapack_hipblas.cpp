@@ -229,7 +229,7 @@ namespace quda
           pool_host_pinned_free(A_h);
 #endif
         } else {
-          errorQuda("%s not implemented for precision=%d", __func__, prec);
+          errorQuda("Not implemented for precision=%d", prec);
         }
 
         if (location == QUDA_CPU_FIELD_LOCATION) {

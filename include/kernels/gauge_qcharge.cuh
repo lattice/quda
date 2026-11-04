@@ -9,6 +9,7 @@ namespace quda
   template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false>
   struct QChargeArg : public ReduceArg<array<device_reduce_t, 3>> {
     using Float = Float_;
+    using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
@@ -36,13 +37,14 @@ namespace quda
     // return the qcharge and field strength at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &E, int x_cb, int parity)
     {
-      using real = typename Arg::Float;
+      using real = typename Arg::real;
       using Link = Matrix<complex<real>, Arg::nColor>;
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
-      reduce_t E_local {};
+      array<reduction_t, 3> E_local {};
       auto &Q = E_local[2];
+      real E_compute[2] = {real(0), real(0)};
 
       // Load the field-strength tensor from global memory
       //F0 = F[Y,X], F1 = F[Z,X], F2 = F[Z,Y],
@@ -60,14 +62,16 @@ namespace quda
 
         // Sum trace of square, normalise in .cu
         if (i < 3)
-          E_local[0] -= getTrace(tmp * tmp).real(); // spatial
+          E_compute[0] -= getTrace(tmp * tmp).real(); // spatial
         else
-          E_local[1] -= getTrace(tmp * tmp).real(); // temporal
+          E_compute[1] -= getTrace(tmp * tmp).real(); // temporal
       }
+      E_local[0] = static_cast<reduction_t>(E_compute[0]);
+      E_local[1] = static_cast<reduction_t>(E_compute[1]);
 
       // now compute topological charge
-      double Q_idx = 0.0;
-      double Qi[3] = {0.0,0.0,0.0};
+      real Q_idx = real(0);
+      real Qi[3] = {real(0), real(0), real(0)};
       // unroll computation
 #pragma unroll
       for (int i=0; i<3; i++) {
@@ -79,8 +83,8 @@ namespace quda
       // apply correct levi-civita symbol
       for (int i=0; i<3; i++) i % 2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
       const real q_site = static_cast<real>(Q_idx) * q_norm;
-      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = q_site;
-      Q = q_site;
+      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = static_cast<typename Arg::Float>(q_site);
+      Q = static_cast<reduction_t>(q_site);
 
       return operator()(E, E_local);
     }

@@ -295,7 +295,8 @@ namespace quda
 #endif
 
 #if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)                          \
-  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE))
+  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE)                                                                          \
+      && (defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_IS_FLOATFLOAT)))
   template <> void comm_allreduce_sum<std::vector<device_reduce_t>>(std::vector<device_reduce_t> &a)
   {
     comm_allreduce_sum_array(a.data(), a.size());
@@ -351,7 +352,8 @@ namespace quda
 #endif
 
 #if defined(QUDA_REDUCTION_ALGORITHM_KAHAN) || defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)                          \
-  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE))
+  || (defined(QUDA_REDUCTION_ALGORITHM_NAIVE)                                                                          \
+      && (defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_IS_FLOATFLOAT)))
   template <> void comm_allreduce_sum<device_reduce_t>(device_reduce_t &a)
   {
     get_current_communicator().comm_allreduce_sum_array(&a, 1);
@@ -391,7 +393,8 @@ namespace quda
   }
 #endif
 
-#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
+#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE)                                                                            \
+  && (defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE) || defined(QUDA_REDUCTION_IS_FLOATFLOAT))
   template <> void comm_allreduce_max<std::vector<device_reduce_t>>(std::vector<device_reduce_t> &a)
   {
     comm_allreduce_max_array(a.data(), a.size());
@@ -426,8 +429,15 @@ namespace quda
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }
 
-#if defined(QUDA_ENABLE_DOUBLEDOUBLE)
+#if defined(QUDA_ENABLE_DOUBLEDOUBLE) && !defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
   template <> void comm_allreduce_max<std::vector<deviation_t<doubledouble>>>(std::vector<deviation_t<doubledouble>> &a)
+  {
+    get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
+  }
+#endif
+
+#if defined(QUDA_REDUCTION_IS_FLOATFLOAT) || defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
+  template <> void comm_allreduce_max<std::vector<deviation_t<reduction_t>>>(std::vector<deviation_t<reduction_t>> &a)
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }

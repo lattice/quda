@@ -1,3 +1,4 @@
+#include <dslash_helper.cuh>
 #include <gauge_field_order.h>
 #ifdef QUDA_MMA_AVAILABLE
 #include <mdw_dslash5_tensor_core.cuh>
@@ -27,6 +28,7 @@ namespace quda {
     struct FusedDslashArg : kernel_param<> {
       using storage_type = storage_type_;
       using real = typename mapper<storage_type>::type; // the compute type for the in kernel computation
+      static constexpr int hop_unroll = wilson_dslash_hop_unroll<real>;
       static constexpr int nColor = nColor_;
       static constexpr QudaReconstructType recon = recon_;
       static constexpr int Ls = Ls_;
@@ -206,7 +208,7 @@ namespace quda {
 
       const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
 
-#pragma unroll
+#pragma unroll Arg::hop_unroll
       for (int d = 0; d < 4; d++) // loop over dimension
       {
         int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};

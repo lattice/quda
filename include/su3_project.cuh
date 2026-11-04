@@ -84,8 +84,8 @@ namespace quda {
   template <typename Float>
   __host__ __device__ inline void polarSu3(Matrix<complex<Float>,3> &in, Float tol)
   {
-    constexpr Float negative_third = -1.0/3.0;
-    constexpr Float negative_sixth = -1.0/6.0;
+    constexpr Float negative_third(-1.0 / 3.0);
+    constexpr Float negative_sixth(-1.0 / 6.0);
     Matrix<complex<Float>,3> out = in;
     Matrix<complex<Float>,3> inv = inverse(in);
 

@@ -84,7 +84,7 @@ namespace quda
           for (uint64_t i = 0; i < batch; i++) { invertEigen<MatrixXcd, double>(A_eig, Ainv_eig, n, i); }
           flops += batch * FLOPS_ZGETRF(n, n);
         } else {
-          errorQuda("%s not implemented for precision = %d", __func__, prec);
+          errorQuda("Not implemented for precision = %d", prec);
         }
 
         gettimeofday(&stop, NULL);
