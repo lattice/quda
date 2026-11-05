@@ -44,7 +44,7 @@ namespace quda
 
       array<reduction_t, 3> E_local {};
       auto &Q = E_local[2];
-      real E_compute[2] = {real(0), real(0)};
+      real E_compute[2] = {real(0.0), real(0.0)};
 
       // Load the field-strength tensor from global memory
       //F0 = F[Y,X], F1 = F[Z,X], F2 = F[Z,Y],
@@ -70,8 +70,8 @@ namespace quda
       E_local[1] = static_cast<reduction_t>(E_compute[1]);
 
       // now compute topological charge
-      real Q_idx = real(0);
-      real Qi[3] = {real(0), real(0), real(0)};
+      real Q_idx = real(0.0);
+      real Qi[3] = {real(0.0), real(0.0), real(0.0)};
       // unroll computation
 #pragma unroll
       for (int i=0; i<3; i++) {

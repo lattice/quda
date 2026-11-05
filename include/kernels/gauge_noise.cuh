@@ -39,7 +39,7 @@ namespace quda {
   template<typename real, typename Arg> // Gauss
   __device__ __host__ inline void genGauss(Arg &arg, RNGState& localState, int parity, int x_cb, int g, int r, int c)
   {
-    real phi = real(2) * uniform<real>::rand(localState);
+    real phi = real(2.0) * uniform<real>::rand(localState);
     real radius = uniform<real>::rand(localState);
     radius = sqrt(-log(radius));
     real phi_sin, phi_cos;

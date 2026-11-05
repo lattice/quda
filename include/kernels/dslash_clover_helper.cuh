@@ -68,12 +68,12 @@ namespace quda {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
           a = static_cast<real>(real_t(2) * kappa * mu);
-          b = real(1);
+          b = real(1.0);
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
           a = static_cast<real>(real_t(-2) * kappa * mu);
-          b = real(1) / (real(1) + a * a);
+          b = real(1.0) / (real(1.0) + a * a);
         }
-        if (dagger) a *= real(-1);
+        if (dagger) a *= real(-1.0);
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT){
           a = static_cast<real>(real_t(2) * kappa * mu);
@@ -82,7 +82,7 @@ namespace quda {
           a = static_cast<real>(real_t(-2) * kappa * mu);
           b = static_cast<real>(real_t(2) * kappa * epsilon);
         }
-        if (dagger) a *= real(-1);
+        if (dagger) a *= real(-1.0);
       }
       // factor of 2 comes from clover normalization we need to correct for
       a *= real(0.5);
@@ -156,7 +156,7 @@ namespace quda {
 
 #pragma unroll
       for (int chirality=0; chirality<2; chirality++) {
-        const complex<real> a(real(0), chirality == 0 ? arg.a : -arg.a);
+        const complex<real> a(real(0.0), chirality == 0 ? arg.a : -arg.a);
         Mat A = arg.clover(x_cb, clover_parity, chirality);
 
         half_fermion in_chi = in.chiral_project(chirality);
@@ -228,7 +228,7 @@ namespace quda {
       }
 
       // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
-      const complex<real> a(real(0), chirality == 0 ? arg.a : -arg.a);
+      const complex<real> a(real(0.0), chirality == 0 ? arg.a : -arg.a);
 
       SharedMemoryCache<half_fermion> cache {*this};
 

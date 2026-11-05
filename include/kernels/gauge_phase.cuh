@@ -26,7 +26,7 @@ namespace quda {
     {
       // if staggered phases are applied, then we are removing them
       // else we are applying them
-      real dir = u.StaggeredPhaseApplied() ? real(-1) : real(1);
+      real dir = u.StaggeredPhaseApplied() ? real(-1.0) : real(1.0);
 
       i_mu_phase = complex<real>(static_cast<real>(cos(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))),
                                  dir * static_cast<real>(sin(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))));
@@ -41,7 +41,7 @@ namespace quda {
 
   // FIXME need to check this with odd local volumes
   template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, const Arg &arg) {
-    typename Arg::real phase = typename Arg::real(1);
+    typename Arg::real phase = typename Arg::real(1.0);
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
       if (dim==0) {
         phase = (1 - 2 * (t % 2));
@@ -50,7 +50,7 @@ namespace quda {
       } else if (dim == 2) {
         phase = (1 - 2 * ((t + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1);
+        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim==0) {
@@ -60,7 +60,7 @@ namespace quda {
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + t) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1);
+        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {
       // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
@@ -71,7 +71,7 @@ namespace quda {
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = ((t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1)) * (1 - 2 * ((1 + x + y + z) % 2));
+        phase = ((t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1.0)) * (1 - 2 * ((1 + x + y + z) % 2));
       }
     }
     return phase;
@@ -89,7 +89,7 @@ namespace quda {
     u *= phase;
 
     // apply imaginary chemical potential if needed
-    if (dim == 3 && arg.i_mu != real(0)) u *= arg.i_mu_phase;
+    if (dim == 3 && arg.i_mu != real(0.0)) u *= arg.i_mu_phase;
 
     arg.u(dim, indexCB, parity) = u;
   }

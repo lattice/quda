@@ -170,7 +170,7 @@ namespace quda {
           // remove diagonal constant
 #pragma unroll
         for (int i = 0; i < 3; i++) out[i] -= diagonal;
-        out[3] = real(0); // intentionally zero this so that it can't contribute to the max element
+        out[3] = real(0.0); // intentionally zero this so that it can't contribute to the max element
       }
     };
 

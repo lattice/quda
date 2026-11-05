@@ -189,7 +189,7 @@ namespace quda
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
       using Link = Matrix<complex<real>, Arg::nColor>;
-      complex<real> im(real(0), real(-1));
+      complex<real> im(real(0.0), real(-1.0));
 
       // Get spacetime and local coords
       int x[4];

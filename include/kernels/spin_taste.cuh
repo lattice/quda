@@ -45,38 +45,38 @@ namespace quda
 
       getCoords(x, x_cb, arg.X, parity);
 
-      real sign = real(1);
+      real sign = real(1.0);
 
       if (Arg::gamma == QUDA_SPIN_TASTE_GX) {
-        sign = real(1) - real(2 * ((x[1] + x[2] + x[3]) % 2));
+        sign = real(1.0) - real(2 * ((x[1] + x[2] + x[3]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GY) {
-        sign = real(1) - real(2 * ((x[0] + x[2] + x[3]) % 2));
+        sign = real(1.0) - real(2 * ((x[0] + x[2] + x[3]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GZ) {
-        sign = real(1) - real(2 * ((x[0] + x[1] + x[3]) % 2));
+        sign = real(1.0) - real(2 * ((x[0] + x[1] + x[3]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GT) {
-        sign = real(1) - real(2 * ((x[0] + x[1] + x[2]) % 2));
+        sign = real(1.0) - real(2 * ((x[0] + x[1] + x[2]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_G5) {
-        sign = real(1) - real(2 * ((x[0] + x[1] + x[2] + x[3]) % 2));
+        sign = real(1.0) - real(2 * ((x[0] + x[1] + x[2] + x[3]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GYGZ) {
-        sign = real(1) - real(2 * ((x[1] + x[2]) % 2));
+        sign = real(1.0) - real(2 * ((x[1] + x[2]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GZGX) {
-        sign = real(1) - real(2 * ((x[2] + x[0]) % 2));
+        sign = real(1.0) - real(2 * ((x[2] + x[0]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GXGY) {
-        sign = real(1) - real(2 * ((x[0] + x[1]) % 2));
+        sign = real(1.0) - real(2 * ((x[0] + x[1]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GXGT) {
-        sign = real(1) - real(2 * ((x[0] + x[3]) % 2));
+        sign = real(1.0) - real(2 * ((x[0] + x[3]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GYGT) {
-        sign = real(1) - real(2 * ((x[1] + x[3]) % 2));
+        sign = real(1.0) - real(2 * ((x[1] + x[3]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_GZGT) {
-        sign = real(1) - real(2 * ((x[2] + x[3]) % 2));
+        sign = real(1.0) - real(2 * ((x[2] + x[3]) % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_G5GX) {
-        sign = real(1) - real(2 * (x[0] % 2));
+        sign = real(1.0) - real(2 * (x[0] % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_G5GY) {
-        sign = real(1) - real(2 * (x[1] % 2));
+        sign = real(1.0) - real(2 * (x[1] % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_G5GZ) {
-        sign = real(1) - real(2 * (x[2] % 2));
+        sign = real(1.0) - real(2 * (x[2] % 2));
       } else if (Arg::gamma == QUDA_SPIN_TASTE_G5GT) {
-        sign = real(1) - real(2 * (x[3] % 2));
+        sign = real(1.0) - real(2 * (x[3] % 2));
       }
 
       Vector out = arg.in(x_cb, parity);

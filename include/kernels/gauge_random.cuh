@@ -43,7 +43,7 @@ namespace quda {
     for (int i = 0; i < 4; ++i) {
       rand1[i] = uniform<real>::rand(localState);
       rand2[i] = uniform<real>::rand(localState);
-      phi[i] = real(2) * rand1[i];
+      phi[i] = real(2.0) * rand1[i];
       radius[i] = sqrt(-log(rand2[i]));
       quda::sincospi(phi[i], &temp2[i], &temp1[i]);
       temp1[i] *= radius[i];
@@ -51,10 +51,10 @@ namespace quda {
     }
 
     // construct Anti-Hermitian matrix
-    const real rsqrt_3 = quda::rsqrt(real(3));
+    const real rsqrt_3 = quda::rsqrt(real(3.0));
     ret(0, 0) = complex<real>(0.0, temp1[2] + rsqrt_3 * temp2[3]);
     ret(1, 1) = complex<real>(0.0, -temp1[2] + rsqrt_3 * temp2[3]);
-    ret(2, 2) = complex<real>(real(0), real(-2) * rsqrt_3 * temp2[3]);
+    ret(2, 2) = complex<real>(real(0.0), real(-2.0) * rsqrt_3 * temp2[3]);
     ret(0, 1) = complex<real>(temp1[0], temp1[1]);
     ret(1, 0) = complex<real>(-temp1[0], temp1[1]);
     ret(0, 2) = complex<real>(temp1[3], temp2[0]);
