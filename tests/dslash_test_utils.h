@@ -41,6 +41,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       {"M5inv", dslash_test_type::M5inv},
                                                       {"Dslash4pre", dslash_test_type::Dslash4pre}};
 struct DslashTime {
+  double wall_time = 0.0;
   double event_time;
   double cpu_time;
   double cpu_min;
@@ -827,8 +828,10 @@ struct DslashTestWrapper {
 
     host_timer_t host_timer;
     device_timer_t device_timer;
+    host_timer_t batch_timer;
 
     comm_barrier();
+    batch_timer.start();
     device_timer.start();
 
     if (test_split_grid) {
@@ -1133,6 +1136,8 @@ struct DslashTestWrapper {
     }
     device_timer.stop();
     dslash_time.event_time = device_timer.last();
+    batch_timer.stop();
+    dslash_time.wall_time = batch_timer.last();
 
     return dslash_time;
   }
@@ -1149,6 +1154,12 @@ struct DslashTestWrapper {
 
     printfQuda("Executing %d kernel loops...\n", niter);
     DslashTime dslash_time = dslashCUDA(niter);
+    double max_wall = dslash_time.wall_time;
+    double max_event = dslash_time.event_time;
+    comm_allreduce_max(max_wall);
+    comm_allreduce_max(max_event);
+    printfQuda("Slowest rank: wall %.6f us/call, CUDA-event %.6f us/call\n",
+               1e6 * max_wall / niter, 1e6 * max_event / niter);
     printfQuda("done.\n\n");
 
     unsigned long long flops = (quda::Tunable::flops_global() - flops0);

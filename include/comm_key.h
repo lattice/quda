@@ -13,7 +13,7 @@ namespace quda
     constexpr CommKey() = default;
     constexpr CommKey(int k0, int k1, int k2, int k3) noexcept : key(k0, k1, k2, k3) { }
 
-    constexpr int product() { return key[0] * key[1] * key[2] * key[3]; }
+    constexpr int product() const { return key[0] * key[1] * key[2] * key[3]; }
 
     constexpr int &operator[](int d) { return key[d]; }
 
@@ -25,7 +25,7 @@ namespace quda
 
     constexpr bool is_valid() const { return (key[0] > 0) && (key[1] > 0) && (key[2] > 0) && (key[3] > 0); }
 
-    bool operator==(const CommKey &other) const
+    constexpr bool operator==(const CommKey &other) const
     {
       bool is_same = true;
       for (auto i = 0; i < n_dim; i++)
@@ -67,7 +67,7 @@ namespace quda
   constexpr bool inline operator<(const CommKey &lhs, const CommKey &rhs)
   {
     for (int d = 0; d < CommKey::n_dim; d++) {
-      if (lhs[d] < rhs[d]) { return true; }
+      if (lhs[d] != rhs[d]) return lhs[d] < rhs[d];
     }
     return false;
   }
@@ -75,7 +75,7 @@ namespace quda
   constexpr bool inline operator>(const CommKey &lhs, const CommKey &rhs)
   {
     for (int d = 0; d < CommKey::n_dim; d++) {
-      if (lhs[d] > rhs[d]) { return true; }
+      if (lhs[d] != rhs[d]) return lhs[d] > rhs[d];
     }
     return false;
   }

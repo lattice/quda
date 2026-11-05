@@ -32,6 +32,12 @@ endif()
 
 set(TEST_LIBS quda_test)
 
+if(QUDA_MPI)
+  add_executable(p2p_islands_test EXCLUDE_FROM_ALL p2p_islands_test.cpp)
+  target_link_libraries(p2p_islands_test PRIVATE QUDA::quda MPI::MPI_CXX)
+  target_include_directories(p2p_islands_test PRIVATE $<TARGET_PROPERTY:quda_cpp,INCLUDE_DIRECTORIES>)
+endif()
+
 # custom target for building all tests (useful if QUDA_BUILD_ALL_TESTS is OFF)
 add_custom_target(all_tests)
 
@@ -42,6 +48,15 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   endif()
   add_dependencies(all_tests ${mytarget})
 endmacro()
+
+# Header-only host test: no QUDA initialization, GPU, or MPI launcher required.
+add_executable(comm_key_test comm_key_test.cpp)
+target_include_directories(comm_key_test PRIVATE $<TARGET_PROPERTY:quda_cpp,INCLUDE_DIRECTORIES>)
+if(QUDA_TARGET_HIP)
+  target_link_libraries(comm_key_test PRIVATE hip::host)
+endif()
+QUDA_CHECKBUILDTEST(comm_key_test QUDA_BUILD_ALL_TESTS)
+add_test(NAME comm_key_test COMMAND $<TARGET_FILE:comm_key_test>)
 
 if(NOT ${QUDA_INSTALL_ALL_TESTS})
   set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")

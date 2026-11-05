@@ -52,8 +52,31 @@ namespace quda
     if (comm_nvshmem_enabled())
       errorQuda("Split-grid is currently not supported with NVSHMEM. Set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
 
+    const bool from_full = current_key == default_comm_key;
+    const bool to_full = split_key == default_comm_key;
+
+    // Splits are defined relative to the full communicator. Return there
+    // (merging tuning caches) before selecting a different split.
+    if (from_full == to_full)
+      errorQuda("Unsupported communicator transition [%d,%d,%d,%d] -> [%d,%d,%d,%d]: "
+                "only full -> split and split -> full are allowed",
+                current_key[0], current_key[1], current_key[2], current_key[3], split_key[0], split_key[1], split_key[2],
+                split_key[3]);
+
+    if (from_full) {
+      if (!split_key.is_valid())
+        errorQuda("Invalid split key [%d,%d,%d,%d]: split factors must be positive", split_key[0], split_key[1],
+                  split_key[2], split_key[3]);
+      auto &full = get_default_communicator();
+      for (int d = 0; d < CommKey::n_dim; d++) {
+        if (full.comm_dim(d) % split_key[d] != 0)
+          errorQuda("Invalid split factor %d in dimension %d: full communicator extent is %d", split_key[d], d,
+                    full.comm_dim(d));
+      }
+    }
+
     // if reverting to global, we will need to join the tunecaches
-    bool join_tune_cache = split_key == default_comm_key;
+    const bool join_tune_cache = to_full;
     int local_rank = comm_rank();
     int local_tune_rank = 0;
 
@@ -64,6 +87,13 @@ namespace quda
     LatticeField::freeGhostBuffer();
     ColorSpinorField::freeGhostBuffer();
     FieldTmp<ColorSpinorField>::destroy();
+
+    // Independent subgrids can execute different numbers of dslashes (also
+    // during autotuning), leaving the double-buffer indices out of phase.
+    // IPC sends address the same buffer index on the peer, so all ranks in
+    // the new communicator must start on the same buffer. The old buffers
+    // and their outstanding work have been torn down above.
+    LatticeField::bufferIndex = 0;
 
     auto search = communicator_stack.find(split_key);
     if (search == communicator_stack.end()) {
@@ -176,6 +206,8 @@ namespace quda
   bool comm_peer2peer_present() { return get_current_communicator().comm_peer2peer_present(); }
 
   int comm_peer2peer_enabled_global() { return get_current_communicator().comm_peer2peer_enabled_global(); }
+
+  bool comm_peer2peer_force() { return get_current_communicator().force_peer_to_peer; }
 
   bool comm_peer2peer_enabled(int dir, int dim) { return get_current_communicator().comm_peer2peer_enabled(dir, dim); }
 

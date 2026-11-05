@@ -7,6 +7,9 @@
 #include <stack>
 #include <algorithm>
 #include <numeric>
+#include <cerrno>
+#include <climits>
+#include <string>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -186,9 +189,61 @@ namespace quda
 
     /** by default enable both copy engines and load/store access */
     int enable_peer_to_peer = 3;
+    bool force_peer_to_peer = false;
 
     /** sets whether we cap which peers can use peer-to-peer */
     int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
+
+    // Assigned in the original QUDA communicator, inherited by split communicators.
+    int test_p2p_island = -1;
+    uint64_t test_p2p_config_hash = 14695981039346656037ull;
+    bool test_p2p_island_initialized = false;
+    std::vector<int> test_p2p_neighbor_islands;
+
+    void init_test_p2p_islands()
+    {
+#if defined(MPI_COMMS) || defined(QMP_COMMS)
+      if (!test_p2p_island_initialized) {
+        const char *env = getenv("QUDA_TEST_P2P_ISLANDS");
+        std::string value = env ? env : "";
+        int length = value.size();
+        comm_broadcast(&length, sizeof(length));
+        std::string reference(length, '\0');
+        if (comm_rank() == 0) reference = value;
+        comm_broadcast(reference.data(), reference.size());
+        int mismatch = value != reference;
+        comm_allreduce_int(mismatch);
+        if (mismatch) errorQuda("QUDA_TEST_P2P_ISLANDS must be identical on all ranks");
+        if (env) {
+          // Stable FNV-1a fingerprint of the complete original-rank assignment.
+          for (unsigned char byte : value) test_p2p_config_hash = (test_p2p_config_hash ^ byte) * 1099511628211ull;
+          std::vector<int> islands;
+          const char *p = value.c_str();
+          while (*p) {
+            if (*p < '0' || *p > '9') errorQuda("Invalid QUDA_TEST_P2P_ISLANDS: expected comma-separated nonnegative IDs");
+            errno = 0;
+            char *end = nullptr;
+            long id = strtol(p, &end, 10);
+            if (errno || id > INT_MAX || (*end && *end != ',')) errorQuda("Invalid QUDA_TEST_P2P_ISLANDS ID");
+            islands.push_back(static_cast<int>(id));
+            p = end;
+            if (*p == ',') {
+              p++;
+              if (!*p) errorQuda("Trailing comma in QUDA_TEST_P2P_ISLANDS");
+            }
+          }
+          if (islands.size() != comm_size()) errorQuda("QUDA_TEST_P2P_ISLANDS requires one ID per original QUDA rank");
+          test_p2p_island = islands[comm_rank()];
+        }
+        test_p2p_island_initialized = true;
+      }
+      test_p2p_neighbor_islands.resize(comm_size());
+      if (MPI_Allgather(&test_p2p_island, 1, MPI_INT, test_p2p_neighbor_islands.data(), 1, MPI_INT, MPI_COMM_HANDLE)
+          != MPI_SUCCESS) errorQuda("Failed to gather P2P island IDs");
+#else
+      if (getenv("QUDA_TEST_P2P_ISLANDS")) errorQuda("QUDA_TEST_P2P_ISLANDS requires MPI or QMP communications");
+#endif
+    }
 
     void comm_peer2peer_init(const char *hostname_recv_buf)
     {
@@ -198,65 +253,41 @@ namespace quda
       if (comm_gdr_enabled()) {
         if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Enabling GPU-Direct RDMA access\n");
         comm_gdr_blacklist(); // set GDR blacklist
-        // by default, if GDR is enabled we disable non-p2p policies to
-        // prevent possible conflict between MPI and QUDA opening the same
-        // IPC memory handles when using CUDA-aware MPI
-        enable_peer_to_peer += 4;
       } else {
         if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling GPU-Direct RDMA access\n");
       }
 
-      char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+      auto read_setting = [](const char *name, int default_value, int maximum) {
+        const char *value = getenv(name);
+        if (!value) return default_value;
+        if (value[0] < '0' || value[0] > '0' + maximum || value[1] != '\0')
+          errorQuda("Invalid %s='%s': expected an integer in 0..%d", name, value, maximum);
+        return value[0] - '0';
+      };
+      enable_peer_to_peer = read_setting("QUDA_ENABLE_P2P", 3, 3);
+      force_peer_to_peer = read_setting("QUDA_ENABLE_P2P_FORCE", 0, 1);
+      if (force_peer_to_peer && !enable_peer_to_peer)
+        errorQuda("QUDA_ENABLE_P2P_FORCE=1 requires QUDA_ENABLE_P2P to be nonzero");
 
-      // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
-      // and comm_dim(dim) == 2 (used for perf benchmarking)
-      bool disable_peer_to_peer_bidir = false;
-
-      if (enable_peer_to_peer_env) {
-        enable_peer_to_peer = atoi(enable_peer_to_peer_env);
-
-        switch (std::abs(enable_peer_to_peer)) {
-        case 0:
-          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
-          break;
-        case 1:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
-          break;
-        case 2:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
-          break;
-        case 3:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access\n");
-          break;
-        case 5:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n");
-          break;
-        case 6:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n");
-          break;
-        case 7:
-          if (getVerbosity() > QUDA_SILENT && rank == 0)
-            printf("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n");
-          break;
-        default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
-        }
-
-        if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
-          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
-          disable_peer_to_peer_bidir = true;
-        }
-
-        enable_peer_to_peer = std::abs(enable_peer_to_peer);
-
-      } else { // !enable_peer_to_peer_env
+      switch (enable_peer_to_peer) {
+      case 0:
+        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
+        break;
+      case 1:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
+        break;
+      case 2:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
+        break;
+      case 3:
         if (getVerbosity() > QUDA_SILENT && rank == 0)
           printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+        break;
       }
+      if (getVerbosity() > QUDA_SILENT && rank == 0 && force_peer_to_peer)
+        printf("Forcing peer-to-peer policies where eligible links exist\n");
 
       if (!peer2peer_init && enable_peer_to_peer) {
 
@@ -286,11 +317,6 @@ namespace quda
             int neighbor_rank = comm_neighbor_rank(dir, dim);
             if (neighbor_rank == comm_rank()) continue;
 
-            // disable peer-to-peer comms in one direction
-            if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
-                && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
-              continue;
-
             // if the neighbors are on the same
             if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
               int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
@@ -300,7 +326,8 @@ namespace quda
 
               // enable P2P if we can access the peer or if peer is self
               // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
-              if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+              bool same_island = test_p2p_island < 0 || test_p2p_neighbor_islands[neighbor_rank] == test_p2p_island;
+              if (same_island && ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid)) {
                 peer2peer_enabled[dir][dim] = true;
                 if (getVerbosity() > QUDA_SILENT) {
                   printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
@@ -309,6 +336,9 @@ namespace quda
                 }
               } else {
                 intranode_enabled[dir][dim] = true;
+                if (!same_island && getVerbosity() > QUDA_SILENT)
+                  printf("P2P island boundary: rank %d (island=%d), neighbor %d (island=%d), dir=%d, dim=%d\n",
+                         comm_rank(), test_p2p_island, neighbor_rank, test_p2p_neighbor_islands[neighbor_rank], dir, dim);
                 if (getVerbosity() > QUDA_SILENT) {
                   printf(
                     "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
@@ -588,6 +618,7 @@ namespace quda
       }
     } // -ve gpuid
 
+    init_test_p2p_islands();
     comm_peer2peer_init(hostname_recv_buf);
 
     host_free(hostname_recv_buf);
@@ -613,7 +644,7 @@ namespace quda
     }
   }
 
-  char config_string[64];
+  char config_string[128];
   bool config_init = false;
 
   const char *comm_config_string()
@@ -621,6 +652,8 @@ namespace quda
     if (!config_init) {
       strcpy(config_string, ",p2p=");
       strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
+      strcat(config_string, ",p2p_force=");
+      strcat(config_string, force_peer_to_peer ? "1" : "0");
       if (enable_p2p_max_access_rank != std::numeric_limits<int>::max()) {
         strcat(config_string, ",p2p_max_access_rank=");
         strcat(config_string, std::to_string(enable_p2p_max_access_rank).c_str());
@@ -629,6 +662,28 @@ namespace quda
       strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
       strcat(config_string, ",nvshmem=");
       strcat(config_string, std::to_string(comm_nvshmem_enabled()).c_str());
+      if (test_p2p_island >= 0) {
+        // Include the current communicator's membership AND coordinate mapping.
+        // All ranks derive the same key; row/column mappings and subgrids with
+        // different island connectivity must not reuse a policy tuning entry.
+        uint64_t hash = test_p2p_config_hash;
+        auto mix = [&](uint32_t value) {
+          for (int byte = 0; byte < 4; byte++) {
+            hash = (hash ^ (value & 0xff)) * 1099511628211ull;
+            value >>= 8;
+          }
+        };
+        for (int dim = 0; dim < 4; dim++) mix(comm_dim(dim));
+        auto *topo = comm_default_topology();
+        for (size_t rank = 0; rank < test_p2p_neighbor_islands.size(); rank++) {
+          mix(test_p2p_neighbor_islands[rank]);
+          const int *coords = comm_coords_from_rank(topo, rank);
+          for (int dim = 0; dim < 4; dim++) mix(coords[dim]);
+        }
+        char suffix[40];
+        snprintf(suffix, sizeof(suffix), ",p2p_islands=%016llx", static_cast<unsigned long long>(hash));
+        strcat(config_string, suffix);
+      }
       config_init = true;
     }
 
@@ -808,6 +863,12 @@ namespace quda
 
 constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
+/**
+ * Switch between the full communicator and a nontrivial split of it.
+ * Exactly one endpoint must be default_comm_key; no-op and direct split-to-split
+ * transitions are errors. Split factors must be positive divisors of the full
+ * communicator extents. Return to full before selecting a different split.
+ */
 void push_communicator(const CommKey &split_key);
 
 /**
