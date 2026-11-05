@@ -75,15 +75,17 @@ auto laph_test(test_t param)
 
   // host reference [nSink][nEv][Lt][nSpin][complexity] (CPU fields are double precision)
   using host_complex = std::complex<double>;
-  auto Lt = tdim * comm_dim(3);
+  // Work around Clang OpenMP crashes with a global variable as a collapsed loop bound.
+  const int local_tdim = tdim;
+  auto Lt = local_tdim * comm_dim(3);
   std::vector<host_complex> hostRes(nSink * nEv * Lt * nSpin, host_complex(0., 0.));
 
 #pragma omp parallel for collapse(4)
   for (int iEv = 0; iEv < nEv; ++iEv) {
     for (int iSink = 0; iSink < nSink; ++iSink) {
       for (int iSpin = 0; iSpin < nSpin; ++iSpin) {
-        for (int iT = 0; iT < tdim; ++iT) {
-          int globT = comm_coord(3) * tdim + iT;
+        for (int iT = 0; iT < local_tdim; ++iT) {
+          int globT = comm_coord(3) * local_tdim + iT;
           for (int iZ = 0; iZ < zdim; ++iZ) {
             for (int iY = 0; iY < ydim; ++iY) {
               for (int iX = 0; iX < xdim; ++iX) {
