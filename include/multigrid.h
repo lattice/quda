@@ -492,6 +492,21 @@ namespace quda {
 
       return (param.level == 0 || kd_nearnull_gen);
     }
+
+    /** @brief Access the transfer operator for this level */
+    const Transfer *getTransfer() const { return transfer; }
+
+    /** @brief Access the coarse Dirac residual matrix wrapper */
+    const DiracMatrix *getMatCoarseResidual() const { return matCoarseResidual; }
+
+    /** @brief Access the coarse Dirac operator (raw, for creating MdagM wrappers) */
+    const Dirac *getDiracCoarseResidual() const { return diracCoarseResidual; }
+
+    /** @brief Access the next coarser MG level */
+    MG *getCoarse() const { return coarse; }
+
+    /** @brief Access the multigrid parameters for this level */
+    const MGParam &getParam() const { return param; }
   };
 
   /**
