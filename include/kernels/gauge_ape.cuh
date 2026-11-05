@@ -34,7 +34,7 @@ namespace quda
       alpha(static_cast<real>(alpha)),
       dir_ignore(dir_ignore),
       anisotropy(static_cast<real>(anisotropy)),
-      tolerance(in.toleranceSU3())
+      tolerance(static_cast<real>(in.toleranceSU3()))
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];

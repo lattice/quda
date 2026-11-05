@@ -88,14 +88,59 @@ namespace quda
 
   template <> void Communicator::comm_allreduce_max_array<double>(double *, size_t) { }
 
-#if defined(QUDA_ENABLE_DOUBLEDOUBLE)
-  // reduction_t when doubledouble; aliases device_reduce_t under QUDA_REDUCTION_ALGORITHM_NAIVE.
-  template <> void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *, size_t) { }
+#if defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)
+#define QUDA_COMM_DD_T reduction_t
+#elif defined(QUDA_ENABLE_DOUBLEDOUBLE)
+#define QUDA_COMM_DD_T doubledouble
+#endif
 
-  template <> void Communicator::comm_allreduce_max_array<doubledouble>(doubledouble *, size_t) { }
+// real_t follows QUDA_FPMP_DOUBLEDOUBLE_ACCURACY. reduction_t can pin a
+// different fp64mp2 accuracy (QUDA_REDUCTION_TYPE=doubledouble_low, for
+// example). Both symbols are required: vector<complex_t> reduces real_t.
+#if defined(QUDA_SCALAR_IS_DOUBLEDOUBLE) && defined(QUDA_REDUCTION_IS_DOUBLEDOUBLE)                                    \
+  && !((defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_LOW) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_LOW))             \
+       || (defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_MID) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_MID))          \
+       || (defined(QUDA_FPMP_DOUBLEDOUBLE_ACCURACY_HIGH) && defined(QUDA_REDUCTION_DOUBLEDOUBLE_ACCURACY_HIGH)))
+#define QUDA_COMM_DD_SCALAR_DISTINCT doubledouble
+#endif
+
+#ifdef QUDA_COMM_DD_T
+  template <> void Communicator::comm_allreduce_sum_array<QUDA_COMM_DD_T>(QUDA_COMM_DD_T *, size_t) { }
+
+  template <> void Communicator::comm_allreduce_max_array<QUDA_COMM_DD_T>(QUDA_COMM_DD_T *, size_t) { }
 
   template <>
-  void Communicator::comm_allreduce_max_array<deviation_t<doubledouble>>(deviation_t<doubledouble> *, size_t)
+  void Communicator::comm_allreduce_max_array<deviation_t<QUDA_COMM_DD_T>>(deviation_t<QUDA_COMM_DD_T> *, size_t)
+  {
+  }
+#undef QUDA_COMM_DD_T
+#endif
+
+#ifdef QUDA_COMM_DD_SCALAR_DISTINCT
+  template <>
+  void Communicator::comm_allreduce_sum_array<QUDA_COMM_DD_SCALAR_DISTINCT>(QUDA_COMM_DD_SCALAR_DISTINCT *, size_t)
+  {
+  }
+
+  template <>
+  void Communicator::comm_allreduce_max_array<QUDA_COMM_DD_SCALAR_DISTINCT>(QUDA_COMM_DD_SCALAR_DISTINCT *, size_t)
+  {
+  }
+
+  template <>
+  void Communicator::comm_allreduce_max_array<deviation_t<QUDA_COMM_DD_SCALAR_DISTINCT>>(
+    deviation_t<QUDA_COMM_DD_SCALAR_DISTINCT> *, size_t)
+  {
+  }
+#undef QUDA_COMM_DD_SCALAR_DISTINCT
+#endif
+
+#if defined(QUDA_REDUCTION_IS_FLOATFLOAT)
+  template <> void Communicator::comm_allreduce_sum_array<reduction_t>(reduction_t *, size_t) { }
+
+  template <> void Communicator::comm_allreduce_max_array<reduction_t>(reduction_t *, size_t) { }
+
+  template <> void Communicator::comm_allreduce_max_array<deviation_t<reduction_t>>(deviation_t<reduction_t> *, size_t)
   {
   }
 #endif

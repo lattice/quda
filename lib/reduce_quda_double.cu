@@ -7,6 +7,9 @@ namespace quda
   {
 
     INSTANTIATE_REDUCE_STORE(double)
+#ifdef QUDA_FPMP_FLOATFLOAT
+    INSTANTIATE_REDUCE_STORE(floatfloat)
+#endif
 
   } // namespace blas
 

@@ -190,10 +190,14 @@ namespace quda
     template <typename reduce_t, typename T> __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
     {
       using scalar_t = typename reduce_t::value_type;
-      auto r = scalar_t(a.real()) * scalar_t(b.real());
-      r = fma(scalar_t(a.imag()), scalar_t(b.imag()), r);
-      auto i = scalar_t(a.real()) * scalar_t(b.imag());
-      i = fma(-scalar_t(a.imag()), scalar_t(b.real()), i);
+      const auto ar = scalar_t(a.real());
+      const auto ai = scalar_t(a.imag());
+      const auto br = scalar_t(b.real());
+      const auto bi = scalar_t(b.imag());
+      auto r = ar * br;
+      r = fma(ai, bi, r);
+      auto i = ar * bi;
+      i = fma(-ai, br, i);
       return reduce_t {r, i};
     }
 
@@ -216,8 +220,8 @@ namespace quda
     };
 
     template <typename real_reduce_t, typename real>
-    struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
-      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+    struct multiCdotCopy : public MultiReduceFunctor<array<real_reduce_t, 2>, complex<real>> {
+      using reduce_t = array<real_reduce_t, 2>;
       static constexpr memory_access<1, 1> read { };
       static constexpr memory_access<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
