@@ -115,8 +115,8 @@ namespace quda {
     void init();
 
     /**
-       @brief Destroy the memory pool subsystem.  Pairs with init(); when built
-       with NVSHMEM it also finalizes NVSHMEM (init() bootstraps NVSHMEM).
+       @brief Destroy the memory pool subsystem.  Pairs with init(); when
+       NVSHMEM is active it also finalizes NVSHMEM (init() bootstraps NVSHMEM).
     */
     void destroy();
 

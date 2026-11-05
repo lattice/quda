@@ -274,8 +274,10 @@ namespace quda
 
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
       if (comm_peer2peer_enabled(dir2,dim)) {
+#ifndef MNNVL_COMMS
         PROFILE(qudaStreamWaitEvent(device::get_default_stream(), halo.getIPCRemoteCopyEvent(dir2, dim), 0), profile,
                 QUDA_PROFILE_STREAM_WAIT_EVENT);
+#endif
       } else {
 
         if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
@@ -304,14 +306,19 @@ namespace quda
   */
   template <typename T> inline void completeDslash(const ColorSpinorField &halo, const T &dslashParam)
   {
+#ifdef MNNVL_COMMS
+    (void)halo;
+#endif
     // this ensures that the p2p sending is completed before any
     // subsequent work is done on the compute stream
     for (int dim=3; dim>=0; dim--) {
       if (!dslashParam.commDim[dim]) continue;
       for (int dir=0; dir<2; dir++) {
 	if (comm_peer2peer_enabled(dir,dim)) {
+#ifndef MNNVL_COMMS
           PROFILE(qudaStreamWaitEvent(device::get_default_stream(), halo.getIPCCopyEvent(dir, dim), 0), profile,
                   QUDA_PROFILE_STREAM_WAIT_EVENT);
+#endif
         }
       }
     }

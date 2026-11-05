@@ -192,6 +192,9 @@ namespace quda
 
     void comm_peer2peer_init(const char *hostname_recv_buf)
     {
+#ifdef MNNVL_COMMS
+      (void)hostname_recv_buf;
+#endif
       if (peer2peer_init) return;
 
       // set gdr enablement
@@ -208,9 +211,11 @@ namespace quda
 
       char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
 
+#ifndef MNNVL_COMMS
       // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
       // and comm_dim(dim) == 2 (used for perf benchmarking)
       bool disable_peer_to_peer_bidir = false;
+#endif
 
       if (enable_peer_to_peer_env) {
         enable_peer_to_peer = atoi(enable_peer_to_peer_env);
@@ -248,7 +253,9 @@ namespace quda
 
         if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
           if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
+#ifndef MNNVL_COMMS
           disable_peer_to_peer_bidir = true;
+#endif
         }
 
         enable_peer_to_peer = std::abs(enable_peer_to_peer);
@@ -272,11 +279,12 @@ namespace quda
                        enable_p2p_max_access_rank);
         }
 
-        const int gpuid = comm_gpuid();
-
         comm_set_neighbor_ranks();
 
+#ifndef MNNVL_COMMS
+        const int gpuid = comm_gpuid();
         char *hostname = comm_hostname();
+#endif
         int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
 
         comm_gather_gpuid(gpuid_recv_buf);
@@ -285,7 +293,7 @@ namespace quda
           for (int dim = 0; dim < 4; ++dim) {
             int neighbor_rank = comm_neighbor_rank(dir, dim);
             if (neighbor_rank == comm_rank()) continue;
-
+#ifndef MNNVL_COMMS
             // disable peer-to-peer comms in one direction
             if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
                 && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
@@ -303,7 +311,7 @@ namespace quda
               if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
                 peer2peer_enabled[dir][dim] = true;
                 if (getVerbosity() > QUDA_SILENT) {
-                  printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                  printf("Peer-to-peer candidate for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
                          "access rank = (%3d)\n",
                          comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
                 }
@@ -318,6 +326,9 @@ namespace quda
               }
 
             } // on the same node
+#else
+            peer2peer_enabled[dir][dim] = true;
+#endif
           }   // different dimensions - x, y, z, t
         }     // different directions - forward/backward
 
@@ -328,7 +339,7 @@ namespace quda
 
       comm_barrier();
 
-      peer2peer_present = comm_peer2peer_enabled_global();
+      peer2peer_present = comm_peer2peer_any_global();
     }
 
     bool comm_peer2peer_present() { return peer2peer_present; }
@@ -337,21 +348,56 @@ namespace quda
 
     bool comm_peer2peer_enabled(int dir, int dim) { return enable_p2p ? peer2peer_enabled[dir][dim] : false; }
 
+    void comm_peer2peer_disable(int dir, int dim)
+    {
+      peer2peer_enabled[dir][dim] = false;
+      peer2peer_validation_reported = false;
+    }
+
+    void comm_peer2peer_finalize_validation()
+    {
+      init = false;
+      config_init = false;
+      peer2peer_present = comm_peer2peer_enabled_global();
+    }
+
+    bool peer2peer_validation_reported = false;
+
+    void comm_peer2peer_report_validated()
+    {
+      if (peer2peer_validation_reported) return;
+      if (getVerbosity() > QUDA_SILENT) {
+        for (int dim = 0; dim < 4; ++dim) {
+          for (int dir = 0; dir < 2; ++dir) {
+            if (peer2peer_enabled[dir][dim])
+              printf("Validated peer-to-peer mapping for rank %3d (gpu=%d) with neighbor %3d dir=%d, dim=%d\n",
+                     comm_rank(), comm_gpuid(), comm_neighbor_rank(dir, dim), dir, dim);
+          }
+        }
+      }
+      peer2peer_validation_reported = true;
+    }
+
     bool init = false;
     bool p2p_global = false;
+
+    bool comm_peer2peer_any_global()
+    {
+      int p2p = 0;
+      for (int dim = 0; dim < 4; dim++)
+        for (int dir = 0; dir < 2; dir++) p2p += (int)peer2peer_enabled[dir][dim];
+
+      comm_allreduce_int(p2p);
+      return p2p > 0;
+    }
 
     int comm_peer2peer_enabled_global()
     {
       if (!enable_p2p) return false;
 
       if (!init) {
-        int p2p = 0;
-        for (int dim = 0; dim < 4; dim++)
-          for (int dir = 0; dir < 2; dir++) p2p += (int)comm_peer2peer_enabled(dir, dim);
-
-        comm_allreduce_int(p2p);
+        p2p_global = comm_peer2peer_any_global();
         init = true;
-        p2p_global = p2p > 0 ? true : false;
       }
       return p2p_global * enable_peer_to_peer;
     }

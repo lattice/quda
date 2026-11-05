@@ -179,6 +179,12 @@ namespace quda
 
   bool comm_peer2peer_enabled(int dir, int dim) { return get_current_communicator().comm_peer2peer_enabled(dir, dim); }
 
+  void comm_peer2peer_disable(int dir, int dim) { get_current_communicator().comm_peer2peer_disable(dir, dim); }
+
+  void comm_peer2peer_finalize_validation() { get_current_communicator().comm_peer2peer_finalize_validation(); }
+
+  void comm_peer2peer_report_validated() { get_current_communicator().comm_peer2peer_report_validated(); }
+
   void comm_enable_peer2peer(bool enable) { get_current_communicator().comm_enable_peer2peer(enable); }
 
   bool comm_intranode_enabled(int dir, int dim) { return get_current_communicator().comm_intranode_enabled(dir, dim); }

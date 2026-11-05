@@ -14,6 +14,11 @@ env:
 
 jobs:
   build:
+    name: CUDA (MNNVL ${{ matrix.mnnvl }})
+    strategy:
+      fail-fast: false
+      matrix:
+        mnnvl: ["OFF", "ON"]
     # ubuntu-latest is Ubuntu 26.04. CUDA 13.3 is published for ubuntu2404,
     # which is also what the other 13.x workflows use.
     runs-on: ubuntu-24.04
@@ -31,7 +36,7 @@ jobs:
       - name: Ccache for gh actions
         uses: hendrikmuhs/ccache-action@v1.2.17
         with:
-          key: ${{ github.job }}-g++-14-cuda-13.3
+          key: ${{ github.job }}-g++-14-cuda-13.3-mnnvl-${{ matrix.mnnvl }}
           max-size: 2000M
 
       - name: Configure CMake
@@ -47,6 +52,7 @@ jobs:
           -DQUDA_MULTIGRID_NVEC_LIST=24
           -DQUDA_MDW_FUSED_LS_LIST=4
           -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON
+          -DQUDA_MNNVL=${{ matrix.mnnvl }} -DQUDA_NVSHMEM=OFF
           -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON -DQUDA_FAST_COMPILE_REDUCE=ON
           -GNinja
           -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
