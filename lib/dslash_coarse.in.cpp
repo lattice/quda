@@ -1,6 +1,7 @@
 #include "multigrid.h"
 #include <multigrid.hpp>
 #include <dirac_quda.h>
+#include "dslash_coarse_launch.hpp"
 
 namespace quda
 {

@@ -130,7 +130,7 @@ void wil_dslash(void *out, const void *const *gauge, const void *in, int parity,
     else if (parity == QUDA_ODD_PARITY)
       otherParity = QUDA_EVEN_PARITY;
     else
-      errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
+      errorQuda("Full parity not supported");
     const int nFace = 1;
 
     inField.exchangeGhost(otherParity, nFace, dagger);

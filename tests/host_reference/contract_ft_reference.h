@@ -179,7 +179,7 @@ int contractionFT_reference(void **spinorX, void **spinorY, const double *const 
   contractFTHost<Float>(spinorX, spinorY, h_result, cType, src_colors, X, source_position, n_mom, mom_modes, fft_type);
 
   const int ntol = 7;
-  auto epsilon = std::numeric_limits<Float>::epsilon();
+  auto epsilon = compute_epsilon<Float>();
   auto fact = epsilon;
   fact *= sqrt((double)nSpin * 6 * V * comm_size() * 2 / reduction_slices); // account for repeated roundoff in float ops
   fact *= 10; // account for variation in phase computation

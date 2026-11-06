@@ -342,7 +342,7 @@ namespace quda {
 
       __device__ __host__ void operator()(int x_cb, int parity)
       {
-        using real = typename Arg::Float;
+        using real = typename mapper<typename Arg::Float>::type;
 
         // This part of the calculation is always done in double precision
         Matrix<complex<double>,3> v, result, oprod;

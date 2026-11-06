@@ -43,7 +43,7 @@ namespace quda
       staple_scale(static_cast<real>(alpha_ / (static_cast<real>(2 * (apeDim - 1))))),
       dir_ignore(dir_ignore),
       anisotropy(static_cast<real>(anisotropy)),
-      tolerance(in.toleranceSU3())
+      tolerance(static_cast<real>(in.toleranceSU3()))
     {
       for (int dir = 0; dir < 4; ++dir) {
         E[dir] = in.X()[dir];

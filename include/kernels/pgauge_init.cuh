@@ -18,7 +18,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     using real = typename mapper<Float>::type;
-    using Gauge = typename gauge_mapper<real, recon>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     int X[4]; // grid dimensions
     Gauge U;
     InitGaugeColdArg(const GaugeField &U) :
@@ -47,7 +47,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     using real = typename mapper<Float>::type;
-    using Gauge = typename gauge_mapper<real, recon>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     int X[4]; // grid dimensions
     Gauge U;
     RNGState *rng;
@@ -69,8 +69,8 @@ namespace quda {
   template <typename Float>
   __host__ __device__ static inline void reunit_link( Matrix<complex<Float>,3> &U )
   {
-    complex<Float> t2((Float)0.0, (Float)0.0);
-    Float t1 = 0.0;
+    complex<Float> t2(Float(0), Float(0));
+    Float t1 = Float(0);
     //first normalize first row
     //sum of squares of row
 #pragma unroll
