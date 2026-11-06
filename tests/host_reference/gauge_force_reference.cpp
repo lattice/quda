@@ -300,8 +300,7 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
                            void *loop_coeff, int num_paths, bool compute_force)
 {
   // created extended field
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -322,8 +321,7 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::complex_t
                                 int **input_path, int *length, double *path_coeff, int num_paths)
 {
   // create extended field
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;

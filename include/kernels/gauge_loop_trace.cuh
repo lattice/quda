@@ -32,8 +32,8 @@ namespace quda
 
     const real factor;                // overall scaling factor for all loops
     static constexpr int nParity = 2; // always true for gauge fields
-    int X[4];                         // the regular volume parameters
-    int E[4];                         // the extended volume parameters
+    int_fastdiv X[4];                 // the regular volume parameters
+    int_fastdiv E[4];                 // the extended volume parameters
     int border[4];                    // radius of border
 
     const paths<1> p;
@@ -47,7 +47,7 @@ namespace quda
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = u.R()[dir];
         E[dir] = u.X()[dir];
-        X[dir] = u.X()[dir] - border[dir] * 2;
+        X[dir] = E[dir] - border[dir] * 2;
       }
     }
   };

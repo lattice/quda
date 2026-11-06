@@ -569,6 +569,8 @@ extern double gauge_smear_alpha;
 extern double gauge_smear_alpha1;
 extern double gauge_smear_alpha2;
 extern double gauge_smear_alpha3;
+extern double gauge_smear_anisotropy;
+extern unsigned int gauge_smear_rk_order;
 extern int gauge_smear_steps;
 extern int gauge_n_save;
 extern int hier_threshold;
