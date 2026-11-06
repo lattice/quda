@@ -68,22 +68,22 @@ namespace
 
   const char *prec_str(QudaPrecision prec) { return prec == QUDA_DOUBLE_PRECISION ? "double" : "single"; }
 
-  // a host gauge field in QDP order, one array per direction
-  struct HostGauge {
-    const QudaPrecision prec;
-    std::array<std::vector<char>, 4> data;
-    void *ptr[4];
-    HostGauge(QudaPrecision prec, size_t volume) : prec(prec)
-    {
-      for (int d = 0; d < 4; d++) {
-        data[d].resize(volume * link_reals * prec);
-        ptr[d] = data[d].data();
-      }
-    }
-    HostGauge(const HostGauge &) = delete;
-    HostGauge &operator=(const HostGauge &) = delete;
-    quda::GaugeField field(const int *X) const { return plainHostGaugeFieldReference(ptr, prec, X); }
-  };
+  // a zeroed host gauge field in QDP order for the links a file holds: general links, periodic t, no phases
+  GaugeField plain_host_field(QudaPrecision prec, const int *X)
+  {
+    QudaGaugeParam gauge_param = newQudaGaugeParam();
+    for (int d = 0; d < 4; d++) gauge_param.X[d] = X[d];
+    gauge_param.type = QUDA_GENERAL_LINKS;
+    gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    gauge_param.cpu_prec = prec;
+    gauge_param.t_boundary = QUDA_PERIODIC_T;
+    gauge_param.anisotropy = 1.0;
+    gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+    GaugeFieldParam param(gauge_param);
+    param.create = QUDA_ZERO_FIELD_CREATE;
+    param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    return GaugeField(param);
+  }
 
   // the input and output and their parameters, all checked before any file is touched
   struct Conversion {
@@ -298,9 +298,9 @@ namespace
     comm_barrier();
   }
 
-  double unitarity_deviation(const HostGauge &gauge)
+  double unitarity_deviation(const GaugeField &gauge)
   {
-    double deviation = io::unitarity_deviation(gauge.ptr, gauge.prec, volume());
+    double deviation = io::unitarity_deviation(gauge.data_array<const void *>().data, gauge.Precision(), volume());
     comm_allreduce_max(deviation);
     return deviation;
   }
@@ -310,23 +310,26 @@ namespace
     return 4.0 * link_reals * static_cast<int>(prec) * volume() * comm_size() / 1e9;
   }
 
-  void report_field(const char *what, const HostGauge &gauge, const int *X)
+  void report_field(const char *what, const GaugeField &gauge)
   {
-    const auto obs = gauge_observables(gauge.field(X));
+    const auto obs = gauge_observables(gauge);
     printfQuda("%s: plaquette %.12f (spatial %.12f, temporal %.12f), link trace %.12e, largest deviation from "
                "unitarity %.2e\n",
                what, obs.plaq, obs.plaq_spatial, obs.plaq_temporal, obs.linktr, unitarity_deviation(gauge));
   }
 
-  void generate(HostGauge &gauge)
+  void generate(GaugeField &gauge)
   {
     if (gauge_input_seed_given) initRand(gauge_input_seed);
     // links without any boundary condition or anisotropy, as a file holds them
     const auto mode = resolveGaugeInputMode();
+    auto ptrs = gauge.data_array();
     switch (mode) {
-    case GaugeInputMode::HAAR: constructRandomSU3GaugeField(gauge.ptr, gauge.prec); break;
-    case GaugeInputMode::UNIT: constructIdentityGaugeField(gauge.ptr, gauge.prec); break;
-    case GaugeInputMode::GAUSSIAN_SU3: constructGaussianSU3GaugeField(gauge.ptr, gauge.prec, gauge_input_width); break;
+    case GaugeInputMode::HAAR: constructRandomSU3GaugeField(ptrs.data, gauge.Precision()); break;
+    case GaugeInputMode::UNIT: constructIdentityGaugeField(ptrs.data, gauge.Precision()); break;
+    case GaugeInputMode::GAUSSIAN_SU3:
+      constructGaussianSU3GaugeField(ptrs.data, gauge.Precision(), gauge_input_width);
+      break;
     default: errorQuda("Unexpected gauge input %s", getGaugeInputStr(mode));
     }
     printGaugeInput(mode);
@@ -625,26 +628,36 @@ namespace
      @brief Reload the output and compare it with what was saved
      @return What is wrong, empty if nothing
    */
-  std::vector<std::string> verify(const Conversion &c, const HostGauge &saved, const GaugeMetadata &given, const int *X)
+  std::vector<std::string> verify(const Conversion &c, const GaugeField &saved, QudaPrecision prec,
+                                  const GaugeMetadata &given, const int *X)
   {
     std::vector<std::string> failures;
-    HostGauge loaded(saved.prec, volume());
-    auto loaded_field = loaded.field(X);
+    auto loaded = plain_host_field(prec, X);
     host_timer_t timer;
     timer.start();
-    const auto info = GaugeIO(c.output, c.verify_param).load(loaded_field);
+    const auto info = GaugeIO(c.output, c.verify_param).load(loaded);
     timer.stop();
 
-    size_t differ = 0;
-    for (int d = 0; d < 4; d++)
-      for (size_t i = 0; i < volume() * link_reals; i++)
-        if (memcmp(saved.data[d].data() + i * saved.prec, loaded.data[d].data() + i * saved.prec, saved.prec) != 0)
-          differ++;
+    // the saved field is double but holds values of the precision saved, so converted to it they are the reals saved
+    auto differing = [&](auto real) {
+      using Float = decltype(real);
+      size_t n = 0;
+      for (int d = 0; d < 4; d++) {
+        const auto s = saved.data<const double *>(d);
+        const auto l = loaded.data<const Float *>(d);
+        for (size_t i = 0; i < volume() * link_reals; i++) {
+          const Float v = static_cast<Float>(s[i]);
+          if (memcmp(&v, &l[i], sizeof(Float)) != 0) n++;
+        }
+      }
+      return n;
+    };
+    size_t differ = prec == QUDA_DOUBLE_PRECISION ? differing(0.0) : differing(0.0f);
     comm_allreduce_sum(differ);
     if (differ > 0) failures.push_back(std::to_string(differ) + " of the reloaded reals differ from those saved");
 
     const auto family = save_family(c.save_format);
-    if (info.file_prec != saved.prec) failures.push_back("the file is not of the precision saved");
+    if (info.file_prec != prec) failures.push_back("the file is not of the precision saved");
     if (load_family(info) != family) failures.push_back("the file is not of the format saved");
     if (info.has_checksum && !info.checksum_matches) failures.push_back("its checksums don't match its data");
     if (info.has_plaq_linktr && !info.plaq_linktr_matches)
@@ -682,23 +695,22 @@ namespace
     }
 
     printfQuda("Verified %s: reloaded in %g s (%.3f GB/s), checksums %s, %s\n", c.output.c_str(), timer.last(),
-               gigabytes(saved.prec) / timer.last(), io::checksum_str({info.sum29, info.sum31}).c_str(),
+               gigabytes(prec) / timer.last(), io::checksum_str({info.sum29, info.sum31}).c_str(),
                failures.empty() ? "every value and the metadata as saved" : "FAILED");
     return failures;
   }
 
   void convert(const Conversion &c, const std::vector<std::string> &existing, const int *X)
   {
-    HostGauge gauge(QUDA_DOUBLE_PRECISION, volume());
+    auto gauge = plain_host_field(QUDA_DOUBLE_PRECISION, X);
     GaugeFileInfo info;
     if (c.generated) {
       generate(gauge);
-      report_field("Generated field", gauge, X);
+      report_field("Generated field", gauge);
     } else {
-      auto field = gauge.field(X);
       host_timer_t timer;
       timer.start();
-      info = GaugeIO(c.input, c.load_param).load(field);
+      info = GaugeIO(c.input, c.load_param).load(gauge);
       timer.stop();
       printfQuda("Loaded %s: %s%s, %s precision, checksums %s (%s), in %g s (%.3f GB/s)\n", c.input.c_str(),
                  family_str(load_family(info)), c.load_param.external_qio ? " (external QIO)" : "",
@@ -710,7 +722,7 @@ namespace
       if (info.reunitarized_deviation >= 0)
         printfQuda("Reunitarized with %s: largest deviation from unitarity %.2e before\n",
                    get_gauge_reunitarize_str(c.load_param.reunitarize), info.unitarity_deviation);
-      report_field("Loaded field", gauge, X);
+      report_field("Loaded field", gauge);
     }
     if (c.output.empty()) return;
 
@@ -727,21 +739,15 @@ namespace
                   "builds do)",
                   c.input.c_str());
 
-    // the links as saved: rounded in place for single precision, so that both copies hold the saved values
-    HostGauge rounded(QUDA_SINGLE_PRECISION, save_prec == QUDA_SINGLE_PRECISION ? volume() : 0);
+    // the links as saved: rounded in place for single precision, so that the field holds the saved values
     if (save_prec == QUDA_SINGLE_PRECISION) {
       for (int d = 0; d < 4; d++) {
-        auto u = static_cast<double *>(gauge.ptr[d]);
-        auto f = static_cast<float *>(rounded.ptr[d]);
+        auto u = gauge.data<double *>(d);
 #pragma omp parallel for
-        for (size_t i = 0; i < volume() * link_reals; i++) {
-          f[i] = static_cast<float>(u[i]);
-          u[i] = f[i];
-        }
+        for (size_t i = 0; i < volume() * link_reals; i++) u[i] = static_cast<float>(u[i]);
       }
     }
-    const HostGauge &saved = save_prec == QUDA_SINGLE_PRECISION ? rounded : gauge;
-    const auto observables = gauge_observables(gauge.field(X));
+    const auto observables = gauge_observables(gauge);
 
     const auto reasons = change_reasons(c, info, save_prec);
     const bool noop = reasons.empty();
@@ -759,14 +765,14 @@ namespace
     remove_existing(existing);
     host_timer_t timer;
     timer.start();
-    GaugeIO(c.output, c.save_param).save(saved.field(X), saved.prec, map.metadata);
+    GaugeIO(c.output, c.save_param).save(gauge, save_prec, map.metadata);
     timer.stop();
     printfQuda("Saved %s: %s%s%s, %s precision, in %g s (%.3f GB/s)\n", c.output.c_str(), family_str(family),
                c.save_param.external_qio ? " (external QIO)" : "", c.save_param.partfile ? " partfile" : "",
                prec_str(save_prec), timer.last(), gigabytes(save_prec) / timer.last());
 
     if (!gauge_convert_verify) return;
-    const auto failures = verify(c, saved, map.metadata, X);
+    const auto failures = verify(c, gauge, save_prec, map.metadata, X);
     if (!failures.empty()) {
       for (auto &f : failures) printfQuda("Verification of %s: %s\n", c.output.c_str(), f.c_str());
       errorQuda("Verification of %s failed (%lu problems)", c.output.c_str(), failures.size());
