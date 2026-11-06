@@ -34,8 +34,9 @@ namespace quda
     /**
        @brief Parameters for a reference field of general links with periodic boundaries on the QDP arrays of a
        host field
+       @param[in] arrays The host field's data_array(), which must outlive the construction of the field
      */
-    GaugeFieldParam host_field_param(const GaugeField &host)
+    GaugeFieldParam host_field_param(const GaugeField &host, array<void *, QUDA_MAX_DIM> &arrays)
     {
       QudaGaugeParam gauge_param = newQudaGaugeParam();
       for (int d = 0; d < 4; d++) gauge_param.X[d] = host.X()[d];
@@ -46,7 +47,7 @@ namespace quda
       gauge_param.anisotropy = 1.0;
       gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-      GaugeFieldParam field_param(gauge_param, host.raw_pointer());
+      GaugeFieldParam field_param(gauge_param, arrays.data);
       field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       return field_param;
     }
@@ -286,7 +287,8 @@ namespace quda
      */
     void compute_plaquettes_linktr(const GaugeField &view, GaugeObservables &obs)
     {
-      auto field_param = host_field_param(view);
+      auto arrays = view.data_array();
+      auto field_param = host_field_param(view, arrays);
       GaugeField host(field_param);
       GaugeField device(device_field_param(field_param));
       device.copy(host);
@@ -468,7 +470,8 @@ namespace quda
      */
     void project_polar(GaugeField &view)
     {
-      auto field_param = host_field_param(view);
+      auto arrays = view.data_array();
+      auto field_param = host_field_param(view, arrays);
       GaugeField host(field_param);
       GaugeField device(device_field_param(field_param));
       device.copy(host);
