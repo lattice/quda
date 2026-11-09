@@ -12,40 +12,6 @@
 #include "gauge_force_reference.h"
 #include "timer.h"
 
-int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
-{
-  int oddBit = 0;
-  int x[4];
-  auto half_idx = i;
-  if (i >= lat.volume / 2) {
-    oddBit = 1;
-    half_idx = i - lat.volume / 2;
-  }
-
-  auto za = half_idx / (lat.x[0] / 2);
-  auto x0h = half_idx - za * (lat.x[0] / 2);
-  auto zb = za / lat.x[1];
-  x[1] = za - zb * lat.x[1];
-  x[3] = zb / lat.x[2];
-  x[2] = zb - x[3] * lat.x[2];
-  auto x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-  x[0] = 2 * x0h + x1odd;
-
-  for (int d = 0; d < 4; d++) {
-    x[d] = quda::comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d];
-  }
-  size_t nbr_half_idx = ((x[3] + lat.r[3]) * (lat.e[2] * lat.e[1] * lat.e[0]) + (x[2] + lat.r[2]) * (lat.e[1] * lat.e[0])
-                         + (x[1] + lat.r[1]) * (lat.e[0]) + (x[0] + lat.r[0]))
-    / 2;
-
-  int oddBitChanged = (dx[3] + dx[2] + dx[1] + dx[0]) % 2;
-  if (oddBitChanged) { oddBit = 1 - oddBit; }
-  int ret = nbr_half_idx;
-  if (oddBit) ret += lat.volume_ex / 2;
-
-  return ret;
-}
-
 /**
  * @brief Calculates an arbitary gauge path, returning the product matrix
  * @return The product of the gauge path

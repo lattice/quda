@@ -16,14 +16,14 @@ template <typename real_t>
 double plaquette(const matrix<real_t> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
-  const auto &u1 = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &u1 = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]++;
-  const auto &u2 = links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &u2 = links[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]--;
   dx[nu]++;
-  const auto &u3 = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &u3 = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[nu]--;
-  const auto &u4 = links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &u4 = links[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   return trace(u1 * u2 * conj(u3) * conj(u4)).real();
 }
 
@@ -31,32 +31,32 @@ template <typename real_t>
 double rectangle(const matrix<real_t> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
-  auto mu_long = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  auto mu_long = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]++;
-  mu_long = mu_long * links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  mu_long = mu_long * links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]++;
-  mu_long = mu_long * links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  mu_long = mu_long * links[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]--;
   dx[nu]++;
-  mu_long = mu_long * conj(links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)]);
+  mu_long = mu_long * conj(links[mu][gf_neighborIndexFullLattice(i, dx, lat)]);
   dx[mu]--;
-  mu_long = mu_long * conj(links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)]);
+  mu_long = mu_long * conj(links[mu][gf_neighborIndexFullLattice(i, dx, lat)]);
   dx[nu]--;
-  mu_long = mu_long * conj(links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)]);
+  mu_long = mu_long * conj(links[nu][gf_neighborIndexFullLattice(i, dx, lat)]);
 
   dx = {};
-  auto nu_long = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  auto nu_long = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]++;
-  nu_long = nu_long * links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  nu_long = nu_long * links[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[nu]++;
-  nu_long = nu_long * links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  nu_long = nu_long * links[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]--;
   dx[nu]++;
-  nu_long = nu_long * conj(links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)]);
+  nu_long = nu_long * conj(links[mu][gf_neighborIndexFullLattice(i, dx, lat)]);
   dx[nu]--;
-  nu_long = nu_long * conj(links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)]);
+  nu_long = nu_long * conj(links[nu][gf_neighborIndexFullLattice(i, dx, lat)]);
   dx[nu]--;
-  nu_long = nu_long * conj(links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)]);
+  nu_long = nu_long * conj(links[nu][gf_neighborIndexFullLattice(i, dx, lat)]);
 
   return trace(mu_long + nu_long).real();
 }
@@ -224,8 +224,7 @@ template <typename real_t>
 const matrix<real_t> &shifted_link(const matrix<real_t> *const *links, size_t i, int dir,
                                    const std::array<int, 4> &shift, const lattice_t &lat)
 {
-  auto dx = shift;
-  return links[dir][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  return links[dir][gf_neighborIndexFullLattice(i, shift, lat)];
 }
 
 template <typename real_t>

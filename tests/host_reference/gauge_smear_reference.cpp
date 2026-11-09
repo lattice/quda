@@ -36,20 +36,20 @@ matrix<real_t> staple(const matrix<real_t> *const *links, size_t i, int nu, int 
     coeff = 1.0;
     if (mu == 3) coeff = anisotropy * anisotropy;
     std::array<int, 4> dx {};
-    const auto &u1 = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+    const auto &u1 = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
     dx[mu]++;
-    const auto &u2 = links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+    const auto &u2 = links[nu][gf_neighborIndexFullLattice(i, dx, lat)];
     dx[mu]--;
     dx[nu]++;
-    const auto &u3 = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+    const auto &u3 = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
     out += coeff * u1 * u2 * conj(u3);
 
     dx = {};
     dx[mu]--;
-    const auto &u4 = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
-    const auto &u5 = links[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+    const auto &u4 = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
+    const auto &u5 = links[nu][gf_neighborIndexFullLattice(i, dx, lat)];
     dx[nu]++;
-    const auto &u6 = links[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+    const auto &u6 = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
     out += coeff * conj(u4) * u5 * u6;
   }
   return out;
@@ -68,7 +68,7 @@ template <typename real_t>
 const matrix<real_t> &centered_link(const matrix<real_t> *const *links, size_t i, int dir, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
-  return links[dir][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  return links[dir][gf_neighborIndexFullLattice(i, dx, lat)];
 }
 
 /**
@@ -126,20 +126,20 @@ matrix<real_t> mixed_staple(const matrix<real_t> *const *gauge_mu, const matrix<
                             int mu, int nu, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
-  const auto &a = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &a = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[nu]++;
-  const auto &b = gauge_mu[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &b = gauge_mu[mu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[nu]--;
   dx[mu]++;
-  const auto &c = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &c = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   auto out = a * b * conj(c);
 
   dx = {};
   dx[nu]--;
-  const auto &d = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
-  const auto &e = gauge_mu[mu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &d = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx, lat)];
+  const auto &e = gauge_mu[mu][gf_neighborIndexFullLattice(i, dx, lat)];
   dx[mu]++;
-  const auto &f = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+  const auto &f = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx, lat)];
   out += conj(d) * e * f;
   return out;
 }
@@ -162,11 +162,11 @@ matrix<real_t> path_product(const matrix<real_t> *const *links, size_t i, const 
   for (const auto signed_dir : path) {
     const int dir = std::abs(signed_dir) - 1;
     if (signed_dir > 0) {
-      product = product * links[dir][gf_neighborIndexFullLattice(i, dx.data(), lat)];
+      product = product * links[dir][gf_neighborIndexFullLattice(i, dx, lat)];
       dx[dir]++;
     } else {
       dx[dir]--;
-      product = product * conj(links[dir][gf_neighborIndexFullLattice(i, dx.data(), lat)]);
+      product = product * conj(links[dir][gf_neighborIndexFullLattice(i, dx, lat)]);
     }
   }
   return product;
