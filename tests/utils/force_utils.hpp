@@ -5,10 +5,6 @@
 
 #include <gauge_field.h>
 
-// declare omp reductions for std::complex:
-#pragma omp declare reduction(+ : std::complex <double> : omp_out += omp_in) initializer(omp_priv = 0)
-#pragma omp declare reduction(+ : std::complex <float> : omp_out += omp_in) initializer(omp_priv = 0)
-
 template <typename real_t_> struct su3_matrix {
   using real_t = real_t_;
   using complex_t = std::complex<real_t>;

@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <array>
+#include <complex>
 #include <cstddef>
 #include <random>
 #include <string>
@@ -13,6 +14,10 @@
 #include <color_spinor_field.h>
 
 #include "host_rng.hpp"
+
+// declare omp reductions for std::complex:
+#pragma omp declare reduction(+ : std::complex <double> : omp_out += omp_in) initializer(omp_priv = 0)
+#pragma omp declare reduction(+ : std::complex <float> : omp_out += omp_in) initializer(omp_priv = 0)
 
 constexpr size_t gauge_site_size = 18;      // real numbers per link
 constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor

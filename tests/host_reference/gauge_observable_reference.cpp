@@ -176,17 +176,16 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
       }
     }
 
-    double real = 0.0;
-    double imaginary = 0.0;
-#pragma omp parallel for reduction(+ : real, imaginary)
+    std::complex<double> sum = 0.0;
+#pragma omp parallel for reduction(+ : sum)
     for (size_t spatial_index = 0; spatial_index < spatial_volume; spatial_index++) {
       auto product = Identity<3, std::complex<double>>()();
       for (int t = 0; t < temporal_ranks; t++) product = product * rank_product[t][spatial_index];
-      const auto value = trace(product);
-      real += value.real();
-      imaginary += value.imag();
+      sum += trace(product);
     }
 
+    double real = sum.real();
+    double imaginary = sum.imag();
     quda::comm_allreduce_sum(real);
     quda::comm_allreduce_sum(imaginary);
     const double normalization = spatial_volume * quda::comm_size();
@@ -199,29 +198,25 @@ template <typename real_t> struct LinkDeterminantTraceReferenceCompute {
   {
     const auto ptrs = u.data_array<const matrix<real_t> *>();
     const auto links = ptrs.data;
-    double determinant_real = 0.0;
-    double determinant_imaginary = 0.0;
-    double trace_real = 0.0;
-    double trace_imaginary = 0.0;
+    std::complex<double> determinant_sum = 0.0;
+    std::complex<double> trace_sum = 0.0;
     double determinant_scale = 0.0;
     double trace_scale = 0.0;
 
-#pragma omp parallel for reduction(+ : determinant_real, determinant_imaginary, trace_real, trace_imaginary,           \
-                                     determinant_scale, trace_scale)
+#pragma omp parallel for reduction(+ : determinant_sum, trace_sum, determinant_scale, trace_scale)
     for (size_t i = 0; i < u.Volume(); i++) {
       for (int dir = 0; dir < 4; dir++) {
         const auto determinant = links[dir][i].determinant();
         const auto link_trace = trace(links[dir][i]);
-        determinant_real += determinant.real();
-        determinant_imaginary += determinant.imag();
-        trace_real += link_trace.real();
-        trace_imaginary += link_trace.imag();
+        determinant_sum += determinant;
+        trace_sum += link_trace;
         determinant_scale += std::abs(determinant);
         trace_scale += std::abs(link_trace);
       }
     }
 
-    result = {determinant_real, determinant_imaginary, trace_real, trace_imaginary, determinant_scale, trace_scale};
+    result = {determinant_sum.real(), determinant_sum.imag(), trace_sum.real(),
+              trace_sum.imag(),       determinant_scale,      trace_scale};
   }
 };
 
