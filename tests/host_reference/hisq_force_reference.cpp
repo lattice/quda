@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "host_utils.h"
+#include "dslash_reference.h"
 #include "force_utils.hpp"
 #include "index_utils.hpp"
 #include "instantiate_host.hpp"
@@ -15,29 +16,77 @@ extern int Z[4];
 extern int V;
 extern int Vh;
 
-template <typename real_t> struct ComputeLinkOrderedOuterProduct {
-  void operator()(const void *const src_, quda::GaugeField &dest, size_t nhops)
+template <typename real> struct ComputeLinkOrderedOuterProduct {
+  void operator()(const quda::ColorSpinorField &src, quda::GaugeField &dest, int nhops)
   {
-    auto src = static_cast<const su3_vector<real_t> *>(src_);
+    for (int parity = 0; parity < 2; ++parity) {
+      // nhops is odd, so the forward neighbor of a site lives on the opposite parity
+      const int nbr_parity = 1 - parity;
+      const auto &site_field = parity == 0 ? src.Even() : src.Odd();
+      const auto &nbr_field = nbr_parity == 0 ? src.Even() : src.Odd();
+      nbr_field.exchangeGhost(static_cast<QudaParity>(nbr_parity), nhops, 0);
+
+      const auto site = site_field.data<const su3_vector<real> *>();
+      const auto nbr = nbr_field.data<const real *>();
+      const auto fwd_ghost = typed_ptr_array<const real *>(nbr_field.fwdGhostFaceBuffer);
+      const auto back_ghost = typed_ptr_array<const real *>(nbr_field.backGhostFaceBuffer);
 
 #pragma omp parallel for
-    for (int i = 0; i < V; ++i) {
-      int dx[4];
-      for (int dir = 0; dir < 4; ++dir) {
-        dx[3] = dx[2] = dx[1] = dx[0] = 0;
-        dx[dir] = nhops;
-        int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-        auto hw = src + nbr_idx;
-        auto p = get_su3_matrix<real_t>(dest, i, dir);
-        su3_projector(hw, &src[i], p);
-      } // dir
-    }   // i
+      for (int i = 0; i < Vh; ++i) {
+        for (int dir = 0; dir < 4; ++dir) {
+          auto hw = reinterpret_cast<const su3_vector<real> *>(spinorNeighbor(
+            i, 2 * dir, parity, nbr, fwd_ghost.data(), back_ghost.data(), nhops, nhops, stag_spinor_site_size));
+          auto p = get_su3_matrix<real>(dest, parity * Vh + i, dir);
+          su3_projector(hw, &site[i], p);
+        } // dir
+      } // i
+    } // parity
   }
 };
 
-void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
+void computeLinkOrderedOuterProduct(const quda::ColorSpinorField &src, quda::GaugeField &dst, int nhops)
 {
-  instantiate_host<ComputeLinkOrderedOuterProduct>(precision, src, dst, nhops);
+  if (src.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Expected a full-parity spinor field");
+  if (nhops % 2 == 0) errorQuda("Outer product separation %d must be odd", nhops);
+  instantiate_host<ComputeLinkOrderedOuterProduct>(src.Precision(), src, dst, nhops);
+}
+
+template <typename real> struct AccumulateByParity {
+  void operator()(quda::GaugeField &y, const quda::GaugeField &x, double a_even, double a_odd)
+  {
+    const size_t half = x.VolumeCB() * gauge_site_size;
+    for (int d = 0; d < 4; d++) {
+      auto yd = y.data<real *>(d);
+      auto xd = x.data<const real *>(d);
+      for (size_t i = 0; i < half; i++) {
+        yd[i] += a_even * xd[i];
+        yd[half + i] += a_odd * xd[half + i];
+      }
+    }
+  }
+};
+
+void computeStaggeredOprodCPU(std::array<quda::GaugeField, 2> &out, const quda::ColorSpinorField &in,
+                              const double coeff[], int nFace)
+{
+  if (nFace != 1 && nFace != 3) errorQuda("Invalid nFace=%d", nFace);
+  for (int i = 0; i < (nFace == 3 ? 2 : 1); i++) {
+    if (out[i].Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", out[i].Order());
+    if (out[i].Precision() != in.Precision())
+      errorQuda("Outer product precision %d does not match quark precision %d", out[i].Precision(), in.Precision());
+  }
+
+  quda::GaugeFieldParam param(out[0]);
+  param.create = QUDA_NULL_FIELD_CREATE;
+  quda::GaugeField oprod(param);
+
+  computeLinkOrderedOuterProduct(in, oprod, 1);
+  instantiate_host<AccumulateByParity>(in.Precision(), out[0], oprod, coeff[0], nFace == 1 ? -coeff[0] : coeff[0]);
+
+  if (nFace == 3) {
+    computeLinkOrderedOuterProduct(in, oprod, 3);
+    instantiate_host<AccumulateByParity>(in.Precision(), out[1], oprod, coeff[1], coeff[1]);
+  }
 }
 
 #define RETURN_IF_ERR                                                                                                  \
@@ -54,10 +103,10 @@ template <> struct Sign<1> {
   static const int result = -1;
 };
 
-template <typename real_t_> class LoadStore
+template <typename real_> class LoadStore
 {
-  using real_t = real_t_;
-  using complex = std::complex<real_t>;
+  using real = real_;
+  using complex = std::complex<real>;
   using matrix = Matrix<3, complex>;
 
 private:
@@ -67,9 +116,9 @@ private:
 public:
   LoadStore(int vol) : volume(vol), half_volume(vol / 2) { }
 
-  void loadMatrixFromField(const real_t *const field, int oddBit, int half_lattice_index, matrix *const mat) const;
+  void loadMatrixFromField(const real *const field, int oddBit, int half_lattice_index, matrix *const mat) const;
 
-  void loadMatrixFromField(const real_t *const *const field, int oddBit, int dir, int half_lattice_index,
+  void loadMatrixFromField(const real *const *const field, int oddBit, int dir, int half_lattice_index,
                            matrix *const mat) const;
 
   void loadMatrixFromField(const matrix *const field, int oddBit, int half_lattice_index, matrix *const mat) const;
@@ -77,136 +126,85 @@ public:
   void loadMatrixFromField(const matrix *const *const field, int oddBit, int dir, int half_lattice_index,
                            matrix *const mat) const;
 
-  void storeMatrixToField(const matrix &mat, int oddBit, int half_lattice_index, real_t *const field) const;
+  void storeMatrixToField(const matrix &mat, int oddBit, int half_lattice_index, real *const field) const;
 
   void storeMatrixToField(const matrix &mat, int oddBit, int half_lattice_index, matrix *const field) const;
 
-  void addMatrixToField(const matrix &mat, int oddBit, int half_lattice_index, real_t coeff, real_t *const) const;
+  void addMatrixToField(const matrix &mat, int oddBit, int half_lattice_index, real coeff, real *const) const;
 
-  void addMatrixToField(const matrix &mat, int oddBit, int half_lattice_index, real_t coeff, matrix *const) const;
+  void addMatrixToField(const matrix &mat, int oddBit, int half_lattice_index, real coeff, matrix *const) const;
 
-  void addMatrixToField(const matrix &mat, int oddBit, int dir, int half_lattice_index, real_t coeff,
-                        real_t *const *const) const;
+  void addMatrixToField(const matrix &mat, int oddBit, int dir, int half_lattice_index, real coeff,
+                        real *const *const) const;
 
-  void addMatrixToField(const matrix &mat, int oddBit, int dir, int half_lattice_index, real_t coeff,
+  void addMatrixToField(const matrix &mat, int oddBit, int dir, int half_lattice_index, real coeff,
                         matrix *const *const) const;
 
-  void storeMatrixToMomentumField(const matrix &mat, int oddBit, int dir, int half_lattice_index, real_t coeff,
-                                  real_t *const) const;
-  real_t getData(const real_t *const *const field, int idx, int dir, int oddBit, int offset, int hfv) const;
-  void addData(real_t *const *const field, int idx, int dir, int oddBit, int offset, real_t, int hfv) const;
-  int half_idx_conversion_ex2normal(int half_lattice_index, const int *dim, int oddBit) const;
-  int half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const;
+  void storeMatrixToMomentumField(const matrix &mat, int oddBit, int dir, int half_lattice_index, real coeff,
+                                  real *const) const;
+  real getData(const real *const *const field, int idx, int dir, int oddBit, int offset, int hfv) const;
+  void addData(real *const *const field, int idx, int dir, int oddBit, int offset, real, int hfv) const;
 };
 
-template <typename real_t>
-int LoadStore<real_t>::half_idx_conversion_ex2normal(int half_lattice_index_ex, const int *dim, int oddBit) const
+// The rest of this reference (field sizes, Vh_ex) also assumes this radius, so it must stay in sync
+constexpr int force_ref_r = is_multi_gpu() ? 2 : 0;
+constexpr std::array<int, 4> force_ref_R = {force_ref_r, force_ref_r, force_ref_r, force_ref_r};
+
+static void checkForceRefRadius(const quda::GaugeField &field, const char *name)
 {
-  int X1 = dim[0];
-  int X2 = dim[1];
-  int X3 = dim[2];
-  // int X4=dim[3];
-
-  int E1 = dim[0] + 4;
-  int E2 = dim[1] + 4;
-  int E3 = dim[2] + 4;
-  // int E4=dim[3]+4;
-  int E1h = E1 / 2;
-
-  int sid = half_lattice_index_ex;
-
-  int za = sid / E1h;
-  int x1h = sid - za * E1h;
-  int zb = za / E2;
-  int x2 = za - zb * E2;
-  int x4 = zb / E3;
-  int x3 = zb - x4 * E3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
-
-  int idx = ((x4 - 2) * X3 * X2 * X1 + (x3 - 2) * X2 * X1 + (x2 - 2) * X1 + (x1 - 2)) / 2;
-  return idx;
+  for (int d = 0; d < 4; d++) {
+    if (field.R()[d] != force_ref_R[d])
+      errorQuda("%s has extension radius %d in dimension %d, but this reference requires %d", name, field.R()[d], d,
+                force_ref_R[d]);
+  }
 }
 
-template <class real_t>
-int LoadStore<real_t>::half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const
-{
-  int X1 = dim[0];
-  int X2 = dim[1];
-  int X3 = dim[2];
-  // int X4=dim[3];
-  int X1h = X1 / 2;
-
-  int E1 = dim[0] + 4;
-  int E2 = dim[1] + 4;
-  int E3 = dim[2] + 4;
-  // int E4=dim[3]+4;
-  // int E1h=E1/2;
-
-  int sid = half_lattice_index;
-
-  int za = sid / X1h;
-  int x1h = sid - za * X1h;
-  int zb = za / X2;
-  int x2 = za - zb * X2;
-  int x4 = zb / X3;
-  int x3 = zb - x4 * X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
-
-  int idx = ((x4 + 2) * E3 * E2 * E1 + (x3 + 2) * E2 * E1 + (x2 + 2) * E1 + (x1 + 2)) / 2;
-
-  return idx;
-}
-
-template <class real_t>
-void LoadStore<real_t>::loadMatrixFromField(const typename LoadStore<real_t>::matrix *const field, int oddBit,
-                                            int half_lattice_index, typename LoadStore<real_t>::matrix *const mat) const
+template <class real>
+void LoadStore<real>::loadMatrixFromField(const typename LoadStore<real>::matrix *const field, int oddBit,
+                                          int half_lattice_index, typename LoadStore<real>::matrix *const mat) const
 {
   int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
   *mat = field[oddBit * hfv + half_lattice_index];
 }
 
-template <class real_t>
-void LoadStore<real_t>::loadMatrixFromField(const typename LoadStore<real_t>::matrix *const *const field, int oddBit,
-                                            int dir, int half_lattice_index,
-                                            typename LoadStore<real_t>::matrix *const mat) const
+template <class real>
+void LoadStore<real>::loadMatrixFromField(const typename LoadStore<real>::matrix *const *const field, int oddBit, int dir,
+                                          int half_lattice_index, typename LoadStore<real>::matrix *const mat) const
 {
   int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
   *mat = field[dir][oddBit * hfv + half_lattice_index];
 }
 
-template <class real_t>
-void LoadStore<real_t>::storeMatrixToField(const typename LoadStore<real_t>::matrix &mat, int oddBit,
-                                           int half_lattice_index, typename LoadStore<real_t>::matrix *const field) const
+template <class real>
+void LoadStore<real>::storeMatrixToField(const typename LoadStore<real>::matrix &mat, int oddBit,
+                                         int half_lattice_index, typename LoadStore<real>::matrix *const field) const
 {
   int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
   field[oddBit * hfv + half_lattice_index] = mat;
 }
 
-template <class real_t>
-void LoadStore<real_t>::addMatrixToField(const typename LoadStore<real_t>::matrix &mat, int oddBit,
-                                         int half_lattice_index, real_t coeff,
-                                         typename LoadStore<real_t>::matrix *const field) const
+template <class real>
+void LoadStore<real>::addMatrixToField(const typename LoadStore<real>::matrix &mat, int oddBit, int half_lattice_index,
+                                       real coeff, typename LoadStore<real>::matrix *const field) const
 {
   int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
   field[oddBit * hfv + half_lattice_index] += coeff * mat;
 }
 
-template <class real_t>
-void LoadStore<real_t>::addMatrixToField(const typename LoadStore<real_t>::matrix &mat, int oddBit, int dir,
-                                         int half_lattice_index, real_t coeff,
-                                         typename LoadStore<real_t>::matrix *const *const field) const
+template <class real>
+void LoadStore<real>::addMatrixToField(const typename LoadStore<real>::matrix &mat, int oddBit, int dir,
+                                       int half_lattice_index, real coeff,
+                                       typename LoadStore<real>::matrix *const *const field) const
 {
   int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
   field[dir][oddBit * hfv + half_lattice_index] += coeff * mat;
 }
 
-template <class real_t>
-void LoadStore<real_t>::storeMatrixToMomentumField(const typename LoadStore<real_t>::matrix &mat, int oddBit, int dir,
-                                                   int half_lattice_index, real_t coeff, real_t *const field) const
+template <class real>
+void LoadStore<real>::storeMatrixToMomentumField(const typename LoadStore<real>::matrix &mat, int oddBit, int dir,
+                                                 int half_lattice_index, real coeff, real *const field) const
 {
-  real_t *const mom_field = field + ((oddBit * half_volume + half_lattice_index) * 4 + dir) * 10;
+  real *const mom_field = field + ((oddBit * half_volume + half_lattice_index) * 4 + dir) * 10;
   mom_field[0] = (mat(0, 1).real() - mat(1, 0).real()) * 0.5 * coeff;
   mom_field[1] = (mat(0, 1).imag() + mat(1, 0).imag()) * 0.5 * coeff;
 
@@ -216,7 +214,7 @@ void LoadStore<real_t>::storeMatrixToMomentumField(const typename LoadStore<real
   mom_field[4] = (mat(1, 2).real() - mat(2, 1).real()) * 0.5 * coeff;
   mom_field[5] = (mat(1, 2).imag() + mat(2, 1).imag()) * 0.5 * coeff;
 
-  const real_t temp = (mat(0, 0).imag() + mat(1, 1).imag() + mat(2, 2).imag()) * 0.3333333333333333333;
+  const real temp = (mat(0, 0).imag() + mat(1, 1).imag() + mat(2, 2).imag()) * 0.3333333333333333333;
   mom_field[6] = (mat(0, 0).imag() - temp) * coeff;
   mom_field[7] = (mat(1, 1).imag() - temp) * coeff;
   mom_field[8] = (mat(2, 2).imag() - temp) * coeff;
@@ -388,40 +386,40 @@ template <int oddBit> int Locator<oddBit>::getNeighborFromFullIndex(int full_lat
   return neighbor_index;
 }
 
-template <class real_t> struct PathCoefficients {
-  real_t one;
-  real_t three;
-  real_t five;
-  real_t seven;
-  real_t naik;
-  real_t lepage;
+template <class real> struct PathCoefficients {
+  real one;
+  real three;
+  real five;
+  real seven;
+  real naik;
+  real lepage;
 };
 
-template <typename real_t> struct HisqStaplesForce {
-  using complex = std::complex<real_t>;
+template <typename real> struct HisqStaplesForce {
+  using complex = std::complex<real>;
   using matrix = Matrix<3, complex>;
 
   template <int oddBit>
   void computeOneLinkSite(const int dim[4], int half_lattice_index, const matrix *const *const oprod, int sig,
-                          real_t coeff, const LoadStore<real_t> &ls, matrix *const *const output)
+                          real coeff, const LoadStore<real> &ls, matrix *const *const output)
   {
     if (GOES_FORWARDS(sig)) {
       matrix colorMatW;
 
-      int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+      int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
       ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatW);
       ls.addMatrixToField(colorMatW, oddBit, sig, idx, coeff, output);
     }
   }
 
-  void computeOneLinkField(const int dim[4], const matrix *const *const oprod, int sig, real_t coeff,
+  void computeOneLinkField(const int dim[4], const matrix *const *const oprod, int sig, real coeff,
                            matrix *const *const output)
   {
     int volume = 1;
     for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
     const int half_volume = volume / 2;
-    LoadStore<real_t> ls(volume);
+    LoadStore<real> ls(volume);
 
 #pragma omp parallel for
     for (int site = 0; site < half_volume; ++site) { computeOneLinkSite<0>(dim, site, oprod, sig, coeff, ls, output); }
@@ -432,8 +430,8 @@ template <typename real_t> struct HisqStaplesForce {
 
   template <int oddBit>
   void computeMiddleLinkSite(int half_lattice_index, const int dim[4], const matrix *const oprod,
-                             const matrix *const Qprev, const matrix *const *const link, int sig, int mu, real_t coeff,
-                             const LoadStore<real_t> &ls, matrix *const Pmu, matrix *const P3, matrix *const Qmu,
+                             const matrix *const Qprev, const matrix *const *const link, int sig, int mu, real coeff,
+                             const LoadStore<real> &ls, matrix *const Pmu, matrix *const P3, matrix *const Qmu,
                              matrix *const *const newOprod)
   {
     const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
@@ -516,7 +514,7 @@ template <typename real_t> struct HisqStaplesForce {
   } // computeMiddleLinkSite
 
   void computeMiddleLinkField(const int dim[4], const matrix *const oprod, const matrix *const Qprev,
-                              const matrix *const *const link, int sig, int mu, real_t coeff, matrix *const Pmu,
+                              const matrix *const *const link, int sig, int mu, real coeff, matrix *const Pmu,
                               matrix *const P3, matrix *const Qmu, matrix *const *const newOprod)
   {
 
@@ -527,7 +525,7 @@ template <typename real_t> struct HisqStaplesForce {
     // loop over the lattice volume
     // To keep the code as close to the GPU code as possible, we'll
     // loop over the even sites first and then the odd sites
-    LoadStore<real_t> ls(volume);
+    LoadStore<real> ls(volume);
 #pragma omp parallel for
     for (int site = 0; site < loop_count; ++site) {
       computeMiddleLinkSite<0>(site, dim, oprod, Qprev, link, sig, mu, coeff, ls, Pmu, P3, Qmu, newOprod);
@@ -541,8 +539,8 @@ template <typename real_t> struct HisqStaplesForce {
 
   template <int oddBit>
   void computeSideLinkSite(int half_lattice_index, const int dim[4], const matrix *const P3, const matrix *const Qprod,
-                           const matrix *const *const link, int sig, int mu, real_t coeff, real_t accumu_coeff,
-                           const LoadStore<real_t> &ls, matrix *const shortP, matrix *const *const newOprod)
+                           const matrix *const *const link, int sig, int mu, real coeff, real accumu_coeff,
+                           const LoadStore<real> &ls, matrix *const shortP, matrix *const *const newOprod)
   {
 
     const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
@@ -576,7 +574,7 @@ template <typename real_t> struct HisqStaplesForce {
       ls.addMatrixToField(colorMatW, 1 - oddBit, point_d, accumu_coeff, shortP);
     } // if(shortP)
 
-    real_t mycoeff = ((sig_positive && oddBit) || (!sig_positive && !oddBit)) ? coeff : -coeff;
+    real mycoeff = ((sig_positive && oddBit) || (!sig_positive && !oddBit)) ? coeff : -coeff;
 
     if (Qprod) {
       ls.loadMatrixFromField(Qprod, 1 - oddBit, point_d, &colorMatX);
@@ -605,14 +603,14 @@ template <typename real_t> struct HisqStaplesForce {
   } // computeSideLinkSite
 
   void computeSideLinkField(const int dim[4], const matrix *const P3, const matrix *const Qprod,
-                            const matrix *const *const link, int sig, int mu, real_t coeff, real_t accumu_coeff,
+                            const matrix *const *const link, int sig, int mu, real coeff, real accumu_coeff,
                             matrix *const shortP, matrix *const *const newOprod)
   {
     // Need some way of setting half_volume
     int volume = 1;
     for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
     const int loop_count = is_multi_gpu() ? Vh_ex : volume / 2;
-    LoadStore<real_t> ls(volume);
+    LoadStore<real> ls(volume);
 
 #pragma omp parallel for
     for (int site = 0; site < loop_count; ++site) {
@@ -627,8 +625,8 @@ template <typename real_t> struct HisqStaplesForce {
 
   template <int oddBit>
   void computeAllLinkSite(int half_lattice_index, const int dim[4], const matrix *const oprod, const matrix *const Qprev,
-                          const matrix *const *const link, int sig, int mu, real_t coeff, real_t accumu_coeff,
-                          const LoadStore<real_t> &ls, matrix *const shortP, matrix *const *const newOprod)
+                          const matrix *const *const link, int sig, int mu, real coeff, real accumu_coeff,
+                          const LoadStore<real> &ls, matrix *const shortP, matrix *const *const newOprod)
   {
     const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
     const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
@@ -655,7 +653,7 @@ template <typename real_t> struct HisqStaplesForce {
     point_b = new_mem_idx >> 1;
     ab_link_nbr_idx = (sig_positive) ? half_lattice_index : point_b;
 
-    real_t mycoeff = ((sig_positive && oddBit) || (!sig_positive && !oddBit)) ? coeff : -coeff;
+    real mycoeff = ((sig_positive && oddBit) || (!sig_positive && !oddBit)) ? coeff : -coeff;
 
     if (mu_positive) {
       ls.loadMatrixFromField(Qprev, 1 - oddBit, point_d, &colorMatX);
@@ -711,14 +709,14 @@ template <typename real_t> struct HisqStaplesForce {
   }   // allLinkKernel
 
   void computeAllLinkField(const int dim[4], const matrix *const oprod, const matrix *const Qprev,
-                           const matrix *const *const link, int sig, int mu, real_t coeff, real_t accumu_coeff,
+                           const matrix *const *const link, int sig, int mu, real coeff, real accumu_coeff,
                            matrix *const shortP, matrix *const *const newOprod)
   {
     int volume = 1;
     for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
     const int loop_count = is_multi_gpu() ? Vh_ex : volume / 2;
 
-    LoadStore<real_t> ls(volume);
+    LoadStore<real> ls(volume);
 #pragma omp parallel for
     for (int site = 0; site < loop_count; ++site) {
       computeAllLinkSite<0>(site, dim, oprod, Qprev, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
@@ -739,7 +737,7 @@ template <typename real_t> struct HisqStaplesForce {
     const auto newOprodArray = newOprod_->data_array<matrix *>();
     const auto newOprod = newOprodArray.data;
 
-    real_t OneLink, ThreeSt, FiveSt, SevenSt, Lepage, coeff;
+    real OneLink, ThreeSt, FiveSt, SevenSt, Lepage, coeff;
     OneLink = staple_coeff.one;
     ThreeSt = staple_coeff.three;
     FiveSt = staple_coeff.five;
@@ -819,6 +817,10 @@ template <typename real_t> struct HisqStaplesForce {
 void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda::GaugeField &link,
                          quda::GaugeField *newOprod)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+  checkForceRefRadius(*newOprod, "newOprod");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
@@ -834,13 +836,13 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   instantiate_host<HisqStaplesForce>(precision, X_, act_path_coeff, oprod, link, newOprod);
 }
 
-template <class real_t> struct ComputeLongLinkField {
-  using complex = std::complex<real_t>;
+template <class real> struct ComputeLongLinkField {
+  using complex = std::complex<real>;
   using matrix = Matrix<3, complex>;
 
   template <int oddBit>
   void computeLongLinkSite(int half_lattice_index, const int dim[4], const matrix *const *const oprod,
-                           const matrix *const *const link, int sig, real_t coeff, const LoadStore<real_t> &ls,
+                           const matrix *const *const link, int sig, real coeff, const LoadStore<real> &ls,
                            matrix *const *const output)
   {
     if (GOES_FORWARDS(sig)) {
@@ -851,7 +853,7 @@ template <class real_t> struct ComputeLongLinkField {
       matrix colorMatU, colorMatV, colorMatW, colorMatX, colorMatY, colorMatZ;
 
       int point_a, point_b, point_c, point_d, point_e;
-      int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+      int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
       int X = locator.getFullFromHalfIndex(idx);
       point_c = idx;
@@ -883,7 +885,7 @@ template <class real_t> struct ComputeLongLinkField {
     }
   }
 
-  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig, real_t coeff,
+  void operator()(const int dim[4], quda::GaugeField &oprod_, quda::GaugeField &link_, int sig, real coeff,
                   quda::GaugeField *output_)
   {
     const auto oprodArray = oprod_.data_array<const matrix *>();
@@ -897,7 +899,7 @@ template <class real_t> struct ComputeLongLinkField {
     for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
     const int half_volume = volume / 2;
 
-    LoadStore<real_t> ls(volume);
+    LoadStore<real> ls(volume);
 #pragma omp parallel for
     for (int site = 0; site < half_volume; ++site) {
       computeLongLinkSite<0>(site, dim, oprod, link, sig, coeff, ls, output);
@@ -912,6 +914,10 @@ template <class real_t> struct ComputeLongLinkField {
 
 void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *newOprod)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+  checkForceRefRadius(*newOprod, "newOprod");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
@@ -921,22 +927,22 @@ void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeFiel
   } // sig
 }
 
-template <class real_t> struct CompleteForceField {
-  using complex = std::complex<real_t>;
+template <class real> struct CompleteForceField {
+  using complex = std::complex<real>;
   using matrix = Matrix<3, complex>;
 
   template <int oddBit>
   void completeForceSite(int half_lattice_index, const int dim[4], const matrix *const *const oprod,
-                         const matrix *const *const link, int sig, const LoadStore<real_t> &ls, real_t *const mom)
+                         const matrix *const *const link, int sig, const LoadStore<real> &ls, real *const mom)
   {
     matrix colorMatX, colorMatY, linkW;
 
-    int idx = is_multi_gpu() ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+    int idx = getIndexExtended(half_lattice_index, dim, oddBit, force_ref_R);
 
     ls.loadMatrixFromField(link, oddBit, sig, idx, &linkW);
     ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatX);
 
-    const real_t coeff = (oddBit) ? -1 : 1;
+    const real coeff = (oddBit) ? -1 : 1;
     colorMatY = linkW * colorMatX;
 
     ls.storeMatrixToMomentumField(colorMatY, oddBit, sig, half_lattice_index, coeff, mom);
@@ -948,11 +954,11 @@ template <class real_t> struct CompleteForceField {
     const auto oprod = oprodArray.data;
     const auto linkArray = link_.data_array<const matrix *>();
     const auto link = linkArray.data;
-    const auto mom = mom_->data<real_t *>();
+    const auto mom = mom_->data<real *>();
 
     int volume = dim[0] * dim[1] * dim[2] * dim[3];
     const int half_volume = volume / 2;
-    LoadStore<real_t> ls(volume);
+    LoadStore<real> ls(volume);
 
 #pragma omp parallel for
     for (int site = 0; site < half_volume; ++site) { completeForceSite<0>(site, dim, oprod, link, sig, ls, mom); }
@@ -963,6 +969,9 @@ template <class real_t> struct CompleteForceField {
 
 void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *mom)
 {
+  checkForceRefRadius(oprod, "oprod");
+  checkForceRefRadius(link, "link");
+
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();

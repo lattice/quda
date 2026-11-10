@@ -4,7 +4,7 @@
 
 #include "host_utils.h"
 
-template <typename real_t> inline void aXpY(real_t a, const real_t *x, real_t *y, int len)
+template <typename real> inline void aXpY(real a, const real *x, real *y, int len)
 {
   for (int i = 0; i < len; i++) { y[i] += a * x[i]; }
 }
@@ -26,7 +26,7 @@ void caxpy(double _Complex a, void *x, void *y, int len, QudaPrecision precision
 }
 
 // performs the operation x[i] *= a
-template <typename real_t> inline void aX(real_t a, real_t *x, int len)
+template <typename real> inline void aX(real a, real *x, int len)
 {
   for (int i = 0; i < len; i++) x[i] *= a;
 }
@@ -49,7 +49,7 @@ void cax(double _Complex a, void *x, int len, QudaPrecision precision)
 }
 
 // performs the operation y[i] -= x[i] (minus x plus y)
-template <typename real_t> inline void mXpY(real_t *x, real_t *y, int len)
+template <typename real> inline void mXpY(real *x, real *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] -= x[i];
 }
@@ -63,7 +63,7 @@ void mxpy(void *x, void *y, int len, QudaPrecision precision)
 }
 
 // returns the square of the L2 norm of the vector
-template <typename real_t> inline double norm2(real_t *v, int len, bool global)
+template <typename real> inline double norm2(real *v, int len, bool global)
 {
   double sum = 0.0;
   for (int i = 0; i < len; i++) sum += v[i] * v[i];
@@ -80,7 +80,7 @@ double norm_2(void *v, int len, QudaPrecision precision, bool global)
 }
 
 // performs the operation y[i] = x[i] + a*y[i]
-template <typename real_t> static inline void xpay(const real_t *x, real_t a, real_t *y, int len)
+template <typename real> static inline void xpay(const real *x, real a, real *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = x[i] + a * y[i];
 }

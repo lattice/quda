@@ -2,13 +2,22 @@
 
 #include <vector>
 #include <array>
+#include <complex>
+#include <cstddef>
 #include <random>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include <quda.h>
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
 #include "host_rng.hpp"
+
+// declare omp reductions for std::complex:
+#pragma omp declare reduction(+ : std::complex <double> : omp_out += omp_in) initializer(omp_priv = 0)
+#pragma omp declare reduction(+ : std::complex <float> : omp_out += omp_in) initializer(omp_priv = 0)
 
 constexpr size_t gauge_site_size = 18;      // real numbers per link
 constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
@@ -57,6 +66,29 @@ constexpr bool is_multi_gpu()
 #endif
 }
 
+/**
+ * @brief Build a typed array of per-dimension pointers, e.g., from ghost buffers
+ *
+ * @tparam T The pointer type to cast each element to (e.g., const double *)
+ * @tparam N The number of elements to convert
+ * @tparam Src An indexable source whose elements are either pointers (e.g.,
+ * ColorSpinorField::fwdGhostFaceBuffer) or objects with a data() method (e.g.,
+ * GaugeField::Ghost())
+ * @param[in] src The source to convert
+ * @return Array of the first N elements of src cast to T
+ */
+template <typename T, std::size_t N = 4, typename Src> std::array<T, N> typed_ptr_array(const Src &src)
+{
+  std::array<T, N> out {};
+  for (std::size_t i = 0; i < N; i++) {
+    if constexpr (std::is_pointer_v<std::decay_t<decltype(src[i])>>)
+      out[i] = static_cast<T>(src[i]);
+    else
+      out[i] = static_cast<T>(src[i].data());
+  }
+  return out;
+}
+
 // Determine if the Laplace operator has been defined
 constexpr bool is_enabled_laplace()
 {
@@ -85,8 +117,9 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
                                             int argc, char **argv);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
-void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
+void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **vlink,
+                         void **wlink, void **sitelink, void *qudaGaugeParamPtr,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
 void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_param);
 void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
                                    quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param,
@@ -201,10 +234,10 @@ void printGaugeElement(void *gauge, int X, QudaPrecision precision);
 
 /**
  * @brief Print the components of an nColor = 3 vector
- * @tparam real_t Floating point type of vector
+ * @tparam real Floating point type of vector
  * @param[in] v nColor = 3 complex vector
  */
-template <typename real_t> void printVector(real_t *v)
+template <typename real> void printVector(real *v)
 {
   printfQuda("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
 }
@@ -245,13 +278,63 @@ int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, co
                       const std::string &msgB);
 
 /**
-   @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations
-   @param[out] stag_for_oprod Set of four contiguous host spinor fields
-   @param[in] precision Precision of field
-   @param[in] x Full lattice volume
+   @brief Compare two non-extended QDP-ordered host gauge fields element-wise and by accuracy level
+   @param[in] result Field under test
+   @param[in] msg_result Label printed for result in verbose output
+   @param[in] expected Reference field
+   @param[in] msg_expected Label printed for expected in verbose output
+   @param[in] tol Element-wise absolute tolerance
+   @return Whether every element agrees within tol, and the accuracy level from strong_check_field
+*/
+std::pair<bool, int> compare_link_fields(const quda::GaugeField &result, const std::string &msg_result,
+                                         const quda::GaugeField &expected, const std::string &msg_expected, double tol);
+
+/**
+ * @brief Summary returned by logarithmic field-comparison diagnostics.
+ */
+struct StrongCheckResult {
+  double max_deviation; /**< Largest absolute component-wise difference. */
+  int accuracy_level;   /**< Largest L with no deviation above 10^-(L+1), matching strong_check_link. */
+};
+
+/**
+ * @brief Compare arbitrary-geometry host fields and print a logarithmic failure histogram.
+ *
+ * @param[in] a First CPU, QDP-ordered field.
+ * @param[in] label_a Label printed for the first field.
+ * @param[in] b Second CPU, QDP-ordered field.
+ * @param[in] label_b Label printed for the second field.
+ * @return Maximum deviation and achieved accuracy level.
+ */
+StrongCheckResult strong_check_field(const quda::GaugeField &a, const std::string &label_a, const quda::GaugeField &b,
+                                     const std::string &label_b);
+
+/**
+ * @brief Compare contiguous scalar fields and print a logarithmic failure histogram.
+ *
+ * @param[in] a First scalar field.
+ * @param[in] label_a Label printed for the first field.
+ * @param[in] b Second scalar field.
+ * @param[in] label_b Label printed for the second field.
+ * @param[in] length Number of scalar elements.
+ * @param[in] precision Scalar precision.
+ * @return Maximum deviation and achieved accuracy level.
+ */
+StrongCheckResult strong_check_scalar(const void *a, const std::string &label_a, const void *b,
+                                      const std::string &label_b, size_t length, QudaPrecision precision);
+
+/**
+   @brief Fill a staggered spinor field, whose outer product is used for momentum calculations
+   @param[out] stag_for_oprod Full-parity host staggered spinor field
    @param[in] rng RNG
 */
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng);
+void createStagForOprodCPU(quda::ColorSpinorField &stag_for_oprod, quda::RNG &rng);
+
+/**
+   @brief Extension radius used for extended gauge fields in tests and host references
+   @return 2 in each partitioned dimension and 0 otherwise
+*/
+quda::lat_dim_t gauge_extension_radius();
 
 // additions for dw (quickly hacked on)
 int fullLatticeIndex_4d(int i, int oddBit);
@@ -259,6 +342,9 @@ int fullLatticeIndex_5d(int i, int oddBit);
 int fullLatticeIndex_5d_4dpc(int i, int oddBit);
 int process_command_line_option(int argc, char **argv, int *idx);
 int process_options(int argc, char **argv);
+
+// Number of diagonal ghost link buffers: one per (nu, mu) direction pair, indexed as nu * 4 + mu
+constexpr int n_ghost_diag = 16;
 
 // Implemented in face_gauge.cpp
 void exchange_cpu_sitelink(quda::lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
@@ -291,7 +377,7 @@ template <> struct get_quda_precision<float> {
   static constexpr QudaPrecision value = QUDA_SINGLE_PRECISION;
 };
 
-template <typename real_t> constexpr QudaPrecision get_quda_precision_v = get_quda_precision<real_t>::value;
+template <typename real> constexpr QudaPrecision get_quda_precision_v = get_quda_precision<real>::value;
 
 inline QudaPrecision getPrecision(int i)
 {

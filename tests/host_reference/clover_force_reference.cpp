@@ -160,7 +160,7 @@ template <typename sFloat, typename gFloat>
 void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::ColorSpinorField &inA,
                              quda::ColorSpinorField &inB, int projSign, int parity, double force_coeff)
 {
-  gFloat **gaugeFull = (gFloat **)gauge.data();
+  const auto gaugeFull = typed_ptr_array<gFloat *>(gauge);
   sFloat *spinorField = (sFloat *)inB.data();
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
@@ -183,9 +183,10 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
 #ifndef MULTI_GPU
       const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, 1);
 #else
-      sFloat **backSpinor = (sFloat **)inB.backGhostFaceBuffer;
-      sFloat **fwdSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
-      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const auto backSpinor = typed_ptr_array<const sFloat *>(inB.backGhostFaceBuffer);
+      const auto fwdSpinor = typed_ptr_array<const sFloat *>(inB.fwdGhostFaceBuffer);
+      const sFloat *spinor = spinorNeighbor(i, dir, parity, static_cast<const sFloat *>(spinorField), fwdSpinor.data(),
+                                            backSpinor.data(), 1, 1);
 #endif
       sFloat projectedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (projSign + 1) / 2; //+ (dir + daggerBit) % 2;
@@ -492,7 +493,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
   int acc_parity = yIndex == 0 ? parity : 1 - parity;
   gFloat *mom = (gFloat *)h_mom_ + (4 * (i + Vh * acc_parity) + mu) * mom_site_size;
 
-  gFloat **gaugeFull_ex = (gFloat **)gauge_ex;
+  const auto gaugeFull_ex = typed_ptr_array<gFloat *>(gauge_ex);
 
   int otherparity = (1 - parity);
   const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
@@ -799,8 +800,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, quda::GaugeField &opr
                                 QudaGaugeParam &gauge_param)
 {
   // created extended field
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
 
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
@@ -811,6 +811,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, quda::GaugeField &opr
   lattice_t lat(*qdp_ex);
 
   auto oprod_ex = quda::createExtendedGauge(oprod, R);
+  auto qdp_ex_ptrs = qdp_ex->data_array();
 
 #pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
@@ -820,11 +821,9 @@ void cloverDerivative_reference(void *h_mom, void **gauge, quda::GaugeField &opr
           if (nu == mu)
             continue;
           else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
-            computeForce_reference<double>(h_mom, (void **)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex,
-                                           parity, mu, nu);
+            computeForce_reference<double>(h_mom, qdp_ex_ptrs.data, lat, oprod_ex->data(), i, yIndex, parity, mu, nu);
           else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
-            computeForce_reference<float>(h_mom, (void **)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex,
-                                          parity, mu, nu);
+            computeForce_reference<float>(h_mom, qdp_ex_ptrs.data, lat, oprod_ex->data(), i, yIndex, parity, mu, nu);
           else
             errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
         }

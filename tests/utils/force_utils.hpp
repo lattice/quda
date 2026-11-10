@@ -1,62 +1,58 @@
 #pragma once
 
+#include <cmath>
 #include <complex>
 
 #include <gauge_field.h>
 
-// declare omp reductions for std::complex:
-#pragma omp declare reduction(+ : std::complex <double> : omp_out += omp_in) initializer(omp_priv = 0)
-#pragma omp declare reduction(+ : std::complex <float> : omp_out += omp_in) initializer(omp_priv = 0)
-
-template <typename real_t_> struct su3_matrix {
-  using real_t = real_t_;
-  using complex_t = std::complex<real_t>;
-  complex_t e[3][3];
+template <typename real_> struct su3_matrix {
+  using real = real_;
+  using complex = std::complex<real>;
+  complex e[3][3];
 };
 
-template <typename real_t_> struct su3_vector {
-  using real_t = real_t_;
-  using complex_t = std::complex<real_t>;
-  complex_t c[3];
+template <typename real_> struct su3_vector {
+  using real = real_;
+  using complex = std::complex<real>;
+  complex c[3];
 };
 
-template <typename real_t_> struct anti_hermitmat {
-  using real_t = real_t_;
-  using complex_t = std::complex<real_t>;
-  complex_t m01, m02, m12;
-  real_t m00im, m11im, m22im;
-  real_t space;
+template <typename real_> struct anti_hermitmat {
+  using real = real_;
+  using complex = std::complex<real>;
+  complex m01, m02, m12;
+  real m00im, m11im, m22im;
+  real space;
 };
 
-template <typename real_t> su3_matrix<real_t> *get_su3_matrix(quda::GaugeField &p, int idx, int dir)
+template <typename real> su3_matrix<real> *get_su3_matrix(quda::GaugeField &p, int idx, int dir)
 {
-  auto data = static_cast<su3_matrix<real_t> *>(p.data(dir));
+  auto data = static_cast<su3_matrix<real> *>(p.data(dir));
   return data + idx;
 }
 
-template <typename real_t> const su3_matrix<real_t> *get_su3_matrix(const quda::GaugeField &p, int idx, int dir)
+template <typename real> const su3_matrix<real> *get_su3_matrix(const quda::GaugeField &p, int idx, int dir)
 {
-  auto data = static_cast<const su3_matrix<real_t> *>(p.data(dir));
+  auto data = static_cast<const su3_matrix<real> *>(p.data(dir));
   return data + idx;
 }
 
-template <typename real_t>
-void su3_projector(const su3_vector<real_t> *a, const su3_vector<real_t> *b, su3_matrix<real_t> *c)
+template <typename real> void su3_projector(const su3_vector<real> *a, const su3_vector<real> *b, su3_matrix<real> *c)
 {
   for (int i = 0; i < 3; i++)
     for (int j = 0; j < 3; j++) c->e[i][j] = a->c[i] * std::conj(b->c[j]);
 }
 
-template <typename real_t> void su3_adjoint(const su3_matrix<real_t> *a, su3_matrix<real_t> *b)
+template <typename real> void su3_adjoint(const su3_matrix<real> *a, su3_matrix<real> *b)
 {
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) { b->e[i][j] = std::conj(a->e[j][i]); }
   }
 }
 
-template <typename real_t> void make_anti_hermitian(const su3_matrix<real_t> *m3, anti_hermitmat<real_t> *ah3)
+template <typename real> void make_anti_hermitian(const su3_matrix<real> *m3, anti_hermitmat<real> *ah3)
 {
-  using complex = std::complex<real_t>;
+  using complex = std::complex<real>;
 
   auto temp = (m3->e[0][0].imag() + m3->e[1][1].imag() + m3->e[2][2].imag()) * 0.33333333333333333;
   ah3->m00im = m3->e[0][0].imag() - temp;
@@ -67,10 +63,10 @@ template <typename real_t> void make_anti_hermitian(const su3_matrix<real_t> *m3
   ah3->m12 = complex((m3->e[1][2].real() - m3->e[2][1].real()) * 0.5, (m3->e[1][2].imag() + m3->e[2][1].imag()) * 0.5);
 }
 
-template <typename real_t>
-static void uncompress_anti_hermitian(const anti_hermitmat<real_t> *mat_antihermit, su3_matrix<real_t> *mat_su3)
+template <typename real>
+static void uncompress_anti_hermitian(const anti_hermitmat<real> *mat_antihermit, su3_matrix<real> *mat_su3)
 {
-  using complex = std::complex<real_t>;
+  using complex = std::complex<real>;
 
   mat_su3->e[0][0] = complex(0, mat_antihermit->m00im);
   mat_su3->e[1][1] = complex(0, mat_antihermit->m11im);
@@ -86,24 +82,23 @@ static void uncompress_anti_hermitian(const anti_hermitmat<real_t> *mat_antiherm
   mat_su3->e[2][1] = -std::conj(mat_antihermit->m12);
 }
 
-template <typename real_t>
-void scalar_mult_sub_su3_matrix(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, real_t s, su3_matrix<real_t> *c)
+template <typename real>
+void scalar_mult_sub_su3_matrix(const su3_matrix<real> *a, const su3_matrix<real> *b, real s, su3_matrix<real> *c)
 {
   for (int i = 0; i < 3; i++)
     for (int j = 0; j < 3; j++) c->e[i][j] = a->e[i][j] - s * b->e[i][j];
 }
 
-template <typename real_t>
-void scalar_mult_add_su3_matrix(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, real_t s, su3_matrix<real_t> *c)
+template <typename real>
+void scalar_mult_add_su3_matrix(const su3_matrix<real> *a, const su3_matrix<real> *b, real s, su3_matrix<real> *c)
 {
   for (int i = 0; i < 3; i++)
     for (int j = 0; j < 3; j++) c->e[i][j] = a->e[i][j] + s * b->e[i][j];
 }
 
-template <typename real_t>
-void mult_su3_nn(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, su3_matrix<real_t> *c)
+template <typename real> void mult_su3_nn(const su3_matrix<real> *a, const su3_matrix<real> *b, su3_matrix<real> *c)
 {
-  using complex = std::complex<real_t>;
+  using complex = std::complex<real>;
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       complex x = 0;
@@ -113,10 +108,9 @@ void mult_su3_nn(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, su3_m
   }
 }
 
-template <typename real_t>
-void mult_su3_an(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, su3_matrix<real_t> *c)
+template <typename real> void mult_su3_an(const su3_matrix<real> *a, const su3_matrix<real> *b, su3_matrix<real> *c)
 {
-  using complex = std::complex<real_t>;
+  using complex = std::complex<real>;
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       complex x = 0;
@@ -126,10 +120,9 @@ void mult_su3_an(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, su3_m
   }
 }
 
-template <typename real_t>
-void mult_su3_na(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, su3_matrix<real_t> *c)
+template <typename real> void mult_su3_na(const su3_matrix<real> *a, const su3_matrix<real> *b, su3_matrix<real> *c)
 {
-  using complex = std::complex<real_t>;
+  using complex = std::complex<real>;
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       complex x = 0;
@@ -139,19 +132,19 @@ void mult_su3_na(const su3_matrix<real_t> *a, const su3_matrix<real_t> *b, su3_m
   }
 }
 
-template <typename real_t> void add_su3(const su3_matrix<real_t> *a, su3_matrix<real_t> *b, real_t eb3)
+template <typename real> void add_su3(const su3_matrix<real> *a, su3_matrix<real> *b, real eb3)
 {
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) { b->e[i][j] = b->e[i][j] + eb3 * a->e[i][j]; }
   }
 }
 
-template <typename real_t> std::complex<real_t> trace_su3(const su3_matrix<real_t> *a)
+template <typename real> std::complex<real> trace_su3(const su3_matrix<real> *a)
 {
   return (a->e[0][0] + a->e[1][1] + a->e[2][2]);
 }
 
-template <typename real_t> void print_su3_matrix(const su3_matrix<real_t> *a)
+template <typename real> void print_su3_matrix(const su3_matrix<real> *a)
 {
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) { printf("(%f %f)\t", a->e[i][j].real(), a->e[i][j].imag()); }
@@ -238,6 +231,24 @@ public:
   Matrix &operator-=(const Matrix<N, T> &mat);
   const T &operator()(int i, int j) const;
   T &operator()(int i, int j);
+
+  /**
+   * @brief Compute the determinant of a 3x3 matrix.
+   *
+   * This operation is implemented only for matrices with N = 3.
+   *
+   * @return Matrix determinant.
+   */
+  T determinant() const;
+
+  /**
+   * @brief Compute the inverse of a 3x3 matrix.
+   *
+   * This operation is implemented only for matrices with N = 3 and requires a non-singular matrix.
+   *
+   * @return Inverse matrix.
+   */
+  Matrix inverse() const;
 };
 
 template <int N, class T> Matrix<N, T>::Matrix()
@@ -250,6 +261,31 @@ template <int N, class T> Matrix<N, T>::Matrix()
 template <int N, class T> T &Matrix<N, T>::operator()(int i, int j) { return data[i][j]; }
 
 template <int N, class T> const T &Matrix<N, T>::operator()(int i, int j) const { return data[i][j]; }
+
+template <int N, class T> T Matrix<N, T>::determinant() const
+{
+  static_assert(N == 3, "Matrix::determinant is implemented only for 3x3 matrices");
+  return (*this)(0, 0) * ((*this)(1, 1) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 1))
+    - (*this)(0, 1) * ((*this)(1, 0) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 0))
+    + (*this)(0, 2) * ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0));
+}
+
+template <int N, class T> Matrix<N, T> Matrix<N, T>::inverse() const
+{
+  static_assert(N == 3, "Matrix::inverse is implemented only for 3x3 matrices");
+  Matrix<N, T> out;
+  const auto det = determinant();
+  out(0, 0) = ((*this)(1, 1) * (*this)(2, 2) - (*this)(1, 2) * (*this)(2, 1)) / det;
+  out(0, 1) = ((*this)(0, 2) * (*this)(2, 1) - (*this)(0, 1) * (*this)(2, 2)) / det;
+  out(0, 2) = ((*this)(0, 1) * (*this)(1, 2) - (*this)(0, 2) * (*this)(1, 1)) / det;
+  out(1, 0) = ((*this)(1, 2) * (*this)(2, 0) - (*this)(1, 0) * (*this)(2, 2)) / det;
+  out(1, 1) = ((*this)(0, 0) * (*this)(2, 2) - (*this)(0, 2) * (*this)(2, 0)) / det;
+  out(1, 2) = ((*this)(0, 2) * (*this)(1, 0) - (*this)(0, 0) * (*this)(1, 2)) / det;
+  out(2, 0) = ((*this)(1, 0) * (*this)(2, 1) - (*this)(1, 1) * (*this)(2, 0)) / det;
+  out(2, 1) = ((*this)(0, 1) * (*this)(2, 0) - (*this)(0, 0) * (*this)(2, 1)) / det;
+  out(2, 2) = ((*this)(0, 0) * (*this)(1, 1) - (*this)(0, 1) * (*this)(1, 0)) / det;
+  return out;
+}
 
 template <int N, class T> Matrix<N, T> &Matrix<N, T>::operator+=(const Matrix<N, T> &mat)
 {
@@ -302,6 +338,88 @@ template <int N, class T> Matrix<N, std::complex<T>> conj(const Matrix<N, std::c
   return result;
 }
 
+/**
+ * @brief Replace a matrix with its traceless Hermitian projection.
+ *
+ * @param[in,out] m Matrix to project.
+ */
+template <typename real> void make_herm(Matrix<3, std::complex<real>> &m)
+{
+  auto anti_hermitian = conj(m) - m;
+  real trace = 0;
+  for (int i = 0; i < 3; i++) trace += anti_hermitian(i, i).imag();
+  for (int i = 0; i < 3; i++) anti_hermitian(i, i).imag(anti_hermitian(i, i).imag() - trace / 3);
+  m = std::complex<real>(0, static_cast<real>(0.5)) * anti_hermitian;
+}
+
+/**
+ * @brief Compute exp(i Q) for a traceless Hermitian SU(3) generator.
+ *
+ * @param[in] q Traceless Hermitian generator.
+ * @return Matrix exponential exp(i Q).
+ */
+template <typename real> Matrix<3, std::complex<real>> exponentiate_iQ(const Matrix<3, std::complex<real>> &q)
+{
+  using complex = std::complex<real>;
+  constexpr real inv3 = static_cast<real>(1.0 / 3.0);
+  constexpr real inv_pi = static_cast<real>(1.0 / M_PI);
+  constexpr real inv_3pi = static_cast<real>(1.0 / (3.0 * M_PI));
+
+  const auto q2 = q * q;
+  real c0 = q.determinant().real();
+  const real c1 = static_cast<real>(0.5) * trace(q2).real();
+  const real sqrt_c1_inv3 = std::sqrt(c1 * inv3);
+  const real c0_max = 2 * c1 * inv3 * sqrt_c1_inv3;
+  Matrix<3, complex> identity;
+  for (int i = 0; i < 3; i++) identity(i, i) = static_cast<real>(1.0);
+
+  if (c1 == 0) return identity;
+
+  int parity = 0;
+  if (c0 < 0) {
+    c0 = -c0;
+    parity = 1;
+  }
+
+  const real theta = std::acos(c0 / c0_max);
+  const real u = std::cos(theta * inv_3pi * static_cast<real>(M_PI)) * sqrt_c1_inv3;
+  const real w = std::sin(theta * inv_3pi * static_cast<real>(M_PI)) * std::sqrt(c1);
+  const real u_sq = u * u;
+  const real w_sq = w * w;
+  const real denom_inv = static_cast<real>(1.0) / (9 * u_sq - w_sq);
+  const real exp_iu_re = std::cos(u * inv_pi * static_cast<real>(M_PI));
+  const real exp_iu_im = std::sin(u * inv_pi * static_cast<real>(M_PI));
+  const real exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+  const real exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+  const real cos_w = std::cos(w * inv_pi * static_cast<real>(M_PI));
+  const real sinc_w = std::abs(w) < static_cast<real>(0.05) ? static_cast<real>(1.0)
+      - w_sq / 6
+        * (static_cast<real>(1.0)
+           - w_sq * static_cast<real>(0.05)
+             * (static_cast<real>(1.0) - w_sq / 42 * (static_cast<real>(1.0) - w_sq / 72))) :
+                                                              std::sin(w * inv_pi * static_cast<real>(M_PI)) / w;
+
+  real h_re = (u_sq - w_sq) * exp_2iu_re + 8 * u_sq * cos_w * exp_iu_re + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_im;
+  real h_im = (u_sq - w_sq) * exp_2iu_im - 8 * u_sq * cos_w * exp_iu_im + 2 * u * (3 * u_sq + w_sq) * sinc_w * exp_iu_re;
+  complex f0(h_re * denom_inv, h_im * denom_inv);
+
+  h_re = 2 * u * exp_2iu_re - 2 * u * cos_w * exp_iu_re + (3 * u_sq - w_sq) * sinc_w * exp_iu_im;
+  h_im = 2 * u * exp_2iu_im + 2 * u * cos_w * exp_iu_im + (3 * u_sq - w_sq) * sinc_w * exp_iu_re;
+  complex f1(h_re * denom_inv, h_im * denom_inv);
+
+  h_re = exp_2iu_re - cos_w * exp_iu_re - 3 * u * sinc_w * exp_iu_im;
+  h_im = exp_2iu_im + cos_w * exp_iu_im - 3 * u * sinc_w * exp_iu_re;
+  complex f2(h_re * denom_inv, h_im * denom_inv);
+
+  if (parity) {
+    f0.imag(-f0.imag());
+    f1.real(-f1.real());
+    f2.imag(-f2.imag());
+  }
+
+  return f0 * identity + f1 * q + f2 * q2;
+}
+
 template <int N, class T> Matrix<N, T> transpose(const Matrix<N, std::complex<T>> &mat)
 {
   Matrix<N, T> result;
@@ -313,7 +431,7 @@ template <int N, class T> Matrix<N, T> transpose(const Matrix<N, std::complex<T>
 
 template <int N, class T> T trace(const Matrix<N, T> &mat)
 {
-  T tr;
+  T tr {};
   for (int i = 0; i < N; i++) tr += mat(i, i);
 
   return tr;
@@ -335,6 +453,54 @@ template <int N, class T, class U>
 Matrix<N, typename Promote<T, U>::Type> operator*(const U &scalar, const Matrix<N, T> &mat)
 {
   return mat * scalar;
+}
+
+/**
+ * @brief Check whether a complex 3x3 matrix and its inverse satisfy an SU(3) tolerance.
+ *
+ * @param[in] inv Inverse of the matrix.
+ * @param[in] u Matrix to check.
+ * @param[in] tol Unitarity tolerance.
+ */
+template <typename real>
+bool is_unitary(const Matrix<3, std::complex<real>> &inv, const Matrix<3, std::complex<real>> &u, real tol)
+{
+  const auto identity = conj(u) * u;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      if (std::abs(u(i, j).real() - inv(j, i).real()) > tol || std::abs(u(i, j).imag() + inv(j, i).imag()) > tol)
+        return false;
+    }
+    if (std::abs(identity(i, i).real() - static_cast<real>(1.0)) > tol || std::abs(identity(i, i).imag()) > tol)
+      return false;
+    for (int j = 0; j < i; j++) {
+      if (std::abs(identity(i, j).real()) > tol || std::abs(identity(i, j).imag()) > tol
+          || std::abs(identity(j, i).real()) > tol || std::abs(identity(j, i).imag()) > tol)
+        return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief Project a complex 3x3 matrix onto SU(3) using polar decomposition.
+ *
+ * @param[in,out] u Matrix to project.
+ * @param[in] tol Unitarity tolerance.
+ */
+template <typename real> void polar_su3(Matrix<3, std::complex<real>> &u, real tol)
+{
+  auto out = u;
+  auto inv = u.inverse();
+  int i = 0;
+  do {
+    out = static_cast<real>(0.5) * (out + conj(inv));
+    inv = out.inverse();
+  } while (!is_unitary(inv, out, tol) && ++i < 100);
+
+  const auto det = out.determinant();
+  const auto mod = std::pow(std::norm(det), static_cast<real>(-1.0 / 6.0));
+  u = std::polar(mod, -std::arg(det) / static_cast<real>(3.0)) * out;
 }
 
 template <int N, class T> struct Identity {

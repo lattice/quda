@@ -1396,10 +1396,10 @@ namespace quda {
         QudaGhostExchange ghostExchange;
 
         // scale factor is set when using recon-9
-        Reconstruct(const GaugeField &u, real scale = real(1)) :
+        Reconstruct(const GaugeField &u, real scale = real(1.0)) :
           anisotropy(static_cast<real>(u.Anisotropy() * scale), static_cast<real>(1.0 / (u.Anisotropy() * scale))),
           tBoundary(static_cast<real>(static_cast<int>(u.TBoundary())) * scale,
-                    real(1) / (static_cast<real>(static_cast<int>(u.TBoundary())) * scale)),
+                    real(1.0) / (static_cast<real>(static_cast<int>(u.TBoundary())) * scale)),
           firstTimeSliceBound(u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
@@ -1457,14 +1457,14 @@ namespace quda {
           // bulk and identity otherwise (IEEE / mid / high).
           using mag_t = typename promote_mapper<real>::type;
           mag_t s2 = mag_t(u0_inv) * mag_t(u0_inv);
-          out[0] *= sqrt(max(real(s2 - mag_t(row_sum)), real(0)));
+          out[0] *= sqrt(max(real(s2 - mag_t(row_sum)), real(0.0)));
 
           // Second, reconstruct first column
           real column_sum = out[0].real() * out[0].real();
           column_sum += out[0].imag() * out[0].imag();
           column_sum += out[3].real() * out[3].real();
           column_sum += out[3].imag() * out[3].imag();
-          out[6] *= sqrt(max(real(s2 - mag_t(column_sum)), real(0)));
+          out[6] *= sqrt(max(real(s2 - mag_t(column_sum)), real(0.0)));
 
           // Finally, reconstruct last elements from SU(2) rotation
           real r_inv2 = u0_inv * row_sum_inv;
@@ -1746,7 +1746,7 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = real(1)) const
+        __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = real(1.0)) const
         {
           real tmp[reconLen];
 
@@ -1968,13 +1968,13 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = real(1)) const
+      __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = real(1.0)) const
       {
         return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
       }
 
       __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity,
-                                                real phase = real(1)) const
+                                                real phase = real(1.0)) const
       {
         real tmp[reconLen];
 
@@ -2050,7 +2050,7 @@ namespace quda {
          this field at the above coordinates.
        */
       __device__ __host__ inline gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                           real phase = real(1))
+                                                                           real phase = real(1.0))
       {
         return gauge_ghost_wrapper<real, Accessor>(*this, dim, ghost_idx, parity, phase);
       }
@@ -2066,7 +2066,7 @@ namespace quda {
          this field at the above coordinates.
        */
       __device__ __host__ inline const gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                                 real phase = real(1)) const
+                                                                                 real phase = real(1.0)) const
       {
         return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
       }
@@ -2095,7 +2095,7 @@ namespace quda {
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
-        real phase = real(0);
+        real phase = real(0.0);
         if constexpr (hasPhase) {
           if constexpr (isFixed<Float>::value) {
             copy_and_scale(phase,
@@ -2214,7 +2214,7 @@ namespace quda {
            this field at the above coordinates.
          */
         __device__ __host__ inline const gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                                   real phase = real(1)) const
+                                                                                   real phase = real(1.0)) const
         {
           return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
         }
@@ -2243,12 +2243,13 @@ namespace quda {
       using Accessor = QDPOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      Float *gauge[QUDA_MAX_DIM];
+      Float *gauge[QUDA_MAX_DIM] = {};
       const unsigned int volumeCB;
       QDPOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
-        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+        if (u.Geometry() > QUDA_MAX_DIM) errorQuda("Unsupported gauge geometry %d for QDP order", u.Geometry());
+        for (int i = 0; i < u.Geometry(); i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
       }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
@@ -2290,12 +2291,13 @@ namespace quda {
       using Accessor = QDPJITOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      Float *gauge[QUDA_MAX_DIM];
+      Float *gauge[QUDA_MAX_DIM] = {};
       const unsigned int volumeCB;
       QDPJITOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
-        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+        if (u.Geometry() > QUDA_MAX_DIM) errorQuda("Unsupported gauge geometry %d for QDPJIT order", u.Geometry());
+        for (int i = 0; i < u.Geometry(); i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
       }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const

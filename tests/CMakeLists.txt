@@ -283,6 +283,21 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(hisq_end_to_end_test hisq_end_to_end_test.cpp)
+  target_link_libraries(hisq_end_to_end_test ${TEST_LIBS})
+  quda_checkbuildtest(hisq_end_to_end_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_end_to_end_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(staggered_oprod_test staggered_oprod_test.cpp)
+  target_link_libraries(staggered_oprod_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_oprod_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_oprod_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(staggered_oprod_ctest staggered_oprod_ctest.cpp)
+  target_link_libraries(staggered_oprod_ctest ${TEST_LIBS})
+  quda_checkbuildtest(staggered_oprod_ctest QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_oprod_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
   add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
   target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
@@ -293,6 +308,11 @@ add_executable(gauge_path_test gauge_path_test.cpp)
 target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(gauge_smear_test gauge_smear_test.cpp)
+target_link_libraries(gauge_smear_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_smear_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_smear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_executable(clover_force_test clover_force_test.cpp)
@@ -1645,6 +1665,16 @@ if(QUDA_DIRAC_STAGGERED)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
                    --dim 8 8 8 8
                    --gtest_output=xml:hisq_stencil_test.xml)
+
+  add_test(NAME hisq_end_to_end
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_end_to_end_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_end_to_end_test.xml)
+
+  add_test(NAME staggered_oprod
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_oprod_ctest> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:staggered_oprod_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
@@ -1662,6 +1692,16 @@ add_test(NAME gauge_path
   COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
   --dim 2 4 6 8 --enable-testing true --niter 1
   --gtest_output=xml:gauge_path_test.xml)
+
+add_test(NAME gauge_smear
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_smear_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true
+  --gtest_output=xml:gauge_smear_test.xml)
+
+add_test(NAME su3
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:su3_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true --niter 1
+  --gtest_output=xml:su3_test.xml)
 
 foreach(prec IN LISTS TEST_PRECS)
 
