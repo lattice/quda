@@ -567,12 +567,13 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option(
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
-  quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
+  quda_app->add_option("--load-gauge", latfile,
+                       "File to load the gauge field from with --gauge-input load (requires QIO)");
   quda_app
     ->add_option(
       "--gauge-input", gauge_input,
-      "Gauge field input mode: haar, unit, gaussian-su3, or load (default: load with --load-gauge, otherwise the "
-      "test's own default, usually haar)")
+      "Gauge field input mode: haar, unit, gaussian-su3, or load from the file of --load-gauge (default: the "
+      "test's own, usually haar)")
     ->check(CLI::IsMember({"haar", "unit", "gaussian-su3", "load"}));
   quda_app
     ->add_option(

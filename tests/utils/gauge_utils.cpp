@@ -516,7 +516,7 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
     return mode;
   }
 
-  if (has_load) return GaugeInputMode::LOAD;
+  if (has_load) errorQuda("--load-gauge %s needs --gauge-input load to load it", latfile.c_str());
   return default_mode;
 }
 

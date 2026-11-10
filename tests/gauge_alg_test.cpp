@@ -399,6 +399,7 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
+  // a bare --load-gauge also takes the host path, so that constructHostGaugeInputField reports it
   host_gauge_input = !gauge_input.empty() || !latfile.empty();
   gauge_store = (gauge_outfile.size() > 0);
 
