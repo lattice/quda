@@ -10,10 +10,10 @@
 #include "instantiate_host.hpp"
 #include "misc.h"
 
-template <typename real_t> using matrix = Matrix<3, std::complex<real_t>>;
+template <typename real> using matrix = Matrix<3, std::complex<real>>;
 
-template <typename real_t>
-double plaquette(const matrix<real_t> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
+template <typename real>
+double plaquette(const matrix<real> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
   const auto &u1 = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
@@ -27,8 +27,8 @@ double plaquette(const matrix<real_t> *const *links, size_t i, int mu, int nu, c
   return trace(u1 * u2 * conj(u3) * conj(u4)).real();
 }
 
-template <typename real_t>
-double rectangle(const matrix<real_t> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
+template <typename real>
+double rectangle(const matrix<real> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
   auto mu_long = links[mu][gf_neighborIndexFullLattice(i, dx, lat)];
@@ -61,10 +61,10 @@ double rectangle(const matrix<real_t> *const *links, size_t i, int mu, int nu, c
   return trace(mu_long + nu_long).real();
 }
 
-template <typename real_t> struct PlaquetteReference {
+template <typename real> struct PlaquetteReference {
   void operator()(std::array<double, 2> &result, const quda::GaugeField &u, const lattice_t &lat)
   {
-    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto ptrs = u.data_array<const matrix<real> *>();
     const auto links = ptrs.data;
     double spatial = 0.0;
     double temporal = 0.0;
@@ -81,10 +81,10 @@ template <typename real_t> struct PlaquetteReference {
   }
 };
 
-template <typename real_t> struct PlaquetteRectangleReferenceCompute {
+template <typename real> struct PlaquetteRectangleReferenceCompute {
   void operator()(std::array<double, 4> &result, const quda::GaugeField &u, const lattice_t &lat)
   {
-    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto ptrs = u.data_array<const matrix<real> *>();
     const auto links = ptrs.data;
     double spatial_plaquette = 0.0;
     double temporal_plaquette = 0.0;
@@ -107,7 +107,7 @@ template <typename real_t> struct PlaquetteRectangleReferenceCompute {
   }
 };
 
-template <typename real_t> struct PolyakovLoopReferenceCompute {
+template <typename real> struct PolyakovLoopReferenceCompute {
   std::array<double, 2> operator()(const quda::GaugeField &u)
   {
     const int x0 = u.X()[0];
@@ -116,7 +116,7 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
     const int x3 = u.X()[3];
     const size_t volume = u.Volume();
     const size_t spatial_volume = volume / x3;
-    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto ptrs = u.data_array<const matrix<real> *>();
     const auto links = ptrs.data;
 
     std::vector<matrix<double>> local_product(spatial_volume);
@@ -184,19 +184,19 @@ template <typename real_t> struct PolyakovLoopReferenceCompute {
       sum += trace(product);
     }
 
-    double real = sum.real();
-    double imaginary = sum.imag();
-    quda::comm_allreduce_sum(real);
-    quda::comm_allreduce_sum(imaginary);
+    double re = sum.real();
+    double im = sum.imag();
+    quda::comm_allreduce_sum(re);
+    quda::comm_allreduce_sum(im);
     const double normalization = spatial_volume * quda::comm_size();
-    return {real / normalization, imaginary / normalization};
+    return {re / normalization, im / normalization};
   }
 };
 
-template <typename real_t> struct LinkDeterminantTraceReferenceCompute {
+template <typename real> struct LinkDeterminantTraceReferenceCompute {
   void operator()(std::array<double, 6> &result, const quda::GaugeField &u)
   {
-    const auto ptrs = u.data_array<const matrix<real_t> *>();
+    const auto ptrs = u.data_array<const matrix<real> *>();
     const auto links = ptrs.data;
     std::complex<double> determinant_sum = 0.0;
     std::complex<double> trace_sum = 0.0;
@@ -220,17 +220,17 @@ template <typename real_t> struct LinkDeterminantTraceReferenceCompute {
   }
 };
 
-template <typename real_t>
-const matrix<real_t> &shifted_link(const matrix<real_t> *const *links, size_t i, int dir,
-                                   const std::array<int, 4> &shift, const lattice_t &lat)
+template <typename real>
+const matrix<real> &shifted_link(const matrix<real> *const *links, size_t i, int dir, const std::array<int, 4> &shift,
+                                 const lattice_t &lat)
 {
   return links[dir][gf_neighborIndexFullLattice(i, shift, lat)];
 }
 
-template <typename real_t>
-matrix<real_t> clover_fmunu(const matrix<real_t> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
+template <typename real>
+matrix<real> clover_fmunu(const matrix<real> *const *links, size_t i, int mu, int nu, const lattice_t &lat)
 {
-  auto link = [&](int dir, int delta_mu, int delta_nu) -> const matrix<real_t> & {
+  auto link = [&](int dir, int delta_mu, int delta_nu) -> const matrix<real> & {
     std::array<int, 4> dx {};
     dx[mu] = delta_mu;
     dx[nu] = delta_nu;
@@ -241,15 +241,15 @@ matrix<real_t> clover_fmunu(const matrix<real_t> *const *links, size_t i, int mu
   f += link(nu, 0, 0) * conj(link(mu, -1, 1)) * conj(link(nu, -1, 0)) * link(mu, -1, 0);
   f += conj(link(nu, 0, -1)) * link(mu, 0, -1) * link(nu, 1, -1) * conj(link(mu, 0, 0));
   f += conj(link(mu, -1, 0)) * conj(link(nu, -1, -1)) * link(mu, -1, -1) * link(nu, 0, -1);
-  return static_cast<real_t>(0.125) * (f - conj(f));
+  return static_cast<real>(0.125) * (f - conj(f));
 }
 
-template <typename real_t> struct FieldStrengthReferenceCompute {
+template <typename real> struct FieldStrengthReferenceCompute {
   void operator()(quda::GaugeField &out, const quda::GaugeField &u, const lattice_t &lat)
   {
-    const auto input_ptrs = u.data_array<const matrix<real_t> *>();
+    const auto input_ptrs = u.data_array<const matrix<real> *>();
     const auto links = input_ptrs.data;
-    const auto output_ptrs = out.data_array<matrix<real_t> *>();
+    const auto output_ptrs = out.data_array<matrix<real> *>();
     const auto fmunu = output_ptrs.data;
     constexpr std::array<std::array<int, 2>, 6> directions {{{1, 0}, {2, 0}, {2, 1}, {3, 0}, {3, 1}, {3, 2}}};
 
@@ -261,12 +261,12 @@ template <typename real_t> struct FieldStrengthReferenceCompute {
   }
 };
 
-template <typename real_t> struct FieldStrengthObservableReferenceCompute {
+template <typename real> struct FieldStrengthObservableReferenceCompute {
   FieldStrengthObservableReference operator()(const quda::GaugeField &fmunu)
   {
-    const auto ptrs = fmunu.data_array<const matrix<real_t> *>();
+    const auto ptrs = fmunu.data_array<const matrix<real> *>();
     const auto field = ptrs.data;
-    const auto identity = Identity<3, std::complex<real_t>>()();
+    const auto identity = Identity<3, std::complex<real>>()();
     constexpr double q_norm = -1.0 / (4.0 * M_PI * M_PI);
     double spatial_energy = 0.0;
     double temporal_energy = 0.0;
@@ -276,10 +276,9 @@ template <typename real_t> struct FieldStrengthObservableReferenceCompute {
 
 #pragma omp parallel for reduction(+ : spatial_energy, temporal_energy, qcharge, qcharge_scale)
     for (size_t i = 0; i < fmunu.Volume(); i++) {
-      std::array<matrix<real_t>, 6> traceless;
+      std::array<matrix<real>, 6> traceless;
       for (int component = 0; component < 6; component++) {
-        traceless[component]
-          = field[component][i] - static_cast<real_t>(1.0 / 3.0) * trace(field[component][i]) * identity;
+        traceless[component] = field[component][i] - static_cast<real>(1.0 / 3.0) * trace(field[component][i]) * identity;
         const double contribution = -trace(traceless[component] * traceless[component]).real();
         if (component < 3)
           spatial_energy += contribution;
@@ -306,12 +305,12 @@ template <typename real_t> struct FieldStrengthObservableReferenceCompute {
   }
 };
 
-template <typename real_t> struct ProjectSU3Reference {
+template <typename real> struct ProjectSU3Reference {
   int operator()(quda::GaugeField &u)
   {
-    const auto ptrs = u.data_array<matrix<real_t> *>();
+    const auto ptrs = u.data_array<matrix<real> *>();
     const auto links = ptrs.data;
-    const auto tolerance = static_cast<real_t>(u.toleranceSU3());
+    const auto tolerance = static_cast<real>(u.toleranceSU3());
     int failures = 0;
 
 #pragma omp parallel for reduction(+ : failures)

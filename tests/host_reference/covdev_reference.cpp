@@ -23,12 +23,12 @@
 // if daggerBit is one:  perform hermitian covariant derivative operator
 //
 
-template <typename real_t>
-void covdevReference(real_t *res, real_t **link, real_t **ghostLink, const ColorSpinorField &in, int oddBit,
-                     int daggerBit, int mu)
+template <typename real>
+void covdevReference(real *res, real **link, real **ghostLink, const ColorSpinorField &in, int oddBit, int daggerBit,
+                     int mu)
 {
-  const auto fwd_nbr_spinor = typed_ptr_array<const real_t *>(in.fwdGhostFaceBuffer);
-  const auto back_nbr_spinor = typed_ptr_array<const real_t *>(in.backGhostFaceBuffer);
+  const auto fwd_nbr_spinor = typed_ptr_array<const real *>(in.fwdGhostFaceBuffer);
+  const auto back_nbr_spinor = typed_ptr_array<const real *>(in.backGhostFaceBuffer);
 
   const int my_spinor_site_size = in.Nspin() == 1 ? stag_spinor_site_size : spinor_site_size;
   int muDagger = mu * 2 + daggerBit;
@@ -36,8 +36,8 @@ void covdevReference(real_t *res, real_t **link, real_t **ghostLink, const Color
 #pragma omp parallel for
   for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
 
-  real_t *linkEven[4], *linkOdd[4];
-  real_t *ghostLinkEven[4], *ghostLinkOdd[4];
+  real *linkEven[4], *linkOdd[4];
+  real *ghostLinkEven[4], *ghostLinkOdd[4];
 
   for (int dir = 0; dir < 4; dir++) {
     linkEven[dir] = link[dir];
@@ -51,11 +51,11 @@ void covdevReference(real_t *res, real_t **link, real_t **ghostLink, const Color
   for (int sid = 0; sid < Vh; sid++) {
     int offset = my_spinor_site_size * sid;
 
-    const real_t *lnk = gaugeLink(sid, muDagger, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
-    const real_t *spinor = spinorNeighbor(sid, muDagger, oddBit, static_cast<const real_t *>(in.data()),
-                                          fwd_nbr_spinor.data(), back_nbr_spinor.data(), 1, 1, my_spinor_site_size);
+    const real *lnk = gaugeLink(sid, muDagger, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
+    const real *spinor = spinorNeighbor(sid, muDagger, oddBit, static_cast<const real *>(in.data()),
+                                        fwd_nbr_spinor.data(), back_nbr_spinor.data(), 1, 1, my_spinor_site_size);
 
-    std::vector<real_t> gaugedSpinor(my_spinor_site_size);
+    std::vector<real> gaugedSpinor(my_spinor_site_size);
 
     if (daggerBit) {
       for (int s = 0; s < in.Nspin(); s++) su3Tmul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
@@ -95,11 +95,11 @@ void covdev_dslash(ColorSpinorField &out, const GaugeField &link, const ColorSpi
   }
 }
 
-template <typename real_t>
+template <typename real>
 void Mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int daggerBit, int mu)
 {
-  auto link_ptrs = link.data_array<real_t *>();
-  auto ghost_ptrs = typed_ptr_array<real_t *>(link.Ghost());
+  auto link_ptrs = link.data_array<real *>();
+  auto ghost_ptrs = typed_ptr_array<real *>(link.Ghost());
 
   const int nFace = 1;
   {
@@ -107,8 +107,8 @@ void Mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &
     auto &outOdd = out.Odd();
 
     inEven.exchangeGhost(QUDA_EVEN_PARITY, nFace, daggerBit);
-    covdevReference(reinterpret_cast<real_t *>(outOdd.data()), link_ptrs.data, ghost_ptrs.data(), in.Even(), 1,
-                    daggerBit, mu);
+    covdevReference(reinterpret_cast<real *>(outOdd.data()), link_ptrs.data, ghost_ptrs.data(), in.Even(), 1, daggerBit,
+                    mu);
   }
 
   {
@@ -116,8 +116,8 @@ void Mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &
     auto &outEven = out.Even();
 
     inOdd.exchangeGhost(QUDA_ODD_PARITY, nFace, daggerBit);
-    covdevReference(reinterpret_cast<real_t *>(outEven.data()), link_ptrs.data, ghost_ptrs.data(), in.Odd(), 0,
-                    daggerBit, mu);
+    covdevReference(reinterpret_cast<real *>(outEven.data()), link_ptrs.data, ghost_ptrs.data(), in.Odd(), 0, daggerBit,
+                    mu);
   }
 }
 

@@ -11,7 +11,7 @@
 #include "instantiate_host.hpp"
 #include "misc.h"
 
-template <typename real_t> using matrix = Matrix<3, std::complex<real_t>>;
+template <typename real> using matrix = Matrix<3, std::complex<real>>;
 
 /**
  * @brief Compute the forward and backward APE staples for a link.
@@ -24,15 +24,15 @@ template <typename real_t> using matrix = Matrix<3, std::complex<real_t>>;
  * @param[in] lat Extended lattice metadata.
  * @return APE staple.
  */
-template <typename real_t>
-matrix<real_t> staple(const matrix<real_t> *const *links, size_t i, int nu, int dir_ignore, double anisotropy,
-                      const lattice_t &lat)
+template <typename real>
+matrix<real> staple(const matrix<real> *const *links, size_t i, int nu, int dir_ignore, double anisotropy,
+                    const lattice_t &lat)
 {
-  matrix<real_t> out;
+  matrix<real> out;
   for (int mu = 0; mu < 4; mu++) {
     if (mu == nu || mu == dir_ignore) continue;
 
-    real_t coeff;
+    real coeff;
     coeff = 1.0;
     if (mu == 3) coeff = anisotropy * anisotropy;
     std::array<int, 4> dx {};
@@ -64,8 +64,8 @@ matrix<real_t> staple(const matrix<real_t> *const *links, size_t i, int nu, int 
  * @param[in] lat Extended lattice metadata.
  * @return Link at the local site.
  */
-template <typename real_t>
-const matrix<real_t> &centered_link(const matrix<real_t> *const *links, size_t i, int dir, const lattice_t &lat)
+template <typename real>
+const matrix<real> &centered_link(const matrix<real> *const *links, size_t i, int dir, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
   return links[dir][gf_neighborIndexFullLattice(i, dx, lat)];
@@ -81,27 +81,27 @@ const matrix<real_t> &centered_link(const matrix<real_t> *const *links, size_t i
  * @param[in] anisotropy Temporal anisotropy.
  * @param[in] lat Extended lattice metadata.
  */
-template <typename real_t> struct APESmear {
+template <typename real> struct APESmear {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, double alpha, int dir_ignore, double anisotropy,
                   const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     const auto input_ptrs = in.data_array<const link *>();
     const auto output_ptrs = out.data_array<link *>();
     const auto input = input_ptrs.data;
     const auto output = output_ptrs.data;
     const int ape_dim = dir_ignore == 4 ? 4 : 3;
-    const auto alpha_ = static_cast<real_t>(alpha);
-    const auto anisotropy_ = static_cast<real_t>(anisotropy);
-    const auto scale = alpha_ / static_cast<real_t>(2 * (ape_dim - 1));
-    const auto tolerance = static_cast<real_t>(in.toleranceSU3());
+    const auto alpha_ = static_cast<real>(alpha);
+    const auto anisotropy_ = static_cast<real>(anisotropy);
+    const auto scale = alpha_ / static_cast<real>(2 * (ape_dim - 1));
+    const auto tolerance = static_cast<real>(in.toleranceSU3());
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
       for (int d = 0; d < ape_dim; d++) {
         const int nu = d + (d >= dir_ignore);
         const auto &u = centered_link(input, i, nu, lat);
-        auto test_u = (static_cast<real_t>(1.0) - alpha_) * Identity<3, std::complex<real_t>>()()
+        auto test_u = (static_cast<real>(1.0) - alpha_) * Identity<3, std::complex<real>>()()
           + scale * staple(input, i, nu, dir_ignore, anisotropy_, lat) * conj(u);
         polar_su3(test_u, tolerance);
         output[nu][i] = test_u * u;
@@ -121,9 +121,9 @@ template <typename real_t> struct APESmear {
  * @param[in] lat Extended lattice metadata.
  * @return Forward and backward staple.
  */
-template <typename real_t>
-matrix<real_t> mixed_staple(const matrix<real_t> *const *gauge_mu, const matrix<real_t> *const *gauge_nu, size_t i,
-                            int mu, int nu, const lattice_t &lat)
+template <typename real>
+matrix<real> mixed_staple(const matrix<real> *const *gauge_mu, const matrix<real> *const *gauge_nu, size_t i, int mu,
+                          int nu, const lattice_t &lat)
 {
   std::array<int, 4> dx {};
   const auto &a = gauge_nu[nu][gf_neighborIndexFullLattice(i, dx, lat)];
@@ -153,11 +153,10 @@ matrix<real_t> mixed_staple(const matrix<real_t> *const *gauge_mu, const matrix<
  * @param[in] lat Extended lattice metadata.
  * @return Ordered path product.
  */
-template <typename real_t, size_t N>
-matrix<real_t> path_product(const matrix<real_t> *const *links, size_t i, const std::array<int, N> &path,
-                            const lattice_t &lat)
+template <typename real, size_t N>
+matrix<real> path_product(const matrix<real> *const *links, size_t i, const std::array<int, N> &path, const lattice_t &lat)
 {
-  auto product = Identity<3, std::complex<real_t>>()();
+  auto product = Identity<3, std::complex<real>>()();
   std::array<int, 4> dx {};
   for (const auto signed_dir : path) {
     const int dir = std::abs(signed_dir) - 1;
@@ -183,14 +182,14 @@ matrix<real_t> path_product(const matrix<real_t> *const *links, size_t i, const 
  * @param[in] lat Extended lattice metadata.
  * @return Rectangle sum.
  */
-template <typename real_t>
-matrix<real_t> rectangle(const matrix<real_t> *const *links, size_t i, int nu, int dir_ignore, double anisotropy,
-                         const lattice_t &lat)
+template <typename real>
+matrix<real> rectangle(const matrix<real> *const *links, size_t i, int nu, int dir_ignore, double anisotropy,
+                       const lattice_t &lat)
 {
-  matrix<real_t> out;
+  matrix<real> out;
   for (int mu = 0; mu < 4; mu++) {
     if (mu == nu || mu == dir_ignore) continue;
-    real_t coeff;
+    real coeff;
     coeff = 1.0;
     if (mu == 3) coeff = anisotropy * anisotropy;
     const int m = mu + 1;
@@ -212,7 +211,7 @@ matrix<real_t> rectangle(const matrix<real_t> *const *links, size_t i, int nu, i
  * @param[in] u Input link.
  * @return Updated link.
  */
-template <typename real_t> matrix<real_t> stout_update(matrix<real_t> omega, const matrix<real_t> &u)
+template <typename real> matrix<real> stout_update(matrix<real> omega, const matrix<real> &u)
 {
   make_herm(omega);
   return exponentiate_iQ(omega) * u;
@@ -230,21 +229,21 @@ template <typename real_t> matrix<real_t> stout_update(matrix<real_t> omega, con
  * @param[in] over_improved Select the rectangle-improved action.
  * @param[in] lat Extended lattice metadata.
  */
-template <typename real_t> struct StoutSmear {
+template <typename real> struct StoutSmear {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, double rho, double epsilon, int dir_ignore,
                   double anisotropy, bool over_improved, const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     const auto input_ptrs = in.data_array<const link *>();
     const auto output_ptrs = out.data_array<link *>();
     const auto input = input_ptrs.data;
     const auto output = output_ptrs.data;
     const int smear_dim = dir_ignore == 4 ? 4 : 3;
-    const auto rho_ = static_cast<real_t>(rho);
-    const auto epsilon_ = static_cast<real_t>(epsilon);
-    const auto anisotropy_ = static_cast<real_t>(anisotropy);
-    const auto staple_coeff = static_cast<real_t>(rho_ * (5.0 - 2.0 * epsilon_) / 3.0);
-    const auto rectangle_coeff = static_cast<real_t>(rho_ * (1.0 - epsilon_) / 12.0);
+    const auto rho_ = static_cast<real>(rho);
+    const auto epsilon_ = static_cast<real>(epsilon);
+    const auto anisotropy_ = static_cast<real>(anisotropy);
+    const auto staple_coeff = static_cast<real>(rho_ * (5.0 - 2.0 * epsilon_) / 3.0);
+    const auto rectangle_coeff = static_cast<real>(rho_ * (1.0 - epsilon_) / 12.0);
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
@@ -271,11 +270,11 @@ template <typename real_t> struct StoutSmear {
  * @param[in] dir_ignore Direction excluded for three-dimensional HYP.
  * @param[in] lat Extended lattice metadata.
  */
-template <typename real_t> struct HYPLevel1 {
+template <typename real> struct HYPLevel1 {
   void operator()(quda::GaugeField *const *out, const quda::GaugeField &in, double alpha, int dir_ignore,
                   const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     const auto input_ptrs = in.data_array<const link *>();
     const auto input = input_ptrs.data;
     std::array<std::array<link *, 4>, 4> output;
@@ -283,9 +282,9 @@ template <typename real_t> struct HYPLevel1 {
       const auto field = out[slot]->data_array<link *>();
       for (int dir = 0; dir < 4; dir++) output[slot][dir] = field[dir];
     }
-    const auto alpha_ = static_cast<real_t>(alpha);
-    const auto identity = Identity<3, std::complex<real_t>>()();
-    const auto tolerance = static_cast<real_t>(in.toleranceSU3());
+    const auto alpha_ = static_cast<real>(alpha);
+    const auto identity = Identity<3, std::complex<real>>()();
+    const auto tolerance = static_cast<real>(in.toleranceSU3());
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
@@ -294,8 +293,8 @@ template <typename real_t> struct HYPLevel1 {
         const auto &u = centered_link(input, i, mu, lat);
         for (int nu = 0; nu < 4; nu++) {
           if (nu == mu || nu == dir_ignore) continue;
-          auto test_u = (static_cast<real_t>(1.0) - alpha_) * identity
-            + static_cast<real_t>(alpha_ / 2) * mixed_staple(input, input, i, mu, nu, lat) * conj(u);
+          auto test_u = (static_cast<real>(1.0) - alpha_) * identity
+            + static_cast<real>(alpha_ / 2) * mixed_staple(input, input, i, mu, nu, lat) * conj(u);
           polar_su3(test_u, tolerance);
           output[nu][mu][i] = test_u * u;
         }
@@ -313,11 +312,11 @@ template <typename real_t> struct HYPLevel1 {
  * @param[in] alpha HYP level coefficient.
  * @param[in] lat Extended lattice metadata.
  */
-template <typename real_t> struct HYPLevel2 {
+template <typename real> struct HYPLevel2 {
   void operator()(quda::GaugeField *const *out, quda::GaugeField *const *in, const quda::GaugeField &thin, double alpha,
                   const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     std::array<std::array<const link *, 4>, 4> input;
     std::array<std::array<link *, 4>, 4> output;
     for (int slot = 0; slot < 4; slot++) {
@@ -330,9 +329,9 @@ template <typename real_t> struct HYPLevel2 {
     }
     const auto thin_ptrs = thin.data_array<const link *>();
     const auto thin_links = thin_ptrs.data;
-    const auto alpha_ = static_cast<real_t>(alpha);
-    const auto identity = Identity<3, std::complex<real_t>>()();
-    const auto tolerance = static_cast<real_t>(thin.toleranceSU3());
+    const auto alpha_ = static_cast<real>(alpha);
+    const auto identity = Identity<3, std::complex<real>>()();
+    const auto tolerance = static_cast<real>(thin.toleranceSU3());
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
@@ -348,7 +347,7 @@ template <typename real_t> struct HYPLevel2 {
             staple_sum += mixed_staple(input[sigma].data(), input[sigma].data(), i, mu, rho, lat);
           }
           auto test_u
-            = (static_cast<real_t>(1.0) - alpha_) * identity + static_cast<real_t>(alpha_ / 4) * staple_sum * conj(u);
+            = (static_cast<real>(1.0) - alpha_) * identity + static_cast<real>(alpha_ / 4) * staple_sum * conj(u);
           polar_su3(test_u, tolerance);
           output[nu][mu][i] = test_u * u;
         }
@@ -367,11 +366,11 @@ template <typename real_t> struct HYPLevel2 {
  * @param[in] dir_ignore Direction excluded for three-dimensional HYP.
  * @param[in] lat Extended lattice metadata.
  */
-template <typename real_t> struct HYPFinal {
+template <typename real> struct HYPFinal {
   void operator()(quda::GaugeField &out, quda::GaugeField *const *tensors, const quda::GaugeField &thin, double alpha,
                   int dir_ignore, const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     std::array<std::array<const link *, 4>, 4> input;
     for (int slot = 0; slot < 4; slot++) {
       const auto field = tensors[slot]->data_array<const link *>();
@@ -382,10 +381,10 @@ template <typename real_t> struct HYPFinal {
     const auto thin_links = thin_ptrs.data;
     const auto output = output_ptrs.data;
     const int hyp_dim = dir_ignore == 4 ? 4 : 3;
-    const auto alpha_ = static_cast<real_t>(alpha);
-    const auto scale = static_cast<real_t>(alpha_ / (hyp_dim == 4 ? 6 : 4));
-    const auto identity = Identity<3, std::complex<real_t>>()();
-    const auto tolerance = static_cast<real_t>(thin.toleranceSU3());
+    const auto alpha_ = static_cast<real>(alpha);
+    const auto scale = static_cast<real>(alpha_ / (hyp_dim == 4 ? 6 : 4));
+    const auto identity = Identity<3, std::complex<real>>()();
+    const auto tolerance = static_cast<real>(thin.toleranceSU3());
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
@@ -403,7 +402,7 @@ template <typename real_t> struct HYPFinal {
           }
         }
         const auto &u = centered_link(thin_links, i, mu, lat);
-        auto test_u = (static_cast<real_t>(1.0) - alpha_) * identity + scale * staple_sum * conj(u);
+        auto test_u = (static_cast<real>(1.0) - alpha_) * identity + scale * staple_sum * conj(u);
         polar_su3(test_u, tolerance);
         output[mu][i] = test_u * u;
       }
@@ -461,7 +460,7 @@ void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam
 /**
  * @brief Compute the Wilson or Symanzik flow action for one link.
  *
- * @tparam real_t Floating-point type used for the host gauge field.
+ * @tparam real Floating-point type used for the host gauge field.
  * @param[in] links Extended input gauge links.
  * @param[in] i Local link index.
  * @param[in] dir Link direction.
@@ -470,27 +469,27 @@ void hyp_smear(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam
  * @param[in] lat Extended lattice metadata.
  * @return Wilson staple sum or Symanzik-improved staple and rectangle sum.
  */
-template <typename real_t>
-matrix<real_t> flow_action(const matrix<real_t> *const *links, size_t i, int dir, QudaGaugeSmearType type,
-                           double anisotropy, const lattice_t &lat)
+template <typename real>
+matrix<real> flow_action(const matrix<real> *const *links, size_t i, int dir, QudaGaugeSmearType type,
+                         double anisotropy, const lattice_t &lat)
 {
   if (type == QUDA_GAUGE_SMEAR_WILSON_FLOW) return staple(links, i, dir, 4, anisotropy, lat);
-  return static_cast<real_t>(5.0 / 3.0) * staple(links, i, dir, 4, anisotropy, lat)
-    - static_cast<real_t>(1.0 / 12.0) * rectangle(links, i, dir, 4, anisotropy, lat);
+  return static_cast<real>(5.0 / 3.0) * staple(links, i, dir, 4, anisotropy, lat)
+    - static_cast<real>(1.0 / 12.0) * rectangle(links, i, dir, 4, anisotropy, lat);
 }
 
-template <typename real_t> using flow_temp = std::vector<std::array<matrix<real_t>, 4>>;
+template <typename real> using flow_temp = std::vector<std::array<matrix<real>, 4>>;
 
 /**
  * @brief First stage of the third-order Wilson-flow integrator.
  *
- * @tparam real_t Floating-point type used for the host gauge field.
+ * @tparam real Floating-point type used for the host gauge field.
  */
-template <typename real_t> struct WFlowW1 {
-  void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real_t> &temp, real_t epsilon,
-                  real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
+template <typename real> struct WFlowW1 {
+  void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real> &temp, real epsilon,
+                  real anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     const auto input_ptrs = in.data_array<const link *>();
     const auto output_ptrs = out.data_array<link *>();
     const auto input = input_ptrs.data;
@@ -501,7 +500,7 @@ template <typename real_t> struct WFlowW1 {
         const auto &u = centered_link(input, i, dir, lat);
         const auto z = flow_action(input, i, dir, type, anisotropy, lat) * conj(u);
         temp[i][dir] = z;
-        output[dir][i] = stout_update(static_cast<real_t>(1.0 / 4.0) * epsilon * z, u);
+        output[dir][i] = stout_update(static_cast<real>(1.0 / 4.0) * epsilon * z, u);
       }
     }
   }
@@ -510,13 +509,13 @@ template <typename real_t> struct WFlowW1 {
 /**
  * @brief Second stage of the third-order Wilson-flow integrator.
  *
- * @tparam real_t Floating-point type used for the host gauge field.
+ * @tparam real Floating-point type used for the host gauge field.
  */
-template <typename real_t> struct WFlowW2 {
-  void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real_t> &temp, real_t epsilon,
-                  real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
+template <typename real> struct WFlowW2 {
+  void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real> &temp, real epsilon,
+                  real anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     const auto input_ptrs = in.data_array<const link *>();
     const auto output_ptrs = out.data_array<link *>();
     const auto input = input_ptrs.data;
@@ -525,8 +524,8 @@ template <typename real_t> struct WFlowW2 {
     for (size_t i = 0; i < lat.volume; i++) {
       for (int dir = 0; dir < 4; dir++) {
         const auto &u = centered_link(input, i, dir, lat);
-        auto z = static_cast<real_t>(8.0 / 9.0) * flow_action(input, i, dir, type, anisotropy, lat) * conj(u);
-        z = z - static_cast<real_t>(17.0 / 36.0) * temp[i][dir];
+        auto z = static_cast<real>(8.0 / 9.0) * flow_action(input, i, dir, type, anisotropy, lat) * conj(u);
+        z = z - static_cast<real>(17.0 / 36.0) * temp[i][dir];
         temp[i][dir] = z;
         output[dir][i] = stout_update(epsilon * z, u);
       }
@@ -537,13 +536,13 @@ template <typename real_t> struct WFlowW2 {
 /**
  * @brief Final stage of the third-order Wilson-flow integrator.
  *
- * @tparam real_t Floating-point type used for the host gauge field.
+ * @tparam real Floating-point type used for the host gauge field.
  */
-template <typename real_t> struct WFlowVt {
-  void operator()(quda::GaugeField &out, const quda::GaugeField &in, const flow_temp<real_t> &temp, real_t epsilon,
-                  real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
+template <typename real> struct WFlowVt {
+  void operator()(quda::GaugeField &out, const quda::GaugeField &in, const flow_temp<real> &temp, real epsilon,
+                  real anisotropy, QudaGaugeSmearType type, const lattice_t &lat)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     const auto input_ptrs = in.data_array<const link *>();
     const auto output_ptrs = out.data_array<link *>();
     const auto input = input_ptrs.data;
@@ -552,7 +551,7 @@ template <typename real_t> struct WFlowVt {
     for (size_t i = 0; i < lat.volume; i++) {
       for (int dir = 0; dir < 4; dir++) {
         const auto &u = centered_link(input, i, dir, lat);
-        auto z = static_cast<real_t>(3.0 / 4.0) * flow_action(input, i, dir, type, anisotropy, lat) * conj(u);
+        auto z = static_cast<real>(3.0 / 4.0) * flow_action(input, i, dir, type, anisotropy, lat) * conj(u);
         z = z - temp[i][dir];
         output[dir][i] = stout_update(epsilon * z, u);
       }
@@ -575,12 +574,12 @@ template <typename real_t> struct WFlowVt {
  * @param[in] get_stored Whether to subtract the stored generator.
  * @param[in] do_store Whether to store the current generator.
  */
-template <typename real_t> struct WFlowRK4Step {
-  void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real_t> &temp, real_t epsilon,
-                  real_t anisotropy, QudaGaugeSmearType type, const lattice_t &lat, double coeff_a, double coeff_b,
+template <typename real> struct WFlowRK4Step {
+  void operator()(quda::GaugeField &out, const quda::GaugeField &in, flow_temp<real> &temp, real epsilon,
+                  real anisotropy, QudaGaugeSmearType type, const lattice_t &lat, double coeff_a, double coeff_b,
                   bool get_stored, bool do_store)
   {
-    using link = matrix<real_t>;
+    using link = matrix<real>;
     const auto input_ptrs = in.data_array<const link *>();
     const auto output_ptrs = out.data_array<link *>();
     const auto input = input_ptrs.data;
@@ -590,9 +589,9 @@ template <typename real_t> struct WFlowRK4Step {
       for (int dir = 0; dir < 4; dir++) {
         const auto &u = centered_link(input, i, dir, lat);
         auto z = flow_action(input, i, dir, type, anisotropy, lat) * conj(u);
-        if (get_stored) z -= static_cast<real_t>(coeff_a) * temp[i][dir];
+        if (get_stored) z -= static_cast<real>(coeff_a) * temp[i][dir];
         if (do_store) temp[i][dir] = z;
-        output[dir][i] = stout_update(static_cast<real_t>(coeff_b) * epsilon * z, u);
+        output[dir][i] = stout_update(static_cast<real>(coeff_b) * epsilon * z, u);
       }
     }
   }
@@ -604,29 +603,29 @@ template <typename real_t> struct WFlowRK4Step {
  * The operator advances an extended input field through the W1, W2, and Vt stages using temporary
  * fields constructed from the supplied gauge parameters and the input's extension radius.
  *
- * @tparam real_t Floating-point type used for the host gauge field.
+ * @tparam real Floating-point type used for the host gauge field.
  */
-template <typename real_t> struct WFlowRK3 {
+template <typename real> struct WFlowRK3 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
                   const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
   {
     const auto &R = in.R();
-    const auto epsilon = static_cast<real_t>(smear_param.epsilon);
-    const auto anisotropy = static_cast<real_t>(smear_param.smear_anisotropy);
+    const auto epsilon = static_cast<real>(smear_param.epsilon);
+    const auto anisotropy = static_cast<real>(smear_param.smear_anisotropy);
     const auto type = smear_param.smear_type;
-    flow_temp<real_t> temp(lat.volume);
+    flow_temp<real> temp(lat.volume);
 
     quda::GaugeFieldParam field_param(out);
     field_param.location = QUDA_CPU_FIELD_LOCATION;
     field_param.create = QUDA_NULL_FIELD_CREATE;
     quda::GaugeField stage_two(field_param);
 
-    WFlowW1<real_t> {}(out, in, temp, epsilon, anisotropy, type, lat);
+    WFlowW1<real> {}(out, in, temp, epsilon, anisotropy, type, lat);
     auto stage_one_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowW2<real_t> {}(stage_two, *stage_one_ex, temp, epsilon, anisotropy, type, lat);
+    WFlowW2<real> {}(stage_two, *stage_one_ex, temp, epsilon, anisotropy, type, lat);
     delete stage_one_ex;
     auto stage_two_ex = quda::createExtendedGauge(stage_two.data_array().data, gauge_param, R);
-    WFlowVt<real_t> {}(out, *stage_two_ex, temp, epsilon, anisotropy, type, lat);
+    WFlowVt<real> {}(out, *stage_two_ex, temp, epsilon, anisotropy, type, lat);
     delete stage_two_ex;
   }
 };
@@ -637,9 +636,9 @@ template <typename real_t> struct WFlowRK3 {
  * The operator applies the fixed six-stage Runge--Kutta coefficients using temporary fields
  * constructed from the supplied gauge parameters and the input's extension radius.
  *
- * @tparam real_t Floating-point type used for the host gauge field.
+ * @tparam real Floating-point type used for the host gauge field.
  */
-template <typename real_t> struct WFlowRK4 {
+template <typename real> struct WFlowRK4 {
   void operator()(quda::GaugeField &out, const quda::GaugeField &in, QudaGaugeParam &gauge_param,
                   const QudaGaugeSmearParam &smear_param, const lattice_t &lat)
   {
@@ -659,37 +658,37 @@ template <typename real_t> struct WFlowRK4 {
       {2.813971388035, 0.27, true, false},
     }};
 
-    const auto epsilon = static_cast<real_t>(smear_param.epsilon);
-    const auto anisotropy = static_cast<real_t>(smear_param.smear_anisotropy);
+    const auto epsilon = static_cast<real>(smear_param.epsilon);
+    const auto anisotropy = static_cast<real>(smear_param.smear_anisotropy);
     const auto type = smear_param.smear_type;
-    flow_temp<real_t> temp(lat.volume);
+    flow_temp<real> temp(lat.volume);
 
     quda::GaugeFieldParam field_param(out);
     field_param.location = QUDA_CPU_FIELD_LOCATION;
     field_param.create = QUDA_NULL_FIELD_CREATE;
     quda::GaugeField stage(field_param);
 
-    WFlowRK4Step<real_t> {}(out, in, temp, epsilon, anisotropy, type, lat, stages[0].coeff_a, stages[0].coeff_b,
-                            stages[0].get_stored, stages[0].do_store);
+    WFlowRK4Step<real> {}(out, in, temp, epsilon, anisotropy, type, lat, stages[0].coeff_a, stages[0].coeff_b,
+                          stages[0].get_stored, stages[0].do_store);
     auto out_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[1].coeff_a, stages[1].coeff_b,
-                            stages[1].get_stored, stages[1].do_store);
+    WFlowRK4Step<real> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[1].coeff_a, stages[1].coeff_b,
+                          stages[1].get_stored, stages[1].do_store);
     delete out_ex;
     auto stage_ex = quda::createExtendedGauge(stage.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t> {}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[2].coeff_a, stages[2].coeff_b,
-                            stages[2].get_stored, stages[2].do_store);
+    WFlowRK4Step<real> {}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[2].coeff_a, stages[2].coeff_b,
+                          stages[2].get_stored, stages[2].do_store);
     delete stage_ex;
     out_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[3].coeff_a, stages[3].coeff_b,
-                            stages[3].get_stored, stages[3].do_store);
+    WFlowRK4Step<real> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[3].coeff_a, stages[3].coeff_b,
+                          stages[3].get_stored, stages[3].do_store);
     delete out_ex;
     stage_ex = quda::createExtendedGauge(stage.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t> {}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[4].coeff_a, stages[4].coeff_b,
-                            stages[4].get_stored, stages[4].do_store);
+    WFlowRK4Step<real> {}(out, *stage_ex, temp, epsilon, anisotropy, type, lat, stages[4].coeff_a, stages[4].coeff_b,
+                          stages[4].get_stored, stages[4].do_store);
     delete stage_ex;
     out_ex = quda::createExtendedGauge(out.data_array().data, gauge_param, R);
-    WFlowRK4Step<real_t> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[5].coeff_a, stages[5].coeff_b,
-                            stages[5].get_stored, stages[5].do_store);
+    WFlowRK4Step<real> {}(stage, *out_ex, temp, epsilon, anisotropy, type, lat, stages[5].coeff_a, stages[5].coeff_b,
+                          stages[5].get_stored, stages[5].do_store);
     delete out_ex;
     out.copy(stage);
   }

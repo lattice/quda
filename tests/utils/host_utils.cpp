@@ -173,19 +173,19 @@ void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 /**
  * @brief Construct a random (but reasonable) clover field
  *
- * @tparam real_t Floating point type
+ * @tparam real Floating point type
  * @param[out] clover The clover field
  * @param[in] norm Scale factor for clover field elements
  * @param[in] diag Diagonal addition to the clover field
  */
-template <typename real_t> struct ConstructCloverField {
+template <typename real> struct ConstructCloverField {
   void operator()(void *res, double norm, double diag)
   {
 #pragma omp parallel for
     for (auto i = 0lu; i < static_cast<size_t>(Vh); i++) {
       for (auto parity = 0lu; parity < 2lu; parity++) {
-        auto clover_matrix = reinterpret_cast<real_t *>(res) + 72 * (parity * Vh + i);
-        for (int j = 0; j < 72; j++) { clover_matrix[j] = random_uniform_host<real_t>(i, parity, -norm, norm); }
+        auto clover_matrix = reinterpret_cast<real *>(res) + 72 * (parity * Vh + i);
+        for (int j = 0; j < 72; j++) { clover_matrix[j] = random_uniform_host<real>(i, parity, -norm, norm); }
 
         // impose clover symmetry on each chiral block
         for (int ch = 0; ch < 2; ch++) {

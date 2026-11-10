@@ -14,15 +14,15 @@
 /**
  * @brief Apply spatial anisotropic scaling
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] anisotropy Spatial anisotropy factor
  */
-template <typename real_t> struct ApplyGaugeSpatialAnisotropy {
+template <typename real> struct ApplyGaugeSpatialAnisotropy {
   void operator()(void *const *gauge_, int Vh, double anisotropy)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
     auto inv_anisotropy = 1.0 / anisotropy;
     for (int d = 0; d < 3; d++) {
 #pragma omp parallel for
@@ -39,8 +39,8 @@ template <typename real_t> struct ApplyGaugeSpatialAnisotropy {
  * @param[in] anisotropy Spatial anisotropy factor
  * @param[in] precision Floating-point precision of the field
  */
-template <typename real_t>
-void applyGaugeSpatialAnisotropy(real_t *const *gauge, int Vh, double anisotropy, QudaPrecision precision)
+template <typename real>
+void applyGaugeSpatialAnisotropy(real *const *gauge, int Vh, double anisotropy, QudaPrecision precision)
 {
   instantiate_host<ApplyGaugeSpatialAnisotropy>(precision, gauge, Vh, anisotropy);
 }
@@ -48,16 +48,16 @@ void applyGaugeSpatialAnisotropy(real_t *const *gauge, int Vh, double anisotropy
 /**
  * @brief Apply temporal boundary conditions
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] t_boundary Temporal boundary conditions
  * @param[in] three_link Whether or not this is for the asqtad long links, default false
  */
-template <typename real_t> struct ApplyGaugeTemporalBCs {
+template <typename real> struct ApplyGaugeTemporalBCs {
   void operator()(void *const *gauge_, int Vh, QudaTboundary t_boundary, bool three_link = false)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
     if (t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
       int lower_bound = (Z[0] / 2) * Z[1] * Z[2];
       lower_bound *= three_link ? (Z[3] - 3) : (Z[3] - 1);
@@ -93,19 +93,19 @@ void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary,
  * Emulate imposing the temporal gauge by setting all gauge links
  * except for the last Z[0]*Z[1]*Z[2]/2 to the identity.
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  */
-template <typename real_t> struct EmulateGaugeTemporalGauge {
+template <typename real> struct EmulateGaugeTemporalGauge {
   void operator()(void *const *gauge_, int Vh)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
     int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
-    real_t *gaugeEven = gauge[dir];
-    real_t *gaugeOdd = gauge[dir] + Vh * gauge_site_size;
+    real *gaugeEven = gauge[dir];
+    real *gaugeOdd = gauge[dir] + Vh * gauge_site_size;
 #pragma omp parallel for
     for (int i = 0; i < iMax; i++) {
       for (int m = 0; m < 3; m++) {
@@ -138,17 +138,17 @@ void emulateGaugeTemporalGauge(void *const *gauge, int Vh, QudaPrecision precisi
 /**
  * @brief Rescale long links by the appropriate coefficient, 1/(24 * tadpole^2)
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] tadpole Tadpole coefficient
  */
-template <typename real_t> struct ApplyGaugeLongLinkScaling {
+template <typename real> struct ApplyGaugeLongLinkScaling {
   void operator()(void *const *gauge_, int Vh, double tadpole_coeff)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
-    real_t inv_scale = -1.0 / (24.0 * tadpole_coeff * tadpole_coeff);
+    real inv_scale = -1.0 / (24.0 * tadpole_coeff * tadpole_coeff);
     for (int d = 0; d < 4; d++) {
 #pragma omp parallel for
       for (auto i = 0lu; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] *= inv_scale; }
@@ -172,7 +172,7 @@ void applyGaugeLongLinkScaling(void *const *gauge, int Vh, double tadpole_coeff,
 /**
  * @brief Get the staggered phase (without boundary conditions) for a given coordinate and phase type.
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[in] x Local x coordinate
  * @param[in] y Local y coordinate
  * @param[in] z Local z coordinate
@@ -183,14 +183,14 @@ void applyGaugeLongLinkScaling(void *const *gauge, int Vh, double tadpole_coeff,
  * @param[in] phase_type Staggered phase type
  * @param
  */
-template <typename real_t>
-real_t getStaggeredPhase(int x, int y, int z, int t, const int X[], int dim,
-                         QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
-                         QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
+template <typename real>
+real getStaggeredPhase(int x, int y, int z, int t, const int X[], int dim,
+                       QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
+                       QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
 {
-  real_t t_boundary_factor = (last_node_in_t() && t == (X[3] - 1)) ? t_boundary : 1;
+  real t_boundary_factor = (last_node_in_t() && t == (X[3] - 1)) ? t_boundary : 1;
 
-  real_t phase = 1.0;
+  real phase = 1.0;
   if (phase_type == QUDA_STAGGERED_PHASE_NO) {
     if (dim == 3) phase = t_boundary_factor;
   } else if (phase_type == QUDA_STAGGERED_PHASE_MILC) {
@@ -233,18 +233,18 @@ real_t getStaggeredPhase(int x, int y, int z, int t, const int X[], int dim,
 /**
  * @brief Apply staggered phases to a gauge field
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] X Full-parity local dimensions
  * @param[in] t_boundary Temporal boundary conditions
  * @param[in] phase_type Staggered phase type
  */
-template <typename real_t> struct ApplyGaugeStaggeredPhase {
+template <typename real> struct ApplyGaugeStaggeredPhase {
   void operator()(void *const *gauge_, int Vh, const int X[], QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
                   QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
     int X1 = X[0];
     int X2 = X[1];
@@ -261,7 +261,7 @@ template <typename real_t> struct ApplyGaugeStaggeredPhase {
           int i2 = (index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1)) / X1;
           int i1 = index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
 
-          real_t sign = getStaggeredPhase<real_t>(i1, i2, i3, i4, X, d, t_boundary, phase_type);
+          real sign = getStaggeredPhase<real>(i1, i2, i3, i4, X, d, t_boundary, phase_type);
 
           for (int j = 0; j < 18; j++) { gauge[d][(parity * Vh + i) * gauge_site_size + j] *= sign; }
         }
@@ -288,15 +288,15 @@ void applyGaugeFieldScaling(void *const *gauge, int Vh, const QudaGaugeParam &pa
 /**
  * @brief Constructs a 3x3 identity gauge field
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  */
-template <typename real_t> struct ConstructIdentityGaugeField {
+template <typename real> struct ConstructIdentityGaugeField {
   void operator()(void *const *gauge_)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
-    real_t *gaugeOdd[4], *gaugeEven[4];
+    real *gaugeOdd[4], *gaugeEven[4];
     for (int dir = 0; dir < 4; dir++) {
       gaugeEven[dir] = gauge[dir];
       gaugeOdd[dir] = gauge[dir] + Vh * gauge_site_size;
@@ -326,17 +326,17 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision)
 /**
  * @brief Constructs a random unitary gauge field
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  */
-template <typename real_t> struct ConstructRandomSU3GaugeField {
+template <typename real> struct ConstructRandomSU3GaugeField {
   void operator()(void *const *gauge_)
   {
-    using complex = std::complex<real_t>;
+    using complex = std::complex<real>;
 
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
-    real_t *gaugeOdd[4], *gaugeEven[4];
+    real *gaugeOdd[4], *gaugeEven[4];
     for (int dir = 0; dir < 4; dir++) {
       gaugeEven[dir] = gauge[dir];
       gaugeOdd[dir] = gauge[dir] + Vh * gauge_site_size;
@@ -360,7 +360,7 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
     };
 
     // accumulate a conjugate product
-    auto accumulateConjugateProduct = [](real_t *a, real_t *b, real_t *c, int sign) -> void {
+    auto accumulateConjugateProduct = [](real *a, real *b, real *c, int sign) -> void {
       a[0] += sign * (b[0] * c[0] - b[1] * c[1]);
       a[1] -= sign * (b[0] * c[1] + b[1] * c[0]);
     };
@@ -370,10 +370,10 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
       for (int i = 0; i < Vh; i++) {
         for (int m = 1; m < 3; m++) {   // last 2 rows
           for (int n = 0; n < 3; n++) { // 3 columns
-            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = random_uniform_host<real_t>(i, 0);
-            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = random_uniform_host<real_t>(i, 0);
-            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = random_uniform_host<real_t>(i, 1);
-            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = random_uniform_host<real_t>(i, 1);
+            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = random_uniform_host<real>(i, 0);
+            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = random_uniform_host<real>(i, 0);
+            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = random_uniform_host<real>(i, 1);
+            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = random_uniform_host<real>(i, 1);
           }
         }
         normalize(reinterpret_cast<complex *>(gaugeEven[dir] + (i * 3 + 1) * 3 * 2), 3);
@@ -387,9 +387,9 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
         normalize(reinterpret_cast<complex *>(gaugeOdd[dir] + (i * 3 + 2) * 3 * 2), 3);
 
         {
-          real_t *w = gaugeEven[dir] + (i * 3 + 0) * 3 * 2;
-          real_t *u = gaugeEven[dir] + (i * 3 + 1) * 3 * 2;
-          real_t *v = gaugeEven[dir] + (i * 3 + 2) * 3 * 2;
+          real *w = gaugeEven[dir] + (i * 3 + 0) * 3 * 2;
+          real *u = gaugeEven[dir] + (i * 3 + 1) * 3 * 2;
+          real *v = gaugeEven[dir] + (i * 3 + 2) * 3 * 2;
 
           for (int n = 0; n < 6; n++) w[n] = 0.0;
           accumulateConjugateProduct(w + 0 * (2), u + 1 * (2), v + 2 * (2), +1);
@@ -401,9 +401,9 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
         }
 
         {
-          real_t *w = gaugeOdd[dir] + (i * 3 + 0) * 3 * 2;
-          real_t *u = gaugeOdd[dir] + (i * 3 + 1) * 3 * 2;
-          real_t *v = gaugeOdd[dir] + (i * 3 + 2) * 3 * 2;
+          real *w = gaugeOdd[dir] + (i * 3 + 0) * 3 * 2;
+          real *u = gaugeOdd[dir] + (i * 3 + 1) * 3 * 2;
+          real *v = gaugeOdd[dir] + (i * 3 + 2) * 3 * 2;
 
           for (int n = 0; n < 6; n++) w[n] = 0.0;
           accumulateConjugateProduct(w + 0 * (2), u + 1 * (2), v + 2 * (2), +1);
@@ -426,15 +426,15 @@ void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision)
 /**
  * @brief Construct independent Gaussian SU(3) links by algebra projection and exponentiation.
  *
- * @tparam real_t Floating point type of the gauge field.
+ * @tparam real Floating point type of the gauge field.
  * @param[out] gauge Generated QDP-ordered gauge field.
  * @param[in] width Gaussian width sigma applied to each matrix component.
  */
-template <typename real_t> struct ConstructGaussianSU3GaugeField {
+template <typename real> struct ConstructGaussianSU3GaugeField {
   void operator()(void *const *gauge_, double width)
   {
-    using complex = std::complex<real_t>;
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    using complex = std::complex<real>;
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
     for (int dir = 0; dir < 4; dir++) {
 #pragma omp parallel for
@@ -443,8 +443,8 @@ template <typename real_t> struct ConstructGaussianSU3GaugeField {
           Matrix<3, complex> matrix;
           for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
-              matrix(row, col) = complex(random_gaussian_host<real_t>(i, parity, 0, width),
-                                         random_gaussian_host<real_t>(i, parity, 0, width));
+              matrix(row, col) = complex(random_gaussian_host<real>(i, parity, 0, width),
+                                         random_gaussian_host<real>(i, parity, 0, width));
             }
           }
           make_herm(matrix);
@@ -567,24 +567,24 @@ void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam 
 /**
  * @brief Rescales a gauge field with a per-site random phase
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[in,out] gauge Generated QDP-ordered gauge field
  */
-template <typename real_t> struct ApplyRandomU1Phase {
+template <typename real> struct ApplyRandomU1Phase {
   void operator()(void *const *gauge_)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
     for (int dir = 0; dir < 4; dir++) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         for (int parity = 0; parity < 2; parity++) {
           // create a random phase
-          real_t phase = random_uniform_host<real_t>(i, parity, 0, 2 * M_PI);
-          std::complex<real_t> u1 = std::polar(static_cast<real_t>(1), phase);
+          real phase = random_uniform_host<real>(i, parity, 0, 2 * M_PI);
+          std::complex<real> u1 = std::polar(static_cast<real>(1), phase);
 
           // rescale bottom row
-          auto link = reinterpret_cast<std::complex<real_t> *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
+          auto link = reinterpret_cast<std::complex<real> *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
           constexpr int m = 2;          // bottom row
           for (int n = 0; n < 3; n++) { // 3 columns
             link[m * 3 + n] *= u1;
@@ -603,27 +603,27 @@ void applyRandomU1Phase(void *const *gauge, QudaPrecision precision)
 /**
  * @brief Constructs a "gauge field" of random (sane, invertable) matrices
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  */
-template <typename real_t> struct ConstructRandomMatrixGaugeField {
+template <typename real> struct ConstructRandomMatrixGaugeField {
   void operator()(void *const *gauge_)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
 
     // Encapsulate creating a random matrix in a lambda to simplify making sure
     // the matrix is invertable
-    auto randomMatrix = [](real_t *link, int i, int parity) -> void {
+    auto randomMatrix = [](real *link, int i, int parity) -> void {
       for (int m = 0; m < 3; m++) {   // 3 rows
         for (int n = 0; n < 3; n++) { // 3 columns
-          link[m * (3 * 2) + n * (2) + 0] = 0.8 * random_uniform_host<real_t>(i, parity, -1, 1);
-          link[m * (3 * 2) + n * (2) + 1] = 1.3 * random_uniform_host<real_t>(i, parity, -1, 1);
+          link[m * (3 * 2) + n * (2) + 0] = 0.8 * random_uniform_host<real>(i, parity, -1, 1);
+          link[m * (3 * 2) + n * (2) + 1] = 1.3 * random_uniform_host<real>(i, parity, -1, 1);
         }
       }
     };
 
-    auto isReasonable = [](real_t *link) -> bool {
-      auto mat = reinterpret_cast<std::complex<real_t> *>(link);
+    auto isReasonable = [](real *link) -> bool {
+      auto mat = reinterpret_cast<std::complex<real> *>(link);
 
       auto det = mat[0 * 3 + 0] * (mat[1 * 3 + 1] * mat[2 * 3 + 2] - mat[1 * 3 + 2] * mat[2 * 3 + 1])
         - mat[0 * 3 + 1] * (mat[1 * 3 + 0] * mat[2 * 3 + 2] - mat[1 * 3 + 2] * mat[2 * 3 + 0])
@@ -640,7 +640,7 @@ template <typename real_t> struct ConstructRandomMatrixGaugeField {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         for (int parity = 0; parity < 2; parity++) {
-          real_t *link = gauge[dir] + (parity * Vh + i) * gauge_site_size;
+          real *link = gauge[dir] + (parity * Vh + i) * gauge_site_size;
           do {
             randomMatrix(link, i, parity);
           } while (!isReasonable(link));
@@ -658,22 +658,22 @@ void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision
 /**
  * @brief Adds some non-unitary noise to a gauge field
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[in,out] gauge Generated QDP-ordered gauge field
  * @param[in] noise_max Scale of noise added to the gauge field
  */
-template <typename real_t> struct AddNoiseToGaugeField {
+template <typename real> struct AddNoiseToGaugeField {
   void operator()(void *const *gauge_, double noise_max)
   {
-    const auto gauge = typed_ptr_array<real_t *>(gauge_);
+    const auto gauge = typed_ptr_array<real *>(gauge_);
     // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
     for (int dir = 0; dir < 4; ++dir) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; ++i) {
         for (int parity = 0; parity < 2; parity++) {
           for (size_t c = 0lu; c < gauge_site_size; c++) {
-            real_t *link = gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
-            *link += random_uniform_host<real_t>(i, parity, -noise_max, noise_max);
+            real *link = gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
+            *link += random_uniform_host<real>(i, parity, -noise_max, noise_max);
           }
         }
       }

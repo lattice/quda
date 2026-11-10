@@ -15,7 +15,7 @@
 /**
  * @brief Calculates an arbitary gauge path, returning the product matrix
  * @return The product of the gauge path
- * @tparam real_t The precision of the calculation
+ * @tparam real The precision of the calculation
  * @param[in] sitelink Gauge link structure
  * @param[in] i Full lattice index of origin
  * @param[in] path Gauge link path
@@ -23,13 +23,13 @@
  * @param[in] dx Memory for a relative coordinate shift; can be non-zero
  * @param[in] lat Utility lattice information
  */
-template <typename real_t>
-Matrix<3, std::complex<real_t>> compute_gauge_path(const Matrix<3, std::complex<real_t>> *const *const sitelink, int i,
-                                                   const int *const path, int len, int dx[4], const lattice_t &lat)
+template <typename real>
+Matrix<3, std::complex<real>> compute_gauge_path(const Matrix<3, std::complex<real>> *const *const sitelink, int i,
+                                                 const int *const path, int len, int dx[4], const lattice_t &lat)
 {
-  using matrix = Matrix<3, std::complex<real_t>>;
+  using matrix = Matrix<3, std::complex<real>>;
 
-  matrix prev_matrix, curr_matrix = Identity<3, std::complex<real_t>>()();
+  matrix prev_matrix, curr_matrix = Identity<3, std::complex<real>>()();
 
   for (int j = 0; j < len; j++) {
     int lnkdir;
@@ -62,15 +62,15 @@ Matrix<3, std::complex<real_t>> compute_gauge_path(const Matrix<3, std::complex<
   return curr_matrix;
 }
 
-template <typename real_t> struct ComputePathProduct {
+template <typename real> struct ComputePathProduct {
   void operator()(void *const staple_, const void *const *const sitelink_, const int *const path, int len,
                   const void *const loop_coeff_, int coeff_index, int dir, const lattice_t &lat)
   {
-    using matrix = Matrix<3, std::complex<real_t>>;
+    using matrix = Matrix<3, std::complex<real>>;
     const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
 
     auto staple = reinterpret_cast<matrix *>(staple_);
-    auto loop_coeff = reinterpret_cast<const real_t *>(loop_coeff_);
+    auto loop_coeff = reinterpret_cast<const real *>(loop_coeff_);
     auto coeff = loop_coeff[coeff_index];
 
 #pragma omp parallel for
@@ -105,11 +105,11 @@ void compute_path_product(void *const staple, const void *const *const sitelink,
   instantiate_host<ComputePathProduct>(precision, staple, sitelink, path, len, loop_coeff, coeff_index, dir, lat);
 }
 
-template <typename real_t> struct ComputeLoopTrace {
+template <typename real> struct ComputeLoopTrace {
   std::complex<double> operator()(const void *const *const sitelink_, int *path, int len, double loop_coeff,
                                   const lattice_t &lat)
   {
-    using matrix = Matrix<3, std::complex<real_t>>;
+    using matrix = Matrix<3, std::complex<real>>;
     const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
 
     std::complex<double> accum = 0;
@@ -145,13 +145,13 @@ std::complex<double> compute_loop_trace(const void *const *const sitelink, int *
   return instantiate_host_reduce<ComputeLoopTrace, std::complex<double>>(precision, sitelink, path, len, loop_coeff, lat);
 }
 
-template <typename real_t> struct UpdateMomentum {
+template <typename real> struct UpdateMomentum {
   void operator()(void *const momentum_, int dir, const void *const *const sitelink_, const void *const staple_,
-                  real_t eb3, const lattice_t &lat)
+                  real eb3, const lattice_t &lat)
   {
-    using matrix = Matrix<3, std::complex<real_t>>;
+    using matrix = Matrix<3, std::complex<real>>;
 
-    auto momentum = reinterpret_cast<anti_hermitmat<real_t> *>(momentum_);
+    auto momentum = reinterpret_cast<anti_hermitmat<real> *>(momentum_);
     const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
     auto staple = reinterpret_cast<const matrix *>(staple_);
 
@@ -162,11 +162,11 @@ template <typename real_t> struct UpdateMomentum {
       auto &mom = momentum[4 * i + dir];
 
       matrix mom_full;
-      uncompress_anti_hermitian(&mom, reinterpret_cast<su3_matrix<real_t> *>(&mom_full));
+      uncompress_anti_hermitian(&mom, reinterpret_cast<su3_matrix<real> *>(&mom_full));
 
       mom_full = mom_full - eb3 * lnk * conj(stp);
 
-      make_anti_hermitian(reinterpret_cast<const su3_matrix<real_t> *>(&mom_full), &mom);
+      make_anti_hermitian(reinterpret_cast<const su3_matrix<real> *>(&mom_full), &mom);
     }
   }
 };
@@ -188,11 +188,11 @@ void update_momentum(void *const momentum, int dir, const void *const *const sit
   instantiate_host<UpdateMomentum>(precision, momentum, dir, sitelink, staple, eb3, lat);
 }
 
-template <typename real_t> struct UpdateGauge {
-  void operator()(void *const gauge_, int dir, const void *const *const sitelink_, const void *const staple_,
-                  real_t eb3, const lattice_t &lat)
+template <typename real> struct UpdateGauge {
+  void operator()(void *const gauge_, int dir, const void *const *const sitelink_, const void *const staple_, real eb3,
+                  const lattice_t &lat)
   {
-    using matrix = Matrix<3, std::complex<real_t>>;
+    using matrix = Matrix<3, std::complex<real>>;
 
     auto gauge = reinterpret_cast<matrix *>(gauge_);
     const auto sitelink = typed_ptr_array<const matrix *>(sitelink_);
