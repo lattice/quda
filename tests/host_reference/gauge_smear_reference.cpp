@@ -649,6 +649,9 @@ template <typename real> struct WFlowRK4 {
       bool get_stored;
       bool do_store;
     };
+    // Berland, Bogey, and Bailly, Computers and Fluids 35 (2006) 1459-1463. The coefficients are
+    // numerically optimized and only published to 12 decimals; keep these in sync with
+    // coeff_a_host and coeff_b_host in include/kernels/gauge_wilson_flow.cuh.
     static constexpr std::array<rk4_stage, 6> stages {{
       {0.0, 0.032918605146, false, true},
       {0.737101392796, 0.823256998200, true, true},

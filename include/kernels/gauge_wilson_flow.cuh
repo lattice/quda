@@ -46,6 +46,9 @@ namespace quda
       coeff1x1(static_cast<real>(5.0 / 3.0)),
       coeff2x1(static_cast<real>(-1.0 / 12.0))
     {
+      // Berland, Bogey, and Bailly, Computers and Fluids 35 (2006) 1459-1463. The coefficients are
+      // numerically optimized and only published to 12 decimals. coeff_a holds -A_i from the paper,
+      // since it is applied as Z - coeff_a * Z_prev.
       constexpr double coeff_a_host[]
         = {0.0, 0.737101392796, 1.634740794341, 0.744739003780, 1.469897351522, 2.813971388035};
       constexpr double coeff_b_host[]
