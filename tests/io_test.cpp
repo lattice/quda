@@ -250,7 +250,7 @@ std::string full_test_name(const testing::TestParamInfo<cs_test_t> &param)
   name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
   name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
   name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
-  name += ::testing::get<7>(param.param) ? "_singlefile" : "_partfile";
+  name += ::testing::get<7>(param.param) ? "_partfile" : "_singlefile";
   name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
   if (::testing::get<9>(param.param) > 1) name += std::string("_Ls") + std::to_string(::testing::get<9>(param.param));
   return name;
