@@ -75,6 +75,11 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
 
   // load a field WITHOUT PHASES
   if (latfile.size() > 0) {
+    // a loaded field has no long links, so asqtad needs them built
+    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong)
+      errorQuda(
+        "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\"");
+
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
