@@ -10,18 +10,18 @@
 
 /**
  * @brief Apply the clover matrix field to a spinor field
- * @tparam real_t The floating-point type used for the computation
+ * @tparam real The floating-point type used for the computation
  * @param[out] out Result field (single parity)
  * @param[in] clover Clover-matrix field (full field)
  * @param[in] in Input field (single parity)
  * @param[in] parity Parity to which we are applying the clover field
  */
-template <typename real_t> struct CloverReference {
+template <typename real> struct CloverReference {
   void operator()(void *out_, const void *clover_, const void *in_, int parity)
   {
-    using complex = std::complex<real_t>;
+    using complex = std::complex<real>;
     auto out = reinterpret_cast<complex *>(out_);
-    auto clover = reinterpret_cast<const real_t *>(clover_);
+    auto clover = reinterpret_cast<const real *>(clover_);
     auto in = reinterpret_cast<const complex *>(in_);
 
     int nSpin = 4;

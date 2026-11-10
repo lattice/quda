@@ -583,7 +583,8 @@ namespace quda
     using Gauge = typename gauge_mapper<Float, recon>::type;
     static constexpr bool heatbath = heatbath_;
 
-    int X[4]; // grid dimensions
+    int_fastdiv X[4]; // grid dimensions
+    int_fastdiv E[4]; // extended grid dims
     int border[4];
     Gauge dataOr;
     real BetaOverNc;
@@ -595,8 +596,9 @@ namespace quda
     {
       BetaOverNc = static_cast<real>(Beta / nColor);
       for (int dir = 0; dir < 4; dir++) {
+        E[dir] = data.X()[dir];
         border[dir] = data.R()[dir];
-        X[dir] = data.X()[dir] - border[dir] * 2;
+        X[dir] = E[dir] - 2 * border[dir];
       }
     }
   };
@@ -612,18 +614,11 @@ namespace quda
       auto mu = arg.mu;
       auto parity = arg.parity;
 
-      int X[4];
-#pragma unroll
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-
       int x[4];
-      getCoords(x, x_cb, X, parity);
+      getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
-      for (int dr = 0; dr < 4; ++dr) {
-        x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
-      }
-      int e_cb = linkIndex(x, X);
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
+      int e_cb = linkIndex(x, arg.E);
 
       Link staple = {};
 
@@ -634,20 +629,20 @@ namespace quda
           packed_array<int8_t, 4> dx = {};
           Link link = arg.dataOr(nu, e_cb, parity);
           dx[nu]++;
-          U = arg.dataOr(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U = arg.dataOr(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
           link *= U;
           dx[nu]--;
           dx[mu]++;
-          U = arg.dataOr(nu, linkIndexShift(x, dx, X), 1 - parity);
+          U = arg.dataOr(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
           link *= conj(U);
           staple += link;
           dx[mu]--;
           dx[nu]--;
-          link = arg.dataOr(nu, linkIndexShift(x, dx, X), 1 - parity);
-          U = arg.dataOr(mu, linkIndexShift(x, dx, X), 1 - parity);
+          link = arg.dataOr(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
+          U = arg.dataOr(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
           link = conj(link) * U;
           dx[mu]++;
-          U = arg.dataOr(nu, linkIndexShift(x, dx, X), parity);
+          U = arg.dataOr(nu, linkIndexShift(x, dx, arg.E), parity);
           link *= U;
           staple += link;
         }

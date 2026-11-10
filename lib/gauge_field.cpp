@@ -89,6 +89,8 @@ namespace quda {
     reconstruct = param.reconstruct;
     nInternal = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2;
     order = param.order;
+    if (geometry == QUDA_KDINVERSE_GEOMETRY && (order == QUDA_QDP_GAUGE_ORDER || order == QUDA_QDPJIT_GAUGE_ORDER))
+      errorQuda("Unsupported gauge field order %d for KD-inverse geometry", order);
 
     fixed = param.fixed;
     link_type = param.link_type;

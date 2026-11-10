@@ -1158,6 +1158,20 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #endif
 
 #ifdef INIT_PARAM
+  for (int i = 0; i < 3; i++) P(plaquette[i], 0.0);
+  for (int i = 0; i < 3; i++) P(rectangle[i], 0.0);
+  for (int i = 0; i < 2; i++) P(ploop[i], 0.0);
+  P(qcharge, 0.0);
+  for (int i = 0; i < 3; i++) P(energy[i], 0.0);
+#elif defined(PRINT_PARAM)
+  for (int i = 0; i < 3; i++) P(plaquette[i], INVALID_DOUBLE);
+  for (int i = 0; i < 3; i++) P(rectangle[i], INVALID_DOUBLE);
+  for (int i = 0; i < 2; i++) P(ploop[i], INVALID_DOUBLE);
+  P(qcharge, INVALID_DOUBLE);
+  for (int i = 0; i < 3; i++) P(energy[i], INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 }

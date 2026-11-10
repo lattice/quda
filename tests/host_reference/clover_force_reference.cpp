@@ -800,8 +800,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, quda::GaugeField &opr
                                 QudaGaugeParam &gauge_param)
 {
   // created extended field
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
 
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
