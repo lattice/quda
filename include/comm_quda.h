@@ -320,6 +320,9 @@ namespace quda
   */
   int comm_peer2peer_enabled_global();
 
+  /** Whether non-P2P tuning candidates are excluded when eligible P2P links exist. */
+  bool comm_peer2peer_force();
+
   /**
      Query if peer-to-peer communication is enabled
      @param dir Direction (0 - backwards, 1 forwards)
