@@ -30,21 +30,13 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
                                 QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
 {
   if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
-    // Set fatlink to the identity matrix
+    // Set fatlink and longlink to the identity matrix
     constructIdentityGaugeField(fatlink, precision);
-
-    // Apply anisotropy, temporal boundary conditions, and emulate temporal
-    // gauge fixing as appropriate
-    applyGaugeFieldScaling(fatlink, Vh, param, precision);
-
-    // Repeat for the longlink field
     constructIdentityGaugeField(longlink, precision);
-    applyGaugeFieldScaling(longlink, Vh, param, precision);
 
-    // apply MILC phases... and temporal boundary conditions? again?
+    // apply MILC phases and temporal boundary conditions
     applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
 
-    // also apply MILC phases and temporal boundary conditions (again?)
     if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
       applyGaugeFieldScaling_long(longlink, Vh, param, dslash_type, precision);
     }
