@@ -48,7 +48,7 @@ namespace quda
       auto Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
       auto V4 = v0.Volume() / Ls;
       if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate) V4 *= 2;
-      auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * v0.Precision();
+      auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * load_prec;
       std::vector<void *> V(Nvec * Ls);
       for (int i = 0; i < Nvec; i++) {
         auto &v = create_tmp ? tmp[i] : vecs[i];
@@ -137,7 +137,7 @@ namespace quda
       auto Ls = v0.Ndim() == 5 ? v0.X(4) : 1;
       auto V4 = v0.Volume() / Ls;
       if (v0.SiteSubset() == QUDA_PARITY_SITE_SUBSET && parity_inflate) V4 *= 2;
-      auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * v0.Precision();
+      auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * save_prec;
       std::vector<const void *> V(Nvec * Ls);
       for (int i = 0; i < Nvec; i++) {
         auto &v = create_tmp ? tmp[i] : vecs[i];
