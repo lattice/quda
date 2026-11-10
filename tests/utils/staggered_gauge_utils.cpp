@@ -30,7 +30,8 @@ static double max_allowed_error = 1e-11;
  * and temporal boundary conditions
  *
  * @param[out] longlink QDP-ordered long links
- * @param[in] mode Gauge input mode: unit links, or random SU(3) links with a random U(1) phase
+ * @param[in] mode Gauge input mode: unit links, Haar random SU(3) links with a uniform random U(1) phase, or Gaussian
+ * SU(3) links with a Gaussian random U(1) phase, both of width --gauge-input-width
  * @param[in] gauge_param Gauge field parameters
  */
 static void constructAsqtadLongLinks(void *const *longlink, GaugeInputMode mode, const QudaGaugeParam &gauge_param)
@@ -46,6 +47,11 @@ static void constructAsqtadLongLinks(void *const *longlink, GaugeInputMode mode,
     applyGaugeFieldScaling_long(longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, precision);
     // incorporate non-trivial phase into long links
     applyRandomU1Phase(longlink, precision);
+    break;
+  case GaugeInputMode::GAUSSIAN_SU3:
+    constructGaussianSU3GaugeField(longlink, precision, gauge_input_width);
+    applyGaugeFieldScaling_long(longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, precision);
+    applyRandomU1Phase(longlink, precision, RandomDistribution::GAUSSIAN, gauge_input_width);
     break;
   default:
     errorQuda("Gauge input %s is not supported for asqtad links without \"--compute-fat-long true\"",
@@ -71,6 +77,11 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   if (construct_fat_long && mode == GaugeInputMode::HAAR) {
     // fat links aren't unitary, so random ones are random matrices
     constructRandomMatrixGaugeField(qdp_inlink, gauge_param.cpu_prec);
+  } else if (construct_fat_long && mode == GaugeInputMode::GAUSSIAN_SU3) {
+    // fat links aren't unitary, so Gaussian ones get Gaussian non-unitary noise of the same width
+    constructGaussianSU3GaugeField(qdp_inlink, gauge_param.cpu_prec, gauge_input_width);
+    addNoiseToGaugeField(qdp_inlink, gauge_input_width, gauge_param.cpu_prec, RandomDistribution::GAUSSIAN);
+    applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
   } else {
     // the Laplace operator takes the temporal boundary conditions but no staggered phases
     const QudaStaggeredPhase phase
