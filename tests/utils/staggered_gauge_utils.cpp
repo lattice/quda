@@ -7,7 +7,6 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <unitarization_links.h>
-#include <qio_field.h>
 
 #include "misc.h"
 #include "host_utils.h"
@@ -26,45 +25,31 @@ static double svd_rel_error = 1e-4;
 static double svd_abs_error = 1e-4;
 static double max_allowed_error = 1e-11;
 
-void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, GaugeFieldConstructionType type,
-                                QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
+/**
+ * @brief Construct asqtad long links directly rather than from thin links, with the long-link scaling, MILC phases
+ * and temporal boundary conditions
+ *
+ * @param[out] longlink QDP-ordered long links
+ * @param[in] mode Gauge input mode: unit links, or random SU(3) links with a random U(1) phase
+ * @param[in] gauge_param Gauge field parameters
+ */
+static void constructAsqtadLongLinks(void *const *longlink, GaugeInputMode mode, const QudaGaugeParam &gauge_param)
 {
-  if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
-    // Set fatlink and longlink to the identity matrix
-    constructIdentityGaugeField(fatlink, precision);
+  const auto precision = gauge_param.cpu_prec;
+  switch (mode) {
+  case GaugeInputMode::UNIT:
     constructIdentityGaugeField(longlink, precision);
-
-    // apply MILC phases and temporal boundary conditions
-    applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
-      applyGaugeFieldScaling_long(longlink, Vh, param, dslash_type, precision);
-    }
-
-  } else if (type == GaugeFieldConstructionType::RANDOM_GAUGE) {
-    // if doing naive staggered then set to long links so that the staggered phase is applied
-    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-
-    constructRandomGaugeField(fatlink, param, precision, dslash_type);
-
-    param.type = QUDA_ASQTAD_LONG_LINKS;
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      constructRandomGaugeField(longlink, param, precision, dslash_type);
-
-      // incorporate non-trivial phase into long links
-      applyRandomU1Phase(longlink, precision);
-    }
-  } else {
-    errorQuda("constructFatLongGaugeField builds unit or random links, not construction type %d; "
-              "constructStaggeredHostGaugeField sets up loaded links",
-              static_cast<int>(type));
-  }
-
-  // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  // FIXME: may break host comparison
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
-    for (int dir = 0; dir < 4; ++dir) { memset(longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size); }
+    applyGaugeFieldScaling_long(longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, precision);
+    break;
+  case GaugeInputMode::HAAR:
+    constructRandomSU3GaugeField(longlink, precision);
+    applyGaugeFieldScaling_long(longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, precision);
+    // incorporate non-trivial phase into long links
+    applyRandomU1Phase(longlink, precision);
+    break;
+  default:
+    errorQuda("Gauge input %s is not supported for asqtad links without \"--compute-fat-long true\"",
+              getGaugeInputStr(mode));
   }
 }
 
@@ -73,31 +58,26 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  // load a field WITHOUT PHASES
-  if (latfile.size() > 0) {
-    // a loaded field has no long links, so asqtad needs them built
-    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong)
-      errorQuda(
-        "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\"");
+  const GaugeInputMode mode = resolveGaugeInputMode(GaugeInputMode::HAAR);
 
-    // load in the command line supplied gauge field using QIO and LIME
-    read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      // the Laplace operator takes the links without phases, but with the temporal boundary conditions
-      applyGaugeFieldScaling(qdp_inlink, Vh, gauge_param, gauge_param.cpu_prec);
-    } else {
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-    }
+  // without --compute-fat-long, asqtad's fat and long links are constructed directly instead of from thin links
+  const bool construct_fat_long = dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong;
+
+  // a loaded field has no long links, so asqtad needs them built
+  if (construct_fat_long && mode == GaugeInputMode::LOAD)
+    errorQuda(
+      "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\"");
+
+  if (construct_fat_long && mode == GaugeInputMode::HAAR) {
+    // fat links aren't unitary, so random ones are random matrices
+    constructRandomMatrixGaugeField(qdp_inlink, gauge_param.cpu_prec);
   } else {
-    GaugeFieldConstructionType construct_type
-      = (unit_gauge) ? GaugeFieldConstructionType::UNIT_GAUGE : GaugeFieldConstructionType::RANDOM_GAUGE;
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param, gauge_param.cpu_prec);
-    } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink, construct_type, gauge_param.cpu_prec, gauge_param,
-                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
-    }
+    // the Laplace operator takes the temporal boundary conditions but no staggered phases
+    const QudaStaggeredPhase phase
+      = dslash_type == QUDA_LAPLACE_DSLASH ? QUDA_STAGGERED_PHASE_NO : QUDA_STAGGERED_PHASE_MILC;
+    constructHostGaugeInputField(qdp_inlink, gauge_param, argc, argv, GaugeInputMode::HAAR, phase);
   }
+  if (construct_fat_long) constructAsqtadLongLinks(qdp_longlink, mode, gauge_param);
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
