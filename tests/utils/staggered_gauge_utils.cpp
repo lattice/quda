@@ -59,23 +59,14 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       constructRandomGaugeField(longlink, param, precision, dslash_type);
+
       // incorporate non-trivial phase into long links
       applyRandomU1Phase(longlink, precision);
     }
   } else {
-    // if doing naive staggered then set to long links so that the staggered phase is applied
-    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-
-    constructRandomGaugeField(fatlink, param, precision, dslash_type);
-
-    param.type = QUDA_ASQTAD_LONG_LINKS;
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      constructRandomGaugeField(longlink, param, precision, dslash_type);
-
-      // incorporate non-trivial phase into long links
-      applyRandomU1Phase(longlink, precision);
-    }
+    errorQuda("constructFatLongGaugeField builds unit or random links, not construction type %d; "
+              "constructStaggeredHostGaugeField sets up loaded links",
+              static_cast<int>(type));
   }
 
   // set all links to zero to emulate the 1-link operator (needed for host comparison)
