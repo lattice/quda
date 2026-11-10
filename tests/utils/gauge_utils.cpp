@@ -566,13 +566,15 @@ void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam 
 }
 
 /**
- * @brief Multiplies each link of a gauge field by a random U(1) phase, uniform in [0, 2 pi)
+ * @brief Multiplies each link of a gauge field by a random U(1) phase
  *
  * @tparam real Floating point type of the gauge field
  * @param[in,out] gauge QDP-ordered gauge field
+ * @param[in] distribution Distribution of the phase angles: uniform in [0, 2 pi), or Gaussian of the given width
+ * @param[in] width Width of a Gaussian distribution; unused for a uniform one
  */
 template <typename real> struct ApplyRandomU1Phase {
-  void operator()(void *const *gauge_)
+  void operator()(void *const *gauge_, RandomDistribution distribution, double width)
   {
     const auto gauge = typed_ptr_array<real *>(gauge_);
 
@@ -581,7 +583,9 @@ template <typename real> struct ApplyRandomU1Phase {
       for (int i = 0; i < Vh; i++) {
         for (int parity = 0; parity < 2; parity++) {
           // create a random phase
-          double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+          double phase = distribution == RandomDistribution::UNIFORM ?
+            random_uniform_host<double>(i, parity, 0, 2 * M_PI) :
+            random_gaussian_host<double>(i, parity, 0, width);
           std::complex<double> u1 = std::polar(1.0, phase);
 
           // rescale the whole link
@@ -593,9 +597,9 @@ template <typename real> struct ApplyRandomU1Phase {
   }
 };
 
-void applyRandomU1Phase(void *const *gauge, QudaPrecision precision)
+void applyRandomU1Phase(void *const *gauge, QudaPrecision precision, RandomDistribution distribution, double width)
 {
-  instantiate_host<ApplyRandomU1Phase>(precision, gauge);
+  instantiate_host<ApplyRandomU1Phase>(precision, gauge, distribution, width);
 }
 
 /**
@@ -654,14 +658,15 @@ void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision
 }
 
 /**
- * @brief Adds some non-unitary noise to a gauge field
+ * @brief Adds some non-unitary noise to each real component of a gauge field
  *
  * @tparam real Floating point type of the gauge field
  * @param[in,out] gauge Generated QDP-ordered gauge field
- * @param[in] noise_max Scale of noise added to the gauge field
+ * @param[in] scale Scale of the noise: the half-width of a uniform distribution, or the width of a Gaussian one
+ * @param[in] distribution Distribution of the noise
  */
 template <typename real> struct AddNoiseToGaugeField {
-  void operator()(void *const *gauge_, double noise_max)
+  void operator()(void *const *gauge_, double scale, RandomDistribution distribution)
   {
     const auto gauge = typed_ptr_array<real *>(gauge_);
     // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
@@ -671,7 +676,8 @@ template <typename real> struct AddNoiseToGaugeField {
         for (int parity = 0; parity < 2; parity++) {
           for (size_t c = 0lu; c < gauge_site_size; c++) {
             real *link = gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
-            *link += random_uniform_host<real>(i, parity, -noise_max, noise_max);
+            *link += distribution == RandomDistribution::UNIFORM ? random_uniform_host<real>(i, parity, -scale, scale) :
+                                                                   random_gaussian_host<real>(i, parity, 0, scale);
           }
         }
       }
@@ -679,9 +685,9 @@ template <typename real> struct AddNoiseToGaugeField {
   }
 };
 
-void addNoiseToGaugeField(void *const *gauge, double noise_max, QudaPrecision precision)
+void addNoiseToGaugeField(void *const *gauge, double scale, QudaPrecision precision, RandomDistribution distribution)
 {
-  instantiate_host<AddNoiseToGaugeField>(precision, gauge, noise_max);
+  instantiate_host<AddNoiseToGaugeField>(precision, gauge, scale, distribution);
 }
 
 void constructRandomGaugeField(void *const *gauge, const QudaGaugeParam &param, QudaPrecision precision,
