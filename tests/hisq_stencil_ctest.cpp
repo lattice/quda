@@ -133,6 +133,9 @@ int main(int argc, char **argv)
 
   setVerbosity(verbosity);
   initComms(argc, argv, gridsize_from_cmdline);
+  // this test builds its own gauge links
+  if (!gauge_input.empty() || unit_gauge || !latfile.empty())
+    errorQuda("This test doesn't take --gauge-input, --unit-gauge or --load-gauge");
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
