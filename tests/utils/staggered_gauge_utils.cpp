@@ -77,7 +77,10 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   if (latfile.size() > 0) {
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    if (dslash_type != QUDA_LAPLACE_DSLASH) {
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      // the Laplace operator takes the links without phases, but with the temporal boundary conditions
+      applyGaugeFieldScaling(qdp_inlink, Vh, gauge_param, gauge_param.cpu_prec);
+    } else {
       applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
     }
   } else {
