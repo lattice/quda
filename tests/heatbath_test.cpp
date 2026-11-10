@@ -112,7 +112,7 @@ void init_gauge(int argc, char **argv)
 
   if (latfile.size() > 0 || heatbath_initialize_on_host) {
     // Load or fill the gauge fields from the host
-    constructHostGaugeField(reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param, argc, argv);
+    constructHostGaugeInputField(reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param, argc, argv);
 
     // copy in the host field
     gauge = cpuGauge;

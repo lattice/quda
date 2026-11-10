@@ -47,7 +47,7 @@ void run(test_t param)
     new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
-  constructHostGaugeField(gauge, gauge_param, argc_copy, argv_copy);
+  constructHostGaugeInputField(gauge, gauge_param, argc_copy, argv_copy);
   // Load the gauge field to the device
   gauge_param.cuda_prec = prec;
   gauge_param.cuda_prec_sloppy = prec;

@@ -53,26 +53,6 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMod
 const char *getGaugeInputStr(GaugeInputMode mode);
 
 /**
- * @brief Constructs a QDP-ordered gauge field: either unit, random, or based on a file
- *
- * @param[out] gauge Generated QDP-ordered gauge field
- * @param[in] gauge_param Information about the desired gauge field
- * @param[in] argc Input command-line argument count
- * @param[in] argv Input command-line arguments used in the case of loading a file
- */
-void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv);
-
-/**
- * @brief Constructs a gauge field: either unit, random, or based on a file
- *
- * @param[out] gauge Generated gauge field
- * @param[in] gauge_param Information about the desired gauge field
- * @param[in] argc Input command-line argument count
- * @param[in] argv Input command-line arguments used in the case of loading a file
- */
-void constructHostGaugeField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv);
-
-/**
  * @brief Constructs a gauge field based on a construction type
  *
  * @param[in,out] gauge Generated QDP-ordered gauge field

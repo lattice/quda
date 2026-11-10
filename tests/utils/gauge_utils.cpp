@@ -730,37 +730,6 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
   }
 }
 
-void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv)
-{
-  GaugeFieldConstructionType construct_type;
-  if (latfile.size() > 0) {
-    // load in the command line supplied gauge field using QIO and LIME
-    logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
-    read_gauge_field(latfile.c_str(), (void **)gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_type = GaugeFieldConstructionType::LOAD_GAUGE;
-  } else {
-    if (unit_gauge)
-      construct_type = GaugeFieldConstructionType::UNIT_GAUGE;
-    else
-      construct_type = GaugeFieldConstructionType::RANDOM_GAUGE;
-  }
-  constructQudaGaugeField(gauge, construct_type, gauge_param, gauge_param.cpu_prec);
-}
-
-void constructHostGaugeField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv)
-{
-  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
-    constructHostGaugeField(static_cast<void *const *>(gauge.raw_pointer()), gauge_param, argc, argv);
-  } else {
-    GaugeFieldParam param(gauge);
-    param.order = QUDA_QDP_GAUGE_ORDER;
-    param.create = QUDA_NULL_FIELD_CREATE;
-    GaugeField u(param);
-    constructHostGaugeField(static_cast<void *const *>(u.raw_pointer()), gauge_param, argc, argv);
-    gauge = u;
-  }
-}
-
 void applyGaugeFieldScaling_long(void *const *gauge, int Vh, const QudaGaugeParam &param, QudaDslashType dslash_type,
                                  QudaPrecision precision)
 {

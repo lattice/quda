@@ -412,7 +412,7 @@ int main(int argc, char **argv)
     printfQuda("Loading gauge field from host\n");
     for (int dir = 0; dir < 4; dir++) { host_gauge[dir].resize(V * gauge_site_size * host_gauge_data_type_size); }
     void *h_gauge[] = {host_gauge[0].data(), host_gauge[1].data(), host_gauge[2].data(), host_gauge[3].data()};
-    constructHostGaugeField(h_gauge, gauge_param, argc, argv);
+    constructHostGaugeInputField(h_gauge, gauge_param, argc, argv);
   }
 
   return test.execute(); // run tests

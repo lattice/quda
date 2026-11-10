@@ -47,7 +47,7 @@ void init(int argc, char **argv)
 
   // Allocate host side memory for the gauge field.
   for (int dir = 0; dir < 4; dir++) { links[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size); }
-  constructHostGaugeField(links, gauge_param, argc, argv);
+  constructHostGaugeInputField(links, gauge_param, argc, argv);
 
   // cpuLink is only used for ghost allocation
   GaugeFieldParam cpuParam(gauge_param, links);
