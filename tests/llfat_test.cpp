@@ -26,7 +26,7 @@ static void llfat_test()
   QudaGaugeParam qudaGaugeParam;
 #ifdef MULTI_GPU
   void *ghost_sitelink[4];
-  void *ghost_sitelink_diag[16];
+  void *ghost_sitelink_diag[n_ghost_diag];
 #endif
 
   initQuda(device_ordinal);

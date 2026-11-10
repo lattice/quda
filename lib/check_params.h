@@ -272,6 +272,11 @@ void printQudaEigParam(QudaEigParam *param) {
   P(io_parity_inflate, QUDA_BOOLEAN_INVALID);
 #endif
 
+  // mat_norm is an output, so it is never checked for being undefined
+#if defined INIT_PARAM || defined PRINT_PARAM
+  P(mat_norm, 0.0);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -1150,6 +1155,20 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
   P(compute_qcharge, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
   P(remove_staggered_phase, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  for (int i = 0; i < 3; i++) P(plaquette[i], 0.0);
+  for (int i = 0; i < 3; i++) P(rectangle[i], 0.0);
+  for (int i = 0; i < 2; i++) P(ploop[i], 0.0);
+  P(qcharge, 0.0);
+  for (int i = 0; i < 3; i++) P(energy[i], 0.0);
+#elif defined(PRINT_PARAM)
+  for (int i = 0; i < 3; i++) P(plaquette[i], INVALID_DOUBLE);
+  for (int i = 0; i < 3; i++) P(rectangle[i], INVALID_DOUBLE);
+  for (int i = 0; i < 2; i++) P(ploop[i], INVALID_DOUBLE);
+  P(qcharge, INVALID_DOUBLE);
+  for (int i = 0; i < 3; i++) P(energy[i], INVALID_DOUBLE);
 #endif
 
 #ifdef INIT_PARAM

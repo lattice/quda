@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <type_traits>
+#include <vector>
 
 // QUDA headers
 #include <gauge_field.h>
@@ -19,6 +20,26 @@
 #include "gamma_reference.h"
 
 #include <Eigen/Dense>
+
+// MILC tensor geometry: [parity][x_cb][munu][color][re/im]
+constexpr int oprod_geometry = 6;
+
+inline size_t milcOprodIndex(int x_cb, int parity, int munu, int color, int volume_cb)
+{
+  return ((parity * volume_cb + x_cb) * oprod_geometry + munu) * gauge_site_size + color * 2;
+}
+
+quda::GaugeField createHostOprod(QudaGaugeParam &gauge_param)
+{
+  quda::GaugeFieldParam gparam(gauge_param, nullptr, QUDA_GENERAL_LINKS);
+  gparam.location = QUDA_CPU_FIELD_LOCATION;
+  gparam.order = QUDA_MILC_GAUGE_ORDER;
+  gparam.geometry = QUDA_TENSOR_GEOMETRY;
+  gparam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gparam.create = QUDA_ZERO_FIELD_CREATE;
+  gparam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  return quda::GaugeField(gparam);
+}
 
 template <typename sFloat, typename gFloat> void outerProdSpinTrace(gFloat *gauge, sFloat *x, sFloat *y)
 {
@@ -139,7 +160,7 @@ template <typename sFloat, typename gFloat>
 void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::ColorSpinorField &inA,
                              quda::ColorSpinorField &inB, int projSign, int parity, double force_coeff)
 {
-  gFloat **gaugeFull = (gFloat **)gauge.data();
+  const auto gaugeFull = typed_ptr_array<gFloat *>(gauge);
   sFloat *spinorField = (sFloat *)inB.data();
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
@@ -162,9 +183,10 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
 #ifndef MULTI_GPU
       const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, 1);
 #else
-      sFloat **backSpinor = (sFloat **)inB.backGhostFaceBuffer;
-      sFloat **fwdSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
-      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const auto backSpinor = typed_ptr_array<const sFloat *>(inB.backGhostFaceBuffer);
+      const auto fwdSpinor = typed_ptr_array<const sFloat *>(inB.fwdGhostFaceBuffer);
+      const sFloat *spinor = spinorNeighbor(i, dir, parity, static_cast<const sFloat *>(spinorField), fwdSpinor.data(),
+                                            backSpinor.data(), 1, 1);
 #endif
       sFloat projectedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (projSign + 1) / 2; //+ (dir + daggerBit) % 2;
@@ -313,10 +335,9 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
         // (oprod[0]  ---                    )
         // (oprod[1]  oprod[2]  ---          )
         // (oprod[3]  oprod[4]  oprod[5]  ---)
-        // the full lexicographic index of oprod is
-        // = reim + 2 * (x_eo / 2 + (V/2) * (color + 9 * (munu + parity * 6)))
+        // MILC tensor: [parity][x_cb][munu][color][re/im]
         // munu = (mu - 1) * mu / 2 + nu
-        // color = col_color+ row_color*Ncolor
+        // color = col_color + row_color * Ncolor
 
         Matrix3c mat = Matrix3c::Zero();
         cFloat diag[2][6];
@@ -427,7 +448,7 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
         for (int ci = 0; ci < nColor; ci++) {   // row
           for (int cj = 0; cj < nColor; cj++) { // col
             int color = ci * nColor + cj;
-            int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
+            int id = milcOprodIndex(i, parity, munu, color, Vh);
             oprod[id + 0] += mat(ci, cj).real();
             oprod[id + 1] += mat(ci, cj).imag();
           }
@@ -451,11 +472,12 @@ void get_su3FromOprod(gFloat *oprod_out, gFloat *oprod, int munu, size_t nbr_idx
 {
   int x_cb = nbr_idx % (lat.volume_ex / 2);
   int OddBit = nbr_idx / (lat.volume_ex / 2);
+  const int Vh_ex = lat.volume_ex / 2;
 
   for (int i = 0; i < 3; i++) {   // col
     for (int j = 0; j < 3; j++) { // row
       int color = i + j * 3;
-      int id = 2 * (x_cb + (lat.volume_ex / 2) * (color + 9 * (munu + OddBit * 6)));
+      int id = milcOprodIndex(x_cb, OddBit, munu, color, Vh_ex);
       oprod_out[j * 6 + i * 2 + 0] = oprod[id + 0];
       oprod_out[j * 6 + i * 2 + 1] = oprod[id + 1];
     }
@@ -471,7 +493,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
   int acc_parity = yIndex == 0 ? parity : 1 - parity;
   gFloat *mom = (gFloat *)h_mom_ + (4 * (i + Vh * acc_parity) + mu) * mom_site_size;
 
-  gFloat **gaugeFull_ex = (gFloat **)gauge_ex;
+  const auto gaugeFull_ex = typed_ptr_array<gFloat *>(gauge_ex);
 
   int otherparity = (1 - parity);
   const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
@@ -774,11 +796,11 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
   }
 }
 
-void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int parity, QudaGaugeParam &gauge_param)
+void cloverDerivative_reference(void *h_mom, void **gauge, quda::GaugeField &oprod, int parity,
+                                QudaGaugeParam &gauge_param)
 {
   // created extended field
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  const auto R = gauge_extension_radius();
 
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
@@ -788,11 +810,8 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
   auto qdp_ex = quda::createExtendedGauge(gauge, param, R);
   lattice_t lat(*qdp_ex);
 
-  quda::GaugeFieldParam gparam(gauge_param, oprod, QUDA_GENERAL_LINKS);
-  gparam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gparam.order = QUDA_NATIVE_GAUGE_ORDER;
-  gparam.geometry = QUDA_TENSOR_GEOMETRY;
-  auto oprod_ex = quda::createExtendedGauge(quda::GaugeField(gparam), R);
+  auto oprod_ex = quda::createExtendedGauge(oprod, R);
+  auto qdp_ex_ptrs = qdp_ex->data_array();
 
 #pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
@@ -802,11 +821,9 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
           if (nu == mu)
             continue;
           else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
-            computeForce_reference<double>(h_mom, (void **)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex,
-                                           parity, mu, nu);
+            computeForce_reference<double>(h_mom, qdp_ex_ptrs.data, lat, oprod_ex->data(), i, yIndex, parity, mu, nu);
           else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
-            computeForce_reference<float>(h_mom, (void **)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex,
-                                          parity, mu, nu);
+            computeForce_reference<float>(h_mom, qdp_ex_ptrs.data, lat, oprod_ex->data(), i, yIndex, parity, mu, nu);
           else
             errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
         }
@@ -861,7 +878,7 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
             for (int ci = 0; ci < nColor; ci++) {   // row
               for (int cj = 0; cj < nColor; cj++) { // col
                 int color = ci * nColor + cj;
-                int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
+                int id = milcOprodIndex(i, parity, munu, color, Vh);
                 oprod[id + 0] += coeff[parity] * oprod_imx2[color * 2 + 0] / 2.0;
                 oprod[id + 1] += coeff[parity] * oprod_imx2[color * 2 + 1] / 2.0;
               }
@@ -948,13 +965,6 @@ template <typename Float> void add_mom(Float *a, Float *b, int len, double coeff
 {
 #pragma omp parallel for
   for (int i = 0; i < len; i++) { a[i] += coeff * b[i]; }
-}
-
-template <typename Float> void set_to_zero(void *oprod_)
-{
-  Float *oprod = (Float *)oprod_;
-#pragma omp parallel for
-  for (size_t i = 0; i < V * 6 * gauge_site_size; i++) oprod[i] = 0;
 }
 
 void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
@@ -1101,16 +1111,8 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
   // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
   CloverForce_reference(refmom, gauge, x, p, force_coeff);
 
-  // create oprod and trace field
-  std::vector<char> oprod_(V * 6 * gauge_site_size * host_gauge_data_type_size);
-  void *oprod = oprod_.data();
-
-  if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
-    set_to_zero<double>(oprod);
-  else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
-    set_to_zero<float>(oprod);
-  else
-    errorQuda("precision not valid");
+  // create oprod and trace field (MILC tensor, IEEE host storage)
+  quda::GaugeField oprod = createHostOprod(*gauge_param);
 
   double k_csw_ov_8 = inv_param->kappa * inv_param->clover_csw / 8.0;
   size_t twist_flavor = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param->twist_flavor : QUDA_TWIST_NO;
@@ -1124,7 +1126,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
   // the non-twisted trace is larger by a factor 4 than the twisted one for mu -> 0, and a single flavor requires
   // an additional factor 1/2, see computeTMCloverForceQuda
   double sigma_coeff = k_csw_ov_8 * (twist_flavor != QUDA_TWIST_NO ? 32.0 : 8.0) * (rhmc_flavors == 1 ? 0.5 : 1.0);
-  if (trlog) computeCloverSigmaTrace_reference(oprod, clover.data(), sigma_coeff, 0, mu2, eps2, twist_flavor);
+  if (trlog) computeCloverSigmaTrace_reference(oprod.data(), clover.data(), sigma_coeff, 0, mu2, eps2, twist_flavor);
 
   std::vector<std::vector<double>> ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {
@@ -1138,7 +1140,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
   }
   // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
   // sw_spinor_eo(OO,..)  in tmLQCD
-  computeCloverSigmaOprod_reference(oprod, p, x, ferm_epsilon, *gauge_param);
+  computeCloverSigmaOprod_reference(oprod.data(), p, x, ferm_epsilon, *gauge_param);
 
   // oprod = (A12) of hep-lat/0112051
   // compute the insertion of oprod in Fig.27 of hep-lat/0112051

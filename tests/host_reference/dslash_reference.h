@@ -9,6 +9,7 @@
 
 #include "index_utils.hpp"
 
+#if 0
 /**
  * @brief Build a typed array of per-dimension pointers, e.g., from ghost buffers
  *
@@ -31,17 +32,18 @@ template <typename T, std::size_t N = 4, typename Src> std::array<T, N> typed_pt
   }
   return out;
 }
+#endif
 
 /**
  * @brief Computes the element-wise sum of two arrays, storing it into a third
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[out] dst The output array to store the sum
  * @param[in] a The first input array
  * @param[in] b The second input array
  * @param[in] len The number of elements in the input arrays
  */
-template <typename real_t> static inline void sum(real_t *dst, const real_t *a, const real_t *b, int len)
+template <typename real> static inline void sum(real *dst, const real *a, const real *b, int len)
 {
   for (int i = 0; i < len; i++) dst[i] = a[i] + b[i];
 }
@@ -49,13 +51,13 @@ template <typename real_t> static inline void sum(real_t *dst, const real_t *a, 
 /**
  * @brief Computes the element-wise difference of two arrays, storing it into a third
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[out] dst The output array to store the sum
  * @param[in] a The first input array
  * @param[in] b The second input array
  * @param[in] len The number of elements in the input arrays
  */
-template <typename real_t> static inline void sub(real_t *dst, const real_t *a, const real_t *b, int len)
+template <typename real> static inline void sub(real *dst, const real *a, const real *b, int len)
 {
   for (int i = 0; i < len; i++) dst[i] = a[i] - b[i];
 }
@@ -63,13 +65,13 @@ template <typename real_t> static inline void sub(real_t *dst, const real_t *a, 
 /**
  * @brief Rescale an array by a real scalar, storing it into a separate array
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[out] dst The output array to store the rescaling
  * @param[in] a The rescaling factor
  * @param[in] x The input array
  * @param[in] len The number of elements in the input array
  */
-template <typename real_t> static inline void ax(real_t *dst, real_t a, const real_t *x, int len)
+template <typename real> static inline void ax(real *dst, real a, const real *x, int len)
 {
   for (int i = 0; i < len; i++) dst[i] = a * x[i];
 }
@@ -77,13 +79,13 @@ template <typename real_t> static inline void ax(real_t *dst, real_t a, const re
 /**
  * @brief Perform the operation y[i] = a*x[i] + y[i]
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[in] a The rescaling factor
  * @param[in] x The input array
  * @param[in,out] y An input and output array that is accumulated into
  * @param[in] len The number of elements in the input array
  */
-template <typename real_t> static inline void axpy(real_t a, const real_t *x, real_t *y, int len)
+template <typename real> static inline void axpy(real a, const real *x, real *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = a * x[i] + y[i];
 }
@@ -91,14 +93,14 @@ template <typename real_t> static inline void axpy(real_t a, const real_t *x, re
 /**
  * @brief Perform the operation y[i] = a*x[i] + b*y[i]
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[in] a One rescaling factor
  * @param[in] x The input array
  * @param[in] b The second rescaling factor
  * @param[in,out] y An input and output array that is accumulated into
  * @param[in] len The number of elements in the input array
  */
-template <typename real_t> static inline void axpby(real_t a, const real_t *x, real_t b, real_t *y, int len)
+template <typename real> static inline void axpby(real a, const real *x, real b, real *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = a * x[i] + b * y[i];
 }
@@ -106,13 +108,13 @@ template <typename real_t> static inline void axpby(real_t a, const real_t *x, r
 /**
  * @brief Perform the operation y[i] = a*x[i] - y[i]
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[in] a The rescaling factor
  * @param[in] x The input array
  * @param[in,out] y An input and output array that is accumulated into
  * @param[in] len The number of elements in the input array
  */
-template <typename real_t> static inline void axmy(const real_t *x, real_t a, real_t *y, int len)
+template <typename real> static inline void axmy(const real *x, real a, real *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = a * x[i] - y[i];
 }
@@ -120,11 +122,11 @@ template <typename real_t> static inline void axmy(const real_t *x, real_t a, re
 /**
  * @brief Perform the element-wise norm2 of an array
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[in] x The input array
  * @param[in] len The number of elements in the input array
  */
-template <typename real_t> static double norm2(const real_t *v, int len)
+template <typename real> static double norm2(const real *v, int len)
 {
   double sum = 0.0;
   for (int i = 0; i < len; i++) sum += v[i] * v[i];
@@ -134,11 +136,11 @@ template <typename real_t> static double norm2(const real_t *v, int len)
 /**
  * @brief Perform the element-wise negation of an array
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[in,out] x The input array
  * @param[in] len The number of elements in the input array
  */
-template <typename real_t> static inline void negx(real_t *x, int len)
+template <typename real> static inline void negx(real *x, int len)
 {
   for (int i = 0; i < len; i++) x[i] = -x[i];
 }
@@ -146,19 +148,19 @@ template <typename real_t> static inline void negx(real_t *x, int len)
 /**
  * @brief Perform the element-wise complex dot product of a 3-component complex array
  *
- * @tparam real_t The floating-point type of the array elements
+ * @tparam real The floating-point type of the array elements
  * @param[out] res The output values
  * @param[in] a The first input array
  * @param[in] b The first input array
  */
-template <typename real_t> static inline void dot(real_t *res, const real_t *a, const real_t *b)
+template <typename real> static inline void dot(real *res, const real *a, const real *b)
 {
   res[0] = res[1] = 0;
   for (int m = 0; m < 3; m++) {
-    real_t a_re = a[2 * m + 0];
-    real_t a_im = a[2 * m + 1];
-    real_t b_re = b[2 * m + 0];
-    real_t b_im = b[2 * m + 1];
+    real a_re = a[2 * m + 0];
+    real a_im = a[2 * m + 1];
+    real b_re = b[2 * m + 0];
+    real b_im = b[2 * m + 1];
     res[0] += a_re * b_re - a_im * b_im;
     res[1] += a_re * b_im + a_im * b_re;
   }
@@ -167,11 +169,11 @@ template <typename real_t> static inline void dot(real_t *res, const real_t *a, 
 /**
  * @brief Perform the Hermitian conjugate of an SU(3) matrix, storing it in a second matrix
  *
- * @tparam real_t The floating-point type of the matrix elements
+ * @tparam real The floating-point type of the matrix elements
  * @param[out] res The output SU(3) matrix
  * @param[in] mat The input SU(3) matrix
  */
-template <typename real_t> static inline void su3Transpose(real_t *res, const real_t *mat)
+template <typename real> static inline void su3Transpose(real *res, const real *mat)
 {
   for (int m = 0; m < 3; m++) {
     for (int n = 0; n < 3; n++) {
@@ -184,12 +186,12 @@ template <typename real_t> static inline void su3Transpose(real_t *res, const re
 /**
  * @brief Perform an SU(3) matrix-vector multiplication
  *
- * @tparam real_t The floating-point type of the matrix and vector elements
+ * @tparam real The floating-point type of the matrix and vector elements
  * @param[out] res The output 3-component vector
  * @param[in] mat The input SU(3) matrix
  * @param[in] vec The input 3-component vector
  */
-template <typename real_t> static inline void su3Mul(real_t *res, const real_t *mat, const real_t *vec)
+template <typename real> static inline void su3Mul(real *res, const real *mat, const real *vec)
 {
   for (int n = 0; n < 3; n++) dot(&res[n * (2)], &mat[n * (3 * 2)], vec);
 }
@@ -197,14 +199,14 @@ template <typename real_t> static inline void su3Mul(real_t *res, const real_t *
 /**
  * @brief Perform an SU(3) matrix-vector multiplication, using the Hermitian conjugate of the matrix
  *
- * @tparam real_t The floating-point type of the matrix and vector elements
+ * @tparam real The floating-point type of the matrix and vector elements
  * @param[out] res The output 3-component vector
  * @param[in] mat The input SU(3) matrix
  * @param[in] vec The input 3-component vector
  */
-template <typename real_t> static inline void su3Tmul(real_t *res, const real_t *mat, const real_t *vec)
+template <typename real> static inline void su3Tmul(real *res, const real *mat, const real *vec)
 {
-  real_t matT[3 * 3 * 2];
+  real matT[3 * 3 * 2];
   su3Transpose(matT, mat);
   su3Mul(res, matT, vec);
 }
@@ -312,7 +314,7 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
 /**
  * @brief Return the pointer to a gauge link as a function of an origin and an offset
  *
- * @tparam real_t The data type of the fields (e.g., float or double)
+ * @tparam real The data type of the fields (e.g., float or double)
  * @param[in] i The checkerboard index of the site
  * @param[in] dir The displacement direction
  * @param[in] oddBit The parity of the site
@@ -324,14 +326,14 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
  * @param[in] nbr_distance Displacement distance
  * @return A pointer to the offset gauge link
  */
-template <typename real_t>
-const real_t *gaugeLink(int i, int dir, int oddBit, const real_t *const *gaugeEven, const real_t *const *gaugeOdd,
-                        const real_t *const *ghostGaugeEven, const real_t *const *ghostGaugeOdd, int n_ghost_faces,
-                        int nbr_distance)
+template <typename real>
+const real *gaugeLink(int i, int dir, int oddBit, const real *const *gaugeEven, const real *const *gaugeOdd,
+                      const real *const *ghostGaugeEven, const real *const *ghostGaugeOdd, int n_ghost_faces,
+                      int nbr_distance)
 {
   int j;
   int d = nbr_distance;
-  const real_t *const *gaugeField = [&]() -> const real_t *const * {
+  const real *const *gaugeField = [&]() -> const real *const * {
     if (dir % 2 == 0)
       return (oddBit ? gaugeOdd : gaugeEven);
     else
@@ -356,7 +358,7 @@ const real_t *gaugeLink(int i, int dir, int oddBit, const real_t *const *gaugeEv
     case 1: { //-X direction
       int new_x1 = (x1 - d + X1) % X1;
       if (x1 - d < 0 && quda::comm_dim_partitioned(0)) {
-        const real_t *ghostGaugeField = (oddBit ? ghostGaugeEven[0] : ghostGaugeOdd[0]);
+        const real *ghostGaugeField = (oddBit ? ghostGaugeEven[0] : ghostGaugeOdd[0]);
         int offset = (n_ghost_faces + x1 - d) * X4 * X3 * X2 / 2 + (x4 * X3 * X2 + x3 * X2 + x2) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -366,7 +368,7 @@ const real_t *gaugeLink(int i, int dir, int oddBit, const real_t *const *gaugeEv
     case 3: { //-Y direction
       int new_x2 = (x2 - d + X2) % X2;
       if (x2 - d < 0 && quda::comm_dim_partitioned(1)) {
-        const real_t *ghostGaugeField = (oddBit ? ghostGaugeEven[1] : ghostGaugeOdd[1]);
+        const real *ghostGaugeField = (oddBit ? ghostGaugeEven[1] : ghostGaugeOdd[1]);
         int offset = (n_ghost_faces + x2 - d) * X4 * X3 * X1 / 2 + (x4 * X3 * X1 + x3 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -376,7 +378,7 @@ const real_t *gaugeLink(int i, int dir, int oddBit, const real_t *const *gaugeEv
     case 5: { //-Z direction
       int new_x3 = (x3 - d + X3) % X3;
       if (x3 - d < 0 && quda::comm_dim_partitioned(2)) {
-        const real_t *ghostGaugeField = (oddBit ? ghostGaugeEven[2] : ghostGaugeOdd[2]);
+        const real *ghostGaugeField = (oddBit ? ghostGaugeEven[2] : ghostGaugeOdd[2]);
         int offset = (n_ghost_faces + x3 - d) * X4 * X2 * X1 / 2 + (x4 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -386,7 +388,7 @@ const real_t *gaugeLink(int i, int dir, int oddBit, const real_t *const *gaugeEv
     case 7: { //-T direction
       int new_x4 = (x4 - d + X4) % X4;
       if (x4 - d < 0 && quda::comm_dim_partitioned(3)) {
-        const real_t *ghostGaugeField = (oddBit ? ghostGaugeEven[3] : ghostGaugeOdd[3]);
+        const real *ghostGaugeField = (oddBit ? ghostGaugeEven[3] : ghostGaugeOdd[3]);
         int offset = (n_ghost_faces + x4 - d) * X1 * X2 * X3 / 2 + (x3 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -404,7 +406,7 @@ const real_t *gaugeLink(int i, int dir, int oddBit, const real_t *const *gaugeEv
 /**
  * @brief Return the pointer to a gauge link as a function of an origin and an offset
  *
- * @tparam real_t The data type of the fields (e.g., float or double)
+ * @tparam real The data type of the fields (e.g., float or double)
  * @param[in] i The checkerboard index of the site
  * @param[in] dir The displacement direction
  * @param[in] oddBit The parity of the site
@@ -413,11 +415,11 @@ const real_t *gaugeLink(int i, int dir, int oddBit, const real_t *const *gaugeEv
  * @param[in] nbr_distance Displacement distance
  * @return A pointer to the offset gauge link
  */
-template <typename real_t>
-const real_t *gaugeLink(int i, int dir, int oddBit, real_t **gaugeEven, real_t **gaugeOdd, int nbr_distance)
+template <typename real>
+const real *gaugeLink(int i, int dir, int oddBit, real **gaugeEven, real **gaugeOdd, int nbr_distance)
 {
-  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<const real_t *const *>(nullptr),
-                   static_cast<const real_t *const *>(nullptr), 0, nbr_distance);
+  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<const real *const *>(nullptr),
+                   static_cast<const real *const *>(nullptr), 0, nbr_distance);
 }
 
 /**
@@ -436,7 +438,7 @@ inline int x4_mg(int i, int oddBit)
 /**
  * @brief Return the pointer to a fermion field as a function of an origin and an offset
  *
- * @tparam real_t The data type of the fields (e.g., float or double)
+ * @tparam real The data type of the fields (e.g., float or double)
  * @param[in] i The checkerboard index of the site
  * @param[in] dir The displacement direction
  * @param[in] oddBit The parity of the site
@@ -448,9 +450,9 @@ inline int x4_mg(int i, int oddBit)
  * @param[in] site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
  * @return A pointer to the offset fermion field
  */
-template <typename real_t>
-const real_t *spinorNeighbor(int i, int dir, int oddBit, const real_t *spinorField, const real_t *const *fwd_nbr_spinor,
-                             const real_t *const *back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+template <typename real>
+const real *spinorNeighbor(int i, int dir, int oddBit, const real *spinorField, const real *const *fwd_nbr_spinor,
+                           const real *const *back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -554,7 +556,7 @@ const real_t *spinorNeighbor(int i, int dir, int oddBit, const real_t *spinorFie
 /**
  * @brief Return the pointer to a fermion field as a function of an origin and an offset
  *
- * @tparam real_t The data type of the fields (e.g., float or double)
+ * @tparam real The data type of the fields (e.g., float or double)
  * @param[in] i The checkerboard index of the site
  * @param[in] dir The displacement direction
  * @param[in] oddBit The parity of the site
@@ -563,12 +565,11 @@ const real_t *spinorNeighbor(int i, int dir, int oddBit, const real_t *spinorFie
  * @param[in] site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
  * @return A pointer to the offset fermion field
  */
-template <typename real_t>
-const real_t *spinorNeighbor(int i, int dir, int oddBit, const real_t *spinorField, int neighbor_distance,
-                             int site_size = 24)
+template <typename real>
+const real *spinorNeighbor(int i, int dir, int oddBit, const real *spinorField, int neighbor_distance, int site_size = 24)
 {
-  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<const real_t *const *>(nullptr),
-                        static_cast<const real_t *const *>(nullptr), neighbor_distance, 0, site_size);
+  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<const real *const *>(nullptr),
+                        static_cast<const real *const *>(nullptr), neighbor_distance, 0, site_size);
 }
 
 /**
@@ -588,7 +589,7 @@ template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
 /**
  * @brief Return the pointer to a 5-d fermion field as a function of an origin and an offset
  * @tparam type The PCType, either QUDA_5D_PC or QUDA_4D_PC
- * @tparam real_t The data type of the fields (e.g., float or double)
+ * @tparam real The data type of the fields (e.g., float or double)
  * @param[in] i The checkerboard index of the site
  * @param[in] dir The displacement direction
  * @param[in] oddBit The parity of the site
@@ -600,10 +601,9 @@ template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
  * @param[in] site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
  * @return A pointer to the offset fermion field
  */
-template <QudaPCType type, typename real_t>
-const real_t *spinorNeighbor_5d(int i, int dir, int oddBit, const real_t *spinorField,
-                                const real_t *const *fwd_nbr_spinor, const real_t *const *back_nbr_spinor,
-                                int neighbor_distance, int nFace, int site_size = 24)
+template <QudaPCType type, typename real>
+const real *spinorNeighbor_5d(int i, int dir, int oddBit, const real *spinorField, const real *const *fwd_nbr_spinor,
+                              const real *const *back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -712,7 +712,7 @@ const real_t *spinorNeighbor_5d(int i, int dir, int oddBit, const real_t *spinor
  * @brief Return the pointer to a 5-d fermion field as a function of an origin and an offset
  *
  * @tparam type The PCType, either QUDA_5D_PC or QUDA_4D_PC
- * @tparam real_t The data type of the fields (e.g., float or double)
+ * @tparam real The data type of the fields (e.g., float or double)
  * @param i The checkerboard index of the site
  * @param dir The displacement direction
  * @param oddBit The parity of the site
@@ -721,9 +721,9 @@ const real_t *spinorNeighbor_5d(int i, int dir, int oddBit, const real_t *spinor
  * @param site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
  * @return A pointer to the offset fermion field
  */
-template <QudaPCType type, typename real_t>
-real_t *spinorNeighbor_5d(int i, int dir, int oddBit, real_t *spinorField, int neighbor_distance = 1, int site_size = 24)
+template <QudaPCType type, typename real>
+real *spinorNeighbor_5d(int i, int dir, int oddBit, real *spinorField, int neighbor_distance = 1, int site_size = 24)
 {
-  return spinorNeighbor_5d<type>(i, dir, oddBit, spinorField, static_cast<real_t **>(nullptr),
-                                 static_cast<real_t **>(nullptr), neighbor_distance, 0, site_size);
+  return spinorNeighbor_5d<type>(i, dir, oddBit, spinorField, static_cast<real **>(nullptr),
+                                 static_cast<real **>(nullptr), neighbor_distance, 0, site_size);
 }

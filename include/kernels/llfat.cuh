@@ -11,13 +11,14 @@ namespace quda {
   template <typename Float_, int nColor_, QudaReconstructType recon>
   struct LinkArg : kernel_param<> {
     using Float = Float_;
+    using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Link;
     typedef typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type Gauge;
 
     Link link;
     Gauge u;
-    Float coeff;
+    real coeff;
 
     int_fastdiv X[4];
     int_fastdiv E[4];
@@ -29,11 +30,8 @@ namespace quda {
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
 
-    LinkArg(GaugeField &link, const GaugeField &u, Float coeff) :
-      kernel_param(dim3(link.VolumeCB(), 2, 4)),
-      link(link),
-      u(u),
-      coeff(coeff)
+    LinkArg(GaugeField &link, const GaugeField &u, real_t coeff) :
+      kernel_param(dim3(link.VolumeCB(), 2, 4)), link(link), u(u), coeff(static_cast<real>(coeff))
     {
       if (u.StaggeredPhase() != QUDA_STAGGERED_PHASE_MILC && u.Reconstruct() != QUDA_RECONSTRUCT_NO)
         errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
@@ -53,7 +51,7 @@ namespace quda {
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
 
     Link a = arg.u(dir, linkIndex(x, arg.E), parity);
 
@@ -96,7 +94,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
 
       Link a = arg.u(dir, linkIndex(x,arg.E), parity);
       arg.link(dir, x_cb, parity) = arg.coeff*a;
@@ -106,6 +104,7 @@ namespace quda {
   template <typename Float_, int nColor_, QudaReconstructType recon, QudaReconstructType recon_mu, bool save_staple_>
   struct StapleArg : kernel_param<> {
     using Float = Float_;
+    using real = typename mapper<Float>::type;
     using Link = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Gauge = typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type;
     using MuLink = typename gauge_mapper<Float, recon_mu, 18, QUDA_STAGGERED_PHASE_MILC>::type;
@@ -123,7 +122,7 @@ namespace quda {
     Link staple;
     MuLink mulink;
     Gauge u;
-    Float coeff;
+    real coeff;
 
     int nu;
     int mu_map[4];
@@ -134,17 +133,16 @@ namespace quda {
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
 
-    StapleArg(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
-              Float coeff, int nu, int mu_map[4]) :
+    StapleArg(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u, real_t coeff, int nu,
+              int mu_map[4]) :
       kernel_param(dim3(1, 2, 1)),
       fat(fat),
       staple(staple),
       mulink(mulink),
       u(u),
-      coeff(coeff),
+      coeff(static_cast<real>(coeff)),
       nu(nu),
-      odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
-                commDimPartitioned(2)+commDimPartitioned(3))%2 )
+      odd_bit((commDimPartitioned(0) + commDimPartitioned(1) + commDimPartitioned(2) + commDimPartitioned(3)) % 2)
     {
       for (int d=0; d<4; d++) {
         X[d] = (fat.X()[d] + u.X()[d]) / 2;
@@ -162,10 +160,10 @@ namespace quda {
   };
 
   template <typename Arg>
-  __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
+  __device__ inline void computeStaple(Matrix<complex<typename Arg::real>, Arg::nColor> &staple, const Arg &arg,
                                        int x[], int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     packed_array<int8_t, 4> dx = {};
 
     /* Computes the upper staple :
@@ -236,7 +234,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, (parity+arg.odd_bit)%2);
       for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       Link staple;
       computeStaple(staple, arg, x, parity, mu, arg.nu);
 

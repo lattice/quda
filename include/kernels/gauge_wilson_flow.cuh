@@ -33,6 +33,8 @@ namespace quda
     const real anisotropy;
     const real coeff1x1;
     const real coeff2x1;
+    real coeff_a[6];
+    real coeff_b[6];
 
     GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, real_t epsilon, real_t anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
@@ -41,9 +43,20 @@ namespace quda
       in(in),
       epsilon(static_cast<real>(epsilon)),
       anisotropy(static_cast<real>(anisotropy)),
-      coeff1x1(5.0 / 3.0),
-      coeff2x1(-1.0 / 12.0)
+      coeff1x1(static_cast<real>(5.0 / 3.0)),
+      coeff2x1(static_cast<real>(-1.0 / 12.0))
     {
+      // Berland, Bogey, and Bailly, Computers and Fluids 35 (2006) 1459-1463. The coefficients are
+      // numerically optimized and only published to 12 decimals. coeff_a holds -A_i from the paper,
+      // since it is applied as Z - coeff_a * Z_prev.
+      constexpr double coeff_a_host[]
+        = {0.0, 0.737101392796, 1.634740794341, 0.744739003780, 1.469897351522, 2.813971388035};
+      constexpr double coeff_b_host[]
+        = {0.032918605146, 0.823256998200, 0.381530948900, 0.200092213184, 1.718581042715, 0.27};
+      for (int i = 0; i < 6; i++) {
+        coeff_a[i] = static_cast<real>(coeff_a_host[i]);
+        coeff_b[i] = static_cast<real>(coeff_b_host[i]);
+      }
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
         X[dir] = in.X()[dir] - border[dir] * 2;
@@ -139,11 +152,12 @@ namespace quda
     Z2 *= arg.epsilon;
     return Z2;
   }
-  
+
   template <typename Link, typename Ftor>
   __host__ __device__ inline auto computeWStep(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                        const int x_cb, const int dir, const double coeff_a, const double coeff_b,
-                                        const bool get_stored, const bool do_store)
+                                               const int x_cb, const int dir, const typename Ftor::Arg::real coeff_a,
+                                               const typename Ftor::Arg::real coeff_b, const bool get_stored,
+                                               const bool do_store)
   {
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
@@ -178,16 +192,12 @@ namespace quda
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
       using Link = Matrix<complex<real>, Arg::nColor>;
-      complex<real> im(0.0, -1.0);
+      complex<real> im(real(0.0), real(-1.0));
 
       // Get spacetime and local coords
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
-
-      // Coefficients for fourth order integrator
-      double coeff_a[] = {0.0, 0.737101392796, 1.634740794341, 0.744739003780, 1.469897351522, 2.813971388035};
-      double coeff_b[] = {0.032918605146, 0.823256998200, 0.381530948900, 0.200092213184, 1.718581042715, 0.27};
 
       Link U, Z;
       switch (arg.step_type) {
@@ -195,22 +205,22 @@ namespace quda
       case WFLOW_STEP_W2: Z = computeW2Step(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_STEP_VT: Z = computeVtStep(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_FOURTH_ORDER_STEP_1:
-        Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[0], coeff_b[0], false, true);
+        Z = computeWStep(*this, U, x, parity, x_cb, dir, arg.coeff_a[0], arg.coeff_b[0], false, true);
         break;
       case WFLOW_FOURTH_ORDER_STEP_2:
-        Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[1], coeff_b[1], true, true);
+        Z = computeWStep(*this, U, x, parity, x_cb, dir, arg.coeff_a[1], arg.coeff_b[1], true, true);
         break;
       case WFLOW_FOURTH_ORDER_STEP_3:
-        Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[2], coeff_b[2], true, true);
+        Z = computeWStep(*this, U, x, parity, x_cb, dir, arg.coeff_a[2], arg.coeff_b[2], true, true);
         break;
       case WFLOW_FOURTH_ORDER_STEP_4:
-        Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[3], coeff_b[3], true, true);
+        Z = computeWStep(*this, U, x, parity, x_cb, dir, arg.coeff_a[3], arg.coeff_b[3], true, true);
         break;
       case WFLOW_FOURTH_ORDER_STEP_5:
-        Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[4], coeff_b[4], true, true);
+        Z = computeWStep(*this, U, x, parity, x_cb, dir, arg.coeff_a[4], arg.coeff_b[4], true, true);
         break;
       case WFLOW_FOURTH_ORDER_STEP_6:
-        Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[5], coeff_b[5], true, false);
+        Z = computeWStep(*this, U, x, parity, x_cb, dir, arg.coeff_a[5], arg.coeff_b[5], true, false);
         break;
       }
 

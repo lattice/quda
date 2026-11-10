@@ -214,22 +214,6 @@ namespace quda
     /**
        Functor to perform the operation y = a*x + b*y  (complex-valued)
     */
-    template <typename T>
-    __device__ __host__ void _caxpby(const complex<T> &a, const typename VectorType<T, 2>::type &x,
-                                     const complex<T> &b, typename VectorType<T, 2>::type &y)
-    {
-      typename VectorType<T, 2>::type yy;
-      yy.x = a.x * x.x;
-      yy.x -= a.y * x.y;
-      yy.x += b.x * y.x;
-      yy.x -= b.y * y.y;
-      yy.y = a.y * x.x;
-      yy.y += a.x * x.y;
-      yy.y += b.y * y.x;
-      yy.y += b.x * y.y;
-      y = yy;
-    }
-
     template <typename real> struct caxpby_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
@@ -505,7 +489,7 @@ namespace quda
                                                                      const complex<real> &omega)
     {
       const complex<reduction_t> cdot {to_reduction_scalar(ar4[0]), to_reduction_scalar(ar4[1])};
-      const reduction_t scale = omega.real() / to_reduction_scalar(ar4[2]);
+      const reduction_t scale = static_cast<reduction_t>(omega.real()) / to_reduction_scalar(ar4[2]);
       const complex<reduction_t> alpha_r = {cdot.real() * scale, cdot.imag() * scale};
       return complex<real>(static_cast<real>(alpha_r.real()), static_cast<real>(alpha_r.imag()));
     }

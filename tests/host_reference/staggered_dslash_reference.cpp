@@ -18,7 +18,7 @@
 
 /**
  * @brief Perform a staggered Dslash operation on a spinor field
- * @tparam real_t The data type of the fields (e.g., float or double)
+ * @tparam real The data type of the fields (e.g., float or double)
  * @param[out] res The result spinor field
  * @param[in] fatlink The fat gauge links
  * @param[in] longlink The long gauge links (only used for ASQTAD Dslash)
@@ -33,7 +33,7 @@
  * @param[in] laplace3D Whether we applying the 3-d laplace operator
  * (in the case of dslash_type being QUDA_LAPLACE_DSLASH)
  */
-template <typename real_t> struct StaggeredDslashReference {
+template <typename real> struct StaggeredDslashReference {
   void operator()(ColorSpinorField &res_, const GaugeField &fatlink_, const GaugeField &longlink_,
                   const ColorSpinorField &spinorField_, int oddBit, int daggerBit, QudaDslashType dslash_type,
                   int laplace3D)
@@ -41,31 +41,27 @@ template <typename real_t> struct StaggeredDslashReference {
     if (laplace3D < 4 && dslash_type != QUDA_LAPLACE_DSLASH)
       errorQuda("laplace3D = %d only supported for Laplace dslash (%d requested)", laplace3D, dslash_type);
 
-    const auto res = res_.data<real_t *>();
-    const auto fatlinkArray = fatlink_.data_array<const real_t *>();
+    const auto res = res_.data<real *>();
+    const auto fatlinkArray = fatlink_.data_array<const real *>();
     const auto fatlink = fatlinkArray.data;
-    const auto longlinkArray = longlink_.data_array<const real_t *>();
+    const auto longlinkArray = longlink_.data_array<const real *>();
     const auto longlink = longlinkArray.data;
-    //const real_t *const ghostFatlink[] = INIT(fatlink_.Ghost(), .data());
-    //const real_t *const ghostLonglink[] = INIT(longlink_.Ghost(), .data());
-    const auto ghostFatlink = typed_ptr_array<const real_t *>(fatlink_.Ghost());
-    const auto ghostLonglink = typed_ptr_array<const real_t *>(longlink_.Ghost());
-    const auto spinorField = spinorField_.data<const real_t *>();
-    //const real_t *const fwd_nbr_spinor[] = INIT(spinorField_.fwdGhostFaceBuffer, );
-    //const real_t *const back_nbr_spinor[] = INIT(spinorField_.backGhostFaceBuffer, );
-    const auto fwd_nbr_spinor = typed_ptr_array<const real_t *>(spinorField_.fwdGhostFaceBuffer);
-    const auto back_nbr_spinor = typed_ptr_array<const real_t *>(spinorField_.backGhostFaceBuffer);
+    const auto ghostFatlink = typed_ptr_array<const real *>(fatlink_.Ghost());
+    const auto ghostLonglink = typed_ptr_array<const real *>(longlink_.Ghost());
+    const auto spinorField = spinorField_.data<const real *>();
+    const auto fwd_nbr_spinor = typed_ptr_array<const real *>(spinorField_.fwdGhostFaceBuffer);
+    const auto back_nbr_spinor = typed_ptr_array<const real *>(spinorField_.backGhostFaceBuffer);
 
 #pragma omp parallel for
     for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
 
-    const real_t *fatlinkEven[4], *fatlinkOdd[4];
-    const real_t *longlinkEven[4], *longlinkOdd[4];
+    const real *fatlinkEven[4], *fatlinkOdd[4];
+    const real *longlinkEven[4], *longlinkOdd[4];
 
-    const real_t *ghostFatlinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
-    const real_t *ghostFatlinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
-    const real_t *ghostLonglinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
-    const real_t *ghostLonglinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+    const real *ghostFatlinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+    const real *ghostFatlinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+    const real *ghostLonglinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+    const real *ghostLonglinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
 
     for (int dir = 0; dir < 4; dir++) {
       fatlinkEven[dir] = fatlink[dir];
@@ -88,18 +84,19 @@ template <typename real_t> struct StaggeredDslashReference {
       for (int dir = 0; dir < 8; dir++) {
         if (laplace3D == dir / 2) continue; // skip dimensions if needed
         const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
-        const real_t *fatlnk
+        const real *fatlnk
           = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
-        const real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
+        const real *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
           gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
           nullptr;
-        const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor.data(),
-                                                             back_nbr_spinor.data(), 1, nFace, stag_spinor_site_size);
-        const real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
-          spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor.data(), back_nbr_spinor.data(), 3, nFace, stag_spinor_site_size) :
+        const real *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor.data(),
+                                                           back_nbr_spinor.data(), 1, nFace, stag_spinor_site_size);
+        const real *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
+          spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor.data(), back_nbr_spinor.data(), 3, nFace,
+                         stag_spinor_site_size) :
           nullptr;
 
-        real_t gaugedSpinor[stag_spinor_site_size];
+        real gaugedSpinor[stag_spinor_site_size];
 
         if (dir % 2 == 0) {
           su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);

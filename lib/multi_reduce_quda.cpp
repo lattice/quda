@@ -14,25 +14,25 @@ namespace quda
       void reDotProduct(std::vector<real_t> &result, cvector_ref<const ColorSpinorField> &x,
                         cvector_ref<const ColorSpinorField> &y)
       {
-        dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { reDotProduct_t<store_t>(result, x, y); });
+        dispatch_reduce_store(x, [&]<typename store_t>() { reDotProduct_t<store_t>(result, x, y); });
       }
 
       void cDotProduct(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                        cvector_ref<const ColorSpinorField> &y)
       {
-        dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { cDotProduct_t<store_t>(result, x, y); });
+        dispatch_reduce_store(x, [&]<typename store_t>() { cDotProduct_t<store_t>(result, x, y); });
       }
 
       void hDotProduct(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                        cvector_ref<const ColorSpinorField> &y)
       {
-        dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { hDotProduct_t<store_t>(result, x, y); });
+        dispatch_reduce_store(x, [&]<typename store_t>() { hDotProduct_t<store_t>(result, x, y); });
       }
 
       void hDotProduct_Anorm(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                              cvector_ref<const ColorSpinorField> &y)
       {
-        dispatch_reduce_prec(x.Precision(), [&]<typename store_t>() { hDotProduct_Anorm_t<store_t>(result, x, y); });
+        dispatch_reduce_store(x, [&]<typename store_t>() { hDotProduct_Anorm_t<store_t>(result, x, y); });
       }
 
     } // namespace block
