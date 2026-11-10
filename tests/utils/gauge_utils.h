@@ -134,9 +134,9 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision);
 void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision);
 
 /**
- * @brief Rescales a gauge field with a per-site random phase
+ * @brief Multiplies each link of a gauge field by a random U(1) phase, uniform in [0, 2 pi)
  *
- * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in,out] gauge QDP-ordered gauge field
  * @param[in] precision Gauge field floating point precision
  */
 void applyRandomU1Phase(void *const *gauge, QudaPrecision precision);

@@ -565,10 +565,10 @@ void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam 
 }
 
 /**
- * @brief Rescales a gauge field with a per-site random phase
+ * @brief Multiplies each link of a gauge field by a random U(1) phase, uniform in [0, 2 pi)
  *
  * @tparam real Floating point type of the gauge field
- * @param[in,out] gauge Generated QDP-ordered gauge field
+ * @param[in,out] gauge QDP-ordered gauge field
  */
 template <typename real> struct ApplyRandomU1Phase {
   void operator()(void *const *gauge_)
@@ -580,15 +580,12 @@ template <typename real> struct ApplyRandomU1Phase {
       for (int i = 0; i < Vh; i++) {
         for (int parity = 0; parity < 2; parity++) {
           // create a random phase
-          real phase = random_uniform_host<real>(i, parity, 0, 2 * M_PI);
-          std::complex<real> u1 = std::polar(static_cast<real>(1), phase);
+          double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+          std::complex<double> u1 = std::polar(1.0, phase);
 
-          // rescale bottom row
+          // rescale the whole link
           auto link = reinterpret_cast<std::complex<real> *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
-          constexpr int m = 2;          // bottom row
-          for (int n = 0; n < 3; n++) { // 3 columns
-            link[m * 3 + n] *= u1;
-          }
+          for (auto j = 0lu; j < gauge_site_size / 2; j++) link[j] *= u1;
         }
       }
     }
