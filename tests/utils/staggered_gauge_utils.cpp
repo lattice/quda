@@ -363,7 +363,7 @@ void computeStaggeredPlaquetteQDPOrder(void **qdp_link, double plaq[3], const Qu
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = gauge_param_in.t_boundary;
 
   gauge_param.cpu_prec = gauge_param_in.cpu_prec;
 
