@@ -230,7 +230,7 @@ struct StaggeredGSmearTestWrapper { //
 
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-    constructHostGaugeField(qdp_inlink, gauge_param, argc, argv);
+    constructHostGaugeInputField(qdp_inlink, gauge_param, argc, argv);
     initExtendedField(qdp_inlink_ex, qdp_inlink);
     // Prepare two link field:
     if (verify_results or (gtest_type == gsmear_test_type::GaussianSmear and smear_compute_two_link == false))
