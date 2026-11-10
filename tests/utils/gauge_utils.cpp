@@ -509,9 +509,6 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
     if (mode != GaugeInputMode::LOAD && has_load) {
       errorQuda("--load-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
     }
-    if (mode != GaugeInputMode::UNIT && unit_gauge) {
-      errorQuda("--unit-gauge conflicts with explicit --gauge-input %s", gauge_input.c_str());
-    }
     if (mode == GaugeInputMode::LOAD && !has_load) { errorQuda("--gauge-input load requires --load-gauge"); }
     if (mode == GaugeInputMode::GAUSSIAN_SU3 && (!std::isfinite(gauge_input_width) || gauge_input_width < 0)) {
       errorQuda("--gauge-input-width must be finite and nonnegative");
@@ -520,7 +517,6 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
   }
 
   if (has_load) return GaugeInputMode::LOAD;
-  if (unit_gauge) return GaugeInputMode::UNIT;
   return default_mode;
 }
 

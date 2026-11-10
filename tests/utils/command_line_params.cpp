@@ -47,7 +47,6 @@ bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 std::string latfile;
-bool unit_gauge = false;
 std::string gauge_input;
 double gauge_input_width = 0.25;
 bool gauge_input_width_explicit = false;
@@ -291,7 +290,6 @@ int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
-bool heatbath_coldstart = false;
 bool heatbath_initialize_on_host = true;
 // GF Options
 int gf_gauge_dir = 4;
@@ -572,8 +570,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
   quda_app
     ->add_option(
-      "--gauge-input",
-      gauge_input, "Gauge field input mode: haar, unit, gaussian-su3, or load (default: legacy --unit-gauge / --load-gauge selection)")
+      "--gauge-input", gauge_input,
+      "Gauge field input mode: haar, unit, gaussian-su3, or load (default: load with --load-gauge, otherwise the "
+      "test's own default, usually haar)")
     ->check(CLI::IsMember({"haar", "unit", "gaussian-su3", "load"}));
   quda_app
     ->add_option(
@@ -731,9 +730,14 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--tol", tol, "Set L2 residual tolerance");
   quda_app->add_option("--tolhq", tol_hq, "Set heavy-quark residual tolerance");
   quda_app->add_option("--tol-precondition", tol_precondition, "Set L2 residual tolerance for preconditioner");
-  quda_app->add_option(
-    "--unit-gauge", unit_gauge,
-    "Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)");
+  quda_app
+    ->add_option(
+      "--unit-gauge",
+      [](CLI::results_t) -> bool {
+        throw CLI::ValidationError("--unit-gauge", "has been removed; use --gauge-input unit");
+      },
+      "Removed: use --gauge-input unit")
+    ->type_name("BOOL");
 
   quda_app->add_option("--verbosity", verbosity, "The the verbosity on the top level of QUDA( default summarize)")
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
@@ -1235,10 +1239,17 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   // Option group for heatbath related options
   auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath tests");
   opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
-  opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
-                      "Whether to use a cold or hot start in heatbath test (default false)");
+  opgroup
+    ->add_option(
+      "--heatbath-coldstart",
+      [](CLI::results_t) -> bool {
+        throw CLI::ValidationError("--heatbath-coldstart", "has been removed; use --gauge-input unit");
+      },
+      "Removed: use --gauge-input unit")
+    ->type_name("BOOL");
   opgroup->add_option("--heatbath-initialize-on-host", heatbath_initialize_on_host,
-                      "Whether to initialize the gauge field on the host or on the device (default true == host)");
+                      "Whether to initialize the gauge field on the host or on the device, which only makes "
+                      "--gauge-input haar and unit (default true == host)");
   opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
                       "Number of heatbath hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,

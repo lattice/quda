@@ -127,14 +127,10 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
         int nsteps = heatbath_num_steps;
         int nhbsteps = heatbath_num_heatbath_per_step;
         int novrsteps = heatbath_num_overrelax_per_step;
-        bool coldstart = heatbath_coldstart;
         double beta_value = heatbath_beta_value;
         a1.start();
 
-        if (coldstart)
-          InitGaugeField(*U);
-        else
-          InitGaugeField(*U, randstates);
+        InitGaugeField(*U, randstates);
 
         for (int step = 1; step <= nsteps; ++step) {
           printfQuda("Step %d\n", step);
