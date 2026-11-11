@@ -387,7 +387,7 @@ namespace quda
   void comm_enable_peer2peer(bool enable);
 
   /**
-     Query if intra-node (non-peer-to-peer) communication is enabled
+     @brief Query if intra-node (non-peer-to-peer) communication is enabled
      in a given dimension and direction
      @param dir Direction (0 - backwards, 1 forwards)
      @param dim Dimension (0-3)

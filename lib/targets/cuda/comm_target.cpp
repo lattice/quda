@@ -47,6 +47,9 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
+  /**
+     @brief Map an allocation handle for device access, cleaning up the mapping on failure.
+  */
   static CUresult try_map_device_ptr_from_handle(void **ptr, CUmemGenericAllocationHandle handle, size_t bytes, int device)
   {
     // reserve / map its allocation (we could also map into one huge range)
@@ -77,6 +80,9 @@ namespace quda
     return CUDA_SUCCESS;
   }
 
+  /**
+     @brief Map an allocation handle for device access, aborting on failure.
+  */
   void *map_device_ptr_from_handle(CUmemGenericAllocationHandle handle, size_t bytes, int device)
   {
     void *ptr = nullptr;
@@ -84,6 +90,9 @@ namespace quda
     return ptr;
   }
 
+  /**
+     @brief Collectively disable peer links without valid mappings at both endpoints.
+  */
   static void validate_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, const char *mapping,
                                        bool release_invalid);
 
@@ -218,6 +227,9 @@ namespace quda
     return local_ptr;
   }
 
+  /**
+     @brief Unmap a VMM allocation and release its reserved virtual address range.
+  */
   void free_cu_ptr(void *ptr)
   {
     CUdeviceptr alloc_ptr;

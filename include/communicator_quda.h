@@ -341,6 +341,9 @@ namespace quda
 
     bool comm_peer2peer_enabled(int dir, int dim) { return enable_p2p ? peer2peer_enabled[dir][dim] : false; }
 
+    /**
+       @brief Disable a directed peer-to-peer link and allow its updated state to be reported.
+    */
     void comm_peer2peer_disable(int dir, int dim)
     {
       peer2peer_enabled[dir][dim] = false;
@@ -349,6 +352,9 @@ namespace quda
 
     bool peer2peer_validation_reported = false;
 
+    /**
+       @brief Collectively refresh validated peer-to-peer state and report surviving links.
+    */
     void comm_peer2peer_finalize_validation()
     {
       init = false;
@@ -371,6 +377,9 @@ namespace quda
     bool init = false;
     bool p2p_global = false;
 
+    /**
+       @brief Collectively query whether any candidate peer-to-peer link is present.
+    */
     bool comm_peer2peer_any_global()
     {
       int p2p = 0;

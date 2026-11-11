@@ -296,7 +296,7 @@ namespace quda
   }
 
 #ifdef MNNVL_COMMS
-  /** Allocate VMM memory for MNNVL communication buffers. */
+  /** @brief Allocate VMM memory for MNNVL communication buffers. */
   void *device_vmm_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
@@ -537,6 +537,7 @@ namespace quda
   }
 
 #ifdef MNNVL_COMMS
+  /** @brief Free and untrack VMM memory allocated for MNNVL communication buffers. */
   void device_vmm_free_(const char *func, const char *file, int line, void *ptr)
   {
     if (!ptr) { errorQuda("Attempt to free NULL VMM pointer (%s:%d in %s())", file, line, func); }

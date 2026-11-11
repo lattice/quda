@@ -8,6 +8,9 @@
 
 namespace quda {
 
+  /**
+     @brief Return whether receive buffers use Fabric VMM allocation instead of the pinned communication allocator.
+  */
 #ifdef NVSHMEM_COMMS
   static bool use_mnnvl_vmm_comms()
 #else
