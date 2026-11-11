@@ -29,7 +29,7 @@ namespace quda {
     int localParity[nDim];
     ExtractGhostExArg(const GaugeField &u, const lat_dim_t &R_, void **ghost) :
       kernel_param(dim3(0, 2, 2)),
-      u(u, 0, reinterpret_cast<typename Gauge::store_t**>(ghost))
+      u(u, static_cast<typename Gauge::store_t *>(nullptr), reinterpret_cast<typename Gauge::store_t **>(ghost))
     {
       for (int d=0; d<nDim; d++) {
 	E[d] = u.X()[d];

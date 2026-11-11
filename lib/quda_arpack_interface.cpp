@@ -31,6 +31,9 @@ namespace quda
   void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<complex_t> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param)
   {
+    // ARPACK does not report mat_norm. Drop any estimate left by a previous solve.
+    eig_param->mat_norm = 0;
+
     // Create Eigensolver object for member function use
     EigenSolver *eig_solver = EigenSolver::create(eig_param, mat);
 

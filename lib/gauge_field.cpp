@@ -89,6 +89,8 @@ namespace quda {
     reconstruct = param.reconstruct;
     nInternal = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2;
     order = param.order;
+    if (geometry == QUDA_KDINVERSE_GEOMETRY && (order == QUDA_QDP_GAUGE_ORDER || order == QUDA_QDPJIT_GAUGE_ORDER))
+      errorQuda("Unsupported gauge field order %d for KD-inverse geometry", order);
 
     fixed = param.fixed;
     link_type = param.link_type;
@@ -1255,7 +1257,9 @@ namespace quda {
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.setPrecision(a.Precision(), a.Precision(), true);
+    // Native gauge storage is floatfloat; legacy orders keep IEEE doubles.
+    spinor_param.setPrecision(a.Precision(), a.Precision(), a.isNative());
+    if (!a.isNative()) spinor_param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = a.data();

@@ -7,7 +7,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
-// std overloads for host .cpp (nvcc host pass uses math_helper / nvvm-latest)
+// std overloads for host .cpp; the CUDA host pass uses math_helper.h instead.
 #if !defined(__CUDACC__)
 
 namespace std

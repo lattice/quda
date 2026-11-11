@@ -1388,7 +1388,7 @@ namespace quda {
       complex<store_t> a(f2i_round<store_t>(scale * vuv.real()), f2i_round<store_t>(scale * vuv.imag()));
       atomic_fetch_add(Y, a);
     } else {
-      atomic_fetch_add(Y, reinterpret_cast<const complex<store_t>&>(vuv));
+      atomic_fetch_add(Y, complex<store_t> {store_cast<store_t>(vuv.real()), store_cast<store_t>(vuv.imag())});
     }
   }
 

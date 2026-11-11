@@ -53,7 +53,7 @@ jobs:
           -DQUDA_MDW_FUSED_LS_LIST=4
           -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON
           -DQUDA_MNNVL=${{ matrix.mnnvl }} -DQUDA_NVSHMEM=OFF
-          -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON -DQUDA_FAST_COMPILE_REDUCE=ON
+          -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON
           -GNinja
           -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 

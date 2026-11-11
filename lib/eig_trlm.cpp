@@ -39,6 +39,7 @@ namespace quda
 
   void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
+    clearMatNorm();
     // Override any user input for block size.
     block_size = 1;
 
@@ -167,6 +168,8 @@ namespace quda
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    reportMatNorm(mat_norm);
 
     // Post computation report
     //---------------------------------------------------------------------------
