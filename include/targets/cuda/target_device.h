@@ -276,6 +276,18 @@ namespace quda
   {
 
     /**
+       @brief Return whether MNNVL communication support is compiled in.
+    */
+    constexpr bool is_enabled_mnnvl_comms()
+    {
+#ifdef MNNVL_COMMS
+      return true;
+#else
+      return false;
+#endif
+    }
+
+    /**
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */

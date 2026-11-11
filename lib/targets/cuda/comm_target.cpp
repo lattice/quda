@@ -112,7 +112,6 @@ namespace quda
 
     validate_neighbor_memory(remote, "NVSHMEM", false);
     comm_peer2peer_finalize_validation();
-    comm_peer2peer_report_validated();
     nvshmem_free(probe);
 #ifdef MNNVL_COMMS
     comm_allreduce_int(cross_clique_links);

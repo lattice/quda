@@ -9,6 +9,7 @@
 #include <numeric>
 
 #include <quda_internal.h>
+#include <target_device.h>
 #include <comm_quda.h>
 #include <color_spinor_field.h>
 #include <field_cache.h>
@@ -192,9 +193,6 @@ namespace quda
 
     void comm_peer2peer_init(const char *hostname_recv_buf)
     {
-#ifdef MNNVL_COMMS
-      (void)hostname_recv_buf;
-#endif
       if (peer2peer_init) return;
 
       // set gdr enablement
@@ -211,11 +209,9 @@ namespace quda
 
       char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
 
-#ifndef MNNVL_COMMS
       // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
       // and comm_dim(dim) == 2 (used for perf benchmarking)
-      bool disable_peer_to_peer_bidir = false;
-#endif
+      [[maybe_unused]] bool disable_peer_to_peer_bidir = false;
 
       if (enable_peer_to_peer_env) {
         enable_peer_to_peer = atoi(enable_peer_to_peer_env);
@@ -253,9 +249,7 @@ namespace quda
 
         if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
           if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
-#ifndef MNNVL_COMMS
-          disable_peer_to_peer_bidir = true;
-#endif
+          disable_peer_to_peer_bidir = !device::is_enabled_mnnvl_comms();
         }
 
         enable_peer_to_peer = std::abs(enable_peer_to_peer);
@@ -281,10 +275,6 @@ namespace quda
 
         comm_set_neighbor_ranks();
 
-#ifndef MNNVL_COMMS
-        const int gpuid = comm_gpuid();
-        char *hostname = comm_hostname();
-#endif
         int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
 
         comm_gather_gpuid(gpuid_recv_buf);
@@ -293,42 +283,45 @@ namespace quda
           for (int dim = 0; dim < 4; ++dim) {
             int neighbor_rank = comm_neighbor_rank(dir, dim);
             if (neighbor_rank == comm_rank()) continue;
-#ifndef MNNVL_COMMS
-            // disable peer-to-peer comms in one direction
-            if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
-                && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
-              continue;
+            if constexpr (!device::is_enabled_mnnvl_comms()) {
+              const int gpuid = comm_gpuid();
+              char *hostname = comm_hostname();
+              // disable peer-to-peer comms in one direction
+              if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
+                  && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
+                continue;
 
-            // if the neighbors are on the same
-            if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
-              int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+              // if the neighbors are on the same
+              if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank],
+                           QUDA_MAX_HOSTNAME_STRING)) {
+                int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 
-              bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
-              int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
+                bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
+                int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
 
-              // enable P2P if we can access the peer or if peer is self
-              // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
-              if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
-                peer2peer_enabled[dir][dim] = true;
-                if (getVerbosity() > QUDA_SILENT) {
-                  printf("Peer-to-peer candidate for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
-                         "access rank = (%3d)\n",
-                         comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+                // enable P2P if we can access the peer or if peer is self
+                // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
+                if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+                  peer2peer_enabled[dir][dim] = true;
+                  if (getVerbosity() > QUDA_SILENT) {
+                    printf("Peer-to-peer candidate for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                           "access rank = (%3d)\n",
+                           comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+                  }
+                } else {
+                  intranode_enabled[dir][dim] = true;
+                  if (getVerbosity() > QUDA_SILENT) {
+                    printf(
+                      "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
+                      "dim=%d\n",
+                      comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                  }
                 }
-              } else {
-                intranode_enabled[dir][dim] = true;
-                if (getVerbosity() > QUDA_SILENT) {
-                  printf(
-                    "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
-                    "dim=%d\n",
-                    comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-                }
-              }
 
-            } // on the same node
-#else
-            peer2peer_enabled[dir][dim] = true;
-#endif
+              } // on the same node
+            } else {
+              peer2peer_enabled[dir][dim] = true;
+            }
           }   // different dimensions - x, y, z, t
         }     // different directions - forward/backward
 
@@ -354,17 +347,14 @@ namespace quda
       peer2peer_validation_reported = false;
     }
 
+    bool peer2peer_validation_reported = false;
+
     void comm_peer2peer_finalize_validation()
     {
       init = false;
       config_init = false;
       peer2peer_present = comm_peer2peer_enabled_global();
-    }
 
-    bool peer2peer_validation_reported = false;
-
-    void comm_peer2peer_report_validated()
-    {
       if (peer2peer_validation_reported) return;
       if (getVerbosity() > QUDA_SILENT) {
         for (int dim = 0; dim < 4; ++dim) {

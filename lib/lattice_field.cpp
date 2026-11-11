@@ -1,5 +1,6 @@
 #include <typeinfo>
 #include <quda_internal.h>
+#include <target_device.h>
 #include <lattice_field.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
@@ -7,17 +8,21 @@
 
 namespace quda {
 
-  static bool use_mnnvl_vmm_comms()
-  {
-#ifdef MNNVL_COMMS
 #ifdef NVSHMEM_COMMS
-    return !comm_nvshmem_enabled();
+  static bool use_mnnvl_vmm_comms()
 #else
-    return true;
+  static constexpr bool use_mnnvl_vmm_comms()
 #endif
+  {
+    if constexpr (device::is_enabled_mnnvl_comms()) {
+#ifdef NVSHMEM_COMMS
+      return !comm_nvshmem_enabled();
 #else
-    return false;
+      return true;
 #endif
+    } else {
+      return false;
+    }
   }
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field) :
@@ -491,10 +496,7 @@ namespace quda {
       // set remote send buffer to ghost receive buffers on neighboring processes
       comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
     }
-    if (comm_nvshmem_enabled()) {
-      comm_peer2peer_finalize_validation();
-      comm_peer2peer_report_validated();
-    }
+    if (comm_nvshmem_enabled()) { comm_peer2peer_finalize_validation(); }
     for (int b = 0; b < 2; b++) {
       // get remote events
       comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
@@ -505,7 +507,6 @@ namespace quda {
         comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
       }
       comm_peer2peer_finalize_validation();
-      comm_peer2peer_report_validated();
       for (int b = 0; b < 2; b++) { comm_create_local_event(ipcCopyEvent[b]); }
     } else {
       for (int b = 0; b < 2; b++) {
@@ -514,7 +515,6 @@ namespace quda {
         from_face_d[b] = ghost_recv_buffer_d[b];
       }
       comm_peer2peer_finalize_validation();
-      comm_peer2peer_report_validated();
       for (int b = 0; b < 2; b++) { comm_create_local_event(ipcCopyEvent[b]); }
     }
 
