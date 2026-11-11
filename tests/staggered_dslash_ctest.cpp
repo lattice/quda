@@ -146,12 +146,6 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
-  // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't
-  // ask to build the fat/long links... it doesn't make sense.
-  if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH)
-    errorQuda(
-      "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
-
   // Set n_naiks to 2 if eps_naik != 0.0
   if (eps_naik != 0.0) {
     if (compute_fatlong)

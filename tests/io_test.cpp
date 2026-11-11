@@ -46,7 +46,7 @@ TEST_P(GaugeIOTest, verify)
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  constructHostGaugeField(gauge, gauge_param, 0, nullptr);
+  constructHostGaugeInputField(gauge, gauge_param, 0, nullptr);
 
   auto get_plaq = [&]() {
     // Load the gauge field to the device
@@ -80,7 +80,7 @@ TEST_P(GaugeIOTest, verify)
 }
 
 using cs_test_t = ::testing::tuple<QudaSiteSubset, QudaSiteSubset, QudaParity, bool, QudaPrecision, QudaPrecision, int,
-                                   bool, QudaFieldLocation>;
+                                   bool, QudaFieldLocation, int>;
 
 class ColorSpinorIOTest : public ::testing::TestWithParam<cs_test_t>
 {
@@ -94,6 +94,7 @@ protected:
   int nSpin;
   bool partfile;
   QudaFieldLocation location;
+  int Ls;
 
 public:
   ColorSpinorIOTest() :
@@ -105,7 +106,8 @@ public:
     prec_io(::testing::get<5>(GetParam())),
     nSpin(::testing::get<6>(GetParam())),
     partfile(::testing::get<7>(GetParam())),
-    location(::testing::get<8>(GetParam()))
+    location(::testing::get<8>(GetParam())),
+    Ls(::testing::get<9>(GetParam()))
   {
   }
 };
@@ -158,6 +160,10 @@ TEST_P(ColorSpinorIOTest, verify)
   param_save.location = location;
   if (location == QUDA_CPU_FIELD_LOCATION) param_save.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param_save.create = QUDA_NULL_FIELD_CREATE;
+  if (Ls > 1) {
+    param_save.nDim = 5;
+    param_save.x[4] = Ls;
+  }
 
   // Loaded
   param_load = param_save;
@@ -238,22 +244,36 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugeIOTest, Combine(Values(QUDA_DOUBLE_PRECISIO
                            return get_prec_str(::testing::get<0>(param.param));
                          });
 
+std::string full_test_name(const testing::TestParamInfo<cs_test_t> &param)
+{
+  std::string name;
+  name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
+  name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
+  name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
+  name += ::testing::get<7>(param.param) ? "_partfile" : "_singlefile";
+  name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
+  if (::testing::get<9>(param.param) > 1) name += std::string("_Ls") + std::to_string(::testing::get<9>(param.param));
+  return name;
+}
+
+std::string parity_test_name(const testing::TestParamInfo<cs_test_t> &param)
+{
+  std::string name;
+  name += ::testing::get<1>(param.param) == QUDA_PARITY_SITE_SUBSET ? "load_parity_" : "load_full_";
+  name += ::testing::get<2>(param.param) == QUDA_EVEN_PARITY ? "even_" : "odd_";
+  if (::testing::get<3>(param.param)) name += std::string("inflate_");
+  return name + full_test_name(param);
+}
+
 // colorspinor full field IO test
 INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,
                          Combine(Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_FULL_SITE_SUBSET),
                                  Values(QUDA_INVALID_PARITY), Values(false),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
-                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
-                         [](testing::TestParamInfo<cs_test_t> param) {
-                           std::string name;
-                           name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
-                           name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
-                           name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
-                           name += ::testing::get<7>(param.param) ? "_singlefile" : "_partfile";
-                           name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
-                           return name;
-                         });
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION),
+                                 Values(1)),
+                         full_test_name);
 
 // colorspinor parity field IO test
 INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
@@ -261,17 +281,24 @@ INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
                                  Values(QUDA_EVEN_PARITY, QUDA_ODD_PARITY), Values(false, true),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
-                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
-                         [](testing::TestParamInfo<cs_test_t> param) {
-                           std::string name;
-                           name += ::testing::get<1>(param.param) == QUDA_PARITY_SITE_SUBSET ? "load_parity_" :
-                                                                                               "load_full_";
-                           name += ::testing::get<2>(param.param) == QUDA_EVEN_PARITY ? "even_" : "odd_";
-                           if (::testing::get<3>(param.param)) name += std::string("inflate_");
-                           name += get_prec_str(::testing::get<4>(param.param)) + std::string("_");
-                           name += get_prec_str(::testing::get<5>(param.param)) + std::string("_");
-                           name += std::string("spin") + std::to_string(::testing::get<6>(param.param));
-                           name += ::testing::get<7>(param.param) ? "_singlefile" : "_partfile";
-                           name += ::testing::get<8>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
-                           return name;
-                         });
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION),
+                                 Values(1)),
+                         parity_test_name);
+
+// 5-d colorspinor full field IO test: each 4-d slice is saved as a vector of its own
+INSTANTIATE_TEST_SUITE_P(FiveDFull, ColorSpinorIOTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET), Values(QUDA_FULL_SITE_SUBSET),
+                                 Values(QUDA_INVALID_PARITY), Values(false),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(4), Values(false, true),
+                                 Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION), Values(4)),
+                         full_test_name);
+
+// 5-d colorspinor parity field IO test
+INSTANTIATE_TEST_SUITE_P(FiveDParity, ColorSpinorIOTest,
+                         Combine(Values(QUDA_PARITY_SITE_SUBSET), Values(QUDA_PARITY_SITE_SUBSET, QUDA_FULL_SITE_SUBSET),
+                                 Values(QUDA_EVEN_PARITY, QUDA_ODD_PARITY), Values(false, true),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(4), Values(false, true),
+                                 Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION), Values(4)),
+                         parity_test_name);

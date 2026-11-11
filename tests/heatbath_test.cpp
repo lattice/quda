@@ -110,9 +110,15 @@ void init_gauge(int argc, char **argv)
   // initialize the device-side RNG
   randstates = quda::RNG(gaugeEx, 1234);
 
-  if (latfile.size() > 0 || heatbath_initialize_on_host) {
+  const GaugeInputMode mode = resolveGaugeInputMode(GaugeInputMode::HAAR);
+  // the device only makes cold (unit) and hot (Haar) starts
+  if (!heatbath_initialize_on_host && mode != GaugeInputMode::UNIT && mode != GaugeInputMode::HAAR)
+    errorQuda("--gauge-input %s can't be initialized on the device; set --heatbath-initialize-on-host true",
+              getGaugeInputStr(mode));
+
+  if (heatbath_initialize_on_host) {
     // Load or fill the gauge fields from the host
-    constructHostGaugeField(reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param, argc, argv);
+    constructHostGaugeInputField(reinterpret_cast<void **>(cpuGauge.raw_pointer()), gauge_param, argc, argv);
 
     // copy in the host field
     gauge = cpuGauge;
@@ -124,7 +130,7 @@ void init_gauge(int argc, char **argv)
     gaugeEx.exchangeExtendedGhost(gaugeEx.R());
   } else {
     // initialize on the device using QUDA routines
-    if (heatbath_coldstart)
+    if (mode == GaugeInputMode::UNIT)
       InitGaugeField(gaugeEx);
     else
       InitGaugeField(gaugeEx, randstates);
@@ -173,15 +179,17 @@ void heatbath_test()
     int nwarm = heatbath_warmup_steps;
     int nhbsteps = heatbath_num_heatbath_per_step;
     int novrsteps = heatbath_num_overrelax_per_step;
-    bool coldstart = heatbath_coldstart;
     double beta_value = heatbath_beta_value;
 
     // Descriptor of how the gauge field was initialized
+    const GaugeInputMode mode = resolveGaugeInputMode(GaugeInputMode::HAAR);
     std::string start_description;
-    if (latfile.size() > 0) {
+    if (mode == GaugeInputMode::LOAD) {
       start_description = "loaded gauge field";
     } else {
-      start_description = coldstart ? "cold start" : "hot start";
+      start_description = mode == GaugeInputMode::UNIT ? "cold start" :
+        mode == GaugeInputMode::HAAR                   ? "hot start" :
+                                                         "Gaussian SU(3) start";
       start_description += " initialized on the ";
       start_description += heatbath_initialize_on_host ? "host" : "device";
     }
@@ -253,12 +261,6 @@ int main(int argc, char **argv)
 
   // call srand() with a rank-dependent seed
   initRand();
-
-  // let heatbath_coldstart take precedence over unit_gauge
-  if (heatbath_coldstart != unit_gauge) {
-    warningQuda("--heatbath-coldstart and --unit-gauge do not agree, --heatbath-coldstart takes precedence.");
-    unit_gauge = heatbath_coldstart;
-  }
 
   display_test_info();
 

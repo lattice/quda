@@ -14,6 +14,9 @@ enum class GaugeFieldConstructionType { UNIT_GAUGE, RANDOM_GAUGE, LOAD_GAUGE };
 
 enum class GaugeInputMode { HAAR, UNIT, GAUSSIAN_SU3, LOAD };
 
+// Distribution of the random numbers that the random gauge field helpers draw
+enum class RandomDistribution { UNIFORM, GAUSSIAN };
+
 /**
  * @brief Immutable host gauge input shared by independent test cases.
  */
@@ -48,26 +51,6 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode = GaugeInputMod
  * @param[in] mode Gauge-input mode.
  */
 const char *getGaugeInputStr(GaugeInputMode mode);
-
-/**
- * @brief Constructs a QDP-ordered gauge field: either unit, random, or based on a file
- *
- * @param[out] gauge Generated QDP-ordered gauge field
- * @param[in] gauge_param Information about the desired gauge field
- * @param[in] argc Input command-line argument count
- * @param[in] argv Input command-line arguments used in the case of loading a file
- */
-void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv);
-
-/**
- * @brief Constructs a gauge field: either unit, random, or based on a file
- *
- * @param[out] gauge Generated gauge field
- * @param[in] gauge_param Information about the desired gauge field
- * @param[in] argc Input command-line argument count
- * @param[in] argv Input command-line arguments used in the case of loading a file
- */
-void constructHostGaugeField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv);
 
 /**
  * @brief Constructs a gauge field based on a construction type
@@ -134,12 +117,15 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision);
 void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision);
 
 /**
- * @brief Rescales a gauge field with a per-site random phase
+ * @brief Multiplies each link of a gauge field by a random U(1) phase
  *
- * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in,out] gauge QDP-ordered gauge field
  * @param[in] precision Gauge field floating point precision
+ * @param[in] distribution Distribution of the phase angles: uniform in [0, 2 pi), or Gaussian of the given width
+ * @param[in] width Width of a Gaussian distribution; unused for a uniform one
  */
-void applyRandomU1Phase(void *const *gauge, QudaPrecision precision);
+void applyRandomU1Phase(void *const *gauge, QudaPrecision precision,
+                        RandomDistribution distribution = RandomDistribution::UNIFORM, double width = 0.0);
 
 /**
  * @brief Constructs a "gauge field" of random (sane, invertable) matrices
@@ -150,13 +136,15 @@ void applyRandomU1Phase(void *const *gauge, QudaPrecision precision);
 void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision);
 
 /**
- * @brief Adds some non-unitary noise to a gauge field
+ * @brief Adds some non-unitary noise to each real component of a gauge field
  *
  * @param[in,out] gauge Generated QDP-ordered gauge field
- * @param[in] noise_max Scale of noise added to the gauge field
+ * @param[in] scale Scale of the noise: the half-width of a uniform distribution, or the width of a Gaussian one
  * @param[in] precision Gauge field floating point precision
+ * @param[in] distribution Distribution of the noise
  */
-void addNoiseToGaugeField(void *const *gauge, double noise_max, QudaPrecision precision);
+void addNoiseToGaugeField(void *const *gauge, double scale, QudaPrecision precision,
+                          RandomDistribution distribution = RandomDistribution::UNIFORM);
 
 /**
  * @brief Constructs a random gauge field, which may be SU(3), U(3), or arbitrary as requested

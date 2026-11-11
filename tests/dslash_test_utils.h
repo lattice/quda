@@ -218,7 +218,7 @@ struct DslashTestWrapper {
     }
 
     printfQuda("Randomizing fields... ");
-    constructHostGaugeField(hostGauge, gauge_param, argc, argv);
+    constructHostGaugeInputField(hostGauge, gauge_param, argc, argv);
 
     ColorSpinorParam csParam;
     csParam.nColor = 3;
