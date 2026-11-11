@@ -686,6 +686,10 @@ endif()
 # Do not export CCCL as an installed-package dependency.
 target_link_libraries(quda INTERFACE "$<BUILD_INTERFACE:CCCL::CCCL>")
 
+if(QUDA_MNNVL)
+  target_compile_definitions(quda PUBLIC MNNVL_COMMS)
+endif()
+
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)

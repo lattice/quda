@@ -278,12 +278,27 @@ namespace quda
   void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
   /**
+     @brief Allocate local Fabric memory and map peer-to-peer neighbors
+     @param[out] remote Array of remote pointers; null for inaccessible links
+     @param[in] bytes Local allocation size in bytes
+     @return Local memory pointer
+  */
+  void *comm_create_local_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, size_t bytes);
+
+  /**
      @brief Deallocate the remote addresses to logically neighboring
      processes on the on the lattice.
      @param[in] remote Array of remote memory pointers to neighboring
      pointers
   */
   void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
+
+  /**
+     @brief Release local Fabric memory and its remote mappings
+     @param[in] local Local memory pointer
+     @param[in,out] remote Array of remote pointers, cleared on return
+  */
+  void comm_destroy_local_neighbor_memory(void *local, array_2d<void *, QUDA_MAX_DIM, 2> &remote);
 
   /**
      @brief Create unique events shared between each logical pair of
@@ -299,12 +314,24 @@ namespace quda
                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
+     @brief Create local events for peer-to-peer neighbors without exchanging handles
+     @param[out] local Array of local events to neighboring processes
+  */
+  void comm_create_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
+
+  /**
      @brief Destroy the coupled events
      @param[out] remote Array of remote events to neighboring processes
      @param[in] local Array of local event to neighboring processes
    */
   void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                    array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
+
+  /**
+     @brief Destroy events created by comm_create_local_event()
+     @param[in] local Array of local events to neighboring processes
+  */
+  void comm_destroy_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
      @brief Returns true if any peer-to-peer capability is present on
@@ -329,6 +356,30 @@ namespace quda
   bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
+     @brief Disable peer-to-peer communication for a single directed neighbor link.
+     This is used when runtime creation of the remote mapping fails after the
+     link was identified as a peer-to-peer candidate during topology setup.
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+  */
+  void comm_peer2peer_disable(int dir, int dim);
+
+  /**
+     @brief Collectively commit the peer-to-peer links that survived runtime
+     remote-mapping validation.  This must be called by every rank after all
+     candidate links have been validated and before the links are used.
+     Report the validated links once per communicator, unless a link is
+     subsequently disabled, and only when verbosity is above QUDA_SILENT.
+  */
+  void comm_peer2peer_finalize_validation();
+
+  /**
+     @brief Collectively validate candidate peer links with an NVSHMEM symmetric probe
+     No operation when NVSHMEM is not active.
+  */
+  void comm_peer2peer_validate_nvshmem();
+
+  /**
      @brief Enable / disable peer-to-peer communication: used for dslash
      policies that do not presently support peer-to-peer communication
      @param[in] enable Boolean flag to enable / disable peer-to-peer communication
@@ -336,7 +387,7 @@ namespace quda
   void comm_enable_peer2peer(bool enable);
 
   /**
-     Query if intra-node (non-peer-to-peer) communication is enabled
+     @brief Query if intra-node (non-peer-to-peer) communication is enabled
      in a given dimension and direction
      @param dir Direction (0 - backwards, 1 forwards)
      @param dim Dimension (0-3)
