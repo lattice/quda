@@ -249,7 +249,7 @@ namespace quda
 
         if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
           if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
-          disable_peer_to_peer_bidir = !device::is_enabled_mnnvl_comms();
+          disable_peer_to_peer_bidir = true;
         }
 
         enable_peer_to_peer = std::abs(enable_peer_to_peer);
