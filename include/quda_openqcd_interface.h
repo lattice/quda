@@ -97,6 +97,7 @@ typedef enum OpenQCDFieldType_s {
   OPENQCD_FIELD_SPINOR = 1,
   OPENQCD_FIELD_GAUGE = 2,
   OPENQCD_FIELD_CLOVER = 3,
+  OPENQCD_FIELD_MOM = 4,
   OPENQCD_FIELD_INVALID = QUDA_INVALID_ENUM
 } OpenQCDFieldType;
 
@@ -568,16 +569,6 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType 
 
 
 /**
- * @brief     Create new resident momentum field. Initialize to zero. TODO: add
- *            support to initialize to random, or from the CPU?
- * 
- * @param[in]  prec        Precision of the incoming gauge field
- * @param[in]  t_boundary  Time boundary condition
- */
-void openQCD_qudaMomCreate(QudaPrecision prec, QudaTboundary t_boundary);
-
-
-/**
  * @brief      Save the gauge fields from quda to host.
  *
  * @param[out] gauge       The gauge fields (will be stored in openqcd order)
@@ -609,6 +600,15 @@ void openQCD_qudaCloverLoad(void *clover, QudaInvertParam *inv_param);
  * @brief      Free the clover field allocated in quda.
  */
 void openQCD_qudaCloverFree(void);
+
+
+/**
+ * @brief     Load the momentum field from host to quda.
+ * 
+ * @param[in]  mom        The momentum field (in openqcd order)
+ * @param[in]  inv_param  The QudaInvertParam from which
+ */
+void openQCD_qudaMomLoad(void *mom, QudaPrecision prec);
 
 #ifdef __cplusplus
 }

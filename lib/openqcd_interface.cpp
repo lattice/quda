@@ -838,27 +838,6 @@ void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType 
   qudaState.layout.quda2openqcd(OPENQCD_FIELD_GAUGE, buf, gauge);
 }
 
-void openQCD_qudaMomCreate(QudaPrecision prec, QudaTboundary t_boundary)
-{
-  QudaGaugeParam param = newOpenQCDGaugeParam(prec, QUDA_RECONSTRUCT_10, t_boundary);
-  param.make_resident_mom = true;
-  param.return_result_mom = false;
-
-  /* Use MILC order on all zeros since OpenQCD order does not suppot mom order */
-  param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-
-  size_t V = static_cast<size_t>(param.X[0]) * param.X[1] * param.X[2] * param.X[3];
-  size_t bytes = 4ul * V * 10 * (prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
-  void *mom = safe_malloc(bytes);
-  memset(mom, 0, bytes);
-  
-  /* Make resident momentum field*/
-  WITH_COMM(momResidentQuda(mom, &param));
-  /* to make a random momentum field
-  * void gaussMomQuda(unsigned long long seed, double sigma) */
-  host_free(mom);
-}
-
 void openQCD_qudaGaugeFree(void)
 {
   WITH_COMM(freeGaugeQuda());
@@ -866,6 +845,22 @@ void openQCD_qudaGaugeFree(void)
   qudaState.ad_rev = -1;
   qudaState.swd_ud_rev = -1;
   qudaState.swd_ad_rev = -1;
+}
+
+
+// download the momentum from openQCD and place into the resident mom field
+void openQCD_qudaMomLoad(void *mom, QudaPrecision prec)
+{
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec, QUDA_RECONSTRUCT_NO, QUDA_PERIODIC_T);
+  param.make_resident_mom = true;
+  param.return_result_mom = false;
+  param.type = QUDA_MOMENTUM_LINKS;
+
+  /* use idx -1 to prevent allocating a spinor field */
+  void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, -1, mom);
+  if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_MOM, mom, buf)) {
+    momResidentQuda(buf, &param);
+  }
 }
 
 void openQCD_qudaCloverLoad(void *clover, QudaInvertParam *inv_param)
