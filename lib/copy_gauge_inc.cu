@@ -384,6 +384,16 @@ namespace quda {
 #else
 	    errorQuda("TIFR interface has not been built\n");
 #endif
+          } else if (in.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+#ifdef BUILD_OPENQCD_INTERFACE
+            using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
+            typedef OpenQCDOrder<FloatIn,18> momIn;
+            CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in,
+                                                                                 scale);
+            copyMom<decltype(arg)>(arg,out,in,location);
+#else
+	    errorQuda("OPENQCD interface has not been built\n");
+#endif
           } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 #ifdef BUILD_TIFR_INTERFACE
             using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
