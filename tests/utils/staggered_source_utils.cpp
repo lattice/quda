@@ -129,17 +129,17 @@ namespace
     return {z.real() * yr - z.imag() * yi, z.real() * yi + z.imag() * yr};
   }
 
-  template <typename real_t>
+  template <typename real>
   void build(std::vector<quda::ColorSpinorField> &sources, const KSSourceParam &param, const coords_t &X,
              const coords_t &N, KSSourceRNG *rng)
   {
     const size_t volume = static_cast<size_t>(X[0]) * X[1] * X[2] * X[3];
     const int t0 = param.type == KSSourceType::POINT ? param.origin[3] : param.t0;
     const int n = sources.size();
-    std::vector<real_t *> data(n);
+    std::vector<real *> data(n);
     for (int i = 0; i < n; i++) {
       sources[i].zero();
-      data[i] = sources[i].data<real_t *>();
+      data[i] = sources[i].data<real *>();
     }
 
     const bool color_wall = param.type == KSSourceType::RANDOM_COLOR_WALL;
