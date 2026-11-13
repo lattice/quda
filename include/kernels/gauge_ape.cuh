@@ -35,15 +35,15 @@ namespace quda
     const real anisotropy;
     const real tolerance;
 
-    GaugeAPEArg(GaugeField &out, const GaugeField &in, real_t alpha_, int dir_ignore, real_t anisotropy) :
+    GaugeAPEArg(GaugeField &out, const GaugeField &in, real_t alpha, int dir_ignore, real_t anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),
-      alpha(static_cast<real>(alpha_)),
-      staple_scale(static_cast<real>(alpha_ / (static_cast<real>(2 * (apeDim - 1))))),
+      alpha(static_cast<real>(alpha)),
+      staple_scale(static_cast<real>(alpha / (static_cast<real>(2 * (apeDim - 1))))),
       dir_ignore(dir_ignore),
       anisotropy(static_cast<real>(anisotropy)),
-      tolerance(in.toleranceSU3())
+      tolerance(static_cast<real>(in.toleranceSU3()))
     {
       for (int dir = 0; dir < 4; ++dir) {
         E[dir] = in.X()[dir];

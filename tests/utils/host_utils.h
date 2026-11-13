@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <array>
+#include <complex>
 #include <cstddef>
 #include <random>
 #include <string>
@@ -13,6 +14,10 @@
 #include <color_spinor_field.h>
 
 #include "host_rng.hpp"
+
+// declare omp reductions for std::complex:
+#pragma omp declare reduction(+ : std::complex <double> : omp_out += omp_in) initializer(omp_priv = 0)
+#pragma omp declare reduction(+ : std::complex <float> : omp_out += omp_in) initializer(omp_priv = 0)
 
 constexpr size_t gauge_site_size = 18;      // real numbers per link
 constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
@@ -256,10 +261,10 @@ void printGaugeElement(void *gauge, int X, QudaPrecision precision);
 
 /**
  * @brief Print the components of an nColor = 3 vector
- * @tparam real_t Floating point type of vector
+ * @tparam real Floating point type of vector
  * @param[in] v nColor = 3 complex vector
  */
-template <typename real_t> void printVector(real_t *v)
+template <typename real> void printVector(real *v)
 {
   printfQuda("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
 }
@@ -399,7 +404,7 @@ template <> struct get_quda_precision<float> {
   static constexpr QudaPrecision value = QUDA_SINGLE_PRECISION;
 };
 
-template <typename real_t> constexpr QudaPrecision get_quda_precision_v = get_quda_precision<real_t>::value;
+template <typename real> constexpr QudaPrecision get_quda_precision_v = get_quda_precision<real>::value;
 
 inline QudaPrecision getPrecision(int i)
 {

@@ -10,6 +10,9 @@ namespace quda
     {
 
       INSTANTIATE_MULTI_REDUCE_STORE(double)
+#ifdef QUDA_FPMP_FLOATFLOAT
+      INSTANTIATE_MULTI_REDUCE_STORE(floatfloat)
+#endif
 
     } // namespace block
 

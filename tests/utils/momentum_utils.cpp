@@ -12,12 +12,11 @@
  * @brief Create a random traceless anti-Hermitian matrix with the correct
  * Gaussian distribution, times an (optional) scaling factor
  *
- * @tparam real_t Floating point type of the field
+ * @tparam real Floating point type of the field
  * @param[out] mat Output random anti-Hermitian matrix
  * @param[in] max_val Optional scaling factor
  */
-template <typename real_t>
-void create_random_traceless_antiherm(real_t mat[10], int i, int parity, real_t max_val = 1.0)
+template <typename real> void create_random_traceless_antiherm(real mat[10], int i, int parity, real max_val = 1.0)
 {
   // The ordering of components is given in the RECONSTRUCT_10 unpack routine
   // in include/gauge_field_order.h
@@ -32,9 +31,9 @@ void create_random_traceless_antiherm(real_t mat[10], int i, int parity, real_t 
   // out[8] = complex(0.0, in[8]);
 
   // Normalization for generators on the diagonal
-  real_t inv_sqrt3 = quda::sqrt(1. / 3.);
-  real_t r3 = max_val * random_gaussian_host(i, parity);
-  real_t r8 = max_val * random_gaussian_host(i, parity);
+  real inv_sqrt3 = quda::sqrt(1. / 3.);
+  real r3 = max_val * random_gaussian_host(i, parity);
+  real r8 = max_val * random_gaussian_host(i, parity);
 
   // contributes to the (0, 1), (1, 0) components
   mat[0] = max_val * random_gaussian_host(i, parity);
@@ -92,16 +91,16 @@ void createMomCPU(void *mom, QudaPrecision precision, double max_val)
  * @brief Compute and print a robust comparison of agreement between two
  *        momentum fields
  *
- * @tparam real_t Floating point type of the field
+ * @tparam real Floating point type of the field
  * @param[in] momA First momentum field
  * @param[in] momB Second momentum field
  * @param[in] len Length of the momentum field
  */
-template <typename real_t> struct CompareMomentum {
+template <typename real> struct CompareMomentum {
   int operator()(const void *momA_, const void *momB_, int len)
   {
-    auto momA = reinterpret_cast<const real_t *>(momA_);
-    auto momB = reinterpret_cast<const real_t *>(momB_);
+    auto momA = reinterpret_cast<const real *>(momA_);
+    auto momB = reinterpret_cast<const real *>(momB_);
 
     const int fail_check = 16;
     int fail[fail_check];
@@ -195,16 +194,16 @@ int strong_check_mom(const void *momA, const void *momB, int len, QudaPrecision 
  * contribution, including the MILC convention of subtracting 4
  * from each site norm to improve stability.
  *
- * @tparam real_t Floating point type of the field
+ * @tparam real Floating point type of the field
  * @param[in] mom Momentum field
  * @param[in] len Length of the momentum field
  */
-template <typename real_t> struct MomentumAction {
+template <typename real> struct MomentumAction {
   double operator()(const void *mom_, int len)
   {
     double action = 0.0;
     for (int i = 0; i < len; i++) {
-      auto mom = reinterpret_cast<const real_t *>(mom_) + i * mom_site_size;
+      auto mom = reinterpret_cast<const real *>(mom_) + i * mom_site_size;
       double local = 0.0;
       for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
       for (int j = 6; j < 9; j++) local += 0.5 * mom[j] * mom[j];

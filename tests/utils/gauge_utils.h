@@ -113,7 +113,7 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
 /**
  * @brief Apply staggered phases to a QDP-ordered gauge field
  *
- * @tparam real_t Floating point type of the gauge field
+ * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] X Full-parity local dimensions

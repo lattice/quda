@@ -370,6 +370,11 @@ void printQudaEigParam(QudaEigParam *param) {
     if (param->file_io_param) printQudaFileIOParam(param->file_io_param);
 #endif
 
+  // mat_norm is an output, so it is never checked for being undefined
+#if defined INIT_PARAM || defined PRINT_PARAM
+  P(mat_norm, 0.0);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif

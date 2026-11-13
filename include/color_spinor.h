@@ -966,9 +966,13 @@ namespace quda {
   __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Nsa> &a,
                                                          const ColorSpinor<Float, Nc, Nsb> &b, int sa, int sb)
   {
-    complex<Float> dot = cmul(conj(a(sa, 0)), b(sb, 0));
+    // Map runtime spin to a literal index so ColorSpinor::data[] can SROA.
+    auto cs = [](const auto &x, int s, int c) {
+      return s == 0 ? x(0, c) : s == 1 ? x(1, c) : s == 2 ? x(2, c) : x(3, c);
+    };
+    complex<Float> dot = cmul(conj(cs(a, sa, 0)), cs(b, sb, 0));
 #pragma unroll
-    for (int c = 1; c < Nc; c++) dot = cmac(conj(a(sa, c)), b(sb, c), dot);
+    for (int c = 1; c < Nc; c++) dot = cmac(conj(cs(a, sa, c)), cs(b, sb, c), dot);
     return dot;
   }
 

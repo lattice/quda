@@ -11,14 +11,14 @@ namespace quda
   namespace staggered_quark_smearing
   {
 
-    template <typename real_, int nColor_, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
+    template <typename Float, int nColor_, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
     struct TwoLinkArg : kernel_param<> {
-      using real = real_;
+      using real = typename mapper<Float>::type;
       static constexpr int nColor = nColor_;
-      typedef typename gauge_mapper<real, reconstruct>::type G;
+      typedef typename gauge_mapper<Float, reconstruct>::type G;
       const G link;
 
-      typedef typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type F;
+      typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type F;
       F outA;
 
       int X[4]; // regular grid dims

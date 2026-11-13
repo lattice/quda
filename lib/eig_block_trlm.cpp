@@ -55,6 +55,7 @@ namespace quda
 
   void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
+    clearMatNorm();
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     queryPrec(kSpace[0].Precision());
@@ -200,6 +201,8 @@ namespace quda
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    reportMatNorm(mat_norm);
 
     // Post computation report
     //---------------------------------------------------------------------------

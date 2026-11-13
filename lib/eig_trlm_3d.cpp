@@ -65,6 +65,7 @@ namespace quda
 
   void TRLM3D::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
+    clearMatNorm();
     // Create 3-d split communicators
     CommKey split_key = {1, 1, 1, comm_dim(3)};
 
@@ -243,6 +244,9 @@ namespace quda
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    // The 3-d solver holds an independent operator per slice; report the largest
+    reportMatNorm(*std::max_element(mat_norm_3D.begin(), mat_norm_3D.end()));
 
     // Post computation report
     //---------------------------------------------------------------------------
