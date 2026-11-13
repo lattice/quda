@@ -188,7 +188,7 @@ int main(int argc, char **argv)
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  constructHostGaugeInputField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 

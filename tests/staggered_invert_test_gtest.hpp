@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <quda_arch.h>
+#include <gauge_utils.h>
 
 // tuple containing parameters for Schwarz solver
 using schwarz_t = ::testing::tuple<QudaSchwarzType, QudaInverterType, QudaPrecision>;
@@ -44,9 +45,9 @@ bool skip_test(test_t param)
     if (solution_type != QUDA_MAT_SOLUTION || solve_type != QUDA_DIRECT_SOLVE)
       return true; // Laplace only supports direct solves
 
-    // on Gaussian SU(3) fields CGNE and CA-CGNE in single precision stall just above the tolerance, which of them
-    // depending on the lattice
-    if (resolveGaugeInputMode(staggered_default_gauge_input) == GaugeInputMode::GAUSSIAN_SU3
+    // with --gauge-input gaussian-su3, CGNE and CA-CGNE in single precision stall just above the tolerance, which of
+    // them depending on the lattice
+    if (resolveGaugeInputMode() == GaugeInputMode::GAUSSIAN_SU3
         && (inverter_type == QUDA_CGNE_INVERTER || inverter_type == QUDA_CA_CGNE_INVERTER)
         && prec < QUDA_DOUBLE_PRECISION)
       return true;

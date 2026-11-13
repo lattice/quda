@@ -110,7 +110,7 @@ void init(int argc, char **argv)
   //----------------------------------------------------------------------------
   gauge_.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
   for (int i = 0; i < 4; i++) gauge[i] = gauge_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
-  constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
+  constructHostGaugeInputField(gauge.data(), gauge_param, argc, argv);
 
   // Allocate host side memory for clover terms if needed.
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {

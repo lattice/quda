@@ -17,7 +17,6 @@
 #include <misc.h>
 #include <host_utils.h>
 #include "gauge_utils.h"
-#include "staggered_gauge_utils.h"
 #include "command_line_params.h"
 
 using namespace quda;
@@ -231,7 +230,7 @@ struct StaggeredGSmearTestWrapper { //
 
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-    constructHostGaugeInputField(qdp_inlink, gauge_param, argc, argv, staggered_default_gauge_input);
+    constructHostGaugeInputField(qdp_inlink, gauge_param, argc, argv);
     initExtendedField(qdp_inlink_ex, qdp_inlink);
     // Prepare two link field:
     if (verify_results or (gtest_type == gsmear_test_type::GaussianSmear and smear_compute_two_link == false))

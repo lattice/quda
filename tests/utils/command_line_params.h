@@ -307,7 +307,6 @@ extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
 extern std::string latfile;
-extern bool unit_gauge;
 extern std::string gauge_input;
 extern double gauge_input_width;
 extern bool gauge_input_width_explicit;
@@ -577,7 +576,6 @@ extern int heatbath_warmup_steps;
 extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
-extern bool heatbath_coldstart;
 extern bool heatbath_initialize_on_host;
 
 extern int gf_gauge_dir;

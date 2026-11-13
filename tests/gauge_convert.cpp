@@ -112,7 +112,6 @@ namespace
   Conversion check_options()
   {
     Conversion c;
-    if (unit_gauge) errorQuda("gauge_convert takes --gauge-input unit rather than --unit-gauge");
     c.generated = !gauge_input.empty() && gauge_input != "load";
     if (c.generated && !latfile.empty())
       errorQuda("Give either --load-gauge or a generated --gauge-input, not both (--gauge-input %s)",

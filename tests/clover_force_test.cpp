@@ -55,7 +55,7 @@ void init(int argc, char **argv)
   mom_ref = quda::GaugeField(param);
 
   printfQuda("Randomizing gauge fields... ");
-  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  constructHostGaugeInputField(gauge, gauge_param, argc, argv);
 
   clover.resize(V * clover_site_size * host_clover_data_type_size);
   clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);

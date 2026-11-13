@@ -17,7 +17,7 @@ protected:
     printfQuda("prec     recon    test_type     S_dim         T_dimension\n");
     printfQuda("%s   %s       %s       %d/%d/%d      %d \n", get_prec_str(prec), get_recon_str(link_recon),
                get_string(gtest_type_map, gtest_type).c_str(), xdim, ydim, zdim, tdim);
-    printGaugeInput(resolveGaugeInputMode(staggered_default_gauge_input));
+    printGaugeInput(resolveGaugeInputMode());
     printfQuda("Grid partition info:     X  Y  Z  T\n");
     printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
                dimPartitioned(3));

@@ -32,7 +32,7 @@ using namespace quda;
 //***********************************************************//
 bool execute = true;
 
-bool gauge_load;
+bool host_gauge_input;
 bool gauge_store;
 
 std::array<std::vector<char>, 4> host_gauge;
@@ -107,8 +107,8 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
 
       a0.start();
 
-      // If no field is loaded, create a physical quenched field on the device
-      if (!gauge_load) {
+      // If no field is given on the command line, create a physical quenched field on the device
+      if (!host_gauge_input) {
         GaugeFieldParam gParam(param);
         gParam.location = QUDA_CUDA_FIELD_LOCATION;
         gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
@@ -127,14 +127,10 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
         int nsteps = heatbath_num_steps;
         int nhbsteps = heatbath_num_heatbath_per_step;
         int novrsteps = heatbath_num_overrelax_per_step;
-        bool coldstart = heatbath_coldstart;
         double beta_value = heatbath_beta_value;
         a1.start();
 
-        if (coldstart)
-          InitGaugeField(*U);
-        else
-          InitGaugeField(*U, randstates);
+        InitGaugeField(*U, randstates);
 
         for (int step = 1; step <= nsteps; ++step) {
           printfQuda("Step %d\n", step);
@@ -295,7 +291,7 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
 
 TEST_P(GaugeAlgTest, Generation)
 {
-  if (execute && !gauge_load) {
+  if (execute && !host_gauge_input) {
     auto detu = getLinkDeterminant(*U);
     ASSERT_TRUE(CheckDeterminant(detu));
   }
@@ -404,16 +400,17 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
-  gauge_load = (latfile.size() > 0);
+  // a bare --load-gauge also takes the host path, so that constructHostGaugeInputField reports it
+  host_gauge_input = !gauge_input.empty() || !latfile.empty();
   gauge_store = (gauge_outfile.size() > 0);
 
-  // If we are passing a gauge field to the test, we must allocate host memory.
-  // If no gauge is passed, we generate a quenched field on the device.
-  if (gauge_load) {
-    printfQuda("Loading gauge field from host\n");
+  // If a gauge field is given on the command line, we must allocate host memory.
+  // Otherwise we generate a quenched field on the device.
+  if (host_gauge_input) {
+    printfQuda("Constructing the gauge field on the host\n");
     for (int dir = 0; dir < 4; dir++) { host_gauge[dir].resize(V * gauge_site_size * host_gauge_data_type_size); }
     void *h_gauge[] = {host_gauge[0].data(), host_gauge[1].data(), host_gauge[2].data(), host_gauge[3].data()};
-    constructHostGaugeField(h_gauge, gauge_param, argc, argv);
+    constructHostGaugeInputField(h_gauge, gauge_param, argc, argv);
   }
 
   return test.execute(); // run tests

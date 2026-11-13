@@ -7,7 +7,6 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <unitarization_links.h>
-#include <io/gauge_io.h>
 
 #include "misc.h"
 #include "host_utils.h"
@@ -16,7 +15,6 @@
 #include "staggered_gauge_utils.h"
 #include "rng_utils.hpp"
 #include "llfat_utils.h"
-#include "instantiate_host.hpp"
 
 extern double tadpole_factor;
 // Unitarization coefficients
@@ -27,80 +25,37 @@ static double svd_rel_error = 1e-4;
 static double svd_abs_error = 1e-4;
 static double max_allowed_error = 1e-11;
 
-// multiply each link by exp(i angle(i, parity)), one angle per link, drawn in the order dir, site, parity
-template <typename real_t> struct ApplyLinkU1Phase {
-  template <typename F> void operator()(void *const *links_, F &&angle)
-  {
-    const auto links = typed_ptr_array<real_t *>(links_);
-
-    for (int dir = 0; dir < 4; ++dir) {
-#pragma omp parallel for
-      for (int i = 0; i < Vh; ++i) {
-        for (int parity = 0; parity < 2; parity++) {
-          std::complex<double> z = std::polar(1.0, angle(i, parity));
-          auto link = reinterpret_cast<std::complex<real_t> *>(links[dir] + (parity * Vh + i) * gauge_site_size);
-          for (auto j = 0lu; j < gauge_site_size / 2; j++) link[j] *= z;
-        }
-      }
-    }
-  }
-};
-
-template <typename F> static void applyLinkU1Phase(void *const *links, QudaPrecision precision, F &&angle)
+/**
+ * @brief Construct asqtad long links directly rather than from thin links, with the long-link scaling, MILC phases
+ * and temporal boundary conditions
+ *
+ * @param[out] longlink QDP-ordered long links
+ * @param[in] mode Gauge input mode: unit links, Haar random SU(3) links with a uniform random U(1) phase, or Gaussian
+ * SU(3) links with a Gaussian random U(1) phase, both of width --gauge-input-width
+ * @param[in] gauge_param Gauge field parameters
+ */
+static void constructAsqtadLongLinks(void *const *longlink, GaugeInputMode mode, const QudaGaugeParam &gauge_param)
 {
-  instantiate_host<ApplyLinkU1Phase>(precision, links, angle);
-}
-
-void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, GaugeFieldConstructionType type,
-                                QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
-{
-  if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
-    // Set fatlink and longlink to the identity matrix
-    constructIdentityGaugeField(fatlink, precision);
+  const auto precision = gauge_param.cpu_prec;
+  switch (mode) {
+  case GaugeInputMode::UNIT:
     constructIdentityGaugeField(longlink, precision);
-
-    // apply MILC phases and temporal boundary conditions
-    applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
-      applyGaugeFieldScaling_long(longlink, Vh, param, dslash_type, precision);
-    }
-
-  } else if (type == GaugeFieldConstructionType::RANDOM_GAUGE) {
-    // if doing naive staggered then set to long links so that the staggered phase is applied
-    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-
-    constructRandomGaugeField(fatlink, param, precision, dslash_type);
-
-    param.type = QUDA_ASQTAD_LONG_LINKS;
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      constructRandomGaugeField(longlink, param, precision, dslash_type);
-      // incorporate non-trivial phase into long links
-      applyLinkU1Phase(longlink, precision,
-                       [](int i, int parity) { return random_uniform_host<double>(i, parity, 0, 2 * M_PI); });
-    }
-  } else {
-    // if doing naive staggered then set to long links so that the staggered phase is applied
-    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-
-    constructRandomGaugeField(fatlink, param, precision, dslash_type);
-
-    param.type = QUDA_ASQTAD_LONG_LINKS;
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      constructRandomGaugeField(longlink, param, precision, dslash_type);
-
-      // incorporate non-trivial phase into long links
-      applyLinkU1Phase(longlink, precision,
-                       [](int i, int parity) { return random_uniform_host<double>(i, parity, 0, 2 * M_PI); });
-    }
-  }
-
-  // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  // FIXME: may break host comparison
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
-    for (int dir = 0; dir < 4; ++dir) { memset(longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size); }
+    applyGaugeFieldScaling_long(longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, precision);
+    break;
+  case GaugeInputMode::HAAR:
+    constructRandomSU3GaugeField(longlink, precision);
+    applyGaugeFieldScaling_long(longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, precision);
+    // incorporate non-trivial phase into long links
+    applyRandomU1Phase(longlink, precision);
+    break;
+  case GaugeInputMode::GAUSSIAN_SU3:
+    constructGaussianSU3GaugeField(longlink, precision, gauge_input_width);
+    applyGaugeFieldScaling_long(longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, precision);
+    applyRandomU1Phase(longlink, precision, RandomDistribution::GAUSSIAN, gauge_input_width);
+    break;
+  default:
+    errorQuda("Gauge input %s is not supported for asqtad links without \"--compute-fat-long true\"",
+              getGaugeInputStr(mode));
   }
 }
 
@@ -109,42 +64,32 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  const auto input_mode = resolveGaugeInputMode(staggered_default_gauge_input);
-  printGaugeInput(input_mode);
+  const GaugeInputMode mode = resolveGaugeInputMode(GaugeInputMode::HAAR);
+  printGaugeInput(mode);
 
-  // load or generate a field WITHOUT PHASES
-  if (input_mode == GaugeInputMode::LOAD || input_mode == GaugeInputMode::GAUSSIAN_SU3) {
-    if (input_mode == GaugeInputMode::LOAD) {
-      // load in the command line supplied gauge field
-      loadPlainHostGaugeField(latfile, qdp_inlink, gauge_param);
-    } else {
-      constructGaussianSU3GaugeField(qdp_inlink, gauge_param.cpu_prec, gauge_input_width);
-      if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
-        // the long links are not computed from the thin links, so they are independent Gaussian links, with a
-        // U(1) phase for reconstruct 13/9 to recover
-        constructGaussianSU3GaugeField(qdp_longlink, gauge_param.cpu_prec, gauge_input_width);
-        applyLinkU1Phase(qdp_longlink, gauge_param.cpu_prec, [](int i, int parity) {
-          return random_gaussian_host<double>(i, parity, 0, gauge_input_width);
-        });
-        applyGaugeFieldScaling_long(qdp_longlink, Vh, gauge_param, QUDA_ASQTAD_DSLASH, gauge_param.cpu_prec);
-      }
-    }
-    // the Laplace operator takes the t boundary but no staggered phases
-    if (dslash_type == QUDA_LAPLACE_DSLASH)
-      applyGaugeTemporalBCs(qdp_inlink, Vh, gauge_param.t_boundary, gauge_param.cpu_prec);
-    else
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
+  // without --compute-fat-long, asqtad's fat and long links are constructed directly instead of from thin links
+  const bool construct_fat_long = dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong;
+
+  // a loaded field has no long links, so asqtad needs them built
+  if (construct_fat_long && mode == GaugeInputMode::LOAD)
+    errorQuda(
+      "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\"");
+
+  if (construct_fat_long && mode == GaugeInputMode::HAAR) {
+    // fat links aren't unitary, so random ones are random matrices
+    constructRandomMatrixGaugeField(qdp_inlink, gauge_param.cpu_prec);
+  } else if (construct_fat_long && mode == GaugeInputMode::GAUSSIAN_SU3) {
+    // fat links aren't unitary, so Gaussian ones get Gaussian non-unitary noise of the same width
+    constructGaussianSU3GaugeField(qdp_inlink, gauge_param.cpu_prec, gauge_input_width);
+    addNoiseToGaugeField(qdp_inlink, gauge_input_width, gauge_param.cpu_prec, RandomDistribution::GAUSSIAN);
+    applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
   } else {
-    GaugeFieldConstructionType construct_type = input_mode == GaugeInputMode::UNIT ?
-      GaugeFieldConstructionType::UNIT_GAUGE :
-      GaugeFieldConstructionType::RANDOM_GAUGE;
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param, gauge_param.cpu_prec);
-    } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink, construct_type, gauge_param.cpu_prec, gauge_param,
-                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
-    }
+    // the Laplace operator takes the temporal boundary conditions but no staggered phases
+    const QudaStaggeredPhase phase
+      = dslash_type == QUDA_LAPLACE_DSLASH ? QUDA_STAGGERED_PHASE_NO : QUDA_STAGGERED_PHASE_MILC;
+    constructHostGaugeInputField(qdp_inlink, gauge_param, 0, nullptr, GaugeInputMode::HAAR, phase);
   }
+  if (construct_fat_long) constructAsqtadLongLinks(qdp_longlink, mode, gauge_param);
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
@@ -415,7 +360,7 @@ void computeStaggeredPlaquetteQDPOrder(void **qdp_link, double plaq[3], const Qu
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = gauge_param_in.t_boundary;
 
   gauge_param.cpu_prec = gauge_param_in.cpu_prec;
 
