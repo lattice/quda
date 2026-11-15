@@ -75,6 +75,7 @@ typedef struct {
 typedef struct {
   int qhat;
   double m0, su3csw, u1csw, cF[2], theta[3];
+  double mu;     /* mu: twisted mass */
 } openQCD_dirac_parms_t;
 
 typedef struct {
@@ -268,8 +269,7 @@ void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
  * @brief      Apply the Dirac operator that corresponds to the current openQxD
  *             setup to a field. All fields passed and returned are host (CPU)
  *             fields in openQCD order.
- *
- * @param[in]  mu    Twisted mass parameter
+ * @param      mu    The value of mu for twisted-mass
  * @param[in]  in    Input spinor (host pointer)
  * @param[out] out   Output spinor (host pointer)
  */
@@ -277,10 +277,9 @@ void openQCD_qudaDw(double mu, void *in, void *out);
 
 /**
  * @brief      Apply the Dirac operator that corresponds to the current openQxD
- *             setup to a field. All fields passed and returned are devicde
+ *             setup to a field. All fields passed and returned are device
  *             (GPU) fields returned by openQCD_qudaH2D().
- *
- * @param[in]  mu     Twisted mass parameter
+ * @param      mu    The value of mu for twisted-mass
  * @param[in]  d_in   Input spinor (device pointer)
  * @param[out] d_out  Output spinor (device pointer)
  */
@@ -338,7 +337,7 @@ void openQCD_qudaSolverPrintSetup(int id);
  * @param[in]  id        The solver identifier in the input file, i.e.
  *                       "Solver #". The input file is the one given by
  *                       quda_init
- * @param[in]  mu        Twisted mass parameter
+ * @param      mu        The value of mu for twisted-mass 
  * @param[in]  source    The source
  * @param[out] solution  The solution
  * @param[out] status    If the function is able to solve the Dirac equation to
@@ -350,7 +349,6 @@ void openQCD_qudaSolverPrintSetup(int id);
  */
 double openQCD_qudaInvert(int id, double mu, void* source, void* solution, int *status);
 
-
 /**
  * @brief      Solve Ax=b for an Clover Wilson operator with a QUDA solver. All
  *             fields passed and returned are host (CPU) field in openQCD order.
@@ -360,7 +358,7 @@ double openQCD_qudaInvert(int id, double mu, void* source, void* solution, int *
  * @param[in]  id         The solver identifier in the input file, i.e.
  *                        "Solver #". The input file is the one given by
  *                        quda_init
- * @param[in]  mu         Twisted mass parameter
+ * @param      mu        The value of mu for twisted-mass
  * @param[in]  sources    The source(s)
  * @param[out] solutions  The solution(s)
  * @param[out] status     If the function is able to solve the Dirac equation to

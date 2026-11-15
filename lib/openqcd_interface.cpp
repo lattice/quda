@@ -750,7 +750,9 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
 static ColorSpinorField *openQCD_qudaSpinorAlloc(void)
 {
   if (in_comm()) {
-    QudaInvertParam param = newOpenQCDParam();
+    /* QudaInvertParam param = newOpenQCDParam(); */
+    QudaInvertParam *param1 = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
+    QudaInvertParam & param = *param1;
     ColorSpinorParam cpuParam(nullptr, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
     ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -769,7 +771,10 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 
   if (in_comm()) {
     /* sets up the necessary parameters */
-    QudaInvertParam param = newOpenQCDParam();
+    /* QudaInvertParam param = newOpenQCDParam(); */
+    QudaInvertParam *param1 = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
+    QudaInvertParam & param = *param1;
+
 
     /* creates a field on the CPU */
     ColorSpinorParam cpuParam(out, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
@@ -789,7 +794,9 @@ void *openQCD_qudaH2D(void *openQCD_field)
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in)) {
 
     /* sets up the necessary parameters */
-    QudaInvertParam param = newOpenQCDParam();
+    /* QudaInvertParam param = newOpenQCDParam(); */
+    QudaInvertParam *param1 = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
+    QudaInvertParam & param = *param1;
 
     /* creates a field on the CPU */
     ColorSpinorParam cpuParam(in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
@@ -1032,6 +1039,14 @@ static int openQCD_qudaInvertParamCheck(void *param_)
     ret = false;
   }
 
+  if (param->mu != dp.mu) {
+    WITH_COMM(logQuda(
+      QUDA_VERBOSE, "Property mu does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: %.6e, QUDA: %.6e)\n",
+      dp.mu, param->mu));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  => need params update\n"));
+    ret = false;
+  }
+
   if (additional_prop->u1csw != dp.u1csw) {
     WITH_COMM(logQuda(
       QUDA_VERBOSE,
@@ -1156,15 +1171,29 @@ static void openQCD_qudaSolverUpdate(void *param_)
   }
 
   if (do_param_update) {
-    WITH_COMM(logQuda(QUDA_VERBOSE, "Syncing kappa, qhat, su3csw, u1csw values from openQCD ...\n"));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "Syncing kappa, qhat, su3csw, u1csw and mu values from openQCD ...\n"));
     param->kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
     additional_prop->u1csw = dp.u1csw;
     additional_prop->qhat = dp.qhat;
     set_su3csw(param, dp.su3csw);
 
+    logQuda(QUDA_DEBUG_VERBOSE, "openQCD_qudaSolverUpdate) param->mu was:%g, now is:%g (mu should NOT change here)\n ", param->mu, dp.mu);
+
+    param->mu = dp.mu;
+    if (fabs(param->mu) > 0.0) {
+    	param->twist_flavor = QUDA_TWIST_SINGLET;
+    	param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+    }
+
     QudaInvertParam *mg_inv_param = additional_prop->mg_param->invert_param;
     mg_inv_param->kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
     set_su3csw(mg_inv_param, dp.su3csw);
+    mg_inv_param->mu = dp.mu;
+    
+    if (fabs(mg_inv_param->mu) > 0.0) {
+    	mg_inv_param->twist_flavor = QUDA_TWIST_SINGLET;
+    	mg_inv_param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+    }
   }
 
   if (do_clover_update) {
@@ -1187,6 +1216,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
          */
         WITH_COMM(logQuda(QUDA_VERBOSE, "Generating Clover field in QUDA ...\n"));
         PUSH_RANGE("loadCloverQuda", 3);
+        logQuda(QUDA_DEBUG_VERBOSE, "Before loadCloverQuda: param->mu=%f, param->dslash_type=%d\n", param->mu, param->dslash_type); 
         WITH_COMM(loadCloverQuda(NULL, NULL, param));
         POP_RANGE;
         clover_field_set_revision();
@@ -1258,6 +1288,7 @@ static void *openQCD_qudaSolverReadIn(int id)
 {
   int my_rank;
   openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
+  logQuda(QUDA_DEBUG_VERBOSE, "Check dp.mu = %f, id = %d\n", dp.mu, id);  
 
   MPI_Comm_rank(qudaState.layout.world_comm, &my_rank);
 
@@ -1279,7 +1310,6 @@ static void *openQCD_qudaSolverReadIn(int id)
   param->gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
   param->dslash_type = QUDA_WILSON_DSLASH;
   param->kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
-  param->mu = 0.0;
   param->dagger = QUDA_DAG_NO;
   param->solution_type = QUDA_MAT_SOLUTION;
   param->solve_type = QUDA_DIRECT_SOLVE;
@@ -1289,6 +1319,12 @@ static void *openQCD_qudaSolverReadIn(int id)
   param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
   set_su3csw(param, dp.su3csw);
+
+  param->mu = dp.mu;
+  if( fabs(param->mu) > 0.0 ) {
+        param->twist_flavor = QUDA_TWIST_SINGLET;
+        param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+  }
 
   if (my_rank == 0 && id != -1) {
 
@@ -1315,7 +1351,7 @@ static void *openQCD_qudaSolverReadIn(int id)
 
     param->inv_type = kv.get<QudaInverterType>(section, "inv_type", param->inv_type);
     param->kappa = kv.get<double>(section, "kappa", param->kappa);
-    param->mu = kv.get<double>(section, "mu", param->mu);
+    /* param->mu = kv.get<double>(section, "mu", param->mu); Already set mu from upper section */
     param->tm_rho = kv.get<double>(section, "tm_rho", param->tm_rho);
     param->epsilon = kv.get<double>(section, "epsilon", param->epsilon);
     param->twist_flavor = kv.get<QudaTwistFlavorType>(section, "twist_flavor", param->twist_flavor);
@@ -1611,6 +1647,8 @@ static void *openQCD_qudaSolverReadIn(int id)
   additional_prop->u1csw = 0.0;
   additional_prop->qhat = 0.0;
   param->additional_prop = reinterpret_cast<void *>(additional_prop);
+ 
+  logQuda(QUDA_DEBUG_VERBOSE, "SolverReadIn return: id=%d, param->mu=%f, param->dslash_type=%d\n", id, param->mu, param->dslash_type); 
 
   return (void *)param;
 }
@@ -1669,7 +1707,13 @@ void openQCD_qudaDw(double mu, void *src, void *dst)
   }
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
-  param->mu = mu;
+
+  logQuda(QUDA_DEBUG_VERBOSE, "openQCD_qudaDw) param->mu was:%g, now is:%g \n ", param->mu, -mu);
+  param->mu = -mu;
+  if( fabs(param->mu) > 0.0 ) {
+        param->twist_flavor = QUDA_TWIST_SINGLET;
+        param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+  }
 
   if (!openQCD_qudaInvertParamCheck(param)) {
     WITH_COMM(errorQuda("QudaInvertParam struct check failed, parameters/fields between openQxD and QUDA are not in sync."));
@@ -1678,6 +1722,11 @@ void openQCD_qudaDw(double mu, void *src, void *dst)
   /* both fields reside on the CPU */
   param->input_location = QUDA_CPU_FIELD_LOCATION;
   param->output_location = QUDA_CPU_FIELD_LOCATION;
+ 
+  logQuda(QUDA_DEBUG_VERBOSE, "==== QUDA InvertParam Debug ====\n");
+  logQuda(QUDA_DEBUG_VERBOSE, "dslash_type: %d\n", param->dslash_type);
+  logQuda(QUDA_DEBUG_VERBOSE, "mu: %f\n", param->mu);
+  logQuda(QUDA_DEBUG_VERBOSE, "================================\n");
 
   void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, src);
   void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 1, dst);
@@ -1694,7 +1743,13 @@ void openQCD_qudaDw_NoLoads(double mu, void *d_in, void *d_out)
   }
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
-  param->mu = mu;
+
+  logQuda(QUDA_DEBUG_VERBOSE, "openQCD_qudaDw_NoLoads) param->mu was:%g, now is:%g \n ", param->mu, -mu);
+  param->mu = -mu;
+  if( fabs(param->mu) > 0.0 ) {
+        param->twist_flavor = QUDA_TWIST_SINGLET;
+        param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+  }
 
   if (!openQCD_qudaInvertParamCheck(param)) {
     WITH_COMM(errorQuda("QudaInvertParam struct check failed, parameters/fields between openQxD and QUDA are not in sync."));
@@ -1842,7 +1897,13 @@ void openQCD_qudaInvertMultiSrc(int id, double mu, void** sources, void** soluti
   }
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
-  param->mu = mu;
+
+  logQuda(QUDA_DEBUG_VERBOSE, "openQCD_qudaInvertMultiSrc) param->mu was:%g, now is:%g \n ", param->mu, -mu);
+  param->mu = -mu;
+  if( fabs(param->mu) > 0.0 ) {
+        param->twist_flavor = QUDA_TWIST_SINGLET;
+        param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+  }
 
   if (!openQCD_qudaInvertParamCheck(param)) {
     WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
@@ -1979,7 +2040,12 @@ void openQCD_qudaInvertAsyncSetup(int id, double mu)
   }
 
   qudaState.async_params = *static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
-  qudaState.async_params.mu = mu;
+  logQuda(QUDA_DEBUG_VERBOSE, "openQCD_qudaInvertAsyncSetup) qudaState.async_params.mu was:%g, now is:%g \n ", qudaState.async_params.mu, -mu);
+  qudaState.async_params.mu = -mu;
+  if( fabs(qudaState.async_params.mu) > 0.0 ) {
+        qudaState.async_params.twist_flavor = QUDA_TWIST_SINGLET;
+        qudaState.async_params.dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+  }
 
   if (!openQCD_qudaInvertParamCheck(&qudaState.async_params)) {
     WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
