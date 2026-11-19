@@ -26,28 +26,10 @@ namespace quda {
     const int parity;
     unsigned int sharedBytes;
 
-#if 0
-#if defined(QUDA_TARGET_SYCL)
-    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
-    {
-      // static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
-      // using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
-      // static constexpr int block_dim = 1;
-      // using BlockReduce_t = BlockReduce<vector, block_dim, Arg::n_vector_z>;
-      int coarse_color_per_thread = fineColor != 3 ? 2 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
-      int vsize = 2 * sizeof(out_t) * coarseSpin * coarse_color_per_thread;
-      return vsize * (tp.block.x * tp.block.y * tp.block.z) / device::warp_size();
-    }
-#else
-    bool tuneSharedBytes() const { return false; }
-#endif
-#else
     unsigned int sharedBytesPerBlock(const TuneParam &) const
     {
-      //printfQuda("restrictor getSharedBytes: %i\n", sharedBytes);
       return sharedBytes;
     }
-#endif
 
     bool tuneAuxDim() const { return true; }
     unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
@@ -77,7 +59,6 @@ namespace quda {
       arg.swizzle_factor = tp.aux.x;
       using Barg = BlockKernelArg<Aggregates::block[0], Arg<from_non_rel>>;
       sharedBytes = sharedMemSize<getKernelOps<Restrictor<Barg>>>(tp.block, Barg(arg));
-      //printfQuda("restrictor setSharedBytes: %i\n", sharedBytes);
       setSharedBytes(tp);
       launch<Restrictor, Aggregates>(tp, stream, arg);
     }
@@ -132,9 +113,7 @@ namespace quda {
       TunableBlock2D::initTuneParam(param);
       param.block.x = blockMapper();
       param.grid.x = out.Volume();
-      //param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
-      //setSharedBytes(param);
     }
 
     void defaultTuneParam(TuneParam &param) const
@@ -142,9 +121,7 @@ namespace quda {
       TunableBlock2D::defaultTuneParam(param);
       param.block.x = blockMapper();
       param.grid.x = out.Volume();
-      //param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
-      //setSharedBytes(param);
     }
 
     long long flops() const

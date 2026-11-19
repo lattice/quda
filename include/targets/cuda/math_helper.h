@@ -470,6 +470,8 @@ namespace quda
     return a / b;
   }
 
+  template<typename T> __device__ __host__ inline T fma(T a, T b, T c) { return std::fma(a, b, c); }
+
   template <bool is_device> struct ffma2_impl {
     inline float2 operator()(float2 a, float2 b, float2 c)
     {

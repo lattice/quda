@@ -259,8 +259,8 @@ namespace quda
     */
     template <typename T> __device__ __host__ auto dot_(compute_t &sum, const complex<T> &a, const complex<T> &b)
     {
-      sum = fma(compute_t(a.real()), compute_t(b.real()), sum);
-      sum = fma(compute_t(a.imag()), compute_t(b.imag()), sum);
+      sum = quda::fma(compute_t(a.real()), compute_t(b.real()), sum);
+      sum = quda::fma(compute_t(a.imag()), compute_t(b.imag()), sum);
     }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
@@ -329,10 +329,10 @@ namespace quda
       const auto ai = compute_t(a.imag());
       const auto br = compute_t(b.real());
       const auto bi = compute_t(b.imag());
-      sum.real(fma(ar, br, sum.real()));
-      sum.real(fma(ai, bi, sum.real()));
-      sum.imag(fma(ar, bi, sum.imag()));
-      sum.imag(fma(-ai, br, sum.imag()));
+      sum.real(quda::fma(ar, br, sum.real()));
+      sum.real(quda::fma(ai, bi, sum.real()));
+      sum.imag(quda::fma(ar, bi, sum.imag()));
+      sum.imag(quda::fma(-ai, br, sum.imag()));
     }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)

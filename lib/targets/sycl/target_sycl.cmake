@@ -59,33 +59,34 @@ mark_as_advanced(QUDA_SYCL_TARGETS)
 # ######################################################################################################################
 # define SYCL flags
 
-set(CMAKE_SYCL_FLAGS_DEVEL
+set(CMAKE_SYCLX_FLAGS_DEVEL
     "-O3 -gline-directives-only -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
-set(CMAKE_SYCL_FLAGS_STRICT
+set(CMAKE_SYCLX_FLAGS_STRICT
     "-Os -Wall -Wextra -Werror"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
-set(CMAKE_SYCL_FLAGS_RELEASE
+set(CMAKE_SYCLX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT}"
     CACHE STRING "Flags used by the C++ compiler during release builds.")
-set(CMAKE_SYCL_FLAGS_HOSTDEBUG
+set(CMAKE_SYCLX_FLAGS_HOSTDEBUG
     "-gline-directives-only -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_SYCL_FLAGS_DEBUG
+set(CMAKE_SYCLX_FLAGS_DEBUG
     "-gline-directives-only -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
-set(CMAKE_SYCL_FLAGS_SANITIZE
+set(CMAKE_SYCLX_FLAGS_SANITIZE
     "-gline-directives-only -fno-inline -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
-mark_as_advanced(CMAKE_SYCL_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_SYCL_FLAGS_STRICT)
-mark_as_advanced(CMAKE_SYCL_FLAGS_RELEASE)
-mark_as_advanced(CMAKE_SYCL_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_SYCL_FLAGS_DEBUG)
-mark_as_advanced(CMAKE_SYCL_FLAGS_SANITIZE)
+mark_as_advanced(CMAKE_SYCLX_FLAGS_DEVEL)
+mark_as_advanced(CMAKE_SYCLX_FLAGS_STRICT)
+mark_as_advanced(CMAKE_SYCLX_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_SYCLX_FLAGS_HOSTDEBUG)
+mark_as_advanced(CMAKE_SYCLX_FLAGS_DEBUG)
+mark_as_advanced(CMAKE_SYCLX_FLAGS_SANITIZE)
 
-enable_language(SYCL)
+#enable_language(SYCL)
+enable_language(SYCLX)
 
 #set(CMAKE_SYCL_FLAGS "${CMAKE_SYCL_FLAGS_${CMAKE_BUILD_TYPE}}")
 #message(STATUS "CMAKE_BUILD_TYPE " ${CMAKE_BUILD_TYPE})
@@ -103,7 +104,7 @@ set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter pre
 # SYCL specific variables
 
 # QUDA_HASH for tunecache
-#set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},sycl_version=${CMAKE_SYCL_COMPILER_VERSION})
+#set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},sycl_version=${CMAKE_SYCLX_COMPILER_VERSION})
 set(HASH cpu_arch=${CPU_ARCH},SYCL)
 #set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-SYCL")
@@ -111,15 +112,15 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-SYCL")
 # ######################################################################################################################
 # sycl specific compile options
 
-if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM" OR "x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xClang")
+if("x${CMAKE_SYCLX_COMPILER_ID}" STREQUAL "xIntelLLVM" OR "x${CMAKE_SYCLX_COMPILER_ID}" STREQUAL "xClang")
   target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fsycl>)
-  target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:SYCL>:-fsycl>)
+  target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:SYCLX>:-fsycl>)
   target_link_options(quda PUBLIC -fsycl)
   if(QUDA_SYCL_TARGETS)
     #string(APPEND CMAKE_CXX_FLAGS " -fsycl-targets=${QUDA_SYCL_TARGETS}")
     #string(APPEND CMAKE_SYCL_FLAGS " -fsycl-targets=${QUDA_SYCL_TARGETS}")
     target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fsycl-targets=${QUDA_SYCL_TARGETS}>)
-    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:SYCL>:-fsycl-targets=${QUDA_SYCL_TARGETS}>)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:SYCLX>:-fsycl-targets=${QUDA_SYCL_TARGETS}>)
     target_link_options(quda PUBLIC -fsycl-targets=${QUDA_SYCL_TARGETS})
   endif()
   set(SYCL_LINK_FLAGS -fsycl-device-code-split=per_kernel)
@@ -139,7 +140,7 @@ endif()
 
 target_compile_options(quda PRIVATE -std=c++20)
 
-if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM")
+if("x${CMAKE_SYCLX_COMPILER_ID}" STREQUAL "xIntelLLVM")
   target_compile_options(quda PUBLIC -fhonor-nan-compares)
   target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
   target_compile_options(quda PUBLIC -Rno-debug-disables-optimization)
@@ -153,7 +154,7 @@ if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM")
   #endif()
 endif()
 
-if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xClang")
+if("x${CMAKE_SYCLX_COMPILER_ID}" STREQUAL "xClang")
   target_compile_options(quda PUBLIC -fhonor-nans)
   target_compile_options(quda PUBLIC -Wno-vla-cxx-extension)
 endif()
@@ -164,7 +165,7 @@ if(DEFINED ENV{SYCL_FLAGS})
   message(STATUS "With user SYCL_FLAGS: ${SYCL_FLAGS}")
 endif()
 if(SYCL_FLAGS)
-  string(APPEND CMAKE_SYCL_FLAGS " ${SYCL_FLAGS}")
+  string(APPEND CMAKE_SYCLX_FLAGS " ${SYCL_FLAGS}")
 endif()
 
 if(DEFINED ENV{SYCL_LINK_FLAGS})
@@ -178,8 +179,8 @@ if(SYCL_LINK_FLAGS)
   target_link_options(quda PUBLIC "SHELL:${SYCL_LINK_FLAGS}")
 endif()
 
-string(JOIN " " CMAKE_SYCL_FLAGS ${CMAKE_SYCL_FLAGS} ${CMAKE_SYCL_COMPILE_OPTIONS_EXPLICIT_LANGUAGE})
-set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE SYCL)
+string(JOIN " " CMAKE_SYCLX_FLAGS ${CMAKE_SYCLX_FLAGS} ${CMAKE_SYCLX_COMPILE_OPTIONS_EXPLICIT_LANGUAGE})
+set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE SYCLX)
 
 #set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
 #if(SYCL_FLAGS)

@@ -164,7 +164,7 @@ namespace quda
     template <typename reduce_t, typename T> __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
     {
       auto d = reduce_t(a.real()) * reduce_t(b.real());
-      return fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
+      return quda::fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
     }
 
     template <typename reduce_t, typename real>
@@ -195,9 +195,9 @@ namespace quda
       const auto br = scalar_t(b.real());
       const auto bi = scalar_t(b.imag());
       auto r = ar * br;
-      r = fma(ai, bi, r);
+      r = quda::fma(ai, bi, r);
       auto i = ar * bi;
-      i = fma(-ai, br, i);
+      i = quda::fma(-ai, br, i);
       return reduce_t {r, i};
     }
 

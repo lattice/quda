@@ -9,7 +9,8 @@ namespace quda
   inline float fabs(const float a) { return sycl::fabs(a); }
   inline double fabs(const double a) { return sycl::fabs(a); }
 
-  template <typename T> inline int rint(const T a) { return (int)sycl::round(a); }
+  //template <typename T> inline int rint(const T a) { return (int)sycl::round(a); }
+  template <typename T> inline int rint(const T a) { return (int)sycl::rint(a); }
   template <typename T> inline T fmod(const T a, const T b) { return sycl::fmod(a, b); }
   inline __host__ __device__ bool isnan(float a) { return sycl::isnan(a); }
   inline __host__ __device__ bool isnan(double a) { return sycl::isnan(a); }
@@ -19,7 +20,7 @@ namespace quda
    * @param a first number
    * @param b second number
    */
-  template <typename T> inline __host__ __device__ T max(const T a, const T b) { return a > b ? a : b; }
+  template <typename T> inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
 
   /**
    * @brief Minimum of two numbers
@@ -43,7 +44,7 @@ namespace quda
   template <typename T> inline T cos(T a) { return sycl::cos(a); }
 
   /**
-   * @brief Combined sin and cos colculation in QUDA NAMESPACE
+   * @brief Combined sin and cos calculation in QUDA NAMESPACE
    * @param a the angle
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
@@ -155,11 +156,16 @@ namespace quda
   __device__ __host__ inline float2 mul2(float2 a, float2 b) { return {a.x * b.x, a.y * b.y}; }
   __device__ __host__ inline double2 mul2(double2 a, double2 b) { return {a.x * b.x, a.y * b.y}; }
 
+  template<typename T> inline T fma(T a, T b, T c) { return a * b + c; }
+  //template<typename T> inline T fma(T a, T b, T c) { return sycl::fma(a, b, c); }
+
   __device__ __host__ inline float2 fma2(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
   __device__ __host__ inline double2 fma2(double2 a, double2 b, double2 c)
   {
     return {a.x * b.x + c.x, a.y * b.y + c.y};
   }
+  //inline float2 fma2(float2 a, float2 b, float2 c) { return {sycl::fma(a.x, b.x, c.x), sycl::fma(a.y, b.y, c.y)}; }
+  //inline double2 fma2(double2 a, double2 b, double2 c) { return {sycl::fma(a.x, b.x, c.x), sycl::fma(a.y, b.y, c.y)}; }
 
   /**
      @brief IEEE double precision multiplication
@@ -175,5 +181,6 @@ namespace quda
      @brief IEEE double precision fused multiply add
   */
   __device__ __host__ inline double fma_rn(double a, double b, double c) { return a * b + c; }
+  //__device__ __host__ inline double fma_rn(double a, double b, double c) { return sycl::fma(a, b, c); }
 
 } // namespace quda
