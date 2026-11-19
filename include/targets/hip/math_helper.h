@@ -216,7 +216,8 @@ namespace quda
   __device__ __host__ inline float fdivide(float a, float b) { return target::dispatch<fdivide_impl>(a, b); }
   __device__ __host__ inline double fdivide(double a, double b) { return target::dispatch<fdivide_impl>(a, b); }
 
-  template<typename T> __device__ __host__ inline T fma(T a, T b, T c) { return std::fma(a, b, c); }
+  __device__ __host__ inline float fma(float a, float b, float c) { return std::fma(a, b, c); }
+  __device__ __host__ inline double fma(double a, double b, double c) { return std::fma(a, b, c); }
 
   __device__ __host__ inline float2 fma2(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
   __device__ __host__ inline double2 fma2(double2 a, double2 b, double2 c)

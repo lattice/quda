@@ -20,8 +20,8 @@ namespace quda
     template <typename T, size_t prefetch_size>
     __device__ __host__ inline void operator()(T &value, const void *ptr, index_t idx, const prefetch_t<prefetch_size> &)
     {
-      //value = static_cast<const T *>(ptr)[idx];
-      memcpy(&value, static_cast<const char *>(ptr)+idx*sizeof(T), sizeof(T));
+      value = static_cast<const T *>(ptr)[idx];
+      //memcpy(&value, static_cast<const char *>(ptr)+idx*sizeof(T), sizeof(T));
       //memcpy(&value, static_cast<const T *>(ptr)+idx, sizeof(T));
     }
   };
@@ -58,8 +58,8 @@ namespace quda
   template <bool is_device> struct vector_store_impl {
     template <typename T> __device__ __host__ inline void operator()(void *ptr, index_t idx, const T &value)
     {
-      //static_cast<T *>(ptr)[idx] = value;
-      memcpy(static_cast<char *>(ptr)+idx*sizeof(T), &value, sizeof(T));
+      static_cast<T *>(ptr)[idx] = value;
+      //memcpy(static_cast<char *>(ptr)+idx*sizeof(T), &value, sizeof(T));
       //memcpy(static_cast<T *>(ptr)+idx, &value, sizeof(T));
     }
   };

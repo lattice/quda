@@ -156,8 +156,10 @@ namespace quda
   __device__ __host__ inline float2 mul2(float2 a, float2 b) { return {a.x * b.x, a.y * b.y}; }
   __device__ __host__ inline double2 mul2(double2 a, double2 b) { return {a.x * b.x, a.y * b.y}; }
 
-  template<typename T> inline T fma(T a, T b, T c) { return a * b + c; }
-  //template<typename T> inline T fma(T a, T b, T c) { return sycl::fma(a, b, c); }
+  inline float fma(float a, float b, float c) { return a * b + c; }
+  inline double fma(double a, double b, double c) { return a * b + c; }
+  //inline float fma(float a, float b, float c) { return sycl::fma(a, b, c); }
+  //inline double fma(double a, double b, double c) { return sycl::fma(a, b, c); }
 
   __device__ __host__ inline float2 fma2(float2 a, float2 b, float2 c) { return {a.x * b.x + c.x, a.y * b.y + c.y}; }
   __device__ __host__ inline double2 fma2(double2 a, double2 b, double2 c)
