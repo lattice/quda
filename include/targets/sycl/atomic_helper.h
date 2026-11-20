@@ -1,7 +1,5 @@
 #pragma once
 
-//#include <array.h>
-
 /**
    @file atomic_helper.h
 

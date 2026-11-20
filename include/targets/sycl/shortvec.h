@@ -69,8 +69,7 @@ typedef vec3<float> float3;
 typedef vec4<float> float4;
 #define make_float1(a) make_vec1<float>(a)
 #define make_float2(a, b) make_vec2<float>(a, b)
-#define make_float3(a,b,c) make_vec3<float>(a,b,c)
-//#define make_float3(a, b, c) float3 { a, b, c }
+#define make_float3(a, b, c) make_vec3<float>(a, b, c)
 #define make_float4(a, b, c, d) make_vec4<float>(a, b, c, d)
 
 typedef vec1<double> double1;
