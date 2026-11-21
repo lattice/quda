@@ -451,6 +451,35 @@ extern "C" {
                         void *jlowmu2, int reload);
 
   /**
+   * Compute the exact low-mode contribution to the sea-quark loop with the
+   * insertion of a Dslash difference operator dD (MILC's exact_sea_loop):
+   *
+   *   jlow_sea += sum_n -2 Re < v_n | dD_eo D_oe v_n > / (lambda_n + 4 mass^2)
+   *
+   * Uses the even-parity deflation space, which must hold eigenvectors of
+   * the massless operator. Both link sets are copied to private device
+   * fields; the resident gauge fields are not changed.
+   *
+   * MILC sums jlow_sea over nodes afterward, so each rank receives
+   * 1/(number of ranks) of the global sum.
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] milc_dfatlink Fat links of the difference operator dD, on the host
+   * @param[in] milc_dlonglink Long links of the difference operator dD, on the host
+   * @param[in] milc_fatlink Fat links of the Dirac operator D, on the host
+   * @param[in] milc_longlink Long links of the Dirac operator D, on the host
+   * @param[in] mass Quark mass
+   * @param[in] inv_args Struct with the tadpole factor and Naik epsilon of the links
+   * @param[in] eigargs Struct containing information for the eigensolver (n_ev, prec_eigensolver)
+   * @param[in,out] jlow_sea Scalar to accumulate into, at external_precision (float if 1, double if 2)
+   */
+  void qudaExactSeaLoop(int external_precision, int quda_precision, const void *const milc_dfatlink,
+                        const void *const milc_dlonglink, const void *const milc_fatlink,
+                        const void *const milc_longlink, double mass, QudaInvertArgs_t inv_args,
+                        QudaEigensolverArgs_t eigargs, void *jlow_sea);
+
+  /**
    * Solve Ax=b for an improved staggered operator. All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
    * function requires that persistent gauge and clover fields have

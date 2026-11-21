@@ -117,4 +117,54 @@ namespace quda
     delete dirac;
   }
 
+  double exactSeaLoop(const std::vector<ColorSpinorField> &evec_even, const std::vector<real_t> &eval, real_t mass,
+                      GaugeField &fat, GaugeField &lng, GaugeField &dfat, GaugeField &dlng)
+  {
+    const int n_ev = evec_even.size();
+    if (n_ev < 1) errorQuda("exactSeaLoop requires at least one eigenvector");
+    if (eval.size() != static_cast<size_t>(n_ev)) errorQuda("Eigenvector and eigenvalue counts do not match");
+    for (auto *g : {&fat, &lng, &dfat, &dlng})
+      if (g->Precision() != evec_even[0].Precision())
+        errorQuda("Gauge precision %d does not match eigenvector precision %d", g->Precision(),
+                  evec_even[0].Precision());
+
+    // Two improved staggered operators, D (fat, lng) and dD (dfat, dlng).
+    // Only Dslash is used, so the mass and matpc type are immaterial.
+    DiracParam diracParam;
+    diracParam.type = QUDA_ASQTADPC_DIRAC;
+    diracParam.matpcType = QUDA_MATPC_EVEN_EVEN;
+    diracParam.dagger = QUDA_DAG_NO;
+    diracParam.mass = 0.0;
+    diracParam.gauge = &fat;
+    diracParam.fatGauge = &fat;
+    diracParam.longGauge = &lng;
+    Dirac *dirac = Dirac::create(diracParam);
+
+    diracParam.gauge = &dfat;
+    diracParam.fatGauge = &dfat;
+    diracParam.longGauge = &dlng;
+    Dirac *ddirac = Dirac::create(diracParam);
+
+    // Full-parity work field: Odd() holds D v, Even() holds dD D v
+    ColorSpinorParam gpuParam(evec_even[0]);
+    gpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gpuParam.x[0] *= 2;
+    gpuParam.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField work(gpuParam);
+
+    double sum = 0.0;
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    for (int i = 0; i < n_ev; i++) {
+      dirac->Dslash(work.Odd(), evec_even[i], QUDA_ODD_PARITY);
+      ddirac->Dslash(work.Even(), work.Odd(), QUDA_EVEN_PARITY);
+      const double z = static_cast<double>(blas::reDotProduct(evec_even[i], work.Even()));
+      sum += -2.0 * z / static_cast<double>(eval[i] + 4.0 * mass * mass);
+    }
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    delete ddirac;
+    delete dirac;
+    return sum;
+  }
+
 } // namespace quda

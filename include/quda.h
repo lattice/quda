@@ -1835,6 +1835,35 @@ extern "C" {
                         int nmasses, QudaInvertParam *param, const int *X, void *jlow, void *jlow2);
 
   /**
+   * Exact low-mode contribution to the sea-quark loop with the insertion of
+   * a Dslash difference operator dD:
+   *
+   *   result = sum_n -2 Re < v_n | dD_eo D_oe v_n > / (lambda_n + 4 mass^2),
+   *
+   * summed over the whole lattice (all ranks). D is the improved staggered
+   * Dslash from (fatlink, longlink) and dD the one from (dfatlink, dlonglink).
+   * Both link sets are copied to private, uncompressed device fields at the
+   * eigenvector precision; the resident gauge fields are not touched.
+   *
+   * @param[in] evec_even Even-parity eigenvector device pointers, length n_ev.
+   * @param[in] evals Real parts of the even-parity eigenvalues of the massless operator, length n_ev.
+   * @param[in] n_ev Number of eigenvectors.
+   * @param[in] mass Staggered mass.
+   * @param[in] fatlink Host fat links of D.
+   * @param[in] longlink Host long links of D.
+   * @param[in] dfatlink Host fat links of dD.
+   * @param[in] dlonglink Host long links of dD.
+   * @param[in] fat_param Gauge parameters of the host fat links; cuda_prec must equal param->cuda_prec.
+   * @param[in] long_param Gauge parameters of the host long links; cuda_prec must equal param->cuda_prec.
+   * @param[in] param Invert-param metadata. cuda_prec is the eigenvector precision.
+   * @param[in] X Full local lattice dimensions.
+   * @param[out] result The global sum.
+   */
+  void exactSeaLoopQuda(void **evec_even, const double *evals, int n_ev, double mass, void *fatlink, void *longlink,
+                        void *dfatlink, void *dlonglink, QudaGaugeParam *fat_param, QudaGaugeParam *long_param,
+                        QudaInvertParam *param, const int *X, double *result);
+
+  /**
    * @param[in] x pointer to host data array
    * @param[in] y pointer to host data array
    * @param[out] result pointer to the spin*spin projections per lattice slice site

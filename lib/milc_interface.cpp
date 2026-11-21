@@ -1630,6 +1630,69 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   qudamilc_called<false>(__func__, verbosity);
 } // qudaExactCurrent
 
+// Compute the exact low-mode contribution to the sea-quark loop with the
+// insertion of a Dslash difference operator (MILC's exact_sea_loop)
+void qudaExactSeaLoop(int external_precision, int quda_precision, const void *const dfatlink,
+                      const void *const dlonglink, const void *const fatlink, const void *const longlink, double mass,
+                      QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eigargs, void *jlow_sea)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  if (!dfatlink || !dlonglink || !fatlink || !longlink || !jlow_sea)
+    errorQuda("qudaExactSeaLoop requires fat and long links for both operators and an output");
+
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  // As in qudaExactCurrent, the Dslash operators act on the deflation eigenvectors,
+  // so they run at the eigenvector storage precision.
+  QudaPrecision device_precision = (eigargs.prec_eigensolver != QUDA_INVALID_PRECISION) ?
+    eigargs.prec_eigensolver :
+    ((quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION);
+
+  QudaGaugeParam fat_param = newQudaGaugeParam();
+  QudaGaugeParam long_param = newQudaGaugeParam();
+  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision,
+                 inv_args.tadpole, inv_args.naik_epsilon);
+
+  // Even-parity deflation space with eigenvalues of the massless operator
+  deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_deflation_space[0]);
+  if (!space_even) errorQuda("The even-parity deflation space is not loaded!");
+  if (preserved_evals_mass[0] != 0.0)
+    errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
+  int n_evecs = eigargs.n_ev;
+  if (n_evecs < 1) errorQuda("Requested number of eigenvectors %d must be positive", n_evecs);
+  if (space_even->evecs.size() < static_cast<size_t>(n_evecs) || space_even->evals.size() < static_cast<size_t>(n_evecs))
+    errorQuda("Requested %d eigenvectors but the even deflation space holds %zu (evals=%zu)", n_evecs,
+              space_even->evecs.size(), space_even->evals.size());
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParams(host_precision, device_precision, device_precision, 0.0, 1.0, 0.0, inv_args.max_iter, 1e-1,
+                  QUDA_EVEN_PARITY, verbosity, QUDA_CG_INVERTER, &invertParam);
+
+  std::vector<void *> evec_even(n_evecs);
+  std::vector<double> evals(n_evecs);
+  for (int i = 0; i < n_evecs; i++) {
+    evec_even[i] = space_even->evecs[i].data();
+    evals[i] = quda::to_double(space_even->evals[i].real());
+  }
+
+  double result = 0.0;
+  exactSeaLoopQuda(evec_even.data(), evals.data(), n_evecs, mass, const_cast<void *>(fatlink),
+                   const_cast<void *>(longlink), const_cast<void *>(dfatlink), const_cast<void *>(dlonglink), &fat_param,
+                   &long_param, &invertParam, localDim, &result);
+
+  // MILC accumulates a per-node partial sum and does the global sum itself
+  // (write_sea_values), but result is already global. Give each rank an
+  // equal share so that MILC's sum restores the total.
+  const double share = result / comm_size();
+  if (host_precision == QUDA_SINGLE_PRECISION)
+    *reinterpret_cast<float *>(jlow_sea) += static_cast<float>(share);
+  else
+    *reinterpret_cast<double *>(jlow_sea) += share;
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaExactSeaLoop
+
 // Wrapper function for qudaInvertDeflatable to maintain backward compatibility with old(er) MILC
 void qudaInvert(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                 double target_residual, double target_fermilab_residual, const void *const fatlink,

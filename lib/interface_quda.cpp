@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iostream>
 #include <functional>
+#include <memory>
 #include <sys/time.h>
 
 #include <quda.h>
@@ -241,6 +242,7 @@ static TimeProfile profileContract("contractQuda");
 
 //!< Profiler for the exact staggered current
 static TimeProfile profileExactCurrent("exactCurrentQuda");
+static TimeProfile profileExactSeaLoop("exactSeaLoopQuda");
 
 //!< Profiler for FT contractions
 static TimeProfile profileContractFT("contractFTQuda");
@@ -6437,6 +6439,68 @@ void exactCurrentQuda(void **evec_even, void **evec_odd, const double *evals, in
   profileExactCurrent.TPSTOP(QUDA_PROFILE_D2H);
 
   free(h_result);
+}
+
+// Device copy of a MILC-order staggered link field, uncompressed and at the
+// QudaGaugeParam's cuda_prec. Mirrors the field creation in loadGaugeQuda, but
+// the result is private (not resident) and never reconstructed: difference
+// links are not unitary.
+static std::unique_ptr<GaugeField> createDeviceStaggeredLinks(void *h_gauge, QudaGaugeParam param)
+{
+  if (!h_gauge) errorQuda("Null host link field");
+  checkGaugeParam(&param);
+  GaugeFieldParam gauge_param(param, h_gauge);
+  if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  std::unique_ptr<GaugeField> in(GaugeField::Create(gauge_param));
+
+  gauge_param.create = QUDA_NULL_FIELD_CREATE;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  gauge_param.setPrecision(param.cuda_prec, true);
+  gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
+  auto out = std::make_unique<GaugeField>(gauge_param);
+  out->copy(*in); // also exchanges the ghost links
+  return out;
+}
+
+void exactSeaLoopQuda(void **evec_even, const double *evals, int n_ev, double mass, void *fatlink, void *longlink,
+                      void *dfatlink, void *dlonglink, QudaGaugeParam *fat_param, QudaGaugeParam *long_param,
+                      QudaInvertParam *param, const int *X, double *result)
+{
+  auto profile = pushProfile(profileExactSeaLoop);
+
+  if (!evec_even || !evals || !fatlink || !longlink || !dfatlink || !dlonglink || !fat_param || !long_param || !param
+      || !X || !result)
+    errorQuda("exactSeaLoopQuda called with a null argument");
+  if (n_ev < 1) errorQuda("exactSeaLoopQuda requires at least one eigenvector");
+  if (fat_param->cuda_prec != param->cuda_prec || long_param->cuda_prec != param->cuda_prec)
+    errorQuda("Link precision (fat %d, long %d) must match the eigenvector precision %d", fat_param->cuda_prec,
+              long_param->cuda_prec, param->cuda_prec);
+
+  std::vector<real_t> eval(n_ev);
+  for (int i = 0; i < n_ev; i++) eval[i] = static_cast<real_t>(evals[i]);
+
+  // Wrap the device eigenvectors (native order, cuda_prec) without copying
+  QudaInvertParam invertParam = *param;
+  lat_dim_t X_ = {X[0], X[1], X[2], X[3]};
+  ColorSpinorParam csParam(evec_even[0], invertParam, X_, true, QUDA_CUDA_FIELD_LOCATION);
+  csParam.setPrecision(invertParam.cuda_prec, invertParam.cuda_prec, true);
+  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  std::vector<ColorSpinorField> src_even;
+  src_even.reserve(n_ev);
+  for (int i = 0; i < n_ev; i++) {
+    csParam.v = evec_even[i];
+    src_even.emplace_back(csParam);
+  }
+
+  profileExactSeaLoop.TPSTART(QUDA_PROFILE_H2D);
+  auto fat = createDeviceStaggeredLinks(fatlink, *fat_param);
+  auto lng = createDeviceStaggeredLinks(longlink, *long_param);
+  auto dfat = createDeviceStaggeredLinks(dfatlink, *fat_param);
+  auto dlng = createDeviceStaggeredLinks(dlonglink, *long_param);
+  profileExactSeaLoop.TPSTOP(QUDA_PROFILE_H2D);
+
+  *result = exactSeaLoop(src_even, eval, static_cast<real_t>(mass), *fat, *lng, *dfat, *dlng);
 }
 
 void gaugeObservablesQuda(QudaGaugeObservableParam *param)

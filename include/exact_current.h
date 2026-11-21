@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <color_spinor_field.h>
+#include <gauge_field.h>
 
 namespace quda
 {
@@ -30,5 +31,29 @@ namespace quda
                     const std::vector<real_t> &eval, const std::vector<real_t> &mass, QudaInvertParam &invert_param,
                     std::vector<ColorSpinorField> &acc_even, std::vector<ColorSpinorField> &acc_odd,
                     std::vector<ColorSpinorField> &acc2_even, std::vector<ColorSpinorField> &acc2_odd);
+
+  /**
+     @brief Exact low-mode contribution to the sea-quark loop with the
+     insertion of a Dslash difference operator,
+
+       sum_n -2 Re < v_n | dD_eo D_oe v_n > / (lambda_n + 4 m^2),
+
+     summed over the whole lattice (all ranks). v_n are the even-parity
+     eigenvectors of the massless operator with eigenvalues lambda_n, D is
+     the improved staggered Dslash built from (fat, lng), and dD is the
+     one built from the difference links (dfat, dlng). Emulates MILC's
+     exact_sea_loop() in generic_ks/f_meas_current.c.
+
+     @param[in] evec_even Even-parity eigenvectors (device fields).
+     @param[in] eval Real parts of the even-parity eigenvalues.
+     @param[in] mass Staggered mass.
+     @param[in] fat Fat links of the Dirac operator D.
+     @param[in] lng Long links of the Dirac operator D.
+     @param[in] dfat Fat links of the difference operator dD.
+     @param[in] dlng Long links of the difference operator dD.
+     @return The global (all-rank) sum.
+   */
+  double exactSeaLoop(const std::vector<ColorSpinorField> &evec_even, const std::vector<real_t> &eval, real_t mass,
+                      GaugeField &fat, GaugeField &lng, GaugeField &dfat, GaugeField &dlng);
 
 } // namespace quda
