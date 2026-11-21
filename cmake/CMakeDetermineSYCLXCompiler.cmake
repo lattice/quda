@@ -1,0 +1,36 @@
+if(NOT CMAKE_SYCLX_COMPILER)
+  set(CMAKE_SYCLX_COMPILER ${CMAKE_CXX_COMPILER})
+endif()
+mark_as_advanced(CMAKE_SYCLX_COMPILER)
+message(STATUS "The SYCLX compiler is " ${CMAKE_SYCLX_COMPILER})
+
+if(NOT CMAKE_SYCLX_COMPILER_ID_RUN)
+  set(CMAKE_SYCLX_COMPILER_ID_RUN 1)
+
+  # Try to identify the compiler.
+  set(CMAKE_SYCLX_COMPILER_ID)
+  set(CMAKE_SYCLX_PLATFORM_ID)
+  file(READ ${CMAKE_ROOT}/Modules/CMakePlatformId.h.in CMAKE_SYCLX_COMPILER_ID_PLATFORM_CONTENT)
+
+  set(CMAKE_SYCLX_COMPILER_ID_TEST_FLAGS_FIRST)
+  set(CMAKE_SYCLX_COMPILER_ID_TEST_FLAGS)
+
+  set(CMAKE_CXX_COMPILER_ID_CONTENT "#if defined(__INTEL_LLVM_COMPILER)\n# define COMPILER_ID \"IntelLLVM\"\n")
+  string(APPEND CMAKE_CXX_COMPILER_ID_CONTENT "#elif defined(__clang__)\n# define COMPILER_ID \"Clang\"\n")
+  string(APPEND CMAKE_CXX_COMPILER_ID_CONTENT "#endif\n")
+  include(${CMAKE_ROOT}/Modules/CMakeDetermineCompilerId.cmake)
+  CMAKE_DETERMINE_COMPILER_ID(SYCLX SYCLXFLAGS CMakeCXXCompilerId.cpp)
+
+  _cmake_find_compiler_sysroot(SYCLX)
+endif()
+
+
+#set(CMAKE_SYCLX_COMPILER_ID_TEST_FLAGS_FIRST)
+#set(CMAKESYCLX_COMPILER_ID_TEST_FLAGS "-c")
+#include(${CMAKE_ROOT}/Modules/CMakeDetermineCompilerId.cmake)
+#CMAKE_DETERMINE_COMPILER_ID(SYCLX SYCLXFLAGS CMakeCXXCompilerId.cpp)
+
+configure_file(${CMAKE_CURRENT_LIST_DIR}/CMakeSYCLXCompiler.cmake.in
+               ${CMAKE_PLATFORM_INFO_DIR}/CMakeSYCLXCompiler.cmake)
+
+set(CMAKE_SYCLX_COMPILER_ENV_VAR "SYCLX")

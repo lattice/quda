@@ -487,6 +487,10 @@ __device__ __host__ inline doubledouble hypot(const doubledouble &x, const doubl
 */
 __device__ __host__ inline doubledouble fma(const doubledouble &a, const doubledouble &b, const doubledouble &c) { return a * b + c; }
 
+namespace quda {
+  __device__ __host__ inline doubledouble fma(const doubledouble &a, const doubledouble &b, const doubledouble &c) { return ::fma(a, b, c); }
+}
+
 struct doubledouble2 {
   doubledouble x;
   doubledouble y;

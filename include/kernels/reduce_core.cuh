@@ -224,7 +224,7 @@ namespace quda
       const auto re = reduce_t(a.real());
       const auto im = reduce_t(a.imag());
       auto n = re * re;
-      return fma(im, im, n);
+      return quda::fma(im, im, n);
     }
 
     /**
@@ -262,7 +262,7 @@ namespace quda
       const auto br = reduce_t(b.real());
       const auto bi = reduce_t(b.imag());
       auto d = ar * br;
-      return fma(ai, bi, d);
+      return quda::fma(ai, bi, d);
     }
 
     template <typename reduce_t, typename real>
@@ -403,9 +403,9 @@ namespace quda
       const auto br = scalar_t(b.real());
       const auto bi = scalar_t(b.imag());
       auto r = ar * br;
-      r = fma(ai, bi, r);
+      r = quda::fma(ai, bi, r);
       auto i = ar * bi;
-      i = fma(-ai, br, i);
+      i = quda::fma(-ai, br, i);
       return reduce_t {r, i};
     }
 

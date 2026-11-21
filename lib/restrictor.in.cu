@@ -24,8 +24,13 @@ namespace quda {
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int parity;
+    unsigned int sharedBytes;
 
-    bool tuneSharedBytes() const { return false; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const
+    {
+      return sharedBytes;
+    }
+
     bool tuneAuxDim() const { return true; }
     unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
 
@@ -46,24 +51,29 @@ namespace quda {
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream)
+    template <bool from_non_rel>
+    void launch_(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Arg<from_non_rel> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      arg.swizzle_factor = tp.aux.x;
+      using Barg = BlockKernelArg<Aggregates::block[0], Arg<from_non_rel>>;
+      sharedBytes = sharedMemSize<getKernelOps<Restrictor<Barg>>>(tp.block, Barg(arg));
+      setSharedBytes(tp);
+      launch<Restrictor, Aggregates>(tp, stream, arg);
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
       if (checkNative(out[0], in[0], v)) {
         if constexpr (fineSpin == 4) {
           if (in[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
-            Arg<true> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-            arg.swizzle_factor = tp.aux.x;
-            launch<Restrictor, Aggregates>(tp, stream, arg);
+	    launch_<true>(stream);
           } else {
-            Arg<false> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-            arg.swizzle_factor = tp.aux.x;
-            launch<Restrictor, Aggregates>(tp, stream, arg);
+	    launch_<false>(stream);
           }
         } else {
-          Arg<false> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-          arg.swizzle_factor = tp.aux.x;
-          launch<Restrictor, Aggregates>(tp, stream, arg);
+	  launch_<false>(stream);
         }
       }
     }
@@ -103,7 +113,6 @@ namespace quda {
       TunableBlock2D::initTuneParam(param);
       param.block.x = blockMapper();
       param.grid.x = out.Volume();
-      param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
     }
 
@@ -112,7 +121,6 @@ namespace quda {
       TunableBlock2D::defaultTuneParam(param);
       param.block.x = blockMapper();
       param.grid.x = out.Volume();
-      param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
     }
 
