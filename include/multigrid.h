@@ -266,6 +266,14 @@ namespace quda {
     /** Storage for the parameter struct for the coarse solver */
     SolverParam *param_coarse_solver = nullptr;
 
+    /**
+       @return The next coarser MG level, nullptr on the coarsest level. On a
+       level with cycle_type VCYCLE (not the next-to-coarsest one) the coarse
+       grid solve passes through to this level, param_coarse_solver is then
+       nullptr.
+     */
+    MG *getCoarse() const { return coarse; }
+
   private:
     /** Local copy of the multigrid metadata */
     MGParam &param;
@@ -462,6 +470,31 @@ namespace quda {
      * @param[in]  in    The input vector
      */
     void projector(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
+
+    /**
+     * @brief      Solve on a coarser level of this hierarchy and prolongate
+     *             back, out = P_0 ... P_{d-1} A_d^{-1} R_{d-1} ... R_0 in
+     *             (indices relative to this level, d = depth). No smoothing is
+     *             applied on the levels in between. A_d^{-1} is the Krylov
+     *             coarse solver of level d-1 (param_coarse_solver, the level
+     *             must not pass through, i.e. cycle_type RECURSIVE or the
+     *             next-to-coarsest level), with its current parameters. This
+     *             allows one MG instance to provide the solves on several
+     *             levels, e.g. for multigrid low-mode averaging.
+     *
+     * @param[out] out    The output vector (on this level)
+     * @param[in]  in     The input vector (on this level)
+     * @param[in]  depth  Number of levels below this one, depth >= 1
+     */
+    void solveAtDepth(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int depth);
+
+    /**
+     * @brief      The parameters of the coarse solver used by solveAtDepth(),
+     *             nullptr if that level has none.
+     *
+     * @param[in]  depth  Number of levels below this one, depth >= 1
+     */
+    SolverParam *solverParamAtDepth(int depth);
 
     /**
      * @brief      Apply the coarse operator sandwiched by restrictor and

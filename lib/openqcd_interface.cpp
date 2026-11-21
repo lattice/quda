@@ -2095,19 +2095,81 @@ static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
 }
 
 
-static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, QudaInvertParam *param, int *status, double *residual)
+/**
+ * @brief      Apply the MG-LMA level solve of an MG instance.
+ *
+ * @param      x         solutions
+ * @param      b         sources
+ * @param      param     the solver (with MG preconditioner)
+ * @param      status    iteration count or -1 per source
+ * @param      residual  true relative residual per source
+ * @param[in]  depth     0: apply the MG cycle of level 0 (its coarse solve
+ *                       defines the level; if level 0 passes through
+ *                       (VCYCLE), the first Krylov coarse solve below).
+ *                       d >= 1: P_0..P_{d-1} A_d^{-1} R_{d-1}..R_0 via
+ *                       MG::solveAtDepth(), the solve on level d to
+ *                       param->tol; its solver parameters are restored
+ *                       afterwards, since the same solver can also be part of
+ *                       the preconditioner of a solve at a smaller depth.
+ */
+static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, QudaInvertParam *param,
+                           int *status, double *residual, int depth = 0)
 {
   static TimeProfile profileMG("MG");
   auto profile = pushProfile(profileMG, param); // this will fill param->secs/gflops properly in its deconstructor
 
   auto mg_instance = (multigrid_solver*) param->preconditioner;
   auto mg = (MG*) mg_instance->mg;
-  auto cparam = mg->param_coarse_solver;
+
+  if (depth > 0) {
+    SolverParam *cparam = mg->solverParamAtDepth(depth);
+    if (cparam == nullptr) errorQuda("MG level %d has no Krylov coarse solver for the solve at depth %d", depth - 1, depth);
+
+    const double tol0 = cparam->tol;
+    const bool true_res0 = cparam->compute_true_res, sloppy0 = cparam->sloppy_converge;
+    const QudaUseInitGuess guess0 = cparam->use_init_guess;
+    cparam->tol = param->tol;
+    cparam->compute_true_res = true;
+    cparam->sloppy_converge = false;
+    cparam->use_init_guess = QUDA_USE_INIT_GUESS_NO;
+    cparam->iter = 0;
+
+    massRescale(b, *param, false);
+    mg->solveAtDepth(x, b, depth);
+
+    param->iter = cparam->iter;
+    for (int i = 0; i < param->num_src; ++i) {
+      residual[i] = cparam->true_res[i];
+      status[i] = residual[i] <= cparam->tol ? cparam->iter : -1;
+    }
+
+    cparam->tol = tol0;
+    cparam->compute_true_res = true_res0;
+    cparam->sloppy_converge = sloppy0;
+    cparam->use_init_guess = guess0;
+    return;
+  }
+
+  // A level with cycle_type VCYCLE (and not the next-to-coarsest one) has no
+  // coarse solver of its own, it passes through to the next MG level. Descend
+  // to the level that owns the Krylov coarse solve, its tolerance, residual
+  // and iteration count describe the solve.
+  MG *solve_level = mg;
+  int pass = 0;
+  while (solve_level->param_coarse_solver == nullptr) {
+    MG *next = solve_level->getCoarse();
+    if (next == nullptr) errorQuda("No coarse solver found in the MG hierarchy");
+    solve_level = next;
+    pass++;
+  }
+  auto cparam = solve_level->param_coarse_solver;
+  if (pass > 0) logQuda(QUDA_DEBUG_VERBOSE, "callMultiSrcMg: pass-through, coarse solve on MG level %d\n", pass + 1);
 
   // we want true convergence
   cparam->compute_true_res = true;
   cparam->sloppy_converge = false;
-  cparam->use_init_guess = param->use_init_guess;
+  // an initial guess can only be passed to the solve on the first coarse level
+  cparam->use_init_guess = pass == 0 ? param->use_init_guess : QUDA_USE_INIT_GUESS_NO;
   cparam->iter = 0; // reset the solver
 
   // FIXME: explain this!
@@ -2175,8 +2237,10 @@ void openQCD_qudaMGTAR(int id, void* in_h, void* out_h)
 }
 
 
-void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions, int *status, double *residual)
+static void MGMultiSrc(int id, int depth, double mu, void** sources, void** solutions, int *status, double *residual)
 {
+  if (depth < 0) { WITH_COMM(errorQuda("depth = %d must be >= 0", depth)); }
+
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
   if (qudaState.layout.h_sw != nullptr) {
@@ -2205,7 +2269,7 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
     out[i] = std::move(CSFactory(param->use_init_guess == QUDA_USE_INIT_GUESS_YES ? solutions[i] : nullptr, prec));
   }
 
-  WITH_COMM(callMultiSrcMg(out, in, param, status, residual));
+  WITH_COMM(callMultiSrcMg(out, in, param, status, residual, depth));
 
   for (int i = 0; i < param->num_src; ++i) {
     openQCD_qudaD2H(&(out[i]), solutions[i]);
@@ -2216,7 +2280,7 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
     MPI_Bcast(residual, param->num_src, MPI_DOUBLE, 0, qudaState.layout.world_comm);
   }
 
-  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaMGMultiSrc()\n"));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaMGMultiSrc(depth=%d)\n", depth));
   WITH_COMM(logQuda(QUDA_VERBOSE, "  iter           = %d\n", param->iter));
   WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops         = %.2e\n", param->gflops));
   WITH_COMM(logQuda(QUDA_VERBOSE, "  secs           = %.2e\n", param->secs));
@@ -2224,6 +2288,17 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
     WITH_COMM(logQuda(QUDA_VERBOSE, "  residual[%d]    = %.2e\n", i, residual[i]));
     WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]      = %d\n", i, status[i]));
   }
+}
+
+void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions, int *status, double *residual)
+{
+  MGMultiSrc(id, 0, mu, sources, solutions, status, residual);
+}
+
+void openQCD_qudaMGMultiSrcDepth(int id, int depth, double mu, void** sources, void** solutions, int *status,
+                                 double *residual)
+{
+  MGMultiSrc(id, depth, mu, sources, solutions, status, residual);
 }
 
 

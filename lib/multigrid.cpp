@@ -1219,7 +1219,8 @@ namespace quda
             r_coarse[0].Precision(), residual[0].Precision());
         transfer->R(r_coarse, residual);
 
-        if (param.level == 0 && param_coarse_solver->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        // param_coarse_solver is null if this level passes through to the next MG level (VCYCLE)
+        if (param.level == 0 && param_coarse_solver && param_coarse_solver->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
           logQuda(QUDA_VERBOSE, "Using inital guess for coarse solver ...\n");
           transfer->R(x_coarse, x);
         }
@@ -1271,6 +1272,40 @@ namespace quda
     QudaSiteSubset site_subset
       = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
     transfer->setSiteSubset(site_subset, parity); // use this to force location of transfer
+  }
+
+  SolverParam *MG::solverParamAtDepth(int depth)
+  {
+    if (depth < 1 || param.level + depth > param.Nlevel - 1)
+      errorQuda("Invalid depth %d on level %d of a %d-level hierarchy", depth, param.level, param.Nlevel);
+    return depth == 1 ? param_coarse_solver : coarse->solverParamAtDepth(depth - 1);
+  }
+
+  void MG::solveAtDepth(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int depth)
+  {
+    if (depth < 1 || param.level + depth > param.Nlevel - 1)
+      errorQuda("Invalid depth %d on level %d of a %d-level hierarchy", depth, param.level, param.Nlevel);
+    if (!transfer) errorQuda("Coarse levels need to be created");
+    if (param.coarse_grid_solution_type != QUDA_MAT_SOLUTION)
+      errorQuda("solveAtDepth requires coarse_grid_solution_type QUDA_MAT_SOLUTION on level %d", param.level);
+    if (depth == 1 && param_coarse_solver == nullptr)
+      errorQuda("Level %d has no Krylov coarse solver (cycle_type VCYCLE passes through)", param.level);
+
+    pushOutputPrefix(prefix);
+
+    transfer->setSiteSubset(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
+    resize(r_coarse, in.size(), QUDA_NULL_FIELD_CREATE);
+    resize(x_coarse, in.size(), QUDA_NULL_FIELD_CREATE);
+
+    transfer->R(r_coarse, in);
+    if (depth == 1) {
+      (*coarse_solver)(x_coarse, r_coarse);
+    } else {
+      coarse->solveAtDepth(x_coarse, r_coarse, depth - 1);
+    }
+    transfer->P(out, x_coarse);
+
+    popOutputPrefix();
   }
 
   void MG::projector(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in)

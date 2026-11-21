@@ -413,6 +413,31 @@ double openQCD_qudaMG(int id, double mu, void* source, void* solution, int *stat
 void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions, int *status, double *residual);
 
 /**
+ * @brief      Like openQCD_qudaMGMultiSrc(), but the result is the solve on
+ *             level depth of the MG hierarchy, prolongated back,
+ *             P_0 .. P_{d-1} A_d^{-1} R_{d-1} .. R_0 (d = depth, no smoothing in
+ *             between), solved to invert_param->tol by the Krylov coarse solver
+ *             of level d-1 (the level must not pass through, i.e. cycle_type
+ *             QUDA_MG_CYCLE_RECURSIVE or the next-to-coarsest level, and all
+ *             levels 0..d-1 need coarse_grid_solution_type QUDA_MAT_SOLUTION).
+ *             One MG instance can so provide the solves of several MG-LMA
+ *             levels, e.g. depth 1 (the 8x8x4x4 aggregation of level 0) and
+ *             depth 2 (with the blocking of level 1 on top). depth = 0 is
+ *             openQCD_qudaMGMultiSrc().
+ *
+ * @param[in]  id         The solver identifier, "Solver #"
+ * @param[in]  depth      The level of the solve, >= 0
+ * @param[in]  mu         Twisted mass parameter
+ * @param[in]  sources    The source(s)
+ * @param[out] solutions  The solution(s)
+ * @param[out] status     Iteration count per source, -1 if the solve did not
+ *                        reach invert_param->tol
+ * @param      residual   The num_src true relative residuals of the solve
+ */
+void openQCD_qudaMGMultiSrcDepth(int id, int depth, double mu, void** sources, void** solutions, int *status,
+                                 double *residual);
+
+/**
  * @brief      Apply the MG projector.
  *
  * @param[in]  id     The solver identifier
