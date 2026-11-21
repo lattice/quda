@@ -258,6 +258,8 @@ namespace quda
     using ccc_t = floatfloat_cccl_t<T>;
     atomicAdd(static_cast<ccc_t *>(addr), static_cast<const ccc_t &>(val));
   }
+
+  __device__ __host__ inline floatfloat fma(const floatfloat &a, const floatfloat &b, const floatfloat &c) { return cuda::fma(a, b, c); }
 } // namespace quda
 
 template <typename T, quda::enable_if_floatfloat<T> = 0> __device__ __host__ inline T abs(const T &a)
