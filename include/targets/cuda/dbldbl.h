@@ -110,7 +110,7 @@ namespace quda
     return output;
   }
 
-  __device__ __host__ inline doubledouble fma(const doubledouble &a, const doubledouble &b, const doubledouble &c) { return ::fma(a, b, c); }
+  __device__ __host__ inline doubledouble fma(const doubledouble &a, const doubledouble &b, const doubledouble &c) { return cuda::fma(a, b, c); }
 
   template <typename T>
   __device__ __host__ inline doubledouble_pair<T> add2(doubledouble_pair<T> a, doubledouble_pair<T> b)
