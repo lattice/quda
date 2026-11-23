@@ -139,7 +139,8 @@ namespace
     ha.copy(a);
     hb.copy(b);
 
-    // sites by their coordinates in the field, halo included; R is the halo width of an extended field
+    // sites by their coordinates in the field, halo included; R is the halo width of an extended field, whose sites
+    // are labelled by the parity of their interior coordinates
     const auto &E = ha.X();
     const auto &R = ha.R();
     const size_t volume = ha.Volume();
@@ -150,7 +151,8 @@ namespace
         for (int y = 0; y < E[1]; y++)
           for (int x = 0; x < E[0]; x++) {
             const size_t lex = x + E[0] * (y + static_cast<size_t>(E[1]) * (z + static_cast<size_t>(E[2]) * t));
-            const size_t index = (x + y + z + t) % 2 == 0 ? lex / 2 : (lex + volume) / 2;
+            const int parity = (x + y + z + t + R[0] + R[1] + R[2] + R[3]) & 1;
+            const size_t index = parity * (volume / 2) + lex / 2;
             for (int dir = 0; dir < 4; dir++) {
               const auto pa = static_cast<const char *>(ha.data(dir)) + index * site_bytes;
               const auto pb = static_cast<const char *>(hb.data(dir)) + index * site_bytes;
@@ -276,10 +278,6 @@ namespace
   }
 
   /**
-     @param[in] type A staggered phase convention
-     @return Its name in test names
-   */
-  /**
      @param[in] recon A reconstruct
      @return Whether this build instantiates it
    */
@@ -330,6 +328,10 @@ namespace
     return v;
   }
 
+  /**
+     @param[in] type A staggered phase convention
+     @return Its name in test names
+   */
   const char *get_phase_str(QudaStaggeredPhase type)
   {
     switch (type) {
