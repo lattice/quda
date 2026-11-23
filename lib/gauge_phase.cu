@@ -58,10 +58,14 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeTBoundary_ : TunableKernel2D
   {
     GaugeField &u; // used for meta data only
+    long long boundary_bytes;
     unsigned int minThreads() const { return u.VolumeCB(); }
 
   public:
-    GaugeTBoundary_(GaugeField &u) : TunableKernel2D(u, 2), u(u)
+    GaugeTBoundary_(GaugeField &u) :
+      TunableKernel2D(u, 2),
+      u(u),
+      boundary_bytes(2 * (u.Bytes() / 4) * GaugePhaseGeometry(u).boundaryTimeSlices() / u.X()[3])
     {
       strcat(aux, "t_boundary");
       apply(device::get_default_stream());
@@ -77,7 +81,7 @@ namespace quda {
     void postTune() { u.restore(); }
 
     long long flops() const { return 0; }
-    long long bytes() const { return 2 * u.Bytes() / 4; }
+    long long bytes() const { return boundary_bytes; }
   };
 
   void applyGaugeTBoundary(GaugeField &u)

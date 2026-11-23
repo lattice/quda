@@ -40,6 +40,16 @@ namespace quda
        @param[in] t The global t coordinate
      */
     __device__ __host__ inline bool crossesTBoundary(int t) const { return t >= G[3] - boundary_slices; }
+
+    /**
+       @brief The number of time slices of the field, halo included, whose t links cross the t boundary
+     */
+    int boundaryTimeSlices() const
+    {
+      int n = 0;
+      for (int t = 0; t < E[3]; t++) n += crossesTBoundary((t - border[3] + offset[3] + G[3]) % G[3]);
+      return n;
+    }
   };
 
   /**
