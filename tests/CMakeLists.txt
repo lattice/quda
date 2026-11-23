@@ -211,6 +211,11 @@ target_link_libraries(su3_test ${TEST_LIBS})
 quda_checkbuildtest(su3_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS su3_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(gauge_phase_test gauge_phase_test.cpp)
+target_link_libraries(gauge_phase_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_phase_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_phase_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 if(QUDA_DIRAC_LAPLACE)
   add_executable(su3_fermion_test su3_fermion_test.cpp)
   target_link_libraries(su3_fermion_test ${TEST_LIBS})
@@ -1687,6 +1692,11 @@ add_test(NAME su3
   COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:su3_test> ${MPIEXEC_POSTFLAGS}
   --dim 2 4 6 8 --enable-testing true --niter 1
   --gtest_output=xml:su3_test.xml)
+
+add_test(NAME gauge_phase
+         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_phase_test> ${MPIEXEC_POSTFLAGS}
+                 --dim 4 4 4 8
+                 --gtest_output=xml:gauge_phase_test.xml)
 
 foreach(prec IN LISTS TEST_PRECS)
 
