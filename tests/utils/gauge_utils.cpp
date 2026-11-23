@@ -1,5 +1,7 @@
 #include <cmath>
+#include <complex>
 #include <quda.h>
+#include <comm_quda.h>
 #include <gauge_field.h>
 #include <qio_field.h>
 
@@ -84,6 +86,31 @@ template <typename real> struct ApplyGaugeTemporalBCs {
 void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision, bool three_link)
 {
   instantiate_host<ApplyGaugeTemporalBCs>(precision, gauge, Vh, t_boundary, three_link);
+}
+
+/**
+ * @brief Apply an imaginary chemical potential, as QUDA's staggered phases do
+ *
+ * @tparam real Floating point type of the gauge field
+ * @param[in,out] gauge QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] i_mu The imaginary chemical potential
+ */
+template <typename real> struct ApplyGaugeImaginaryChemicalPotential {
+  void operator()(void *const *gauge_, int Vh, double i_mu)
+  {
+    const auto gauge = typed_ptr_array<real *>(gauge_);
+    const double angle = M_PI * i_mu / (quda::comm_dim(3) * Z[3]);
+    const std::complex<real> phase(std::cos(angle), std::sin(angle));
+    const auto links = reinterpret_cast<std::complex<real> *>(gauge[3]);
+#pragma omp parallel for
+    for (auto i = 0lu; i < 2 * Vh * (gauge_site_size / 2); i++) links[i] *= phase;
+  }
+};
+
+void applyGaugeImaginaryChemicalPotential(void *const *gauge, int Vh, double i_mu, QudaPrecision precision)
+{
+  instantiate_host<ApplyGaugeImaginaryChemicalPotential>(precision, gauge, Vh, i_mu);
 }
 
 /**

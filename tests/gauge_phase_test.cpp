@@ -20,7 +20,8 @@
 // The staggered phases that GaugeField::applyStaggeredPhase and removeStaggeredPhase apply to device fields,
 // against the test utilities' host phases (applyGaugeStaggeredPhase) and t boundary sign (applyGaugeTemporalBCs):
 // the MILC, TIFR or CHROMA convention, times the antiperiodic sign on the t links of the last global t slice, or of
-// the last three for long links.  The links are Haar-random, and the fields must agree exactly.  Extended fields are
+// the last three for long links.  The links are Haar-random, and the fields must agree exactly, except under an
+// imaginary chemical potential, whose phase on the t links rounds, so they agree within tolerance.  Extended fields are
 // checked as the gauge force and gauge path computations use them: removing the phases from an extended copy of a
 // phased field must give the extended copy of the field without phases, halo included.  Through the interface,
 // phased links with the antiperiodic sign are loaded with the phases removed: labelled periodic, as MILC's
@@ -42,11 +43,12 @@ namespace
      @param[in] t_boundary t boundary the field records
      @param[in] link_type SU(3) links, or long links
      @param[in] recon The reconstruct of a device field; host fields have none
+     @param[in] i_mu The imaginary chemical potential the field records
      @return The parameters
    */
   quda::GaugeFieldParam field_param(QudaFieldLocation location, QudaPrecision prec, QudaStaggeredPhase phase,
                                     QudaTboundary t_boundary, QudaLinkType link_type = QUDA_SU3_LINKS,
-                                    QudaReconstructType recon = QUDA_RECONSTRUCT_NO)
+                                    QudaReconstructType recon = QUDA_RECONSTRUCT_NO, double i_mu = 0.0)
   {
     QudaGaugeParam gauge_param = newQudaGaugeParam();
     setWilsonGaugeParam(gauge_param);
@@ -55,6 +57,7 @@ namespace
     gauge_param.t_boundary = t_boundary;
     gauge_param.staggered_phase_type = phase;
     gauge_param.staggered_phase_applied = false;
+    gauge_param.i_mu = i_mu;
     quda::GaugeFieldParam param(gauge_param);
     param.location = location;
     param.create = QUDA_NULL_FIELD_CREATE;
@@ -370,6 +373,32 @@ TEST_P(GaugePhaseTest, apply_remove)
   EXPECT_FALSE(device.StaggeredPhaseApplied());
   host.copy(device);
   expect_links(host, "device unphased", u, "original");
+}
+
+// an imaginary chemical potential multiplies every t link by exp(i pi i_mu / T) along with the phases, T being the
+// global time extent, and removing the phases takes it out again; long links don't support it
+TEST_P(GaugePhaseTest, i_mu)
+{
+  const auto [prec, type, t_boundary, link_type] = GetParam();
+  if (!quda::is_enabled(prec) || link_type == QUDA_THREE_LINKS) GTEST_SKIP();
+  constexpr double i_mu = 0.3;
+  const double tol = getTolerance(prec);
+  const auto u = random_field(prec, t_boundary);
+  quda::GaugeField device(
+    field_param(QUDA_CUDA_FIELD_LOCATION, prec, type, t_boundary, link_type, QUDA_RECONSTRUCT_NO, i_mu));
+  device.copy(u);
+
+  device.applyStaggeredPhase(type);
+  quda::GaugeField host(field_param(QUDA_CPU_FIELD_LOCATION, prec, type, t_boundary, link_type));
+  host.copy(device);
+  auto expected = host_phased(u, type, t_boundary);
+  auto arrays = expected.data_array();
+  applyGaugeImaginaryChemicalPotential(arrays.data, static_cast<int>(expected.VolumeCB()), i_mu, prec);
+  expect_links(host, "device phased", expected, "host phased", tol);
+
+  device.removeStaggeredPhase();
+  host.copy(device);
+  expect_links(host, "device unphased", u, "original", tol);
 }
 
 // removing the phases from an extended copy of a phased field gives the extended copy of the field without phases

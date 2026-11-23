@@ -94,6 +94,17 @@ void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary,
                            bool three_link = false);
 
 /**
+ * @brief Multiply every t link of a QDP-ordered gauge field of the test's lattice by the phase that an imaginary
+ * chemical potential gives it in QUDA's staggered phases, exp(i pi i_mu / T), T being the global time extent
+ *
+ * @param[in,out] gauge QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] i_mu The imaginary chemical potential
+ * @param[in] precision Floating-point precision of the field
+ */
+void applyGaugeImaginaryChemicalPotential(void *const *gauge, int Vh, double i_mu, QudaPrecision precision);
+
+/**
  * @brief Apply staggered phases to a QDP-ordered gauge field, in all four directions, without the t boundary sign,
  * which applyGaugeTemporalBCs applies
  *
