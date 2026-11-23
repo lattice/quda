@@ -1032,7 +1032,7 @@ void createSiteLinkCPU(void *const *gauge, QudaPrecision precision, SiteLinkType
     constructRandomSU3GaugeField(gauge, precision);
   } else if (phase == SiteLinkType::SITELINK_PHASE_MILC) {
     constructRandomSU3GaugeField(gauge, precision);
-    applyGaugeStaggeredPhase(gauge, Vh, Z, precision, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
+    applyGaugeStaggeredPhase(gauge, Vh, Z, precision, QUDA_STAGGERED_PHASE_MILC);
   } else if (phase == SiteLinkType::SITELINK_PHASE_U1) {
     constructRandomSU3GaugeField(gauge, precision);
     applyRandomU1Phase(gauge, precision);

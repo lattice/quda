@@ -81,19 +81,26 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
                              QudaPrecision precision);
 
 /**
- * @brief Apply staggered phases to a QDP-ordered gauge field
+ * @brief Apply staggered phases to a QDP-ordered gauge field, in all four directions, without the t boundary sign,
+ * which applyGaugeTemporalBCs applies
  *
- * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] X Full-parity local dimensions
  * @param[in] precision Gauge field floating point precision
- * @param[in] t_boundary Temporal boundary conditions
- * @param[in] phase_type Staggered phase type
+ * @param[in] phase_type Staggered phase type: MILC, TIFR or CHROMA
  */
 void applyGaugeStaggeredPhase(void *const *gauge, int Vh, const int X[], QudaPrecision precision,
-                              QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
                               QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC);
+
+/**
+ * @brief Apply staggered phases to a host gauge field of any order, in all four directions, without the t boundary
+ * sign, which applyGaugeTemporalBCs applies; a field in another order than QDP goes through a QDP copy
+ *
+ * @param[in,out] gauge The host gauge field, not extended
+ * @param[in] phase_type Staggered phase type: MILC, TIFR or CHROMA
+ */
+void applyGaugeStaggeredPhase(quda::GaugeField &gauge, QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC);
 
 /**
  * @brief Apply spatial scaling, anti-periodic boundary conditions, or temporal gauge fixing as requested

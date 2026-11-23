@@ -231,37 +231,36 @@ real getStaggeredPhase(int x, int y, int z, int t, const int X[], int dim,
 }
 
 /**
- * @brief Apply staggered phases to a gauge field
+ * @brief Apply staggered phases to a gauge field, in all four directions, without the t boundary sign
  *
  * @tparam real Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] X Full-parity local dimensions
- * @param[in] t_boundary Temporal boundary conditions
  * @param[in] phase_type Staggered phase type
  */
 template <typename real> struct ApplyGaugeStaggeredPhase {
-  void operator()(void *const *gauge_, int Vh, const int X[], QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
-                  QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
+  void operator()(void *const *gauge_, int Vh, const int X[], QudaStaggeredPhase phase_type)
   {
     const auto gauge = typed_ptr_array<real *>(gauge_);
 
+    int dims[4] = {X[0], X[1], X[2], X[3]};
     int X1 = X[0];
     int X2 = X[1];
     int X3 = X[2];
 
-    // apply the staggered phases
-    for (int d = 0; d < 3; d++) {
+    // the t boundary sign is applyGaugeTemporalBCs's, so the phases are taken with a periodic t
+    for (int d = 0; d < 4; d++) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         for (int parity = 0; parity < 2; parity++) {
-          int index = fullLatticeIndex(i, parity);
+          int index = fullLatticeIndex(dims, i, parity);
           int i4 = index / (X3 * X2 * X1);
           int i3 = (index - i4 * (X3 * X2 * X1)) / (X2 * X1);
           int i2 = (index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1)) / X1;
           int i1 = index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
 
-          real sign = getStaggeredPhase<real>(i1, i2, i3, i4, X, d, t_boundary, phase_type);
+          real sign = getStaggeredPhase<real>(i1, i2, i3, i4, X, d, QUDA_PERIODIC_T, phase_type);
 
           for (int j = 0; j < 18; j++) { gauge[d][(parity * Vh + i) * gauge_site_size + j] *= sign; }
         }
@@ -271,9 +270,31 @@ template <typename real> struct ApplyGaugeStaggeredPhase {
 };
 
 void applyGaugeStaggeredPhase(void *const *gauge, int Vh, const int X[], QudaPrecision precision,
-                              QudaTboundary t_boundary, QudaStaggeredPhase phase_type)
+                              QudaStaggeredPhase phase_type)
 {
-  instantiate_host<ApplyGaugeStaggeredPhase>(precision, gauge, Vh, X, t_boundary, phase_type);
+  instantiate_host<ApplyGaugeStaggeredPhase>(precision, gauge, Vh, X, phase_type);
+}
+
+void applyGaugeStaggeredPhase(quda::GaugeField &gauge, QudaStaggeredPhase phase_type)
+{
+  if (gauge.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("applyGaugeStaggeredPhase needs a host gauge field");
+  if (gauge.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED)
+    errorQuda("applyGaugeStaggeredPhase does not support extended gauge fields");
+  const int X[4] = {gauge.X()[0], gauge.X()[1], gauge.X()[2], gauge.X()[3]};
+  // not raw_pointer(): it returns a static buffer that every later call overwrites
+  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+    auto arrays = gauge.data_array();
+    applyGaugeStaggeredPhase(arrays.data, static_cast<int>(gauge.VolumeCB()), X, gauge.Precision(), phase_type);
+  } else {
+    GaugeFieldParam param(gauge);
+    param.order = QUDA_QDP_GAUGE_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField u(param);
+    u.copy(gauge);
+    auto arrays = u.data_array();
+    applyGaugeStaggeredPhase(arrays.data, static_cast<int>(u.VolumeCB()), X, u.Precision(), phase_type);
+    gauge.copy(u);
+  }
 }
 
 void applyGaugeFieldScaling(void *const *gauge, int Vh, const QudaGaugeParam &param, QudaPrecision precision)
@@ -526,7 +547,7 @@ GaugeInputMode resolveGaugeInputMode(GaugeInputMode default_mode)
 void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
                                   GaugeInputMode default_mode, QudaStaggeredPhase phase)
 {
-  // applyGaugeStaggeredPhase only sets the spatial phases, which is the complete MILC convention
+  // the tests' gauge input takes MILC's phases or none
   if (phase != QUDA_STAGGERED_PHASE_NO && phase != QUDA_STAGGERED_PHASE_MILC)
     errorQuda("Unsupported staggered phase type %d for gauge input", phase);
 
@@ -543,8 +564,7 @@ void constructHostGaugeInputField(void *const *gauge, const QudaGaugeParam &gaug
   }
 
   applyGaugeFieldScaling(gauge, Vh, gauge_param, gauge_param.cpu_prec);
-  if (phase != QUDA_STAGGERED_PHASE_NO)
-    applyGaugeStaggeredPhase(gauge, Vh, gauge_param.X, gauge_param.cpu_prec, QUDA_PERIODIC_T, phase);
+  if (phase != QUDA_STAGGERED_PHASE_NO) applyGaugeStaggeredPhase(gauge, Vh, gauge_param.X, gauge_param.cpu_prec, phase);
 }
 
 void constructHostGaugeInputField(quda::GaugeField &gauge, const QudaGaugeParam &gauge_param, int argc, char **argv,
@@ -766,7 +786,7 @@ void applyGaugeFieldScaling_long(void *const *gauge, int Vh, const QudaGaugePara
   // apply staggered phases WITHOUT the temporal boundary conditions
   // The temporal boundary conditions are (carefully) applied in
   // applyGaugeTemporalBCs
-  applyGaugeStaggeredPhase(gauge, Vh, param.X, precision, QUDA_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
+  applyGaugeStaggeredPhase(gauge, Vh, param.X, precision, QUDA_STAGGERED_PHASE_MILC);
 
   applyGaugeTemporalBCs(gauge, Vh, param.t_boundary, precision, dslash_type == QUDA_ASQTAD_DSLASH);
 }
