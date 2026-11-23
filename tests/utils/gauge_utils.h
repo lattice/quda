@@ -94,6 +94,16 @@ void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary,
                            bool three_link = false);
 
 /**
+ * @brief Apply the antiperiodic t boundary sign to the t links of the last global time slice, or of the last three
+ * for long links, of a host gauge field of the test's lattice of any order; a field in another order than QDP goes
+ * through a QDP copy
+ *
+ * @param[in,out] gauge The host gauge field, not extended; its link type decides whether it holds long links
+ * @param[in] t_boundary Temporal boundary conditions: nothing is done for periodic ones
+ */
+void applyGaugeTemporalBCs(quda::GaugeField &gauge, QudaTboundary t_boundary);
+
+/**
  * @brief Multiply every t link of a QDP-ordered gauge field of the test's lattice by the phase that an imaginary
  * chemical potential gives it in QUDA's staggered phases, exp(i pi i_mu / T), T being the global time extent
  *

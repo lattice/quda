@@ -1,7 +1,4 @@
-#include <algorithm>
 #include <array>
-#include <cmath>
-#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -94,17 +91,13 @@ namespace
      @param[in] type MILC, TIFR or CHROMA
      @param[in] t_boundary Periodic or antiperiodic: whether the t links of the last global t slice, or of the last
      three for long links, change sign
-     @return The phased links, as a host field in QDP order of u's link type recording t_boundary
+     @return The phased links, as a host field like u
    */
   quda::GaugeField host_phased(const quda::GaugeField &u, QudaStaggeredPhase type, QudaTboundary t_boundary)
   {
-    quda::GaugeField phased(
-      field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, t_boundary, u.LinkType()));
-    for (int dir = 0; dir < 4; dir++) memcpy(phased.data(dir), u.data(dir), u.Volume() * 18 * u.Precision());
+    quda::GaugeField phased(u);
     applyGaugeStaggeredPhase(phased, type);
-    auto arrays = phased.data_array();
-    applyGaugeTemporalBCs(arrays.data, static_cast<int>(phased.VolumeCB()), t_boundary, phased.Precision(),
-                          u.LinkType() == QUDA_THREE_LINKS);
+    applyGaugeTemporalBCs(phased, t_boundary);
     return phased;
   }
 
@@ -285,41 +278,6 @@ namespace
     return momentumActionCPU(m.data(), links, m.Precision()) + 4.0 * all_links;
   }
 
-  /**
-     @brief A host field's links with the t links that cross the t boundary negated, by the test utilities
-     @param[in] u The links, in QDP order
-     @param[in] t_boundary The t boundary the returned field records
-     @return The links, as a host field in QDP order of u's link type
-   */
-  quda::GaugeField negate_boundary(const quda::GaugeField &u, QudaTboundary t_boundary)
-  {
-    quda::GaugeField v(
-      field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, t_boundary, u.LinkType()));
-    for (int dir = 0; dir < 4; dir++) memcpy(v.data(dir), u.data(dir), u.Volume() * 18 * u.Precision());
-    auto arrays = v.data_array();
-    applyGaugeTemporalBCs(arrays.data, static_cast<int>(v.VolumeCB()), QUDA_ANTI_PERIODIC_T, v.Precision(),
-                          u.LinkType() == QUDA_THREE_LINKS);
-    return v;
-  }
-
-  /**
-     @brief A host field's links as a device field with a reconstruct stores them: packed into the device field and
-     unpacked again, under the host field's t boundary
-     @param[in] u The links, in QDP order
-     @param[in] recon The reconstruct
-     @return The links, as a host field in QDP order like u
-   */
-  quda::GaugeField stored(const quda::GaugeField &u, QudaReconstructType recon)
-  {
-    quda::GaugeField device(field_param(QUDA_CUDA_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, u.TBoundary(),
-                                        u.LinkType(), recon));
-    device.copy(u);
-    quda::GaugeField v(
-      field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, u.TBoundary(), u.LinkType()));
-    v.copy(device);
-    return v;
-  }
-
 } // namespace
 
 using test_t = ::testing::tuple<QudaPrecision, QudaStaggeredPhase, QudaTboundary, QudaLinkType>;
@@ -451,20 +409,19 @@ class GaugeTBoundaryTest : public ::testing::TestWithParam<t_boundary_test_t>
 };
 
 // applyTBoundary puts the antiperiodic sign into the links of a field without phases and records it, and
-// removeTBoundary takes it out again, as the test utilities apply the sign.  Reconstruct NO and 12 store the negated
-// links exactly, so the fields must agree exactly with the links as the reconstruct stores them, u_r.  Reconstruct
-// 8, 13 and 9 store phase angles, which negating a link shifts by pi, so the fields agree with the links within the
-// tests' usual tolerance, getTolerance.  Long links take reconstruct NO, 13 or 9: 12 and 8 rebuild the sign on one
-// time slice, not three.
+// removeTBoundary takes it out again, as the test utilities apply the sign.  Reconstruct NO stores the links exactly,
+// so the fields must agree exactly; the others rebuild part of each link, so the fields agree within the tests'
+// usual tolerance, getTolerance.  Long links take reconstruct NO, 13 or 9: 12 and 8 rebuild the sign on one time
+// slice, not three.
 TEST_P(GaugeTBoundaryTest, apply_remove)
 {
   const auto [prec, recon, link_type] = GetParam();
   if (!quda::is_enabled(prec) || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) GTEST_SKIP();
   if (link_type == QUDA_THREE_LINKS && (recon == QUDA_RECONSTRUCT_12 || recon == QUDA_RECONSTRUCT_8)) GTEST_SKIP();
-  const bool exact = recon == QUDA_RECONSTRUCT_NO || recon == QUDA_RECONSTRUCT_12;
-  const double tol = exact ? 0.0 : getTolerance(prec);
+  const double tol = recon == QUDA_RECONSTRUCT_NO ? 0.0 : getTolerance(prec);
   const auto u = random_field(prec, QUDA_PERIODIC_T, link_type);
-  const auto reference = exact ? stored(u, recon) : u;
+  quda::GaugeField host_signed(u);
+  applyGaugeTemporalBCs(host_signed, QUDA_ANTI_PERIODIC_T);
   quda::GaugeField device(
     field_param(QUDA_CUDA_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_PERIODIC_T, link_type, recon));
   device.copy(u);
@@ -474,13 +431,13 @@ TEST_P(GaugeTBoundaryTest, apply_remove)
   quda::GaugeField signed_links(
     field_param(QUDA_CPU_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_ANTI_PERIODIC_T, link_type));
   signed_links.copy(device);
-  expect_links(signed_links, "device signed", negate_boundary(reference, QUDA_ANTI_PERIODIC_T), "host signed", tol);
+  expect_links(signed_links, "device signed", host_signed, "host signed", tol);
 
   device.removeTBoundary();
   EXPECT_EQ(device.TBoundary(), QUDA_PERIODIC_T);
   quda::GaugeField plain(field_param(QUDA_CPU_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_PERIODIC_T, link_type));
   plain.copy(device);
-  expect_links(plain, "device unsigned", reference, "host unsigned", tol);
+  expect_links(plain, "device unsigned", u, "host unsigned", tol);
 }
 
 // applying the sign to an extended copy of a field gives the extended copy of the field with the sign, halo

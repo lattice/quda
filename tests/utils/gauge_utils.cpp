@@ -88,6 +88,28 @@ void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary,
   instantiate_host<ApplyGaugeTemporalBCs>(precision, gauge, Vh, t_boundary, three_link);
 }
 
+void applyGaugeTemporalBCs(quda::GaugeField &gauge, QudaTboundary t_boundary)
+{
+  if (gauge.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("applyGaugeTemporalBCs needs a host gauge field");
+  if (gauge.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED)
+    errorQuda("applyGaugeTemporalBCs does not support extended gauge fields");
+  const bool three_link = gauge.LinkType() == QUDA_THREE_LINKS;
+  // not raw_pointer(): it returns a static buffer that every later call overwrites
+  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+    auto arrays = gauge.data_array();
+    applyGaugeTemporalBCs(arrays.data, static_cast<int>(gauge.VolumeCB()), t_boundary, gauge.Precision(), three_link);
+  } else {
+    GaugeFieldParam param(gauge);
+    param.order = QUDA_QDP_GAUGE_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField u(param);
+    u.copy(gauge);
+    auto arrays = u.data_array();
+    applyGaugeTemporalBCs(arrays.data, static_cast<int>(u.VolumeCB()), t_boundary, u.Precision(), three_link);
+    gauge.copy(u);
+  }
+}
+
 /**
  * @brief Apply an imaginary chemical potential, as QUDA's staggered phases do
  *
