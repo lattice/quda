@@ -42,30 +42,35 @@ namespace quda
     __device__ __host__ inline bool crossesTBoundary(int t) const { return t >= G[3] - boundary_slices; }
 
     /**
+       @brief The global coordinate of a coordinate of the field, halo included, which wraps around the global lattice
+       @param[in] d The direction
+       @param[in] x The coordinate in the field
+     */
+    __device__ __host__ inline int globalCoord(int d, int x) const { return (x - border[d] + offset[d] + G[d]) % G[d]; }
+
+    /**
+       @brief The global coordinates of a site of the field, halo included
+       @param[out] x The coordinates
+       @param[in] x_cb The site's checkerboard index in the field
+       @param[in] parity The site's parity label
+     */
+    __device__ __host__ inline void getGlobalCoords(int x[4], int x_cb, int parity) const
+    {
+      getCoords(x, x_cb, E, (parity + parity_shift) & 1);
+#pragma unroll
+      for (int d = 0; d < 4; d++) x[d] = globalCoord(d, x[d]);
+    }
+
+    /**
        @brief The number of time slices of the field, halo included, whose t links cross the t boundary
      */
     int boundaryTimeSlices() const
     {
       int n = 0;
-      for (int t = 0; t < E[3]; t++) n += crossesTBoundary((t - border[3] + offset[3] + G[3]) % G[3]);
+      for (int t = 0; t < E[3]; t++) n += crossesTBoundary(globalCoord(3, t));
       return n;
     }
   };
-
-  /**
-     @brief The global coordinates of a site of a gauge field, halo included, which wraps around the global lattice
-     @param[out] x The coordinates
-     @param[in] x_cb The site's checkerboard index in the field
-     @param[in] parity The site's parity label
-     @param[in] arg The field's geometry
-   */
-  template <typename Arg>
-  __device__ __host__ inline void getGlobalCoords(int x[4], int x_cb, int parity, const Arg &arg)
-  {
-    getCoords(x, x_cb, arg.E, (parity + arg.parity_shift) & 1);
-#pragma unroll
-    for (int d = 0; d < 4; d++) x[d] = (x[d] - arg.border[d] + arg.offset[d] + arg.G[d]) % arg.G[d];
-  }
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_>
   struct GaugePhaseArg : kernel_param<>, GaugePhaseGeometry {
@@ -158,7 +163,7 @@ namespace quda
     __device__ __host__ void operator()(int x_cb, int parity)
     {
       int x[4];
-      getGlobalCoords(x, x_cb, parity, arg);
+      arg.getGlobalCoords(x, x_cb, parity);
       gaugePhase<0>(x, x_cb, parity, arg);
       gaugePhase<1>(x, x_cb, parity, arg);
       gaugePhase<2>(x, x_cb, parity, arg);
@@ -191,7 +196,7 @@ namespace quda
     __device__ __host__ void operator()(int x_cb, int parity)
     {
       int x[4];
-      getGlobalCoords(x, x_cb, parity, arg);
+      arg.getGlobalCoords(x, x_cb, parity);
       if (!arg.crossesTBoundary(x[3])) return;
       Matrix<complex<typename Arg::real>, Arg::nColor> u = arg.u(3, x_cb, parity);
       u *= static_cast<typename Arg::real>(-1.0);
