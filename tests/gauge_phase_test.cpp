@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -126,13 +125,15 @@ namespace
   }
 
   /**
-     @brief Whether two fields hold the same links on every rank, compared on the host in QDP order, printing the
-     first few that differ.  Collective.
+     @brief Expect two fields to hold the same links on every rank, halo included, compared on the host in QDP order.
+     Collective.
      @param[in] a A field
+     @param[in] msg_a Its label in messages
      @param[in] b Another, with the same parameters
-     @return Whether they are equal
+     @param[in] msg_b Its label in messages
    */
-  bool same_links(const quda::GaugeField &a, const quda::GaugeField &b)
+  void expect_same_links(const quda::GaugeField &a, const std::string &msg_a, const quda::GaugeField &b,
+                         const std::string &msg_b)
   {
     quda::GaugeFieldParam host_param(a);
     host_param.location = QUDA_CPU_FIELD_LOCATION;
@@ -141,31 +142,7 @@ namespace
     quda::GaugeField ha(host_param), hb(host_param);
     ha.copy(a);
     hb.copy(b);
-
-    // sites by their coordinates in the field, halo included; R is the halo width of an extended field, whose sites
-    // are labelled by the parity of their interior coordinates
-    const auto &E = ha.X();
-    const auto &R = ha.R();
-    const size_t volume = ha.Volume();
-    const size_t site_bytes = 18 * ha.Precision();
-    size_t wrong = 0;
-    for (int t = 0; t < E[3]; t++)
-      for (int z = 0; z < E[2]; z++)
-        for (int y = 0; y < E[1]; y++)
-          for (int x = 0; x < E[0]; x++) {
-            const size_t lex = x + E[0] * (y + static_cast<size_t>(E[1]) * (z + static_cast<size_t>(E[2]) * t));
-            const int parity = (x + y + z + t + R[0] + R[1] + R[2] + R[3]) & 1;
-            const size_t index = parity * (volume / 2) + lex / 2;
-            for (int dir = 0; dir < 4; dir++) {
-              const auto pa = static_cast<const char *>(ha.data(dir)) + index * site_bytes;
-              const auto pb = static_cast<const char *>(hb.data(dir)) + index * site_bytes;
-              if (memcmp(pa, pb, site_bytes) != 0 && wrong++ < 4)
-                printf("rank %d: link dir %d at (%d %d %d %d) in the field, (%d %d %d %d) in the interior, differs\n",
-                       quda::comm_rank(), dir, x, y, z, t, x - R[0], y - R[1], z - R[2], t - R[3]);
-            }
-          }
-    quda::comm_allreduce_sum(wrong);
-    return wrong == 0;
+    expect_links(ha, msg_a, hb, msg_b);
   }
 
   /**
@@ -421,7 +398,8 @@ TEST_P(GaugePhaseTest, extended_remove)
     std::unique_ptr<quda::GaugeField> expected(quda::createExtendedGauge(plain, R));
     std::unique_ptr<quda::GaugeField> extended(quda::createExtendedGauge(phased, R));
     extended->removeStaggeredPhase();
-    EXPECT_TRUE(same_links(*extended, *expected)) << "halo width " << width;
+    expect_same_links(*extended, "extended unphased, halo width " + std::to_string(width), *expected,
+                      "extended original");
   }
 }
 
@@ -535,7 +513,8 @@ TEST_P(GaugeTBoundaryTest, extended)
     std::unique_ptr<quda::GaugeField> expected(quda::createExtendedGauge(applied, R));
     std::unique_ptr<quda::GaugeField> extended(quda::createExtendedGauge(plain, R));
     extended->applyTBoundary();
-    EXPECT_TRUE(same_links(*extended, *expected)) << "halo width " << width;
+    expect_same_links(*extended, "extended signed, halo width " + std::to_string(width), *expected,
+                      "extended copy of signed");
   }
 }
 

@@ -278,7 +278,8 @@ int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, co
                       const std::string &msgB);
 
 /**
-   @brief Compare two non-extended QDP-ordered host gauge fields element-wise and by accuracy level
+   @brief Compare two QDP-ordered host gauge fields of the same layout, extended or not, element-wise and by
+   accuracy level
    @param[in] result Field under test
    @param[in] msg_result Label printed for result in verbose output
    @param[in] expected Reference field
