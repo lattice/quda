@@ -13,6 +13,7 @@
 
 #include "host_utils.h"
 #include "gauge_utils.h"
+#include "momentum_utils.h"
 #include "misc.h"
 #include "test.h"
 
@@ -238,23 +239,50 @@ namespace
   }
 
   /**
-     @brief The largest difference between two momentum fields over all ranks.  Collective.
-     @tparam real double or float
-     @param[in] a A host momentum field in QDP order
-     @param[in] b Another, with the same parameters
-     @return The largest absolute difference of any real
+     @param[in] mom A host momentum field
+     @return Its copy in MILC order, the layout of the test utilities' momentum checks
    */
-  template <typename real> double max_mom_deviation(const quda::GaugeField &a, const quda::GaugeField &b)
+  quda::GaugeField milc_mom(const quda::GaugeField &mom)
   {
-    const size_t reals = a.Volume() * a.Reconstruct();
-    double dev = 0.0;
-    for (int dir = 0; dir < 4; dir++) {
-      const auto pa = a.data<const real *>(dir);
-      const auto pb = b.data<const real *>(dir);
-      for (size_t i = 0; i < reals; i++) dev = std::max(dev, std::abs(static_cast<double>(pa[i]) - pb[i]));
-    }
-    quda::comm_allreduce_max(dev);
-    return dev;
+    quda::GaugeFieldParam milc_param(mom);
+    milc_param.order = QUDA_MILC_GAUGE_ORDER;
+    milc_param.create = QUDA_NULL_FIELD_CREATE;
+    quda::GaugeField m(milc_param);
+    m.copy(mom);
+    return m;
+  }
+
+  /**
+     @brief Expect two host momentum fields to agree within tol on every rank, with the test utilities' momentum
+     checks.  Collective.
+     @param[in] a A host momentum field
+     @param[in] b Another, with the same parameters
+     @param[in] tol The largest difference allowed of any real
+   */
+  void expect_same_mom(const quda::GaugeField &a, const quda::GaugeField &b, double tol = 0.0)
+  {
+    const auto ma = milc_mom(a);
+    const auto mb = milc_mom(b);
+    const int links = static_cast<int>(4 * ma.Volume());
+    strong_check_mom(ma.data(), mb.data(), links, ma.Precision());
+    int fail = compare_floats(ma.data(), mb.data(), links * mom_site_size, tol, ma.Precision()) ? 0 : 1;
+    quda::comm_allreduce_max(fail);
+    EXPECT_EQ(fail, 0) << "the momenta differ";
+  }
+
+  /**
+     @brief How much a host momentum field's action, summed over all ranks by momentumActionCPU, exceeds that of a
+     zero field, -4 per link: zero only for a zero field.  Collective.
+     @param[in] mom A host momentum field
+     @return The excess
+   */
+  double mom_action_excess(const quda::GaugeField &mom)
+  {
+    const auto m = milc_mom(mom);
+    const int links = static_cast<int>(4 * m.Volume());
+    double all_links = links;
+    quda::comm_allreduce_sum(all_links);
+    return momentumActionCPU(m.data(), links, m.Precision()) + 4.0 * all_links;
   }
 
   /**
@@ -442,16 +470,8 @@ TEST_P(GaugePhaseInterfaceTest, gauge_force)
   const auto u = random_field(prec, QUDA_ANTI_PERIODIC_T);
   const auto plain = gauge_force(u, QUDA_STAGGERED_PHASE_NO, QUDA_PERIODIC_T, false);
   const auto phased = gauge_force(host_phased(u, type, QUDA_ANTI_PERIODIC_T), type, QUDA_ANTI_PERIODIC_T, true);
-  const double dev = prec == QUDA_DOUBLE_PRECISION ? max_mom_deviation<double>(phased, plain) :
-                                                     max_mom_deviation<float>(phased, plain);
-  EXPECT_EQ(dev, 0.0);
-
-  quda::GaugeFieldParam zero_param(plain);
-  zero_param.create = QUDA_ZERO_FIELD_CREATE;
-  const quda::GaugeField zero(zero_param);
-  const double size
-    = prec == QUDA_DOUBLE_PRECISION ? max_mom_deviation<double>(plain, zero) : max_mom_deviation<float>(plain, zero);
-  EXPECT_GT(size, 0.0) << "the force is zero, so the comparison shows nothing";
+  expect_same_mom(phased, plain);
+  EXPECT_GT(mom_action_excess(plain), 0.0) << "the force is zero, so the comparison shows nothing";
 }
 
 using t_boundary_test_t = ::testing::tuple<QudaPrecision, QudaReconstructType, QudaLinkType>;
