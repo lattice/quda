@@ -86,6 +86,15 @@ namespace quda {
 
   void applyGaugeTBoundary(GaugeField &u)
   {
+    const bool recon_12_8 = u.Reconstruct() == QUDA_RECONSTRUCT_12 || u.Reconstruct() == QUDA_RECONSTRUCT_8;
+    if (u.LinkType() == QUDA_THREE_LINKS && recon_12_8)
+      errorQuda("Reconstruct %d rebuilds the t boundary sign on one time slice, not the three of long links",
+                u.Reconstruct());
+    // a field without phases holds i_mu only if its links were given the potential's U(1) phase, which reconstruct 12
+    // and 8 cannot represent
+    if (recon_12_8 && u.iMu() != 0.0)
+      errorQuda("Reconstruct %d cannot hold the imaginary chemical potential (i_mu = %g)", u.Reconstruct(),
+                static_cast<double>(u.iMu()));
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeTBoundary_, ReconstructGauge>(u);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);

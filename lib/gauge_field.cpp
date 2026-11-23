@@ -425,9 +425,6 @@ namespace quda {
     if (u.TBoundary() != t_boundary)
       errorQuda("%s: the field records t boundary %d, not %d", name, u.TBoundary(), t_boundary);
     if (!u.isNative()) errorQuda("%s: the field is in order %d, not native order", name, u.Order());
-    if ((u.Reconstruct() == QUDA_RECONSTRUCT_12 || u.Reconstruct() == QUDA_RECONSTRUCT_8) && u.iMu() != 0.0)
-      errorQuda("%s: reconstruct %d cannot hold the imaginary chemical potential (i_mu = %g)", name, u.Reconstruct(),
-                static_cast<double>(u.iMu()));
   }
 
   void GaugeField::applyTBoundary()
