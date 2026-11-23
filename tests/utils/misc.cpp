@@ -66,6 +66,21 @@ const char *get_gauge_order_str(QudaGaugeFieldOrder order)
   return ret;
 }
 
+const char *get_staggered_phase_str(QudaStaggeredPhase phase)
+{
+  const char *ret;
+
+  switch (phase) {
+  case QUDA_STAGGERED_PHASE_NO: ret = "no"; break;
+  case QUDA_STAGGERED_PHASE_MILC: ret = "milc"; break;
+  case QUDA_STAGGERED_PHASE_CHROMA: ret = "chroma"; break;
+  case QUDA_STAGGERED_PHASE_TIFR: ret = "tifr"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
 const char *get_recon_str(QudaReconstructType recon)
 {
   const char *ret;

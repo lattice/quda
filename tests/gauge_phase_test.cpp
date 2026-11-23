@@ -286,22 +286,6 @@ namespace
   }
 
   /**
-     @param[in] recon A reconstruct
-     @return Whether this build instantiates it
-   */
-  bool recon_enabled(QudaReconstructType recon)
-  {
-    switch (recon) {
-    case QUDA_RECONSTRUCT_NO: return quda::is_enabled<QUDA_RECONSTRUCT_NO>();
-    case QUDA_RECONSTRUCT_13: return quda::is_enabled<QUDA_RECONSTRUCT_13>();
-    case QUDA_RECONSTRUCT_12: return quda::is_enabled<QUDA_RECONSTRUCT_12>();
-    case QUDA_RECONSTRUCT_9: return quda::is_enabled<QUDA_RECONSTRUCT_9>();
-    case QUDA_RECONSTRUCT_8: return quda::is_enabled<QUDA_RECONSTRUCT_8>();
-    default: return false;
-    }
-  }
-
-  /**
      @brief A host field's links with the t links that cross the t boundary negated, by the test utilities
      @param[in] u The links, in QDP order
      @param[in] t_boundary The t boundary the returned field records
@@ -334,20 +318,6 @@ namespace
       field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, u.TBoundary(), u.LinkType()));
     v.copy(device);
     return v;
-  }
-
-  /**
-     @param[in] type A staggered phase convention
-     @return Its name in test names
-   */
-  const char *get_phase_str(QudaStaggeredPhase type)
-  {
-    switch (type) {
-    case QUDA_STAGGERED_PHASE_MILC: return "milc";
-    case QUDA_STAGGERED_PHASE_TIFR: return "tifr";
-    case QUDA_STAGGERED_PHASE_CHROMA: return "chroma";
-    default: return "invalid";
-    }
   }
 
 } // namespace
@@ -489,7 +459,7 @@ class GaugeTBoundaryTest : public ::testing::TestWithParam<t_boundary_test_t>
 TEST_P(GaugeTBoundaryTest, apply_remove)
 {
   const auto [prec, recon, link_type] = GetParam();
-  if (!quda::is_enabled(prec) || !recon_enabled(recon)) GTEST_SKIP();
+  if (!quda::is_enabled(prec) || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) GTEST_SKIP();
   if (link_type == QUDA_THREE_LINKS && (recon == QUDA_RECONSTRUCT_12 || recon == QUDA_RECONSTRUCT_8)) GTEST_SKIP();
   const bool exact = recon == QUDA_RECONSTRUCT_NO || recon == QUDA_RECONSTRUCT_12;
   const double tol = exact ? 0.0 : getTolerance(prec);
@@ -554,7 +524,7 @@ INSTANTIATE_TEST_SUITE_P(Phase, GaugePhaseTest,
                                  Values(QUDA_PERIODIC_T, QUDA_ANTI_PERIODIC_T), Values(QUDA_SU3_LINKS, QUDA_THREE_LINKS)),
                          [](testing::TestParamInfo<test_t> param) {
                            std::string name = get_prec_str(::testing::get<0>(param.param));
-                           name += std::string("_") + get_phase_str(::testing::get<1>(param.param));
+                           name += std::string("_") + get_staggered_phase_str(::testing::get<1>(param.param));
                            name += ::testing::get<2>(param.param) == QUDA_PERIODIC_T ? "_periodic" : "_antiperiodic";
                            return ::testing::get<3>(param.param) == QUDA_THREE_LINKS ? name + "_long" : name;
                          });
@@ -565,7 +535,7 @@ INSTANTIATE_TEST_SUITE_P(Interface, GaugePhaseInterfaceTest,
                                         QUDA_STAGGERED_PHASE_CHROMA)),
                          [](testing::TestParamInfo<interface_test_t> param) {
                            return std::string(get_prec_str(::testing::get<0>(param.param))) + "_"
-                             + get_phase_str(::testing::get<1>(param.param));
+                             + get_staggered_phase_str(::testing::get<1>(param.param));
                          });
 
 INSTANTIATE_TEST_SUITE_P(TBoundary, GaugeTBoundaryTest,
