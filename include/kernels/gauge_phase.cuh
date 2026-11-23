@@ -5,7 +5,8 @@
 #include <kernel.h>
 #include <math_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_>
   struct GaugePhaseArg : kernel_param<> {
@@ -15,15 +16,16 @@ namespace quda {
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr QudaStaggeredPhase phase = phase_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     Gauge u;
     int_fastdiv E[4]; // extended grid dims
     int_fastdiv X[4]; // regular grid dims
     int border[4];
-    int offset[4];    // global coordinates of the rank's first regular site
-    int_fastdiv G[4]; // global grid dims
-    int parity_shift; // sites are labelled by their regular parity: this changes it to that of their coordinates
+    int offset[4];       // global coordinates of the rank's first regular site
+    int_fastdiv G[4];    // global grid dims
+    int parity_shift;    // sites are labelled by their regular parity: this changes it to that of their coordinates
+    int boundary_slices; // the last global time slices whose t links cross the boundary: three for long links
     real tBoundary;
     real i_mu;
     complex<real> i_mu_phase;
@@ -48,50 +50,53 @@ namespace quda {
       i_mu_phase = complex<real>(static_cast<real>(cos(M_PI * double(u.iMu()) / T)),
                                  dir * static_cast<real>(sin(M_PI * double(u.iMu()) / T)));
 
+      boundary_slices = u.LinkType() == QUDA_THREE_LINKS ? 3 : 1;
       tBoundary = static_cast<real>(static_cast<int>(u.TBoundary()));
     }
   };
 
   // x, y, z and t are a site's global coordinates
-  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, const Arg &arg) {
+  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, const Arg &arg)
+  {
     typename Arg::real phase = typename Arg::real(1.0);
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
-      if (dim==0) {
+      if (dim == 0) {
         phase = (1 - 2 * (t % 2));
       } else if (dim == 1) {
         phase = (1 - 2 * ((t + x) % 2));
       } else if (dim == 2) {
         phase = (1 - 2 * ((t + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t == arg.G[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
+        phase = (t >= arg.G[3] - arg.boundary_slices) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_TIFR) {
-      if (dim==0) {
+      if (dim == 0) {
         phase = (1 - 2 * ((3 + t + z + y) % 2));
       } else if (dim == 1) {
         phase = (1 - 2 * ((2 + t + z) % 2));
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + t) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t == arg.G[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
+        phase = (t >= arg.G[3] - arg.boundary_slices) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {
       // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
-      if (dim==0) {
-	phase = -1.0;
+      if (dim == 0) {
+        phase = -1.0;
       } else if (dim == 1) {
         phase = (1 - 2 * ((1 + x) % 2));
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = ((t == arg.G[3] - 1) ? arg.tBoundary : typename Arg::real(1.0)) * (1 - 2 * ((1 + x + y + z) % 2));
+        phase = ((t >= arg.G[3] - arg.boundary_slices) ? arg.tBoundary : typename Arg::real(1.0))
+          * (1 - 2 * ((1 + x + y + z) % 2));
       }
     }
     return phase;
   }
 
-  template <int dim, typename Arg>
-  __device__ __host__ void gaugePhase(int indexCB, int parity, const Arg &arg) {
+  template <int dim, typename Arg> __device__ __host__ void gaugePhase(int indexCB, int parity, const Arg &arg)
+  {
     using real = typename Arg::real;
 
     // every site of the field, halo included, which wraps around the global lattice
@@ -101,7 +106,7 @@ namespace quda {
     for (int d = 0; d < 4; d++) x[d] = (x[d] - arg.border[d] + arg.offset[d] + arg.G[d]) % arg.G[d];
 
     real phase = getPhase<dim>(x[0], x[1], x[2], x[3], arg);
-    Matrix<complex<real>,Arg::nColor> u = arg.u(dim, indexCB, parity);
+    Matrix<complex<real>, Arg::nColor> u = arg.u(dim, indexCB, parity);
     u *= phase;
 
     // apply imaginary chemical potential if needed
@@ -110,10 +115,9 @@ namespace quda {
     arg.u(dim, indexCB, parity) = u;
   }
 
-  template <typename Arg> struct GaugePhase
-  {
+  template <typename Arg> struct GaugePhase {
     const Arg &arg;
-    constexpr GaugePhase(const Arg &arg) : arg(arg) {}
+    constexpr GaugePhase(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
@@ -125,4 +129,4 @@ namespace quda {
     }
   };
 
-}
+} // namespace quda

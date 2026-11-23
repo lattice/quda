@@ -45,6 +45,9 @@ namespace quda {
 
   void applyGaugePhase(GaugeField &u)
   {
+    if (u.LinkType() == QUDA_THREE_LINKS && u.iMu() != 0.0)
+      errorQuda("The imaginary chemical potential (i_mu = %g) is not supported on long links",
+                static_cast<double>(u.iMu()));
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePhase_, ReconstructNone>(u);
     // ensure that ghosts are updated if needed

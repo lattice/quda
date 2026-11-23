@@ -81,8 +81,7 @@ template <typename real> struct ApplyGaugeTemporalBCs {
  * @param[in] precision Floating-point precision of the field
  * @param[in] three_link Whether or not this is for the asqtad long links, default false
  */
-void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision,
-                           bool three_link = false)
+void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision, bool three_link)
 {
   instantiate_host<ApplyGaugeTemporalBCs>(precision, gauge, Vh, t_boundary, three_link);
 }

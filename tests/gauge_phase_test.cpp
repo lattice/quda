@@ -18,9 +18,9 @@
 #include "test.h"
 
 // The staggered phases that GaugeField::applyStaggeredPhase and removeStaggeredPhase apply to device fields,
-// against the test utilities' host phases (applyGaugeStaggeredPhase) and t boundary sign (applyGaugeTemporalBCs,
-// through applyGaugeFieldScaling): the MILC, TIFR or CHROMA convention, times the antiperiodic sign on the t links
-// of the last global t slice.  The links are Haar-random, and the fields must agree exactly.  Extended fields are
+// against the test utilities' host phases (applyGaugeStaggeredPhase) and t boundary sign (applyGaugeTemporalBCs):
+// the MILC, TIFR or CHROMA convention, times the antiperiodic sign on the t links of the last global t slice, or of
+// the last three for long links.  The links are Haar-random, and the fields must agree exactly.  Extended fields are
 // checked as the gauge force and gauge path computations use them: removing the phases from an extended copy of a
 // phased field must give the extended copy of the field without phases, halo included.  Through the interface,
 // phased links with the antiperiodic sign are loaded with the phases removed: labelled periodic, as MILC's
@@ -38,13 +38,15 @@ namespace
      @param[in] prec Precision of the field
      @param[in] phase Staggered phase type the field records
      @param[in] t_boundary t boundary the field records
+     @param[in] link_type SU(3) links, or long links
      @return The parameters
    */
   quda::GaugeFieldParam field_param(QudaFieldLocation location, QudaPrecision prec, QudaStaggeredPhase phase,
-                                    QudaTboundary t_boundary)
+                                    QudaTboundary t_boundary, QudaLinkType link_type = QUDA_SU3_LINKS)
   {
     QudaGaugeParam gauge_param = newQudaGaugeParam();
     setWilsonGaugeParam(gauge_param);
+    gauge_param.type = link_type;
     gauge_param.cpu_prec = prec;
     gauge_param.t_boundary = t_boundary;
     gauge_param.staggered_phase_type = phase;
@@ -63,16 +65,17 @@ namespace
      @param[in] prec Precision of the field
      @param[in] t_boundary The t boundary the field records, which GaugeField::copy requires of the fields it is
      copied to and from; without reconstruct, the label doesn't change the links
+     @param[in] link_type SU(3) links, or long links, which GaugeField::copy also requires to match
      @return The field
    */
-  quda::GaugeField random_field(QudaPrecision prec, QudaTboundary t_boundary)
+  quda::GaugeField random_field(QudaPrecision prec, QudaTboundary t_boundary, QudaLinkType link_type = QUDA_SU3_LINKS)
   {
     QudaGaugeParam gauge_param = newQudaGaugeParam();
     setWilsonGaugeParam(gauge_param);
     gauge_param.cpu_prec = prec;
     gauge_param.t_boundary = QUDA_PERIODIC_T;
     gauge_param.anisotropy = 1.0;
-    quda::GaugeField u(field_param(QUDA_CPU_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, t_boundary));
+    quda::GaugeField u(field_param(QUDA_CPU_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, t_boundary, link_type));
     constructHostGaugeInputField(u, gauge_param, 0, nullptr, GaugeInputMode::HAAR);
     return u;
   }
@@ -82,23 +85,19 @@ namespace
      utilities
      @param[in] u The links, in QDP order
      @param[in] type MILC, TIFR or CHROMA
-     @param[in] t_boundary Periodic or antiperiodic: whether the t links of the last global t slice change sign
-     @return The phased links, as a host field in QDP order recording t_boundary
+     @param[in] t_boundary Periodic or antiperiodic: whether the t links of the last global t slice, or of the last
+     three for long links, change sign
+     @return The phased links, as a host field in QDP order of u's link type recording t_boundary
    */
   quda::GaugeField host_phased(const quda::GaugeField &u, QudaStaggeredPhase type, QudaTboundary t_boundary)
   {
-    quda::GaugeField phased(field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, t_boundary));
+    quda::GaugeField phased(
+      field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, t_boundary, u.LinkType()));
     for (int dir = 0; dir < 4; dir++) memcpy(phased.data(dir), u.data(dir), u.Volume() * 18 * u.Precision());
     applyGaugeStaggeredPhase(phased, type);
-
-    // with no anisotropy and no gauge fixing, applyGaugeFieldScaling only applies the t boundary sign
-    QudaGaugeParam gauge_param = newQudaGaugeParam();
-    setWilsonGaugeParam(gauge_param);
-    gauge_param.anisotropy = 1.0;
-    gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-    gauge_param.t_boundary = t_boundary;
     auto arrays = phased.data_array();
-    applyGaugeFieldScaling(arrays.data, static_cast<int>(phased.VolumeCB()), gauge_param, phased.Precision());
+    applyGaugeTemporalBCs(arrays.data, static_cast<int>(phased.VolumeCB()), t_boundary, phased.Precision(),
+                          u.LinkType() == QUDA_THREE_LINKS);
     return phased;
   }
 
@@ -287,7 +286,7 @@ namespace
 
 } // namespace
 
-using test_t = ::testing::tuple<QudaPrecision, QudaStaggeredPhase, QudaTboundary>;
+using test_t = ::testing::tuple<QudaPrecision, QudaStaggeredPhase, QudaTboundary, QudaLinkType>;
 
 class GaugePhaseTest : public ::testing::TestWithParam<test_t>
 {
@@ -296,16 +295,16 @@ class GaugePhaseTest : public ::testing::TestWithParam<test_t>
 // the device phases and t boundary sign are those of the test utilities, and removing them restores the links
 TEST_P(GaugePhaseTest, apply_remove)
 {
-  const auto [prec, type, t_boundary] = GetParam();
+  const auto [prec, type, t_boundary, link_type] = GetParam();
   if (!quda::is_enabled(prec)) GTEST_SKIP();
-  const auto u = random_field(prec, t_boundary);
-  quda::GaugeField device(field_param(QUDA_CUDA_FIELD_LOCATION, prec, type, t_boundary));
+  const auto u = random_field(prec, t_boundary, link_type);
+  quda::GaugeField device(field_param(QUDA_CUDA_FIELD_LOCATION, prec, type, t_boundary, link_type));
   device.copy(u);
 
   // the copy takes u's phase type, so the device field is given its own
   device.applyStaggeredPhase(type);
   EXPECT_TRUE(device.StaggeredPhaseApplied());
-  quda::GaugeField host(field_param(QUDA_CPU_FIELD_LOCATION, prec, type, t_boundary));
+  quda::GaugeField host(field_param(QUDA_CPU_FIELD_LOCATION, prec, type, t_boundary, link_type));
   host.copy(device);
   expect_links(host, "device phased", host_phased(u, type, t_boundary), "host phased");
 
@@ -318,12 +317,12 @@ TEST_P(GaugePhaseTest, apply_remove)
 // removing the phases from an extended copy of a phased field gives the extended copy of the field without phases
 TEST_P(GaugePhaseTest, extended_remove)
 {
-  const auto [prec, type, t_boundary] = GetParam();
+  const auto [prec, type, t_boundary, link_type] = GetParam();
   if (!quda::is_enabled(prec)) GTEST_SKIP();
-  const auto u = random_field(prec, t_boundary);
-  quda::GaugeField plain(field_param(QUDA_CUDA_FIELD_LOCATION, prec, type, t_boundary));
+  const auto u = random_field(prec, t_boundary, link_type);
+  quda::GaugeField plain(field_param(QUDA_CUDA_FIELD_LOCATION, prec, type, t_boundary, link_type));
   plain.copy(u);
-  quda::GaugeField phased(field_param(QUDA_CUDA_FIELD_LOCATION, prec, type, t_boundary));
+  quda::GaugeField phased(field_param(QUDA_CUDA_FIELD_LOCATION, prec, type, t_boundary, link_type));
   phased.copy(u);
   phased.applyStaggeredPhase(type);
 
@@ -403,12 +402,12 @@ using ::testing::Values;
 INSTANTIATE_TEST_SUITE_P(Phase, GaugePhaseTest,
                          Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
                                  Values(QUDA_STAGGERED_PHASE_MILC, QUDA_STAGGERED_PHASE_TIFR, QUDA_STAGGERED_PHASE_CHROMA),
-                                 Values(QUDA_PERIODIC_T, QUDA_ANTI_PERIODIC_T)),
+                                 Values(QUDA_PERIODIC_T, QUDA_ANTI_PERIODIC_T), Values(QUDA_SU3_LINKS, QUDA_THREE_LINKS)),
                          [](testing::TestParamInfo<test_t> param) {
                            std::string name = get_prec_str(::testing::get<0>(param.param));
                            name += std::string("_") + get_phase_str(::testing::get<1>(param.param));
-                           return name
-                             + (::testing::get<2>(param.param) == QUDA_PERIODIC_T ? "_periodic" : "_antiperiodic");
+                           name += ::testing::get<2>(param.param) == QUDA_PERIODIC_T ? "_periodic" : "_antiperiodic";
+                           return ::testing::get<3>(param.param) == QUDA_THREE_LINKS ? name + "_long" : name;
                          });
 
 INSTANTIATE_TEST_SUITE_P(Interface, GaugePhaseInterfaceTest,

@@ -81,6 +81,19 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
                              QudaPrecision precision);
 
 /**
+ * @brief Apply the antiperiodic t boundary sign to the t links of the last global time slice, or of the last three
+ * for long links, of a QDP-ordered gauge field of the test's lattice
+ *
+ * @param[in,out] gauge QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] t_boundary Temporal boundary conditions: nothing is done for periodic ones
+ * @param[in] precision Floating-point precision of the field
+ * @param[in] three_link Whether or not this is for the asqtad long links
+ */
+void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision,
+                           bool three_link = false);
+
+/**
  * @brief Apply staggered phases to a QDP-ordered gauge field, in all four directions, without the t boundary sign,
  * which applyGaugeTemporalBCs applies
  *
