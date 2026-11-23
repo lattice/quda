@@ -1698,6 +1698,13 @@ add_test(NAME gauge_phase
                  --dim 4 4 4 8
                  --gtest_output=xml:gauge_phase_test.xml)
 
+# x, z and t partitioned: an odd number of partitioned directions alone or on a grid partitioned in z and t, so that
+# extended fields of halo width 1 label their sites with the opposite parity to their coordinates
+add_test(NAME gauge_phase_partition
+         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_phase_test> ${MPIEXEC_POSTFLAGS}
+                 --dim 4 4 4 8 --partition 13
+                 --gtest_output=xml:gauge_phase_partition_test.xml)
+
 foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_DIRAC_STAGGERED)
