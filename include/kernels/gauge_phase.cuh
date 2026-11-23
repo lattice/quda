@@ -14,7 +14,6 @@ namespace quda
    */
   struct GaugePhaseGeometry {
     int_fastdiv E[4]; // extended grid dims
-    int_fastdiv X[4]; // regular grid dims
     int border[4];
     int offset[4];       // global coordinates of the rank's first regular site
     int_fastdiv G[4];    // global grid dims
@@ -27,14 +26,20 @@ namespace quda
       for (int d = 0; d < 4; d++) {
         E[d] = u.X()[d];
         border[d] = u.R()[d];
-        X[d] = E[d] - 2 * border[d];
-        offset[d] = comm_coord(d) * X[d];
-        G[d] = comm_dim(d) * X[d];
+        const int X = u.X()[d] - 2 * border[d];
+        offset[d] = comm_coord(d) * X;
+        G[d] = comm_dim(d) * X;
         parity_shift += border[d];
       }
       parity_shift &= 1;
       boundary_slices = u.LinkType() == QUDA_THREE_LINKS ? 3 : 1;
     }
+
+    /**
+       @brief Whether the t links of a global time slice cross the t boundary
+       @param[in] t The global t coordinate
+     */
+    __device__ __host__ inline bool crossesTBoundary(int t) const { return t >= G[3] - boundary_slices; }
   };
 
   /**
@@ -93,7 +98,7 @@ namespace quda
       } else if (dim == 2) {
         phase = (1 - 2 * ((t + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t >= arg.G[3] - arg.boundary_slices) ? arg.tBoundary : typename Arg::real(1.0);
+        phase = arg.crossesTBoundary(t) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim == 0) {
@@ -103,7 +108,7 @@ namespace quda
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + t) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t >= arg.G[3] - arg.boundary_slices) ? arg.tBoundary : typename Arg::real(1.0);
+        phase = arg.crossesTBoundary(t) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {
       // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
@@ -114,8 +119,7 @@ namespace quda
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = ((t >= arg.G[3] - arg.boundary_slices) ? arg.tBoundary : typename Arg::real(1.0))
-          * (1 - 2 * ((1 + x + y + z) % 2));
+        phase = (arg.crossesTBoundary(t) ? arg.tBoundary : typename Arg::real(1.0)) * (1 - 2 * ((1 + x + y + z) % 2));
       }
     }
     return phase;
@@ -178,7 +182,7 @@ namespace quda
     {
       int x[4];
       getGlobalCoords(x, x_cb, parity, arg);
-      if (x[3] < arg.G[3] - arg.boundary_slices) return;
+      if (!arg.crossesTBoundary(x[3])) return;
       Matrix<complex<typename Arg::real>, Arg::nColor> u = arg.u(3, x_cb, parity);
       u *= static_cast<typename Arg::real>(-1.0);
       arg.u(3, x_cb, parity) = u;
