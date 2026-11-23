@@ -18,7 +18,12 @@ namespace quda {
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
     Gauge u;
-    int X[4];
+    int_fastdiv E[4]; // extended grid dims
+    int_fastdiv X[4]; // regular grid dims
+    int border[4];
+    int offset[4];    // global coordinates of the rank's first regular site
+    int_fastdiv G[4]; // global grid dims
+    int parity_shift; // sites are labelled by their regular parity: this changes it to that of their coordinates
     real tBoundary;
     real i_mu;
     complex<real> i_mu_phase;
@@ -28,18 +33,26 @@ namespace quda {
       // else we are applying them
       real dir = u.StaggeredPhaseApplied() ? real(-1.0) : real(1.0);
 
-      i_mu_phase = complex<real>(static_cast<real>(cos(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))),
-                                 dir * static_cast<real>(sin(M_PI * double(u.iMu()) / (u.X()[3] * comm_dim(3)))));
+      parity_shift = 0;
+      for (int d = 0; d < 4; d++) {
+        E[d] = u.X()[d];
+        border[d] = u.R()[d];
+        X[d] = E[d] - 2 * border[d];
+        offset[d] = comm_coord(d) * X[d];
+        G[d] = comm_dim(d) * X[d];
+        parity_shift += border[d];
+      }
+      parity_shift &= 1;
 
-      for (int d=0; d<4; d++) X[d] = u.X()[d];
+      const int T = G[3];
+      i_mu_phase = complex<real>(static_cast<real>(cos(M_PI * double(u.iMu()) / T)),
+                                 dir * static_cast<real>(sin(M_PI * double(u.iMu()) / T)));
 
-      // only set the boundary condition on the last time slice of nodes
-      bool last_node_in_t = (commCoords(3) == commDim(3)-1);
-      tBoundary = static_cast<real>(static_cast<int>(last_node_in_t ? u.TBoundary() : QUDA_PERIODIC_T));
+      tBoundary = static_cast<real>(static_cast<int>(u.TBoundary()));
     }
   };
 
-  // FIXME need to check this with odd local volumes
+  // x, y, z and t are a site's global coordinates
   template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, const Arg &arg) {
     typename Arg::real phase = typename Arg::real(1.0);
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
@@ -50,7 +63,7 @@ namespace quda {
       } else if (dim == 2) {
         phase = (1 - 2 * ((t + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
+        phase = (t == arg.G[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim==0) {
@@ -60,7 +73,7 @@ namespace quda {
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + t) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = (t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
+        phase = (t == arg.G[3] - 1) ? arg.tBoundary : typename Arg::real(1.0);
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {
       // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
@@ -71,7 +84,7 @@ namespace quda {
       } else if (dim == 2) {
         phase = (1 - 2 * ((1 + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-        phase = ((t == arg.X[3] - 1) ? arg.tBoundary : typename Arg::real(1.0)) * (1 - 2 * ((1 + x + y + z) % 2));
+        phase = ((t == arg.G[3] - 1) ? arg.tBoundary : typename Arg::real(1.0)) * (1 - 2 * ((1 + x + y + z) % 2));
       }
     }
     return phase;
@@ -81,8 +94,11 @@ namespace quda {
   __device__ __host__ void gaugePhase(int indexCB, int parity, const Arg &arg) {
     using real = typename Arg::real;
 
+    // every site of the field, halo included, which wraps around the global lattice
     int x[4];
-    getCoords(x, indexCB, arg.X, parity);
+    getCoords(x, indexCB, arg.E, (parity + arg.parity_shift) & 1);
+#pragma unroll
+    for (int d = 0; d < 4; d++) x[d] = (x[d] - arg.border[d] + arg.offset[d] + arg.G[d]) % arg.G[d];
 
     real phase = getPhase<dim>(x[0], x[1], x[2], x[3], arg);
     Matrix<complex<real>,Arg::nColor> u = arg.u(dim, indexCB, parity);

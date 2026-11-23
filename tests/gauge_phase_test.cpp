@@ -327,13 +327,16 @@ TEST_P(GaugePhaseTest, extended_remove)
   phased.copy(u);
   phased.applyStaggeredPhase(type);
 
-  // the halo widths of the interface's extended fields
-  quda::lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
-  std::unique_ptr<quda::GaugeField> expected(quda::createExtendedGauge(plain, R));
-  std::unique_ptr<quda::GaugeField> extended(quda::createExtendedGauge(phased, R));
-  extended->removeStaggeredPhase();
-  EXPECT_TRUE(same_links(*extended, *expected));
+  // the halo widths of the interface's extended fields, and of width 1, whose sum is odd when an odd number of
+  // directions is partitioned, so that a site's parity label differs from the parity of its coordinates
+  for (int width : {2, 1}) {
+    quda::lat_dim_t R;
+    for (int d = 0; d < 4; d++) R[d] = width * quda::comm_dim_partitioned(d);
+    std::unique_ptr<quda::GaugeField> expected(quda::createExtendedGauge(plain, R));
+    std::unique_ptr<quda::GaugeField> extended(quda::createExtendedGauge(phased, R));
+    extended->removeStaggeredPhase();
+    EXPECT_TRUE(same_links(*extended, *expected)) << "halo width " << width;
+  }
 }
 
 using interface_test_t = ::testing::tuple<QudaPrecision, QudaStaggeredPhase>;
