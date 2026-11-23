@@ -394,6 +394,21 @@ namespace quda {
     void removeStaggeredPhase();
 
     /**
+       @brief Put the antiperiodic t boundary sign into the links of a field without staggered phases: negate the t
+       links of the last global time slice, or of the last three for long links, halo included, and record an
+       antiperiodic t boundary, which for such fields means that the links hold the sign.  The field must record a
+       periodic t boundary, be in native order with reconstruct NO, 13, 12, 9 or 8, and for reconstruct 12 and 8
+       have no imaginary chemical potential.
+    */
+    void applyTBoundary();
+
+    /**
+       @brief Take the antiperiodic t boundary sign out of the links of a field without staggered phases, and record
+       a periodic t boundary; the reverse of applyTBoundary
+    */
+    void removeTBoundary();
+
+    /**
        Return the imaginary chemical potential applied to this field
     */
     real_t iMu() const { return i_mu; }
@@ -806,6 +821,13 @@ namespace quda {
      @param[in] u The gauge field to which we apply the staggered phase factors
   */
   void applyGaugePhase(GaugeField &u);
+
+  /**
+     @brief Negate the t links that cross the t boundary: those of the last global time slice, or of the last three
+     for long links, halo included.  The field's t boundary label is left to the caller.
+     @param[in,out] u The gauge field, in native order with reconstruct NO, 13, 12, 9 or 8
+  */
+  void applyGaugeTBoundary(GaugeField &u);
 
   /**
      Compute XOR-based checksum of this gauge field: each gauge field entry is

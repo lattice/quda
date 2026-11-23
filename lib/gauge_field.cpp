@@ -406,6 +406,46 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
+  /**
+     @brief Check that a field's t boundary sign can be put into or taken out of its links
+     @param[in] u The field
+     @param[in] t_boundary The t boundary the field must record
+     @param[in] name The operation, for messages
+   */
+  static void checkTBoundary(const GaugeField &u, QudaTboundary t_boundary, const char *name)
+  {
+    switch (u.StaggeredPhase()) {
+    case QUDA_STAGGERED_PHASE_MILC:
+    case QUDA_STAGGERED_PHASE_TIFR:
+    case QUDA_STAGGERED_PHASE_CHROMA:
+      errorQuda("%s: the t boundary sign of a field with staggered phase type %d goes with its phases", name,
+                u.StaggeredPhase());
+    default: break;
+    }
+    if (u.TBoundary() != t_boundary)
+      errorQuda("%s: the field records t boundary %d, not %d", name, u.TBoundary(), t_boundary);
+    if (!u.isNative()) errorQuda("%s: the field is in order %d, not native order", name, u.Order());
+    if ((u.Reconstruct() == QUDA_RECONSTRUCT_12 || u.Reconstruct() == QUDA_RECONSTRUCT_8) && u.iMu() != 0.0)
+      errorQuda("%s: reconstruct %d cannot hold the imaginary chemical potential (i_mu = %g)", name, u.Reconstruct(),
+                static_cast<double>(u.iMu()));
+  }
+
+  void GaugeField::applyTBoundary()
+  {
+    checkTBoundary(*this, QUDA_PERIODIC_T, __func__);
+    applyGaugeTBoundary(*this);
+    t_boundary = QUDA_ANTI_PERIODIC_T;
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) exchangeGhost();
+  }
+
+  void GaugeField::removeTBoundary()
+  {
+    checkTBoundary(*this, QUDA_ANTI_PERIODIC_T, __func__);
+    applyGaugeTBoundary(*this);
+    t_boundary = QUDA_PERIODIC_T;
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) exchangeGhost();
+  }
+
   void GaugeField::createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir)
   {
     allocateGhostBuffer(R, no_comms_fill, bidir); // allocate the ghost buffer if not yet allocated

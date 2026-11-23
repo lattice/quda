@@ -55,4 +55,36 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeTBoundary_ : TunableKernel2D
+  {
+    GaugeField &u; // used for meta data only
+    unsigned int minThreads() const { return u.VolumeCB(); }
+
+  public:
+    GaugeTBoundary_(GaugeField &u) : TunableKernel2D(u, 2), u(u)
+    {
+      strcat(aux, "t_boundary");
+      apply(device::get_default_stream());
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch<GaugeTBoundary>(tp, stream, GaugeTBoundaryArg<Float, nColor, recon>(u));
+    }
+
+    void preTune() { u.backup(); }
+    void postTune() { u.restore(); }
+
+    long long flops() const { return 0; }
+    long long bytes() const { return 2 * u.Bytes() / 4; }
+  };
+
+  void applyGaugeTBoundary(GaugeField &u)
+  {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    instantiate<GaugeTBoundary_, ReconstructGauge>(u);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+  }
+
 } // namespace quda

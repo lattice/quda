@@ -27,22 +27,26 @@
 // observables load them, the sign stays and the Polyakov loop is the negative of that of the links without phases;
 // labelled antiperiodic, the sign is removed with the phases and the Polyakov loop is theirs.  The gauge force of
 // phased links labelled antiperiodic, as MILC's gauge force loads them, is that of the links without phases.
+// GaugeField::applyTBoundary and removeTBoundary put the antiperiodic sign into the links of a field without phases
+// and take it out, recording it in the field's t boundary, for every reconstruct of gauge fields.
 
 namespace
 {
 
   /**
-     @brief Parameters for a gauge field of the test's lattice in double or single precision, without
-     reconstruct or ghost zone: QDP order on the host, native order on the device
+     @brief Parameters for a gauge field of the test's lattice in double or single precision, without ghost zone:
+     QDP order on the host, native order on the device
      @param[in] location Host or device
      @param[in] prec Precision of the field
      @param[in] phase Staggered phase type the field records
      @param[in] t_boundary t boundary the field records
      @param[in] link_type SU(3) links, or long links
+     @param[in] recon The reconstruct of a device field; host fields have none
      @return The parameters
    */
   quda::GaugeFieldParam field_param(QudaFieldLocation location, QudaPrecision prec, QudaStaggeredPhase phase,
-                                    QudaTboundary t_boundary, QudaLinkType link_type = QUDA_SU3_LINKS)
+                                    QudaTboundary t_boundary, QudaLinkType link_type = QUDA_SU3_LINKS,
+                                    QudaReconstructType recon = QUDA_RECONSTRUCT_NO)
   {
     QudaGaugeParam gauge_param = newQudaGaugeParam();
     setWilsonGaugeParam(gauge_param);
@@ -55,7 +59,7 @@ namespace
     param.location = location;
     param.create = QUDA_NULL_FIELD_CREATE;
     param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    param.reconstruct = QUDA_RECONSTRUCT_NO;
+    param.reconstruct = location == QUDA_CUDA_FIELD_LOCATION ? recon : QUDA_RECONSTRUCT_NO;
     param.setPrecision(prec, location == QUDA_CUDA_FIELD_LOCATION);
     return param;
   }
@@ -108,11 +112,12 @@ namespace
      @param[in] msg_result Its label in messages
      @param[in] expected The reference
      @param[in] msg_expected Its label in messages
+     @param[in] tol The largest difference allowed of any real
    */
   void expect_links(const quda::GaugeField &result, const std::string &msg_result, const quda::GaugeField &expected,
-                    const std::string &msg_expected)
+                    const std::string &msg_expected, double tol = 0.0)
   {
-    int fail = compare_link_fields(result, msg_result, expected, msg_expected, 0.0).first ? 0 : 1;
+    int fail = compare_link_fields(result, msg_result, expected, msg_expected, tol).first ? 0 : 1;
     quda::comm_allreduce_max(fail);
     EXPECT_EQ(fail, 0) << msg_result << " links differ from the " << msg_expected << " links";
   }
@@ -274,6 +279,57 @@ namespace
      @param[in] type A staggered phase convention
      @return Its name in test names
    */
+  /**
+     @param[in] recon A reconstruct
+     @return Whether this build instantiates it
+   */
+  bool recon_enabled(QudaReconstructType recon)
+  {
+    switch (recon) {
+    case QUDA_RECONSTRUCT_NO: return quda::is_enabled<QUDA_RECONSTRUCT_NO>();
+    case QUDA_RECONSTRUCT_13: return quda::is_enabled<QUDA_RECONSTRUCT_13>();
+    case QUDA_RECONSTRUCT_12: return quda::is_enabled<QUDA_RECONSTRUCT_12>();
+    case QUDA_RECONSTRUCT_9: return quda::is_enabled<QUDA_RECONSTRUCT_9>();
+    case QUDA_RECONSTRUCT_8: return quda::is_enabled<QUDA_RECONSTRUCT_8>();
+    default: return false;
+    }
+  }
+
+  /**
+     @brief A host field's links with the t links that cross the t boundary negated, by the test utilities
+     @param[in] u The links, in QDP order
+     @param[in] t_boundary The t boundary the returned field records
+     @return The links, as a host field in QDP order of u's link type
+   */
+  quda::GaugeField negate_boundary(const quda::GaugeField &u, QudaTboundary t_boundary)
+  {
+    quda::GaugeField v(
+      field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, t_boundary, u.LinkType()));
+    for (int dir = 0; dir < 4; dir++) memcpy(v.data(dir), u.data(dir), u.Volume() * 18 * u.Precision());
+    auto arrays = v.data_array();
+    applyGaugeTemporalBCs(arrays.data, static_cast<int>(v.VolumeCB()), QUDA_ANTI_PERIODIC_T, v.Precision(),
+                          u.LinkType() == QUDA_THREE_LINKS);
+    return v;
+  }
+
+  /**
+     @brief A host field's links as a device field with a reconstruct stores them: packed into the device field and
+     unpacked again, under the host field's t boundary
+     @param[in] u The links, in QDP order
+     @param[in] recon The reconstruct
+     @return The links, as a host field in QDP order like u
+   */
+  quda::GaugeField stored(const quda::GaugeField &u, QudaReconstructType recon)
+  {
+    quda::GaugeField device(field_param(QUDA_CUDA_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, u.TBoundary(),
+                                        u.LinkType(), recon));
+    device.copy(u);
+    quda::GaugeField v(
+      field_param(QUDA_CPU_FIELD_LOCATION, u.Precision(), QUDA_STAGGERED_PHASE_NO, u.TBoundary(), u.LinkType()));
+    v.copy(device);
+    return v;
+  }
+
   const char *get_phase_str(QudaStaggeredPhase type)
   {
     switch (type) {
@@ -389,6 +445,68 @@ TEST_P(GaugePhaseInterfaceTest, gauge_force)
   EXPECT_GT(size, 0.0) << "the force is zero, so the comparison shows nothing";
 }
 
+using t_boundary_test_t = ::testing::tuple<QudaPrecision, QudaReconstructType, QudaLinkType>;
+
+class GaugeTBoundaryTest : public ::testing::TestWithParam<t_boundary_test_t>
+{
+};
+
+// applyTBoundary puts the antiperiodic sign into the links of a field without phases and records it, and
+// removeTBoundary takes it out again, as the test utilities apply the sign.  Reconstruct NO and 12 store the negated
+// links exactly, so the fields must agree exactly with the links as the reconstruct stores them, u_r.  Reconstruct
+// 8, 13 and 9 store phase angles, which negating a link shifts by pi, so the fields agree with the links within the
+// tests' usual tolerance, getTolerance.
+TEST_P(GaugeTBoundaryTest, apply_remove)
+{
+  const auto [prec, recon, link_type] = GetParam();
+  if (!quda::is_enabled(prec) || !recon_enabled(recon)) GTEST_SKIP();
+  if (link_type == QUDA_THREE_LINKS && recon != QUDA_RECONSTRUCT_NO) GTEST_SKIP();
+  const bool exact = recon == QUDA_RECONSTRUCT_NO || recon == QUDA_RECONSTRUCT_12;
+  const double tol = exact ? 0.0 : getTolerance(prec);
+  const auto u = random_field(prec, QUDA_PERIODIC_T, link_type);
+  const auto reference = exact ? stored(u, recon) : u;
+  quda::GaugeField device(
+    field_param(QUDA_CUDA_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_PERIODIC_T, link_type, recon));
+  device.copy(u);
+
+  device.applyTBoundary();
+  EXPECT_EQ(device.TBoundary(), QUDA_ANTI_PERIODIC_T);
+  quda::GaugeField signed_links(
+    field_param(QUDA_CPU_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_ANTI_PERIODIC_T, link_type));
+  signed_links.copy(device);
+  expect_links(signed_links, "device signed", negate_boundary(reference, QUDA_ANTI_PERIODIC_T), "host signed", tol);
+
+  device.removeTBoundary();
+  EXPECT_EQ(device.TBoundary(), QUDA_PERIODIC_T);
+  quda::GaugeField plain(field_param(QUDA_CPU_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_PERIODIC_T, link_type));
+  plain.copy(device);
+  expect_links(plain, "device unsigned", reference, "host unsigned", tol);
+}
+
+// applying the sign to an extended copy of a field gives the extended copy of the field with the sign, halo
+// included, for halo widths of 2 and 1
+TEST_P(GaugeTBoundaryTest, extended)
+{
+  const auto [prec, recon, link_type] = GetParam();
+  if (!quda::is_enabled(prec) || recon != QUDA_RECONSTRUCT_NO) GTEST_SKIP();
+  const auto u = random_field(prec, QUDA_PERIODIC_T, link_type);
+  quda::GaugeField plain(field_param(QUDA_CUDA_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_PERIODIC_T, link_type));
+  plain.copy(u);
+  quda::GaugeField applied(
+    field_param(QUDA_CUDA_FIELD_LOCATION, prec, QUDA_STAGGERED_PHASE_NO, QUDA_PERIODIC_T, link_type));
+  applied.copy(u);
+  applied.applyTBoundary();
+
+  for (int width : {2, 1}) {
+    quda::lat_dim_t R;
+    for (int d = 0; d < 4; d++) R[d] = width * quda::comm_dim_partitioned(d);
+    std::unique_ptr<quda::GaugeField> expected(quda::createExtendedGauge(applied, R));
+    std::unique_ptr<quda::GaugeField> extended(quda::createExtendedGauge(plain, R));
+    extended->applyTBoundary();
+    EXPECT_TRUE(same_links(*extended, *expected)) << "halo width " << width;
+  }
+}
+
 int main(int argc, char **argv)
 {
   quda_test test("Gauge phase test", argc, argv);
@@ -417,4 +535,15 @@ INSTANTIATE_TEST_SUITE_P(Interface, GaugePhaseInterfaceTest,
                          [](testing::TestParamInfo<interface_test_t> param) {
                            return std::string(get_prec_str(::testing::get<0>(param.param))) + "_"
                              + get_phase_str(::testing::get<1>(param.param));
+                         });
+
+INSTANTIATE_TEST_SUITE_P(TBoundary, GaugeTBoundaryTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12,
+                                        QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8),
+                                 Values(QUDA_SU3_LINKS, QUDA_THREE_LINKS)),
+                         [](testing::TestParamInfo<t_boundary_test_t> param) {
+                           std::string name = get_prec_str(::testing::get<0>(param.param));
+                           name += std::string("_") + get_recon_str(::testing::get<1>(param.param));
+                           return ::testing::get<2>(param.param) == QUDA_THREE_LINKS ? name + "_long" : name;
                          });
