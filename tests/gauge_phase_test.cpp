@@ -455,12 +455,13 @@ class GaugeTBoundaryTest : public ::testing::TestWithParam<t_boundary_test_t>
 // removeTBoundary takes it out again, as the test utilities apply the sign.  Reconstruct NO and 12 store the negated
 // links exactly, so the fields must agree exactly with the links as the reconstruct stores them, u_r.  Reconstruct
 // 8, 13 and 9 store phase angles, which negating a link shifts by pi, so the fields agree with the links within the
-// tests' usual tolerance, getTolerance.
+// tests' usual tolerance, getTolerance.  Long links take reconstruct NO, 13 or 9: 12 and 8 rebuild the sign on one
+// time slice, not three.
 TEST_P(GaugeTBoundaryTest, apply_remove)
 {
   const auto [prec, recon, link_type] = GetParam();
   if (!quda::is_enabled(prec) || !recon_enabled(recon)) GTEST_SKIP();
-  if (link_type == QUDA_THREE_LINKS && recon != QUDA_RECONSTRUCT_NO) GTEST_SKIP();
+  if (link_type == QUDA_THREE_LINKS && (recon == QUDA_RECONSTRUCT_12 || recon == QUDA_RECONSTRUCT_8)) GTEST_SKIP();
   const bool exact = recon == QUDA_RECONSTRUCT_NO || recon == QUDA_RECONSTRUCT_12;
   const double tol = exact ? 0.0 : getTolerance(prec);
   const auto u = random_field(prec, QUDA_PERIODIC_T, link_type);
