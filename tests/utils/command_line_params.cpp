@@ -1523,12 +1523,12 @@ void add_gauge_convert_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group(
     "Gauge conversion",
-    "Options of gauge_convert, which loads the gauge field of --load-gauge (or generates one with --gauge-input) and "
-    "saves it to --save-gauge. --gauge-allow-checksum-mismatch and --gauge-reunitarize apply to the load; "
-    "--gauge-save-partfile, --gauge-ildg-lfn and --gauge-write-usqcd-info to the save. Unless the conversion "
-    "changes nothing, the output records its source in MILC's gauge.previous.filename (the path as given), "
-    "gauge.previous.time_stamp and gauge.previous.checksums (the source's checksums as its format defines them: "
-    "suma and sumb for SciDAC and ILDG, sum29 and sum31 for MILC)");
+    "Options of gauge_convert, which loads the gauge field of --load-gauge with --gauge-input load (or generates one "
+    "with --gauge-input haar|unit|gaussian-su3) and saves it to --save-gauge. --gauge-allow-checksum-mismatch and "
+    "--gauge-reunitarize apply to the load; --gauge-save-partfile, --gauge-ildg-lfn and --gauge-write-usqcd-info to "
+    "the save. Unless the conversion changes nothing, the output records its source in MILC's gauge.previous.filename "
+    "(the path as given), gauge.previous.time_stamp and gauge.previous.checksums (the source's checksums as its "
+    "format defines them: suma and sumb for SciDAC and ILDG, sum29 and sum31 for MILC)");
 
   opgroup
     ->add_option("--gauge-load-format", gauge_load_format,

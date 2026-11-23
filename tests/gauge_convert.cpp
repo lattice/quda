@@ -112,12 +112,16 @@ namespace
   Conversion check_options()
   {
     Conversion c;
-    c.generated = !gauge_input.empty() && gauge_input != "load";
+    if (gauge_input.empty()) {
+      if (!latfile.empty()) errorQuda("--load-gauge %s needs --gauge-input load to load it", latfile.c_str());
+      errorQuda("Give the field to convert, with --gauge-input load and --load-gauge or a generated --gauge-input "
+                "haar|unit|gaussian-su3");
+    }
+    c.generated = gauge_input != "load";
     if (c.generated && !latfile.empty())
       errorQuda("Give either --load-gauge or a generated --gauge-input, not both (--gauge-input %s)",
                 gauge_input.c_str());
-    if (!c.generated && latfile.empty())
-      errorQuda("Give the field to convert, with --load-gauge or a generated --gauge-input haar|unit|gaussian-su3");
+    if (!c.generated && latfile.empty()) errorQuda("--gauge-input load requires --load-gauge");
     if (gauge_input_width_explicit && !(c.generated && gauge_input == "gaussian-su3"))
       errorQuda("--gauge-input-width requires --gauge-input gaussian-su3");
     if (gauge_input_seed_given && !c.generated) errorQuda("--gauge-input-seed requires a generated --gauge-input");
