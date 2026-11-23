@@ -163,7 +163,8 @@ namespace quda {
       int d    = D0          + gd   - g   *arg.R[dim];
 
       // we only do the extraction for parity we are currently working on
-      int oddness = (a+b+c+d) & 1;
+      // sites are labelled by the parity of their regular coordinates, as in the rest of the field
+      int oddness = (a + b + c + d + arg.R[0] + arg.R[1] + arg.R[2] + arg.R[3]) & 1;
       if (oddness == parity) {
         if (Arg::extract) extractor(arg, dir, a, b, c, d, g, parity);
         else injector(arg, dir, a, b, c, d, g, parity);

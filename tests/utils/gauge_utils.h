@@ -81,19 +81,60 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
                              QudaPrecision precision);
 
 /**
- * @brief Apply staggered phases to a QDP-ordered gauge field
+ * @brief Apply the antiperiodic t boundary sign to the t links of the last global time slice, or of the last three
+ * for long links, of a QDP-ordered gauge field of the test's lattice
  *
- * @tparam real Floating point type of the gauge field
+ * @param[in,out] gauge QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] t_boundary Temporal boundary conditions: nothing is done for periodic ones
+ * @param[in] precision Floating-point precision of the field
+ * @param[in] three_link Whether or not this is for the asqtad long links
+ */
+void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary, QudaPrecision precision,
+                           bool three_link = false);
+
+/**
+ * @brief Apply the antiperiodic t boundary sign to the t links of the last global time slice, or of the last three
+ * for long links, of a host gauge field of the test's lattice of any order; a field in another order than QDP goes
+ * through a QDP copy
+ *
+ * @param[in,out] gauge The host gauge field, not extended; its link type decides whether it holds long links
+ * @param[in] t_boundary Temporal boundary conditions: nothing is done for periodic ones
+ */
+void applyGaugeTemporalBCs(quda::GaugeField &gauge, QudaTboundary t_boundary);
+
+/**
+ * @brief Multiply every t link of a QDP-ordered gauge field of the test's lattice by the phase that an imaginary
+ * chemical potential gives it in QUDA's staggered phases, exp(i pi i_mu / T), T being the global time extent
+ *
+ * @param[in,out] gauge QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] i_mu The imaginary chemical potential
+ * @param[in] precision Floating-point precision of the field
+ */
+void applyGaugeImaginaryChemicalPotential(void *const *gauge, int Vh, double i_mu, QudaPrecision precision);
+
+/**
+ * @brief Apply staggered phases to a QDP-ordered gauge field, in all four directions, without the t boundary sign,
+ * which applyGaugeTemporalBCs applies
+ *
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
  * @param[in] X Full-parity local dimensions
  * @param[in] precision Gauge field floating point precision
- * @param[in] t_boundary Temporal boundary conditions
- * @param[in] phase_type Staggered phase type
+ * @param[in] phase_type Staggered phase type: MILC, TIFR or CHROMA
  */
 void applyGaugeStaggeredPhase(void *const *gauge, int Vh, const int X[], QudaPrecision precision,
-                              QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
                               QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC);
+
+/**
+ * @brief Apply staggered phases to a host gauge field of any order, in all four directions, without the t boundary
+ * sign, which applyGaugeTemporalBCs applies; a field in another order than QDP goes through a QDP copy
+ *
+ * @param[in,out] gauge The host gauge field, not extended
+ * @param[in] phase_type Staggered phase type: MILC, TIFR or CHROMA
+ */
+void applyGaugeStaggeredPhase(quda::GaugeField &gauge, QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC);
 
 /**
  * @brief Apply spatial scaling, anti-periodic boundary conditions, or temporal gauge fixing as requested

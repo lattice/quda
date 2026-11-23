@@ -1481,8 +1481,8 @@ extern "C" {
   /**
    * Apply the staggered phase factors to the gauge field.  If the
    * imaginary chemical potential is non-zero then the phase factor
-   * exp(imu/T) will be applied to the links in the temporal
-   * direction.
+   * exp(i pi i_mu / T), T being the global time extent, will be
+   * applied to every link in the temporal direction.
    *
    * @param gauge_h The gauge field
    * @param param The parameters of the gauge field

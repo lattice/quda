@@ -45,10 +45,58 @@ namespace quda {
 
   void applyGaugePhase(GaugeField &u)
   {
+    if (u.LinkType() == QUDA_THREE_LINKS && u.iMu() != 0.0)
+      errorQuda("The imaginary chemical potential (i_mu = %g) is not supported on long links",
+                static_cast<double>(u.iMu()));
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePhase_, ReconstructNone>(u);
     // ensure that ghosts are updated if needed
     if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) u.exchangeGhost();
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+  }
+
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeTBoundary_ : TunableKernel2D
+  {
+    GaugeField &u; // used for meta data only
+    long long boundary_bytes;
+    unsigned int minThreads() const { return u.VolumeCB(); }
+
+  public:
+    GaugeTBoundary_(GaugeField &u) :
+      TunableKernel2D(u, 2),
+      u(u),
+      boundary_bytes(2 * (u.Bytes() / 4) * GaugePhaseGeometry(u).boundaryTimeSlices() / u.X()[3])
+    {
+      strcat(aux, "t_boundary");
+      apply(device::get_default_stream());
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch<GaugeTBoundary>(tp, stream, GaugeTBoundaryArg<Float, nColor, recon>(u));
+    }
+
+    void preTune() { u.backup(); }
+    void postTune() { u.restore(); }
+
+    long long flops() const { return 0; }
+    long long bytes() const { return boundary_bytes; }
+  };
+
+  void applyGaugeTBoundary(GaugeField &u)
+  {
+    const bool recon_12_8 = u.Reconstruct() == QUDA_RECONSTRUCT_12 || u.Reconstruct() == QUDA_RECONSTRUCT_8;
+    if (u.LinkType() == QUDA_THREE_LINKS && recon_12_8)
+      errorQuda("Reconstruct %d rebuilds the t boundary sign on one time slice, not the three of long links",
+                u.Reconstruct());
+    // a field without phases holds i_mu only if its links were given the potential's U(1) phase, which reconstruct 12
+    // and 8 cannot represent
+    if (recon_12_8 && u.iMu() != 0.0)
+      errorQuda("Reconstruct %d cannot hold the imaginary chemical potential (i_mu = %g)", u.Reconstruct(),
+                static_cast<double>(u.iMu()));
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    instantiate<GaugeTBoundary_, ReconstructGauge>(u);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
