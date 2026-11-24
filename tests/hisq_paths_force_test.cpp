@@ -413,6 +413,16 @@ static int hisq_force_test(bool lepage)
   double long_time_sec = 0.0;
   double complete_time_sec = 0.0;
 
+  // tune outside the timed calls; the fields this accumulates into are zeroed below
+  if (getTuning()) {
+    fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
+    if (lepage && d_act_path_coeff[1] != 0.)
+      fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
+    fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
+    updateMomentum(*cudaMom, 1.0, *cudaForce_ex, __func__);
+    qudaDeviceSynchronize();
+  }
+
   /********************************
    * Zero momenta and force fields *
    ********************************/
