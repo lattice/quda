@@ -69,6 +69,10 @@ struct HisqStencilTestWrapper {
   static inline void *qdp_fatlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
   static inline void *qdp_longlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
 
+  // whether the CPU reference has been built, and whether it is built with the Naik whatever the test's eps_naik
+  static inline bool reference_built = false;
+  static inline bool naik_reference = false;
+
   void set_naik(bool has_naik)
   {
     if (has_naik) {
@@ -94,10 +98,9 @@ struct HisqStencilTestWrapper {
 
     static bool first_time = true;
     if (first_time) {
-      // force the Naik build up front, it doesn't effect the non-naik fields
-      set_naik(true);
+      // the CPU reference is built with the Naik, which doesn't affect the non-Naik fields, so it serves every test
+      naik_reference = true;
       init_host();
-      set_naik(has_naik);
       first_time = false;
     }
     init();
@@ -179,6 +182,18 @@ struct HisqStencilTestWrapper {
 
     // Note: this could be replaced with loading a gauge field
     createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+  }
+
+  /**
+     @brief Build the CPU reference fat and long links, and allocate the host fields the GPU results are compared in.
+     Only verify() needs them, so it builds them on first use.
+   */
+  void build_reference()
+  {
+    // the ctest's reference holds the Naik fields too, whatever the current test's eps_naik
+    const double eps_naik_test = eps_naik;
+    const int n_naiks_test = n_naiks;
+    if (naik_reference) set_naik(true);
 
     ///////////////////////
     // Perform CPU Build //
@@ -216,6 +231,10 @@ struct HisqStencilTestWrapper {
 #ifdef MULTI_GPU
     exchange_llfat_cleanup();
 #endif
+
+    eps_naik = eps_naik_test;
+    n_naiks = n_naiks_test;
+    reference_built = true;
   }
 
   void init()
@@ -270,25 +289,23 @@ struct HisqStencilTestWrapper {
 
   static void destroy()
   {
-
+    // the reference fields exist only if verify() ran, and the Naik ones only if they were built
+    auto free_if_allocated = [](void *&p) {
+      if (p) host_free(p);
+      p = nullptr;
+    };
     for (int i = 0; i < 4; i++) {
-      host_free(fat_reflink[i]);
-      host_free(long_reflink[i]);
-      if (n_naiks > 1) {
-        host_free(fat_reflink_eps[i]);
-        host_free(long_reflink_eps[i]);
-      }
+      free_if_allocated(fat_reflink[i]);
+      free_if_allocated(long_reflink[i]);
+      free_if_allocated(fat_reflink_eps[i]);
+      free_if_allocated(long_reflink_eps[i]);
+      free_if_allocated(qdp_sitelink[i]);
+      free_if_allocated(qdp_fatlink[i]);
+      free_if_allocated(qdp_longlink[i]);
+      free_if_allocated(qdp_fatlink_eps[i]);
+      free_if_allocated(qdp_longlink_eps[i]);
     }
-
-    for (int i = 0; i < 4; i++) {
-      host_free(qdp_sitelink[i]);
-      host_free(qdp_fatlink[i]);
-      host_free(qdp_longlink[i]);
-      if (n_naiks > 1) {
-        host_free(qdp_fatlink_eps[i]);
-        host_free(qdp_longlink_eps[i]);
-      }
-    }
+    reference_built = false;
   }
 
   /*--------------------------------------------------------------------*/
@@ -391,6 +408,8 @@ struct HisqStencilTestWrapper {
 
   std::array<double, 2> verify()
   {
+    if (!reference_built) build_reference();
+
     ////////////////////////////////////////////////////////////////////
     // Layout change for fatlink, fatlink_eps, longlink, longlink_eps //
     ////////////////////////////////////////////////////////////////////
