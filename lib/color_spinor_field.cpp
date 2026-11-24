@@ -1486,7 +1486,7 @@ namespace quda
   {
     if (backup_depth == 0) {
       backup_h.resize(1);
-      backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
+      backup_h[0] = quda_ptr(BackupMemType(), bytes, BackupMemPool());
       qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
     }
     backup_depth++;

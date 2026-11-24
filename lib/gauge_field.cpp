@@ -1367,12 +1367,12 @@ namespace quda {
     if (order == QUDA_QDP_GAUGE_ORDER) {
       backup_h.resize(geometry);
       for (int d = 0; d < geometry; d++) {
-        backup_h[d] = quda_ptr(QUDA_MEMORY_HOST, bytes / geometry);
+        backup_h[d] = quda_ptr(BackupMemType(), bytes / geometry, BackupMemPool());
         qudaMemcpy(backup_h[d], gauge_array[d], bytes / geometry, qudaMemcpyDefault);
       }
     } else {
       backup_h.resize(1);
-      backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
+      backup_h[0] = quda_ptr(BackupMemType(), bytes, BackupMemPool());
       qudaMemcpy(backup_h[0], gauge, bytes, qudaMemcpyDefault);
     }
   }
