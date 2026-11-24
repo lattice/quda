@@ -27,33 +27,6 @@ namespace quda {
     }
   }
 
-  /**
-     @return The memory type that QUDA_TUNE_BACKUP_MEMORY sets for the backups of device fields, read once
-   */
-  static QudaMemoryType tune_backup_mem_type()
-  {
-    static const QudaMemoryType type = [] {
-      const char *env = getenv("QUDA_TUNE_BACKUP_MEMORY");
-      if (!env || strcmp(env, "host") == 0) return QUDA_MEMORY_HOST;
-      if (strcmp(env, "pinned") == 0) {
-        logQuda(QUDA_SUMMARIZE, "Backing up device fields in pinned host memory while tuning\n");
-        return QUDA_MEMORY_HOST_PINNED;
-      }
-      if (strcmp(env, "device") == 0) {
-        logQuda(QUDA_SUMMARIZE, "Backing up device fields in device memory while tuning\n");
-        return QUDA_MEMORY_DEVICE;
-      }
-      errorQuda("Unknown QUDA_TUNE_BACKUP_MEMORY=%s, expected host, pinned or device", env);
-      return QUDA_MEMORY_INVALID;
-    }();
-    return type;
-  }
-
-  QudaMemoryType LatticeField::BackupMemType() const
-  {
-    return location == QUDA_CPU_FIELD_LOCATION ? QUDA_MEMORY_HOST : tune_backup_mem_type();
-  }
-
   LatticeField::LatticeField(const LatticeFieldParam &param) :
     volume(1),
     localVolume(1),
@@ -656,6 +629,33 @@ namespace quda {
 
     errorQuda("Unsupported field type");
     return -1;
+  }
+
+  /**
+     @return The memory type that QUDA_TUNE_BACKUP_MEMORY sets for the backups of device fields, read once
+   */
+  static QudaMemoryType tune_backup_mem_type()
+  {
+    static const QudaMemoryType type = [] {
+      const char *env = getenv("QUDA_TUNE_BACKUP_MEMORY");
+      if (!env || strcmp(env, "host") == 0) return QUDA_MEMORY_HOST;
+      if (strcmp(env, "pinned") == 0) {
+        logQuda(QUDA_SUMMARIZE, "Backing up device fields in pinned host memory while tuning\n");
+        return QUDA_MEMORY_HOST_PINNED;
+      }
+      if (strcmp(env, "device") == 0) {
+        logQuda(QUDA_SUMMARIZE, "Backing up device fields in device memory while tuning\n");
+        return QUDA_MEMORY_DEVICE;
+      }
+      errorQuda("Unknown QUDA_TUNE_BACKUP_MEMORY=%s, expected host, pinned or device", env);
+      return QUDA_MEMORY_INVALID;
+    }();
+    return type;
+  }
+
+  QudaMemoryType LatticeField::BackupMemType() const
+  {
+    return location == QUDA_CPU_FIELD_LOCATION ? QUDA_MEMORY_HOST : tune_backup_mem_type();
   }
 
   // This doesn't really live here, but is fine for the moment
