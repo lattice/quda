@@ -72,11 +72,14 @@ namespace quda {
     template <typename Float, typename Arg> void unitarizeForceCPU(Arg &arg)
     {
       using real = typename mapper<Float>::type;
-      Matrix<complex<double>, 3> v, result, oprod;
-      Matrix<complex<real>, 3> v_tmp, result_tmp, oprod_tmp;
 
       for (int parity = 0; parity < 2; parity++) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (unsigned int i = 0; i < arg.threads.x; i++) {
+          Matrix<complex<double>, 3> v, result, oprod;
+          Matrix<complex<real>, 3> v_tmp, result_tmp, oprod_tmp;
           for (int dir = 0; dir < 4; dir++) {
             oprod_tmp = arg.force_old(dir, i, parity);
             v_tmp = arg.u(dir, i, parity);
