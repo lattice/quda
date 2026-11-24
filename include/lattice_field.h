@@ -808,6 +808,11 @@ namespace quda {
     QudaMemoryType BackupMemType() const;
 
     /**
+       @brief Whether the field's backups are allocated from QUDA's memory pools: all but device-memory backups
+    */
+    bool BackupMemPool() const { return BackupMemType() != QUDA_MEMORY_DEVICE; }
+
+    /**
       @brief If managed memory and prefetch is enabled, prefetch
       all relevant memory fields to the current device or to the CPU.
       @param[in] mem_space Memory space we are prefetching to
