@@ -200,11 +200,11 @@ namespace quda {
   void CloverField::backup() const
   {
     if (backup_h.size()) errorQuda("Already allocated host backup");
-    backup_h.resize(2);
+    backup_h.resize(inverse ? 2 : 1);
     for (auto &b : backup_h) b = quda_ptr(BackupMemType(), bytes);
 
     backup(false);
-    if (inverse) backup(true);
+    if (backup_h.size() > 1) backup(true);
   }
 
   void CloverField::restore(bool which) const
@@ -216,7 +216,7 @@ namespace quda {
   {
     if (!backup_h.size()) errorQuda("Cannot restore since not backed up");
     restore(false);
-    if (inverse) restore(true);
+    if (backup_h.size() > 1) restore(true);
 
     backup_h.resize(0);
   }
