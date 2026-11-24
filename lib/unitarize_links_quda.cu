@@ -55,9 +55,11 @@ namespace quda {
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     checkPrecision(outfield, infield);
 
-    Matrix<complex<double>,3> inlink, outlink;
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
+      Matrix<complex<double>, 3> inlink, outlink;
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
           copyArrayToLink(inlink, infield.data<float *>() + (i * 4 + dir) * 18); // order of arguments?
