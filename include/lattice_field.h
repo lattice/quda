@@ -802,6 +802,12 @@ namespace quda {
     virtual void restore() const { errorQuda("Not implemented"); }
 
     /**
+       @brief The memory type of the field's backups: host memory for a host field, and for a device field the one
+       set by the environment variable QUDA_TUNE_BACKUP_MEMORY, host (the default), pinned or device
+    */
+    QudaMemoryType BackupMemType() const;
+
+    /**
       @brief If managed memory and prefetch is enabled, prefetch
       all relevant memory fields to the current device or to the CPU.
       @param[in] mem_space Memory space we are prefetching to

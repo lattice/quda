@@ -201,7 +201,7 @@ namespace quda {
   {
     if (backup_h.size()) errorQuda("Already allocated host backup");
     backup_h.resize(2);
-    for (auto &b : backup_h) b = quda_ptr(QUDA_MEMORY_HOST, bytes);
+    for (auto &b : backup_h) b = quda_ptr(BackupMemType(), bytes);
 
     backup(false);
     if (inverse) backup(true);
