@@ -1554,6 +1554,18 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   qudamilc_called<false>(__func__, verbosity);
 } // qudaLoadDeflationSpace
 
+// Eigenvalue of the massless operator for entry i of a preserved deflation space.
+// The deflated solvers shift the preserved eigenvalues in place to the mass of
+// the most recent solve and record that mass in preserved_evals_mass.  Only the
+// eigenvalues change: with zero Naik epsilon M^dag M = -D^2 + 4 m^2, so the
+// eigenvectors are mass independent and the shift is exact.
+static double masslessEval(const deflation_space *space, int parity, int i)
+{
+  const double m = preserved_evals_mass[parity];
+  if (m < 0.0) errorQuda("Preserved eigenvalues of parity %d have no recorded mass", parity);
+  return quda::to_double(space->evals[i].real()) - 4.0 * m * m;
+}
+
 // Compute exact low mode contribution to current
 void qudaExactCurrent(int external_precision, int quda_precision, const void *const fatlink, const void *const longlink,
                       const void *const links, int nmasses, const void *masses, QudaInvertArgs_t inv_args,
@@ -1603,8 +1615,6 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_deflation_space[0]);
   deflation_space *space_odd = reinterpret_cast<deflation_space *>(preserved_deflation_space[1]);
   if (!space_even || !space_odd) errorQuda("One or both deflation spaces is not loaded!");
-  if (preserved_evals_mass[0] != 0.0 || preserved_evals_mass[1] != 0.0)
-    errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
   int n_evecs = eigargs.n_ev;
   if (n_evecs < 1) errorQuda("Requested number of eigenvectors %d must be positive", n_evecs);
   if (space_even->evecs.size() < static_cast<size_t>(n_evecs) || space_odd->evecs.size() < static_cast<size_t>(n_evecs)
@@ -1621,7 +1631,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   for (int i = 0; i < n_evecs; i++) {
     evec_even[i] = space_even->evecs[i].data();
     evec_odd[i] = space_odd->evecs[i].data();
-    evals[i] = quda::to_double(space_even->evals[i].real());
+    evals[i] = masslessEval(space_even, 0, i);
   }
 
   exactCurrentQuda(evec_even.data(), evec_odd.data(), evals.data(), n_evecs, mass.data(), nmasses, &invertParam,
@@ -1654,11 +1664,9 @@ void qudaExactSeaLoop(int external_precision, int quda_precision, const void *co
   setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision,
                  inv_args.tadpole, inv_args.naik_epsilon);
 
-  // Even-parity deflation space with eigenvalues of the massless operator
+  // Even-parity deflation space; eigenvalues are converted to the massless operator below
   deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_deflation_space[0]);
   if (!space_even) errorQuda("The even-parity deflation space is not loaded!");
-  if (preserved_evals_mass[0] != 0.0)
-    errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
   int n_evecs = eigargs.n_ev;
   if (n_evecs < 1) errorQuda("Requested number of eigenvectors %d must be positive", n_evecs);
   if (space_even->evecs.size() < static_cast<size_t>(n_evecs) || space_even->evals.size() < static_cast<size_t>(n_evecs))
@@ -1673,7 +1681,7 @@ void qudaExactSeaLoop(int external_precision, int quda_precision, const void *co
   std::vector<double> evals(n_evecs);
   for (int i = 0; i < n_evecs; i++) {
     evec_even[i] = space_even->evecs[i].data();
-    evals[i] = quda::to_double(space_even->evals[i].real());
+    evals[i] = masslessEval(space_even, 0, i);
   }
 
   double result = 0.0;
